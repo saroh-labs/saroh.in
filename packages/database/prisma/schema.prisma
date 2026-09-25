@@ -140,6 +140,11 @@ model Organization {
   storeAllergens     StoreAllergen[]
   productAllergens   ProductAllergen[]
 
+  // Listings and stock per storefront (#510).
+  productListings        ProductListing[]
+  productListingVariants ProductListingVariant[]
+  stockLevels            StockLevel[]
+
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
   sites            Site[]
@@ -483,11 +488,11 @@ model Media {
   updatedAt DateTime @updatedAt
 
   // Products that show this object. Taking it off a product never deletes it.
-  productImages  ProductImage[] @relation("ProductImageMedia")
+  productImages  ProductImage[]    @relation("ProductImageMedia")
   // Product videos that use it as their poster.
-  productPosters ProductImage[] @relation("ProductImagePoster")
+  productPosters ProductImage[]    @relation("ProductImagePoster")
   // The business whose logo it is (at most one: a logo is per business).
-  businessLogos BusinessProfile[] @relation("BusinessLogo")
+  businessLogos  BusinessProfile[] @relation("BusinessLogo")
 
   @@index([organizationId])
 }
@@ -555,6 +560,13 @@ model Store {
   productFields     ProductField[]
   allergens         StoreAllergen[]
 
+  // What it sells from the business's catalogue, and its shelf (#510).
+  listings    ProductListing[]
+  stockLevels StockLevel[]
+
+  // The target of (storeId, organizationId) foreign keys: a listing or a
+  // stock row can only name a storefront of its own business.
+  @@unique([id, organizationId])
   @@index([slug])
   @@index([createdAt])
 }
@@ -621,12 +633,17 @@ model StoreInvitation {
 // E-COMMERCE: PRODUCTS
 // ============================================================================
 
+// A product in the business's catalogue (#510, ADR-010). Storefronts sell it
+// through a ProductListing and count it in StockLevel.
 model Product {
-  id             String        @id @default(cuid())
-  storeId        String
-  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when a product belonged to
+  // one. Kept for the readers that still scope by it until #531; a store
+  // going never takes a catalogue product with it. Dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   name        String
   slug        String
@@ -679,10 +696,15 @@ model Product {
   // Relations
   variants   ProductVariant[]
   orderItems OrderItem[]
-  // Product-level stock: only while the product has no variants. With
-  // variants, each keeps its own VariantInventory and this row is gone.
+  // The stock as it was counted before StockLevel (#510). No longer
+  // written; kept until a later deploy drops it.
   inventory  Inventory?
   images     ProductImage[]   @relation("ProductImages")
+
+  // Where it is sold, and its shelf at each storefront (#510).
+  listings        ProductListing[]
+  listingVariants ProductListingVariant[]
+  stockLevels     StockLevel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -694,7 +716,10 @@ model Product {
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
 
-  @@unique([storeId, slug])
+  // A product's address is unique in its business (#510).
+  @@unique([organizationId, slug])
+  // The target of (productId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([storeId])
   @@index([categoryId])
   @@index([organizationId])
@@ -722,12 +747,20 @@ model ProductVariant {
   photo         ProductImage?       @relation("VariantPhoto", fields: [imageId], references: [id], onDelete: SetNull)
   position      Int                 @default(0)
 
+  // No longer written (#510); StockLevel counts per storefront.
   inventory  VariantInventory?
   orderItems OrderItem[]
+
+  // The storefronts that sell it, and its shelf at each (#510).
+  listings    ProductListingVariant[]
+  stockLevels StockLevel[]
 
   createdAt DateTime @default(now())
 
   @@unique([productId, sku])
+  // The target of (variantId, productId) foreign keys: a row naming a
+  // variant names that variant's own product.
+  @@unique([id, productId])
   @@index([optionValueId])
   @@index([imageId])
 }
@@ -1013,6 +1046,83 @@ model VariantInventory {
   @@index([organizationId])
 }
 
+// A storefront selling a product from the business's catalogue (#510,
+// ADR-010). A product with variants sells only the variants listed in
+// ProductListingVariant; a new variant is listed wherever its product is.
+// Unlisting keeps the storefront's StockLevel rows and their stock.
+model ProductListing {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  storeId   String
+  store     Store   @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  variants ProductListingVariant[]
+
+  @@unique([storeId, productId])
+  // The target of (listingId, productId) foreign keys.
+  @@unique([id, productId])
+  @@index([productId])
+  @@index([organizationId])
+}
+
+// A variant a storefront sells. A variant with no row at a storefront that
+// lists its product is "Not sold here".
+model ProductListingVariant {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  listingId String
+  productId String
+  listing   ProductListing @relation(fields: [listingId, productId], references: [id, productId], onDelete: Cascade)
+  product   Product        @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  @@unique([listingId, variantId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([organizationId])
+}
+
+// One storefront's shelf of one product (variantId null: the product counts
+// as a whole) or of one variant (#510). A product counts stock at a
+// storefront while it has a row there. `promised` belongs to Orders: the
+// sum of open lines' heldQuantity on this row. Written only under a row
+// lock, found and created rather than upserted (the uniques are partial).
+model StockLevel {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  storeId   String
+  store     Store           @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  onHand        Int @default(0)
+  promised      Int @default(0)
+  lowStockAlert Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@unique([storeId, productId], map: "StockLevel_storeId_productId_whole_key", where: raw("\"variantId\" IS NULL"))
+  @@unique([storeId, variantId], map: "StockLevel_storeId_variantId_key", where: raw("\"variantId\" IS NOT NULL"))
+  @@index([productId])
+  @@index([variantId])
+  @@index([organizationId])
+}
+
 // ============================================================================
 // E-COMMERCE: CUSTOMERS & CARTS
 // ============================================================================
@@ -1174,6 +1284,13 @@ model OrderItem {
   // before this was recorded (open ones were backfilled).
   stockRow StockRow?
 
+  // The storefront shelf row the line's stock sits on (#510), set with
+  // stockRow and kept after the line is fulfilled, and how many units the
+  // line holds on it right now. Null with stockRow NONE, for life.
+  stockLevelId String?
+  stockLevel   StockLevel? @relation(fields: [stockLevelId], references: [id], onDelete: SetNull)
+  heldQuantity Int         @default(0)
+
   review ProductReview?
 
   // What has been refunded of this line (U6): caps the next line refund.
@@ -1184,6 +1301,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([variantId])
+  @@index([stockLevelId])
 }
 
 enum StockRow {

@@ -15,3 +15,5 @@ export * from "./rls-proxy";
 // The #529 backfill, exported so the API's integration suite can run it
 // against old-shape rows (twice) and check what it did.
 export * from "./backfill/catalogue-settings";
+// The #510 backfill, exported for the same reason.
+export * from "./backfill/listings-stock-levels";
