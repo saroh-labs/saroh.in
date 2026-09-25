@@ -19,8 +19,18 @@ import { SETTINGS_PAGES } from "@/components/shared/nav-items";
  * Links, not a client tab state: each tab is its own route, so the address,
  * Back and a shared link all land on the same tab. The layout passes only the
  * tabs this person may open.
+ *
+ * `notes` replaces a tab's line while something there needs a person
+ * ("Needs you: email is disconnected"), except on that tab itself, whose page
+ * says it in full.
  */
-export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
+export function SettingsTabs({
+    hrefs,
+    notes,
+}: {
+    hrefs: readonly string[];
+    notes?: Partial<Record<string, string>>;
+}) {
     const pathname = usePathname();
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
     return (
@@ -42,6 +52,7 @@ export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
                     pathname === page.href ||
                     pathname.startsWith(`${page.href}/`);
                 const Icon = page.icon;
+                const note = on ? undefined : notes?.[page.href];
                 return (
                     <Link
                         key={page.href}
@@ -69,7 +80,7 @@ export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
                                 {page.label}
                             </span>
                             <span className="mt-0.5 hidden text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground min-[760px]:block">
-                                {page.description}
+                                {note ?? page.description}
                             </span>
                         </span>
                     </Link>
