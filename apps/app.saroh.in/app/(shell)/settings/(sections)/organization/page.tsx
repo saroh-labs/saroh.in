@@ -35,13 +35,12 @@ export default async function OrganizationSettingsPage() {
 
     return (
         <SettingsPanel
-            width="form"
             header={
                 <SettingsPanelHeader
                     title="Business"
                     description={
                         canEdit
-                            ? "Shown on receipts, invoices and in the business switcher."
+                            ? "Everything customers see on receipts and invoices. Edit one section at a time — the preview shows how it prints."
                             : "What customers see on receipts and invoices."
                     }
                 />
@@ -49,6 +48,10 @@ export default async function OrganizationSettingsPage() {
         >
             {settings ? (
                 <OrganizationSettingsForm
+                    // Keyed by business: the form keeps what it last saved,
+                    // so switching business must start it afresh rather
+                    // than show (and save over) the last one's details.
+                    key={settings.slug}
                     settings={settings}
                     canEdit={canEdit}
                 />

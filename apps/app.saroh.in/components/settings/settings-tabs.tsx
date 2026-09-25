@@ -31,6 +31,12 @@ export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
                 "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-y-auto min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
             )}
         >
+            <p
+                aria-hidden
+                className="hidden px-2.5 pb-2 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground min-[760px]:block"
+            >
+                Settings
+            </p>
             {pages.map((page) => {
                 const on =
                     pathname === page.href ||
