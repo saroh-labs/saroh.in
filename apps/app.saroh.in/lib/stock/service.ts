@@ -33,8 +33,13 @@ export interface StockLevelRow {
 export interface StockLevels {
     storefronts: { id: string; name: string }[];
     rows: StockLevelRow[];
-    /** Products that count no stock: they always sell. */
+    /**
+     * Products that don't track stock — Track stock off for the product or
+     * for the whole business (#515): they always sell. The screen's footer.
+     */
     untracked: { productId: string; name: string; status: string }[];
+    /** The business's Track stock switch; off, every product is untracked. */
+    tracking: boolean;
     /** The caller may count and move stock. */
     canWrite: boolean;
 }
@@ -265,6 +270,45 @@ export function undoStock(input: {
         "/reverse",
         input,
     );
+}
+
+// ---- Track stock, for the whole business (#515) ----
+
+/** The business's Track stock switch, and whether the caller may flip it. */
+export async function getStockTracking(): Promise<{
+    tracked: boolean;
+    canChange: boolean;
+} | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<{ tracked: boolean; canChange: boolean }>(
+        `${base}/stock/tracking`,
+    );
+}
+
+/**
+ * Turn Track stock on or off for every product. Owner/Admin only
+ * (`store:write`). Off is refused while anything is promised ("N are
+ * promised to open orders — fulfil or cancel them first") and counts every
+ * shelf to 0; on starts every shelf at 0.
+ */
+export async function setStockTracking(
+    tracked: boolean,
+): Promise<ApiResult<{ tracked: boolean; counted: number }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    const res = await apiFetch(`${base}/stock/tracking`, {
+        method: "PUT",
+        body: JSON.stringify({ tracked }),
+    });
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) {
+        return {
+            ok: true,
+            data: data as { tracked: boolean; counted: number },
+        };
+    }
+    return toFailure(data, "Track stock didn't change. Try again.");
 }
 
 /** Mark a check looked at; it opens again if its numbers move on. */

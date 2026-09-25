@@ -646,6 +646,11 @@ export async function setStockLevel(
             ? {}
             : { lowStockAlert: a.lowStockAlert }),
     };
+    // A product with a shelf tracks stock (#515).
+    await prisma.product.updateMany({
+        where: { id: a.productId, stockTracked: false },
+        data: { stockTracked: true, stockTrackedAt: new Date() },
+    });
     const found = await prisma.stockLevel.findFirst({
         where: { storeId: a.storeId, productId: a.productId, variantId },
         select: { id: true },
