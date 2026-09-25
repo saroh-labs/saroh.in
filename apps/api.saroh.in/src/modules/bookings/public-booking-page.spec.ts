@@ -61,10 +61,10 @@ import { prisma } from "@saroh/database";
 
 import { validationPipeOptions } from "../../common/validation";
 import { hashPayToken } from "../invoices/pay-token";
-import type { BookInput } from "./bookings.service";
-import { BookingsService } from "./bookings.service";
 import { BookServiceDto } from "./dto";
+import { PublicBookingsService } from "./public-bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
+import type { BookInput } from "./reservation";
 
 const db = prisma as unknown as {
     [
@@ -177,7 +177,7 @@ beforeEach(() => {
 
 describe("pay now (U19)", () => {
     it("holds the place for 15 minutes with a draft invoice at the service's price", async () => {
-        const out = await new BookingsService().bookOnline(
+        const out = await new PublicBookingsService().bookOnline(
             "svc_1",
             input({ pay: "NOW" }),
             "iphash",
@@ -210,7 +210,7 @@ describe("pay now (U19)", () => {
     it("refuses pay now for a service with no price, holding nothing", async () => {
         db.service.findUnique.mockResolvedValue(service({ priceCents: null }));
         await expect(
-            new BookingsService().bookOnline(
+            new PublicBookingsService().bookOnline(
                 "svc_1",
                 input({ pay: "NOW" }),
                 "iphash",
@@ -223,7 +223,7 @@ describe("pay now (U19)", () => {
     it("refuses pay now when the business has no provider connected", async () => {
         db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
         await expect(
-            new BookingsService().bookOnline(
+            new PublicBookingsService().bookOnline(
                 "svc_1",
                 input({ pay: "NOW" }),
                 "iphash",
@@ -240,7 +240,7 @@ describe("pay now (U19)", () => {
                 holdExpiresAt: new Date(NOW.getTime() + 10 * 60_000),
             }),
         );
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         const out = await svc.bookOnline(
             "svc_1",
             input({ pay: "NOW" }),
@@ -264,7 +264,7 @@ describe("pay now (U19)", () => {
     });
 
     it("is rate-limited like any public booking", async () => {
-        const svc = new BookingsService(new FixedWindowRateLimiter(1));
+        const svc = new PublicBookingsService(new FixedWindowRateLimiter(1));
         await svc.bookOnline("svc_1", input({ pay: "DESK" }), "iphash", NOW);
         await expect(
             svc.bookOnline(
@@ -304,7 +304,7 @@ describe("pay now (U19)", () => {
 
 describe("pay at the desk (U19)", () => {
     it("books it confirmed, paid at the desk, with no invoice", async () => {
-        const out = await new BookingsService().bookOnline(
+        const out = await new PublicBookingsService().bookOnline(
             "svc_1",
             input({ pay: "DESK" }),
             "iphash",
@@ -320,7 +320,7 @@ describe("pay at the desk (U19)", () => {
     it("counts a live hold as a taken place", async () => {
         db.booking.count.mockResolvedValue(1);
         await expect(
-            new BookingsService().bookOnline(
+            new PublicBookingsService().bookOnline(
                 "svc_1",
                 input({ pay: "DESK" }),
                 "iphash",
@@ -345,7 +345,7 @@ describe("the next two weeks (U19)", () => {
                 endAt: new Date("2026-09-21T12:00:00.000Z"),
             },
         ]);
-        const out = await new BookingsService().publicDays("svc_1", NOW);
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
 
         expect(out.kind).toBe("one");
         expect(out.timezone).toBe("UTC");
@@ -381,7 +381,7 @@ describe("the next two weeks (U19)", () => {
             latestBookingMinutes: 120,
             freeCancelHours: 12,
         });
-        const out = await new BookingsService().publicDays("svc_1", NOW);
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
         // 10:00 and 11:00 are both inside the two hours: nothing today, and
         // the day still reads open (Full), not Closed.
         expect(out.days[0]).toMatchObject({ open: true, starts: [] });
@@ -411,7 +411,7 @@ describe("the next two weeks (U19)", () => {
                 endAt: new Date("2026-09-18T12:00:00.000Z"),
             })),
         ]);
-        const out = await new BookingsService().publicDays("svc_1", NOW);
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
 
         expect(out.kind).toBe("class");
         expect(out.days[0]!.starts).toEqual([
@@ -455,7 +455,7 @@ describe("the next two weeks (U19)", () => {
                 endAt: new Date("2026-09-22T00:00:00.000Z"),
             },
         ]);
-        const out = await new BookingsService().publicDays("svc_1", NOW);
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
 
         // Mon 21 Sep: he works Mondays, so the day is open — and Full.
         expect(out.days[3]).toMatchObject({ open: true, starts: [] });
@@ -473,7 +473,7 @@ describe("the booking page's read (U19)", () => {
     it("is a 404 for a site that is not published", async () => {
         db.site.findFirst.mockResolvedValue(null);
         await expect(
-            new BookingsService().publicBookingPage("site_x"),
+            new PublicBookingsService().publicBookingPage("site_x"),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -514,7 +514,9 @@ describe("the booking page's read (U19)", () => {
             latestBookingMinutes: 120,
             freeCancelHours: 12,
         });
-        const page = await new BookingsService().publicBookingPage("site_1");
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
 
         expect(page).toMatchObject({
             businessName: "Pulse Fitness",
@@ -552,7 +554,9 @@ describe("the booking page's read (U19)", () => {
                     args.where.moduleKey === "PAYMENTS" ? { id: "m" } : null,
                 ),
         );
-        const page = await new BookingsService().publicBookingPage("site_1");
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
         expect(page.payOnline).toBe(false);
     });
 });
@@ -567,7 +571,7 @@ describe("a hold, by its token (U19)", () => {
             source: "BOOKING",
             booking: hold,
         });
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         expect((await svc.publicHold("tok", "ip", NOW)).state).toBe("HELD");
         expect(
             (
@@ -589,7 +593,7 @@ describe("a hold, by its token (U19)", () => {
             booking: null,
         });
         await expect(
-            new BookingsService().publicHold("tok", "ip", NOW),
+            new PublicBookingsService().publicHold("tok", "ip", NOW),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -610,7 +614,7 @@ describe("a hold, by its token (U19)", () => {
             ...hold,
             status: "CANCELLED",
         });
-        const out = await new BookingsService().releasePublicHold(
+        const out = await new PublicBookingsService().releasePublicHold(
             "tok",
             "ip",
             NOW,
@@ -640,7 +644,7 @@ describe("the hold limits (#508)", () => {
     });
 
     it("lets five people on one network poll every four seconds", async () => {
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         const tokens = ["t1", "t2", "t3", "t4", "t5"];
         // A minute of polling: 15 reads each, 75 in all.
         for (let ms = 0; ms < 60_000; ms += 4_000) {
@@ -653,7 +657,7 @@ describe("the hold limits (#508)", () => {
     });
 
     it("stops one token polled too often, and only that token", async () => {
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         for (let i = 0; i < 40; i++) {
             await svc.publicHold("greedy", "office", at(i));
         }
@@ -670,7 +674,7 @@ describe("the hold limits (#508)", () => {
     });
 
     it("stops one address sending many tokens, made-up ones too, at its ceiling", async () => {
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         // Each made-up token is a 404, but it still counts.
         db.invoice.findUnique.mockResolvedValue(null);
         for (let i = 0; i < 150; i++) {
@@ -690,7 +694,7 @@ describe("the hold limits (#508)", () => {
     });
 
     it("opens again once the minute has passed", async () => {
-        const svc = new BookingsService();
+        const svc = new PublicBookingsService();
         for (let i = 0; i < 40; i++) {
             await svc.publicHold("greedy", "office", at(i));
         }

@@ -36,6 +36,7 @@ import {
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { confirmHoldInTx, releaseHoldInTx } from "./booking-hold";
 import { BookingsService } from "./bookings.service";
+import { PublicBookingsService } from "./public-bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 import { ReleaseHoldsHandler } from "./release-holds.handler";
 
@@ -49,7 +50,10 @@ const webhooks = new WebhooksService(
     payments,
 );
 // A generous limiter: these tests book many times from one "IP".
-const bookings = new BookingsService(new FixedWindowRateLimiter(1_000));
+const publicBookings = new PublicBookingsService(
+    new FixedWindowRateLimiter(1_000),
+);
+const bookings = new BookingsService();
 const sweep = new ReleaseHoldsHandler();
 
 let owner: OrganizationContext;
@@ -199,7 +203,7 @@ async function webhook(event: Record<string, unknown>) {
 
 describe("the booking page (real database)", () => {
     it("reads the site's services with who takes them, and no time off", async () => {
-        const page = await bookings.publicBookingPage(siteId);
+        const page = await publicBookings.publicBookingPage(siteId);
         expect(page.payOnline).toBe(true);
         expect(page.services.map((s) => s.name)).toEqual([
             "Personal training",
@@ -207,7 +211,7 @@ describe("the booking page (real database)", () => {
         ]);
         expect(page.services[0]!.staff).toEqual(["Karan Mehta"]);
 
-        const days = await bookings.publicDays(oneToOne);
+        const days = await publicBookings.publicDays(oneToOne);
         expect(JSON.stringify(days)).not.toMatch(/Wedding|timeOff|reason/);
         // The Monday he is off reads open and Full.
         const off = nextMonday(0, 2).toISOString().slice(0, 10);
@@ -219,7 +223,7 @@ describe("the booking page (real database)", () => {
 
     it("pays at the desk: confirmed, with Karan, paid at the desk", async () => {
         const at = nextMonday(6);
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             oneToOne,
             booker("desk@example.in", "DESK", at),
             "ip_1",
@@ -241,7 +245,7 @@ describe("the booking page (real database)", () => {
 
     it("pays now: the hold takes the place, the webhook confirms it and numbers the invoice", async () => {
         const at = nextMonday(7);
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             oneToOne,
             booker("now@example.in", "NOW", at),
             "ip_1",
@@ -251,7 +255,7 @@ describe("the booking page (real database)", () => {
 
         // Held: nobody else can have 07:00 with Karan.
         await expect(
-            bookings.bookOnline(
+            publicBookings.bookOnline(
                 oneToOne,
                 booker("other@example.in", "DESK", at),
                 "ip_2",
@@ -296,14 +300,14 @@ describe("the booking page (real database)", () => {
         });
         expect(paid.status).toBe("PAID");
         expect(paid.number).toMatch(/^INV-\d{4}$/);
-        expect((await bookings.publicHold(payToken ?? "", "ip_1")).state).toBe(
-            "CONFIRMED",
-        );
+        expect(
+            (await publicBookings.publicHold(payToken ?? "", "ip_1")).state,
+        ).toBe("CONFIRMED");
     });
 
     it("lets an unpaid hold's place go — at once when read, and for good by the sweep", async () => {
         const at = nextMonday(8);
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             oneToOne,
             booker("late@example.in", "NOW", at),
             "ip_1",
@@ -314,11 +318,11 @@ describe("the booking page (real database)", () => {
             where: { id: booking.id },
             data: { holdExpiresAt: new Date(Date.now() - 60_000) },
         });
-        expect((await bookings.publicHold(payToken ?? "", "ip_1")).state).toBe(
-            "RELEASED",
-        );
+        expect(
+            (await publicBookings.publicHold(payToken ?? "", "ip_1")).state,
+        ).toBe("RELEASED");
         // Its place is free again before any sweep.
-        const days = await bookings.publicDays(oneToOne);
+        const days = await publicBookings.publicDays(oneToOne);
         const starts = days.days.flatMap((d) => d.starts.map((s) => s.startAt));
         expect(starts).toContain(at.toISOString());
         // Paying now is refused: the hold ran out.
@@ -343,7 +347,7 @@ describe("the booking page (real database)", () => {
 
     it("confirms a payment that lands after the hold ran out, when the place is still free", async () => {
         const at = nextMonday(6, 3);
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             oneToOne,
             booker("slow@example.in", "NOW", at),
             "ip_1",
@@ -370,7 +374,7 @@ describe("the booking page (real database)", () => {
 
     it("owes back a payment that lands after the place went to someone else", async () => {
         const at = nextMonday(7, 3);
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             oneToOne,
             booker("slower@example.in", "NOW", at),
             "ip_1",
@@ -381,7 +385,7 @@ describe("the booking page (real database)", () => {
             data: { holdExpiresAt: new Date(Date.now() - 60_000) },
         });
         // Someone else books 07:00 once the hold ran out.
-        await bookings.bookOnline(
+        await publicBookings.bookOnline(
             oneToOne,
             booker("quick@example.in", "DESK", at),
             "ip_2",
@@ -408,24 +412,24 @@ describe("the booking page (real database)", () => {
     it("refuses the last place of a class once a hold has it, and shows Full", async () => {
         // Inside the page's two weeks, so it can say Full.
         const at = nextMonday(7, 1);
-        await bookings.bookOnline(
+        await publicBookings.bookOnline(
             hiit,
             booker("one@example.in", "DESK", at),
             "ip_1",
         );
-        await bookings.bookOnline(
+        await publicBookings.bookOnline(
             hiit,
             booker("two@example.in", "NOW", at),
             "ip_1",
         );
         await expect(
-            bookings.bookOnline(
+            publicBookings.bookOnline(
                 hiit,
                 booker("three@example.in", "DESK", at),
                 "ip_3",
             ),
         ).rejects.toBeInstanceOf(ConflictException);
-        const days = await bookings.publicDays(hiit);
+        const days = await publicBookings.publicDays(hiit);
         const session = days.days
             .flatMap((d) => d.starts)
             .find((s) => s.startAt === at.toISOString());
@@ -436,8 +440,8 @@ describe("the booking page (real database)", () => {
         const at = nextMonday(8, 4);
         const request = booker("twice@example.in", "NOW", at);
         const [a, b] = await Promise.all([
-            bookings.bookOnline(oneToOne, request, "ip_1"),
-            bookings.bookOnline(oneToOne, request, "ip_1"),
+            publicBookings.bookOnline(oneToOne, request, "ip_1"),
+            publicBookings.bookOnline(oneToOne, request, "ip_1"),
         ]);
         expect(a.booking.id).toBe(b.booking.id);
         expect(
@@ -488,7 +492,7 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
 
     /** A pay-now hold with a payment started on it. */
     async function heldAndPaying(email: string) {
-        const { booking, payToken } = await bookings.bookOnline(
+        const { booking, payToken } = await publicBookings.bookOnline(
             gym,
             booker(email, "NOW", nextMonday(10)),
             "ip_1",
@@ -522,9 +526,9 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
             payTokenHash: null,
         });
         // The pay link stops working.
-        await expect(bookings.publicHold(payToken, "ip_1")).rejects.toThrow(
-            "Booking not found",
-        );
+        await expect(
+            publicBookings.publicHold(payToken, "ip_1"),
+        ).rejects.toThrow("Booking not found");
         const events = await prisma.bookingEvent.findMany({
             where: { bookingId: booking.id, type: "CANCELLED" },
         });
@@ -546,7 +550,7 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
     });
 
     it("two cancels at once cancel it once", async () => {
-        const confirmed = await bookings.bookOnline(
+        const confirmed = await publicBookings.bookOnline(
             gym,
             booker("twice-cancel@example.in", "DESK", nextMonday(10)),
             "ip_1",

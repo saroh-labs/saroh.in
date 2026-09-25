@@ -50,6 +50,24 @@ files often show them (`backend-nestjs.md`). Gap: 38 source files were over when
 this was written, led by `sites.service.ts`, `site-editor.tsx` and
 `bookings.service.ts`. Seed data is exempt.
 
+Still over after #508 split the booking page and the bookings service (U10),
+each with why it stops there:
+
+- `bookings/bookings.service.ts` (1,298) — the merchant's side: service and
+  rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
+  hand behind one controller. Under 400 means one injectable per feature and
+  a controller and DI change, not a move.
+- `bookings/public-bookings.service.ts` (464) and `bookings/reservation.ts`
+  (418) — one class sharing its rate limiters, and one serializable write
+  with its helpers; a little over, and cutting them splits a method.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (626) — its state, effects
+  and handlers (the hold poll, confirm, letting a hold go) share one
+  component's state; the drawing is already in `steps/`. Less means a
+  reducer or hook seam, which is new logic.
+- Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
+  (1,173), `calendar/calendar.service.ts` (1,051),
+  `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
+
 ## 7. No `any`, no `@ts-ignore`
 
 **Adopted** — Gap: one `any` (`payments/crypto.ts`); no `@ts-ignore`. Suppress

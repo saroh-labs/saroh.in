@@ -7,7 +7,7 @@ import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { BookingEventType } from "../bookings/bookings.service";
+import { BookingEventType } from "../bookings/booking-event-type";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
 
