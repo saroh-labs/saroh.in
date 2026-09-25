@@ -713,6 +713,9 @@ export class SubscriptionsService {
     /**
      * Set or stop the collection schedule. A new day drops the skips still to
      * come — they were for the old day — and keeps the ones already past.
+     * When the old day's skips had left the current period uncharged and the
+     * new day gives it a collection, the period is invoiced now, as its
+     * renewal would have.
      */
     async setCollection(
         ctx: OrganizationContext,
@@ -747,6 +750,12 @@ export class SubscriptionsService {
                           : {}),
                 },
             });
+            if (dto.weekday !== sub.collectionWeekday) {
+                await this.chargeIfUncharged(tx, ctx, {
+                    ...sub,
+                    collectionWeekday: dto.weekday,
+                });
+            }
         });
         return this.read(ctx, id);
     }
@@ -851,7 +860,17 @@ export class SubscriptionsService {
                 dateConflict("That collection has passed");
             }
             await tx.subscriptionSkip.delete({ where: { id: skip.id } });
-            await this.chargeIfUncharged(tx, ctx, sub, date);
+            const inPeriod =
+                sub.collectionWeekday !== null &&
+                collectionDates(
+                    {
+                        start: sub.currentPeriodStart,
+                        end: sub.currentPeriodEnd,
+                    },
+                    sub.collectionWeekday,
+                    sub.timezone,
+                ).includes(date);
+            if (inPeriod) await this.chargeIfUncharged(tx, ctx, sub);
         });
         return this.read(ctx, id);
     }
@@ -1176,16 +1195,16 @@ export class SubscriptionsService {
     }
 
     /**
-     * After an undone skip: when the collection is in the current period,
-     * that period has begun, and it has no invoice at all — the renewal left
-     * it uncharged because every collection was skipped — invoice it now.
-     * A voided invoice counts as one: someone chose that.
+     * After an undone skip or a new collection day: when the current period
+     * has begun, has a collection that is not skipped, and has no invoice at
+     * all — the renewal left it uncharged because every collection was
+     * skipped — invoice it now. A voided invoice counts as one: someone chose
+     * that. `sub` carries the schedule as it now stands.
      */
     private async chargeIfUncharged(
         tx: Tx,
         ctx: OrganizationContext,
         sub: SubscriptionRow,
-        date: string,
     ): Promise<void> {
         const period = {
             start: sub.currentPeriodStart,
@@ -1195,11 +1214,9 @@ export class SubscriptionsService {
             sub.status !== "ACTIVE" ||
             sub.collectionWeekday === null ||
             period.start > new Date() ||
-            !collectionDates(
-                period,
-                sub.collectionWeekday,
-                sub.timezone,
-            ).includes(date)
+            collectionDates(period, sub.collectionWeekday, sub.timezone)
+                .length === 0 ||
+            (await this.allSkipped(tx, sub, period))
         ) {
             return;
         }

@@ -309,6 +309,28 @@ describe("collections, skips and plan changes (real database)", () => {
         expect(invoices[1]!.periodStart).toEqual(utcDay(0));
     });
 
+    it("bills a period its skips left uncharged, once, when the collection day moves", async () => {
+        const { id, collection } = await dueWeeklyBox();
+        await service.skipCollection(org, id, { date: collection });
+        await expect(service.renewOne(id, new Date())).resolves.toBe(
+            "uncharged",
+        );
+        expect(await invoicesOf(id)).toHaveLength(1);
+
+        // Three days out: a day of this period the skip does not cover.
+        const moved = isoWeekday(utcDay(3));
+        await service.setCollection(org, id, { weekday: moved });
+        const invoices = await invoicesOf(id);
+        expect(invoices).toHaveLength(2);
+        expect(invoices[1]!.periodStart).toEqual(utcDay(0));
+
+        // Moving it again finds the period invoiced and adds nothing.
+        await service.setCollection(org, id, {
+            weekday: isoWeekday(utcDay(4)),
+        });
+        expect(await invoicesOf(id)).toHaveLength(2);
+    });
+
     it("refuses a past collection and one already skipped, even at once", async () => {
         const { id, collection } = await dueWeeklyBox();
         await expect(
