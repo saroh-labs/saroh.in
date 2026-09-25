@@ -357,7 +357,11 @@ describe("Products v2: sections, photos, overview (DB)", () => {
             const row = (await products.list(storeId, ownerId)).find(
                 (p) => p.id === tee,
             );
-            expect(row?.inventory).toEqual({ quantity: 15, lowStockAlert: 1 });
+            expect(row?.inventory).toEqual({
+                quantity: 15,
+                promised: 0,
+                lowStockAlert: 1,
+            });
         });
     });
 

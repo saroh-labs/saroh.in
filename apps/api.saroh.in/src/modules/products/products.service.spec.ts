@@ -164,7 +164,11 @@ describe("Products catalog (dev DB)", () => {
         expect(row.id).toBe(productId);
         expect(row.variantCount).toBe(1);
         expect(row.sku).toBe("TS-RED-L");
-        expect(row.inventory).toEqual({ quantity: 42, lowStockAlert: 5 });
+        expect(row.inventory).toEqual({
+            quantity: 42,
+            promised: 0,
+            lowStockAlert: 5,
+        });
     });
 
     it("rejects a category cycle", async () => {
