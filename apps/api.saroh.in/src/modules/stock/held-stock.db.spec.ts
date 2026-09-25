@@ -82,11 +82,18 @@ async function product(name: string): Promise<string> {
     return p.id;
 }
 
-/** A shelf row as a seed writes it: numbers set directly. */
+/**
+ * A shelf row as a seed writes it: numbers set directly, and its product
+ * tracks stock, as the seeds' `setStockLevel` marks it (#515).
+ */
 async function row(
     productId: string,
     n: { onHand: number; promised?: number; variantId?: string },
 ): Promise<string> {
+    await prisma.product.update({
+        where: { id: productId },
+        data: { stockTracked: true, stockTrackedAt: new Date() },
+    });
     return (
         await prisma.stockLevel.create({
             data: {
@@ -182,6 +189,18 @@ describe("the seeds' hold (holdOpenLines)", () => {
         r.mailer = await row(mailer, { onHand: 10 });
         r.tape = await row(tape, { onHand: 0 });
         r.cartonS = await row(carton, { onHand: 5, variantId: cartonS });
+        // Track stock off (#515): its shelf, kept at 0 for the log, holds
+        // nothing, as reserve would leave it.
+        const stamps = await product("Stamps (tracking off)");
+        r.stamps = (
+            await prisma.stockLevel.create({
+                data: {
+                    organizationId: orgId,
+                    storeId: hill,
+                    productId: stamps,
+                },
+            })
+        ).id;
 
         // Made in the workspace: the API holds 1 on the mailer.
         handOrderId = (
@@ -195,6 +214,7 @@ describe("the seeds' hold (holdOpenLines)", () => {
             { productId: mailer, quantity: 4 },
             { productId: tape, quantity: 3 },
             { productId: labels, quantity: 1 },
+            { productId: stamps, quantity: 2 },
         ]);
         l.processing = await order(`${prefix}processing`, "PROCESSING", at(2), [
             { productId: mailer, quantity: 2 },
@@ -243,6 +263,12 @@ describe("the seeds' hold (holdOpenLines)", () => {
             stockLevelId: null,
             heldQuantity: 0,
         });
+        expect(await lineOf(l.open[3])).toEqual({
+            stockRow: "NONE",
+            stockLevelId: null,
+            heldQuantity: 0,
+        });
+        expect(await shelf(r.stamps)).toEqual({ onHand: 0, promised: 0 });
         expect(await lineOf(l.processing[1])).toEqual({
             stockRow: "VARIANT",
             stockLevelId: r.cartonS,

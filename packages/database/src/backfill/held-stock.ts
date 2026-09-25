@@ -311,7 +311,9 @@ export function describeHeldStockReport(r: HeldStockReport): string[] {
  * Make a seed's open orders hold stock as the API's reserve would have: each
  * open line of an order whose id starts with `orderIdPrefix` holds its
  * quantity on its variant's row at the order's storefront, else the
- * product's; with neither, it holds nothing (`stockRow` NONE). The seed's
+ * product's; with neither, or when its product counts no stock (its
+ * `stockTracked` or the business's `stockTracking` off, #515), it holds
+ * nothing (`stockRow` NONE). The seed's
  * closed lines hold nothing. Then every row of the business promises what
  * its open lines hold — lines added by hand included — and its on hand moves
  * by the same amount, so what it can sell (on hand − promised) stays the
@@ -336,10 +338,17 @@ export async function holdOpenLines(
                         ELSE 'NONE' END AS kind
             FROM "OrderItem" i
             JOIN "Order" o ON o.id = i."orderId"
+            JOIN "Product" pr ON pr.id = i."productId"
+            LEFT JOIN "BusinessProfile" bp ON bp."organizationId" = pr."organizationId"
+            -- Only a product that counts stock holds (#515): its switch and
+            -- the business's (no profile: on), as reserve reads them; else
+            -- no row is found and the line is NONE.
             LEFT JOIN "StockLevel" v
-              ON i."variantId" IS NOT NULL AND v."storeId" = o."storeId" AND v."variantId" = i."variantId"
+              ON pr."stockTracked" AND COALESCE(bp."stockTracking", true)
+             AND i."variantId" IS NOT NULL AND v."storeId" = o."storeId" AND v."variantId" = i."variantId"
             LEFT JOIN "StockLevel" p
-              ON p."storeId" = o."storeId" AND p."productId" = i."productId" AND p."variantId" IS NULL
+              ON pr."stockTracked" AND COALESCE(bp."stockTracking", true)
+             AND p."storeId" = o."storeId" AND p."productId" = i."productId" AND p."variantId" IS NULL
             WHERE o."organizationId" = ${a.organizationId}
               AND starts_with(o.id, ${a.orderIdPrefix})
               AND o.status::text = ANY(${open}::text[])

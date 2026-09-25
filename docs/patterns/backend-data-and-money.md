@@ -66,7 +66,8 @@
   keeps it or is checked against it (`backfill/held-stock.ts`):
   `heldStockMismatches` lists breaks (the showcase check and the base seed
   stop on one), seeds make open orders hold with `holdOpenLines` (on hand
-  rises by what is held, so what a row can sell stays the seeded number),
+  rises by what is held, so what a row can sell stays the seeded number;
+  like reserve, a line whose product counts no stock (#515) holds nothing),
   and `reconcileHeldStock` repairs: lines holding more than their row
   promised are capped oldest order first, the rest become `stockRow` NONE;
   a row promising more is only reported (Stock checks shows it). The #510
