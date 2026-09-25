@@ -17,6 +17,8 @@ export const metadata = { title: "Modules" };
 export default async function ModulesSettingsPage() {
     await requireSession();
     const modules = await listModules();
+    // `canManage` is the API's answer for this person, the same on every row.
+    const canManage = modules.some((m) => m.canManage);
 
     return (
         <SettingsPanel
@@ -24,7 +26,12 @@ export default async function ModulesSettingsPage() {
             header={
                 <SettingsPanelHeader
                     title="Modules"
-                    description="Each module adds a section to the rail. Turning one off hides it; nothing is deleted."
+                    description="Turning one off hides it from the rail. Nothing is deleted."
+                    readOnlyNote={
+                        canManage || modules.length === 0
+                            ? undefined
+                            : "Only owners and admins can change this."
+                    }
                 />
             }
         >

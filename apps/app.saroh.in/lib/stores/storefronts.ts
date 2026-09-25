@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * Sell → Storefronts: every storefront in the business and the settings that
@@ -84,6 +84,40 @@ export async function listStorefronts(): Promise<StorefrontSummary[]> {
     const base = await orgBase();
     if (!base) return [];
     return (await getJson<StorefrontSummary[]>(`${base}/storefronts`)) ?? [];
+}
+
+/**
+ * Each storefront and the payment provider its checkout really charges
+ * through (`effectiveProvider`), for the "Used by" line on Settings →
+ * Providers. One read per storefront — a business has one or two.
+ *
+ * Tolerant by design: with Sell switched off the storefront routes answer
+ * 404, and a line of detail on another page must not take that page down,
+ * so any failure is simply "no storefronts to name".
+ */
+export async function listCheckoutProviders(): Promise<
+    { name: string; provider: string | null }[]
+> {
+    const base = await orgBase();
+    if (!base) return [];
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (!res.ok) return [];
+        const stores = (await res.json()) as StorefrontSummary[];
+        const settings = await Promise.all(
+            stores.map(async (s) => {
+                const one = await apiFetch(
+                    `${base}/storefronts/${encodeURIComponent(s.id)}`,
+                );
+                if (!one.ok) return null;
+                const body = (await one.json()) as StorefrontSettings;
+                return { name: body.name, provider: body.effectiveProvider };
+            }),
+        );
+        return settings.filter((s) => s !== null);
+    } catch {
+        return [];
+    }
 }
 
 export async function getStorefront(
