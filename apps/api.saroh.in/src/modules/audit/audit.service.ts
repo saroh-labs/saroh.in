@@ -105,14 +105,33 @@ export class AuditService {
      * Read an Organization's audit events, newest first. Paginated/limited so a
      * long-lived tenant's history can't be fetched unbounded. Ordered by the
      * `[organizationId, createdAt]` index.
+     *
+     * `actions` narrows the stream to those actions (Settings › Activity reads
+     * only the settings ones, not a review being hidden).
+     *
+     * Each event carries who did it — and, for a membership or an invitation,
+     * who it was about — as they are NOW: the row stores bare ids by design,
+     * so names are looked up at read time, in one query per kind, never
+     * written into the append-only stream. The reader already holds
+     * `audit:read` (Owner/Admin), who see the same names and invited
+     * addresses on the Team page.
      */
     async listForOrganization(
         organizationId: string,
-        options: { limit?: number; cursor?: string } = {},
-    ): Promise<{ events: AuditEvent[]; nextCursor: string | null }> {
+        options: {
+            limit?: number;
+            cursor?: string;
+            actions?: readonly AuditAction[];
+        } = {},
+    ): Promise<{ events: AuditEventView[]; nextCursor: string | null }> {
         const take = clampLimit(options.limit);
         const events = await prisma.auditEvent.findMany({
-            where: { organizationId },
+            where: {
+                organizationId,
+                ...(options.actions?.length
+                    ? { action: { in: [...options.actions] } }
+                    : {}),
+            },
             orderBy: { createdAt: "desc" },
             take: take + 1,
             ...(options.cursor
@@ -123,10 +142,89 @@ export class AuditService {
         const hasMore = events.length > take;
         const page = hasMore ? events.slice(0, take) : events;
         return {
-            events: page,
+            events: await this.withPeople(organizationId, page),
             nextCursor: hasMore ? page[page.length - 1].id : null,
         };
     }
+
+    /** Name the actor and, where it is a person, the target of each event. */
+    private async withPeople(
+        organizationId: string,
+        events: AuditEvent[],
+    ): Promise<AuditEventView[]> {
+        if (events.length === 0) return [];
+        const userIds = new Set<string>();
+        const invitationIds = new Set<string>();
+        for (const event of events) {
+            userIds.add(event.actorUserId);
+            if (event.targetId && event.targetType === "membership") {
+                userIds.add(event.targetId);
+            }
+            if (event.targetId && event.targetType === "invitation") {
+                invitationIds.add(event.targetId);
+            }
+        }
+        const [users, invitations] = await Promise.all([
+            prisma.user.findMany({
+                where: { id: { in: [...userIds] } },
+                select: { id: true, name: true, email: true },
+            }),
+            invitationIds.size > 0
+                ? prisma.organizationInvitation.findMany({
+                      // Scoped to the org: an id from another tenant names
+                      // nobody.
+                      where: { id: { in: [...invitationIds] }, organizationId },
+                      select: { id: true, email: true },
+                  })
+                : Promise.resolve([]),
+        ]);
+        const people = new Map<string, AuditPerson>(
+            users.map((u) => [u.id, { name: u.name, email: u.email }]),
+        );
+        for (const invitation of invitations) {
+            people.set(invitation.id, { name: null, email: invitation.email });
+        }
+        return events.map((event) => ({
+            ...event,
+            actor: people.get(event.actorUserId) ?? null,
+            target:
+                event.targetId &&
+                (event.targetType === "membership" ||
+                    event.targetType === "invitation")
+                    ? (people.get(event.targetId) ?? null)
+                    : null,
+        }));
+    }
+}
+
+/** A person an event names, as they are now; `null` when they are gone. */
+export interface AuditPerson {
+    name: string | null;
+    email: string;
+}
+
+/** An audit row as the read endpoint returns it: the row, and who it names. */
+export type AuditEventView = AuditEvent & {
+    actor: AuditPerson | null;
+    target: AuditPerson | null;
+};
+
+const AUDIT_ACTIONS: ReadonlySet<string> = new Set(Object.values(AuditAction));
+
+/**
+ * `actions=profile.update,membership.invite` as the typed list; anything
+ * that is not an action this stream records is dropped, and nothing left
+ * means no filter.
+ */
+export function parseAuditActions(
+    value: string | undefined,
+): AuditAction[] | undefined {
+    if (!value) return undefined;
+    const actions = value
+        .split(",")
+        .map((a) => a.trim())
+        .filter((a): a is AuditAction => AUDIT_ACTIONS.has(a));
+    return actions.length > 0 ? actions : undefined;
 }
 
 /** Default and hard-cap page size, so reads are always bounded. */
