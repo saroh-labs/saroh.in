@@ -10,6 +10,11 @@ import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { onTheShop, ratingLabel } from "@/lib/products/overview-rules";
+import type { ProductTracking } from "@/lib/products/tracking";
+import {
+    BUSINESS_NOT_TRACKING,
+    TRACKING_LOCKED,
+} from "@/lib/products/tracking";
 
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
@@ -20,6 +25,7 @@ import {
     SectionTitle,
 } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
+import { StartTrackingButton } from "./tracking-actions";
 
 /**
  * The product at a glance. Four numbers a merchant checks first, what is
@@ -31,18 +37,21 @@ export function ProductOverviewTab({
     storeId,
     href,
     categories,
+    tracking,
 }: {
     overview: ProductOverview;
     storeId: string;
     href: (tab: ProductTab) => string;
     categories: { id: string; name: string }[];
+    tracking: ProductTracking;
 }) {
     const { product, stock, orders, reviews, discounts } = overview;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency) ?? amount;
     const edit = (section?: EditorSection) =>
         productEditHref(storeId, product.id, section);
-    const tracked = stock.mode === "variant" || stock.product !== null;
+    const tracked =
+        tracking.counts && (stock.mode === "variant" || stock.product !== null);
 
     return (
         <div className="flex flex-col gap-8">
@@ -51,19 +60,28 @@ export function ProductOverviewTab({
                     overview={overview}
                     edit={edit}
                     canWrite={overview.canWrite}
+                    counts={tracking.counts}
                 />
             ) : null}
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
-                <ProductStat
-                    label="Can be sold now"
-                    value={tracked ? stock.totals.canSell : "—"}
-                    hint={
-                        tracked
-                            ? `${stock.totals.onHand} on hand, ${stock.totals.promised} promised`
-                            : "No stock count yet"
-                    }
-                />
+                {tracking.counts ? (
+                    <ProductStat
+                        label="Can be sold now"
+                        value={tracked ? stock.totals.canSell : "—"}
+                        hint={
+                            tracked
+                                ? `${stock.totals.onHand} on hand, ${stock.totals.promised} promised`
+                                : "No stock count yet"
+                        }
+                    />
+                ) : (
+                    <UntrackedStat
+                        tracking={tracking}
+                        productId={product.id}
+                        storeId={storeId}
+                    />
+                )}
                 <ProductStat
                     label="Variants"
                     value={product.variants.length || "—"}
@@ -364,6 +382,44 @@ export function ProductOverviewTab({
                 </Card>
             </section>
         </div>
+    );
+}
+
+/**
+ * The design's untracked card: "Stock / Not tracked / Always available on
+ * the shop." Track stock is Owner/Admin's, and only while the business
+ * tracks stock; a stock-only role is told why it can't.
+ */
+function UntrackedStat({
+    tracking,
+    productId,
+    storeId,
+}: {
+    tracking: ProductTracking;
+    productId: string;
+    storeId: string;
+}) {
+    return (
+        <Card className="rounded-[12px] px-[15px] py-[13px]">
+            <p className="text-[11.5px] text-muted-foreground">Stock</p>
+            <p className="mt-1 font-display text-[18px] font-semibold leading-tight">
+                Not tracked
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                Always available on the shop.
+            </p>
+            {!tracking.business ? (
+                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
+                    {BUSINESS_NOT_TRACKING}
+                </p>
+            ) : tracking.control === "change" ? (
+                <StartTrackingButton productId={productId} storeId={storeId} />
+            ) : tracking.control === "locked" ? (
+                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
+                    {TRACKING_LOCKED}
+                </p>
+            ) : null}
+        </Card>
     );
 }
 

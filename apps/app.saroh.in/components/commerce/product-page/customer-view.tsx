@@ -26,16 +26,19 @@ export function CustomerView({
     overview,
     storeId,
     canWrite,
+    counts,
 }: {
     overview: ProductOverview;
     storeId: string;
     canWrite: boolean;
+    /** The product counts stock (Track stock, #515). */
+    counts: boolean;
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
     const money = (a: string) => formatMoneyMajor(a, product.currency) ?? a;
     const edit = (s: EditorSection) => productEditHref(storeId, product.id, s);
-    const data = toShopData(overview);
+    const data = toShopData(overview, counts);
     const live = product.status === "PUBLISHED";
 
     const variantLine = product.variants
@@ -75,11 +78,12 @@ export function CustomerView({
         {
             n: 3,
             title: product.variants.length > 0 ? "Variants and stock" : "Stock",
-            body:
-                variantLine ||
-                (stock.product
-                    ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
-                    : "No stock count — the shop doesn't say how many are left."),
+            body: !counts
+                ? 'Not tracked — always available on the shop, with no count and no "Sold out".'
+                : variantLine ||
+                  (stock.product
+                      ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
+                      : "No stock count — the shop doesn't say how many are left."),
             action: {
                 label: "Edit",
                 href: edit(product.variants.length > 0 ? "variants" : "stock"),
@@ -208,8 +212,15 @@ export function CustomerView({
 }
 
 /** The product page's read, as the shop page component takes it. */
-export function toShopData(overview: ProductOverview): ProductPageData {
-    const { product, stock, reviews } = overview;
+export function toShopData(
+    overview: ProductOverview,
+    counts = true,
+): ProductPageData {
+    const { product, reviews } = overview;
+    // Untracked (#515): no count, so the shop never says "Sold out".
+    const stock = counts
+        ? overview.stock
+        : { ...overview.stock, variants: [], product: null };
     const shown = (k: Parameters<typeof onTheShop>[1]) =>
         onTheShop(product.shopFields, k);
     const word = (canSell: number, w: string): StockWord =>

@@ -11,6 +11,7 @@ import {
     AlertDialogTitle,
 } from "@saroh/ui/alert-dialog";
 import { buttonVariants } from "@saroh/ui/button";
+import type { LucideIcon } from "lucide-react";
 import { Trash2 } from "lucide-react";
 
 /**
@@ -41,6 +42,7 @@ export function ConfirmDialog({
     confirmLabel,
     cancelLabel = "Cancel",
     onConfirm,
+    icon: Icon = Trash2,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -50,6 +52,8 @@ export function ConfirmDialog({
     confirmLabel: string;
     cancelLabel?: string;
     onConfirm: () => void;
+    /** The mark: a bin unless what goes is not deleted (Stop tracking). */
+    icon?: LucideIcon;
 }) {
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -59,7 +63,7 @@ export function ConfirmDialog({
                         aria-hidden
                         className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-destructive-subtle text-destructive-subtle-foreground"
                     >
-                        <Trash2 className="size-4" />
+                        <Icon className="size-4" />
                     </span>
                     <div className="min-w-0">
                         <AlertDialogTitle className="mb-1.5 font-display text-[17px] font-semibold tracking-[-0.02em]">

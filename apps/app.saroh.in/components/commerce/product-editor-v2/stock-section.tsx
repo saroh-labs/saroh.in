@@ -9,10 +9,13 @@ import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
+import type { TrackingControl } from "@/lib/products/tracking";
+import { TRACKING_LOCKED } from "@/lib/products/tracking";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
+import { TrackStockSwitch } from "./track-stock-switch";
 
 const DEFAULT_WARN = "10";
 
@@ -65,11 +68,14 @@ export function StockSection({
     product,
     storeId,
     defaultWarn,
+    control,
 }: {
     product: ProductDetail;
     storeId: string;
     /** Settings → Defaults: where a first count starts warning. */
     defaultWarn: number | null;
+    /** Who may flip Track stock (#515): Owner/Admin, locked, or no switch. */
+    control: TrackingControl;
 }) {
     const { canWrite, states } = useEditor();
     const ro = !canWrite;
@@ -96,8 +102,11 @@ export function StockSection({
     const counted = perVariant
         ? product.stockMode === "variant"
         : product.inventory !== null;
+    // Track stock (#515): the business tracks stock, or this section isn't
+    // drawn, so the product's own switch decides.
+    const tracked = product.stockTracked;
     const collapsed = !counted && !adding;
-    const dirty = !same(draft, base) || (adding && !counted);
+    const dirty = tracked && (!same(draft, base) || (adding && !counted));
 
     const qtyBad = !isCount(draft.quantity) || !isCount(draft.lowStockAlert);
     const reserved = product.inventory?.reserved ?? 0;
@@ -115,15 +124,17 @@ export function StockSection({
     // list that isn't there yet.
     const variantsPending =
         !!states.variants?.dirty && !!states.variants.changesList;
-    const problem = variantsPending
-        ? "Save variants first."
-        : (perVariant ? lineBad : qtyBad)
-          ? "Whole numbers, zero or more."
-          : belowPromised
-            ? `${belowPromised.promised} promised to open orders${
-                  belowPromised.title ? ` for ${belowPromised.title}` : ""
-              } — on hand can't go below that.`
-            : "";
+    const problem = !tracked
+        ? ""
+        : variantsPending
+          ? "Save variants first."
+          : (perVariant ? lineBad : qtyBad)
+            ? "Whole numbers, zero or more."
+            : belowPromised
+              ? `${belowPromised.promised} promised to open orders${
+                    belowPromised.title ? ` for ${belowPromised.title}` : ""
+                } — on hand can't go below that.`
+              : "";
 
     useSection(
         "stock",
@@ -167,9 +178,49 @@ export function StockSection({
             ),
         });
 
+    const aside =
+        control === "hidden" ? undefined : (
+            <TrackStockSwitch
+                productId={product.id}
+                productName={product.name}
+                tracked={tracked}
+                control={control}
+                onTurnedOff={() => {
+                    setDraft(base);
+                    setAdding(false);
+                }}
+            />
+        );
+    const lockedNote =
+        control === "locked" ? (
+            <p className="mb-2.5 text-[12px] text-muted-foreground">
+                {TRACKING_LOCKED}
+            </p>
+        ) : null;
+
+    if (!tracked) {
+        return (
+            <SectionCard
+                k="stock"
+                title="Stock"
+                aside={aside}
+                bodyClassName="pb-4 pt-2.5"
+            >
+                {lockedNote}
+                <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
+                    Not tracked. This product is always available on the shop,
+                    with no count and no &ldquo;Sold out&rdquo;. Use it for
+                    things made to order. Turning it back on starts from a count
+                    of 0, so count it first.
+                </p>
+            </SectionCard>
+        );
+    }
+
     if (collapsed) {
         return (
-            <SectionCard k="stock" title="Stock">
+            <SectionCard k="stock" title="Stock" aside={aside}>
+                {lockedNote}
                 <p className="mb-3 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                     {perVariant
                         ? `No stock count yet. Each of the ${product.variants.length} variants gets its own, so a small one can run out before a large one.`
@@ -193,7 +244,8 @@ export function StockSection({
         const low = Number(draft.lowStockAlert);
         const lowNow = !qtyBad && qty <= low;
         return (
-            <SectionCard k="stock" title="Stock">
+            <SectionCard k="stock" title="Stock" aside={aside}>
+                {lockedNote}
                 <div className="flex flex-wrap items-start gap-3">
                     <div className="min-w-[92px] flex-[0_1_112px]">
                         <label
@@ -291,7 +343,8 @@ export function StockSection({
         "grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-1.5";
 
     return (
-        <SectionCard k="stock" title="Stock">
+        <SectionCard k="stock" title="Stock" aside={aside}>
+            {lockedNote}
             <div
                 className={cn(
                     grid,
