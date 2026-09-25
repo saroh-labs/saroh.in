@@ -84,7 +84,12 @@ export function AppHeader(props: AppHeaderProps) {
                 />
             ) : null}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <CommandTrigger />
+                <CommandTrigger
+                    actor={{
+                        role: activeOrg?.role ?? null,
+                        actions: activeOrg?.actions ?? null,
+                    }}
+                />
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}
                 <HelpLink />
                 <ThemeToggle />
