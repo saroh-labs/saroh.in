@@ -10,7 +10,7 @@ import {
     Post,
     Query,
 } from "@nestjs/common";
-import { createHash } from "node:crypto";
+import { hashClientIp } from "../../common/client-ip";
 
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
@@ -106,7 +106,7 @@ export class PublicBookingsController {
     @Header("Referrer-Policy", "no-referrer")
     @Header("X-Robots-Tag", "noindex, nofollow")
     hold(@Param("token") token: string, @Ip() ip: string): Promise<PublicHold> {
-        return this.bookings.publicHold(token, hashIp(ip));
+        return this.bookings.publicHold(token, hashClientIp(ip));
     }
 
     /** Let a pay-now hold go before its time (U19). */
@@ -118,7 +118,7 @@ export class PublicBookingsController {
         @Param("token") token: string,
         @Ip() ip: string,
     ): Promise<PublicHold> {
-        return this.bookings.releasePublicHold(token, hashIp(ip));
+        return this.bookings.releasePublicHold(token, hashClientIp(ip));
     }
 
     /**
@@ -155,7 +155,7 @@ export class PublicBookingsController {
                 staffId: dto.staffId,
                 pay: dto.pay,
             },
-            hashIp(ip),
+            hashClientIp(ip),
         );
         const state = holdState(booking, new Date());
         return {
@@ -196,9 +196,4 @@ export class PublicBookingPageController {
     page(@Param("siteId") siteId: string): Promise<PublicBookingPage> {
         return this.bookings.publicBookingPage(siteId);
     }
-}
-
-/** The caller's address, hashed at once — the raw IP never leaves here. */
-function hashIp(ip: string | undefined): string | undefined {
-    return ip ? createHash("sha256").update(ip).digest("hex") : undefined;
 }

@@ -1,5 +1,5 @@
 import { Body, Controller, Ip, Param, Post } from "@nestjs/common";
-import { createHash } from "node:crypto";
+import { hashClientIp } from "../../common/client-ip";
 
 import { SubmitEnquiryDto } from "./dto";
 import { EnquiryService } from "./enquiry.service";
@@ -20,8 +20,9 @@ export class EnquiryController {
 
     /**
      * Submit an enquiry against `:formId`. The source IP (from `@Ip()`) is
-     * immediately hashed (sha256) and only the hash is ever passed on / stored —
-     * the raw IP never leaves this handler.
+     * immediately hashed (sha256; IPv6 by its /64, `common/client-ip.ts`) and
+     * only the hash is ever passed on / stored — the raw IP never leaves this
+     * handler.
      */
     @Post(":formId/submit")
     submit(
@@ -29,9 +30,7 @@ export class EnquiryController {
         @Body() dto: SubmitEnquiryDto,
         @Ip() ip: string,
     ) {
-        const ipHash = ip
-            ? createHash("sha256").update(ip).digest("hex")
-            : undefined;
+        const ipHash = hashClientIp(ip);
 
         return this.enquiry.submit(
             formId,
