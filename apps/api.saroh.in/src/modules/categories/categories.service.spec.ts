@@ -27,7 +27,7 @@ jest.mock("@saroh/database", () => {
 import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { CategoriesService } from "./categories.service";
+import { CategoriesService, collectionsUsing } from "./categories.service";
 
 const db = prisma as unknown as {
     category: Record<string, jest.Mock>;
@@ -122,6 +122,7 @@ describe("CategoriesService (the business's categories)", () => {
             slug: "breads",
             parentId: null,
             _count: { children: 0, discountReach: 0 },
+            collections: [],
             fields: [],
             defaults: [],
         });
@@ -132,5 +133,34 @@ describe("CategoriesService (the business's categories)", () => {
             where: { categoryId: "cat_breads" },
             data: { categoryId: null },
         });
+    });
+
+    it("refuses to delete or merge away a category an automatic collection fills itself from, naming it", async () => {
+        db.category.findFirst.mockResolvedValue({
+            id: "cat_breads",
+            name: "Breads",
+            slug: "breads",
+            parentId: null,
+            _count: { children: 0, discountReach: 0 },
+            collections: [{ name: "Fresh bread" }],
+            fields: [],
+            defaults: [],
+        });
+        await expect(categories.remove(ORG, "cat_breads")).rejects.toThrow(
+            "The Fresh bread collection fills itself from Breads. Change it or delete it in Collections first.",
+        );
+        await expect(
+            categories.merge(ORG, "cat_breads", { intoId: null }),
+        ).rejects.toThrow(/Fresh bread/);
+        expect(db.category.delete).not.toHaveBeenCalled();
+        expect(db.product.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("names every collection that uses the category", () => {
+        expect(
+            collectionsUsing("Breads", ["Bakery", "Fresh bread", "Weekend"]),
+        ).toBe(
+            "The Bakery, Fresh bread and Weekend collections fill themselves from Breads. Change them or delete them in Collections first.",
+        );
     });
 });

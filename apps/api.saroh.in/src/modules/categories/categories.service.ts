@@ -260,6 +260,11 @@ export class CategoriesService {
                 slug: true,
                 parentId: true,
                 _count: { select: { children: true, discountReach: true } },
+                // Automatic collections that fill themselves from it (#516).
+                collections: {
+                    select: { name: true },
+                    orderBy: { name: "asc" },
+                },
                 fields: { select: { fieldId: true } },
                 defaults: {
                     select: {
@@ -286,6 +291,16 @@ export class CategoriesService {
             const n = category._count.discountReach;
             throw new ConflictException(
                 `${n === 1 ? "A discount code applies" : `${n} discount codes apply`} to ${category.name}. Change ${n === 1 ? "it" : "them"} in Discounts first.`,
+            );
+        }
+        // An automatic collection would have nothing to fill itself from;
+        // name it, so the merchant knows what to change first.
+        if (category.collections.length > 0) {
+            throw new ConflictException(
+                collectionsUsing(
+                    category.name,
+                    category.collections.map((c) => c.name),
+                ),
             );
         }
         // Every storefront's products in it: the category is the business's.
@@ -405,4 +420,17 @@ export class CategoriesService {
             cursor = node?.parentId ?? null;
         }
     }
+}
+
+/**
+ * "The Fresh bread collection fills itself from Breads. Change it or delete
+ * it in Collections first." — naming every collection that uses it.
+ */
+export function collectionsUsing(category: string, names: string[]): string {
+    if (names.length === 1) {
+        return `The ${names[0]} collection fills itself from ${category}. Change it or delete it in Collections first.`;
+    }
+    const last = names[names.length - 1];
+    const listed = `${names.slice(0, -1).join(", ")} and ${last}`;
+    return `The ${listed} collections fill themselves from ${category}. Change them or delete them in Collections first.`;
 }

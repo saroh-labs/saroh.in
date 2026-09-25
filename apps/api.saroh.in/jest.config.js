@@ -158,6 +158,10 @@ module.exports = {
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
+        // #516 collections: the gate and who may change them, and the
+        // website-pages scanner — no database.
+        "<rootDir>/src/modules/collections/collections.gate.spec.ts",
+        "<rootDir>/src/modules/collections/website-pages.spec.ts",
         // #529 the business's categories, with a mocked Prisma.
         "<rootDir>/src/modules/categories/categories.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
