@@ -35,6 +35,11 @@ describe("lastActive", () => {
     });
 
     it("turns stale from a month", () => {
+        // Exactly 30 calendar days is the first stale one.
+        expect(lastActive(at(30), now)).toEqual({
+            text: "Last active 30 days ago",
+            stale: true,
+        });
         expect(lastActive(at(34), now)).toEqual({
             text: "Last active 34 days ago",
             stale: true,

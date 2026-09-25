@@ -214,6 +214,38 @@ describe("activityDetail — what changed", () => {
         ]);
     });
 
+    it("tells a module turned off, a role on joining, and the role someone was removed from", () => {
+        const rows = (e: Partial<AuditEventRow>) =>
+            activityDetail(event(e), KOLKATA).changes;
+        expect(
+            rows({
+                action: "organization.module.disabled",
+                targetId: "PAYMENTS",
+                metadata: { module: "Payments", enabled: false },
+            }),
+        ).toEqual([{ label: "Payments", before: "On", after: "Off" }]);
+        expect(
+            rows({
+                action: "membership.accept",
+                metadata: { role: "ADMIN" },
+            }),
+        ).toEqual([{ label: "Role", before: null, after: "Admin" }]);
+        // No role kept: nothing to list, not an empty row.
+        expect(rows({ action: "membership.accept", metadata: {} })).toEqual([]);
+        expect(
+            rows({
+                action: "membership.remove",
+                metadata: { role: "MEMBER" },
+            }),
+        ).toEqual([
+            {
+                label: "Role",
+                before: "Member",
+                after: "Removed from the team",
+            },
+        ]);
+    });
+
     it("has nothing to list for setting up the business", () => {
         expect(
             activityDetail(event({ action: "organization.onboard" }), KOLKATA)

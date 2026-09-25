@@ -742,7 +742,7 @@ describe("PaymentsService.initiateRefund", () => {
     });
 
     it("an error before the call leaves Saroh (no provider) fails the row and passes through", async () => {
-        const { service } = makeService();
+        const { service, fake } = makeService();
         providerFindUnique.mockResolvedValue(null);
 
         await expect(
@@ -751,6 +751,30 @@ describe("PaymentsService.initiateRefund", () => {
             }),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(made.get("rf_1")).toMatchObject({ status: "FAILED" });
+        // Nothing was sent, so nothing can have gone back.
+        expect(fake.refundCalls).toHaveLength(0);
+        expect(eventCreate).not.toHaveBeenCalled();
+    });
+
+    it("keys that cannot be opened fail the row before the provider is called", async () => {
+        const { service, fake } = makeService();
+        const refund = jest.spyOn(fake, "refund");
+        providerFindUnique.mockResolvedValue({
+            ...connectedRow(),
+            credentialsAuthTag: connectedRow().credentialsAuthTag.replace(
+                /^./,
+                (c) => (c === "0" ? "1" : "0"),
+            ),
+        });
+
+        await expect(
+            service.initiateRefund(ctx(), "order_1", {
+                lines: [{ itemId: "li_b", quantity: 1 }],
+            }),
+        ).rejects.toThrow();
+        expect(made.get("rf_1")).toMatchObject({ status: "FAILED" });
+        expect(refund).not.toHaveBeenCalled();
+        expect(eventCreate).not.toHaveBeenCalled();
     });
 
     it("an unknown answer keeps the refund PENDING with its money held — never FAILED", async () => {
