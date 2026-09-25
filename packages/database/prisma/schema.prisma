@@ -323,6 +323,12 @@ model BusinessProfile {
   skuPattern String?
   skuSuggest Boolean @default(true)
 
+  // Track stock for the whole business (#515). Off: every product always
+  // sells and nothing is counted, whatever its own switch says; turned off
+  // only while nothing is promised anywhere, with a counted-to-0 entry per
+  // shelf that had stock. No profile yet reads as on.
+  stockTracking Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -695,6 +701,16 @@ model Product {
   seoDescription String?
   seoImageId     String?
   seoImage       ProductImage? @relation("ProductSeoImage", fields: [seoImageId], references: [id], onDelete: SetNull)
+
+  // Track stock (#515). Off: it always sells and nothing counts it — its
+  // StockLevel rows stay (at 0, for the log) but hold nothing. Turned off
+  // only while nothing is promised, with a counted-to-0 entry per shelf that
+  // had stock; turned on at 0. A line placed while off stays untracked for
+  // life. Counts only while the business tracks stock too
+  // (BusinessProfile.stockTracking). stockTrackedAt: when it last started
+  // counting, so a sale made before then isn't a missed one.
+  stockTracked   Boolean   @default(false)
+  stockTrackedAt DateTime?
 
   // The one store option its variants are chosen by ("Customers choose by").
   optionId String?
