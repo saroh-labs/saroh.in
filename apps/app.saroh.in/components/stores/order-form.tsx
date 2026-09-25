@@ -116,12 +116,18 @@ export function OrderForm({
     customers,
     products,
     checkout = null,
+    gstRegistered = false,
 }: {
     storeId: string;
     customers: CustomerLite[];
     products: ProductLite[];
     /** `null` when it could not be read: the form then assumes nothing. */
     checkout?: CheckoutDefaults | null;
+    /**
+     * A GST-registered business's prices include GST (ADR-008): the API
+     * ignores the storefront's add-on tax, so the form offers none.
+     */
+    gstRegistered?: boolean;
 }) {
     const router = useRouter();
     // Amounts as money, in the storefront's currency, for reading. Inputs keep
@@ -169,9 +175,10 @@ export function OrderForm({
     // Tax follows the storefront's rate until the merchant types their own.
     // Written into the field rather than computed beside it, so what is on
     // screen is exactly what is sent.
-    const taxBasisPoints = checkout?.taxEnabled
-        ? Math.round(Number(checkout.taxRate) * 100)
-        : 0;
+    const taxBasisPoints =
+        checkout?.taxEnabled && !gstRegistered
+            ? Math.round(Number(checkout.taxRate) * 100)
+            : 0;
     const suggestedTax = money(
         Math.round((subtotalCents * taxBasisPoints) / 10_000),
     );
@@ -188,10 +195,12 @@ export function OrderForm({
     const qualifiesForFree = freeOver !== null && subtotalCents >= freeOver;
     const offersDelivery = checkout?.shippingEnabled ?? true;
 
+    // The sum `orders.service.ts` saves: GST is inside a registered
+    // business's prices, so nothing is added for it.
     const totalCents = Math.max(
         0,
         subtotalCents +
-            toCents(tax) +
+            (gstRegistered ? 0 : toCents(tax)) +
             toCents(shipping) -
             (discountCode ? 0 : toCents(discount)),
     );
@@ -212,7 +221,7 @@ export function OrderForm({
         const res = await createOrder(storeId, {
             customerId: values.customerId,
             items,
-            tax: values.tax,
+            tax: gstRegistered ? "0" : values.tax,
             shipping: values.shipping,
             ...(values.discountCode.trim()
                 ? { discountCode: values.discountCode.trim().toUpperCase() }
@@ -298,7 +307,15 @@ export function OrderForm({
             </div>
 
             <div className="space-y-3">
-                <Label>Items</Label>
+                <Label>
+                    Items
+                    {gstRegistered ? (
+                        <span className="font-normal text-muted-foreground">
+                            {" "}
+                            · prices include GST
+                        </span>
+                    ) : null}
+                </Label>
                 {fields.map((line, i) => {
                     // `.at(i)` rather than `[i]`: it returns `T | undefined`,
                     // which is the truth. `fields` (from useFieldArray) and
@@ -372,25 +389,29 @@ export function OrderForm({
 
             <div
                 className={
-                    offersDelivery
+                    offersDelivery && !gstRegistered
                         ? "grid grid-cols-3 gap-4"
                         : "grid grid-cols-2 gap-4"
                 }
             >
-                <div className="grid gap-2">
-                    <Label htmlFor="tax">
-                        Tax
-                        {taxBasisPoints > 0
-                            ? ` (${Number(checkout?.taxRate)}%)`
-                            : null}
-                    </Label>
-                    <Input
-                        id="tax"
-                        inputMode="decimal"
-                        disabled={isSubmitting}
-                        {...form.register("tax")}
-                    />
-                </div>
+                {/* GST is already in a registered business's prices; there
+                    is no tax to add on. */}
+                {gstRegistered ? null : (
+                    <div className="grid gap-2">
+                        <Label htmlFor="tax">
+                            Tax
+                            {taxBasisPoints > 0
+                                ? ` (${Number(checkout?.taxRate)}%)`
+                                : null}
+                        </Label>
+                        <Input
+                            id="tax"
+                            inputMode="decimal"
+                            disabled={isSubmitting}
+                            {...form.register("tax")}
+                        />
+                    </div>
+                )}
                 {/* A storefront that does not deliver has no shipping to
                     charge; the field stays at 0 rather than inviting one. */}
                 {offersDelivery ? (
@@ -471,6 +492,11 @@ export function OrderForm({
                     <p className="text-lg font-semibold tabular-nums">
                         Total {show(totalCents)}
                     </p>
+                    {gstRegistered ? (
+                        <p className="text-[12px] text-muted-foreground">
+                            Includes GST
+                        </p>
+                    ) : null}
                     {discountCode ? (
                         <p className="text-[12px] text-muted-foreground">
                             Before{" "}

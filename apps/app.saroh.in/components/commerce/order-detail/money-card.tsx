@@ -149,6 +149,27 @@ export function MoneyCard({
                     ) : null}
                 </div>
             ))}
+            {(money.owedBack ?? []).map((p) => (
+                <div
+                    key={p.id}
+                    role="status"
+                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
+                >
+                    <p className="text-pretty">
+                        <span className="font-semibold">
+                            {format(n(p.amount))} owed back to the customer.
+                        </span>{" "}
+                        <span className="text-muted-foreground">
+                            They paid an earlier charge for a change that a
+                            later edit replaced, so it isn&apos;t counted as
+                            paid. Refund it from your{" "}
+                            {provider ? providerName(provider) : "provider"}{" "}
+                            dashboard; this clears once the refund comes
+                            through.
+                        </span>
+                    </p>
+                </div>
+            ))}
             {!invoice && taxed ? (
                 <div className="pt-[3px] text-[12.5px] text-muted-foreground">
                     Includes GST {format(n(money.tax))}

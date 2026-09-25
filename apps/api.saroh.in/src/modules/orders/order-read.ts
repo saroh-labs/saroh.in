@@ -101,6 +101,12 @@ export interface OrderMoneyDto {
      * again — the API looks at the provider before it sends anything.
      */
     refundsBeingConfirmed: { id: string; amount: string }[];
+    /**
+     * Money a customer paid on an edit's charge that a later edit replaced
+     * (#508, U8): not counted in `paid`, owed back to them until a refund
+     * for it is on record.
+     */
+    owedBack: { id: string; amount: string }[];
 }
 
 export interface OrderReadDto {
@@ -267,6 +273,8 @@ export interface ReadOptions {
     /** Names for the people on the timeline. */
     actors: ReadonlyMap<string, string | null>;
     now: Date;
+    /** Payments on superseded edit charges not yet handed back. */
+    owedBack?: { id: string; amountCents: number }[];
 }
 
 const cents = (v: DecimalLike) => Math.round(Number(v.toString()) * 100);
@@ -444,6 +452,10 @@ export function serializeOrderRead(
                               : [],
                       ),
                   ),
+                  owedBack: (opts.owedBack ?? []).map((p) => ({
+                      id: p.id,
+                      amount: money(p.amountCents),
+                  })),
                   discountCode: order.discountRedemption
                       ? {
                             code: order.discountRedemption.code,

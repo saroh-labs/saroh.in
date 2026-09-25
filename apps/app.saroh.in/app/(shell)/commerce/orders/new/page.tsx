@@ -5,6 +5,7 @@ import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { OrderForm } from "@/components/stores/order-form";
 import { listCustomers } from "@/lib/customers/service";
+import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { newOrderHref } from "@/lib/orders/links";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
@@ -47,11 +48,14 @@ export default async function NewOrderPage({
         );
     }
 
-    const [customers, products, checkout] = await Promise.all([
+    const [customers, products, checkout, business] = await Promise.all([
         listCustomers(store.id),
         listProducts(store.id),
         // The storefront's tax and delivery, as the form's starting figures.
         getStorefront(store.id).catch(() => null),
+        // GST standing: a registered business's prices include GST, so the
+        // form adds no tax — the total it shows is the one the API saves.
+        getInvoiceBusiness().catch(() => null),
     ]);
 
     return (
@@ -81,6 +85,7 @@ export default async function NewOrderPage({
                     variants: p.variants,
                 }))}
                 checkout={checkout}
+                gstRegistered={business?.registered ?? false}
             />
         </PageContainer>
     );

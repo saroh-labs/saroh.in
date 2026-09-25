@@ -3355,7 +3355,9 @@ model PaymentIntent {
   amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
 
-  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
+  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED,
+  // or SUPERSEDED: an edit's unpaid difference charge a later edit replaced
+  // (payments/intent-state.ts); money paid on it anyway is owed back.
   status String @default("CREATED")
 
   idempotencyKey String? // dedupe client "create intent" calls

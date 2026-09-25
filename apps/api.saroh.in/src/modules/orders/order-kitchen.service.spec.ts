@@ -178,9 +178,11 @@ jest.mock("@saroh/database", () => {
         },
         variantInventory: { count: jest.fn(() => Promise.resolve(0)) },
         paymentIntent: {
-            findMany: jest.fn(() =>
+            findMany: jest.fn(({ where }: { where: { status?: string } }) =>
                 Promise.resolve(
-                    mockDb.order.paymentStatus === "PAID"
+                    // Nothing was paid on a superseded charge here.
+                    where.status !== "SUPERSEDED" &&
+                        mockDb.order.paymentStatus === "PAID"
                         ? [
                               {
                                   amountCents: mockDb.order.paidCents,
@@ -190,6 +192,7 @@ jest.mock("@saroh/database", () => {
                         : [],
                 ),
             ),
+            updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
         },
         user: {
             findMany: jest.fn(() =>
@@ -212,6 +215,7 @@ import {
     ConflictException,
     ForbiddenException,
 } from "@nestjs/common";
+import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { correctOrderInvoiceForEdit } from "../invoices/order-invoicing";
@@ -513,6 +517,56 @@ describe("editing before preparing", () => {
         expect(mockDb.order.total).toBe("120.00");
         expect(payments.createDifferenceIntent).not.toHaveBeenCalled();
         expect(payments.refundOrderDifference).not.toHaveBeenCalled();
+        expect(supersede).not.toHaveBeenCalled();
+    });
+
+    const supersede = prisma.paymentIntent.updateMany as jest.Mock;
+    const SUPERSEDES = {
+        where: {
+            organizationId: "org_1",
+            orderId: "order_1",
+            status: { in: ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"] },
+            idempotencyKey: { startsWith: "order-edit:" },
+        },
+        data: { status: "SUPERSEDED" },
+    };
+
+    it("a second edit up supersedes the first's unpaid charge, then asks for the whole difference", async () => {
+        await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        const second = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 5 }],
+        });
+        expect(supersede).toHaveBeenCalledTimes(2);
+        expect(supersede).toHaveBeenLastCalledWith(SUPERSEDES);
+        // Superseded inside the edit, before the new charge is made.
+        expect(supersede.mock.invocationCallOrder[1]).toBeLessThan(
+            payments.createDifferenceIntent.mock.invocationCallOrder[1]!,
+        );
+        // The first +120 was never paid: the new charge is for both.
+        expect(second.settleCents).toBe(24000);
+        expect(payments.createDifferenceIntent).toHaveBeenLastCalledWith(
+            OWNER,
+            "order_1",
+            24000,
+            `order-edit:${second.eventId}`,
+        );
+    });
+
+    it("an edit back to what was paid supersedes the open charge and makes none", async () => {
+        await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        const back = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 3 }],
+        });
+        expect(back.settleCents).toBe(0);
+        expect(supersede).toHaveBeenCalledTimes(2);
+        expect(supersede).toHaveBeenLastCalledWith(SUPERSEDES);
+        expect(payments.createDifferenceIntent).toHaveBeenCalledTimes(1);
+        expect(payments.refundOrderDifference).not.toHaveBeenCalled();
+        expect(back.charge).toBeNull();
     });
 
     it("a delivery needs an address", async () => {

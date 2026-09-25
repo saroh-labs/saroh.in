@@ -24,6 +24,8 @@ jest.mock("../invoices/order-invoicing", () => ({
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
+        // The intent's row lock; [] keeps the status findIntent read.
+        $queryRaw: jest.fn().mockResolvedValue([]),
         merchantPaymentProvider: { findUnique: jest.fn() },
         webhookEvent: { create: jest.fn(), update: jest.fn() },
         paymentIntent: {
@@ -31,7 +33,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             update: jest.fn(),
         },
-        paymentAttempt: { create: jest.fn() },
+        paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
         paymentRefund: {
             findFirst: jest.fn(),
             create: jest.fn(),
@@ -551,6 +553,82 @@ describe("WebhooksService — the order's invoice (ADR-008)", () => {
         });
         expect(creditNote).toHaveBeenCalledWith(expect.anything(), "rf_new");
         expect(creditRest).not.toHaveBeenCalled();
+    });
+});
+
+describe("WebhooksService — a payment on a superseded edit charge (#508 U8)", () => {
+    const queryRaw = (prisma as unknown as { $queryRaw: jest.Mock }).$queryRaw;
+    const attemptFindFirst = prisma.paymentAttempt.findFirst as jest.Mock;
+    const settleSupplementary = settleSupplementaryInvoices as jest.Mock;
+
+    async function pay(eventId: string) {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: `wh_${eventId}` });
+        const raw = bodyOf({
+            providerEventId: eventId,
+            providerPaymentRef: "pay_late",
+        });
+        return service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+    }
+
+    it("is recorded as captured and owed back, never as the order's money", async () => {
+        intentFindFirst.mockResolvedValue({
+            ...INTENT,
+            id: "pi_old",
+            status: "SUPERSEDED",
+        });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        attemptFindFirst.mockResolvedValue(null);
+
+        await expect(pay("evt_s1")).resolves.toEqual({
+            status: "processed",
+            changed: true,
+        });
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                paymentIntentId: "pi_old",
+                providerRef: "pay_late",
+                status: "CAPTURED_NEEDS_REFUND",
+            }),
+        });
+        // Not SUCCEEDED, so no paid sum counts it; the order and its
+        // supplementary invoices are left as the later edit left them.
+        expect(intentUpdate).not.toHaveBeenCalled();
+        expect(orderUpdate).not.toHaveBeenCalled();
+        expect(settleSupplementary).not.toHaveBeenCalled();
+        expect(ensureOrderInvoice).not.toHaveBeenCalled();
+    });
+
+    it("reads the status under the intent's lock: superseded a moment ago is superseded", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT, id: "pi_old" });
+        queryRaw.mockResolvedValueOnce([{ status: "SUPERSEDED" }]);
+        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
+        attemptFindFirst.mockResolvedValue(null);
+
+        await pay("evt_s2");
+        expect(queryRaw).toHaveBeenCalled();
+        expect(intentUpdate).not.toHaveBeenCalled();
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ status: "CAPTURED_NEEDS_REFUND" }),
+        });
+    });
+
+    it("a second event for the same payment records nothing more", async () => {
+        intentFindFirst.mockResolvedValue({
+            ...INTENT,
+            id: "pi_old",
+            status: "SUPERSEDED",
+        });
+        attemptFindFirst.mockResolvedValue({ id: "pa_owed" });
+
+        await expect(pay("evt_s3")).resolves.toEqual({
+            status: "ignored",
+            changed: false,
+        });
+        expect(attemptCreate).not.toHaveBeenCalled();
     });
 });
 

@@ -851,7 +851,9 @@ describe("collections on a subscription", () => {
 
     it("drops the skips still to come when the day changes", async () => {
         tx.customerSubscription!.findFirst!.mockResolvedValue(collecting());
+        tx.invoice!.findFirst!.mockResolvedValue({ id: "inv_1" });
         await service.setCollection(owner, "sub_1", { weekday: 3 });
+        expect(issueInTx).not.toHaveBeenCalled();
         expect(tx.subscriptionSkip!.deleteMany).toHaveBeenCalledWith({
             where: {
                 subscriptionId: "sub_1",
@@ -862,6 +864,53 @@ describe("collections on a subscription", () => {
             where: { id: "sub_1" },
             data: { collectionWeekday: 3 },
         });
+    });
+
+    // A weekly box from Saturday 19 Sep, collected on Thursdays, whose only
+    // collection (Thursday 24) was skipped, so the renewal left it uncharged.
+    const skippedWeek = () =>
+        sub({
+            interval: "WEEK",
+            collectionWeekday: 4,
+            anchorAt: at("2026-09-19T00:00:00Z"),
+            currentPeriodStart: at("2026-09-19T00:00:00Z"),
+            currentPeriodEnd: at("2026-09-26T00:00:00Z"),
+        });
+
+    it("invoices a period the old day's skips left uncharged once the new day collects in it", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(skippedWeek());
+        await service.setCollection(owner, "sub_1", { weekday: 3 });
+        expect(issueInTx).toHaveBeenCalledTimes(1);
+        expect(issueInTx).toHaveBeenCalledWith(
+            tx,
+            "org_1",
+            expect.objectContaining({
+                periodStart: at("2026-09-19T00:00:00Z"),
+                periodEnd: at("2026-09-26T00:00:00Z"),
+            }),
+        );
+    });
+
+    it("leaves the period uncharged when the new day's collections are skipped too", async () => {
+        // A skip kept from an earlier Monday schedule covers Monday 21.
+        tx.customerSubscription!.findFirst!.mockResolvedValue(skippedWeek());
+        tx.subscriptionSkip!.findMany!.mockResolvedValue([
+            { date: at("2026-09-21T00:00:00Z") },
+        ]);
+        await service.setCollection(owner, "sub_1", { weekday: 1 });
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("charges nothing when the day is unchanged, stopped, or the period is invoiced", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(skippedWeek());
+        await service.setCollection(owner, "sub_1", {
+            weekday: 4,
+            note: "2 loaves",
+        });
+        await service.setCollection(owner, "sub_1", { weekday: null });
+        tx.invoice!.findFirst!.mockResolvedValue({ id: "inv_1" });
+        await service.setCollection(owner, "sub_1", { weekday: 3 });
+        expect(issueInTx).not.toHaveBeenCalled();
     });
 });
 
