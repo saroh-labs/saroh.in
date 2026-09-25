@@ -46,14 +46,25 @@
   delivery state, else the business's state — same state CGST + SGST, else
   IGST. Registered → tax invoice; unregistered → receipt. A registered
   business's orders ignore the storefront's old add-on tax.
-- **Numbering:** `InvoiceSequence` per business **and series** — prefix +
-  financial year when registered, plain prefix otherwise; credit notes on
-  their own series; the full number ≤ 16 characters; never renumber an
-  existing invoice. The year starts in the business's
-  `financialYearStartMonth` (default 4, April–March: "26-27"; January carries
-  one year, "2026"). The series key is the label, so moving the month
-  mid-year continues whichever series today's new label names — possibly an
-  earlier year's, after its last number.
+- **Numbering:** `InvoiceSequence` per business **and series**; never renumber
+  an existing invoice. The financial year is April–March for everyone (GST
+  sets it; not a setting). A business builds its format
+  (`BusinessProfile.invoiceNumberFormat`, `NumberFormat` in `numbering.ts`):
+  parts in its order (prefix, financial year "26-27", year, month), "/" or
+  "-", a 3–6 digit counter last, restarting every financial year, every month
+  or — unregistered only — never. Null is the default, today's numbers:
+  RC/26-27/0001 registered, RC-0001 not, the legacy INV series with no prefix.
+  `numberFormatProblem` is the rule, mirrored in the app's
+  `lib/invoices/invoice-number.ts`: the longest number, invoice or credit
+  note, ≤ 16 characters of A–Z 0–9 - /; a yearly restart needs the financial
+  year or year in the number, a monthly one the month and one of them (the
+  database holds each number once). The series key is prefix + restart period
+  (`RC/26-27`, `RC/2026-09`, `RC`), not the rest of the format, so a mid-year
+  change keeps counting; `nextInvoiceNumber` checks the number is free and
+  otherwise jumps past the highest issued one with the same stem. Credit notes
+  count on their own series (`RCCN/…`) and print "CN" after the prefix, or
+  in its place where that would pass 16 (`CN/26-27/09/0001`), or first when
+  the number has no prefix; supplementary invoices share the invoices'.
 - **Tax settings are Owner/Admin only.**
 - **Where it lives:** the maths is pure — `invoices/gst.ts` (split, spread,
   place of supply), `invoices/gst-states.ts` (state codes, GSTIN checks),

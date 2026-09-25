@@ -12,6 +12,8 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import type { NumberRestart } from "../invoices/numbering";
+import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
 import { logoProblem } from "./business-logo";
 import type {
@@ -72,9 +74,9 @@ const PROFILE_SELECT = {
     gstRegistered: true,
     gstState: true,
     invoicePrefix: true,
+    invoiceNumberFormat: true,
     deliveryGstRate: true,
     deliverySacCode: true,
-    financialYearStartMonth: true,
     logoMediaId: true,
     logoUrl: true,
     addressLine1: true,
@@ -94,9 +96,9 @@ interface ProfileRow {
     gstRegistered: boolean;
     gstState: string | null;
     invoicePrefix: string | null;
+    invoiceNumberFormat: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
-    financialYearStartMonth: number;
     logoMediaId: string | null;
     logoUrl: string | null;
     addressLine1: string | null;
@@ -105,11 +107,14 @@ interface ProfileRow {
     postalCode: string | null;
 }
 
-function splitProfile(p: ProfileRow | null) {
+function splitProfile(
+    p: ProfileRow | null,
+    counters?: Record<NumberRestart, number>,
+) {
     if (!p) {
         return {
             profile: null,
-            tax: taxView(null),
+            tax: taxView(null, counters),
             registeredAddress: addressView(null),
             logo: null,
         };
@@ -118,9 +123,9 @@ function splitProfile(p: ProfileRow | null) {
         gstRegistered: _r,
         gstState: _s,
         invoicePrefix: _p,
+        invoiceNumberFormat: _n,
         deliveryGstRate: _d,
         deliverySacCode: _c,
-        financialYearStartMonth: _f,
         logoMediaId,
         logoUrl,
         addressLine1: _a1,
@@ -131,7 +136,7 @@ function splitProfile(p: ProfileRow | null) {
     } = p;
     return {
         profile,
-        tax: taxView(p),
+        tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
     };
@@ -319,7 +324,13 @@ export class OrganizationSettingsService {
             id: settings.id,
             name: settings.name,
             slug: settings.slug,
-            ...splitProfile(settings.businessProfile),
+            ...splitProfile(
+                settings.businessProfile,
+                await this.counters(
+                    ctx.organizationId,
+                    settings.businessProfile,
+                ),
+            ),
             tradingSince: await this.firstOrderAt(ctx.organizationId),
         };
     }
@@ -406,8 +417,42 @@ export class OrganizationSettingsService {
             id: organization.id,
             name: organization.name,
             slug: organization.slug,
-            ...splitProfile(organization.businessProfile),
+            ...splitProfile(
+                organization.businessProfile,
+                await this.counters(
+                    organizationId,
+                    organization.businessProfile,
+                ),
+            ),
             tradingSince: await this.firstOrderAt(organizationId),
+        };
+    }
+
+    /**
+     * Where the business's invoice series stand now, for each way of
+     * restarting — this financial year's, this month's and the running
+     * counter's last number — so the Tax card can say what the next invoice
+     * will be called, in the stored format or one being tried.
+     */
+    private async counters(
+        organizationId: string,
+        p: Pick<ProfileRow, "invoicePrefix" | "timezone"> | null,
+    ): Promise<Record<NumberRestart, number>> {
+        const keys = invoiceSeriesKeys(
+            p?.invoicePrefix ?? null,
+            new Date(),
+            p?.timezone,
+        );
+        const rows = await prisma.invoiceSequence.findMany({
+            where: { organizationId, series: { in: Object.values(keys) } },
+            select: { series: true, lastNumber: true },
+        });
+        const last = (key: string) =>
+            rows.find((r) => r.series === key)?.lastNumber ?? 0;
+        return {
+            FY: last(keys.FY),
+            MONTH: last(keys.MONTH),
+            NEVER: last(keys.NEVER),
         };
     }
 

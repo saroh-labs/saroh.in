@@ -27,8 +27,11 @@ export interface TaxProfile {
     state: string | null;
     prefix: string | null;
     timezone: string | null;
-    /** The month the financial year starts, 1–12; absent, April. */
-    fyStartMonth?: number;
+    /**
+     * How its numbers are built, as stored (`numbering.ts`, NumberFormat);
+     * absent or null, the default for its GST standing.
+     */
+    numberFormat?: unknown;
     deliveryRateBps: number;
     deliverySac: string | null;
     /**

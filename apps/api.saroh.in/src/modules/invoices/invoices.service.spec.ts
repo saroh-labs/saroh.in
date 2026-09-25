@@ -1030,7 +1030,8 @@ describe("GST (ADR-008)", () => {
             row({ status: "ISSUED", number: "RC/26-27/0004" }),
         );
         registered();
-        tx.invoice!.findUnique!.mockResolvedValue({
+        // The original's read; the number the credit note takes is free.
+        tx.invoice!.findUnique!.mockResolvedValue(null).mockResolvedValueOnce({
             id: "inv_1",
             organizationId: "org_1",
             orderId: null,

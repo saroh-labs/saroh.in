@@ -65,6 +65,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("GSTIN or tax ID", "tax"),
     business("State for GST", "tax"),
     business("Invoice prefix and numbers", "tax"),
+    business("Invoice number format", "tax"),
     business("Financial year", "tax"),
     business("GST on delivery", "tax"),
     business("Delivery SAC", "tax"),

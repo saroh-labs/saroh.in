@@ -283,21 +283,21 @@ model BusinessProfile {
   // The registered address (CGST rule 46: a tax invoice names the supplier's
   // address). Required once GST-registered; its state is `gstState`. Copied
   // onto each invoice at issue (`Invoice.sellerAddress`).
-  addressLine1    String?
-  addressLine2    String?
-  city            String?
-  postalCode      String?
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  postalCode          String?
   // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
   // RC-0001 when not). Null: the legacy INV series.
-  invoicePrefix   String?
+  invoicePrefix       String?
+  // How the business's invoice numbers are built — { parts, separator,
+  // digits, restart } (invoices/numbering.ts, NumberFormat). Null: the
+  // default for its GST standing, the numbers every business had before it
+  // could choose (RC/26-27/0001 registered, RC-0001 not).
+  invoiceNumberFormat Json?
   // Delivery on an order's invoice is a taxed line: this rate and SAC.
-  deliveryGstRate Decimal @default(18) @db.Decimal(5, 2)
-  deliverySacCode String?
-
-  // The month the business's financial year starts, 1–12 (4: April, India's
-  // year and every existing business's). A registered business's invoice
-  // numbers restart with each year: RC/26-27/0001.
-  financialYearStartMonth Int @default(4)
+  deliveryGstRate     Decimal @default(18) @db.Decimal(5, 2)
+  deliverySacCode     String?
 
   // The logo printed at the top of the business's invoices and receipts: a
   // library object, and the address it is served from, taken when it was
@@ -4362,8 +4362,8 @@ model InvoiceLine {
 // insert-or-increment statement on the issuing transaction, so numbers never
 // repeat and the first invoice needs no row to exist beforehand.
 // One counter per business and series (ADR-008): "INV" (the legacy series
-// every business had), "RC" / "RCCN" when unregistered, "RC/26-27" /
-// "RCCN/26-27" per financial year when registered.
+// every business had), "RC" / "RCCN" for a counter that never restarts,
+// "RC/26-27" / "RCCN/26-27" per financial year, "RC/2026-09" per month.
 model InvoiceSequence {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

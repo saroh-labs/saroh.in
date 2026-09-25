@@ -32,6 +32,8 @@ function makeTx() {
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),
+            // No invoice already carries the number taken.
+            findUnique: jest.fn().mockResolvedValue(null),
             update: jest.fn(),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },

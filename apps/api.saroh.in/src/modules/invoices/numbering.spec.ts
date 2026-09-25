@@ -1,15 +1,27 @@
+import type { NumberFormat } from "./numbering";
 import {
+    creditMark,
+    defaultNumberFormat,
     financialYear,
     formatInvoiceNumber,
+    invoiceSeriesKeys,
     LEGACY_SERIES,
+    longestNumber,
     nextInvoiceNumber,
+    numberFormatFor,
+    numberFormatProblem,
     prefixProblem,
+    readNumberFormat,
     seriesFor,
 } from "./numbering";
 
-/** A counter per (business, series), like the table: upsert-increment. */
-function fakeSequencer() {
+/**
+ * A counter per (business, series), like the table: upsert-increment — and
+ * the business's issued numbers, which the unique index keeps one of each.
+ */
+function fakeSequencer(issued: string[] = []) {
     const rows = new Map<string, number>();
+    const numbers = new Set(issued);
     const upsert = jest.fn(
         ({
             where,
@@ -28,7 +40,51 @@ function fakeSequencer() {
             return Promise.resolve({ lastNumber: next });
         },
     );
-    return { tx: { invoiceSequence: { upsert } }, upsert, rows };
+    const update = jest.fn(
+        ({
+            where,
+            data,
+        }: {
+            where: {
+                organizationId_series: {
+                    organizationId: string;
+                    series: string;
+                };
+            };
+            data: { lastNumber: number };
+        }) => {
+            const { organizationId, series } = where.organizationId_series;
+            rows.set(`${organizationId}|${series}`, data.lastNumber);
+            return Promise.resolve({ lastNumber: data.lastNumber });
+        },
+    );
+    const findUnique = jest.fn(
+        ({ where }: { where: { organizationId_number: { number: string } } }) =>
+            Promise.resolve(
+                numbers.has(where.organizationId_number.number)
+                    ? { id: "inv" }
+                    : null,
+            ),
+    );
+    const findMany = jest.fn(
+        ({ where }: { where: { number: { startsWith: string } } }) =>
+            Promise.resolve(
+                [...numbers]
+                    .filter((n) => n.startsWith(where.number.startsWith))
+                    .map((number) => ({ number })),
+            ),
+    );
+    /** Take the next number in a series and issue it. */
+    const issue = async (series: ReturnType<typeof seriesFor>) => {
+        const n = await nextInvoiceNumber(tx as never, "org_1", series);
+        numbers.add(n);
+        return n;
+    };
+    const tx = {
+        invoiceSequence: { upsert, update },
+        invoice: { findUnique, findMany },
+    };
+    return { tx, upsert, update, rows, issue, numbers };
 }
 
 describe("invoice numbering", () => {
@@ -42,7 +98,10 @@ describe("invoice numbering", () => {
 
     it("takes the number with one upsert keyed on business and series", async () => {
         const upsert = jest.fn().mockResolvedValue({ lastNumber: 1 });
-        const tx = { invoiceSequence: { upsert } };
+        const tx = {
+            invoiceSequence: { upsert },
+            invoice: { findUnique: jest.fn().mockResolvedValue(null) },
+        };
 
         await expect(nextInvoiceNumber(tx as never, "org_1")).resolves.toBe(
             "INV-0001",
@@ -207,108 +266,432 @@ describe("issuing across 1 April", () => {
     });
 });
 
-describe("a financial year the business chose", () => {
-    const kolkata = "Asia/Kolkata";
+// ── The business's number format ────────────────────────────────────────────
 
-    it("starts on the 1st of the month chosen, in the business's own time", () => {
-        // July to June.
-        expect(
-            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 7),
-        ).toBe("26-27");
-        expect(
-            financialYear(new Date("2026-06-30T10:00:00Z"), kolkata, 7),
-        ).toBe("25-26");
-        // 1 July 00:10 in India is still 30 June in UTC.
-        expect(
-            financialYear(new Date("2026-06-30T18:40:00Z"), kolkata, 7),
-        ).toBe("26-27");
-        // October to September: late September is still the year before.
-        expect(
-            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 10),
-        ).toBe("25-26");
+const REGISTERED_DEFAULT: NumberFormat = {
+    parts: ["PREFIX", "FY"],
+    separator: "/",
+    digits: 4,
+    restart: "FY",
+};
+const MONTHLY: NumberFormat = {
+    parts: ["PREFIX", "FY", "MONTH"],
+    separator: "/",
+    digits: 4,
+    restart: "MONTH",
+};
+
+describe("defaults: a business that never chose a format keeps its numbers", () => {
+    const at = new Date("2026-09-23T10:00:00Z");
+    const number = (
+        registered: boolean,
+        prefix: string | null,
+        kind: "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY" = "INVOICE",
+        format: unknown = null,
+    ) => {
+        const s = seriesFor({ registered, prefix, kind, at, format });
+        return [s.key, s.format(1)];
+    };
+
+    it("registered with a prefix: RC/26-27/0001, per financial year", () => {
+        expect(number(true, "RC")).toEqual(["RC/26-27", "RC/26-27/0001"]);
+        expect(number(true, "RC", "CREDIT_NOTE")).toEqual([
+            "RCCN/26-27",
+            "RCCN/26-27/0001",
+        ]);
+        expect(number(true, "RC", "SUPPLEMENTARY")).toEqual([
+            "RC/26-27",
+            "RC/26-27/0001",
+        ]);
     });
 
-    it("a year from January spans one calendar year and carries it whole", () => {
-        expect(
-            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 1),
-        ).toBe("2026");
-        expect(
-            financialYear(new Date("2026-12-31T18:40:00Z"), kolkata, 1),
-        ).toBe("2027");
-        const s = seriesFor({
-            registered: true,
-            prefix: "ABC",
-            kind: "CREDIT_NOTE",
-            at: new Date("2026-09-23T10:00:00Z"),
-            fyStartMonth: 1,
+    it("not registered with a prefix: RC-0001, one running counter", () => {
+        expect(number(false, "RC")).toEqual(["RC", "RC-0001"]);
+        expect(number(false, "RC", "CREDIT_NOTE")).toEqual([
+            "RCCN",
+            "RCCN-0001",
+        ]);
+    });
+
+    it("no prefix: the legacy INV series", () => {
+        const legacy = seriesFor({
+            registered: false,
+            prefix: null,
+            kind: "INVOICE",
+            at,
         });
-        expect(s.format(9999)).toBe("ABCCN/2026/9999");
+        expect(legacy.key).toBe(LEGACY_SERIES.key);
+        expect(legacy.format(12)).toBe(LEGACY_SERIES.format(12));
+        expect(number(false, null, "CREDIT_NOTE")).toEqual([
+            "INVCN",
+            "INVCN-0001",
+        ]);
+        expect(number(true, null)).toEqual(["INV/26-27", "INV/26-27/0001"]);
     });
 
-    it("absent or out of range, it is April", () => {
-        const at = new Date("2026-03-15T10:00:00Z");
-        expect(financialYear(at, kolkata, 0)).toBe("25-26");
-        expect(financialYear(at, kolkata, 13)).toBe("25-26");
-        expect(
-            seriesFor({
-                registered: true,
-                prefix: "RC",
-                kind: "INVOICE",
-                at,
-                fyStartMonth: null,
-            }).key,
-        ).toBe("RC/25-26");
+    it("a stored format that is not one is read as none", () => {
+        for (const junk of [
+            null,
+            "RC",
+            [],
+            { parts: ["PREFIX"], separator: "|", digits: 4, restart: "FY" },
+            {
+                parts: ["PREFIX", "PREFIX"],
+                separator: "/",
+                digits: 4,
+                restart: "FY",
+            },
+            { parts: ["PREFIX"], separator: "/", digits: 7, restart: "FY" },
+            { parts: ["WEEK"], separator: "/", digits: 4, restart: "FY" },
+        ]) {
+            expect(readNumberFormat(junk)).toBeNull();
+            expect(number(true, "RC", "INVOICE", junk)[1]).toBe(
+                "RC/26-27/0001",
+            );
+        }
+        expect(numberFormatFor(null, false)).toEqual(
+            defaultNumberFormat(false),
+        );
     });
 
-    it("an unregistered business's plain series has no year to restart", () => {
-        expect(
-            seriesFor({
-                registered: false,
-                prefix: "PF",
-                kind: "INVOICE",
-                at: new Date("2026-09-23T10:00:00Z"),
-                fyStartMonth: 1,
-            }).key,
-        ).toBe("PF");
+    it("the defaults are valid formats for any valid prefix", () => {
+        for (const registered of [true, false]) {
+            for (const prefix of [null, "R", "RC", "ABC"]) {
+                expect(
+                    numberFormatProblem(defaultNumberFormat(registered), {
+                        registered,
+                        prefix,
+                    }),
+                ).toBeNull();
+            }
+        }
     });
 });
 
-describe("moving the start month mid-year", () => {
-    // RC/25-26 ran April 2025 to March 2026 and reached 0312; RC/26-27 has
-    // reached 0057 by 23 September 2026, when the business changes month.
+describe("a chosen format", () => {
     const at = new Date("2026-09-23T10:00:00Z");
-    async function after(fyStartMonth: number) {
-        const { tx, rows } = fakeSequencer();
-        rows.set("org_1|RC/25-26", 312);
-        rows.set("org_1|RC/26-27", 57);
-        const next = await nextInvoiceNumber(
-            tx as never,
-            "org_1",
+    const make = (
+        format: NumberFormat,
+        kind: "INVOICE" | "CREDIT_NOTE" = "INVOICE",
+        prefix: string | null = "RC",
+        registered = true,
+    ) => seriesFor({ registered, prefix, kind, at, format });
+
+    it("prints its parts in its order, with its separator and digits", () => {
+        expect(make(MONTHLY).format(1)).toBe("RC/26-27/09/0001");
+        expect(
+            make({
+                parts: ["FY", "PREFIX"],
+                separator: "-",
+                digits: 3,
+                restart: "FY",
+            }).format(7),
+        ).toBe("26-27-RC-007");
+        expect(
+            make({
+                parts: ["PREFIX", "YEAR", "MONTH"],
+                separator: "-",
+                digits: 5,
+                restart: "MONTH",
+            }).format(42),
+        ).toBe("RC-2026-09-00042");
+        expect(
+            make(
+                { parts: [], separator: "/", digits: 6, restart: "NEVER" },
+                "INVOICE",
+                "RC",
+                false,
+            ).format(3),
+        ).toBe("000003");
+    });
+
+    it("the counter grows past its digits rather than wrap", () => {
+        expect(make({ ...REGISTERED_DEFAULT, digits: 3 }).format(1000)).toBe(
+            "RC/26-27/1000",
+        );
+    });
+
+    it("the series is the prefix and the restart period, not the rest of the format", () => {
+        expect(make(REGISTERED_DEFAULT).key).toBe("RC/26-27");
+        expect(
+            make({
+                parts: ["PREFIX", "YEAR", "FY"],
+                separator: "-",
+                digits: 6,
+                restart: "FY",
+            }).key,
+        ).toBe("RC/26-27");
+        expect(make(MONTHLY).key).toBe("RC/2026-09");
+        expect(make(MONTHLY, "CREDIT_NOTE").key).toBe("RCCN/2026-09");
+        expect(
+            make(
+                {
+                    parts: ["PREFIX"],
+                    separator: "/",
+                    digits: 4,
+                    restart: "NEVER",
+                },
+                "INVOICE",
+                "RC",
+                false,
+            ).key,
+        ).toBe("RC");
+        expect(invoiceSeriesKeys("RC", at)).toEqual({
+            FY: "RC/26-27",
+            MONTH: "RC/2026-09",
+            NEVER: "RC",
+        });
+        expect(invoiceSeriesKeys(null, at).NEVER).toBe(LEGACY_SERIES.key);
+    });
+
+    it("the month is the business's own: 1 October 00:10 in India is October", () => {
+        const s = seriesFor({
+            registered: true,
+            prefix: "RC",
+            kind: "INVOICE",
+            at: new Date("2026-09-30T18:40:00Z"),
+            timezone: "Asia/Kolkata",
+            format: MONTHLY,
+        });
+        expect(s.key).toBe("RC/2026-10");
+        expect(s.format(1)).toBe("RC/26-27/10/0001");
+    });
+
+    it("a stored counter that never restarts meets a registered business as yearly", () => {
+        const never = {
+            parts: ["PREFIX", "FY"],
+            separator: "/",
+            digits: 4,
+            restart: "NEVER",
+        };
+        expect(numberFormatFor(never, true).restart).toBe("FY");
+        expect(numberFormatFor(never, false).restart).toBe("NEVER");
+    });
+
+    describe("credit notes can never share an invoice's number", () => {
+        it("carry CN after the prefix where it fits, as they always have", () => {
+            expect(creditMark(REGISTERED_DEFAULT, "ABC")).toBe("after");
+            expect(make(REGISTERED_DEFAULT, "CREDIT_NOTE").format(1)).toBe(
+                "RCCN/26-27/0001",
+            );
+        });
+
+        it("carry CN in the prefix's place where after it would pass 16", () => {
+            // RCCN/26-27/09/0001 would be 18.
+            expect(creditMark(MONTHLY, "RC")).toBe("instead");
+            expect(make(MONTHLY, "CREDIT_NOTE").format(1)).toBe(
+                "CN/26-27/09/0001",
+            );
+            expect(make(MONTHLY).format(1)).toBe("RC/26-27/09/0001");
+        });
+
+        it("lead with CN when the number has no prefix", () => {
+            const bare: NumberFormat = {
+                parts: ["FY", "MONTH"],
+                separator: "-",
+                digits: 4,
+                restart: "MONTH",
+            };
+            expect(creditMark(bare, "RC")).toBe("first");
+            expect(make(bare).format(1)).toBe("26-27-09-0001");
+            expect(make(bare, "CREDIT_NOTE").format(1)).toBe(
+                "CN-26-27-09-0001",
+            );
+        });
+    });
+});
+
+describe("format rules", () => {
+    const problem = (
+        format: NumberFormat,
+        registered = true,
+        prefix: string | null = "RC",
+    ) => numberFormatProblem(format, { registered, prefix });
+
+    it("the approved example is valid: RC/26-27/09/0001, 16 characters", () => {
+        expect(problem(MONTHLY)).toBeNull();
+        expect(longestNumber(MONTHLY, "RC")).toHaveLength(16);
+    });
+
+    it("never restarting is only for a business that is not registered", () => {
+        const never: NumberFormat = {
+            parts: ["PREFIX"],
+            separator: "-",
+            digits: 4,
+            restart: "NEVER",
+        };
+        expect(problem(never, false)).toBeNull();
+        expect(problem(never, true)?.field).toBe("invoiceNumberRestart");
+    });
+
+    it("a yearly restart needs the financial year or the year", () => {
+        const noYear: NumberFormat = {
+            parts: ["PREFIX", "MONTH"],
+            separator: "/",
+            digits: 4,
+            restart: "FY",
+        };
+        expect(problem(noYear)).toMatchObject({
+            field: "invoiceNumberParts",
+            message: expect.stringMatching(/financial year or the year/),
+        });
+        expect(problem({ ...noYear, parts: ["PREFIX", "YEAR"] })).toBeNull();
+        expect(problem({ ...noYear, parts: ["PREFIX", "FY"] })).toBeNull();
+    });
+
+    it("a monthly restart needs the month, and the financial year or the year", () => {
+        expect(problem({ ...MONTHLY, parts: ["PREFIX", "FY"] })).toMatchObject({
+            field: "invoiceNumberParts",
+            message: expect.stringMatching(/month in them/),
+        });
+        expect(
+            problem({ ...MONTHLY, parts: ["PREFIX", "MONTH"] }),
+        ).toMatchObject({
+            field: "invoiceNumberParts",
+            message: expect.stringMatching(/same month comes round/),
+        });
+        expect(
+            problem({ ...MONTHLY, parts: ["PREFIX", "YEAR", "MONTH"] }),
+        ).toBeNull();
+    });
+
+    it("the longest number, invoice or credit note, is at most 16 characters", () => {
+        // RC/26-27/09/00001: 17.
+        expect(problem({ ...MONTHLY, digits: 5 })).toMatchObject({
+            field: "invoiceNumberDigits",
+            message: expect.stringMatching(/RC\/26-27\/09\/99999, is 17/),
+        });
+        // No prefix: CN/26-27/09/000001 is the long one, 18.
+        expect(
+            problem({ ...MONTHLY, parts: ["FY", "MONTH"], digits: 6 }),
+        ).toMatchObject({
+            field: "invoiceNumberDigits",
+            message: expect.stringMatching(/CN\/26-27\/09\/999999, is 18/),
+        });
+        expect(
+            problem({
+                parts: ["PREFIX", "YEAR", "FY", "MONTH"],
+                separator: "-",
+                digits: 3,
+                restart: "MONTH",
+            }),
+        ).toMatchObject({ field: "invoiceNumberDigits" });
+    });
+
+    it("uses only capitals, digits, - and /", () => {
+        expect(longestNumber(MONTHLY, "RC")).toMatch(/^[A-Z0-9/-]+$/);
+        expect(problem(REGISTERED_DEFAULT, true, "r c")).toMatchObject({
+            field: "invoiceNumberParts",
+        });
+    });
+
+    it("CN cannot be the prefix where it takes the prefix's place", () => {
+        expect(problem(MONTHLY, true, "CN")).toMatchObject({
+            field: "invoicePrefix",
+        });
+        // Where it follows the prefix, CNCN/26-27/0001 is its own.
+        expect(problem(REGISTERED_DEFAULT, true, "CN")).toBeNull();
+    });
+});
+
+describe("changing the format mid-year", () => {
+    const sept = new Date("2026-09-10T10:00:00Z");
+    const series = (format: NumberFormat | null, at = sept) =>
+        seriesFor({
+            registered: true,
+            prefix: "RC",
+            kind: "INVOICE",
+            at,
+            format,
+        });
+
+    it("renumbers nothing and carries on counting in the same series", async () => {
+        const { issue } = fakeSequencer();
+        expect(await issue(series(null))).toBe("RC/26-27/0001");
+        expect(await issue(series(null))).toBe("RC/26-27/0002");
+        // Same restart (the financial year), new parts, separator and digits.
+        const withMonth: NumberFormat = {
+            parts: ["PREFIX", "FY", "MONTH"],
+            separator: "-",
+            digits: 3,
+            restart: "FY",
+        };
+        expect(await issue(series(withMonth))).toBe("RC-26-27-09-003");
+        // And back: the counter never went back.
+        expect(await issue(series(null))).toBe("RC/26-27/0004");
+    });
+
+    it("a new restart period starts its own series", async () => {
+        const { issue } = fakeSequencer();
+        await issue(series(null));
+        await issue(series(null));
+        expect(await issue(series(MONTHLY))).toBe("RC/26-27/09/0001");
+    });
+
+    it("steps past a number the business already issued, never hitting the unique index", async () => {
+        // September's numbers were taken on the yearly counter, in a format
+        // that happened to carry the month...
+        const { issue, update, numbers } = fakeSequencer();
+        const yearlyWithMonth: NumberFormat = { ...MONTHLY, restart: "FY" };
+        for (let i = 0; i < 5; i++) await issue(series(yearlyWithMonth));
+        expect(numbers).toContain("RC/26-27/09/0005");
+        // ...so September's own monthly counter would start on one of them.
+        expect(await issue(series(MONTHLY))).toBe("RC/26-27/09/0006");
+        expect(update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_series: {
+                        organizationId: "org_1",
+                        series: "RC/2026-09",
+                    },
+                },
+                data: { lastNumber: 6 },
+            }),
+        );
+        // And carries on from there.
+        expect(await issue(series(MONTHLY))).toBe("RC/26-27/09/0007");
+        expect(numbers.size).toBe(7);
+    });
+
+    it("steps past numbers from before a counter was kept", async () => {
+        const { issue } = fakeSequencer(["RC-0001", "RC-0002", "RC-0010"]);
+        const plain = seriesFor({
+            registered: false,
+            prefix: "RC",
+            kind: "INVOICE",
+            at: sept,
+        });
+        expect(await issue(plain)).toBe("RC-0011");
+    });
+});
+
+describe("issuing across a month's end on a monthly counter", () => {
+    it("restarts at 0001 on the 1st, in the business's time", async () => {
+        const { issue } = fakeSequencer();
+        const at = (iso: string) =>
             seriesFor({
                 registered: true,
                 prefix: "RC",
                 kind: "INVOICE",
-                at,
-                fyStartMonth,
-            }),
+                at: new Date(iso),
+                format: MONTHLY,
+            });
+        expect(await issue(at("2026-09-30T18:00:00Z"))).toBe(
+            "RC/26-27/09/0001",
         );
-        return { next, rows };
-    }
-
-    it("a month that keeps today's label keeps counting", async () => {
-        // July: July 2026 to June 2027 is still 26-27.
-        expect((await after(7)).next).toBe("RC/26-27/0058");
-    });
-
-    it("a label never used starts at 0001", async () => {
-        expect((await after(1)).next).toBe("RC/2026/0001");
-    });
-
-    it("a label an earlier year used continues after its last number, never repeating one", async () => {
-        // October: today falls in October 2025 to September 2026, "25-26".
-        const { next, rows } = await after(10);
-        expect(next).toBe("RC/25-26/0313");
-        // What 26-27 issued is untouched.
-        expect(rows.get("org_1|RC/26-27")).toBe(57);
+        expect(await issue(at("2026-09-30T18:20:00Z"))).toBe(
+            "RC/26-27/09/0002",
+        );
+        // 00:00 IST, 1 October.
+        expect(await issue(at("2026-09-30T18:30:00Z"))).toBe(
+            "RC/26-27/10/0001",
+        );
+        // 31 March → 1 April: a new month and a new financial year.
+        expect(await issue(at("2027-03-31T18:29:00Z"))).toBe(
+            "RC/26-27/03/0001",
+        );
+        expect(await issue(at("2027-03-31T18:30:00Z"))).toBe(
+            "RC/27-28/04/0001",
+        );
     });
 });

@@ -1,5 +1,9 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type {
+    NumberFormat,
+    NumberRestart,
+} from "@/lib/invoices/invoice-number";
 
 /**
  * Organization settings access (name + business profile).
@@ -28,8 +32,18 @@ export interface TaxSettings {
     /** Percent, e.g. "18". */
     deliveryRate: string;
     deliverySac: string | null;
-    /** The month the financial year starts, 1–12; absent from an older API: April. */
-    financialYearStart?: number;
+    /** How invoice numbers are built; absent from an older API: the default. */
+    invoiceNumber?: InvoiceNumberSettings;
+}
+
+/**
+ * The business's number format — chosen (`custom`), or the default for its
+ * GST standing — and the last number each of its invoice series took in the
+ * current period, per way of restarting (0: none yet).
+ */
+export interface InvoiceNumberSettings extends NumberFormat {
+    custom: boolean;
+    counters: Record<NumberRestart, number>;
 }
 
 /**
@@ -74,7 +88,8 @@ export interface TaxSettingsInput {
     invoicePrefix?: string;
     deliveryRate?: string;
     deliverySac?: string;
-    financialYearStart?: number;
+    /** Sent whole when changed. */
+    invoiceNumber?: NumberFormat;
 }
 
 export interface OrganizationSettingsInput {

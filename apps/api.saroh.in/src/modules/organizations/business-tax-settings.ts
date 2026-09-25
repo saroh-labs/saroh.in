@@ -1,11 +1,20 @@
 import { BadRequestException } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
+import type {
+    NumberFormat,
+    NumberPart,
+    NumberRestart,
+    NumberSeparator,
+} from "../invoices/numbering";
 import {
-    DEFAULT_FY_START_MONTH,
-    isFyStartMonth,
+    defaultNumberFormat,
+    numberFormatFor,
+    numberFormatProblem,
     prefixProblem,
+    readNumberFormat,
 } from "../invoices/numbering";
 import type { UpdateOrganizationDto } from "./dto";
 
@@ -24,8 +33,23 @@ export interface TaxSettingsView {
     /** The GST rate on delivery, in percent ("18"). */
     deliveryRate: string;
     deliverySac: string | null;
-    /** The month the financial year starts, 1–12 (4: April). */
-    financialYearStart: number;
+    /** How invoice numbers are built, and where their counters stand. */
+    invoiceNumber: InvoiceNumberView;
+}
+
+/**
+ * The business's number format — the one it chose, else the default for its
+ * standing (`custom: false`) — and, for the preview of the next number, the
+ * last number its invoice series took in the current period for each way of
+ * restarting (0: none yet). The financial year is April–March, fixed.
+ */
+export interface InvoiceNumberView {
+    parts: NumberPart[];
+    separator: NumberSeparator;
+    digits: number;
+    restart: NumberRestart;
+    custom: boolean;
+    counters: Record<NumberRestart, number>;
 }
 
 export interface RegisteredAddressView {
@@ -47,9 +71,9 @@ export type TaxData = Partial<{
     city: string | null;
     postalCode: string | null;
     invoicePrefix: string | null;
+    invoiceNumberFormat: Prisma.InputJsonObject;
     deliveryGstRate: string;
     deliverySacCode: string | null;
-    financialYearStartMonth: number;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -57,10 +81,10 @@ export interface TaxProfileColumns {
     gstRegistered: boolean;
     gstState: string | null;
     invoicePrefix: string | null;
+    /** As stored; absent on a profile read without it: the default. */
+    invoiceNumberFormat?: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
-    /** Absent on a profile read without it: April. */
-    financialYearStartMonth?: number;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -73,6 +97,8 @@ export const TAX_CURRENT_SELECT = {
     gstState: true,
     taxId: true,
     country: true,
+    invoicePrefix: true,
+    invoiceNumberFormat: true,
     addressLine1: true,
     addressLine2: true,
     city: true,
@@ -84,14 +110,27 @@ export interface TaxCurrent {
     gstState: string | null;
     taxId: string | null;
     country: string | null;
+    invoicePrefix?: string | null;
+    invoiceNumberFormat?: unknown;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
 }
 
-export function taxView(p: TaxProfileColumns | null): TaxSettingsView {
+const NO_COUNTERS: Record<NumberRestart, number> = {
+    FY: 0,
+    MONTH: 0,
+    NEVER: 0,
+};
+
+export function taxView(
+    p: TaxProfileColumns | null,
+    counters: Record<NumberRestart, number> = NO_COUNTERS,
+): TaxSettingsView {
     const bps = rateToBps(p?.deliveryGstRate ?? "18") ?? 1800;
+    const registered = p?.gstRegistered ?? false;
+    const format = numberFormatFor(p?.invoiceNumberFormat, registered);
     return {
         registered: p?.gstRegistered ?? false,
         state: p?.gstState ?? null,
@@ -99,8 +138,11 @@ export function taxView(p: TaxProfileColumns | null): TaxSettingsView {
         invoicePrefix: p?.invoicePrefix ?? null,
         deliveryRate: bpsToRate(bps),
         deliverySac: p?.deliverySacCode ?? null,
-        financialYearStart:
-            p?.financialYearStartMonth ?? DEFAULT_FY_START_MONTH,
+        invoiceNumber: {
+            ...format,
+            custom: readNumberFormat(p?.invoiceNumberFormat) !== null,
+            counters,
+        },
     };
 }
 
@@ -170,8 +212,10 @@ export function touchesTax(sent: TaxSent): boolean {
  * (ADR-008). Registering needs a GSTIN — the profile's tax ID, sent in the
  * same PATCH or already saved — in the register's shape, with its check
  * character, from the state chosen (or, with none chosen, its own). A
- * registered business cannot clear its GSTIN. The prefix keeps every
- * number within GST's 16 characters.
+ * registered business cannot clear its GSTIN. The number format — the one
+ * sent, else the one stored, else the default — must suit the business as
+ * it will be ({@link numberFormatProblem}): changing the prefix or the
+ * registration re-checks it.
  *
  * The registered address goes with them: a registered business needs a
  * first line, a city and a PIN (CGST rule 46), and an Indian business's
@@ -248,6 +292,46 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
             data.invoicePrefix = prefix;
         }
     }
+    const sentFormat = tax?.invoiceNumber;
+    let format: NumberFormat | null = null;
+    if (sentFormat !== undefined) {
+        format = readNumberFormat(sentFormat);
+        if (!format) {
+            taxError(
+                "That is not a number format we know.",
+                "invoiceNumberParts",
+            );
+        }
+        data.invoiceNumberFormat = {
+            parts: format.parts,
+            separator: format.separator,
+            digits: format.digits,
+            restart: format.restart,
+        };
+    }
+    const problem = numberFormatProblem(
+        // The stored format as it is, not as numbering would bend it: a
+        // business registering with a counter that never restarts is told.
+        format ??
+            readNumberFormat(current?.invoiceNumberFormat) ??
+            defaultNumberFormat(registered),
+        {
+            registered,
+            prefix:
+                data.invoicePrefix !== undefined
+                    ? data.invoicePrefix
+                    : (current?.invoicePrefix ?? null),
+        },
+    );
+    if (problem) {
+        // A prefix that alone makes the number too long is the prefix's.
+        const prefixOnly =
+            !sentFormat &&
+            tax?.invoicePrefix !== undefined &&
+            problem.field === "invoiceNumberDigits";
+        taxError(problem.message, prefixOnly ? "invoicePrefix" : problem.field);
+    }
+
     if (tax?.deliveryRate !== undefined) {
         if (!isGstRate(tax.deliveryRate)) {
             taxError(
@@ -259,17 +343,6 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
     }
     if (tax?.deliverySac !== undefined) {
         data.deliverySacCode = tax.deliverySac === "" ? null : tax.deliverySac;
-    }
-    // Where the year starts decides only which series the next number is
-    // taken in (`seriesFor`); nothing already issued is renumbered.
-    if (tax?.financialYearStart !== undefined) {
-        if (!isFyStartMonth(tax.financialYearStart)) {
-            taxError(
-                "A financial year starts in a month, 1 to 12.",
-                "financialYearStart",
-            );
-        }
-        data.financialYearStartMonth = tax.financialYearStart;
     }
     return data;
 }
