@@ -232,6 +232,41 @@ describe("activityLine — values a save recorded (#509)", () => {
             }),
         ).toBe("Sanjay moved the plan from Free to Pro → Plan and billing");
     });
+
+    it("says a product marked sold out by hand, or available again (#515)", () => {
+        expect(
+            said({
+                action: "product.sold-out.mark",
+                targetType: "product",
+                targetId: "p1",
+                metadata: {
+                    product: "Rye loaf",
+                    storefront: "Hill Road",
+                    storefrontId: "s1",
+                },
+            }),
+        ).toBe("Sanjay marked Rye loaf sold out at Hill Road → Rye loaf");
+        expect(
+            said({
+                action: "product.sold-out.clear",
+                targetType: "product",
+                targetId: "p1",
+                metadata: { product: "Rye loaf", storefront: "Hill Road" },
+            }),
+        ).toBe(
+            "Sanjay marked Rye loaf available again at Hill Road → Rye loaf",
+        );
+        // It opens the product at the storefront it was marked at.
+        expect(
+            activityLine(
+                event({
+                    action: "product.sold-out.mark",
+                    targetId: "p1",
+                    metadata: { product: "Rye loaf", storefrontId: "s1" },
+                }),
+            )?.where.href,
+        ).toBe("/commerce/products/p1?storefront=s1");
+    });
 });
 
 describe("activityLine — the team", () => {

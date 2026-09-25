@@ -1,3 +1,5 @@
+import { productHref } from "@/lib/products/links";
+
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -11,14 +13,20 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * names only. So a line says the new value when there is one short enough
  * to read in a sentence, and "updated the invoice prefix" for an earlier
  * save that kept none. A role change records from and to; an invitation,
- * the role; a module switched on or off, its name; a plan, from and to.
+ * the role; a module switched on or off, its name; a plan, from and to; a
+ * product marked sold out by hand or available again (#515), the product
+ * and the storefront.
  *
  * Pure: the page reads the events (`lib/settings/activity-service.ts`) and
  * this turns each into a line, or drops it. The sheet a row opens, with
  * the whole of what changed, is `activity-detail.ts`.
  */
 
-/** The actions the page asks for: the business's settings and its team. */
+/**
+ * The actions the page asks for: the business's settings and its team, and
+ * the hand-marked Sold out (#515) — a change to what the shop sells that no
+ * stock log records.
+ */
 export const ACTIVITY_ACTIONS = [
     "organization.onboard",
     "profile.update",
@@ -30,6 +38,8 @@ export const ACTIVITY_ACTIONS = [
     "membership.accept",
     "membership.role.update",
     "membership.remove",
+    "product.sold-out.mark",
+    "product.sold-out.clear",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -191,6 +201,18 @@ const business = (tab?: BusinessTab) => ({
         ? `/settings/organization?${BUSINESS_TAB_PARAM}=${tab}`
         : "/settings/organization",
 });
+
+/** The product a Sold out change was about, at the storefront it was made. */
+function productPlace(
+    productId: string | null,
+    meta: Record<string, unknown>,
+): ActivityLine["where"] {
+    if (!productId) return { label: "Products", href: "/commerce/products" };
+    return {
+        label: text(meta.product) ?? "Product",
+        href: productHref(text(meta.storefrontId), productId),
+    };
+}
 
 export function personName(person: AuditPerson | null): string | null {
     if (!person) return null;
@@ -425,6 +447,18 @@ export function activityLine(
         }
         case "membership.remove":
             return line(`removed ${target ?? "someone"} from the team`, TEAM());
+        case "product.sold-out.mark":
+        case "product.sold-out.clear": {
+            const product = text(meta.product) ?? "a product";
+            const at = text(meta.storefront);
+            const where = at ? ` at ${at}` : "";
+            return line(
+                event.action === "product.sold-out.mark"
+                    ? `marked ${product} sold out${where}`
+                    : `marked ${product} available again${where}`,
+                productPlace(event.targetId, meta),
+            );
+        }
         default:
             return null;
     }

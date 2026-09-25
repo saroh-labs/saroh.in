@@ -185,6 +185,30 @@ describe("activityDetail — what changed", () => {
         ]);
         expect(
             rows({
+                action: "product.sold-out.mark",
+                targetId: "p1",
+                metadata: { product: "Rye loaf", storefront: "Hill Road" },
+            }),
+        ).toEqual([
+            { label: "Product", before: null, after: "Rye loaf" },
+            {
+                label: "On the shop, Hill Road",
+                before: "Available",
+                after: "Sold out",
+            },
+        ]);
+        expect(
+            rows({
+                action: "product.sold-out.clear",
+                metadata: { product: "Rye loaf", storefront: "Hill Road" },
+            }).at(-1),
+        ).toEqual({
+            label: "On the shop, Hill Road",
+            before: "Sold out",
+            after: "Available",
+        });
+        expect(
+            rows({
                 action: "organization.module.enabled",
                 targetId: "PAYMENTS",
                 metadata: { module: "Payments", enabled: true },

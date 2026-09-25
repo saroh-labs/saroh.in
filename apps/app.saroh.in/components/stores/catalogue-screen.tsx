@@ -121,11 +121,14 @@ function initials(name: string): string {
 /**
  * Stock as words, coloured only to reinforce them: out is Destructive 700,
  * at or under the product's own threshold is Saffron 700, and anything else
- * is plain. Untracked is said, never shown as zero.
+ * is plain. Untracked is said, never shown as zero — "Sold out" when it was
+ * marked sold out by hand (#515), else "Not tracked".
  */
 function stockOf(row: CatalogueRow): { text: string; tone: string } {
     if (row.stock === null) {
-        return { text: "Not tracked", tone: "text-muted-foreground" };
+        return row.soldOut
+            ? { text: "Sold out", tone: "text-destructive-subtle-foreground" }
+            : { text: "Not tracked", tone: "text-muted-foreground" };
     }
     if (row.stock <= 0) {
         return {

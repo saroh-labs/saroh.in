@@ -136,3 +136,51 @@ describe("inStorefront", () => {
         expect(inStorefront(row, "market")).toEqual(row);
     });
 });
+
+describe("sold out by hand (#515)", () => {
+    const untracked = (soldOut: [boolean, boolean]) =>
+        product({
+            id: "cake",
+            inventory: null,
+            listings: [
+                {
+                    storeId: "market",
+                    storeName: "Market Street",
+                    inventory: null,
+                    soldOut: soldOut[0],
+                    variants: [],
+                },
+                {
+                    storeId: "online",
+                    storeName: "Online",
+                    inventory: null,
+                    soldOut: soldOut[1],
+                    variants: [],
+                },
+            ],
+        });
+
+    it("reads Sold out only where every storefront marked it", () => {
+        expect(only(catalogueRows([untracked([true, true])])).soldOut).toBe(
+            true,
+        );
+        expect(only(catalogueRows([untracked([true, false])])).soldOut).toBe(
+            false,
+        );
+        expect(only(catalogueRows([untracked([false, false])])).stock).toBe(
+            null,
+        );
+    });
+
+    it("reads it per storefront under the storefront filter", () => {
+        const row = only(catalogueRows([untracked([true, false])]));
+        expect(inStorefront(row, "market")?.soldOut).toBe(true);
+        expect(inStorefront(row, "online")?.soldOut).toBe(false);
+    });
+
+    it("never calls a counted product sold out by hand", () => {
+        expect(only(catalogueRows([product({ id: "p1" })])).soldOut).toBe(
+            false,
+        );
+    });
+});

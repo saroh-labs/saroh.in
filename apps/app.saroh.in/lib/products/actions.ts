@@ -21,6 +21,7 @@ import {
     reorderVariants as reorderVariantsApi,
     replaceProductImages as replaceProductImagesApi,
     setInventory as setInventoryApi,
+    setProductSoldOut as setProductSoldOutApi,
     setProductStockTracking as setProductStockTrackingApi,
     setVariantStock as setVariantStockApi,
     updateCategory as updateCategoryApi,
@@ -95,6 +96,15 @@ export async function setProductStockTracking(
     tracked: boolean,
 ) {
     return setProductStockTrackingApi(productId, tracked);
+}
+
+/** Sold out by hand at one storefront, or available again (#515). */
+export async function setProductSoldOut(
+    productId: string,
+    storefrontId: string,
+    soldOut: boolean,
+) {
+    return setProductSoldOutApi(productId, storefrontId, soldOut);
 }
 
 /** One section of a product; the API judges the whole product after it. */

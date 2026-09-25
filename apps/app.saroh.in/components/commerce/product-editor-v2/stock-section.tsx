@@ -5,12 +5,17 @@ import { showError } from "@saroh/ui/toast";
 import { Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
+import { SoldOutActions } from "@/components/commerce/product-page/sold-out-actions";
 import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 import type { TrackingControl } from "@/lib/products/tracking";
-import { TRACKING_LOCKED } from "@/lib/products/tracking";
+import {
+    TRACKING_LOCKED,
+    UNTRACKED_NOTE,
+    untrackedLine,
+} from "@/lib/products/tracking";
 
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp } from "./fields";
@@ -199,6 +204,10 @@ export function StockSection({
         ) : null;
 
     if (!tracked) {
+        // Sold out by hand (#515): anyone who may count stock marks it, per
+        // storefront; everyone else reads where it is sold out.
+        const places = product.storefronts ?? [];
+        const line = untrackedLine(places);
         return (
             <SectionCard
                 k="stock"
@@ -208,11 +217,20 @@ export function StockSection({
             >
                 {lockedNote}
                 <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
-                    Not tracked. This product is always available on the shop,
-                    with no count and no &ldquo;Sold out&rdquo;. Use it for
-                    things made to order. Turning it back on starts from a count
-                    of 0, so count it first.
+                    {UNTRACKED_NOTE}
                 </p>
+                {line !== "Available on the shop." ? (
+                    <p className="mt-2 text-pretty text-[12.5px] font-medium text-destructive-subtle-foreground">
+                        {line}
+                    </p>
+                ) : null}
+                {control !== "hidden" ? (
+                    <SoldOutActions
+                        productId={product.id}
+                        places={places}
+                        className="mt-2.5"
+                    />
+                ) : null}
             </SectionCard>
         );
     }

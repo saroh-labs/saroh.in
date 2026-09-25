@@ -82,8 +82,11 @@ export default async function NewOrderPage({
                     name: p.name,
                     price: p.price,
                     variants: p.variants,
-                    // Counted here and nothing on the shelf (#511).
-                    soldOut: p.inventory !== null && p.inventory.quantity <= 0,
+                    // Counted here and nothing on the shelf (#511), or
+                    // untracked and marked sold out here by hand (#515).
+                    soldOut:
+                        p.soldOut === true ||
+                        (p.inventory !== null && p.inventory.quantity <= 0),
                 }))}
                 checkout={checkout}
                 gstRegistered={business?.registered ?? false}

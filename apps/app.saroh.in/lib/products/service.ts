@@ -1,6 +1,8 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
 
+import type { SoldOutPlace } from "./tracking";
+
 /**
  * Catalog data access for app.saroh.in — products, categories, variants, and
  * inventory. Forwards the session cookie to api.saroh.in, which enforces the
@@ -83,6 +85,11 @@ export interface ProductListItem extends Product {
         price: string | null;
     }[];
     inventory: ListStock | null;
+    /**
+     * Marked sold out by hand at this storefront (#515): an untracked
+     * product it refuses orders for. Absent from an older API.
+     */
+    soldOut?: boolean;
 }
 
 /**
@@ -101,6 +108,8 @@ export interface CatalogueListing {
     storeId: string;
     storeName: string;
     inventory: ListStock | null;
+    /** Marked sold out by hand here (#515). Absent from an older API. */
+    soldOut?: boolean;
     /**
      * Each variant's shelf here (#518): whether this storefront sells it,
      * and its stock — null while it is not counted per variant here.
@@ -186,6 +195,10 @@ export interface ProductDetail extends Product {
     optionId: string | null;
     /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
     stockTracked: boolean;
+    /** Marked sold out by hand at the storefront read from (#515). */
+    soldOut?: boolean;
+    /** Every open storefront that sells it, and whether it is marked there. */
+    storefronts?: SoldOutPlace[];
     images: ProductImage[];
     stockMode: "product" | "variant";
     /**
@@ -506,6 +519,24 @@ export function setProductStockTracking(productId: string, tracked: boolean) {
         "/stock-tracking",
         "PUT",
         { tracked },
+    );
+}
+
+/**
+ * Mark an untracked product sold out at one storefront, or available again
+ * (#515). Whoever may count and move stock; a product that counts stock is
+ * refused ("This product counts its stock, …").
+ */
+export function setProductSoldOut(
+    productId: string,
+    storefrontId: string,
+    soldOut: boolean,
+) {
+    return mutateProduct<SoldOutPlace & { productId: string }>(
+        productId,
+        "/sold-out",
+        "PUT",
+        { storefrontId, soldOut },
     );
 }
 

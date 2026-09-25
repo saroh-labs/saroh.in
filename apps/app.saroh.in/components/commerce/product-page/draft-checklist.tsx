@@ -8,6 +8,7 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
+import { untrackedShort } from "@/lib/products/tracking";
 
 /**
  * "Before it goes on the shop" — a draft's checklist. Nothing here is
@@ -77,7 +78,7 @@ export function DraftChecklist({
             : {
                   done: true,
                   title: "Stock",
-                  sub: "Not tracked — always available on the shop.",
+                  sub: untrackedShort(overview.product.storefronts ?? []),
               },
         {
             done: product.variants.length > 0,

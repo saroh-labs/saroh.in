@@ -21,6 +21,7 @@ import {
     customersSee,
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
+import { untrackedShort } from "@/lib/products/tracking";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -170,7 +171,9 @@ export function VariantDrawer({
                                     <p className="text-muted-foreground">
                                         {counts
                                             ? "Counted with the product as a whole."
-                                            : "Not tracked — always available on the shop."}
+                                            : untrackedShort(
+                                                  product.storefronts ?? [],
+                                              )}
                                     </p>
                                 )}
                             </DrawerSection>

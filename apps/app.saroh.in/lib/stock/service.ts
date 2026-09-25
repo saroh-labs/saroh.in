@@ -37,7 +37,13 @@ export interface StockLevels {
      * Products that don't track stock — Track stock off for the product or
      * for the whole business (#515): they always sell. The screen's footer.
      */
-    untracked: { productId: string; name: string; status: string }[];
+    untracked: {
+        productId: string;
+        name: string;
+        status: string;
+        /** Storefronts that marked it sold out by hand (#515). */
+        soldOutAt?: string[];
+    }[];
     /** The business's Track stock switch; off, every product is untracked. */
     tracking: boolean;
     /** The caller may count and move stock. */

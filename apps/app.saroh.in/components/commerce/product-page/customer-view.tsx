@@ -15,6 +15,7 @@ import {
     customFieldText,
     onTheShop,
 } from "@/lib/products/overview-rules";
+import { untrackedShort } from "@/lib/products/tracking";
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
@@ -79,7 +80,7 @@ export function CustomerView({
             n: 3,
             title: product.variants.length > 0 ? "Variants and stock" : "Stock",
             body: !counts
-                ? 'Not tracked — always available on the shop, with no count and no "Sold out".'
+                ? untrackedShort(product.storefronts ?? [])
                 : variantLine ||
                   (stock.product
                       ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
@@ -217,7 +218,9 @@ export function toShopData(
     counts = true,
 ): ProductPageData {
     const { product, reviews } = overview;
-    // Untracked (#515): no count, so the shop never says "Sold out".
+    // Untracked (#515): no count, so the shop says "Sold out" only where
+    // it was marked sold out by hand — at this storefront, every variant.
+    const markedSoldOut = !counts && product.soldOut === true;
     const stock = counts
         ? overview.stock
         : { ...overview.stock, variants: [], product: null };
@@ -302,16 +305,22 @@ export function toShopData(
                 price: v.price,
                 mrp: v.mrp ?? null,
                 imageId: v.imageId ?? null,
-                stock: line ? word(line.canSell, line.word) : "UNTRACKED",
-                left: line?.canSell ?? null,
+                stock: markedSoldOut
+                    ? "SOLD_OUT"
+                    : line
+                      ? word(line.canSell, line.word)
+                      : "UNTRACKED",
+                left: markedSoldOut ? null : (line?.canSell ?? null),
             };
         }),
-        stock: stock.product
-            ? {
-                  word: word(stock.product.canSell, stock.product.word),
-                  left: stock.product.canSell,
-              }
-            : null,
+        stock: markedSoldOut
+            ? { word: "SOLD_OUT", left: null }
+            : stock.product
+              ? {
+                    word: word(stock.product.canSell, stock.product.word),
+                    left: stock.product.canSell,
+                }
+              : null,
         rating:
             summary && summary.average !== null && summary.count > 0
                 ? { average: summary.average, count: summary.count }

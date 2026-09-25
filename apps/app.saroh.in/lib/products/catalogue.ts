@@ -5,6 +5,8 @@ export interface CataloguePlace {
     storeId: string;
     storeName: string;
     inventory: { quantity: number; lowStockAlert: number } | null;
+    /** Marked sold out by hand here (#515); absent from an older API. */
+    soldOut?: boolean;
 }
 
 /**
@@ -29,6 +31,11 @@ export interface CatalogueRow {
     stock: number | null;
     /** The tightest low-stock threshold among those places. */
     lowStockAlert: number | null;
+    /**
+     * Untracked and marked sold out by hand at every place counted (#515):
+     * the stock column says "Sold out", not "Not tracked".
+     */
+    soldOut: boolean;
     updatedAt: string;
     /** In a collection (a category). */
     inCollection: boolean;
@@ -72,11 +79,20 @@ export function inStorefront(
 function stockOf(places: readonly CataloguePlace[]): {
     stock: number | null;
     lowStockAlert: number | null;
+    soldOut: boolean;
 } {
     const tracked = places.flatMap((p) => (p.inventory ? [p.inventory] : []));
-    if (tracked.length === 0) return { stock: null, lowStockAlert: null };
+    if (tracked.length === 0) {
+        return {
+            stock: null,
+            lowStockAlert: null,
+            soldOut:
+                places.length > 0 && places.every((p) => p.soldOut === true),
+        };
+    }
     return {
         stock: tracked.reduce((n, i) => n + i.quantity, 0),
         lowStockAlert: Math.min(...tracked.map((i) => i.lowStockAlert)),
+        soldOut: false,
     };
 }

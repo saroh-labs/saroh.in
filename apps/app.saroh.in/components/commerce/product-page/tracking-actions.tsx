@@ -24,14 +24,16 @@ import {
  * "Track stock" needs no confirmation: nothing is lost, and every shelf
  * starts at 0. It goes on to the editor's Stock section, where the count is
  * made. "Stop tracking" asks first: the count goes to 0 and the product
- * always sells.
+ * sells without a count unless it is marked sold out.
  */
 export function StartTrackingButton({
     productId,
     storeId,
+    className,
 }: {
     productId: string;
     storeId: string;
+    className?: string;
 }) {
     const router = useRouter();
     const [pending, start] = useTransition();
@@ -54,7 +56,10 @@ export function StartTrackingButton({
             onClick={turnOn}
             disabled={pending}
             aria-busy={pending}
-            className="mt-2 rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11"
+            className={cn(
+                "rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11",
+                className,
+            )}
         >
             {pending ? "Turning on…" : "Track stock"}
         </button>

@@ -4,8 +4,9 @@
  * words.
  *
  * A product counts stock while its own switch (`stockTracked`) and the
- * business's are both on. Untracked, it is always available on the shop:
- * no count and no "Sold out".
+ * business's are both on. Untracked, it has no count and sells unless a
+ * storefront marks it sold out by hand — then that storefront refuses new
+ * orders for it until it is marked available again.
  */
 
 /**
@@ -52,7 +53,7 @@ export const TRACKING_LOCKED =
 
 /** The business has Track stock off: no product counts. */
 export const BUSINESS_NOT_TRACKING =
-    "Your business doesn't track stock, so every product is always available on the shop.";
+    "Your business doesn't track stock, so products sell with no count unless you mark them sold out.";
 
 /** Said once it is off. */
 export const TRACKING_OFF_SAID = "Stock is no longer tracked for this product.";
@@ -74,7 +75,74 @@ export function stopTrackingConfirm(productName: string): {
     return {
         title: `Stop tracking ${productName}?`,
         description:
-            'Its count goes to 0 at every storefront, and it is always available on the shop — no count and no "Sold out". Turning it back on starts from 0, so you count it again.',
+            "Its count goes to 0 at every storefront, and it sells without a count unless you mark it sold out. Turning it back on starts from 0, so you count it again.",
         confirmLabel: "Stop tracking",
     };
+}
+
+// ---- Sold out by hand (#515) ----
+
+/** One storefront that sells the product, and whether it is marked Sold out. */
+export interface SoldOutPlace {
+    storefrontId: string;
+    name: string;
+    soldOut: boolean;
+}
+
+/**
+ * Who sees the Mark sold out action: anyone who may count and move stock
+ * (Owner, Admin, and a stock-only role). Everyone else sees the state only.
+ */
+export function canMarkSoldOut(may: { canStock: boolean }): boolean {
+    return may.canStock;
+}
+
+/** The untracked card's line under "Not tracked". */
+export function untrackedLine(places: readonly SoldOutPlace[]): string {
+    const out = places.filter((p) => p.soldOut);
+    if (out.length === 0) return "Available on the shop.";
+    if (places.length <= 1 || out.length === places.length) {
+        return "Sold out — marked by hand";
+    }
+    return `Sold out at ${listNames(out.map((p) => p.name))} — marked by hand`;
+}
+
+/**
+ * The editor's note for an untracked product: no count, sells unless it is
+ * marked sold out, and what turning tracking back on does.
+ */
+export const UNTRACKED_NOTE =
+    "Not tracked. This product has no count and sells unless you mark it sold out. Use it for things made to order. Turning tracking back on starts from a count of 0, so count it first.";
+
+/** The one-line note elsewhere (the variant drawer, the checklist). */
+export function untrackedShort(places: readonly SoldOutPlace[]): string {
+    const line = untrackedLine(places);
+    if (line === "Available on the shop.") {
+        return "Not tracked — sells unless you mark it sold out.";
+    }
+    const said = line.replace(" — marked by hand", ", marked by hand");
+    return `Not tracked — ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
+}
+
+/** The action's label for one storefront. */
+export function soldOutAction(soldOut: boolean): string {
+    return soldOut ? "Mark available" : "Mark sold out";
+}
+
+/** Said once it is done: "Marked sold out at Hill Road." */
+export function soldOutSaid(storefront: string, soldOut: boolean): string {
+    return soldOut
+        ? `Marked sold out at ${storefront}.`
+        : `Available again at ${storefront}.`;
+}
+
+/** Said above the API's reason when it couldn't be changed. */
+export function soldOutFailed(soldOut: boolean): string {
+    return soldOut ? "Not marked sold out" : "Still marked sold out";
+}
+
+/** "a, b and c" */
+function listNames(names: readonly string[]): string {
+    if (names.length <= 1) return names[0] ?? "";
+    return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }

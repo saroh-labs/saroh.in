@@ -174,6 +174,24 @@ function detailRows(
                 rows: [row("Role", role(meta.role), "Removed from the team")],
                 withoutValues: false,
             };
+        case "product.sold-out.mark":
+        case "product.sold-out.clear": {
+            const marked = event.action === "product.sold-out.mark";
+            const where = text(meta.storefront);
+            return {
+                rows: [
+                    ...(text(meta.product)
+                        ? [row("Product", null, text(meta.product))]
+                        : []),
+                    row(
+                        where ? `On the shop, ${where}` : "On the shop",
+                        marked ? "Available" : "Sold out",
+                        marked ? "Sold out" : "Available",
+                    ),
+                ],
+                withoutValues: false,
+            };
+        }
         default:
             return { rows: [], withoutValues: false };
     }
