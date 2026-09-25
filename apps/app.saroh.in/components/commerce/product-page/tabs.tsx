@@ -14,10 +14,13 @@ export function ProductTabs({
     overview,
     active,
     href,
+    counts,
 }: {
     overview: ProductOverview;
     active: ProductTab;
     href: (tab: ProductTab) => string;
+    /** The product counts stock (Track stock, #515); untracked, no stock. */
+    counts: boolean;
 }) {
     const { product, stock, orders, reviews, discounts } = overview;
     const tabs: {
@@ -28,9 +31,9 @@ export function ProductTabs({
         { id: "overview", label: "Overview" },
         {
             id: "variants",
-            label: "Variants and stock",
+            label: counts ? "Variants and stock" : "Variants",
             badge:
-                stock.totals.lowCount > 0
+                counts && stock.totals.lowCount > 0
                     ? {
                           text: `${stock.totals.lowCount} low`,
                           tone: "attention",

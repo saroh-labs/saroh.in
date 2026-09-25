@@ -18,10 +18,13 @@ export function DraftChecklist({
     overview,
     edit,
     canWrite,
+    counts,
 }: {
     overview: ProductOverview;
     edit: (section?: EditorSection) => string;
     canWrite: boolean;
+    /** The product counts stock (Track stock, #515). */
+    counts: boolean;
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
@@ -62,14 +65,20 @@ export function DraftChecklist({
                     : "Not set. The shop says nothing rather than guessing.",
             cta: { label: "Add", section: "details" },
         },
-        {
-            done: tracked,
-            title: "Stock",
-            sub: tracked
-                ? `${stock.totals.onHand} on hand.`
-                : "No stock count yet.",
-            cta: { label: "Add stock", section: "stock" },
-        },
+        counts
+            ? {
+                  done: tracked,
+                  title: "Stock",
+                  sub: tracked
+                      ? `${stock.totals.onHand} on hand.`
+                      : "No stock count yet.",
+                  cta: { label: "Add stock", section: "stock" },
+              }
+            : {
+                  done: true,
+                  title: "Stock",
+                  sub: "Not tracked — always available on the shop.",
+              },
         {
             done: product.variants.length > 0,
             title: "Variants",

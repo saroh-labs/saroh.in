@@ -130,12 +130,19 @@ export function StockSheet({
     onOpenChange,
     product,
     storeId,
+    counts: countsProp,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     product: ProductDetail;
     storeId: string;
+    /**
+     * The product counts stock (Track stock, #515). Untracked, the sheet
+     * edits prices only: a count saved here would quietly start tracking.
+     */
+    counts?: boolean;
 }) {
+    const counts = countsProp ?? product.stockTracked;
     const router = useRouter();
     const form = useForm<Values>({
         resolver: zodResolver(schema),
@@ -146,13 +153,15 @@ export function StockSheet({
     const money = (a: string) => formatMoneyMajor(a, product.currency) ?? a;
     const hasVariants = product.variants.length > 0;
     const switching =
+        counts &&
         hasVariants &&
         product.stockMode === "product" &&
         product.inventory !== null;
     // No count yet: a price edit must not start one at 0 (the shop would
     // say sold out). Counting starts only when asked, as in the editor.
     const counted =
-        product.stockMode === "variant" || product.inventory !== null;
+        counts &&
+        (product.stockMode === "variant" || product.inventory !== null);
     const [adding, setAdding] = useState(false);
     const showStock = counted || adding;
     const rowGrid = cn(
@@ -228,7 +237,7 @@ export function StockSheet({
             return;
         }
         changeOpen(false);
-        showSuccess("Prices and stock saved.");
+        showSuccess(counts ? "Prices and stock saved." : "Prices saved.");
     }
 
     function changeOpen(o: boolean) {
@@ -244,7 +253,7 @@ export function StockSheet({
             open={open}
             onOpenChange={changeOpen}
             productName={product.name}
-            title="Edit prices and stock"
+            title={counts ? "Edit prices and stock" : "Edit prices"}
             fullEditorHref={productEditHref(
                 storeId,
                 product.id,
@@ -443,7 +452,14 @@ export function StockSheet({
                             </p>
                         </div>
                     ) : null}
-                    {!showStock ? (
+                    {!counts ? (
+                        <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
+                            Stock isn&apos;t tracked, so it is always available
+                            on the shop — no count and no &ldquo;Sold
+                            out&rdquo;. Track stock is in the editor&apos;s
+                            Stock section.
+                        </p>
+                    ) : !showStock ? (
                         <div className="flex flex-col items-start gap-2.5">
                             <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                                 {hasVariants

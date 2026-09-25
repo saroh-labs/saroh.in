@@ -25,6 +25,7 @@ export function SheetButton({
     product,
     storeId,
     categories = [],
+    counts,
 }: {
     kind: SheetKind;
     label: string;
@@ -33,6 +34,8 @@ export function SheetButton({
     product: ProductDetail;
     storeId: string;
     categories?: { id: string; name: string }[];
+    /** The product counts stock (Track stock, #515); the stock sheet only. */
+    counts?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const common = { open, onOpenChange: setOpen, product, storeId };
@@ -52,7 +55,9 @@ export function SheetButton({
                 <DetailsSheet {...common} categories={categories} />
             ) : null}
             {kind === "description" ? <DescriptionSheet {...common} /> : null}
-            {kind === "stock" ? <StockSheet {...common} /> : null}
+            {kind === "stock" ? (
+                <StockSheet {...common} counts={counts} />
+            ) : null}
             {kind === "photos" ? <PhotosSheet {...common} /> : null}
         </>
     );
