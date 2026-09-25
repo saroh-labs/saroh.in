@@ -5,7 +5,8 @@ import {
 } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { ContactNotesService } from "./contact-notes.service";
+import type { ContactNoteView } from "./contact-notes.service";
+import { ContactNotesService, notedAllergens } from "./contact-notes.service";
 
 /**
  * Notes about a customer (U8): text and allergens from the storefront's own
@@ -46,7 +47,16 @@ function make() {
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
             deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
-        storeAllergen: { count: jest.fn().mockResolvedValue(1) },
+        storeAllergen: {
+            count: jest.fn().mockResolvedValue(1),
+            // Three storefronts: two spell Nuts their own way, one has Sesame.
+            findMany: jest.fn().mockResolvedValue([
+                { id: "alg_nuts", name: "Nuts" },
+                { id: "alg_sesame", name: "Sesame" },
+                { id: "alg_nuts_stall", name: " nuts " },
+                { id: "alg_nuts_popup", name: "NUTS" },
+            ]),
+        },
         user: {
             findMany: jest
                 .fn()
@@ -211,5 +221,91 @@ describe("ContactNotesService", () => {
             organizationId: "org_1",
         });
         expect(db.contactNote.delete).not.toHaveBeenCalled();
+    });
+
+    describe("across storefronts (#508 R6)", () => {
+        it("matches the named allergen on every storefront, however it is spelled", async () => {
+            const { svc, db } = make();
+
+            const note = await svc.create(OWNER, "c1", {
+                allergenIds: ["alg_nuts"],
+            });
+
+            // One chip for the name; every storefront's "Nuts" to check against.
+            expect(note.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
+            expect(note.matchAllergens).toEqual([
+                { id: "alg_nuts", name: "Nuts" },
+                { id: "alg_nuts_stall", name: " nuts " },
+                { id: "alg_nuts_popup", name: "NUTS" },
+            ]);
+            expect(db.storeAllergen.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { organizationId: "org_1" } }),
+            );
+            // The note is still written with the one id it was given.
+            expect(db.contactNoteAllergen.createMany).toHaveBeenCalledWith({
+                data: [
+                    {
+                        noteId: "note_1",
+                        allergenId: "alg_nuts",
+                        organizationId: "org_1",
+                    },
+                ],
+            });
+        });
+
+        it("adds nothing for an allergen no other storefront names", async () => {
+            const { svc, db } = make();
+            db.contactNote.findFirst.mockResolvedValue(
+                noteRow({
+                    allergens: [
+                        { allergen: { id: "alg_sesame", name: "Sesame" } },
+                    ],
+                }),
+            );
+
+            const note = await svc.update(OWNER, "c1", "note_1", {
+                body: "Sesame only",
+            });
+
+            expect(note.matchAllergens).toEqual([
+                { id: "alg_sesame", name: "Sesame" },
+            ]);
+        });
+
+        it("skips the list read for a note with no allergens", async () => {
+            const { svc, db } = make();
+            db.contactNote.findFirst.mockResolvedValue(
+                noteRow({ allergens: [] }),
+            );
+
+            const note = await svc.create(OWNER, "c1", { body: "Oat milk" });
+
+            expect(note.matchAllergens).toEqual([]);
+            expect(db.storeAllergen.findMany).not.toHaveBeenCalled();
+        });
+
+        it("lists a name once when two notes name two storefronts' copies", () => {
+            const note = (id: string, name: string): ContactNoteView => ({
+                id: `note_${id}`,
+                body: "",
+                allergens: [{ id, name }],
+                matchAllergens: [],
+                createdByUserId: null,
+                author: null,
+                createdAt: NOW.toISOString(),
+                updatedAt: NOW.toISOString(),
+            });
+
+            expect(
+                notedAllergens([
+                    note("alg_nuts_stall", " nuts "),
+                    note("alg_nuts", "Nuts"),
+                    note("alg_sesame", "Sesame"),
+                ]),
+            ).toEqual([
+                { id: "alg_nuts_stall", name: " nuts " },
+                { id: "alg_sesame", name: "Sesame" },
+            ]);
+        });
     });
 });

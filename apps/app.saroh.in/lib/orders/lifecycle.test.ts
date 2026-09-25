@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    allergenWords,
     allergyCheck,
+    allergyNotesFrom,
     canCancel,
     eventText,
     flowOf,
@@ -139,6 +141,70 @@ describe("allergyCheck", () => {
         );
         expect(check.lines.li_1).toBe("Contains gluten");
         expect(check.hits).toEqual([GLUTEN, NUTS]);
+    });
+
+    it("hits a second storefront's allergen once the note's ids are widened (#508 R6)", () => {
+        // The note was written against storefront A's Peanuts; the order is
+        // from storefront B, whose product lists B's own Peanuts.
+        const peanutsA = { id: "al_peanuts_a", name: "Peanuts" };
+        const peanutsB = { id: "al_peanuts_b", name: "PEANUTS" };
+        const satay = line({
+            id: "li_b",
+            name: "Satay bowl",
+            allergens: { contains: [peanutsB], mayContain: [] },
+        });
+
+        const asWritten = allergyCheck(
+            [satay],
+            [{ body: "Peanut allergy", allergens: [peanutsA] }],
+        );
+        expect(asWritten.hits).toEqual([]);
+
+        const notes = allergyNotesFrom([
+            {
+                body: "Peanut allergy",
+                allergens: [peanutsA],
+                matchAllergens: [peanutsA, peanutsB],
+            },
+            { body: "Prefers oat milk", allergens: [], matchAllergens: [] },
+        ]);
+        expect(notes).toEqual([
+            { body: "Peanut allergy", allergens: [peanutsA, peanutsB] },
+        ]);
+        const check = allergyCheck([satay], notes);
+        expect(check.hits).toEqual([peanutsB]);
+        expect(check.lines).toEqual({ li_b: "Contains peanuts" });
+        expect(allergenWords(check.hits)).toBe("peanuts");
+    });
+
+    it("keeps a note's own ids when the wider list is missing", () => {
+        expect(
+            allergyNotesFrom([{ body: "Sesame", allergens: [SESAME] }]),
+        ).toEqual([{ body: "Sesame", allergens: [SESAME] }]);
+    });
+
+    it("does not hit a different allergen on another storefront", () => {
+        const check = allergyCheck(
+            [
+                line({
+                    allergens: {
+                        contains: [{ id: "al_mustard_b", name: "Mustard" }],
+                        mayContain: [],
+                    },
+                }),
+            ],
+            allergyNotesFrom([
+                {
+                    body: "Peanuts",
+                    allergens: [{ id: "al_peanuts_a", name: "Peanuts" }],
+                    matchAllergens: [
+                        { id: "al_peanuts_a", name: "Peanuts" },
+                        { id: "al_peanuts_b", name: "Peanuts" },
+                    ],
+                },
+            ]),
+        );
+        expect(check.hits).toEqual([]);
     });
 
     it("finds nothing when the note names an allergen no line has", () => {

@@ -19,13 +19,26 @@ import type { ContactNoteDto } from "./dto";
  * contain" exactly. Each id is checked against the organization's list
  * before anything is written; a note needs text, an allergen, or both.
  *
+ * Every storefront keeps its own list, so "Peanuts" on one is a different id
+ * from "Peanuts" on the next (#508 R6). A note is written with one id per
+ * name; when it is read, each named allergen is widened to every storefront's
+ * allergen of the same name (`matchAllergens`), so the banner warns on an
+ * order from any storefront — including one opened after the note.
+ *
  * Reading needs `contact:read` — a Member at the counter must see an allergy.
  * Writing needs `contact:write` (Owner/Admin today).
  */
 export interface ContactNoteView {
     id: string;
     body: string;
+    /** As written: one per name, what the note shows as chips. */
     allergens: { id: string; name: string }[];
+    /**
+     * What an order is checked against: each named allergen's id on every
+     * storefront in the business that lists the same name (trimmed, any
+     * case). Never written back; the note keeps the ids it was written with.
+     */
+    matchAllergens: { id: string; name: string }[];
     createdByUserId: string | null;
     /** Who wrote it, by name; null when they have no name or have left. */
     author: string | null;
@@ -59,6 +72,7 @@ function noteView(row: NoteRow): ContactNoteView {
         id: row.id,
         body: row.body,
         allergens: row.allergens.map((a) => a.allergen),
+        matchAllergens: [],
         createdByUserId: row.createdByUserId,
         author: null,
         createdAt: row.createdAt.toISOString(),
@@ -77,7 +91,47 @@ export async function loadContactNotes(
         orderBy: { createdAt: "desc" },
         select: NOTE_SELECT,
     });
-    return withAuthors(db, rows.map(noteView));
+    return withMatches(
+        db,
+        organizationId,
+        await withAuthors(db, rows.map(noteView)),
+    );
+}
+
+/** An allergen's name as storefronts are compared: "peanuts " is "Peanuts". */
+const allergenKey = (name: string) => name.trim().toLowerCase();
+
+/**
+ * Widen each note's allergens to every storefront's allergen of the same
+ * name, so matching stays by id (ADR-008) and still crosses storefronts.
+ * Read fresh each time: a storefront added later is covered with no backfill.
+ */
+async function withMatches(
+    db: typeof prisma,
+    organizationId: string,
+    notes: ContactNoteView[],
+): Promise<ContactNoteView[]> {
+    if (!notes.some((n) => n.allergens.length > 0)) return notes;
+    const rows = await db.storeAllergen.findMany({
+        where: { organizationId },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true },
+    });
+    const byName = new Map<string, { id: string; name: string }[]>();
+    for (const r of rows) {
+        const key = allergenKey(r.name);
+        byName.set(key, [...(byName.get(key) ?? []), r]);
+    }
+    return notes.map((n) => {
+        const matches = new Map<string, { id: string; name: string }>();
+        for (const a of n.allergens) {
+            // The note's own id always counts, whatever the list read says.
+            matches.set(a.id, a);
+            for (const same of byName.get(allergenKey(a.name)) ?? [])
+                matches.set(same.id, same);
+        }
+        return { ...n, matchAllergens: [...matches.values()] };
+    });
 }
 
 /** Put the writer's name on each note: the team reads "Nisha, 12 Sep". */
@@ -110,6 +164,8 @@ async function withAuthors(
 /**
  * The allergens a note may name: every storefront's list in the
  * organization, one per name (the first storefront's id wins), in list order.
+ * The chosen id stands for the name across storefronts: a read widens it to
+ * every storefront's allergen of that name (`withMatches`).
  */
 export async function allergenChoices(
     db: typeof prisma,
@@ -122,19 +178,25 @@ export async function allergenChoices(
     });
     const seen = new Map<string, { id: string; name: string }>();
     for (const r of rows) {
-        const key = r.name.trim().toLowerCase();
+        const key = allergenKey(r.name);
         if (!seen.has(key)) seen.set(key, r);
     }
     return [...seen.values()];
 }
 
-/** Every allergen the notes name, once, in the order first named. */
+/**
+ * Every allergen the notes name, once per name, in the order first named —
+ * two notes naming two storefronts' "Peanuts" list it once.
+ */
 export function notedAllergens(
     notes: ContactNoteView[],
 ): { id: string; name: string }[] {
     const seen = new Map<string, { id: string; name: string }>();
     for (const note of notes)
-        for (const a of note.allergens) if (!seen.has(a.id)) seen.set(a.id, a);
+        for (const a of note.allergens) {
+            const key = allergenKey(a.name);
+            if (!seen.has(key)) seen.set(key, a);
+        }
     return [...seen.values()];
 }
 
@@ -250,7 +312,11 @@ export class ContactNotesService {
             select: NOTE_SELECT,
         });
         if (!row) throw new NotFoundException("Note not found");
-        const views = await withAuthors(this.db, [noteView(row)]);
+        const views = await withMatches(
+            this.db,
+            ctx.organizationId,
+            await withAuthors(this.db, [noteView(row)]),
+        );
         return views[0] ?? noteView(row);
     }
 

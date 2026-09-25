@@ -1,8 +1,9 @@
 /**
  * One read of a customer (U8) against a real Postgres: orders join only
  * through a confirmed link, an unlinked same-email store customer is only a
- * possible match, notes keep their allergens, and an allergen a note names
- * cannot be removed from the list. Runs in the integration project
+ * possible match, notes keep their allergens and match the same-named
+ * allergen on every storefront, and an allergen a note names cannot be
+ * removed from the list. Runs in the integration project
  * (TEST_DATABASE_URL).
  */
 import { prisma } from "@saroh/database";
@@ -17,6 +18,9 @@ import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 
 const tag = `${process.pid}-${Date.now()}`;
+
+const ids = (list: { id: string }[] | undefined) =>
+    (list ?? []).map((a) => a.id).sort();
 
 const availability = {
     listViews: jest.fn().mockResolvedValue(
@@ -203,6 +207,82 @@ describe("Customer detail (DB)", () => {
         await expect(
             allergens.remove(storeId, nuts.id, ownerId),
         ).resolves.toEqual({ id: nuts.id, name: "Nuts" });
+    });
+
+    it("matches a note's allergen on every storefront that lists the same name", async () => {
+        // Two storefronts each keep their own "Peanuts" (#508 R6): a note
+        // written against the first must still warn on the second's order.
+        const [peanuts, sesame] = await allergens.add(storeId, ownerId, [
+            "Peanuts",
+            "Sesame",
+        ]);
+        const stallPeanuts = await prisma.storeAllergen.create({
+            data: {
+                storeId: lookalikeStoreId,
+                organizationId: ctx.organizationId,
+                name: " peanuts ",
+            },
+        });
+        const stallMustard = await prisma.storeAllergen.create({
+            data: {
+                storeId: lookalikeStoreId,
+                organizationId: ctx.organizationId,
+                name: "Mustard",
+            },
+        });
+
+        const note = await notes.create(ctx, contactId, {
+            body: "Peanut allergy",
+            allergenIds: [peanuts.id],
+        });
+        expect(note.allergens).toEqual([{ id: peanuts.id, name: "Peanuts" }]);
+        expect(ids(note.matchAllergens)).toEqual(
+            [peanuts.id, stallPeanuts.id].sort(),
+        );
+
+        // A storefront opened after the note was written matches too.
+        const later = await prisma.store.create({
+            data: {
+                name: "Rye Pop-up",
+                slug: `detail-popup-${tag}`,
+                organizationId: ctx.organizationId,
+            },
+        });
+        const popupPeanuts = await prisma.storeAllergen.create({
+            data: {
+                storeId: later.id,
+                organizationId: ctx.organizationId,
+                name: "PEANUTS",
+            },
+        });
+        // A second note naming the stall's Peanuts: still one Peanuts.
+        const second = await notes.create(ctx, contactId, {
+            body: "Carries an EpiPen",
+            allergenIds: [stallPeanuts.id],
+        });
+
+        const detail = await details.detail(ctx, contactId);
+        const rows = detail.notes?.rows ?? [];
+        expect(rows.map((n) => n.allergens)).toEqual([
+            [{ id: stallPeanuts.id, name: " peanuts " }],
+            [{ id: peanuts.id, name: "Peanuts" }],
+        ]);
+        const everywhere = [
+            peanuts.id,
+            stallPeanuts.id,
+            popupPeanuts.id,
+        ].sort();
+        for (const row of rows) {
+            expect(ids(row.matchAllergens)).toEqual(everywhere);
+            expect(ids(row.matchAllergens)).not.toContain(sesame.id);
+            expect(ids(row.matchAllergens)).not.toContain(stallMustard.id);
+        }
+        expect(detail.allergens).toEqual([
+            { id: stallPeanuts.id, name: " peanuts " },
+        ]);
+
+        await notes.remove(ctx, contactId, second.id);
+        await notes.remove(ctx, contactId, note.id);
     });
 
     it("refuses an allergen from another organization's list", async () => {

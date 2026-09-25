@@ -328,6 +328,14 @@ describe("CustomerDetailService", () => {
             }),
         );
         expect(detail.notes?.rows[0].body).toBe("Severe nut allergy");
+        // One chip, but the order check sees every storefront's "Nuts".
+        expect(detail.notes?.rows[0].allergens).toEqual([
+            { id: "alg_nuts", name: "Nuts" },
+        ]);
+        expect(detail.notes?.rows[0].matchAllergens).toEqual([
+            { id: "alg_nuts", name: "Nuts" },
+            { id: "alg_nuts_2", name: "nuts" },
+        ]);
         expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
 
         expect(detail.stats).toEqual({
