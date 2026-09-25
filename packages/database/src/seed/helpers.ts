@@ -666,3 +666,32 @@ export async function setStockLevel(
     });
     return a.id;
 }
+
+/**
+ * Make each shelf's stock log add up to what it holds (#513). The seeds set
+ * StockLevel.onHand directly; this writes one COUNTED entry wherever a row's
+ * entries don't sum to its on hand — the opening count on a new row (from 0),
+ * a re-count on a re-seeded one — so before + quantity = after holds and the
+ * entries add up, exactly as the migration left real data. Idempotent: a
+ * re-run over unchanged rows writes nothing. Returns the entries written.
+ */
+export async function balanceStockLog(
+    prisma: Db,
+    organizationId?: string,
+): Promise<number> {
+    const scope = organizationId ?? null;
+    return prisma.$executeRaw`
+        INSERT INTO "StockEntry" ("id", "organizationId", "stockLevelId", "storeId", "productId", "variantId",
+                                  "kind", "quantity", "before", "after", "counted", "note", "createdAt")
+        SELECT 'se' || replace(gen_random_uuid()::text, '-', ''), s."organizationId", s."id", s."storeId",
+               s."productId", s."variantId", 'COUNTED', s."onHand" - COALESCE(e."total", 0),
+               COALESCE(e."total", 0), s."onHand", s."onHand",
+               CASE WHEN e."total" IS NULL THEN 'Opening count' ELSE NULL END, CURRENT_TIMESTAMP
+        FROM "StockLevel" s
+        LEFT JOIN (
+            SELECT "stockLevelId", SUM("quantity")::int AS "total"
+            FROM "StockEntry" GROUP BY "stockLevelId"
+        ) e ON e."stockLevelId" = s."id"
+        WHERE (e."total" IS NULL OR e."total" <> s."onHand")
+          AND (${scope}::text IS NULL OR s."organizationId" = ${scope}::text)`;
+}

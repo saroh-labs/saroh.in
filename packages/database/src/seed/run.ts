@@ -33,6 +33,7 @@ import {
 import type { Db } from "./helpers";
 import {
     at,
+    balanceStockLog,
     buildAnalyticsRows,
     emailFor,
     hashPassword,
@@ -249,6 +250,8 @@ export async function seed(): Promise<void> {
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
+    // Every shelf the seed set opens its stock log (#513).
+    await balanceStockLog(prisma, org.id);
     await report(prisma, org.id);
 }
 

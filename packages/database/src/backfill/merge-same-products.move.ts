@@ -192,6 +192,7 @@ async function moveStock(
         where: { productId: loserId },
         orderBy: { id: "asc" },
     });
+    const logged = await hasStockLog(tx);
     for (const row of rows) {
         const variantId = row.variantId
             ? (variantMap.get(row.variantId) ?? null)
@@ -204,6 +205,12 @@ async function moveStock(
             await tx.$executeRaw`
                 UPDATE "StockLevel" SET "productId" = ${survivorId}, "variantId" = ${variantId}
                 WHERE "id" = ${row.id}`;
+            // Its stock log (#513) follows it, or goes with the loser.
+            if (logged) {
+                await tx.$executeRaw`
+                    UPDATE "StockEntry" SET "productId" = ${survivorId}, "variantId" = ${variantId}
+                    WHERE "stockLevelId" = ${row.id}`;
+            }
             continue;
         }
         // Both at one storefront: one shelf holding both.
@@ -221,8 +228,23 @@ async function moveStock(
             where: { stockLevelId: row.id },
             data: { stockLevelId: there.id },
         });
+        // Its entries join the survivor's shelf, so that shelf's entries
+        // still add up to what it holds.
+        if (logged) {
+            await tx.$executeRaw`
+                UPDATE "StockEntry"
+                SET "stockLevelId" = ${there.id}, "productId" = ${survivorId}, "variantId" = ${variantId}
+                WHERE "stockLevelId" = ${row.id}`;
+        }
         await tx.stockLevel.delete({ where: { id: row.id } });
     }
+}
+
+/** Whether the stock log (#513) exists yet: this runs before and after it. */
+async function hasStockLog(tx: TransactionClient): Promise<boolean> {
+    const [row] = await tx.$queryRaw<{ present: boolean }[]>`
+        SELECT to_regclass('"StockEntry"') IS NOT NULL AS present`;
+    return Boolean(row?.present);
 }
 
 async function moveListings(

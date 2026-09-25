@@ -11,6 +11,7 @@ import {
 import type { Db } from "../helpers";
 import {
     at,
+    balanceStockLog,
     buildAnalyticsRows,
     emailFor,
     hashPassword,
@@ -186,6 +187,8 @@ export async function seedShowcase(): Promise<void> {
         });
     }
 
+    // Every shelf the showcase set opens its stock log (#513).
+    await balanceStockLog(prisma);
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
