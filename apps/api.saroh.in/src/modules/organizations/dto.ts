@@ -9,6 +9,7 @@ import {
     Matches,
     MaxLength,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -51,12 +52,14 @@ export class BusinessProfileDto {
     @MaxLength(100)
     taxId?: string;
 
-    @IsOptional()
+    // "" clears it, as the settings form clears any field; `@IsOptional`
+    // lets only null and undefined through, so it was refused as invalid.
+    @ValidateIf((_o, v: unknown) => v != null && v !== "")
     @Transform(trimLower)
     @IsEmail({}, { message: "A valid contact email is required" })
     contactEmail?: string;
 
-    @IsOptional()
+    @ValidateIf((_o, v: unknown) => v != null && v !== "")
     @Transform(trim)
     @IsUrl({}, { message: "A valid website URL is required" })
     website?: string;
