@@ -1,7 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { ArrowUpRight, ChevronRight, Pencil } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import Link from "next/link";
 
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
@@ -57,7 +57,20 @@ export function ProductHeader({
     const live = product.status === "PUBLISHED";
     return (
         <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {/*
+             * On a phone the trail is one step back, as the design's phone
+             * bar draws it — the full crumbs, the shop's note and a button
+             * that cannot be pressed yet would take three lines above the
+             * product's own name (2026-09-25).
+             */}
+            <Link
+                href="/commerce/products"
+                className="-ml-1 flex w-fit items-center gap-1 rounded-md px-1 py-1 text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11 sm:hidden"
+            >
+                <ChevronLeft aria-hidden className="size-4" />
+                Products
+            </Link>
+            <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 sm:flex">
                 <nav
                     aria-label="Breadcrumb"
                     // A basis, so on a phone the crumbs take their own row rather
@@ -110,7 +123,7 @@ export function ProductHeader({
                 </Button>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border pb-4">
-                <div className="size-14 shrink-0 overflow-hidden rounded-[10px] bg-muted">
+                <div className="size-12 shrink-0 overflow-hidden rounded-[10px] bg-muted sm:size-14">
                     {cover ? (
                         // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist
                         <img
@@ -125,9 +138,9 @@ export function ProductHeader({
                         />
                     ) : null}
                 </div>
-                <div className="min-w-0 flex-[1_1_260px]">
+                <div className="min-w-0 flex-[1_1_200px]">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                        <h1 className="min-w-0 break-words font-display text-[24px] font-semibold leading-[1.1] tracking-[-0.025em]">
+                        <h1 className="min-w-0 break-words font-display text-[20px] font-semibold leading-[1.1] tracking-[-0.025em] sm:text-[24px]">
                             {product.name}
                         </h1>
                         <Badge
@@ -141,7 +154,7 @@ export function ProductHeader({
                         {meta.join(" · ")}
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex w-full flex-wrap items-center justify-between gap-2.5 sm:w-auto sm:justify-start">
                     <nav
                         aria-label="View as"
                         className="inline-flex rounded-[10px] bg-muted p-[3px]"
@@ -159,7 +172,8 @@ export function ProductHeader({
                                         : "text-muted-foreground hover:text-foreground",
                                 )}
                             >
-                                {v === "team" ? "Team view" : "Customer view"}
+                                {v === "team" ? "Team" : "Customer"}
+                                <span className="max-sm:sr-only"> view</span>
                             </Link>
                         ))}
                     </nav>
@@ -174,7 +188,9 @@ export function ProductHeader({
                                     strokeWidth={1.9}
                                     aria-hidden
                                 />
-                                Edit product
+                                Edit
+                                {/* The button spaces its parts itself. */}
+                                <span className="max-sm:sr-only">product</span>
                             </Link>
                         </Button>
                     ) : null}
