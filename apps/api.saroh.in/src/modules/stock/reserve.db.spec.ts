@@ -605,6 +605,41 @@ describe("refunds and the shelf", () => {
         ).rejects.toThrow("None of that line can go back in stock");
     });
 
+    it("a put-back names each line once, and only a line the refund covers", async () => {
+        const fork = await product("Fork", { hill: 10 });
+        const knife = await product("Knife", { hill: 10 });
+        const order = await place(hill, [
+            { productId: fork, quantity: 2 },
+            { productId: knife, quantity: 2 },
+        ]);
+        await pay(order);
+        await fulfil(order);
+        const forkLine = await line(order, fork);
+        const knifeLine = await line(order, knife);
+        await expect(
+            payments.initiateRefund(owner, order, {
+                lines: [{ itemId: forkLine, quantity: 2 }],
+                putBack: [
+                    { itemId: forkLine, quantity: 1 },
+                    { itemId: forkLine, quantity: 1 },
+                ],
+            }),
+        ).rejects.toThrow("Name each line once.");
+        await expect(
+            payments.initiateRefund(owner, order, {
+                lines: [{ itemId: forkLine, quantity: 2 }],
+                putBack: [{ itemId: knifeLine, quantity: 1 }],
+            }),
+        ).rejects.toThrow("Only a line being refunded can go back in stock.");
+        // Refused before anything was written.
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntent: { orderId: order } },
+            }),
+        ).toBe(0);
+        expect(await shelf(hill, fork)).toMatchObject({ onHand: 8 });
+    });
+
     it("a return recorded by hand counts: a refund can't put the same units back again", async () => {
         const plate = await product("Plate", { hill: 10 });
         const order = await place(hill, [{ productId: plate, quantity: 3 }]);
