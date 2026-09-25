@@ -625,3 +625,77 @@ describe("a hold, by its token (U19)", () => {
         expect(out.state).toBe("RELEASED");
     });
 });
+
+describe("the hold limits (#508)", () => {
+    const at = (ms: number) => new Date(NOW.getTime() + ms);
+
+    beforeEach(() => {
+        db.invoice.findUnique.mockResolvedValue({
+            source: "BOOKING",
+            booking: created({
+                status: "PENDING",
+                holdExpiresAt: new Date(NOW.getTime() + 15 * 60_000),
+            }),
+        });
+    });
+
+    it("lets five people on one network poll every four seconds", async () => {
+        const svc = new BookingsService();
+        const tokens = ["t1", "t2", "t3", "t4", "t5"];
+        // A minute of polling: 15 reads each, 75 in all.
+        for (let ms = 0; ms < 60_000; ms += 4_000) {
+            for (const token of tokens) {
+                await expect(
+                    svc.publicHold(token, "office", at(ms)),
+                ).resolves.toMatchObject({ state: "HELD" });
+            }
+        }
+    });
+
+    it("stops one token polled too often, and only that token", async () => {
+        const svc = new BookingsService();
+        for (let i = 0; i < 40; i++) {
+            await svc.publicHold("greedy", "office", at(i));
+        }
+        await expect(
+            svc.publicHold("greedy", "office", at(41)),
+        ).rejects.toMatchObject({ status: 429 });
+        await expect(
+            svc.releasePublicHold("greedy", "office", at(42)),
+        ).rejects.toMatchObject({ status: 429 });
+        // Someone else paying from the same network is not held up.
+        await expect(
+            svc.publicHold("patient", "office", at(43)),
+        ).resolves.toMatchObject({ state: "HELD" });
+    });
+
+    it("stops one address sending many tokens, made-up ones too, at its ceiling", async () => {
+        const svc = new BookingsService();
+        // Each made-up token is a 404, but it still counts.
+        db.invoice.findUnique.mockResolvedValue(null);
+        for (let i = 0; i < 150; i++) {
+            await expect(
+                svc.publicHold(`made_up_${i}`, "scraper", at(i)),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        }
+        // A token never seen before: its own count would be 1.
+        await expect(
+            svc.publicHold("made_up_new", "scraper", at(151)),
+        ).rejects.toMatchObject({ status: 429 });
+        expect(db.invoice.findUnique).toHaveBeenCalledTimes(150);
+        // Another address is untouched.
+        await expect(
+            svc.publicHold("made_up_new", "elsewhere", at(152)),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("opens again once the minute has passed", async () => {
+        const svc = new BookingsService();
+        for (let i = 0; i < 40; i++) {
+            await svc.publicHold("greedy", "office", at(i));
+        }
+        await expect(
+            svc.publicHold("greedy", "office", at(61_000)),
+        ).resolves.toMatchObject({ state: "HELD" });
+    });
+});

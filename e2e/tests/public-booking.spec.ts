@@ -212,4 +212,76 @@ test.describe("the booking page", () => {
             ).days.flatMap((d) => d.starts.map((s) => s.startAt)),
         ).toContain(held.startAt);
     });
+
+    test("pay now falls back to the desk: a double tap makes one booking (#508)", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const email = `fallback-${testInfo.project.name}-${Date.now()}@example.in`;
+        // The payment cannot start, so the page offers the desk instead.
+        await page.route("**/payment-intent", (route) =>
+            route.fulfill({ status: 500, body: "{}" }),
+        );
+        const bookBodies: { pay: string; idempotencyKey: string }[] = [];
+        page.on("request", (request) => {
+            if (
+                request.url().endsWith("/book") &&
+                request.method() === "POST"
+            ) {
+                bookBodies.push(
+                    request.postDataJSON() as {
+                        pay: string;
+                        idempotencyKey: string;
+                    },
+                );
+            }
+        });
+
+        await pickTime(page, 3);
+        await details(page, email);
+        const answer = page.waitForResponse(
+            (r) => r.url().endsWith("/book") && r.request().method() === "POST",
+        );
+        await confirmButton(page, /^Pay ₹.* and book$/, "Pay and book").click();
+        const response = await answer;
+        const serviceId = new URL(response.url()).pathname.split("/")[3];
+
+        const desk = page.getByRole("button", {
+            name: "Book it to pay at the desk",
+        });
+        await expect(desk).toBeVisible();
+        const deskAnswer = page.waitForResponse(
+            (r) =>
+                r.url().endsWith("/book") &&
+                r.request().method() === "POST" &&
+                (r.request().postDataJSON() as { pay: string }).pay === "DESK",
+        );
+        await desk.dblclick();
+        const booked = (await (await deskAnswer).json()) as {
+            reference: string;
+            state: string;
+        };
+        expect(booked.state).toBe("CONFIRMED");
+        await expect(
+            page.getByRole("heading", { name: "You're booked, Asha." }),
+        ).toBeVisible();
+        expect(bookBodies.filter((b) => b.pay === "DESK")).toHaveLength(1);
+        // The let-go hold's time is the one booked at the desk.
+        const hold = (await response.json()) as { startAt: string };
+        const days = await page.request.get(
+            `${urls.API_URL}/public/services/${serviceId}/days`,
+        );
+        expect(
+            (
+                (await days.json()) as {
+                    days: { starts: { startAt: string }[] }[];
+                }
+            ).days.flatMap((d) => d.starts.map((s) => s.startAt)),
+        ).not.toContain(hold.startAt);
+
+        await signIn(page);
+        await page.request.delete(
+            `${urls.API_URL}/organizations/${ORG}/services/bookings/${booked.reference}`,
+        );
+    });
 });

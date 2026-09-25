@@ -179,6 +179,9 @@ type Phase =
 /** How often the page asks where a hold stands while its booker pays. */
 const POLL_MS = 4_000;
 
+/** A booking that came back not standing: a replayed hold that was let go. */
+const TIME_GONE = "That time has gone. Pick another one.";
+
 /** Class sessions shown before "Show more". */
 const SESSIONS_SHOWN = 10;
 
@@ -224,6 +227,12 @@ export default function BookingFlow({
     const wanted = useRef<string | null>(first?.id ?? null);
     // One idempotency key per attempt: a double tap sends the same one.
     const attemptKey = useRef<string | null>(null);
+    // Booking it at the desk after letting a hold go (#508): its own key per
+    // attempt, and one request at a time — the ref, since a second tap can
+    // land before the disabled buttons are drawn.
+    const deskKey = useRef<string | null>(null);
+    const leavingRef = useRef(false);
+    const [leaving, setLeaving] = useState(false);
     const headingRef = useRef<HTMLHeadingElement>(null);
 
     const service = services.find((s) => s.id === serviceId) ?? null;
@@ -347,6 +356,8 @@ export default function BookingFlow({
         const clock = setInterval(tick, 15_000);
         const poll = setInterval(() => {
             void fetchHold(apiUrl, payingToken).then((result) => {
+                // Letting the hold go answers for itself.
+                if (leavingRef.current) return;
                 if (!result.ok) {
                     // A cleared token: the hold was let go.
                     if (result.status === 404) {
@@ -391,6 +402,15 @@ export default function BookingFlow({
         if (phase.kind !== "choose") headingRef.current?.focus();
     }, [phase.kind]);
 
+    /** The time chosen is gone: say so, and show what is left. */
+    const timeGone = (id: string, message: string) => {
+        setPhase({ kind: "choose" });
+        setSubmitError(message);
+        attemptKey.current = null;
+        setStart(null);
+        loadDays(id);
+    };
+
     const confirm = async () => {
         setTouched(true);
         if (block || !service || !chosenStart || submitting) return;
@@ -408,13 +428,9 @@ export default function BookingFlow({
         });
         setSubmitting(false);
         if (!result.ok) {
-            setSubmitError(result.message);
             // Taken meanwhile: show what is left, and a fresh attempt.
-            if (result.status === 409) {
-                attemptKey.current = null;
-                setStart(null);
-                loadDays(service.id);
-            }
+            if (result.status === 409) timeGone(service.id, result.message);
+            else setSubmitError(result.message);
             return;
         }
         attemptKey.current = null;
@@ -441,6 +457,13 @@ export default function BookingFlow({
             );
             return;
         }
+        // Only a booking that stands is a success. A replay of a hold that
+        // was let go answers RELEASED or CANCELLED, and one still held but
+        // with no token to pay it by cannot be paid from here (#508).
+        if (booking.state !== "CONFIRMED") {
+            timeGone(service.id, TIME_GONE);
+            return;
+        }
         setPhase({
             kind: "done",
             booking,
@@ -453,22 +476,29 @@ export default function BookingFlow({
 
     /** Let the hold go and go back to choosing — or book it at the desk. */
     const leaveHold = async (then: "choose" | "desk") => {
-        if (phase.kind !== "paying") return;
+        if (phase.kind !== "paying" || leavingRef.current) return;
+        leavingRef.current = true;
+        setLeaving(true);
         const held = phase;
-        await releaseHold(apiUrl, held.token);
-        if (then === "desk" && service && chosenStart) {
-            setPhase({ kind: "choose" });
+        try {
+            await releaseHold(apiUrl, held.token);
+            if (then !== "desk" || !service || !chosenStart) {
+                backToChoosing();
+                return;
+            }
             setPayChoice("DESK");
+            deskKey.current ??= newKey();
             const result: Result<BookResult> = await book(apiUrl, service.id, {
                 startAt: chosenStart.startAt,
                 bookerName: name.trim(),
                 bookerEmail: email.trim(),
                 bookerPhone: phoneNo.trim() || undefined,
-                idempotencyKey: newKey(),
+                idempotencyKey: deskKey.current,
                 staffId: chosenStart.staffId ?? undefined,
                 pay: "DESK",
             });
-            if (result.ok) {
+            if (result.ok && result.value.state === "CONFIRMED") {
+                deskKey.current = null;
                 setPhase({
                     kind: "done",
                     booking: result.value,
@@ -477,16 +507,23 @@ export default function BookingFlow({
                     when: held.when,
                     first: name.trim().split(/\s+/)[0] ?? "",
                 });
-            } else {
-                setSubmitError(result.message);
-                if (result.status === 409) {
-                    setStart(null);
-                    loadDays(service.id);
-                }
+                return;
             }
-            return;
+            setPhase({ kind: "choose" });
+            if (!result.ok && result.status !== 409) {
+                // Not known to have booked: trying again from the form sends
+                // the same key, so a first try that did book answers with it.
+                setSubmitError(result.message);
+                attemptKey.current = deskKey.current;
+                deskKey.current = null;
+                return;
+            }
+            deskKey.current = null;
+            timeGone(service.id, result.ok ? TIME_GONE : result.message);
+        } finally {
+            leavingRef.current = false;
+            setLeaving(false);
         }
-        backToChoosing();
     };
 
     const backToChoosing = () => {
@@ -565,6 +602,7 @@ export default function BookingFlow({
                             zone={zone}
                             headingRef={headingRef}
                             serviceName={service?.name ?? ""}
+                            busy={leaving}
                             onDesk={() => void leaveHold("desk")}
                             onBack={() => void leaveHold("choose")}
                         />
@@ -1416,6 +1454,7 @@ function PayingCard({
     zone,
     headingRef,
     serviceName,
+    busy,
     onDesk,
     onBack,
 }: {
@@ -1424,6 +1463,8 @@ function PayingCard({
     zone: string;
     headingRef: React.RefObject<HTMLHeadingElement | null>;
     serviceName: string;
+    /** Letting the hold go, or booking it at the desk, is under way. */
+    busy: boolean;
     onDesk: () => void;
     onBack: () => void;
 }) {
@@ -1464,18 +1505,22 @@ function PayingCard({
                         <button
                             type="button"
                             onClick={onDesk}
+                            aria-disabled={busy}
                             className={cn(
                                 "bg-site-fg text-site-bg h-11 cursor-pointer rounded-[calc(var(--site-radius)+8px)] px-4 text-sm font-semibold",
+                                busy && "cursor-default opacity-60",
                                 focusRing,
                             )}
                         >
-                            Book it to pay at the desk
+                            {busy ? "Booking…" : "Book it to pay at the desk"}
                         </button>
                         <button
                             type="button"
                             onClick={onBack}
+                            aria-disabled={busy}
                             className={cn(
                                 "text-site-fg h-11 cursor-pointer px-4 text-sm font-semibold underline",
+                                busy && "cursor-default opacity-60",
                                 focusRing,
                             )}
                         >
@@ -1507,8 +1552,10 @@ function PayingCard({
                 <button
                     type="button"
                     onClick={onBack}
+                    aria-disabled={busy}
                     className={cn(
                         "text-site-fg mt-4 cursor-pointer text-sm font-semibold underline",
+                        busy && "cursor-default opacity-60",
                         focusRing,
                     )}
                 >

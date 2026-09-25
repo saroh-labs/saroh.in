@@ -1,6 +1,10 @@
+import type { INestApplication } from "@nestjs/common";
 import { BadRequestException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { createHash } from "node:crypto";
 
-import type { BookingsService } from "./bookings.service";
+import { trustProxyHops } from "../../common/trust-proxy";
+import { BookingsService } from "./bookings.service";
 import { PublicBookingsController } from "./public-bookings.controller";
 
 function build() {
@@ -108,5 +112,59 @@ describe("PublicBookingsController.book (ADR-007)", () => {
             payToken: null,
         });
         expect(JSON.stringify(first)).not.toMatch(/org_1|contact_1|hash/);
+    });
+});
+
+describe("the caller's address behind a proxy (#508)", () => {
+    const sha = (ip: string) => createHash("sha256").update(ip).digest("hex");
+    let app: INestApplication | undefined;
+
+    afterEach(async () => {
+        await app?.close();
+        app = undefined;
+    });
+
+    /** The controller over HTTP, with `hops` proxies trusted as main.ts does. */
+    async function serve(hops: number) {
+        const publicHold = jest.fn().mockResolvedValue({
+            state: "HELD",
+            holdExpiresAt: null,
+            booking: {},
+        });
+        const moduleRef = await Test.createTestingModule({
+            controllers: [PublicBookingsController],
+            providers: [{ provide: BookingsService, useValue: { publicHold } }],
+        }).compile();
+        app = moduleRef.createNestApplication({ logger: false });
+        trustProxyHops(app, hops);
+        await app.listen(0, "127.0.0.1");
+        const url = await app.getUrl();
+        const poll = (forwardedFor: string) =>
+            fetch(`${url}/public/services/holds/tok_1`, {
+                headers: { "x-forwarded-for": forwardedFor },
+            });
+        return { publicHold, poll };
+    }
+
+    it("hashes the client the proxy names, not the proxy", async () => {
+        const { publicHold, poll } = await serve(1);
+        // A client's own claim, then the one the proxy appended.
+        const res = await poll("10.9.9.9, 203.0.113.7");
+        expect(res.status).toBe(200);
+        expect(publicHold).toHaveBeenCalledWith("tok_1", sha("203.0.113.7"));
+    });
+
+    it("reads the raw string SKIP_ENV_VALIDATION leaves as a hop count", async () => {
+        const { publicHold, poll } = await serve("1" as unknown as number);
+        await poll("10.9.9.9, 203.0.113.7");
+        expect(publicHold).toHaveBeenCalledWith("tok_1", sha("203.0.113.7"));
+    });
+
+    it("believes no forwarded address when no proxy is trusted", async () => {
+        const { publicHold, poll } = await serve(0);
+        await poll("203.0.113.7");
+        const [, ipHash] = publicHold.mock.calls[0] as [string, string];
+        expect(ipHash).not.toBe(sha("203.0.113.7"));
+        expect([sha("127.0.0.1"), sha("::ffff:127.0.0.1")]).toContain(ipHash);
     });
 });

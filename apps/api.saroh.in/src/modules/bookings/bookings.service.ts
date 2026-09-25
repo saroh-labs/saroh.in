@@ -359,10 +359,20 @@ export class BookingsService {
     ) {}
 
     /**
-     * Reads and releases of a pay-now hold, per hashed IP: the page polls
-     * every few seconds while its booker pays, a scraper does more.
+     * Reads and releases of a pay-now hold (#508). The page polls every four
+     * seconds while its booker pays — 15 a minute — so one hold gets 40.
+     * Counted per hashed IP AND token, so one payer cannot use up a limit
+     * the other customers on the same network share.
      */
     private readonly holdLimiter = new FixedWindowRateLimiter(40, 60_000);
+
+    /**
+     * And a ceiling per hashed IP, whatever the token: room for ten people
+     * paying at once from one network (a gym's wifi), not for a scraper. It
+     * is checked first — the token is the caller's to make up, so only this
+     * bounds a run of invented tokens, and the keys it leaves behind.
+     */
+    private readonly holdIpCeiling = new FixedWindowRateLimiter(150, 60_000);
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -869,12 +879,7 @@ export class BookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        if (ipHash && !this.holdLimiter.take(ipHash)) {
-            throw new HttpException(
-                "Too many requests. Try again shortly.",
-                429,
-            );
-        }
+        this.takeHoldHit(token, ipHash, now);
         const booking = await this.holdBooking(token);
         return {
             state: holdState(booking, now),
@@ -893,12 +898,7 @@ export class BookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        if (ipHash && !this.holdLimiter.take(ipHash)) {
-            throw new HttpException(
-                "Too many requests. Try again shortly.",
-                429,
-            );
-        }
+        this.takeHoldHit(token, ipHash, now);
         const found = await this.holdBooking(token);
         await prisma.$transaction((tx) => releaseHoldInTx(tx, found.id, now));
         const booking = await prisma.booking.findUniqueOrThrow({
@@ -909,6 +909,27 @@ export class BookingsService {
             holdExpiresAt: booking.holdExpiresAt?.toISOString() ?? null,
             booking: toPublicBooking(booking),
         };
+    }
+
+    /** One read or release of a hold against its limits; 429 past them. */
+    private takeHoldHit(
+        token: string,
+        ipHash: string | undefined,
+        now: Date,
+    ): void {
+        if (!ipHash) return;
+        const at = now.getTime();
+        // The ceiling first and on its own: a refusal there never adds a
+        // per-token key.
+        const allowed =
+            this.holdIpCeiling.take(ipHash, at) &&
+            this.holdLimiter.take(`${ipHash}:${hashPayToken(token)}`, at);
+        if (!allowed) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                429,
+            );
+        }
     }
 
     private async holdBooking(token: string): Promise<Booking> {
