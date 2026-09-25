@@ -34,10 +34,13 @@ jest.mock("@saroh/database", () => {
         paymentAttempt: { create: jest.fn() },
         paymentRefund: {
             findFirst: jest.fn(),
+            findUniqueOrThrow: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
         },
         order: { findUnique: jest.fn(), update: jest.fn() },
+        orderEvent: { create: jest.fn() },
+        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
@@ -50,7 +53,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { NotFoundException, UnauthorizedException } from "@nestjs/common";
+import {
+    Logger,
+    NotFoundException,
+    UnauthorizedException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
@@ -82,7 +89,10 @@ const intentUpdate = prisma.paymentIntent.update as jest.Mock;
 const intentFindMany = prisma.paymentIntent.findMany as jest.Mock;
 const attemptCreate = prisma.paymentAttempt.create as jest.Mock;
 const refundFindFirst = prisma.paymentRefund.findFirst as jest.Mock;
+const refundFindUnique = prisma.paymentRefund.findUniqueOrThrow as jest.Mock;
 const refundCreate = prisma.paymentRefund.create as jest.Mock;
+const orderEventCreate = prisma.orderEvent.create as jest.Mock;
+const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 const refundUpdate = prisma.paymentRefund.update as jest.Mock;
 const orderFindUnique = prisma.order.findUnique as jest.Mock;
 const orderUpdate = prisma.order.update as jest.Mock;
@@ -326,74 +336,92 @@ describe("WebhooksService reconcile routes through the state machine", () => {
 });
 
 describe("WebhooksService refund settlement", () => {
-    it("settles a PENDING refund to SUCCEEDED once and moves the order PAID→REFUNDED", async () => {
+    /** A refund row as `matchRefund` reads it back under its lock. */
+    function refundRow(over: Record<string, unknown> = {}) {
+        return {
+            id: "rf_1",
+            status: "PENDING",
+            amountCents: 4250,
+            reason: "Burnt",
+            providerRefundId: "rfnd_1",
+            paymentIntent: { orderId: "order_1" },
+            ...over,
+        };
+    }
+
+    /** Deliver one normalized refund event through the full inbox path. */
+    async function deliverRefund(over: Record<string, unknown>) {
         const { service } = makeService();
         providerFindUnique.mockResolvedValue(providerRow());
         whCreate.mockResolvedValue({ id: "wh_1" });
+        const raw = bodyOf({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            ...over,
+        });
+        return service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+    }
+
+    beforeEach(() => {
         intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
         orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
-        refundFindFirst.mockResolvedValue({ id: "rf_1", status: "PENDING" });
+    });
+
+    it("settles a PENDING refund to SUCCEEDED once and moves the order PAID→REFUNDED", async () => {
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue(refundRow());
         // Everything taken has now come back.
         intentFindMany.mockResolvedValue([
             { amountCents: 4250, refunds: [{ amountCents: 4250 }] },
         ]);
 
-        const raw = bodyOf({
-            eventType: "refund.processed",
-            outcome: "REFUNDED",
+        const result = await deliverRefund({
             providerRefundId: "rfnd_1",
-        });
-        const result = await service.handle("razorpay", "org_1", raw, {
-            "x-fake-signature": sign(raw),
+            refundAmountCents: 4250,
         });
 
         expect(result).toEqual({ status: "processed", changed: true });
+        expect(queryRaw).toHaveBeenCalledTimes(1); // the row's lock
         expect(refundUpdate).toHaveBeenCalledWith({
             where: { id: "rf_1" },
-            data: { status: "SUCCEEDED" },
+            data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
         });
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
             data: { paymentStatus: "REFUNDED" },
         });
+        // The refund path attached the provider's id and wrote the step.
+        expect(orderEventCreate).not.toHaveBeenCalled();
     });
 
     it("a partial refund settles but leaves the order PAID (ADR-008)", async () => {
-        const { service } = makeService();
-        providerFindUnique.mockResolvedValue(providerRow());
-        whCreate.mockResolvedValue({ id: "wh_1" });
-        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
-        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
-        refundFindFirst.mockResolvedValue({ id: "rf_1", status: "PENDING" });
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue(refundRow({ amountCents: 1500 }));
         // Two lines of three went back; the rest is still paid for.
         intentFindMany.mockResolvedValue([
             { amountCents: 4250, refunds: [{ amountCents: 1500 }] },
         ]);
 
-        const raw = bodyOf({
-            eventType: "refund.processed",
-            outcome: "REFUNDED",
+        const result = await deliverRefund({
             providerRefundId: "rfnd_1",
-        });
-        const result = await service.handle("razorpay", "org_1", raw, {
-            "x-fake-signature": sign(raw),
+            refundAmountCents: 1500,
         });
 
         expect(result).toEqual({ status: "processed", changed: true });
         expect(refundUpdate).toHaveBeenCalledWith({
             where: { id: "rf_1" },
-            data: { status: "SUCCEEDED" },
+            data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
         });
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 
     it("the refund that settles the last of it moves the order to REFUNDED", async () => {
-        const { service } = makeService();
-        providerFindUnique.mockResolvedValue(providerRow());
-        whCreate.mockResolvedValue({ id: "wh_1" });
-        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
-        orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
-        refundFindFirst.mockResolvedValue({ id: "rf_2", status: "PENDING" });
+        refundFindFirst.mockResolvedValue({ id: "rf_2" });
+        refundFindUnique.mockResolvedValue(
+            refundRow({ id: "rf_2", amountCents: 2750 }),
+        );
         intentFindMany.mockResolvedValue([
             {
                 amountCents: 4250,
@@ -401,13 +429,9 @@ describe("WebhooksService refund settlement", () => {
             },
         ]);
 
-        const raw = bodyOf({
-            eventType: "refund.processed",
-            outcome: "REFUNDED",
+        await deliverRefund({
             providerRefundId: "rfnd_2",
-        });
-        await service.handle("razorpay", "org_1", raw, {
-            "x-fake-signature": sign(raw),
+            refundAmountCents: 2750,
         });
 
         expect(orderUpdate).toHaveBeenCalledWith({
@@ -417,25 +441,190 @@ describe("WebhooksService refund settlement", () => {
     });
 
     it("does not double-settle an already-SUCCEEDED refund on a REFUNDED order", async () => {
-        const { service } = makeService();
-        providerFindUnique.mockResolvedValue(providerRow());
-        whCreate.mockResolvedValue({ id: "wh_1" });
-        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
         orderFindUnique.mockResolvedValue({ paymentStatus: "REFUNDED" });
-        refundFindFirst.mockResolvedValue({ id: "rf_1", status: "SUCCEEDED" });
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue(refundRow({ status: "SUCCEEDED" }));
 
-        const raw = bodyOf({
-            eventType: "refund.processed",
-            outcome: "REFUNDED",
-            providerRefundId: "rfnd_1",
-        });
-        const result = await service.handle("razorpay", "org_1", raw, {
-            "x-fake-signature": sign(raw),
-        });
+        const result = await deliverRefund({ providerRefundId: "rfnd_1" });
 
         expect(result).toEqual({ status: "ignored", changed: false });
         expect(refundUpdate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("arriving before the refund path stored the provider's id, it settles Saroh's row by its reference and writes the REFUND step once", async () => {
+        // No row carries the provider id yet; the reference names Saroh's row.
+        refundFindFirst
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null });
+        refundFindUnique.mockResolvedValue(
+            refundRow({ providerRefundId: null, amountCents: 1500 }),
+        );
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 1500 }] },
+        ]);
+
+        const result = await deliverRefund({
+            providerRefundId: "rfnd_1",
+            refundReference: "rf_1",
+            refundAmountCents: 1500,
+        });
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        // Matched on the same order, never by amount.
+        expect(refundFindFirst).toHaveBeenLastCalledWith({
+            where: {
+                id: "rf_1",
+                organizationId: "org_1",
+                paymentIntent: { orderId: "order_1" },
+            },
+            select: { id: true, providerRefundId: true },
+        });
+        expect(refundUpdate).toHaveBeenCalledWith({
+            where: { id: "rf_1" },
+            data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
+        });
+        expect(refundCreate).not.toHaveBeenCalled();
+        expect(orderEventCreate).toHaveBeenCalledTimes(1);
+        expect(orderEventCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                orderId: "order_1",
+                kind: "REFUND",
+                actorUserId: null,
+                note: "Burnt",
+                amountCents: 1500,
+            },
+        });
+    });
+
+    it("a refund made in the provider's dashboard is recorded at the amount the provider refunded", async () => {
+        refundFindFirst.mockResolvedValue(null);
+        refundCreate.mockResolvedValue({ id: "rf_dash" });
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 1500 }] },
+        ]);
+
+        await deliverRefund({
+            providerRefundId: "rfnd_dash",
+            refundAmountCents: 1500,
+        });
+
+        expect(refundCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                paymentIntentId: "pi_1",
+                amountCents: 1500,
+                currency: "INR",
+                status: "SUCCEEDED",
+                providerRefundId: "rfnd_dash",
+            },
+        });
+        expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("a dashboard refund of the same amount as Saroh's pending one is its own row; Saroh's stays PENDING", async () => {
+        // Saroh's ₹15 row is PENDING, but the event names neither its
+        // provider id nor its reference.
+        refundFindFirst.mockResolvedValue(null);
+        refundCreate.mockResolvedValue({ id: "rf_dash" });
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 1500 }] },
+        ]);
+
+        await deliverRefund({
+            providerRefundId: "rfnd_dash",
+            refundAmountCents: 1500,
+        });
+
+        expect(refundFindUnique).not.toHaveBeenCalled();
+        expect(refundUpdate).not.toHaveBeenCalled();
+        expect(refundCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("an event with no amount falls back to the payment's, and says so", async () => {
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
+        refundFindFirst.mockResolvedValue(null);
+        refundCreate.mockResolvedValue({ id: "rf_dash" });
+        intentFindMany.mockResolvedValue([
+            { amountCents: 4250, refunds: [{ amountCents: 4250 }] },
+        ]);
+
+        await deliverRefund({ providerRefundId: "rfnd_dash" });
+
+        expect(refundCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ amountCents: 4250 }),
+        });
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining("came with no amount"),
+        );
+        warn.mockRestore();
+    });
+
+    it("a refund the provider failed moves Saroh's PENDING row to FAILED: no credit note, the order as it was", async () => {
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue(refundRow());
+
+        const result = await deliverRefund({
+            eventType: "refund.failed",
+            outcome: "REFUND_FAILED",
+            providerRefundId: "rfnd_1",
+            refundAmountCents: 4250,
+        });
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(refundUpdate).toHaveBeenCalledWith({
+            where: { id: "rf_1" },
+            data: { status: "FAILED", providerRefundId: "rfnd_1" },
+        });
+        expect(creditNoteForRefund).not.toHaveBeenCalled();
+        expect(orderUpdate).not.toHaveBeenCalled();
+        expect(orderEventCreate).not.toHaveBeenCalled();
+    });
+
+    it("a failed refund matched by Saroh's reference alone is failed too", async () => {
+        refundFindFirst
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null });
+        refundFindUnique.mockResolvedValue(
+            refundRow({ providerRefundId: null }),
+        );
+
+        await deliverRefund({
+            eventType: "REFUND_STATUS_WEBHOOK",
+            outcome: "REFUND_FAILED",
+            providerRefundId: "cf_77",
+            refundReference: "rf_1",
+        });
+
+        expect(refundUpdate).toHaveBeenCalledWith({
+            where: { id: "rf_1" },
+            data: { status: "FAILED", providerRefundId: "cf_77" },
+        });
+    });
+
+    it("a failure for a refund already SUCCEEDED, or for no refund of Saroh's, changes nothing", async () => {
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue(refundRow({ status: "SUCCEEDED" }));
+        expect(
+            await deliverRefund({
+                outcome: "REFUND_FAILED",
+                providerRefundId: "rfnd_1",
+            }),
+        ).toEqual({ status: "ignored", changed: false });
+
+        refundFindFirst.mockResolvedValue(null);
+        expect(
+            await deliverRefund({
+                providerEventId: "evt_2",
+                outcome: "REFUND_FAILED",
+                providerRefundId: "rfnd_unknown",
+            }),
+        ).toEqual({ status: "ignored", changed: false });
+        expect(refundUpdate).not.toHaveBeenCalled();
+        expect(refundCreate).not.toHaveBeenCalled();
     });
 });
 
@@ -508,7 +697,15 @@ describe("WebhooksService — the order's invoice (ADR-008)", () => {
         whCreate.mockResolvedValue({ id: "wh_4" });
         intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
         orderFindUnique.mockResolvedValue({ paymentStatus: "PAID" });
-        refundFindFirst.mockResolvedValue({ id: "rf_1", status: "PENDING" });
+        refundFindFirst.mockResolvedValue({ id: "rf_1" });
+        refundFindUnique.mockResolvedValue({
+            id: "rf_1",
+            status: "PENDING",
+            amountCents: 4250,
+            reason: null,
+            providerRefundId: "rfnd_1",
+            paymentIntent: { orderId: "order_1" },
+        });
         intentFindMany.mockResolvedValue([
             { amountCents: 4250, refunds: [{ amountCents: 4250 }] },
         ]);
@@ -545,9 +742,13 @@ describe("WebhooksService — the order's invoice (ADR-008)", () => {
             eventType: "refund.processed",
             outcome: "REFUNDED",
             providerRefundId: "rfnd_9",
+            refundAmountCents: 1500,
         });
         await service.handle("razorpay", "org_1", raw, {
             "x-fake-signature": sign(raw),
+        });
+        expect(refundCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ amountCents: 1500 }),
         });
         expect(creditNote).toHaveBeenCalledWith(expect.anything(), "rf_new");
         expect(creditRest).not.toHaveBeenCalled();

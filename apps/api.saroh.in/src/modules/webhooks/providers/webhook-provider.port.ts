@@ -15,8 +15,13 @@
 /** Case-insensitive header bag as delivered on the HTTP request. */
 export type WebhookHeaders = Record<string, string | string[] | undefined>;
 
-/** The normalized money-effect of a verified webhook. */
-export type WebhookOutcome = "SUCCEEDED" | "FAILED" | "REFUNDED" | "IGNORED";
+/**
+ * The normalized money-effect of a verified webhook. `REFUNDED` is money the
+ * provider has handed back; `REFUND_FAILED` is a refund it definitely did
+ * not make (Razorpay `refund.failed`, Cashfree CANCELLED/FAILED/REJECTED).
+ */
+export type WebhookOutcome =
+    "SUCCEEDED" | "FAILED" | "REFUNDED" | "REFUND_FAILED" | "IGNORED";
 
 /**
  * A provider-agnostic view of one verified webhook event. All money-state
@@ -37,6 +42,18 @@ export interface NormalizedWebhookEvent {
     providerPaymentRef?: string;
     /** Present on refund events — the provider refund id to settle. */
     providerRefundId?: string;
+    /**
+     * On refund events: what the provider refunded, in minor units (paise).
+     * The row a webhook creates is made at this amount, never the payment's.
+     */
+    refundAmountCents?: number;
+    /**
+     * On refund events: Saroh's own reference, echoed back — the
+     * PaymentRefund id sent as Razorpay's `receipt`/`notes` or Cashfree's
+     * `refund_id` (DEC-026). Absent on a refund made in the provider's
+     * dashboard.
+     */
+    refundReference?: string;
 }
 
 export interface VerifySignatureInput {

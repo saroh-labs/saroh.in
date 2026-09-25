@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
         paymentAttempt: { create: jest.fn() },
         paymentRefund: {
             findFirst: jest.fn(),
+            findUniqueOrThrow: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
         },
@@ -68,6 +69,7 @@ const intentFindFirst = prisma.paymentIntent.findFirst as jest.Mock;
 const intentUpdate = prisma.paymentIntent.update as jest.Mock;
 const attemptCreate = prisma.paymentAttempt.create as jest.Mock;
 const refundFindFirst = prisma.paymentRefund.findFirst as jest.Mock;
+const refundFindUnique = prisma.paymentRefund.findUniqueOrThrow as jest.Mock;
 const refundCreate = prisma.paymentRefund.create as jest.Mock;
 const refundUpdate = prisma.paymentRefund.update as jest.Mock;
 const orderFindUnique = prisma.order.findUnique as jest.Mock;
@@ -329,10 +331,16 @@ describe("webhook refund on an invoice intent", () => {
 
     it("settles a PENDING refund once, and a repeat is a no-op", async () => {
         intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
-        refundFindFirst.mockResolvedValueOnce({
+        const row = {
             id: "rf_1",
             status: "PENDING",
-        });
+            amountCents: 120000,
+            reason: null,
+            providerRefundId: "rfnd_1",
+            paymentIntent: { orderId: null },
+        };
+        refundFindFirst.mockResolvedValueOnce({ id: "rf_1" });
+        refundFindUnique.mockResolvedValueOnce(row);
         const raw = bodyOf({
             eventType: "refund.processed",
             outcome: "REFUNDED",
@@ -345,14 +353,12 @@ describe("webhook refund on an invoice intent", () => {
         });
         expect(refundUpdate).toHaveBeenCalledWith({
             where: { id: "rf_1" },
-            data: { status: "SUCCEEDED" },
+            data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
         });
 
         refundUpdate.mockClear();
-        refundFindFirst.mockResolvedValueOnce({
-            id: "rf_1",
-            status: "SUCCEEDED",
-        });
+        refundFindFirst.mockResolvedValueOnce({ id: "rf_1" });
+        refundFindUnique.mockResolvedValueOnce({ ...row, status: "SUCCEEDED" });
         expect(
             await deliver(
                 bodyOf({

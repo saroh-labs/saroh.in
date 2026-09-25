@@ -1,7 +1,9 @@
 /**
  * GST and an invoice for every order against a real Postgres (ADR-008, U5):
  * a verified payment webhook makes exactly one order invoice and a replayed
- * delivery none; a refund makes its credit note; what is owed leaves order
+ * delivery none; a refund makes its credit note; the refund webhook settles
+ * Saroh's own row by its reference, at the provider's amount, and a refund
+ * the provider failed frees its money (#508 U2); what is owed leaves order
  * invoices out; issued invoices cannot be edited, deleted or — once the
  * business is GST-registered — voided; two invoices across 1 April land in
  * their own financial year's series; a Karnataka business billing a Goa café
@@ -40,9 +42,8 @@ import { creditNoteForRefund, ensureOrderInvoice } from "./order-invoicing";
 
 const WEBHOOK_SECRET = "whsec_gst_test";
 
-const payments = new PaymentsService(
-    new FakeProviderFactory(new FakeMerchantProvider("RAZORPAY")),
-);
+const fake = new FakeMerchantProvider("RAZORPAY");
+const payments = new PaymentsService(new FakeProviderFactory(fake));
 const webhooks = new WebhooksService(
     new FakeWebhookProviderFactory(new FakeWebhookProvider("RAZORPAY")),
     payments,
@@ -261,35 +262,25 @@ describe("an invoice for every order (real database)", () => {
         const croissant = await prisma.orderItem.findFirstOrThrow({
             where: { orderId: order.id, productId: pastry },
         });
-        const refund = await prisma.paymentRefund.create({
-            data: {
-                organizationId: rye.organizationId,
-                paymentIntentId: order.intentId,
-                amountCents: 10620,
-                currency: "INR",
-                status: "PENDING",
-                providerRefundId: `rfnd_${order.id}`,
-                lines: {
-                    create: [
-                        {
-                            organizationId: rye.organizationId,
-                            orderItemId: croissant.id,
-                            quantity: 1,
-                            amountCents: 10620,
-                        },
-                    ],
-                },
-            },
+        // Through the real refund path: the row, its line and its amount
+        // are the ones the merchant's refund makes.
+        const refund = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: croissant.id, quantity: 1 }],
         });
+        expect(refund.amountCents).toBe(10620);
 
         await deliver({
             eventType: "refund.processed",
             outcome: "REFUNDED",
             providerIntentId: `prov_${order.id}`,
-            providerRefundId: `rfnd_${order.id}`,
+            providerRefundId: refund.providerRefundId,
+            refundReference: refund.refundId,
+            refundAmountCents: 10620,
         });
         // The refund path making it too finds the one already there.
-        await prisma.$transaction((tx) => creditNoteForRefund(tx, refund.id));
+        await prisma.$transaction((tx) =>
+            creditNoteForRefund(tx, refund.refundId),
+        );
 
         const notes = await prisma.invoice.findMany({
             where: { relatedInvoiceId: invoice.id, kind: "CREDIT_NOTE" },
@@ -298,7 +289,7 @@ describe("an invoice for every order (real database)", () => {
         expect(notes).toHaveLength(1);
         const [note] = notes;
         expect(note.number).toMatch(/^RCCN\//);
-        expect(note.paymentRefundId).toBe(refund.id);
+        expect(note.paymentRefundId).toBe(refund.refundId);
         expect(note.total.toString()).toBe("106.2");
         expect(note.cgst.toString()).toBe("8.1");
         expect(note.lines[0].orderItemId).toBe(croissant.id);
@@ -342,6 +333,299 @@ describe("an invoice for every order (real database)", () => {
         const owed = await invoices.owedFor(rye.organizationId, { contactId });
         expect(owed.totals).toEqual([{ currency: "INR", amount: "1500.00" }]);
         expect(owed.unpaidCount).toBe(1);
+    });
+});
+
+describe("the refund webhook settles at the provider's amount (real database)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    /** A paid order (₹489.20) with its invoice, and its croissant line. */
+    async function paidOrder() {
+        const order = await unpaidOrder();
+        await deliver({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${order.id}`,
+            providerPaymentRef: `pay_${order.id}`,
+        });
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { orderId: order.id, kind: "INVOICE" },
+        });
+        const croissant = await prisma.orderItem.findFirstOrThrow({
+            where: { orderId: order.id, productId: pastry },
+        });
+        return { ...order, invoiceId: invoice.id, croissant: croissant.id };
+    }
+
+    /** The fake provider's id for the first refund on this order's payment. */
+    const providerRefundId = (orderId: string) => `fake_refund_prov_${orderId}`;
+
+    const refunded = (
+        orderId: string,
+        over: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+        eventType: "refund.processed",
+        outcome: "REFUNDED",
+        providerIntentId: `prov_${orderId}`,
+        ...over,
+    });
+
+    const creditNotes = (invoiceId: string) =>
+        prisma.invoice.findMany({
+            where: { relatedInvoiceId: invoiceId, kind: "CREDIT_NOTE" },
+            orderBy: { createdAt: "asc" },
+        });
+
+    const refundSteps = (orderId: string) =>
+        prisma.orderEvent.findMany({
+            where: { orderId, kind: "REFUND" },
+        });
+
+    it("a ₹400 refund made in the provider's dashboard is one ₹400 row; the order stays PAID and the credit note is ₹400", async () => {
+        const order = await paidOrder();
+
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: `rfnd_dash_${order.id}`,
+                refundAmountCents: 40000,
+            }),
+        );
+
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: order.intentId },
+        });
+        expect(rows).toEqual([
+            expect.objectContaining({
+                amountCents: 40000,
+                status: "SUCCEEDED",
+            }),
+        ]);
+        const after = await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+        });
+        expect(after.paymentStatus).toBe("PAID");
+        const notes = await creditNotes(order.invoiceId);
+        expect(notes).toHaveLength(1);
+        expect(notes[0].total.toString()).toBe("400");
+    });
+
+    it("the same refund delivered twice is one row and one credit note", async () => {
+        const order = await paidOrder();
+        const refund = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+        const event = refunded(order.id, {
+            providerRefundId: refund.providerRefundId,
+            refundReference: refund.refundId,
+            refundAmountCents: 10620,
+        });
+
+        await deliver(event);
+        await deliver(event); // a second delivery, under another event id
+
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: order.intentId },
+        });
+        expect(rows).toHaveLength(1);
+        expect(rows[0].status).toBe("SUCCEEDED");
+        expect(await creditNotes(order.invoiceId)).toHaveLength(1);
+        expect(await refundSteps(order.id)).toHaveLength(1);
+    });
+
+    it("arriving before the refund path stored the provider's id, it settles Saroh's row — no second row, one REFUND step", async () => {
+        const order = await paidOrder();
+        // The provider's webhook lands while its answer to the call is
+        // still on the way back.
+        const refund = fake.refund.bind(fake);
+        jest.spyOn(fake, "refund").mockImplementationOnce(async (input) => {
+            const made = await refund(input);
+            await deliver(
+                refunded(order.id, {
+                    providerRefundId: made.providerRefundId,
+                    refundReference: input.reference,
+                    refundAmountCents: input.amountCents,
+                }),
+            );
+            return made;
+        });
+
+        const result = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: order.intentId },
+        });
+        expect(rows).toEqual([
+            expect.objectContaining({
+                id: result.refundId,
+                status: "SUCCEEDED",
+                providerRefundId: providerRefundId(order.id),
+                amountCents: 10620,
+            }),
+        ]);
+        const steps = await refundSteps(order.id);
+        expect(steps).toHaveLength(1);
+        expect(steps[0].amountCents).toBe(10620);
+        expect(await creditNotes(order.invoiceId)).toHaveLength(1);
+    });
+
+    it("a refund whose call timed out is confirmed by the webhook: that row SUCCEEDED, one REFUND step on the timeline", async () => {
+        const order = await paidOrder();
+        fake.failNextRefund("UNKNOWN", { madeAnyway: true });
+        const lost = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+        expect(lost.beingConfirmed).toBe(true);
+        expect(await refundSteps(order.id)).toHaveLength(0);
+
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: providerRefundId(order.id),
+                refundReference: lost.refundId,
+                refundAmountCents: 10620,
+            }),
+        );
+
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: order.intentId },
+        });
+        expect(rows).toEqual([
+            expect.objectContaining({
+                id: lost.refundId,
+                status: "SUCCEEDED",
+                providerRefundId: providerRefundId(order.id),
+            }),
+        ]);
+        const steps = await refundSteps(order.id);
+        expect(steps).toHaveLength(1);
+        expect(steps[0]).toMatchObject({
+            amountCents: 10620,
+            actorUserId: null,
+        });
+        expect(await creditNotes(order.invoiceId)).toHaveLength(1);
+        // Settled: try-again has nothing left to do.
+        await expect(
+            payments.retryRefund(rye, order.id, lost.refundId),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("a refund the provider failed frees its line: FAILED, no credit note, the order still PAID", async () => {
+        const order = await paidOrder();
+        fake.failNextRefund("UNKNOWN");
+        const lost = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+
+        await deliver({
+            eventType: "refund.failed",
+            outcome: "REFUND_FAILED",
+            providerIntentId: `prov_${order.id}`,
+            providerRefundId: `rfnd_failed_${order.id}`,
+            refundReference: lost.refundId,
+            refundAmountCents: 10620,
+        });
+
+        expect(
+            await prisma.paymentRefund.findUniqueOrThrow({
+                where: { id: lost.refundId },
+            }),
+        ).toMatchObject({ status: "FAILED" });
+        expect(await creditNotes(order.invoiceId)).toHaveLength(0);
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .paymentStatus,
+        ).toBe("PAID");
+        // The croissant can be refunded again.
+        const again = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+        expect(again.amountCents).toBe(10620);
+    });
+
+    it("a dashboard refund of the same amount as Saroh's pending one is its own row; Saroh's stays PENDING", async () => {
+        const order = await paidOrder();
+        fake.failNextRefund("UNKNOWN");
+        const pending = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: `rfnd_dash_${order.id}`,
+                refundAmountCents: 10620,
+            }),
+        );
+
+        const rows = await prisma.paymentRefund.findMany({
+            where: { paymentIntentId: order.intentId },
+            orderBy: { createdAt: "asc" },
+        });
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({
+            id: pending.refundId,
+            status: "PENDING",
+            providerRefundId: null,
+        });
+        expect(rows[1]).toMatchObject({
+            amountCents: 10620,
+            status: "SUCCEEDED",
+            providerRefundId: `rfnd_dash_${order.id}`,
+        });
+    });
+
+    it("two partial refunds that add up to the payment move the order to REFUNDED once; the credit notes total the payment", async () => {
+        const order = await paidOrder();
+        const first = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.croissant, quantity: 1 }],
+        });
+        const rest = await payments.initiateRefund(rye, order.id);
+        expect(first.amountCents + rest.amountCents).toBe(48920);
+
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: first.providerRefundId,
+                refundReference: first.refundId,
+                refundAmountCents: first.amountCents,
+            }),
+        );
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .paymentStatus,
+        ).toBe("PAID");
+
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: rest.providerRefundId,
+                refundReference: rest.refundId,
+                refundAmountCents: rest.amountCents,
+            }),
+        );
+        // Delivered again: still once.
+        await deliver(
+            refunded(order.id, {
+                providerRefundId: rest.providerRefundId,
+                refundReference: rest.refundId,
+                refundAmountCents: rest.amountCents,
+            }),
+        );
+
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .paymentStatus,
+        ).toBe("REFUNDED");
+        const notes = await creditNotes(order.invoiceId);
+        expect(notes).toHaveLength(2);
+        expect(
+            notes.reduce((s, n) => s + Math.round(Number(n.total) * 100), 0),
+        ).toBe(48920);
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: order.invoiceId },
+                })
+            ).status,
+        ).toBe("CREDITED");
     });
 });
 
