@@ -82,14 +82,34 @@ export interface ProductListItem extends Product {
         title: string;
         price: string | null;
     }[];
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    inventory: ListStock | null;
+}
+
+/**
+ * A list row's stock (#518): on hand (`quantity`), what open orders have
+ * promised from it, and the warning level. Can sell is on hand minus
+ * promised.
+ */
+export interface ListStock {
+    quantity: number;
+    promised: number;
+    lowStockAlert: number;
 }
 
 /** One storefront that sells a catalogue product, and its stock there. */
 export interface CatalogueListing {
     storeId: string;
     storeName: string;
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    inventory: ListStock | null;
+    /**
+     * Each variant's shelf here (#518): whether this storefront sells it,
+     * and its stock — null while it is not counted per variant here.
+     */
+    variants: {
+        variantId: string;
+        soldHere: boolean;
+        inventory: ListStock | null;
+    }[];
 }
 
 /**
@@ -323,6 +343,18 @@ export function createProduct(storeId: string, input: NewProductInput) {
 
 export function updateProduct(productId: string, input: ProductInput) {
     return mutateProduct(productId, "", "PUT", input);
+}
+
+/**
+ * A draft copy (#518): "… (copy)", sold where the original is, stock at 0.
+ * Returns the copy as `getProduct` reads it at `storeId`.
+ */
+export function duplicateProduct(productId: string, storeId?: string | null) {
+    return mutateProduct<ProductDetail>(
+        productId,
+        `/duplicate${at(storeId)}`,
+        "POST",
+    );
 }
 
 /** Delete it from the catalogue — and so from every storefront. */

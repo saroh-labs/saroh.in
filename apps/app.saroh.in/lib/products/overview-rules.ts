@@ -81,6 +81,10 @@ export interface ProductOverview {
     lastChanged: string;
     storefront: { id: string; name: string };
     canWrite: boolean;
+    /** May count and move stock here (inventory:write or store:write). */
+    canStock: boolean;
+    /** May reply to reviews (product-review:write). */
+    canReply: boolean;
     orders: Panel<{
         openCount: number;
         thisMonthCount: number;
@@ -95,6 +99,7 @@ export interface ProductOverview {
         };
         toAnswer: number;
         hiddenCount: number;
+        /** Published ones waiting for a reply first, then the rest. */
         latest: OverviewReview[];
     }>;
     discounts: Panel<OverviewDiscount[]>;
