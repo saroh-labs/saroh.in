@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from "react";
 import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
+import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings } from "@/lib/settings/search";
 
@@ -314,7 +315,8 @@ export function CommandMenu({
         setOpen(false);
         setQuery("");
         setHits([]);
-        router.push(href);
+        // An open edit may hold the page: it asks, and goes if discarded.
+        if (mayNavigate(href)) router.push(href);
     };
 
     const typed = query.trim().length >= 2;

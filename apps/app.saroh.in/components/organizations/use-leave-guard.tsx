@@ -10,6 +10,8 @@ import { Button } from "@saroh/ui/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { onLeaveRequest } from "@/lib/nav/leave-request";
+
 /**
  * Hold a way off this page while an edit is unsaved ("Saroh Settings"
  * design): a link to another page — the rail, the settings tabs — is stopped
@@ -19,13 +21,26 @@ import { useEffect, useState } from "react";
  * Links are caught on the document in the capture phase, before Next's
  * `<Link>` sees the click, so nothing navigates until the person chooses. A
  * link that stays on this page, opens a new tab, or is clicked with a
- * modifier (a new window) is left alone.
+ * modifier (a new window) is left alone. Search settings and the ⌘K menu
+ * navigate in code, and ask the same way first (`lib/nav/leave-request.ts`).
  */
 export function useLeaveGuard(dirty: boolean) {
     const [leaveTo, setLeaveTo] = useState<string | null>(null);
 
     useEffect(() => {
         if (!dirty) return;
+        /** Whether going to `href` is held, and asked about. */
+        const hold = (href: string) => {
+            const url = new URL(href, window.location.href);
+            if (
+                url.origin !== window.location.origin ||
+                url.pathname === window.location.pathname
+            ) {
+                return false;
+            }
+            setLeaveTo(url.pathname + url.search + url.hash);
+            return true;
+        };
         const onClick = (e: MouseEvent) => {
             if (
                 e.defaultPrevented ||
@@ -41,24 +56,18 @@ export function useLeaveGuard(dirty: boolean) {
                 e.target instanceof Element
                     ? e.target.closest<HTMLAnchorElement>("a[href]")
                     : null;
-            if (!link || link.target === "_blank") return;
-            const url = new URL(link.href, window.location.href);
-            if (
-                url.origin !== window.location.origin ||
-                url.pathname === window.location.pathname
-            ) {
-                return;
-            }
+            if (!link || link.target === "_blank" || !hold(link.href)) return;
             e.preventDefault();
             e.stopPropagation();
-            setLeaveTo(url.pathname + url.search + url.hash);
         };
         const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
         document.addEventListener("click", onClick, true);
         window.addEventListener("beforeunload", onUnload);
+        const offRequest = onLeaveRequest(hold);
         return () => {
             document.removeEventListener("click", onClick, true);
             window.removeEventListener("beforeunload", onUnload);
+            offRequest();
         };
     }, [dirty]);
 

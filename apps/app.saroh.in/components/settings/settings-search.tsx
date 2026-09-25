@@ -11,6 +11,7 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
 
@@ -82,7 +83,8 @@ export function SettingsSearch({
     }, []);
     const go = (href: string) => {
         toggle(false);
-        router.push(href);
+        // An open edit may hold the page: it asks, and goes if discarded.
+        if (mayNavigate(href)) router.push(href);
     };
     const onKeyDown = (e: React.KeyboardEvent) => {
         const n = Math.max(1, hits.length);
