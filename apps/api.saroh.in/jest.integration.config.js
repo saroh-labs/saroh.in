@@ -60,6 +60,7 @@ module.exports = {
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
+        "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",

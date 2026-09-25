@@ -96,7 +96,7 @@ export class StockChecksService {
      * under that key, is not found; resolving one already resolved answers
      * the same.
      */
-    resolve(
+    async resolve(
         ctx: OrganizationContext,
         key: string,
         dto: ResolveCheckDto,

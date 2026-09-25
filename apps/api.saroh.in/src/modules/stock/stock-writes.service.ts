@@ -102,7 +102,10 @@ export class StockWritesService {
     }
 
     /** Count shelves: "Count saved: N counted, N changed." */
-    counts(ctx: OrganizationContext, dto: CountStockDto): Promise<CountSaved> {
+    async counts(
+        ctx: OrganizationContext,
+        dto: CountStockDto,
+    ): Promise<CountSaved> {
         const actor = stockWriter(ctx);
         return this.once("counts", actor, dto, async (tx) => {
             for (const productId of new Set(
@@ -139,7 +142,7 @@ export class StockWritesService {
     }
 
     /** Received, baked, wasted, or returned by a customer. */
-    entries(
+    async entries(
         ctx: OrganizationContext,
         dto: StockEntryDto,
     ): Promise<{ entry: StockEntryView; shelf: ShelfAfter }> {
@@ -170,7 +173,7 @@ export class StockWritesService {
     }
 
     /** "+N · Add": units received at a shelf. */
-    adjust(
+    async adjust(
         ctx: OrganizationContext,
         dto: AdjustStockDto,
     ): Promise<{ entry: StockEntryView; shelf: ShelfAfter }> {
@@ -192,7 +195,7 @@ export class StockWritesService {
     }
 
     /** Move units not promised from one storefront to another. */
-    move(
+    async move(
         ctx: OrganizationContext,
         dto: MoveStockDto,
     ): Promise<{
@@ -227,7 +230,7 @@ export class StockWritesService {
     }
 
     /** Undo hand-made changes, all or none. */
-    reverse(
+    async reverse(
         ctx: OrganizationContext,
         dto: ReverseStockDto,
     ): Promise<{ entries: StockEntryView[]; entryIds: string[] }> {
