@@ -48,6 +48,7 @@ import {
     holdsPlace,
     holdState,
     isExpiredHold,
+    lockBookingInTx,
     releaseHoldInTx,
     renewHoldTokenInTx,
 } from "./booking-hold";
@@ -1308,6 +1309,9 @@ export class BookingsService {
      * a whole class called off (U15). The rule protects the business from a
      * customer dropping out late; it never takes a class from someone whose
      * class was cancelled on them.
+     *
+     * A pay-now hold (PENDING) is released rather than cancelled (#508): its
+     * draft invoice is voided with it, as when its time runs out.
      */
     async cancelBooking(
         ctx: OrganizationContext,
@@ -1317,14 +1321,34 @@ export class BookingsService {
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
-        const booking = await this.requireOwnedBooking(ctx, bookingId);
-        if (booking.status === "CANCELLED") {
-            return booking;
+        const found = await this.requireOwnedBooking(ctx, bookingId);
+        if (found.status === "CANCELLED") {
+            return found;
         }
         const rules = await loadBookingRules(prisma, ctx.organizationId);
-        const late =
-            !options.returnCredit && isLateCancel(booking.startAt, now, rules);
         return prisma.$transaction(async (tx) => {
+            // Where it stands now, under its locks — invoice before booking,
+            // the webhook's order (#508) — so a second cancel, or a payment
+            // landing on a hold, is seen rather than overwritten.
+            await lockBookingInTx(tx, found.id);
+            const booking =
+                (await tx.booking.findUnique({ where: { id: found.id } })) ??
+                found;
+            if (booking.status === "CANCELLED") return booking;
+            // A pay-now hold nobody has paid: let it go as the booker would,
+            // so its draft invoice is voided and its pay link stops working.
+            // A payment that lands after is recorded as owed back.
+            if (booking.status === "PENDING") {
+                await releaseHoldInTx(tx, booking.id, now, ctx.userId);
+                return (
+                    (await tx.booking.findUnique({
+                        where: { id: booking.id },
+                    })) ?? booking
+                );
+            }
+            const late =
+                !options.returnCredit &&
+                isLateCancel(booking.startAt, now, rules);
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
                 data: {
@@ -1600,6 +1624,22 @@ export class BookingsService {
                         throw new ConflictException(
                             "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
                         );
+                    }
+                    // A membership's class is one of the month it lands in
+                    // (#508): moved into another month, it needs a class
+                    // left there, on a membership still active. The booking
+                    // itself is not counted, so a move within its month fits.
+                    if (
+                        booking.paidWith === "MEMBERSHIP" &&
+                        booking.subscriptionId
+                    ) {
+                        await useMembershipInTx(tx, {
+                            organizationId: ctx.organizationId,
+                            bookingId: booking.id,
+                            contactId: booking.contactId ?? "",
+                            subscriptionId: booking.subscriptionId,
+                            startAt,
+                        });
                     }
 
                     const moved = await tx.booking.update({

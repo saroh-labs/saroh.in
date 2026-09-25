@@ -30,6 +30,8 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         contact: { upsert: jest.fn(), findUnique: jest.fn() },
+        customerSubscription: { findFirst: jest.fn() },
+        invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
@@ -627,6 +629,79 @@ describe("BookingsService — bookings management", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
+
+    it("cancelBooking lets a pay-now hold go: its draft voided, its pay token cleared (#508)", async () => {
+        const holdExpiresAt = new Date("2026-07-20T08:15:00.000Z");
+        const hold = {
+            id: "bk_1",
+            organizationId: "org_SVC",
+            status: "PENDING",
+            startAt: new Date(START),
+            holdExpiresAt,
+        };
+        bookingFindUnique
+            .mockResolvedValueOnce(hold) // ownership, outside
+            .mockResolvedValueOnce(hold) // under the locks
+            .mockResolvedValueOnce(hold) // releaseHoldInTx's own re-read
+            .mockResolvedValueOnce({ ...hold, status: "CANCELLED" });
+        const queryRaw = (prisma as unknown as { $queryRaw: jest.Mock })
+            .$queryRaw;
+        const invoiceUpdateMany = (
+            prisma as unknown as { invoice: { updateMany: jest.Mock } }
+        ).invoice.updateMany;
+        const now = new Date("2026-07-20T08:05:00.000Z");
+
+        const out = await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            now,
+        );
+
+        expect(out.status).toBe("CANCELLED");
+        expect(bookingUpdate).toHaveBeenCalledTimes(1);
+        expect(bookingUpdate.mock.calls[0][0].data).toEqual({
+            status: "CANCELLED",
+            cancelledAt: now,
+            // Kept, so the booker's page reads it as released.
+            holdExpiresAt,
+        });
+        expect(invoiceUpdateMany.mock.calls[0][0]).toMatchObject({
+            where: { bookingId: "bk_1", source: "BOOKING", status: "DRAFT" },
+            data: { status: "VOID", payTokenHash: null },
+        });
+        expect(eventCreate).toHaveBeenCalledTimes(1);
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "CANCELLED",
+            actorUserId: "user_1",
+        });
+        // Every lock taken invoice first, the webhook's order: the Booking
+        // row is never locked before its invoice.
+        const tables = (queryRaw.mock.calls as [TemplateStringsArray][]).map(
+            ([sql]) => /FROM "(\w+)"/.exec(sql.join("?"))?.[1],
+        );
+        expect(tables[0]).toBe("Invoice");
+        expect(tables.indexOf("Booking")).toBeGreaterThan(
+            tables.indexOf("Invoice"),
+        );
+    });
+
+    it("cancelBooking re-reads under the lock: a cancel that lost the race writes nothing", async () => {
+        bookingFindUnique
+            .mockResolvedValueOnce({
+                id: "bk_1",
+                organizationId: "org_SVC",
+                status: "CONFIRMED",
+            })
+            .mockResolvedValueOnce({
+                id: "bk_1",
+                organizationId: "org_SVC",
+                status: "CANCELLED",
+            });
+        const out = await new BookingsService().cancelBooking(ctx(), "bk_1");
+        expect(out.status).toBe("CANCELLED");
+        expect(bookingUpdate).not.toHaveBeenCalled();
+        expect(eventCreate).not.toHaveBeenCalled();
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -702,6 +777,87 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(transaction).toHaveBeenCalledTimes(1);
         expect(transaction.mock.calls[0][1]).toMatchObject({
             isolationLevel: "Serializable",
+        });
+    });
+
+    describe("a membership's class (#508)", () => {
+        // Mon 3 Aug 2026 10:00 UTC — the same weekly rule, next month.
+        const IN_AUGUST = "2026-08-03T10:00:00.000Z";
+        const findSub = (
+            prisma as unknown as {
+                customerSubscription: { findFirst: jest.Mock };
+            }
+        ).customerSubscription.findFirst;
+
+        function wireMembership(usedInMonth: number) {
+            wireReschedule({
+                paidWith: "MEMBERSHIP",
+                subscriptionId: "sub_1",
+            } as Partial<typeof BOOKING>);
+            findSub.mockResolvedValue({
+                id: "sub_1",
+                contactId: "contact_1",
+                status: "ACTIVE",
+                timezone: "UTC",
+                plan: { name: "Monthly 4", classesPerMonth: 4 },
+            });
+            // The slot's seats, then the month's classes.
+            bookingCount
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(usedInMonth);
+        }
+
+        it("refuses a month whose classes are used", async () => {
+            wireMembership(4);
+            await expect(
+                new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                    startAt: IN_AUGUST,
+                }),
+            ).rejects.toThrow(
+                "Monthly 4 includes 4 classes a month, and this month's are used.",
+            );
+            expect(bookingUpdate).not.toHaveBeenCalled();
+            const counted = bookingCount.mock.calls[1][0].where;
+            expect(counted).toMatchObject({
+                subscriptionId: "sub_1",
+                id: { not: "bk_1" },
+            });
+            expect(counted.startAt.gte).toEqual(
+                new Date("2026-08-01T00:00:00.000Z"),
+            );
+        });
+
+        it("moves it into a month with a class left", async () => {
+            wireMembership(3);
+            const moved = await new BookingsService().rescheduleBooking(
+                ctx(),
+                "bk_1",
+                { startAt: IN_AUGUST },
+            );
+            expect(moved.startAt).toEqual(new Date(IN_AUGUST));
+            // The subscription is locked before its month is counted.
+            expect(
+                (
+                    (prisma as unknown as { $queryRaw: jest.Mock }).$queryRaw
+                        .mock.calls as [TemplateStringsArray][]
+                ).some(([sql]) =>
+                    sql.join("?").includes("CustomerSubscription"),
+                ),
+            ).toBe(true);
+        });
+
+        it("moves it within its own month, leaving itself out of the count", async () => {
+            // Three others in July; with itself that is the month's four.
+            wireMembership(3);
+            const moved = await new BookingsService().rescheduleBooking(
+                ctx(),
+                "bk_1",
+                { startAt: AT_10 },
+            );
+            expect(moved.startAt).toEqual(new Date(AT_10));
+            expect(bookingCount.mock.calls[1][0].where).toMatchObject({
+                id: { not: "bk_1" },
+            });
         });
     });
 

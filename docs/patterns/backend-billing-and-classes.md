@@ -99,6 +99,12 @@
   cancels it and voids its draft, keeping the intent so a late payment is
   still found. A late payment confirms when the place is still free, else it
   is `CAPTURED_NEEDS_REFUND`.
+- **A hold is only ever let go through `releaseHoldInTx`** — the sweep, the
+  booker, and the team cancelling it (`cancelBooking`) — so its draft is
+  always voided and its pay token cleared with it.
+- **Lock a booking that may be a hold invoice first, then booking**
+  (`lockBookingInTx`), the webhook's order. The other way round, a release
+  and a payment arriving together deadlock (#508).
 - **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
   an unnumbered booking invoice out of the invoice list and customer paper.
 - **The price is the service's, on the server.** The book request has no

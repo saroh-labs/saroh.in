@@ -34,6 +34,7 @@ import {
     FakeWebhookProviderFactory,
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { confirmHoldInTx, releaseHoldInTx } from "./booking-hold";
 import { BookingsService } from "./bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 import { ReleaseHoldsHandler } from "./release-holds.handler";
@@ -447,5 +448,222 @@ describe("the booking page (real database)", () => {
         expect(
             await prisma.invoice.count({ where: { bookingId: a.booking.id } }),
         ).toBe(1);
+    });
+});
+
+describe("a hold's lifecycle under the team and the webhook (#508, real database)", () => {
+    let gym: string;
+    // A real team member, since the history names who cancelled.
+    let team: OrganizationContext;
+
+    beforeAll(async () => {
+        const user = await prisma.user.create({
+            data: { email: `team-${process.pid}@example.in` },
+        });
+        team = { ...owner, userId: user.id };
+        // Room for many at once, and nobody's diary: only the hold's own
+        // rows are contended.
+        gym = (
+            await prisma.service.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    name: "Open gym",
+                    durationMinutes: 60,
+                    capacity: 50,
+                    priceCents: 30_000,
+                    currency: "INR",
+                    timezone: "UTC",
+                    availabilityRules: {
+                        create: {
+                            organizationId: owner.organizationId,
+                            dayOfWeek: MONDAY,
+                            startMinute: 10 * 60,
+                            endMinute: 11 * 60,
+                        },
+                    },
+                },
+            })
+        ).id;
+    });
+
+    /** A pay-now hold with a payment started on it. */
+    async function heldAndPaying(email: string) {
+        const { booking, payToken } = await bookings.bookOnline(
+            gym,
+            booker(email, "NOW", nextMonday(10)),
+            "ip_1",
+        );
+        const intent = await publicInvoices.createIntent(payToken ?? "", {});
+        return { booking, payToken: payToken ?? "", intent };
+    }
+
+    function paid(providerIntentId: string | null, ref: string) {
+        return webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId,
+            providerPaymentRef: ref,
+        });
+    }
+
+    it("the team cancelling a hold voids its invoice, and a late payment is owed back", async () => {
+        const { booking, payToken, intent } = await heldAndPaying(
+            "cancelled@example.in",
+        );
+
+        const out = await bookings.cancelBooking(team, booking.id);
+        expect(out.status).toBe("CANCELLED");
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { bookingId: booking.id },
+        });
+        expect(invoice).toMatchObject({
+            status: "VOID",
+            number: null,
+            payTokenHash: null,
+        });
+        // The pay link stops working.
+        await expect(bookings.publicHold(payToken, "ip_1")).rejects.toThrow(
+            "Booking not found",
+        );
+        const events = await prisma.bookingEvent.findMany({
+            where: { bookingId: booking.id, type: "CANCELLED" },
+        });
+        expect(events).toHaveLength(1);
+        expect(events[0]!.actorUserId).toBe(team.userId);
+
+        await paid(intent.providerIntentId, "pay_after_cancel");
+        expect(
+            (
+                await prisma.booking.findUniqueOrThrow({
+                    where: { id: booking.id },
+                })
+            ).status,
+        ).toBe("CANCELLED");
+        const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+            where: { providerRef: "pay_after_cancel" },
+        });
+        expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
+    });
+
+    it("two cancels at once cancel it once", async () => {
+        const confirmed = await bookings.bookOnline(
+            gym,
+            booker("twice-cancel@example.in", "DESK", nextMonday(10)),
+            "ip_1",
+        );
+        const { booking: hold } = await heldAndPaying("twice-hold@example.in");
+
+        for (const id of [confirmed.booking.id, hold.id]) {
+            const both = await Promise.allSettled([
+                bookings.cancelBooking(team, id),
+                bookings.cancelBooking(team, id),
+            ]);
+            expect(both.map((r) => r.status)).toEqual([
+                "fulfilled",
+                "fulfilled",
+            ]);
+            expect(
+                await prisma.bookingEvent.count({
+                    where: { bookingId: id, type: "CANCELLED" },
+                }),
+            ).toBe(1);
+        }
+    });
+
+    it("a release caught between the webhook's two locks waits, and the payment stands", async () => {
+        // The webhook's order, step by step: the invoice's lock, then —
+        // once the release has started — the booking's. A release that
+        // locked the booking first would now hold what the webhook wants
+        // while waiting for what the webhook has: a deadlock.
+        const { booking } = await heldAndPaying("between@example.in");
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { bookingId: booking.id },
+        });
+        let releasing: Promise<boolean> | undefined;
+        const outcome = await prisma.$transaction(
+            async (tx) => {
+                await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoice.id} FOR UPDATE`;
+                releasing = prisma.$transaction(
+                    (other) => releaseHoldInTx(other, booking.id, new Date()),
+                    { timeout: 20_000 },
+                );
+                // Long enough for the release to reach its first lock.
+                await new Promise((resolve) => setTimeout(resolve, 300));
+                return confirmHoldInTx(tx, {
+                    invoiceId: invoice.id,
+                    organizationId: owner.organizationId,
+                    now: new Date(),
+                    payment: {
+                        paymentMethod: "ONLINE",
+                        paymentReference: "pay_between",
+                        paymentNote: "Paid online",
+                    },
+                });
+            },
+            { timeout: 20_000 },
+        );
+        expect(outcome).toBe("confirmed");
+        // The release then finds it paid, and lets nothing go.
+        expect(await releasing).toBe(false);
+        expect(
+            (
+                await prisma.booking.findUniqueOrThrow({
+                    where: { id: booking.id },
+                })
+            ).status,
+        ).toBe("CONFIRMED");
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: invoice.id },
+                })
+            ).status,
+        ).toBe("PAID");
+    });
+
+    it("the release sweep and the payment webhook on one hold never deadlock, and one of them wins", async () => {
+        // Several rounds, each racing the two on a fresh hold whose time
+        // has just run out, the release a little later each round.
+        for (let round = 0; round < 8; round++) {
+            const { booking, intent } = await heldAndPaying(
+                `race-${round}@example.in`,
+            );
+            await prisma.booking.update({
+                where: { id: booking.id },
+                data: { holdExpiresAt: new Date(Date.now() - 1_000) },
+            });
+            const ref = `pay_race_${round}`;
+            const [delivered, released] = await Promise.all([
+                paid(intent.providerIntentId, ref),
+                new Promise((resolve) => setTimeout(resolve, round)).then(() =>
+                    prisma.$transaction((tx) =>
+                        releaseHoldInTx(tx, booking.id, new Date()),
+                    ),
+                ),
+            ]);
+            // Neither was killed: the webhook reconciled, the release ran.
+            expect(delivered.status).toBe("processed");
+
+            const after = await prisma.booking.findUniqueOrThrow({
+                where: { id: booking.id },
+            });
+            const invoice = await prisma.invoice.findFirstOrThrow({
+                where: { bookingId: booking.id },
+            });
+            const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+                where: { providerRef: ref },
+            });
+            if (released) {
+                // The release went first: the money is owed back.
+                expect(after.status).toBe("CANCELLED");
+                expect(invoice.status).toBe("VOID");
+                expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
+            } else {
+                // The payment went first: it stands, and nothing is owed.
+                expect(after.status).toBe("CONFIRMED");
+                expect(invoice.status).toBe("PAID");
+                expect(attempt.status).toBe("CAPTURED");
+            }
+        }
     });
 });

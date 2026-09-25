@@ -47,6 +47,13 @@ type FakeTx = ReturnType<typeof makeTx>;
 const asTx = (tx: FakeTx) =>
     tx as unknown as Parameters<typeof releaseHoldInTx>[0];
 
+/** The tables `tx` row-locked, in order. */
+function lockedTables(tx: FakeTx): string[] {
+    return (tx.$queryRaw.mock.calls as [TemplateStringsArray][]).map(
+        ([sql]) => /FROM "(\w+)"/.exec(sql.join("?"))?.[1] ?? "?",
+    );
+}
+
 describe("what a hold is", () => {
     it("takes a place while it lasts, as a confirmed booking does", () => {
         expect(holdsPlace(NOW)).toEqual({
@@ -205,8 +212,12 @@ describe("releaseHoldInTx", () => {
 
         expect(await releaseHoldInTx(asTx(tx), "bk_1", NOW)).toBe(true);
 
-        // Locked before it is read.
-        expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+        // Locked before it is read: its invoice, then itself — the
+        // webhook's order, so the two cannot deadlock (#508).
+        expect(lockedTables(tx)).toEqual(["Invoice", "Booking"]);
+        expect(tx.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+            tx.booking.findUnique.mock.invocationCallOrder[0],
+        );
         expect(tx.booking.update).toHaveBeenCalledWith({
             where: { id: "bk_1" },
             data: {
@@ -219,9 +230,10 @@ describe("releaseHoldInTx", () => {
             bookingId: "bk_1",
             type: "CANCELLED",
         });
-        expect(tx.bookingEvent.create.mock.calls[0][0].data.actorUserId).toBe(
-            undefined,
-        );
+        // Nobody on the team let it go.
+        expect(
+            tx.bookingEvent.create.mock.calls[0][0].data.actorUserId,
+        ).toBeNull();
         expect(tx.invoice.updateMany).toHaveBeenCalledWith({
             where: {
                 bookingId: "bk_1",
@@ -236,6 +248,21 @@ describe("releaseHoldInTx", () => {
                 payTokenHash: null,
             },
         });
+    });
+
+    it("names the team member who let it go", async () => {
+        const tx = makeTx();
+        tx.booking.findUnique.mockResolvedValue({
+            id: "bk_1",
+            organizationId: "org_1",
+            status: "PENDING",
+            startAt: NOW,
+            holdExpiresAt: LATER,
+        });
+        await releaseHoldInTx(asTx(tx), "bk_1", NOW, "user_1");
+        expect(tx.bookingEvent.create.mock.calls[0][0].data.actorUserId).toBe(
+            "user_1",
+        );
     });
 
     it("leaves a booking that is no longer a hold alone", async () => {
