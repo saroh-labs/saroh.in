@@ -3,6 +3,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { CircleAlert, ReceiptText } from "lucide-react";
 
+import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoney } from "@/lib/format/money";
 import type {
@@ -89,8 +90,9 @@ function YourPlan({ summary }: { summary: PlanSummary }) {
                         )}
                     </p>
                     {summary.method ? (
-                        <p className="mt-0.5 text-[12px] text-muted-foreground">
+                        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground sm:justify-end">
                             {summary.method}
+                            <ChangePaymentMethod />
                         </p>
                     ) : null}
                 </div>
