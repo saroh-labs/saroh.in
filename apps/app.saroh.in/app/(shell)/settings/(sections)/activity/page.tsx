@@ -8,8 +8,11 @@ import {
 import { navCan } from "@/components/shared/nav-items";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { getOrganizationSettings } from "@/lib/organizations/settings-service";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
 import { requireSession } from "@/lib/session";
-import { activityLines } from "@/lib/settings/activity";
+import { activityLine } from "@/lib/settings/activity";
+import { activityDetail } from "@/lib/settings/activity-detail";
 import { listSettingsActivity } from "@/lib/settings/activity-service";
 
 /**
@@ -20,6 +23,10 @@ import { listSettingsActivity } from "@/lib/settings/activity-service";
  * the settings, but the API refuses a Member, so the tab is offered only to
  * those it answers (`SETTINGS_PAGES`) and this page explains the refusal to
  * anyone who types the address.
+ *
+ * A row opens the whole change, timed in the business's own zone (#509).
+ * That zone is read from the settings; should the read fail, the times say
+ * UTC — still true, since the zone is named beside each one.
  */
 export const metadata = { title: "Activity" };
 
@@ -46,23 +53,32 @@ export default async function ActivityPage() {
     );
     if (!may) return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
 
-    const [read, roles] = await Promise.all([
+    const [read, roles, zone] = await Promise.all([
         listSettingsActivity(),
         // Only to name a role the business invented; the built-ins are
         // known without it, so a failed read costs a word, not the page.
         listRoles().catch(() => []),
+        getOrganizationSettings().then(
+            (settings) => settings?.profile?.timezone ?? DEFAULT_TIMEZONE,
+            () => "UTC",
+        ),
     ]);
     if (read.status === "denied") {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
-    const lines = activityLines(
-        read.events,
-        Object.fromEntries(roles.map((role) => [role.key, role.label])),
+    const roleLabels = Object.fromEntries(
+        roles.map((role) => [role.key, role.label]),
     );
+    const entries = read.events.flatMap((event) => {
+        const line = activityLine(event, roleLabels);
+        return line
+            ? [{ line, detail: activityDetail(event, zone, roleLabels) }]
+            : [];
+    });
 
     return (
         <SettingsPanel header={header}>
-            {lines.length === 0 ? (
+            {entries.length === 0 ? (
                 <div className="max-w-[760px]">
                     <EmptyState
                         title="No changes yet"
@@ -70,7 +86,7 @@ export default async function ActivityPage() {
                     />
                 </div>
             ) : (
-                <ActivityList lines={lines} />
+                <ActivityList entries={entries} />
             )}
         </SettingsPanel>
     );
