@@ -57,7 +57,7 @@ describe("activityLine — settings saves", () => {
                     fields: ["addressLine1", "city", "postalCode"],
                 },
             }),
-        ).toBe("Sanjay updated the registered address → Registered address");
+        ).toBe("Sanjay updated the registered address → Address");
     });
 
     it("lists up to three, then counts the rest", () => {

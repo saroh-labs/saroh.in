@@ -63,7 +63,7 @@ const TAB_LABEL: Record<BusinessTab, string> = {
     identity: "Identity",
     contact: "Contact",
     tax: "Tax and invoices",
-    address: "Registered address",
+    address: "Address",
 };
 
 /**
