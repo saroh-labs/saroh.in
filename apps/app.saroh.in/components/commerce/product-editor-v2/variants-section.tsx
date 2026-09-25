@@ -253,7 +253,7 @@ export function VariantsSection({
                         !!id && !rows.some((r) => r.id === id),
                 );
             for (const goneId of goneIds) {
-                const res = await deleteVariant(storeId, product.id, goneId);
+                const res = await deleteVariant(product.id, goneId);
                 if (res.ok) saved = saved.filter((b) => b.id !== goneId);
                 else why ??= res.error;
             }
@@ -286,7 +286,7 @@ export function VariantsSection({
                 };
                 const was = base.find((b) => b.id && b.id === r.id);
                 if (!r.id) {
-                    const res = await createVariant(storeId, product.id, input);
+                    const res = await createVariant(product.id, input);
                     if (!res.ok) {
                         why ??= res.error;
                         continue;
@@ -295,12 +295,7 @@ export function VariantsSection({
                     replace(r.key, { id: res.data.id });
                     saved = [...saved, { ...r, id: res.data.id }];
                 } else if (was && !sameRows([r], [was])) {
-                    const res = await updateVariant(
-                        storeId,
-                        product.id,
-                        r.id,
-                        input,
-                    );
+                    const res = await updateVariant(product.id, r.id, input);
                     if (res.ok)
                         saved = saved.map((b) => (b.id === r.id ? r : b));
                     else why ??= res.error;

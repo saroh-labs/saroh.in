@@ -360,7 +360,7 @@ function EditorBody({
                         storeName={storeName}
                         defaults={defaults}
                     />
-                    <PhotosSection product={product} storeId={storeId} />
+                    <PhotosSection product={product} />
                 </div>
                 <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-[760px]:min-w-0 max-[760px]:border-l-0 max-[760px]:border-t max-[480px]:px-4">
                     <VisibilitySection

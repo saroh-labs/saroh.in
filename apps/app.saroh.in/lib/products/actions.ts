@@ -30,23 +30,23 @@ import {
 /**
  * Server Actions for the catalog. Thin wrappers that forward the session cookie
  * to api.saroh.in; the api resolves the caller from the session and enforces
- * store membership + write role. The UI calls these, never api directly.
+ * the business role. The UI calls these, never api directly. Products are the
+ * business's (#531); a `storeId` names the storefront whose shelf or listing
+ * the action is about.
  */
 
+/** A new product, sold at `storeId`. */
 export async function createProduct(storeId: string, input: NewProductInput) {
     return createProductApi(storeId, input);
 }
 
-export async function updateProduct(
-    storeId: string,
-    productId: string,
-    input: ProductInput,
-) {
-    return updateProductApi(storeId, productId, input);
+export async function updateProduct(productId: string, input: ProductInput) {
+    return updateProductApi(productId, input);
 }
 
-export async function deleteProduct(storeId: string, productId: string) {
-    return deleteProductApi(storeId, productId);
+/** Delete it from the catalogue, and so from every storefront. */
+export async function deleteProduct(productId: string) {
+    return deleteProductApi(productId);
 }
 
 /** A category of the business (#529), made from any storefront's product. */
@@ -62,29 +62,20 @@ export async function deleteCategory(categoryId: string) {
     return deleteCategoryApi(categoryId);
 }
 
-export async function createVariant(
-    storeId: string,
-    productId: string,
-    input: VariantInput,
-) {
-    return createVariantApi(storeId, productId, input);
+export async function createVariant(productId: string, input: VariantInput) {
+    return createVariantApi(productId, input);
 }
 
 export async function updateVariant(
-    storeId: string,
     productId: string,
     variantId: string,
     input: VariantInput,
 ) {
-    return updateVariantApi(storeId, productId, variantId, input);
+    return updateVariantApi(productId, variantId, input);
 }
 
-export async function deleteVariant(
-    storeId: string,
-    productId: string,
-    variantId: string,
-) {
-    return deleteVariantApi(storeId, productId, variantId);
+export async function deleteVariant(productId: string, variantId: string) {
+    return deleteVariantApi(productId, variantId);
 }
 
 export async function setInventory(
@@ -107,11 +98,10 @@ export async function patchProduct(
 }
 
 export async function replaceProductImages(
-    storeId: string,
     productId: string,
     images: ProductImageInput[],
 ) {
-    return replaceProductImagesApi(storeId, productId, images);
+    return replaceProductImagesApi(productId, images);
 }
 
 export async function setVariantStock(

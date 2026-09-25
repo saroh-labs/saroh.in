@@ -50,7 +50,7 @@ export default async function NewOrderPage({
 
     const [customers, products, checkout, business] = await Promise.all([
         listCustomers(store.id),
-        listProducts(store.id),
+        listProducts({ storefront: store.id }),
         // The storefront's tax and delivery, as the form's starting figures.
         getStorefront(store.id).catch(() => null),
         // GST standing: a registered business's prices include GST, so the

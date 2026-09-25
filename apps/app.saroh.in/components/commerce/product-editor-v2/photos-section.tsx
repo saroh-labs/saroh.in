@@ -45,13 +45,7 @@ function fileName(photo: PhotoDraft): string {
  * photo or video; a drop onto the grid works on a desk, and the tiles are the
  * way on a phone.
  */
-export function PhotosSection({
-    product,
-    storeId,
-}: {
-    product: ProductDetail | null;
-    storeId: string;
-}) {
+export function PhotosSection({ product }: { product: ProductDetail | null }) {
     const { canWrite, saving } = useEditor();
     // Read-only, or saving: the set on screen is the one being sent.
     const ro = !canWrite || saving.includes("photos");
@@ -95,7 +89,6 @@ export function PhotosSection({
             save: async () => {
                 if (!product) return false;
                 const res = await replaceProductImages(
-                    storeId,
                     product.id,
                     photosInput(draft),
                 );
@@ -112,7 +105,6 @@ export function PhotosSection({
             afterCreate: async (productId) => {
                 if (draft.length === 0) return true;
                 const res = await replaceProductImages(
-                    storeId,
                     productId,
                     photosInput(draft),
                 );

@@ -8,7 +8,6 @@ import {
     listReviews,
     reviewSummary,
 } from "@/lib/product-reviews/service";
-import type { ProductListItem } from "@/lib/products/service";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -17,11 +16,9 @@ import { viewParam } from "@/lib/views/search-params";
 /**
  * Sell → Products: the business's catalogue, across every storefront.
  *
- * Products are stored per storefront, so this reads each storefront's list in
- * parallel and the screen merges them by SKU. A storefront whose list cannot
- * be read is left out rather than failing the page — the rest of the catalogue
- * is still true — and the screen is told WHICH, so it can say so instead of
- * presenting a subset as the whole catalogue.
+ * The catalogue belongs to the business (#531): one read returns one row per
+ * product with the storefronts that sell it. A failed read fails the page
+ * (its error boundary), never an empty catalogue.
  */
 export const metadata = { title: "Products" };
 
@@ -48,25 +45,12 @@ export default async function CataloguePage({
     const canWriteReviews = may("product-review:write") && may("order:read");
     const tab =
         query.tab === "reviews" && canReadReviews ? "reviews" : "products";
-    const lists = await Promise.all(
-        stores.map((s) =>
-            listProducts(s.id).catch((): ProductListItem[] | null => null),
-        ),
-    );
-    const productsByStore = Object.fromEntries(
-        stores.map((s, i) => [s.id, lists[i] ?? []]),
-    );
-    const missing = stores
-        .filter((_, i) => lists[i] === null)
-        .map((s) => ({ id: s.id, name: s.name }));
+    const products = stores.length > 0 ? await listProducts() : [];
 
     // Reviews are read for the tab's count on both tabs; a failure is an empty
     // list here rather than the whole Products page failing.
     const reviews = canReadReviews ? await listReviews().catch(() => []) : [];
-    const productCount = Object.values(productsByStore).reduce(
-        (n, list) => n + list.length,
-        0,
-    );
+    const productCount = products.length;
     const tabs = canReadReviews ? (
         <ProductsTabs
             active={tab}
@@ -102,8 +86,7 @@ export default async function CataloguePage({
                 tabs={tabs}
                 ratings={ratings}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                productsByStore={productsByStore}
-                missing={missing}
+                products={products}
                 initialView={viewParam(query)}
             />
         </PageContainer>

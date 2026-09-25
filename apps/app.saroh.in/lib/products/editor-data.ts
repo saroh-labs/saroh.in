@@ -10,7 +10,6 @@ import {
 } from "@/lib/products/settings";
 import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
 import { productCategoriesHref } from "@/lib/stores/links";
-import type { Store } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
 /**
@@ -23,7 +22,7 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * starting values.
  */
 export async function loadEditorContext(
-    store: Store,
+    store: { id: string; name: string },
     product?: { id: string; categoryId: string | null },
 ) {
     const [
