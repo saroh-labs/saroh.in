@@ -31,6 +31,9 @@ export interface Service {
     capacity: number;
     priceCents: number | null;
     currency: string | null;
+    /** GST the price includes, in percent, and its SAC code (ADR-008). */
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone: string;
     status: ServiceStatus;
     locationType: LocationType;
@@ -137,6 +140,21 @@ export interface BookingWithService extends Booking {
     service: { id: string; name: string; timezone: string } | null;
 }
 
+// The calendar read's shape and its pure shaping live in ./booking-calendar,
+// which client components can import; re-exported so server callers have one
+// place to look.
+import type { BookingsCalendar } from "./booking-calendar";
+import { flattenCalendar } from "./booking-calendar";
+
+export { flattenCalendar } from "./booking-calendar";
+export type {
+    BookingsCalendar,
+    ClassSession,
+    DiaryBooking,
+    PaidWith,
+    PersonDiary,
+} from "./booking-calendar";
+
 export interface CreateServiceInput {
     name: string;
     description?: string;
@@ -146,6 +164,8 @@ export interface CreateServiceInput {
     capacity?: number;
     priceCents?: number;
     currency?: string;
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
@@ -161,6 +181,8 @@ export interface UpdateServiceInput {
     capacity?: number;
     priceCents?: number;
     currency?: string;
+    gstRate?: string | null;
+    sacCode?: string | null;
     timezone?: string;
     status?: ServiceStatus;
     locationType?: LocationType;
@@ -290,10 +312,13 @@ export async function listAvailability(
     serviceId: string,
     fromISO: string,
     toISO: string,
+    staffId?: string,
 ): Promise<Slot[]> {
     const base = await orgBase();
     if (!base) return [];
     const query = new URLSearchParams({ from: fromISO, to: toISO });
+    // One person's free starts (U3); absent, anyone's.
+    if (staffId) query.set("staffId", staffId);
     const res = await apiFetch(
         `${base}/services/${serviceId}/availability?${query.toString()}`,
     );
@@ -302,30 +327,57 @@ export async function listAvailability(
 }
 
 /**
- * Every booking across the org's services, each joined with its owning
- * Service (name + timezone), sorted by slot ascending — the shape the owner
- * calendar renders. The api exposes bookings per-service, so this fans out over
- * the org's services and merges. Empty when there is no active org.
+ * The bookings calendar over `[from, to)` in one read (U4): a diary per
+ * person, Unassigned last, class starts as sessions with who is booked and
+ * how each paid. Null when it could not be read — a failed read is never an
+ * empty one (`frontend-error-feedback.md`).
+ */
+export async function readBookingsCalendar(
+    fromISO: string,
+    toISO: string,
+    staffId?: string,
+): Promise<BookingsCalendar | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = new URLSearchParams({ from: fromISO, to: toISO });
+    if (staffId) query.set("staffId", staffId);
+    try {
+        const res = await apiFetch(
+            `${base}/services/bookings?${query.toString()}`,
+        );
+        if (!res.ok) return null;
+        return (await res.json()) as BookingsCalendar;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The instant a page reads the diary at. A read, not render: pages take it
+ * from here so "now" stays out of their render (the React Compiler's rule),
+ * and pass it down so every block agrees on it.
+ */
+export function readNow(): number {
+    return Date.now();
+}
+
+/** How far back and ahead the bookings register reads: a year each way. */
+const REGISTER_REACH_MS = 365 * 86_400_000;
+
+/**
+ * Every booking across the org's services within a year either side of now,
+ * each with its Service (name + timezone), sorted by slot ascending — the
+ * shape the bookings register renders. One read of the calendar (U4) instead
+ * of a fan-out over every service. Empty when there is no active org or the
+ * read fails.
  */
 export async function listAllBookings(): Promise<BookingWithService[]> {
-    const services = await listServices();
-    if (services.length === 0) return [];
-
-    const perService = await Promise.all(
-        services.map(async (service) => {
-            const bookings = await listServiceBookings(service.id);
-            return bookings.map<BookingWithService>((booking) => ({
-                ...booking,
-                service: {
-                    id: service.id,
-                    name: service.name,
-                    timezone: service.timezone,
-                },
-            }));
-        }),
+    const now = Date.now();
+    const calendar = await readBookingsCalendar(
+        new Date(now - REGISTER_REACH_MS).toISOString(),
+        new Date(now + REGISTER_REACH_MS).toISOString(),
     );
-
-    return perService.flat().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return calendar ? flattenCalendar(calendar) : [];
 }
 
 /**
@@ -428,6 +480,10 @@ export type BookByHandInput = {
     idempotencyKey?: string;
     /** Pay with this class pack (ADR-007); needs `pack:write`. */
     packPurchaseId?: string;
+    /** Who takes it (U3); absent, whoever is free. */
+    staffId?: string;
+    /** How it is paid (U3). */
+    paidWith?: "PAID" | "DESK";
 } & ({ contactId: string } | { bookerEmail: string; bookerName?: string });
 
 /**
@@ -458,9 +514,15 @@ export function rescheduleBooking(
     );
 }
 
-export function cancelBooking(bookingId: string): Promise<CrmResult<Booking>> {
+export function cancelBooking(
+    bookingId: string,
+    options: { returnCredit?: boolean } = {},
+): Promise<CrmResult<Booking>> {
+    // The business calling a class off gives a pack's class back even inside
+    // the free-cancellation window (U15).
+    const query = options.returnCredit ? "?returnCredit=true" : "";
     return send<Booking>(
-        `/bookings/${bookingId}`,
+        `/bookings/${bookingId}${query}`,
         "DELETE",
         undefined,
         "Could not cancel the booking",

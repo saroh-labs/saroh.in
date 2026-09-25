@@ -433,3 +433,33 @@ own first, which clears the bookings' link, then deletes the contact. When
 a row references two parents that cascade from each other, clear the inner
 one first.
 **Category**: database · `apps/api.saroh.in/src/modules/contacts/contacts.service.ts`
+
+## Frontend — a colour class written in `lib/` never reached the CSS (U17)
+
+**Problem**: The Business Calendar's layer chips rendered with no fill, though
+`bg-layer-1` was a real colour in the shared Tailwind config and its
+`--layer-1` variable was in the page's CSS.
+**Root cause**: Tailwind only generates the classes it finds in its `content`
+globs. `app.saroh.in` scans `app/`, `components/`, `pages/`, `src/` and
+`packages/ui/src` — not `lib/`. The tone → class map lived in
+`lib/calendar/layers.ts`, so every class in it was dropped from the build.
+**Fix**: The class strings moved to `components/calendar/tones.ts`; `lib/`
+keeps the tone numbers. Any whole class string a component picks from a map
+has to live in a scanned folder.
+**Category**: frontend · `apps/app.saroh.in/components/calendar/tones.ts`
+
+## Frontend — a worktree's app under another portless name refused every Server Action (U14)
+
+**Problem**: Running a worktree's `app.saroh.in` as
+`https://orders-app.saroh.localhost` rendered pages fine, but every button that
+called a Server Action failed with "An unexpected response was received from
+the server", and nothing reached the API.
+**Root cause**: The auth middleware (`packages/auth/src/middleware.ts`) refuses
+a POST whose `Origin` is not in `BETTER_AUTH_TRUSTED_ORIGINS` with a 403
+"Untrusted request origin". The app's `.env` lists only
+`https://app.saroh.localhost`.
+**Fix**: Start the second app with its own origin added —
+`BETTER_AUTH_TRUSTED_ORIGINS=…,https://orders-app.saroh.localhost` (and
+`API_URL` for its own API). No code change; reads work either way, which is
+why it looks like a bug in the screen.
+**Category**: local dev · `packages/auth/src/middleware.ts`

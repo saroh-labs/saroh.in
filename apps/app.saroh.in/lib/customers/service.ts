@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, getJson, getList, readError } from "@/lib/api/http";
 
@@ -68,16 +69,14 @@ async function mutate(
     body: unknown,
 ): Promise<CustomerResult> {
     const res = await apiFetch(path, { method, body: JSON.stringify(body) });
-    const data = (await res.json().catch(() => null)) as {
-        id?: string;
-        message?: string;
-        field?: "email";
-    } | null;
-    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    const data: unknown = await res.json().catch(() => null);
+    const id = (data as { id?: unknown } | null)?.id;
+    if (res.ok && typeof id === "string") return { ok: true, data: { id } };
+    const failure = toFailure(data, "Something went wrong");
     return {
         ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: data?.field,
+        error: failure.error,
+        field: failure.field === "email" ? "email" : undefined,
     };
 }
 

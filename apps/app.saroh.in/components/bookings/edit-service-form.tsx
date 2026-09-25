@@ -28,6 +28,13 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { archiveService, updateService } from "@/lib/services/actions";
+
+import {
+    gstDefaults,
+    gstFields,
+    gstPayload,
+    ServiceGstFields,
+} from "@/components/bookings/service-gst-fields";
 import type { Service } from "@/lib/services/service";
 
 /**
@@ -64,6 +71,7 @@ const formSchema = z
                 message: "A price in numbers, like 1800 — or empty.",
             }),
         currency: z.string(),
+        ...gstFields,
         ...locationFields,
     })
     .superRefine(checkLocation);
@@ -94,6 +102,7 @@ export function EditServiceForm({
                     ? ""
                     : (service.priceCents / 100).toString(),
             currency: service.currency ?? defaultCurrency,
+            ...gstDefaults(service),
             locationType: service.locationType,
             meetingUrl: service.meetingUrl ?? "",
         },
@@ -127,11 +136,16 @@ export function EditServiceForm({
                       currency: values.currency,
                   }
                 : {}),
+            ...gstPayload(values),
             ...locationPayload(values),
         });
         if (!res.ok) {
             if (res.field === "meetingUrl") {
                 form.setError("meetingUrl", { message: res.error });
+                return;
+            }
+            if (res.field === "gstRate" || res.field === "sacCode") {
+                form.setError(res.field, { message: res.error });
                 return;
             }
             showError(res.error);
@@ -383,6 +397,8 @@ export function EditServiceForm({
                         )}
                     />
                 </div>
+
+                <ServiceGstFields disabled={isSubmitting} index={3} />
 
                 <ServiceLocationFields disabled={isSubmitting} index={4} />
 

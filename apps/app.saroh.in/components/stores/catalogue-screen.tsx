@@ -31,6 +31,7 @@ import {
     MoreHorizontal,
     Package,
     Plus,
+    Settings2,
     Store,
     Trash2,
     Upload,
@@ -54,7 +55,11 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
-import { newProductHref, productHref } from "@/lib/products/links";
+import {
+    newProductHref,
+    productHref,
+    productSettingsHref,
+} from "@/lib/products/links";
 import type { ProductListItem, ProductStatus } from "@/lib/products/service";
 import { importProductsHref, newStorefrontHref } from "@/lib/stores/links";
 
@@ -74,23 +79,33 @@ const STATUS_VARIANT: Record<
     ARCHIVED: "neutral",
 };
 
+/** Out of stock, or at or under the product's own warning level. */
+function needsRestock(r: CatalogueRow): boolean {
+    if (r.stock === null) return false;
+    return (
+        r.stock <= 0 || (r.lowStockAlert !== null && r.stock <= r.lowStockAlert)
+    );
+}
+
 /**
- * Tabs filter the catalogue (brand file §13): the same products, cut three
- * ways. Collections are the products placed in one; Inventory is the products
- * whose stock is tracked. Status is not a tab — it is on every row, and the
- * Filter button narrows by it.
+ * Filters cut the catalogue the ways a merchant acts on it: what to restock
+ * first, then what is on the shop's collections. Each count answers a
+ * question before the click. "Tracked stock" was a filter once; it held
+ * every product with a count, which told nobody anything. Status is not a
+ * filter here — it is on every row, and the Filter button narrows by it.
  */
 const FILTERS: DataFilter<CatalogueRow>[] = [
     { id: "all", label: "All" },
     {
-        id: "collections",
-        label: "Collections",
-        predicate: (r) => r.inCollection,
+        id: "restock",
+        label: "Needs restock",
+        predicate: needsRestock,
+        attention: true,
     },
     {
-        id: "inventory",
-        label: "Inventory",
-        predicate: (r) => r.stock !== null,
+        id: "collections",
+        label: "In collections",
+        predicate: (r) => r.inCollection,
     },
 ];
 
@@ -390,6 +405,17 @@ export function CatalogueScreen({
                         <>
                             <Button variant="outline" asChild>
                                 <Link
+                                    href={productSettingsHref(
+                                        store?.id ??
+                                            (many ? undefined : first.id),
+                                    )}
+                                >
+                                    <Settings2 className="mr-1.5 size-4" />
+                                    Settings
+                                </Link>
+                            </Button>
+                            <Button variant="outline" asChild>
+                                <Link
                                     href={importProductsHref(
                                         store?.id ??
                                             (many ? undefined : first.id),
@@ -482,6 +508,9 @@ export function CatalogueScreen({
                     searchPlaceholder="Search products"
                     searchableColumnIds={["product"]}
                     filters={FILTERS}
+                    // Under Products | Reviews the filters sit in the toolbar,
+                    // so only one row of tabs navigates (as Leads does).
+                    filterStyle={tabs ? "segmented" : "tabs"}
                     initialFilterId={initialView}
                     onRowClick={setPreview}
                     selectable

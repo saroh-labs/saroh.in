@@ -5,6 +5,7 @@ import {
     demoReviewer,
     demoUser,
     ignoreHTTPSErrors,
+    NORTHWIND_ORG,
     REVIEWED_SITE,
     urls,
 } from "../playwright.config";
@@ -50,6 +51,8 @@ async function asReviewer(browser: Browser): Promise<Page> {
  * one site (ADR-006), so it is in the address.
  */
 async function siteId(page: Page): Promise<string> {
+    // The owner is in several businesses; Website is the OPEN one's.
+    await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
     await page.goto(`${urls.APP_URL}/sites`);
     await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
     await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
@@ -63,6 +66,38 @@ async function siteId(page: Page): Promise<string> {
         throw new Error(`no site id in the address: ${href}`);
     }
     return id;
+}
+
+/**
+ * Publish from the editor, through the pre-publish check, and wait until it
+ * has happened. Returns what the success toast said.
+ *
+ * Waited for, not counted: the check opens a beat after the click, so the
+ * `if (await confirm.count())` this replaces read 0, skipped the publish, and
+ * the test went looking for a record of something that never happened.
+ * Pressed until the check opens, too: a press before hydration does nothing.
+ */
+async function publishFromEditor(page: Page): Promise<string> {
+    const confirm = page
+        .getByRole("button", {
+            name: /^Publish (changes|site|without approval)$/,
+        })
+        // The check's own button, drawn after the editor's "Publish".
+        .last();
+    await expect(async () => {
+        await page
+            .getByRole("button", { name: /^Publish/ })
+            .first()
+            .click();
+        await expect(confirm).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+    await confirm.click();
+    const live = page
+        .getByText(/ is live/)
+        .locator("visible=true")
+        .first();
+    await expect(live).toBeVisible({ timeout: 30_000 });
+    return live.innerText();
 }
 
 test.describe("publishing past a change request", () => {
@@ -83,15 +118,9 @@ test.describe("publishing past a change request", () => {
 
         // 2. The owner publishes anyway. Never prevented — that is the design.
         await page.goto(`${urls.APP_URL}/sites/${id}`);
-        await page
-            .getByRole("button", { name: /^Publish/ })
-            .first()
-            .click();
-        // The pre-publish check says what is outstanding and publishes anyway.
-        const confirm = page.getByRole("button", {
-            name: /Publish (anyway|without approval)/i,
-        });
-        if (await confirm.count()) await confirm.first().click();
+        // The pre-publish check says what is outstanding, and publishes anyway.
+        const toast = await publishFromEditor(page);
+        expect(toast).toMatch(/Recorded as published without approval/);
 
         // 3. The record, on the page a merchant would look at.
         await page.goto(`${urls.APP_URL}/sites/${id}/versions`);
@@ -118,14 +147,7 @@ test.describe("taking a version back", () => {
         // A second version to restore TO — the seed publishes once, so without
         // this there is nothing but the live one and no Restore to press.
         await page.goto(`${urls.APP_URL}/sites/${id}`);
-        await page
-            .getByRole("button", { name: /^Publish/ })
-            .first()
-            .click();
-        const publishAnyway = page.getByRole("button", {
-            name: /Publish (anyway|without approval)/i,
-        });
-        if (await publishAnyway.count()) await publishAnyway.first().click();
+        await publishFromEditor(page);
 
         const reviewer = await asReviewer(browser);
         await reviewer.goto(`${urls.APP_URL}/sites/${id}/review`);
@@ -169,14 +191,7 @@ test.describe("taking a version back", () => {
         const id = await siteId(page);
 
         await page.goto(`${urls.APP_URL}/sites/${id}`);
-        await page
-            .getByRole("button", { name: /^Publish/ })
-            .first()
-            .click();
-        const publishAnyway = page.getByRole("button", {
-            name: /Publish (anyway|without approval)/i,
-        });
-        if (await publishAnyway.count()) await publishAnyway.first().click();
+        await publishFromEditor(page);
 
         await page.goto(`${urls.APP_URL}/sites/${id}/versions`);
 

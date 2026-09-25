@@ -9,6 +9,7 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
@@ -196,9 +197,30 @@ export class PublicInvoicesService {
                     status: true,
                     total: true,
                     currency: true,
+                    source: true,
+                    booking: {
+                        select: { status: true, holdExpiresAt: true },
+                    },
                 },
             });
             if (!invoice) notFound();
+            // A pay-now hold's invoice (U19) is paid as a draft — it takes
+            // its number when the money arrives — and only while the hold
+            // lasts: after that its place may be someone else's.
+            if (invoice.status === "DRAFT" && invoice.source === "BOOKING") {
+                if (
+                    !invoice.booking ||
+                    holdState(invoice.booking, new Date()) !== "HELD"
+                ) {
+                    throw new ConflictException(
+                        "The time held for you ran out. Pick a time again.",
+                    );
+                }
+                return this.payments.createIntentForInvoicePublic(
+                    invoice,
+                    options,
+                );
+            }
             if (invoice.status !== "ISSUED") {
                 throw new ConflictException(
                     invoice.status === "PAID"

@@ -12,15 +12,29 @@ import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
-import { assertPaymentsOn } from "../invoices/payments-on";
+import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { UpcomingCollection } from "./collections";
+import {
+    collectionDates,
+    collectionToCome,
+    dateKey,
+    dateValue,
+    everyCollectionSkipped,
+    isoDay,
+    localDate,
+    upcomingCollections,
+} from "./collections";
 import type {
     CancelSubscriptionDto,
+    ChangePlanDto,
+    CollectionScheduleDto,
     ListPlansQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
+    SkipCollectionDto,
     SubscribeDto,
 } from "./dto";
 import type { Interval, Period } from "./periods";
@@ -45,7 +59,22 @@ function forViewer(
     view: SubscriptionView,
 ): SubscriptionView {
     if (allows(ctx, "invoice:read")) return view;
-    return { ...view, oldestUnpaid: null, latestInvoice: null };
+    return {
+        ...view,
+        oldestUnpaid: null,
+        latestInvoice: null,
+        failedCharge: null,
+    };
+}
+
+/** A blank note is no note. */
+function orNull(value: string | null | undefined): string | null {
+    return value && value.length > 0 ? value : null;
+}
+
+/** A refusal about one collection date: 409 with the field it is about. */
+function dateConflict(message: string): never {
+    throw new ConflictException({ message, details: { field: "date" } });
 }
 
 /** One live subscription per person per plan (the partial unique index). */
@@ -115,6 +144,36 @@ export interface SubscriptionView {
         paidAt: string | null;
     } | null;
     /**
+     * Payment failed: the latest charge is unpaid and past due. Derived from
+     * that invoice, never stored; a cancelled subscription has none.
+     */
+    paymentFailed: boolean;
+    /** That charge — hidden, like every invoice id, without `invoice:read`. */
+    failedCharge: {
+        id: string;
+        number: string | null;
+        dueAt: string | null;
+        total: string;
+    } | null;
+    /** The collection schedule, or null when nothing is collected. */
+    collection: {
+        /** ISO weekday: 1 Monday … 7 Sunday, in the subscription's timezone. */
+        weekday: number;
+        note: string | null;
+        /** The next collections, skipped ones included and marked. */
+        upcoming: UpcomingCollection[];
+    } | null;
+    /** A plan change booked for the next renewal, or null. */
+    pendingPlan: {
+        id: string;
+        name: string;
+        price: string;
+        currency: string;
+        interval: Interval;
+        /** When it takes effect: the next renewal, or a resume after the paid period. */
+        from: string;
+    } | null;
+    /**
      * When it began: the start date a member was moved over with, when that
      * is earlier than the day they were added.
      */
@@ -152,6 +211,18 @@ const SUBSCRIPTION_SELECT = {
     pausedAt: true,
     cancelAtPeriodEnd: true,
     cancelledAt: true,
+    collectionWeekday: true,
+    collectionNote: true,
+    pendingPlanId: true,
+    pendingPlan: {
+        select: {
+            id: true,
+            name: true,
+            price: true,
+            currency: true,
+            interval: true,
+        },
+    },
     createdAt: true,
 } as const;
 
@@ -174,6 +245,15 @@ interface SubscriptionInvoices {
     /** Issued and unpaid, oldest first. */
     unpaid: InvoiceRowLite[];
     latest: InvoiceRowLite | null;
+}
+
+/** What a period is billed at: the subscription's terms, or its new plan's. */
+interface Terms {
+    planId: string;
+    planName: string;
+    price: string;
+    currency: string;
+    interval: Interval;
 }
 
 /**
@@ -306,13 +386,17 @@ export class SubscriptionsService {
             take: LIST_LIMIT,
             select: SUBSCRIPTION_SELECT,
         });
-        const invoices = await this.invoicesFor(
-            ctx.organizationId,
-            rows.map((r) => r.id),
-        );
+        const ids = rows.map((r) => r.id);
+        const [invoices, skips] = await Promise.all([
+            this.invoicesFor(ctx.organizationId, ids),
+            this.skipsFor(ctx.organizationId, ids),
+        ]);
         const now = new Date();
         return rows.map((r) =>
-            forViewer(ctx, this.view(r, invoices.get(r.id), now)),
+            forViewer(
+                ctx,
+                this.view(r, invoices.get(r.id), skips.get(r.id), now),
+            ),
         );
     }
 
@@ -403,6 +487,8 @@ export class SubscriptionsService {
                         anchorAt: anchor.toJSDate(),
                         currentPeriodStart: period.start,
                         currentPeriodEnd: period.end,
+                        collectionWeekday: dto.collectionWeekday ?? null,
+                        collectionNote: orNull(dto.collectionNote),
                         createdByUserId: ctx.userId,
                     },
                     select: { id: true },
@@ -474,7 +560,6 @@ export class SubscriptionsService {
                 throw new ConflictException("This subscription is not paused.");
             }
             const now = new Date();
-            const interval = sub.interval as Interval;
 
             if (now < sub.currentPeriodEnd) {
                 // Calendar days in its own zone, so a pause across a clock
@@ -529,12 +614,15 @@ export class SubscriptionsService {
                 ctx.organizationId,
                 "restart a subscription past its paid period",
             );
+            // A new period starts today: that is the next renewal, so a plan
+            // change booked for it takes effect here.
+            const terms = await this.nextTerms(tx, sub);
             const anchor = DateTime.fromJSDate(now, { zone: sub.timezone })
                 .startOf("day")
                 .toJSDate();
             const period = periodContaining(
                 anchor,
-                interval,
+                terms.interval,
                 sub.timezone,
                 now,
             );
@@ -546,15 +634,16 @@ export class SubscriptionsService {
                     anchorAt: anchor,
                     currentPeriodStart: period.start,
                     currentPeriodEnd: period.end,
+                    ...this.termsData(sub, terms),
                 },
             });
             await this.invoicePeriod(tx, {
                 organizationId: ctx.organizationId,
                 subscriptionId: id,
                 contactId: sub.contactId,
-                planName: sub.plan.name,
-                price: toMoneyString(sub.price),
-                currency: sub.currency,
+                planName: terms.planName,
+                price: terms.price,
+                currency: terms.currency,
                 timezone: sub.timezone,
                 period,
                 createdByUserId: ctx.userId,
@@ -584,10 +673,13 @@ export class SubscriptionsService {
                         status: "CANCELLED",
                         cancelledAt: new Date(),
                         cancelAtPeriodEnd: false,
+                        // Nothing renews, so no change is waiting for it.
+                        pendingPlanId: null,
                     },
                 });
                 return;
             }
+            // A booked plan change is kept, so Keep (the undo) restores it.
             await tx.customerSubscription.update({
                 where: { id },
                 data: { cancelAtPeriodEnd: true },
@@ -615,6 +707,276 @@ export class SubscriptionsService {
             });
         });
         return this.read(ctx, id);
+    }
+
+    // — Collections, plan changes, a failed charge (U7) ————————————————
+
+    /**
+     * Set or stop the collection schedule. A new day drops the skips still to
+     * come — they were for the old day — and keeps the ones already past.
+     * When the old day's skips had left the current period uncharged and the
+     * new day gives it a collection, the period is invoiced now, as its
+     * renewal would have.
+     */
+    async setCollection(
+        ctx: OrganizationContext,
+        id: string,
+        dto: CollectionScheduleDto,
+    ): Promise<SubscriptionView> {
+        authorize(ctx, "subscription:write");
+        await prisma.$transaction(async (tx) => {
+            const sub = await this.lock(tx, ctx.organizationId, id);
+            if (sub.status === "CANCELLED") {
+                throw new ConflictException(
+                    "A cancelled subscription has no collections.",
+                );
+            }
+            if (dto.weekday !== sub.collectionWeekday) {
+                const today = localDate(new Date(), sub.timezone);
+                await tx.subscriptionSkip.deleteMany({
+                    where: {
+                        subscriptionId: id,
+                        date: { gt: dateValue(today) },
+                    },
+                });
+            }
+            await tx.customerSubscription.update({
+                where: { id },
+                data: {
+                    collectionWeekday: dto.weekday,
+                    ...(dto.weekday === null
+                        ? { collectionNote: null }
+                        : dto.note !== undefined
+                          ? { collectionNote: orNull(dto.note) }
+                          : {}),
+                },
+            });
+            if (dto.weekday !== sub.collectionWeekday) {
+                await this.chargeIfUncharged(tx, ctx, {
+                    ...sub,
+                    collectionWeekday: dto.weekday,
+                });
+            }
+        });
+        return this.read(ctx, id);
+    }
+
+    /**
+     * Skip one collection still to come. The charge follows the rule in
+     * `collections.ts`: a period is not charged only when every one of its
+     * collections was skipped before it was invoiced.
+     */
+    async skipCollection(
+        ctx: OrganizationContext,
+        id: string,
+        dto: SkipCollectionDto,
+    ): Promise<SubscriptionView> {
+        authorize(ctx, "subscription:write");
+        await prisma
+            .$transaction(async (tx) => {
+                const sub = await this.lock(tx, ctx.organizationId, id);
+                this.assertCollects(sub);
+                const date = this.collectionDate(sub, dto.date);
+                const today = localDate(new Date(), sub.timezone);
+                if (date <= today) {
+                    fieldError(
+                        "Only a collection still to come can be skipped",
+                        "date",
+                    );
+                }
+                const yearOut = isoDay(
+                    DateTime.fromISO(today, { zone: "UTC" }).plus({ years: 1 }),
+                );
+                if (date > yearOut) {
+                    fieldError(
+                        "That collection is more than a year away",
+                        "date",
+                    );
+                }
+                if (date < localDate(sub.currentPeriodStart, sub.timezone)) {
+                    fieldError(
+                        "The subscription has not started by then",
+                        "date",
+                    );
+                }
+                if (
+                    sub.cancelAtPeriodEnd &&
+                    date >= localDate(sub.currentPeriodEnd, sub.timezone)
+                ) {
+                    fieldError(
+                        "The subscription ends before that collection",
+                        "date",
+                    );
+                }
+                const already = await tx.subscriptionSkip.findFirst({
+                    where: { subscriptionId: id, date: dateValue(date) },
+                    select: { id: true },
+                });
+                if (already) dateConflict("That collection is already skipped");
+                await tx.subscriptionSkip.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        subscriptionId: id,
+                        date: dateValue(date),
+                        createdByUserId: ctx.userId,
+                    },
+                });
+            })
+            .catch((err: unknown) => {
+                if ((err as { code?: string }).code === "P2002") {
+                    dateConflict("That collection is already skipped");
+                }
+                throw err;
+            });
+        return this.read(ctx, id);
+    }
+
+    /**
+     * Undo a skip while its collection is still to come. When that skip was
+     * why the current period went uncharged, the period is invoiced now, as
+     * its renewal would have.
+     */
+    async unskipCollection(
+        ctx: OrganizationContext,
+        id: string,
+        date: string,
+    ): Promise<SubscriptionView> {
+        authorize(ctx, "subscription:write");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            fieldError("A collection date is YYYY-MM-DD", "date");
+        }
+        await prisma.$transaction(async (tx) => {
+            const sub = await this.lock(tx, ctx.organizationId, id);
+            const skip = await tx.subscriptionSkip.findFirst({
+                where: { subscriptionId: id, date: dateValue(date) },
+                select: { id: true },
+            });
+            if (!skip) {
+                throw new NotFoundException({
+                    message: "That collection is not skipped",
+                    details: { field: "date" },
+                });
+            }
+            if (date <= localDate(new Date(), sub.timezone)) {
+                dateConflict("That collection has passed");
+            }
+            await tx.subscriptionSkip.delete({ where: { id: skip.id } });
+            const inPeriod =
+                sub.collectionWeekday !== null &&
+                collectionDates(
+                    {
+                        start: sub.currentPeriodStart,
+                        end: sub.currentPeriodEnd,
+                    },
+                    sub.collectionWeekday,
+                    sub.timezone,
+                ).includes(date);
+            if (inPeriod) await this.chargeIfUncharged(tx, ctx, sub);
+        });
+        return this.read(ctx, id);
+    }
+
+    /**
+     * Book a move to another plan from the next renewal: plan, price and
+     * interval switch then, and the period already invoiced is left alone
+     * (no proration). A second change replaces the first.
+     */
+    async changePlan(
+        ctx: OrganizationContext,
+        id: string,
+        dto: ChangePlanDto,
+    ): Promise<SubscriptionView> {
+        authorize(ctx, "subscription:write");
+        await prisma.$transaction(async (tx) => {
+            const sub = await this.lock(tx, ctx.organizationId, id);
+            if (sub.status === "CANCELLED") {
+                throw new ConflictException(
+                    "A cancelled subscription cannot change plan.",
+                );
+            }
+            if (sub.cancelAtPeriodEnd) {
+                throw new ConflictException(
+                    "This subscription ends with its period. Keep it before changing its plan.",
+                );
+            }
+            const plan = await tx.subscriptionPlan.findFirst({
+                where: { id: dto.planId, organizationId: ctx.organizationId },
+                select: { id: true, name: true, status: true },
+            });
+            if (!plan) notFound("Plan", "planId");
+            if (plan.status !== "ACTIVE") {
+                fieldError(
+                    "That plan is archived and takes no new sign-ups",
+                    "planId",
+                );
+            }
+            if (plan.id === sub.planId) {
+                fieldError(`They are already on ${plan.name}`, "planId");
+            }
+            const onIt = await tx.customerSubscription.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    planId: plan.id,
+                    contactId: sub.contactId,
+                    status: { in: ["ACTIVE", "PAUSED"] },
+                    id: { not: id },
+                },
+            });
+            if (onIt > 0) alreadyOn(plan.name);
+            await tx.customerSubscription.update({
+                where: { id },
+                data: { pendingPlanId: plan.id },
+            });
+        });
+        return this.read(ctx, id);
+    }
+
+    /** Undo a booked plan change. */
+    async cancelPlanChange(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<SubscriptionView> {
+        authorize(ctx, "subscription:write");
+        await prisma.$transaction(async (tx) => {
+            const sub = await this.lock(tx, ctx.organizationId, id);
+            if (!sub.pendingPlanId) {
+                throw new ConflictException(
+                    "No plan change is waiting for this subscription.",
+                );
+            }
+            await tx.customerSubscription.update({
+                where: { id },
+                data: { pendingPlanId: null },
+            });
+        });
+        return this.read(ctx, id);
+    }
+
+    /**
+     * "Retry now" on a failed charge: a new pay link for the unpaid, overdue
+     * latest invoice, replacing the old one. Nothing is charged — there is
+     * no card on file — the link is what the customer pays through.
+     * Needs `invoice:write` as well, as any pay link does.
+     */
+    async retryPayment(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<{ invoiceId: string; token: string }> {
+        authorize(ctx, "subscription:write");
+        const row = await prisma.customerSubscription.findFirst({
+            where: { id, organizationId: ctx.organizationId },
+            select: SUBSCRIPTION_SELECT,
+        });
+        if (!row) notFound("Subscription");
+        const invoices = await this.invoicesFor(ctx.organizationId, [id]);
+        const failed = failedCharge(row, invoices.get(id), new Date());
+        if (!failed) {
+            throw new ConflictException(
+                "The latest charge is not overdue, so there is nothing to retry.",
+            );
+        }
+        const { token } = await this.invoices.createPayLink(ctx, failed.id);
+        return { invoiceId: failed.id, token };
     }
 
     /**
@@ -676,7 +1038,7 @@ export class SubscriptionsService {
     async renewOne(
         id: string,
         now: Date,
-    ): Promise<"renewed" | "advanced" | "ended" | "skipped"> {
+    ): Promise<"renewed" | "advanced" | "uncharged" | "ended" | "skipped"> {
         return prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} FOR UPDATE`;
             const sub = await tx.customerSubscription.findUnique({
@@ -705,9 +1067,16 @@ export class SubscriptionsService {
                 return "ended";
             }
 
+            // A plan change booked for this renewal takes effect now. A new
+            // interval starts its own chain where the old period ended.
+            const terms = await this.nextTerms(tx, sub);
+            const anchor =
+                terms.interval !== sub.interval
+                    ? sub.currentPeriodEnd
+                    : sub.anchorAt;
             const period = periodContaining(
-                sub.anchorAt,
-                sub.interval as Interval,
+                anchor,
+                terms.interval,
                 sub.timezone,
                 now,
             );
@@ -716,6 +1085,8 @@ export class SubscriptionsService {
                 data: {
                     currentPeriodStart: period.start,
                     currentPeriodEnd: period.end,
+                    ...(anchor !== sub.anchorAt ? { anchorAt: anchor } : {}),
+                    ...this.termsData(sub, terms),
                 },
             });
             const live = await tx.invoice.findFirst({
@@ -727,14 +1098,15 @@ export class SubscriptionsService {
                 select: { id: true },
             });
             if (live) return "advanced";
+            if (await this.allSkipped(tx, sub, period)) return "uncharged";
 
             await this.invoicePeriod(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 contactId: sub.contactId,
-                planName: sub.plan.name,
-                price: toMoneyString(sub.price),
-                currency: sub.currency,
+                planName: terms.planName,
+                price: terms.price,
+                currency: terms.currency,
                 timezone: sub.timezone,
                 period,
                 createdByUserId: null,
@@ -744,6 +1116,209 @@ export class SubscriptionsService {
     }
 
     // — internals —————————————————————————————————————————————————
+
+    /**
+     * The terms the next period is billed at: the booked plan's current
+     * price, currency and interval when a change is waiting, else the
+     * subscription's own. A change that would put the person on a plan they
+     * already hold elsewhere stays waiting rather than trip the one-live
+     * index and stall every renewal after it.
+     */
+    private async nextTerms(tx: Tx, sub: SubscriptionRow): Promise<Terms> {
+        const own: Terms = {
+            planId: sub.planId,
+            planName: sub.plan.name,
+            price: toMoneyString(sub.price),
+            currency: sub.currency,
+            interval: sub.interval as Interval,
+        };
+        const next = sub.pendingPlan;
+        if (!next) return own;
+        const clash = await tx.customerSubscription.count({
+            where: {
+                planId: next.id,
+                contactId: sub.contactId,
+                status: { in: ["ACTIVE", "PAUSED"] },
+                id: { not: sub.id },
+            },
+        });
+        if (clash > 0) return own;
+        return {
+            planId: next.id,
+            planName: next.name,
+            price: toMoneyString(next.price),
+            currency: next.currency,
+            interval: next.interval as Interval,
+        };
+    }
+
+    /** The row changes that switch a subscription onto new terms. */
+    private termsData(
+        sub: SubscriptionRow,
+        terms: Terms,
+    ): Prisma.CustomerSubscriptionUncheckedUpdateInput {
+        if (terms.planId === sub.planId) return {};
+        return {
+            planId: terms.planId,
+            price: terms.price,
+            currency: terms.currency,
+            interval: terms.interval,
+            pendingPlanId: null,
+        };
+    }
+
+    /** True when the period has collections and every one is skipped. */
+    private async allSkipped(
+        tx: Tx,
+        sub: SubscriptionRow,
+        period: Period,
+    ): Promise<boolean> {
+        if (sub.collectionWeekday === null) return false;
+        const dates = collectionDates(
+            period,
+            sub.collectionWeekday,
+            sub.timezone,
+        );
+        if (dates.length === 0) return false;
+        const skips = await tx.subscriptionSkip.findMany({
+            where: {
+                subscriptionId: sub.id,
+                date: { in: dates.map(dateValue) },
+            },
+            select: { date: true },
+        });
+        return everyCollectionSkipped(
+            period,
+            sub.collectionWeekday,
+            sub.timezone,
+            new Set(skips.map((k) => dateKey(k.date))),
+        );
+    }
+
+    /**
+     * After an undone skip or a new collection day: when the current period
+     * has begun, has a collection still to come (today or later) that is not
+     * skipped, and has no invoice at all — the renewal left it uncharged
+     * because every collection was skipped — invoice it now. A voided invoice
+     * counts as one: someone chose that. `sub` carries the schedule as it now
+     * stands.
+     */
+    private async chargeIfUncharged(
+        tx: Tx,
+        ctx: OrganizationContext,
+        sub: SubscriptionRow,
+    ): Promise<void> {
+        const period = {
+            start: sub.currentPeriodStart,
+            end: sub.currentPeriodEnd,
+        };
+        const now = new Date();
+        if (
+            sub.status !== "ACTIVE" ||
+            sub.collectionWeekday === null ||
+            period.start > now
+        ) {
+            return;
+        }
+        const dates = collectionDates(
+            period,
+            sub.collectionWeekday,
+            sub.timezone,
+        );
+        const skips = await tx.subscriptionSkip.findMany({
+            where: {
+                subscriptionId: sub.id,
+                date: { in: dates.map(dateValue) },
+            },
+            select: { date: true },
+        });
+        if (
+            !collectionToCome(
+                period,
+                sub.collectionWeekday,
+                sub.timezone,
+                localDate(now, sub.timezone),
+                new Set(skips.map((k) => dateKey(k.date))),
+            )
+        ) {
+            return;
+        }
+        const any = await tx.invoice.findFirst({
+            where: { subscriptionId: sub.id, periodStart: period.start },
+            select: { id: true },
+        });
+        if (any || !(await paymentsOn(tx, ctx.organizationId))) return;
+        await this.invoicePeriod(tx, {
+            organizationId: ctx.organizationId,
+            subscriptionId: sub.id,
+            contactId: sub.contactId,
+            planName: sub.plan.name,
+            price: toMoneyString(sub.price),
+            currency: sub.currency,
+            timezone: sub.timezone,
+            period,
+            createdByUserId: ctx.userId,
+        });
+    }
+
+    /** Refuse a collection change on a subscription that is not collecting. */
+    private assertCollects(sub: SubscriptionRow): void {
+        if (sub.status === "CANCELLED") {
+            throw new ConflictException(
+                "A cancelled subscription has no collections to skip.",
+            );
+        }
+        if (sub.status === "PAUSED") {
+            throw new ConflictException(
+                "Resume the subscription before skipping a collection.",
+            );
+        }
+        if (sub.collectionWeekday === null) {
+            fieldError("This subscription has no collections to skip", "date");
+        }
+    }
+
+    /** A real date, on the subscription's collection day. */
+    private collectionDate(sub: SubscriptionRow, value: string): string {
+        const d = DateTime.fromISO(value, { zone: "UTC" });
+        if (!d.isValid) fieldError("That is not a date", "date");
+        if (d.weekday !== sub.collectionWeekday) {
+            fieldError(
+                `There is no collection on ${d.toFormat("cccc d LLL")}`,
+                "date",
+            );
+        }
+        return isoDay(d);
+    }
+
+    /**
+     * Each subscription's skips from yesterday (UTC) on — enough for
+     * "today" in any zone — for its upcoming collections.
+     */
+    private async skipsFor(
+        organizationId: string,
+        subscriptionIds: string[],
+    ): Promise<Map<string, Set<string>>> {
+        const byId = new Map<string, Set<string>>();
+        if (subscriptionIds.length === 0) return byId;
+        const since = dateValue(
+            new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+        );
+        const rows = await prisma.subscriptionSkip.findMany({
+            where: {
+                organizationId,
+                subscriptionId: { in: subscriptionIds },
+                date: { gte: since },
+            },
+            select: { subscriptionId: true, date: true },
+        });
+        for (const r of rows) {
+            const set = byId.get(r.subscriptionId) ?? new Set<string>();
+            set.add(dateKey(r.date));
+            byId.set(r.subscriptionId, set);
+        }
+        return byId;
+    }
 
     private async invoicePeriod(
         tx: Tx,
@@ -802,8 +1377,14 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         if (!row) notFound("Subscription");
-        const invoices = await this.invoicesFor(organizationId, [id]);
-        return forViewer(ctx, this.view(row, invoices.get(id), new Date()));
+        const [invoices, skips] = await Promise.all([
+            this.invoicesFor(organizationId, [id]),
+            this.skipsFor(organizationId, [id]),
+        ]);
+        return forViewer(
+            ctx,
+            this.view(row, invoices.get(id), skips.get(id), new Date()),
+        );
     }
 
     private async readPlan(
@@ -869,8 +1450,10 @@ export class SubscriptionsService {
     private view(
         row: SubscriptionRow,
         invoices: SubscriptionInvoices | undefined,
+        skips: ReadonlySet<string> | undefined,
         now: Date,
     ): SubscriptionView {
+        const failed = failedCharge(row, invoices, now);
         const unpaid = invoices?.unpaid ?? [];
         const latest = invoices?.latest ?? null;
         const pastDue = unpaid.filter((u) => isPastDue(u, now)).length;
@@ -927,6 +1510,27 @@ export class SubscriptionsService {
                       paidAt: latest.paidAt?.toISOString() ?? null,
                   }
                 : null,
+            paymentFailed: failed !== null,
+            failedCharge: failed
+                ? {
+                      id: failed.id,
+                      number: failed.number,
+                      dueAt: failed.dueAt?.toISOString() ?? null,
+                      total: toMoneyString(failed.total),
+                  }
+                : null,
+            collection: this.collectionView(row, skips, now),
+            pendingPlan:
+                row.pendingPlan && row.status !== "CANCELLED"
+                    ? {
+                          id: row.pendingPlan.id,
+                          name: row.pendingPlan.name,
+                          price: toMoneyString(row.pendingPlan.price),
+                          currency: row.pendingPlan.currency,
+                          interval: row.pendingPlan.interval as Interval,
+                          from: row.currentPeriodEnd.toISOString(),
+                      }
+                    : null,
             // A resume re-anchors a subscription later, so the anchor is
             // its start only while it is the earlier of the two.
             startedAt: (row.anchorAt < row.createdAt ||
@@ -935,6 +1539,37 @@ export class SubscriptionsService {
                 : row.createdAt
             ).toISOString(),
             createdAt: row.createdAt.toISOString(),
+        };
+    }
+
+    /**
+     * The schedule and the next collections. Only an active subscription
+     * collects; one set to end stops at its period end; one that has not
+     * started begins on its start date.
+     */
+    private collectionView(
+        row: SubscriptionRow,
+        skips: ReadonlySet<string> | undefined,
+        now: Date,
+    ): SubscriptionView["collection"] {
+        if (row.collectionWeekday === null) return null;
+        const today = localDate(now, row.timezone);
+        const start = localDate(row.currentPeriodStart, row.timezone);
+        return {
+            weekday: row.collectionWeekday,
+            note: row.collectionNote,
+            upcoming:
+                row.status === "ACTIVE"
+                    ? upcomingCollections({
+                          weekday: row.collectionWeekday,
+                          from: start > today ? start : today,
+                          until: row.cancelAtPeriodEnd
+                              ? localDate(row.currentPeriodEnd, row.timezone)
+                              : null,
+                          today,
+                          skipped: skips ?? new Set(),
+                      })
+                    : [],
         };
     }
 
@@ -961,6 +1596,21 @@ export class SubscriptionsService {
             createdAt: row.createdAt.toISOString(),
         };
     }
+}
+
+/**
+ * Payment failed: the latest charge is still unpaid and past its due date.
+ * Derived, like "overdue", through the one rule (`isPastDue`); a cancelled
+ * subscription has no failed charge to act on.
+ */
+function failedCharge(
+    row: { status: string },
+    invoices: SubscriptionInvoices | undefined,
+    now: Date,
+): InvoiceRowLite | null {
+    const latest = invoices?.latest ?? null;
+    if (row.status === "CANCELLED" || !latest) return null;
+    return isPastDue(latest, now) ? latest : null;
 }
 
 /** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */

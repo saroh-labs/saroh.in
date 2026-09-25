@@ -70,6 +70,11 @@ export interface DataFilter<TRow> {
     label: string;
     /** Omit on the "all" filter; a filter with no predicate matches every row. */
     predicate?: (row: TRow) => boolean;
+    /**
+     * A count someone should act on (low stock, overdue): drawn in the
+     * attention tone while it is above zero, plain at zero.
+     */
+    attention?: boolean;
 }
 
 export interface DataViewProps<TRow> {

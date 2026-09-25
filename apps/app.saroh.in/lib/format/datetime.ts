@@ -79,6 +79,76 @@ export function formatDayHeading(
     return formatDayLabel(iso, timeZone);
 }
 
+/**
+ * A moment on a timeline, the way the counter says it: "Today, 09:14",
+ * "Yesterday, 18:40", "22 Sep, 07:05" — the year only when it is not this one.
+ * 24-hour, as the order designs draw it.
+ */
+export function formatMoment(
+    iso: string | Date,
+    timeZone: string,
+    now: Date = new Date(),
+): string {
+    const time = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).format(new Date(iso));
+    const key = localDateKey(iso, timeZone);
+    if (key === localDateKey(now, timeZone)) return `Today, ${time}`;
+    if (key === localDateKey(new Date(now.getTime() - MS_PER_DAY), timeZone)) {
+        return `Yesterday, ${time}`;
+    }
+    const sameYear =
+        key.slice(0, 4) === localDateKey(now, timeZone).slice(0, 4);
+    const day = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        day: "numeric",
+        month: "short",
+        ...(sameYear ? {} : { year: "numeric" }),
+    })
+        .format(new Date(iso))
+        // ICU writes "Sept"; the designs write three letters every month.
+        .replace("Sept", "Sep");
+    return `${day}, ${time}`;
+}
+
+/**
+ * When something happened, as a log line says it: "Today 09:14",
+ * "Yesterday", "22 Sep" — the year only when it is not this one. The hour
+ * only for today, where it is the difference between two changes; a day
+ * further back is enough to find it by (Settings › Activity).
+ */
+export function formatRecent(
+    iso: string | Date,
+    timeZone: string,
+    now: Date = new Date(),
+): string {
+    const key = localDateKey(iso, timeZone);
+    const today = localDateKey(now, timeZone);
+    if (key === today) {
+        const time = new Intl.DateTimeFormat("en-GB", {
+            timeZone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+        }).format(new Date(iso));
+        return `Today ${time}`;
+    }
+    if (key === localDateKey(new Date(now.getTime() - MS_PER_DAY), timeZone)) {
+        return "Yesterday";
+    }
+    return new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        day: "numeric",
+        month: "short",
+        ...(key.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
+    })
+        .format(new Date(iso))
+        .replace("Sept", "Sep");
+}
+
 /** Whole days between two instants; negative when `iso` is in the past. */
 export function daysUntil(iso: string | Date, now: Date = new Date()): number {
     return Math.round((new Date(iso).getTime() - now.getTime()) / MS_PER_DAY);

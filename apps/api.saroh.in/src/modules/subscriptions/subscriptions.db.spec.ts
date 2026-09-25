@@ -219,3 +219,224 @@ describe("subscriptions (real database)", () => {
         ).toBe(1);
     });
 });
+
+// — U7: collections, skips and a booked plan change ————————————————————
+
+const DAY_MS = 86_400_000;
+
+/** UTC midnight today plus `days` (the subscriptions here run in UTC). */
+function utcDay(days: number): Date {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    return new Date(d.getTime() + days * DAY_MS);
+}
+
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+/** Luxon's ISO weekday of a UTC date: 1 Monday … 7 Sunday. */
+const isoWeekday = (d: Date) => ((d.getUTCDay() + 6) % 7) + 1;
+
+describe("collections, skips and plan changes (real database)", () => {
+    let weeklyPlanId: string;
+    let otherPlanId: string;
+
+    beforeAll(async () => {
+        weeklyPlanId = (
+            await service.createPlan(org, {
+                name: "Bread box",
+                price: "300",
+                currency: "INR",
+                interval: "WEEK",
+            })
+        ).id;
+        otherPlanId = (
+            await service.createPlan(org, {
+                name: "Bread box plus",
+                price: "450",
+                currency: "INR",
+                interval: "MONTH",
+            })
+        ).id;
+    });
+
+    /**
+     * A weekly box whose last period ended at today's UTC midnight, so the
+     * one now due runs today → today + 7, collected two days from now.
+     */
+    async function dueWeeklyBox(): Promise<{ id: string; collection: string }> {
+        const collectOn = utcDay(2);
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId: weeklyPlanId,
+            timezone: "UTC",
+            collectionWeekday: isoWeekday(collectOn),
+        });
+        const start = utcDay(-7);
+        await prisma.customerSubscription.update({
+            where: { id: s.id },
+            data: {
+                anchorAt: start,
+                currentPeriodStart: start,
+                currentPeriodEnd: utcDay(0),
+            },
+        });
+        // Its sign-up invoice becomes the last period's.
+        await prisma.invoice.updateMany({
+            where: { subscriptionId: s.id },
+            data: { periodStart: start, periodEnd: utcDay(0) },
+        });
+        return { id: s.id, collection: ymd(collectOn) };
+    }
+
+    it("advances a period whose only collection is skipped without an invoice, and Undo bills it", async () => {
+        const { id, collection } = await dueWeeklyBox();
+        const skipped = await service.skipCollection(org, id, {
+            date: collection,
+        });
+        expect(
+            skipped.collection!.upcoming.find((c) => c.date === collection),
+        ).toMatchObject({ skipped: true });
+
+        const now = new Date();
+        await expect(service.renewOne(id, now)).resolves.toBe("uncharged");
+        // Idempotent: a second run is not due, and the job adds nothing.
+        await expect(service.renewOne(id, now)).resolves.toBe("skipped");
+        await handler.renewDue(now);
+        expect(await invoicesOf(id)).toHaveLength(1);
+
+        await service.unskipCollection(org, id, collection);
+        const invoices = await invoicesOf(id);
+        expect(invoices).toHaveLength(2);
+        expect(invoices[1]!.periodStart).toEqual(utcDay(0));
+    });
+
+    it("bills a period its skips left uncharged, once, when the collection day moves", async () => {
+        const { id, collection } = await dueWeeklyBox();
+        await service.skipCollection(org, id, { date: collection });
+        await expect(service.renewOne(id, new Date())).resolves.toBe(
+            "uncharged",
+        );
+        expect(await invoicesOf(id)).toHaveLength(1);
+
+        // Three days out: a day of this period the skip does not cover.
+        const moved = isoWeekday(utcDay(3));
+        await service.setCollection(org, id, { weekday: moved });
+        const invoices = await invoicesOf(id);
+        expect(invoices).toHaveLength(2);
+        expect(invoices[1]!.periodStart).toEqual(utcDay(0));
+
+        // Moving it again finds the period invoiced and adds nothing.
+        await service.setCollection(org, id, {
+            weekday: isoWeekday(utcDay(4)),
+        });
+        expect(await invoicesOf(id)).toHaveLength(2);
+    });
+
+    it("refuses a past collection and one already skipped, even at once", async () => {
+        const { id, collection } = await dueWeeklyBox();
+        await expect(
+            service.skipCollection(org, id, { date: ymd(utcDay(-5)) }),
+        ).rejects.toThrow();
+        const results = await Promise.allSettled([
+            service.skipCollection(org, id, { date: collection }),
+            service.skipCollection(org, id, { date: collection }),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        expect(
+            await prisma.subscriptionSkip.count({
+                where: { subscriptionId: id },
+            }),
+        ).toBe(1);
+    });
+
+    it("keeps a skip through a cancel at period end, which then ends it unbilled", async () => {
+        const { id, collection } = await dueWeeklyBox();
+        await service.renewOne(id, new Date());
+        await service.skipCollection(org, id, { date: collection });
+        const ending = await service.cancel(org, id, { when: "periodEnd" });
+        // Nothing listed past the day it ends.
+        for (const c of ending.collection!.upcoming) {
+            expect(c.date < ymd(utcDay(7))).toBe(true);
+        }
+        const before = (await invoicesOf(id)).length;
+        await service.renewOne(id, new Date(Date.now() + 8 * DAY_MS));
+        const after = await service.get(org, id);
+        expect(after.status).toBe("CANCELLED");
+        expect(await invoicesOf(id)).toHaveLength(before);
+    });
+
+    it("applies a plan change booked before a pause when the resume starts a new period", async () => {
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId: weeklyPlanId,
+        });
+        const booked = await service.changePlan(org, s.id, {
+            planId: otherPlanId,
+        });
+        expect(booked.pendingPlan?.id).toBe(otherPlanId);
+        await service.pause(org, s.id);
+        // The pause outlasts the paid week.
+        await prisma.customerSubscription.update({
+            where: { id: s.id },
+            data: {
+                pausedAt: utcDay(-20),
+                anchorAt: utcDay(-21),
+                currentPeriodStart: utcDay(-21),
+                currentPeriodEnd: utcDay(-14),
+            },
+        });
+        // Its sign-up invoice becomes that paid week's, or it would still
+        // claim a period starting today — the one the resume starts.
+        await prisma.invoice.updateMany({
+            where: { subscriptionId: s.id },
+            data: { periodStart: utcDay(-21), periodEnd: utcDay(-14) },
+        });
+        const resumed = await service.resume(org, s.id);
+        expect(resumed).toMatchObject({
+            plan: { id: otherPlanId },
+            price: "450.00",
+            interval: "MONTH",
+            pendingPlan: null,
+        });
+        const invoices = await invoicesOf(s.id);
+        expect(invoices[invoices.length - 1]!.total.toString()).toBe("450");
+    });
+
+    it("applies a booked change exactly once, however concurrently the renewal runs", async () => {
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId: weeklyPlanId,
+        });
+        await service.changePlan(org, s.id, { planId: otherPlanId });
+        await makeDue(s.id);
+        const now = new Date();
+        const outcomes = await Promise.all([
+            service.renewOne(s.id, now),
+            service.renewOne(s.id, now),
+        ]);
+        expect(outcomes.filter((o) => o === "renewed")).toHaveLength(1);
+        const row = await prisma.customerSubscription.findUniqueOrThrow({
+            where: { id: s.id },
+        });
+        expect(row.planId).toBe(otherPlanId);
+        expect(row.pendingPlanId).toBeNull();
+        await handler.renewDue(now);
+        expect(await invoicesOf(s.id)).toHaveLength(2);
+    });
+
+    it("refuses a change to an archived plan", async () => {
+        const archived = await service.createPlan(org, {
+            name: "Old box",
+            price: "250",
+            currency: "INR",
+            interval: "WEEK",
+        });
+        await service.setPlanStatus(org, archived.id, "ARCHIVED");
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId: weeklyPlanId,
+        });
+        await expect(
+            service.changePlan(org, s.id, { planId: archived.id }),
+        ).rejects.toThrow(/archived/);
+    });
+});

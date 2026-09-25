@@ -42,6 +42,10 @@ module.exports = {
         // @saroh/database), so keep them out of the DB-backed run. The legacy
         // DB-backed orders.service.spec.ts still runs here.
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        "<rootDir>/src/modules/orders/order-refunds.spec.ts",
+        "<rootDir>/src/modules/orders/order-read.spec.ts",
+        "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // The waitlist spec mocks Prisma (pure unit test) and runs in the
         // default/unit project — keep it out of the DB-backed run.
@@ -54,6 +58,12 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/products/product-rules.spec.ts",
+        "<rootDir>/src/modules/products/product-overview.spec.ts",
+        "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
+        "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
+        "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
+        "<rootDir>/src/modules/products/products.gate.spec.ts",
         "<rootDir>/src/modules/product-reviews/",
         // ADR-007 invoices: DB-free specs run in the unit project; only
         // invoices.db.spec.ts runs here.
@@ -63,6 +73,11 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13 pay link: mocked-DB specs; invoice-pay-link.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // U5 GST: the tax maths, the states and GSTINs, and the order
+        // invoice builder — pure.
+        "<rootDir>/src/modules/invoices/gst.spec.ts",
+        "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         "<rootDir>/src/modules/webhooks/webhooks.invoice.spec.ts",
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
@@ -70,6 +85,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
+        // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
+        "<rootDir>/src/modules/staff/staff.service.spec.ts",
+        "<rootDir>/src/modules/staff/hours.spec.ts",
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

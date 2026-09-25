@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
 
 /**
@@ -79,7 +80,9 @@ export interface PostCategoryInput {
     slug?: string;
 }
 
-export type ResultField = "title" | "slug" | "name" | "categoryId";
+const RESULT_FIELDS = ["title", "slug", "name", "categoryId"] as const;
+
+export type ResultField = (typeof RESULT_FIELDS)[number];
 
 export type Result<T = { id: string }> =
     { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
@@ -98,17 +101,12 @@ async function mutate<T = { id: string }>(
         method,
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const data = (await res.json().catch(() => null)) as
-        | (Record<string, unknown> & {
-              message?: string;
-              field?: ResultField;
-          })
-        | null;
+    const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
+    const failure = toFailure(data, "Something went wrong");
     return {
-        ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: data?.field,
+        ...failure,
+        field: RESULT_FIELDS.find((f) => f === failure.field),
     };
 }
 

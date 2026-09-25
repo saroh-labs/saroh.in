@@ -82,3 +82,31 @@ export function isInNextWeek(
         new Date(booking.startAt).getTime() <= now + WEEK_MS
     );
 }
+
+/** How early before the start the desk may check someone in (the API's rule). */
+export const CHECK_IN_EARLY_MS = 60 * 60 * 1000;
+
+/**
+ * Whether someone can be checked in now: from an hour before the start, the
+ * way the API allows it — the desk checks people in as they walk in.
+ */
+export function canCheckIn(
+    booking: Pick<BookingStateFields, "status"> & { startAt: string },
+    now: number = Date.now(),
+): boolean {
+    return (
+        booking.status !== "CANCELLED" &&
+        now >= new Date(booking.startAt).getTime() - CHECK_IN_EARLY_MS
+    );
+}
+
+/** Whether a no-show can be said: once the start has passed. */
+export function canMarkNoShow(
+    booking: Pick<BookingStateFields, "status"> & { startAt: string },
+    now: number = Date.now(),
+): boolean {
+    return (
+        booking.status !== "CANCELLED" &&
+        now >= new Date(booking.startAt).getTime()
+    );
+}

@@ -3,12 +3,20 @@ import { describe, expect, it } from "vitest";
 import type { NavGroup, NavRole } from "@/components/shared/nav-items";
 import {
     NAV_GROUPS,
+    SETTINGS_PAGES,
     filterNavGroups,
     filterNavGroupsByRole,
     isNavChildCurrent,
     isNavItemActive,
+    isNavSectionActive,
+    mayOpenSettingsPage,
+    navCan,
+    navCountFor,
     navFor,
+    navPathname,
     navRoleCan,
+    navRowsForModule,
+    settingsPagesFor,
 } from "@/components/shared/nav-items";
 
 /**
@@ -151,6 +159,10 @@ describe("navRoleCan", () => {
     });
 });
 
+/** The settings tabs an actor is offered, by address. */
+const tabsFor = (actor: Parameters<typeof settingsPagesFor>[0]) =>
+    settingsPagesFor(actor).map((page) => page.href);
+
 describe("what each role is offered", () => {
     it("offers an owner the whole workspace", () => {
         const offered = hrefs(
@@ -160,8 +172,19 @@ describe("what each role is offered", () => {
                 sites: SITES,
             }),
         );
-        expect(offered).toContain("/settings/providers");
-        expect(offered).toContain("/notifications");
+        // Settings is one rail row; its pages are the settings screen's tabs,
+        // and Notifications is in the top bar (2026-09-25).
+        expect(offered).toContain("/settings");
+        expect(offered).not.toContain("/notifications");
+        expect(tabsFor({ role: "OWNER" })).toEqual([
+            "/settings/organization",
+            "/settings/people",
+            "/settings/modules",
+            "/settings/billing",
+            "/settings/profile",
+            "/settings/activity",
+            "/settings/providers",
+        ]);
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_2");
     });
@@ -189,11 +212,13 @@ describe("what each role is offered", () => {
                 sites: SITES,
             }),
         );
-        expect(offered).toContain("/settings/people");
-        expect(offered).toContain("/settings/modules");
-        expect(offered).not.toContain("/notifications");
-        expect(offered).not.toContain("/settings/providers");
-        expect(offered).not.toContain("/settings/organization");
+        expect(offered).toContain("/settings");
+        expect(tabsFor({ role: "MEMBER" })).toEqual([
+            "/settings/people",
+            "/settings/modules",
+            "/settings/profile",
+        ]);
+        expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
         expect(offered).not.toContain("/sites/new");
         expect(offered).not.toContain("/sites/site_1");
@@ -229,6 +254,29 @@ describe("what each role is offered", () => {
             "/sites/site_1/review",
             "/sites/site_1/posts",
         ]);
+    });
+
+    it("offers Home › Calendar to everyone who reads the business, not a reviewer", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER"] as const) {
+            expect(
+                hrefs(navFor({ role, moduleKeys: AVAILABLE_TO[role] })),
+            ).toContain("/calendar");
+        }
+        expect(
+            hrefs(
+                navFor({ role: "REVIEWER", moduleKeys: AVAILABLE_TO.REVIEWER }),
+            ),
+        ).not.toContain("/calendar");
+        // A role the business invented follows its own permissions.
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["site:read"],
+                    moduleKeys: null,
+                }),
+            ),
+        ).not.toContain("/calendar");
     });
 
     it("leaves no heading standing over nothing", () => {
@@ -307,11 +355,11 @@ describe("what the two filters each answer", () => {
         // not. Neither filter can answer the other's question.
         const noModules = filterNavGroups(NAV_GROUPS, []);
         expect(hrefs(filterNavGroupsByRole(noModules, "OWNER"))).toContain(
-            "/settings/modules",
+            "/settings",
         );
         expect(
             hrefs(filterNavGroupsByRole(NAV_GROUPS, "REVIEWER")),
-        ).not.toContain("/settings/modules");
+        ).not.toContain("/settings");
     });
 
     it("shows the full nav to every role when availability is unknown", () => {
@@ -344,11 +392,17 @@ describe("navFor — an invented role", () => {
                 sites,
             }),
         );
-        expect(hrefs).toContain("/settings/people");
-        expect(hrefs).toContain("/settings/modules");
-        expect(hrefs).not.toContain("/settings/organization");
-        expect(hrefs).not.toContain("/settings/providers");
-        expect(hrefs).not.toContain("/notifications");
+        expect(hrefs).toContain("/settings");
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["member:read", "module:read"],
+            }),
+        ).toEqual([
+            "/settings/people",
+            "/settings/modules",
+            "/settings/profile",
+        ]);
     });
 
     it("can offer MORE than the floor the role maps to", () => {
@@ -361,8 +415,18 @@ describe("navFor — an invented role", () => {
             }),
         );
         // Business details is OWNER/ADMIN in the shipped map. A business may
-        // grant it to a role it invented, and the rail has to follow.
-        expect(hrefs).toContain("/settings/organization");
+        // grant it to a role it invented, and the tabs have to follow.
+        expect(hrefs).toContain("/settings");
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "member:read"],
+            }),
+        ).toEqual([
+            "/settings/organization",
+            "/settings/people",
+            "/settings/profile",
+        ]);
     });
 
     it("falls back to the role map when permissions were not loaded", () => {
@@ -378,30 +442,56 @@ describe("navFor — an invented role", () => {
 });
 
 /**
- * Orders across the business are gated on `order:read`. The rail has to agree
- * with the API, or a Member clicks a row that answers them with a refusal.
+ * Orders across the business are gated on `order:read` or `order:stage`
+ * (DEC-024: a Member moves kitchen stages, and gets the kitchen's view of the
+ * list). The rail has to agree with the API, or someone clicks a row that
+ * answers them with a refusal.
  */
-describe("Sell → Orders is offered only to roles that can read orders", () => {
+describe("Sell → Orders is offered to roles that read orders or move them", () => {
     const childHrefs = (groups: ReturnType<typeof navFor>) =>
         groups.flatMap((g) =>
             g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
         );
     const sites: { id: string; name: string }[] = [];
 
-    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
-        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
-            "/commerce/orders",
-        );
-    });
-
-    it.each(["MEMBER", "REVIEWER"] as const)(
-        "does not offer it to %s",
+    it.each(["OWNER", "ADMIN", "MEMBER"] as const)(
+        "offers it to %s",
         (role) => {
             expect(
                 childHrefs(navFor({ role, moduleKeys: null, sites })),
-            ).not.toContain("/commerce/orders");
+            ).toContain("/commerce/orders");
         },
     );
+
+    it("does not offer it to a REVIEWER", () => {
+        expect(
+            childHrefs(navFor({ role: "REVIEWER", moduleKeys: null, sites })),
+        ).not.toContain("/commerce/orders");
+    });
+
+    it("offers it to a Member through order:stage alone", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["org:read", "store:read", "order:stage"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/orders");
+    });
+
+    it("does not offer it to an invented role with neither", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["store:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).not.toContain("/commerce/orders");
+    });
 
     it("offers it to an invented role that was granted it", () => {
         const hrefs = childHrefs(
@@ -428,9 +518,22 @@ describe("the storefront rows follow store:read", () => {
         "/commerce/storefronts",
     ];
 
-    it("still offers them to a Member, whose floor includes it", () => {
+    it("still offers products and the storefront to a Member, whose floor includes it", () => {
         const hrefs = childHrefs(
             navFor({ role: "MEMBER", moduleKeys: null, sites }),
+        );
+        expect(hrefs).toContain("/commerce/products");
+        expect(hrefs).toContain("/commerce/storefronts");
+    });
+
+    it("offers a store:read role without the kitchen all three", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["store:read"],
+                moduleKeys: null,
+                sites,
+            }),
         );
         for (const h of storefront) expect(hrefs).toContain(h);
     });
@@ -446,6 +549,55 @@ describe("the storefront rows follow store:read", () => {
         );
         expect(hrefs).toContain("/commerce/orders");
         for (const h of storefront) expect(hrefs).not.toContain(h);
+    });
+});
+
+describe("Sell → Customers is not the counter's (R7, #508)", () => {
+    const childHrefs = (groups: ReturnType<typeof navFor>) =>
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
+        );
+    const sites: { id: string; name: string }[] = [];
+
+    it("withholds it from a Member, who moves stages but reads no money", () => {
+        expect(
+            childHrefs(navFor({ role: "MEMBER", moduleKeys: null, sites })),
+        ).not.toContain("/commerce/customers");
+        expect(
+            childHrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["store:read", "order:stage"],
+                    moduleKeys: null,
+                    sites,
+                }),
+            ),
+        ).not.toContain("/commerce/customers");
+    });
+
+    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/customers",
+        );
+    });
+
+    it("offers it to an invented role that also reads orders", () => {
+        expect(
+            childHrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["store:read", "order:stage", "order:read"],
+                    moduleKeys: null,
+                    sites,
+                }),
+            ),
+        ).toContain("/commerce/customers");
+    });
+
+    it("fails open for an actor it cannot judge", () => {
+        expect(
+            childHrefs(navFor({ role: null, moduleKeys: null, sites })),
+        ).toContain("/commerce/customers");
     });
 });
 
@@ -513,8 +665,8 @@ describe("isNavChildCurrent", () => {
     });
 });
 
-describe("Billing (ADR-007)", () => {
-    it("offers an owner with Payments on Billing › Invoices", () => {
+describe("Payments (ADR-007)", () => {
+    it("offers an owner with Payments on Payments › Invoices", () => {
         const offered = hrefs(
             navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
         );
@@ -544,14 +696,14 @@ describe("Billing (ADR-007)", () => {
         ).toBe(true);
     });
 
-    it("marks Billing on every Billing page, Invoices included", () => {
-        const billing = navFor({
+    it("marks Payments on every Payments page, Invoices included", () => {
+        const payments = navFor({
             role: "OWNER",
             moduleKeys: AVAILABLE_TO.OWNER,
         })
             .flatMap((g) => g.items)
-            .find((i) => i.label === "Billing");
-        const href = billing?.href ?? "";
+            .find((i) => i.label === "Payments");
+        const href = payments?.href ?? "";
         expect(href).toBe("/billing");
         for (const page of [
             "/billing/subscriptions",
@@ -578,14 +730,14 @@ describe("Billing (ADR-007)", () => {
 
     it("drops the section when every page in it is refused, rather than an empty heading", () => {
         // An invented role in a business with Payments on, granted payments
-        // but no invoices: Billing would be a row that opens onto nothing.
+        // but no invoices: Payments would be a row that opens onto nothing.
         const groups = navFor({
             role: "MEMBER",
             actions: ["payment:read"],
             moduleKeys: ["PAYMENTS"],
         });
         const labels = groups.flatMap((g) => g.items.map((i) => i.label));
-        expect(labels).not.toContain("Billing");
+        expect(labels).not.toContain("Payments");
     });
 
     it("keeps Website when a business has no sites yet", () => {
@@ -634,7 +786,7 @@ describe("Courses (ADR-007), its own module", () => {
     });
 });
 
-describe("Class packs (ADR-007), its own row under Appointments", () => {
+describe("Class packs (ADR-007), a page under Bookings", () => {
     it("offers an owner Class packs where Appointments is on, after Courses", () => {
         const offered = hrefs(
             navFor({
@@ -648,12 +800,35 @@ describe("Class packs (ADR-007), its own row under Appointments", () => {
         );
     });
 
-    it("keeps Schedule and Services as rows of their own beside it", () => {
-        const items = navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })
+    it("sits in the Bookings section beside Calendar and Services", () => {
+        const bookings = navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })
             .flatMap((g) => g.items)
-            .map((i) => i.href);
-        expect(items).toEqual(
-            expect.arrayContaining(["/bookings", "/services", "/class-packs"]),
+            .find((i) => i.label === "Bookings");
+        expect(bookings?.children?.map((c) => c.href)).toEqual([
+            "/bookings",
+            "/services",
+            "/bookings/availability",
+            "/class-packs",
+        ]);
+    });
+
+    it("lights Availability alone on its page, and Calendar on the rest", () => {
+        const kids = [
+            { href: "/bookings" },
+            { href: "/bookings/availability" },
+        ];
+        expect(
+            isNavChildCurrent("/bookings/availability", "/bookings", kids),
+        ).toBe(false);
+        expect(
+            isNavChildCurrent(
+                "/bookings/availability",
+                "/bookings/availability",
+                kids,
+            ),
+        ).toBe(true);
+        expect(isNavChildCurrent("/bookings/all", "/bookings", kids)).toBe(
+            true,
         );
     });
 
@@ -685,5 +860,194 @@ describe("Class packs (ADR-007), its own row under Appointments", () => {
         expect(navRoleCan("ADMIN", "pack:write")).toBe(true);
         expect(navRoleCan("MEMBER", "pack:write")).toBe(false);
         expect(navRoleCan("REVIEWER", "pack:write")).toBe(false);
+    });
+});
+
+describe("Bookings, a section across two modules", () => {
+    const bookingsOf = (groups: NavGroup[]) =>
+        groups.flatMap((g) => g.items).find((i) => i.label === "Bookings");
+
+    it("replaces the four rows it used to be", () => {
+        const labels = navFor({
+            role: "OWNER",
+            moduleKeys: ["APPOINTMENTS", "COURSES"],
+        }).flatMap((g) => g.items.map((i) => i.label));
+        expect(labels).toContain("Bookings");
+        for (const gone of ["Schedule", "Services", "Courses", "Class packs"]) {
+            expect(labels).not.toContain(gone);
+        }
+    });
+
+    it("keeps every address it holds", () => {
+        const offered = hrefs(
+            navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS", "COURSES"] }),
+        );
+        for (const href of [
+            "/bookings",
+            "/services",
+            "/courses",
+            "/class-packs",
+        ]) {
+            expect(offered).toContain(href);
+        }
+    });
+
+    it("lands on Courses where only Courses is on", () => {
+        const bookings = bookingsOf(
+            navFor({ role: "OWNER", moduleKeys: ["COURSES"] }),
+        );
+        expect(bookings?.href).toBe("/courses");
+        expect(bookings?.children?.map((c) => c.href)).toEqual(["/courses"]);
+    });
+
+    it("is not offered at all without Appointments or Courses", () => {
+        expect(
+            bookingsOf(navFor({ role: "OWNER", moduleKeys: ["COMMERCE"] })),
+        ).toBeUndefined();
+    });
+
+    it("marks Bookings on its pages outside /bookings", () => {
+        const bookings = bookingsOf(
+            navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS", "COURSES"] }),
+        );
+        if (!bookings) throw new Error("Bookings missing");
+        for (const page of [
+            "/bookings",
+            "/services/s_1",
+            "/courses",
+            "/class-packs/purchases",
+        ]) {
+            expect(isNavSectionActive(page, bookings)).toBe(true);
+        }
+        expect(isNavSectionActive("/commerce/orders", bookings)).toBe(false);
+    });
+
+    it("tells Modules which rows Appointments, Courses and Payments own", () => {
+        expect(navRowsForModule("APPOINTMENTS")).toEqual([
+            "Calendar",
+            "Services",
+            "Availability",
+            "Class packs",
+        ]);
+        expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
+        expect(navRowsForModule("PAYMENTS")).toEqual([
+            "Payments",
+            "Subscriptions",
+            "Invoices",
+            "Plans",
+        ]);
+    });
+});
+
+describe("navCountFor", () => {
+    it("reads unread for Notifications and the Home model for the rest", () => {
+        expect(navCountFor("/notifications", { "/notifications": 9 }, 2)).toBe(
+            2,
+        );
+        expect(navCountFor("/leads", { "/leads": 4 }, 2)).toBe(4);
+        expect(navCountFor("/leads", undefined, 2)).toBe(0);
+        expect(navCountFor(undefined, { "/leads": 4 }, 2)).toBe(0);
+    });
+});
+
+describe("Customer Detail sits in the section that holds customers (U18)", () => {
+    const groupsWith = (moduleKeys: string[]) =>
+        navFor({ role: "OWNER", moduleKeys });
+
+    it("is Sell › Customers where the business sells", () => {
+        const groups = groupsWith(["CRM", "COMMERCE"]);
+        expect(navPathname("/customers/c_1", groups)).toBe(
+            "/commerce/customers",
+        );
+    });
+
+    it("is Contacts where it takes bookings and sells nothing", () => {
+        const groups = groupsWith(["CRM", "APPOINTMENTS"]);
+        expect(navPathname("/customers/c_1", groups)).toBe("/contacts");
+    });
+
+    it("leaves every other address as it is", () => {
+        const groups = groupsWith(["CRM", "COMMERCE"]);
+        expect(navPathname("/commerce/orders/o_1", groups)).toBe(
+            "/commerce/orders/o_1",
+        );
+        expect(navPathname("/customers", groups)).toBe("/customers");
+    });
+});
+
+describe("settings tabs — owner only, and everyone's", () => {
+    it("keeps Plan and billing to the owner, by role", () => {
+        // An admin holds org:settings:read and every other business tab, and
+        // is still not offered what Saroh charges the business.
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/billing");
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/organization");
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/billing");
+        // Resolved permissions do not make an invented role the owner.
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "billing:read"],
+            }),
+        ).not.toContain("/settings/billing");
+    });
+
+    it("still needs the page's action as well as the role", () => {
+        const billing = SETTINGS_PAGES.find(
+            (page) => page.href === "/settings/billing",
+        );
+        expect(billing).toBeDefined();
+        if (!billing) return;
+        expect(
+            mayOpenSettingsPage(
+                { role: "OWNER", actions: ["member:read"] },
+                billing,
+            ),
+        ).toBe(false);
+        expect(
+            mayOpenSettingsPage(
+                { role: "OWNER", actions: ["org:settings:read"] },
+                billing,
+            ),
+        ).toBe(true);
+    });
+
+    it("fails open on a role it does not know, as the rail does", () => {
+        expect(tabsFor({ role: null })).toContain("/settings/billing");
+    });
+
+    it("offers Your profile to everyone, a reviewer included", () => {
+        for (const role of ROLES) {
+            expect(tabsFor({ role })).toContain("/settings/profile");
+        }
+        expect(tabsFor({ role: "REVIEWER" })).toEqual(["/settings/profile"]);
+        // An invented role granted nothing of the business still has itself.
+        expect(tabsFor({ role: "MEMBER", actions: [] })).toEqual([
+            "/settings/profile",
+        ]);
+    });
+
+    it("lists the tabs in the design's order", () => {
+        expect(SETTINGS_PAGES.map((page) => page.label)).toEqual([
+            "Business",
+            "Team",
+            "Modules",
+            "Plan and billing",
+            "Your profile",
+            "Activity",
+            "Providers",
+        ]);
+    });
+
+    it("offers Activity to whoever the API lets read the audit stream", () => {
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/activity");
+        expect(tabsFor({ role: "MEMBER" })).not.toContain("/settings/activity");
+        // The design gates it on reading settings; the API does not, so
+        // reading settings alone is not enough.
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["org:settings:read"] }),
+        ).not.toContain("/settings/activity");
+        expect(tabsFor({ role: "MEMBER", actions: ["audit:read"] })).toContain(
+            "/settings/activity",
+        );
     });
 });

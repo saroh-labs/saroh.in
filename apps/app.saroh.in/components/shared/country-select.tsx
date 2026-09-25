@@ -30,7 +30,7 @@ const COUNTRIES = CODES.map((code) => ({
     name: NAMES.of(code) ?? code,
 })).sort((a, b) => a.name.localeCompare(b.name, "en"));
 
-const nameOf = (code: string) =>
+export const countryName = (code: string) =>
     COUNTRIES.find((c) => c.code === code)?.name ?? code;
 
 /**
@@ -73,7 +73,7 @@ export function CountrySelect({
                         className,
                     )}
                 >
-                    {value ? nameOf(value) : "Choose a country"}
+                    {value ? countryName(value) : "Choose a country"}
                     <ChevronsUpDown
                         aria-hidden
                         className="size-4 shrink-0 opacity-50"

@@ -313,9 +313,11 @@ export function DataView<TRow>({
                                         <span
                                             className={cn(
                                                 "text-[11.5px] tabular-nums",
-                                                on
-                                                    ? "text-accent-foreground/70"
-                                                    : "text-muted-foreground/80",
+                                                f.attention && countOf(f) > 0
+                                                    ? "font-semibold text-brand-subtle-foreground"
+                                                    : on
+                                                      ? "text-accent-foreground/70"
+                                                      : "text-muted-foreground/80",
                                             )}
                                         >
                                             {countOf(f)}

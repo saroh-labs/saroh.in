@@ -9,7 +9,9 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
+import { CalendarModule } from "./modules/calendar/calendar.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
+import { CatalogueModule } from "./modules/catalogue/catalogue.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ClassPacksModule } from "./modules/class-packs/class-packs.module";
 import { CommunicationsModule } from "./modules/communications/communications.module";
@@ -44,6 +46,7 @@ import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
+import { StaffModule } from "./modules/staff/staff.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
@@ -78,6 +81,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AdminModule,
         CapabilitiesModule,
         HomeModule,
+        CalendarModule,
         ProviderHealthModule,
         SavedViewsModule,
         OrganizationsModule,
@@ -87,6 +91,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         MembersModule,
         ProductsModule,
         CategoriesModule,
+        CatalogueModule,
         CustomersModule,
         CustomerWorkspaceModule,
         OrdersModule,
@@ -110,6 +115,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         LeadsModule,
         NotificationsModule,
         BookingsModule,
+        StaffModule,
         PaymentsModule,
         WebhooksModule,
         CommunicationsModule,

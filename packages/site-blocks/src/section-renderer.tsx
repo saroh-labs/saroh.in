@@ -54,6 +54,7 @@ export interface Section {
 export default function SectionRenderer({
     section,
     apiUrl,
+    bookHref,
 }: {
     section: Section;
     /**
@@ -62,6 +63,8 @@ export default function SectionRenderer({
      * before these components moved into a package (#252).
      */
     apiUrl?: string;
+    /** The site's booking page (U19); live sites only. */
+    bookHref?: string;
 }) {
     switch (section.type) {
         case "hero":
@@ -106,6 +109,7 @@ export default function SectionRenderer({
                 <ServicesListSection
                     content={section.content as RenderedServicesList}
                     apiUrl={apiUrl}
+                    bookHref={bookHref}
                 />
             );
         case "contact":
@@ -117,6 +121,7 @@ export default function SectionRenderer({
                 <BookingSection
                     content={section.content as RenderedBooking}
                     apiUrl={apiUrl}
+                    bookHref={bookHref}
                 />
             );
         default:
@@ -156,17 +161,24 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
 export function PageSections({
     sections,
     apiUrl,
+    bookHref,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
     apiUrl?: string;
+    /** The site's booking page (U19), linked from services; live sites only. */
+    bookHref?: string;
 }) {
     return (
         <>
             {sections.map((section, i) => {
                 const style = paddingOverride(section.content);
                 const rendered = (
-                    <SectionRenderer section={section} apiUrl={apiUrl} />
+                    <SectionRenderer
+                        section={section}
+                        apiUrl={apiUrl}
+                        bookHref={bookHref}
+                    />
                 );
                 return style === undefined ? (
                     <div key={i}>{rendered}</div>

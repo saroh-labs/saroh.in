@@ -8,7 +8,38 @@ import { prisma } from "@saroh/database";
 
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
-import type { CreateCategoryDto, UpdateCategoryDto } from "./dto";
+import type {
+    CreateCategoryDto,
+    MergeCategoryDto,
+    RenameCategoryDto,
+    RestoreCategoryDto,
+    UpdateCategoryDto,
+} from "./dto";
+
+/**
+ * What a merge or delete changed, handed back so Undo can reverse exactly
+ * that: the category as it was, where its products went, and which ones.
+ */
+export interface CategoryRemoval {
+    id: string;
+    name: string;
+    slug: string;
+    parentId: string | null;
+    /** The category the products moved to; null = Uncategorized. */
+    movedTo: string | null;
+    productIds: string[];
+    /** Its own defaults, which went with it; null when it had none. */
+    defaults: CategoryDefaultsSnapshot | null;
+    /** Custom fields that were shown for it; their links went with it. */
+    fieldIds: string[];
+}
+
+export interface CategoryDefaultsSnapshot {
+    howToUse: string | null;
+    lowStockAlert: number | null;
+    returnsMode: string | null;
+    returnsText: string | null;
+}
 
 /**
  * Product categories with a parent/child hierarchy. Authorization delegates to
@@ -43,6 +74,9 @@ export class CategoriesService {
                 field: "slug",
             });
         }
+        // The name first: "already a category called Serums" is the answer a
+        // merchant can act on; a clashing address follows from it.
+        await this.assertNameFree(storeId, dto.name);
         await this.assertSlugFree(storeId, slug);
         if (dto.parentId) await this.assertParentInStore(storeId, dto.parentId);
 
@@ -108,12 +142,151 @@ export class CategoriesService {
         }
     }
 
-    /** Delete a category. Blocked if it has children; products are detached. */
-    async remove(storeId: string, categoryId: string, userId: string) {
+    /**
+     * Rename in place. Products in it change with it; the slug stays, so
+     * nothing that links to the category breaks. A name another category
+     * already has (in any case) is refused — that is what Merge is for.
+     */
+    async rename(
+        storeId: string,
+        categoryId: string,
+        userId: string,
+        dto: RenameCategoryDto,
+    ): Promise<{ id: string; name: string; previousName: string }> {
         await this.requireWrite(storeId, userId);
+        const current = await this.requireCategory(storeId, categoryId);
+        await this.assertNameFree(storeId, dto.name, categoryId);
+        await prisma.category.update({
+            where: { id: categoryId },
+            data: { name: dto.name },
+        });
+        return { id: categoryId, name: dto.name, previousName: current.name };
+    }
+
+    /**
+     * Move every product to another category (or Uncategorized) and remove
+     * this one. Returns what moved, for Undo.
+     */
+    async merge(
+        storeId: string,
+        categoryId: string,
+        userId: string,
+        dto: MergeCategoryDto,
+    ): Promise<CategoryRemoval> {
+        await this.requireWrite(storeId, userId);
+        const intoId = dto.intoId ?? null;
+        if (intoId === categoryId) {
+            throw new BadRequestException({
+                message: "Pick another category to merge into.",
+                field: "intoId",
+            });
+        }
+        if (intoId) await this.requireCategory(storeId, intoId);
+        return this.removeInto(storeId, categoryId, intoId);
+    }
+
+    /** Delete a category; its products move to Uncategorized, untouched. */
+    async remove(
+        storeId: string,
+        categoryId: string,
+        userId: string,
+    ): Promise<CategoryRemoval> {
+        await this.requireWrite(storeId, userId);
+        return this.removeInto(storeId, categoryId, null);
+    }
+
+    /**
+     * Undo a merge or delete: recreate the category with its name and
+     * address, and move back the products that moved — only those still in
+     * the place the change put them, so a later edit is never overwritten.
+     */
+    async restore(
+        storeId: string,
+        userId: string,
+        dto: RestoreCategoryDto,
+    ): Promise<{ id: string; moved: number }> {
+        const organizationId = await this.requireWrite(storeId, userId);
+        await this.assertNameFree(storeId, dto.name);
+        await this.assertSlugFree(storeId, dto.slug);
+        if (dto.parentId) await this.assertParentInStore(storeId, dto.parentId);
+        return prisma.$transaction(async (tx) => {
+            const category = await tx.category.create({
+                data: {
+                    storeId,
+                    organizationId,
+                    name: dto.name,
+                    slug: dto.slug,
+                    parentId: dto.parentId ?? null,
+                },
+            });
+            // The custom fields shown for it, where each still exists here.
+            if (dto.fieldIds && dto.fieldIds.length > 0) {
+                const fields = await tx.productField.findMany({
+                    where: {
+                        storeId,
+                        deletedAt: null,
+                        id: { in: dto.fieldIds },
+                    },
+                    select: { id: true },
+                });
+                await tx.productFieldCategory.createMany({
+                    data: fields.map((f) => ({
+                        fieldId: f.id,
+                        categoryId: category.id,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
+            if (dto.defaults && organizationId) {
+                await tx.catalogueDefaults.create({
+                    data: {
+                        storeId,
+                        organizationId,
+                        key: category.id,
+                        categoryId: category.id,
+                        howToUse: dto.defaults.howToUse ?? null,
+                        lowStockAlert: dto.defaults.lowStockAlert ?? null,
+                        returnsMode: dto.defaults.returnsMode ?? null,
+                        returnsText: dto.defaults.returnsText ?? null,
+                    },
+                });
+            }
+            const moved = await tx.product.updateMany({
+                where: {
+                    storeId,
+                    id: { in: dto.productIds },
+                    categoryId: dto.movedTo ?? null,
+                },
+                data: { categoryId: category.id },
+            });
+            return { id: category.id, moved: moved.count };
+        });
+    }
+
+    private async removeInto(
+        storeId: string,
+        categoryId: string,
+        intoId: string | null,
+    ): Promise<CategoryRemoval> {
         const category = await prisma.category.findFirst({
             where: { id: categoryId, storeId },
-            select: { _count: { select: { children: true } } },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                parentId: true,
+                _count: { select: { children: true, discountReach: true } },
+                fields: { select: { fieldId: true } },
+                defaults: {
+                    select: {
+                        howToUse: true,
+                        lowStockAlert: true,
+                        returnsMode: true,
+                        returnsText: true,
+                    },
+                    take: 1,
+                },
+            },
         });
         if (!category) {
             throw new NotFoundException("Category not found");
@@ -123,15 +296,71 @@ export class CategoriesService {
                 "Move or delete the sub-categories first",
             );
         }
-        // Detach products, then delete (Product.categoryId is optional).
+        // A discount code that reaches this category would silently stop
+        // reaching anything; say so rather than break it.
+        if (category._count.discountReach > 0) {
+            const n = category._count.discountReach;
+            throw new ConflictException(
+                `${n === 1 ? "A discount code applies" : `${n} discount codes apply`} to ${category.name}. Change ${n === 1 ? "it" : "them"} in Discounts first.`,
+            );
+        }
+        const products = await prisma.product.findMany({
+            where: { storeId, categoryId },
+            select: { id: true },
+        });
+        const productIds = products.map((p) => p.id);
         await prisma.$transaction([
             prisma.product.updateMany({
                 where: { storeId, categoryId },
-                data: { categoryId: null },
+                data: { categoryId: intoId },
             }),
             prisma.category.delete({ where: { id: categoryId } }),
         ]);
-        return { id: categoryId };
+        return {
+            id: category.id,
+            name: category.name,
+            slug: category.slug,
+            parentId: category.parentId,
+            movedTo: intoId,
+            productIds,
+            defaults: category.defaults[0] ?? null,
+            fieldIds: category.fields.map((f) => f.fieldId),
+        };
+    }
+
+    private async requireCategory(storeId: string, categoryId: string) {
+        const category = await prisma.category.findFirst({
+            where: { id: categoryId, storeId },
+            select: { id: true, name: true },
+        });
+        if (!category) {
+            throw new NotFoundException("Category not found");
+        }
+        return category;
+    }
+
+    /** Names are unique per store, ignoring case ("Serums" = "serums"). */
+    private async assertNameFree(
+        storeId: string,
+        name: string,
+        exceptId?: string,
+    ): Promise<void> {
+        const clash = await prisma.category.findFirst({
+            where: {
+                storeId,
+                name: { equals: name, mode: "insensitive" },
+                ...(exceptId ? { id: { not: exceptId } } : {}),
+            },
+            select: { name: true },
+        });
+        if (clash) {
+            throw new ConflictException({
+                message: exceptId
+                    ? "That name is taken — use Merge to combine them."
+                    : `There is already a category called ${clash.name}.`,
+                field: "name",
+            });
+        }
     }
 
     /**

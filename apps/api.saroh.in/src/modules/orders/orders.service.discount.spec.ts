@@ -2,12 +2,31 @@
 // comes off, records it in the order's own transaction, and refuses rather
 // than charging full price. The real DiscountsService runs against a mocked
 // database, so the order and discount halves are tested together.
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
         order: { create: jest.fn(), count: jest.fn() },
         customer: { findFirst: jest.fn() },
-        product: { findFirst: jest.fn() },
+        product: { findFirst: jest.fn(), findMany: jest.fn() },
         inventory: { findUnique: jest.fn(), update: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
         discount: { findUnique: jest.fn() },
@@ -30,6 +49,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
 import { DiscountsService } from "../discounts/discounts.service";
+import { loadTaxProfile } from "../invoices/order-invoicing";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -76,18 +96,111 @@ beforeEach(() => {
     jest.clearAllMocks();
     db.customer!.findFirst!.mockResolvedValue({ id: "c_1" });
     db.product!.findFirst!.mockResolvedValue({
+        name: "Widget",
         price: "20.00",
         categoryId: "cat_1",
+        variants: [],
     });
     db.inventory!.findUnique!.mockResolvedValue(null);
     db.order!.count!.mockResolvedValue(0);
-    db.order!.create!.mockResolvedValue({ id: "o_1" });
+    db.order!.create!.mockResolvedValue({ id: "o_1", items: [] });
     db.storeSettings!.findUnique!.mockResolvedValue({ currency: "INR" });
     db.discount!.findUnique!.mockResolvedValue(MARKETDAY);
     db.discountRedemption!.count!.mockResolvedValue(3);
 });
 
 const createData = () => db.order!.create!.mock.calls[0][0].data;
+
+describe("OrdersService.create — a GST-registered business (ADR-008)", () => {
+    it("ignores the storefront's add-on tax: GST is in the price, and tax records it", async () => {
+        (loadTaxProfile as jest.Mock).mockResolvedValueOnce({
+            registered: true,
+            gstin: "29AAGCR4375J1ZU",
+            state: "29",
+            prefix: "RC",
+            timezone: "Asia/Kolkata",
+            deliveryRateBps: 1800,
+            deliverySac: null,
+        });
+        db.product!.findMany!.mockResolvedValue([
+            { id: "p_1", gstRate: "18.00" },
+        ]);
+        await makeService().create("st_1", "u_1", { ...DTO, tax: "7.20" });
+        // 2 × ₹20 at 18% inclusive: ₹33.90 + ₹6.10. Nothing added on top.
+        expect(createData()).toMatchObject({
+            subtotal: "40.00",
+            tax: "6.10",
+            total: "40.00",
+        });
+    });
+
+    it("totals subtotal + shipping − discount, the sum the order form shows", async () => {
+        (loadTaxProfile as jest.Mock).mockResolvedValueOnce({
+            registered: true,
+            gstin: "29AAGCR4375J1ZU",
+            state: "29",
+            prefix: "RC",
+            timezone: "Asia/Kolkata",
+            deliveryRateBps: 1800,
+            deliverySac: null,
+        });
+        db.product!.findMany!.mockResolvedValue([
+            { id: "p_1", gstRate: "18.00" },
+        ]);
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            tax: "7.20",
+            shipping: "5.00",
+            discount: "3.00",
+        });
+        expect(createData()).toMatchObject({ total: "42.00" });
+    });
+
+    it("an unregistered business still adds the tax typed at checkout", async () => {
+        await makeService().create("st_1", "u_1", { ...DTO, tax: "7.20" });
+        expect(createData()).toMatchObject({
+            subtotal: "40.00",
+            tax: "7.20",
+            total: "47.20",
+        });
+    });
+});
+
+describe("OrdersService.create — delivery", () => {
+    it("refuses a delivery without an address, on the address field, creating nothing", async () => {
+        const err = await makeService()
+            .create("st_1", "u_1", { ...DTO, fulfilment: "DELIVERY" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toMatchObject({
+            message: "A delivery needs an address.",
+            field: "address",
+        });
+        expect(db.order!.create).not.toHaveBeenCalled();
+    });
+
+    it("takes a delivery with an address, and a collection without one", async () => {
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "DELIVERY",
+            address: {
+                line1: "12 Church Street",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560001",
+            },
+        });
+        expect(createData()).toMatchObject({
+            fulfilment: "DELIVERY",
+            deliveryLine1: "12 Church Street",
+        });
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "COLLECT",
+        });
+        expect(db.order!.create).toHaveBeenCalledTimes(2);
+    });
+});
 
 describe("OrdersService.create — discount codes", () => {
     it("takes off what the API works out and records the redemption with its rule", async () => {
@@ -143,7 +256,7 @@ describe("OrdersService.create — discount codes", () => {
         });
 
         jest.clearAllMocks();
-        db.order!.create!.mockResolvedValue({ id: "o_2" });
+        db.order!.create!.mockResolvedValue({ id: "o_2", items: [] });
         await makeService().create("st_1", "u_1", { ...DTO, discount: "5" });
         expect(db.$transaction.mock.calls[0][1]).toBeUndefined();
         expect(createData()).toMatchObject({ discount: "5.00" });

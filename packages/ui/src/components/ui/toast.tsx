@@ -36,12 +36,30 @@ export function showError(message: string, description?: string) {
  * Something reversible just happened, with the way back beside it. Undo is the
  * default for reversible actions; only the irreversible get a confirm. Eight
  * seconds rather than five, because it carries an action.
+ *
+ * `duration` is for a screen whose Undo window is a rule of its own — Order
+ * Detail holds a kitchen step or a refund for ten seconds (ADR-008), and the
+ * toast offering its Undo must last exactly that long, not the default.
  */
-export function showUndo(message: string, onUndo: () => void) {
+export function showUndo(
+    message: string,
+    onUndo: () => void,
+    options: { duration?: number; description?: string } = {},
+) {
     toast(message, {
-        duration: 8000,
+        description: options.description,
+        duration: options.duration ?? 8000,
         action: { label: "Undo", onClick: onUndo },
     });
+}
+
+/**
+ * Clear every toast on screen. For a screen that starts its own Undo — Order
+ * Detail's ten-second hold — so an older toast's Undo is not left beside it:
+ * two Undos at once, for two different things, is how the wrong one is hit.
+ */
+export function dismissToasts() {
+    toast.dismiss();
 }
 
 /** Something completed, but not the way the user asked for. */

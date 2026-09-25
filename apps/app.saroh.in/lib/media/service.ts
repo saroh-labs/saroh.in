@@ -61,6 +61,8 @@ export async function createUpload(input: {
     contentType: string;
     contentLength: number;
     filename: string;
+    /** The library bucket; site images unless said. */
+    purpose?: "site-image" | "business-logo";
 }): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -69,7 +71,7 @@ export async function createUpload(input: {
         // One bucket for everything a site shows: hero, gallery, share card.
         // Bucketing by section would split a merchant's photographs by where
         // they happened to be used first.
-        body: JSON.stringify({ ...input, purpose: "site-image" }),
+        body: JSON.stringify({ purpose: "site-image", ...input }),
     });
     const data: unknown = await res.json().catch(() => null);
     if (res.ok && data && typeof data === "object" && "uploadUrl" in data) {
@@ -97,4 +99,32 @@ export async function completeUpload(
         ok: false,
         error: messageOf(data, "Could not confirm the upload."),
     };
+}
+
+export interface LibraryItem {
+    id: string;
+    filename: string;
+    contentType: string;
+    status: string;
+    url: string | null;
+    createdAt: string;
+}
+
+/**
+ * The business's photo library, newest first — ready images that storage can
+ * serve. A failed read throws (a failed read is not an empty library).
+ */
+export async function listLibrary(): Promise<LibraryItem[]> {
+    const base = await mediaBase();
+    if (!base) return [];
+    const res = await apiFetch(base, { method: "GET" });
+    if (!res.ok)
+        throw new Error(`The photo library could not be read (${res.status}).`);
+    const rows = (await res.json()) as LibraryItem[];
+    return rows.filter(
+        (r) =>
+            r.status === "READY" &&
+            r.url !== null &&
+            r.contentType.startsWith("image/"),
+    );
 }

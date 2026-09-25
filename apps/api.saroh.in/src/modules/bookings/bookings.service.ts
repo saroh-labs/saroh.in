@@ -1,8 +1,6 @@
 import {
     BadRequestException,
     ConflictException,
-    GoneException,
-    HttpException,
     Injectable,
     NotFoundException,
     Optional,
@@ -14,49 +12,45 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
-import { authorize } from "../organizations/organization-policy";
-import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
-import type {
-    AvailabilityRuleWindow,
-    AvailabilityService,
-    Interval,
-    Slot,
-} from "./availability";
-import { availableSlots, isValidSlotStart } from "./availability";
-import { courseSeatIntervals, courseSeatsHeld } from "./course-seats";
+import { isGstRate } from "../invoices/gst";
+import { allows, authorize } from "../organizations/organization-policy";
+import { isValidSlotStart } from "./availability";
+import type { PersonDiary } from "./booking-calendar";
+import { groupDiaries } from "./booking-calendar";
+import { BookingEventType } from "./booking-event-type";
+import {
+    holdsPlace,
+    isExpiredHold,
+    lockBookingInTx,
+    releaseHoldInTx,
+} from "./booking-hold";
+import { isLateCancel, loadBookingRules } from "./booking-rules";
+import type { AvailableSlot } from "./booking-slots";
+import {
+    loadStaffing,
+    openSlots,
+    parseRange,
+    resolvePerson,
+    toAvailabilityService,
+} from "./booking-slots";
+import { courseSeatsHeld } from "./course-seats";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
     CreateServiceDto,
     LocationType,
+    PaidWith,
     UpdateServiceDto,
 } from "./dto";
-import { FixedWindowRateLimiter } from "./rate-limiter";
-
-/** The validated public booking command input (see {@link BookServiceDto}). */
-export interface BookInput {
-    startAt: string;
-    bookerName?: string;
-    bookerEmail: string;
-    bookerPhone?: string;
-    idempotencyKey?: string;
-}
-
-/**
- * What can happen to a booking. A closed set so call sites never pass a raw,
- * typo-prone string, and so the screen can render each kind deliberately.
- */
-export const BookingEventType = {
-    Booked: "BOOKED",
-    Rescheduled: "RESCHEDULED",
-    Cancelled: "CANCELLED",
-    Attended: "ATTENDED",
-    NoShow: "NO_SHOW",
-} as const;
-
-export type BookingEventType =
-    (typeof BookingEventType)[keyof typeof BookingEventType];
+import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
+import {
+    assertPersonFreeInTx,
+    loadBookableService,
+    reserve,
+    reserveInTx,
+} from "./reservation";
+import { businessZone } from "./staff-availability";
+import { useMembershipInTx } from "./use-membership";
 
 /** Exactly what {@link BookingsService.getBooking} reads, named so the
  *  controller's inferred return type stays portable. */
@@ -86,61 +80,98 @@ const bookingDetailInclude = {
             },
         },
     },
+    // Who takes it (U3) — the name the diary shows, never their hours.
+    staff: { select: { id: true, name: true } },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{
     include: typeof bookingDetailInclude;
 }>;
 
+/** What the bookings calendar reads per booking (see {@link DiaryRow}). */
+const diarySelect = {
+    id: true,
+    serviceId: true,
+    startAt: true,
+    endAt: true,
+    timezone: true,
+    status: true,
+    holdExpiresAt: true,
+    outcome: true,
+    bookerName: true,
+    bookerEmail: true,
+    bookerPhone: true,
+    createdAt: true,
+    cancelledAt: true,
+    cancelledLate: true,
+    paidWith: true,
+    subscriptionId: true,
+    service: {
+        select: {
+            id: true,
+            name: true,
+            timezone: true,
+            capacity: true,
+            durationMinutes: true,
+            priceCents: true,
+            currency: true,
+        },
+    },
+    // Name and email only: `booking:read` is not `contact:read`.
+    contact: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+    },
+    staff: { select: { id: true, name: true } },
+    packRedemption: {
+        select: {
+            reversedAt: true,
+            purchase: { select: { pack: { select: { name: true } } } },
+        },
+    },
+} satisfies Prisma.BookingSelect;
+
+/** The widest range the bookings calendar reads at once: two years. */
+const MAX_CALENDAR_RANGE_MS = 731 * 86_400_000;
+
+/** The bookings calendar (U4): diaries by person over a range. */
+export interface BookingsCalendar {
+    from: string;
+    to: string;
+    /** The business's zone — where "a day" on the calendar is. */
+    timezone: string;
+    /** Whether prices were included for this viewer. */
+    money: boolean;
+    /** One per person, then Unassigned when anything has no person. */
+    diaries: PersonDiary[];
+}
+
+/** A service's GST rate (ADR-008): one GST has, or null to clear it. */
+function serviceGstRate(rate: string | null | undefined): string | null {
+    if (rate === undefined || rate === null) return null;
+    if (!isGstRate(rate)) {
+        throw new BadRequestException({
+            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            details: { field: "gstRate" },
+        });
+    }
+    return rate;
+}
+
 /**
- * Bookable Services, availability and the transactional public booking command
- * (S4-002).
+ * Bookable Services, availability rules and the merchant's side of bookings
+ * (S4-002). The customer's side — the booking page and the website's
+ * services list — is {@link PublicBookingsService}; both write bookings
+ * through the same reservation (`reservation.ts`).
  *
- * Authenticated management (Service CRUD, availability rules, booking list /
- * cancel) is tenant-scoped by `ctx.organizationId` (proven by
+ * Everything here is tenant-scoped by `ctx.organizationId` (proven by
  * `OrganizationGuard`, never a client value) and gated by the central policy:
  * `service:read`/`service:write`, `booking:read`/`booking:write`. Cross-tenant
  * or missing ids surface as 404 (never 403), mirroring the other modules, so a
  * caller can't probe another org's resources.
- *
- * The PUBLIC {@link book} command is UNAUTHENTICATED and org-agnostic: the
- * owning org is derived from the target Service, so an anonymous booker can only
- * ever create rows in the org that owns the Service. Its central guarantee —
- * "only one confirmed booking can own a capacity-one slot" — is enforced by a
- * SERIALIZABLE transaction that re-counts CONFIRMED overlaps INSIDE the tx (see
- * {@link book} for the full race argument).
  */
-/** Who a reservation is made by. */
-export interface ReserveBy {
-    /** `Contact.source` for someone new. */
-    source: string;
-    /** Who made it; `null` when the booker did it themselves. */
-    actorUserId: string | null;
-}
-
-/** A service as a website visitor sees it (#255). No internal fields. */
-export interface PublicService {
-    id: string;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    priceCents: number | null;
-    currency: string | null;
-}
-
 @Injectable()
 export class BookingsService {
-    /**
-     * @param rateLimiter per-instance limiter (default 5 hits / minute per
-     * `${serviceId}:${ipHash}`). Injectable for tests.
-     */
-    constructor(
-        // Not a DI provider — a per-instance default; @Optional() stops Nest
-        // trying to inject it so the default (and test overrides) apply.
-        @Optional()
-        private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
-        @Optional() private readonly activation?: ActivationEvents,
-    ) {}
+    constructor(@Optional() private readonly activation?: ActivationEvents) {}
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -176,6 +207,8 @@ export class BookingsService {
                 capacity: dto.capacity ?? 1,
                 priceCents: dto.priceCents ?? null,
                 currency: dto.currency ?? null,
+                gstRate: serviceGstRate(dto.gstRate),
+                sacCode: dto.sacCode ?? null,
                 timezone: dto.timezone,
                 ...location,
                 status: "ACTIVE",
@@ -252,6 +285,9 @@ export class BookingsService {
         }
         if (dto.priceCents !== undefined) data.priceCents = dto.priceCents;
         if (dto.currency !== undefined) data.currency = dto.currency;
+        if (dto.gstRate !== undefined)
+            data.gstRate = serviceGstRate(dto.gstRate);
+        if (dto.sacCode !== undefined) data.sacCode = dto.sacCode;
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
         if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {
@@ -388,87 +424,15 @@ export class BookingsService {
         serviceId: string,
         fromISO: string,
         toISO: string,
-    ): Promise<Slot[]> {
+        staffId?: string,
+    ): Promise<AvailableSlot[]> {
         authorize(ctx, "service:read");
         const service = await this.requireOwnedService(ctx, serviceId);
-        const { from, to } = this.parseRange(fromISO, toISO);
+        const { from, to } = parseRange(fromISO, toISO);
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId },
         });
-        const busy = await this.busyOverlapping(serviceId, from, to);
-        return availableSlots(
-            this.toAvailabilityService(service),
-            rules,
-            from,
-            to,
-            busy,
-        );
-    }
-
-    /**
-     * PUBLIC availability for a bookable service — no auth, org-agnostic. Loads
-     * the ACTIVE service of an organization with Appointments on (404/410
-     * otherwise) and returns open slots for the range. The org is never
-     * surfaced.
-     */
-    async publicAvailability(
-        serviceId: string,
-        fromISO: string,
-        toISO: string,
-    ): Promise<Slot[]> {
-        const { service, rules } = await this.loadBookableService(serviceId);
-        const { from, to } = this.parseRange(fromISO, toISO);
-        const busy = await this.busyOverlapping(serviceId, from, to);
-        return availableSlots(
-            this.toAvailabilityService(service),
-            rules,
-            from,
-            to,
-            busy,
-        );
-    }
-
-    /**
-     * The public view of a merchant's chosen services, for the website's
-     * services list (#255). Guardless like availability: the ids come from a
-     * published section, and only fields a visitor is meant to see leave here.
-     *
-     * Read live, not frozen at publish, so a changed price or a deleted service
-     * is right on the next page view. Filtered to what may be offered:
-     * - not deleted, and ACTIVE (an archived service is not on offer);
-     * - its Organization has not DISABLED Appointments. A missing module row
-     *   counts as on: enforcement is still dark (#117) and the backfill may not
-     *   have written one, and hiding a merchant's services over an absent row
-     *   would be the wrong way to fail.
-     *
-     * Returned in the order asked for, which is the order the merchant set.
-     * Unknown ids are dropped, never an error: the page must degrade, not 404.
-     */
-    async publicServices(ids: string[]): Promise<PublicService[]> {
-        if (ids.length === 0) return [];
-        const rows = await prisma.service.findMany({
-            where: {
-                id: { in: ids },
-                deletedAt: null,
-                status: "ACTIVE",
-                // The same rule public booking closes on (#327), so a list
-                // never offers a service its booking block would refuse.
-                organization: APPOINTMENTS_OPEN,
-            },
-            select: {
-                id: true,
-                name: true,
-                description: true,
-                durationMinutes: true,
-                priceCents: true,
-                currency: true,
-            },
-        });
-        const byId = new Map(rows.map((row) => [row.id, row]));
-        return ids.flatMap((id) => {
-            const row = byId.get(id);
-            return row ? [row] : [];
-        });
+        return openSlots(service, rules, from, to, staffId);
     }
 
     // ── Bookings (management) ──────────────────────────────────────────────
@@ -509,32 +473,153 @@ export class BookingsService {
                         email: true,
                     },
                 },
+                // Who takes it (U3); null on bookings made before staff.
+                staff: { select: { id: true, name: true } },
             },
         });
+    }
+
+    /**
+     * The bookings calendar in one read (U4): every booking overlapping
+     * `[from, to)`, grouped by the person who takes it, class starts gathered
+     * into sessions with their places and how each was paid. Replaces the
+     * app's fan-out over every service. `booking:read`.
+     *
+     * Every active person gets a diary, booked or not — the calendar draws a
+     * column for each; with `staffId`, only theirs (another org's is a 404).
+     * Prices only with `payment:read` (DEC-020): a Member sees the diary and
+     * the people on it, not the money.
+     */
+    async calendarBookings(
+        ctx: OrganizationContext,
+        query: { from: string; to: string; staffId?: string },
+    ): Promise<BookingsCalendar> {
+        authorize(ctx, "booking:read");
+        const from = new Date(query.from);
+        const to = new Date(query.to);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+            throw new BadRequestException("from and to must be dates.");
+        }
+        if (to <= from) {
+            throw new BadRequestException("to must be after from.");
+        }
+        if (to.getTime() - from.getTime() > MAX_CALENDAR_RANGE_MS) {
+            throw new BadRequestException(
+                "A bookings range can be at most two years.",
+            );
+        }
+        const organizationId = ctx.organizationId;
+        const staffId = query.staffId;
+        const now = new Date();
+        const [people, rows, zone] = await Promise.all([
+            prisma.staffMember.findMany({
+                where: staffId
+                    ? { id: staffId, organizationId }
+                    : { organizationId, status: "ACTIVE" },
+                orderBy: [{ name: "asc" }, { id: "asc" }],
+                select: { id: true, name: true, title: true },
+            }),
+            prisma.booking.findMany({
+                where: {
+                    organizationId,
+                    startAt: { lt: to },
+                    endAt: { gt: from },
+                    ...(staffId ? { staffId } : {}),
+                },
+                orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
+                select: diarySelect,
+            }),
+            businessZone(prisma, organizationId),
+        ]);
+        if (staffId && people.length === 0) {
+            throw new NotFoundException("Staff member not found");
+        }
+        const money = allows(ctx, "payment:read");
+        return {
+            from: from.toISOString(),
+            to: to.toISOString(),
+            timezone: zone.zone,
+            money,
+            // A pay-now hold whose time ran out holds nothing (U19), even
+            // before the sweep job has cancelled it.
+            diaries: groupDiaries(
+                rows.map((row) =>
+                    isExpiredHold(row, now)
+                        ? { ...row, status: "CANCELLED" }
+                        : row,
+                ),
+                people,
+                money,
+            ),
+        };
     }
 
     /**
      * Cancel a booking: set status CANCELLED + `cancelledAt`, freeing the slot.
      * Authorizes `booking:write`; cross-tenant/missing → 404. Idempotent — an
      * already-cancelled booking is returned unchanged.
+     *
+     * The business's free-cancellation rule decides what happens to a class
+     * that was paid for (U3): cancelled in time, a pack's class goes back;
+     * inside the window it stays used and the booking says it was cancelled
+     * late (a membership's class then counts against its month too). With no
+     * rule, every cancel is in time — as before the rules existed.
+     *
+     * `returnCredit` is the business cancelling rather than the customer —
+     * a whole class called off (U15). The rule protects the business from a
+     * customer dropping out late; it never takes a class from someone whose
+     * class was cancelled on them.
+     *
+     * A pay-now hold (PENDING) is released rather than cancelled (#508): its
+     * draft invoice is voided with it, as when its time runs out.
      */
     async cancelBooking(
         ctx: OrganizationContext,
         bookingId: string,
+        now: Date = new Date(),
+        options: { returnCredit?: boolean } = {},
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
 
-        const booking = await this.requireOwnedBooking(ctx, bookingId);
-        if (booking.status === "CANCELLED") {
-            return booking;
+        const found = await this.requireOwnedBooking(ctx, bookingId);
+        if (found.status === "CANCELLED") {
+            return found;
         }
+        const rules = await loadBookingRules(prisma, ctx.organizationId);
         return prisma.$transaction(async (tx) => {
+            // Where it stands now, under its locks — invoice before booking,
+            // the webhook's order (#508) — so a second cancel, or a payment
+            // landing on a hold, is seen rather than overwritten.
+            await lockBookingInTx(tx, found.id);
+            const booking =
+                (await tx.booking.findUnique({ where: { id: found.id } })) ??
+                found;
+            if (booking.status === "CANCELLED") return booking;
+            // A pay-now hold nobody has paid: let it go as the booker would,
+            // so its draft invoice is voided and its pay link stops working.
+            // A payment that lands after is recorded as owed back.
+            if (booking.status === "PENDING") {
+                await releaseHoldInTx(tx, booking.id, now, ctx.userId);
+                return (
+                    (await tx.booking.findUnique({
+                        where: { id: booking.id },
+                    })) ?? booking
+                );
+            }
+            const late =
+                !options.returnCredit &&
+                isLateCancel(booking.startAt, now, rules);
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
-                data: { status: "CANCELLED", cancelledAt: new Date() },
+                data: {
+                    status: "CANCELLED",
+                    cancelledAt: now,
+                    cancelledLate: late,
+                },
             });
-            // A class paid for with a pack goes back to it (ADR-007).
-            await reversePackInTx(tx, booking.id);
+            // A class paid for with a pack goes back to it (ADR-007) —
+            // unless it was cancelled too late to (U3).
+            if (!late) await reversePackInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -562,8 +647,11 @@ export class BookingsService {
      * the ledger with attendance nobody witnessed — which is worse than an
      * empty ledger, because it reads as fact.
      *
-     * **Only after it has ended.** Marking a future appointment attended is
-     * not a mistake worth supporting.
+     * **Not before it could have happened.** The desk checks someone in when
+     * they walk in, so attendance may be said from an hour before the start
+     * (U15, the bookings calendar); a no-show only once the start has passed,
+     * since nobody has failed to turn up before then. Marking next week's
+     * appointment attended is not a mistake worth supporting.
      *
      * **Never on a cancelled booking.** Cancelled-in-advance and did-not-turn-up
      * are the two most different things a merchant can be told about a
@@ -588,11 +676,8 @@ export class BookingsService {
                 "This booking was cancelled, which is already how it went.",
             );
         }
-        if (booking.endAt.getTime() > now.getTime()) {
-            throw new ConflictException(
-                "This appointment has not happened yet.",
-            );
-        }
+        const refusal = outcomeTooEarly(outcome, booking.startAt, now);
+        if (refusal) throw new ConflictException(refusal);
         if (booking.outcome === outcome) {
             // Already said. Not an error, and not a second history line.
             return booking;
@@ -658,7 +743,7 @@ export class BookingsService {
      * the product believes in.
      *
      * Capacity is re-counted INSIDE a serializable transaction, exactly as
-     * {@link book} does and for the same reason: a reschedule and a public
+     * {@link PublicBookingsService.book} does and for the same reason: a reschedule and a public
      * booking racing for the last seat must not both win. The count EXCLUDES
      * this booking, otherwise a capacity-one booking could never be nudged to
      * an overlapping slot — it would collide with itself.
@@ -716,11 +801,40 @@ export class BookingsService {
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId: service.id },
         });
-        const availService = this.toAvailabilityService(service);
-        if (!isValidSlotStart(availService, rules, startAt)) {
-            throw new BadRequestException(
-                "That is not a bookable slot for this service",
+        const availService = toAvailabilityService(service);
+        // A booking with a person moves within that person's diary (U3):
+        // one-to-one, to one of their free starts; a class, on the class's
+        // own grid with its instructor checked for a clash.
+        const staffing = booking.staffId
+            ? await loadStaffing(service)
+            : { people: [], perPerson: false, zone: null };
+        let person: ReserveWith = { staffId: null, perPerson: false };
+        if (booking.staffId && staffing.perPerson) {
+            person = await resolvePerson(
+                service,
+                rules,
+                staffing,
+                startAt,
+                booking.staffId,
+                "team",
+                booking.id,
             );
+        } else {
+            if (!isValidSlotStart(availService, rules, startAt)) {
+                throw new BadRequestException(
+                    "That is not a bookable slot for this service",
+                );
+            }
+            if (booking.staffId) {
+                const instructor = staffing.people.find(
+                    (p) => p.id === booking.staffId,
+                );
+                person = {
+                    staffId: booking.staffId,
+                    staffName: instructor?.name,
+                    perPerson: false,
+                };
+            }
         }
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
@@ -729,27 +843,37 @@ export class BookingsService {
         try {
             return await prisma.$transaction(
                 async (tx) => {
-                    const taken = await tx.booking.count({
-                        where: {
-                            serviceId: service.id,
-                            status: "CONFIRMED",
-                            startAt: { lt: endAt },
-                            endAt: { gt: startAt },
-                            // Itself is not a competitor for its own seat.
-                            id: { not: booking.id },
-                        },
-                    });
-                    const held = await courseSeatsHeld(
+                    if (!person.perPerson) {
+                        const taken = await tx.booking.count({
+                            where: {
+                                serviceId: service.id,
+                                ...holdsPlace(new Date()),
+                                startAt: { lt: endAt },
+                                endAt: { gt: startAt },
+                                // Itself is not a competitor for its own seat.
+                                id: { not: booking.id },
+                            },
+                        });
+                        const held = await courseSeatsHeld(
+                            tx,
+                            service.id,
+                            startAt,
+                            endAt,
+                        );
+                        if (taken + held >= service.capacity) {
+                            throw new ConflictException(
+                                "That slot is fully booked",
+                            );
+                        }
+                    }
+                    await assertPersonFreeInTx(
                         tx,
+                        person,
                         service.id,
                         startAt,
                         endAt,
+                        booking.id,
                     );
-                    if (taken + held >= service.capacity) {
-                        throw new ConflictException(
-                            "That slot is fully booked",
-                        );
-                    }
                     // A class paid with a pack is only paid while the pack
                     // is good on the day (ADR-007): the same rule as spending.
                     const paid = await tx.packRedemption.findFirst({
@@ -760,6 +884,22 @@ export class BookingsService {
                         throw new ConflictException(
                             "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
                         );
+                    }
+                    // A membership's class is one of the month it lands in
+                    // (#508): moved into another month, it needs a class
+                    // left there, on a membership still active. The booking
+                    // itself is not counted, so a move within its month fits.
+                    if (
+                        booking.paidWith === "MEMBERSHIP" &&
+                        booking.subscriptionId
+                    ) {
+                        await useMembershipInTx(tx, {
+                            organizationId: ctx.organizationId,
+                            bookingId: booking.id,
+                            contactId: booking.contactId ?? "",
+                            subscriptionId: booking.subscriptionId,
+                            startAt,
+                        });
                     }
 
                     const moved = await tx.booking.update({
@@ -812,108 +952,11 @@ export class BookingsService {
         }
     }
 
-    // ── PUBLIC booking command ─────────────────────────────────────────────
-
-    /**
-     * Reserve a slot on a public Service. Steps (in order):
-     *  1. Load the Service (+ rules); 404 if missing/soft-deleted, 410 if not ACTIVE.
-     *     The org is taken from `service.organizationId`, NEVER from the client.
-     *  2. Validate `startAt` is a real, geometrically-valid open slot (aligned to
-     *     a rule window + duration stepping) — 400 otherwise.
-     *  3. Idempotency: an existing booking for `(serviceId, idempotencyKey)` is replayed.
-     *  4. Rate-limit by `${serviceId}:${ipHash}`; 429 on exceed.
-     *  5. In ONE Serializable transaction: RE-COUNT confirmed overlaps and abort
-     *     (409) if `>= capacity`, else upsert the Contact, create the CONFIRMED
-     *     Booking (immutable snapshot), and enqueue the `booking.notify` Job.
-     *
-     * WHY the serializable in-tx re-count guarantees "only one confirmed booking
-     * can own a capacity-one slot":
-     *  - The step-4 pre-check is best-effort — two requests can both read
-     *    count = 0 before either writes, so it CANNOT be the guarantee.
-     *  - Inside a `Serializable` transaction, the `booking.count(...)` predicate
-     *    read is tracked by Postgres' SSI. If two concurrent transactions both
-     *    read "0 confirmed overlaps" and both INSERT a CONFIRMED booking into the
-     *    same slot, their read/write sets form a dangerous dependency cycle;
-     *    Postgres detects it at commit and aborts one with a serialization
-     *    failure (surfaced by Prisma as P2034). So at most ONE commits — the
-     *    other is rolled back and mapped to 409. The re-count also directly
-     *    returns 409 when a conflicting booking is already committed and visible.
-     *    Buffers are part of the slot geometry, so overlap uses the [start,end]
-     *    interval — a capacity-1 slot admits exactly one CONFIRMED booking.
-     */
-    async book(
-        serviceId: string,
-        input: BookInput,
-        ipHash: string | undefined,
-    ): Promise<Booking> {
-        // 1. Load the Service. Org is derived from HERE, never the client.
-        const { service, rules } = await this.loadBookableService(serviceId);
-        await assertOrganizationOpen(service.organizationId);
-
-        // 2. Validate the requested instant is a real, aligned slot start.
-        const startAt = new Date(input.startAt);
-        if (Number.isNaN(startAt.getTime())) {
-            throw new BadRequestException("startAt is not a valid instant");
-        }
-        const availService = this.toAvailabilityService(service);
-        if (!isValidSlotStart(availService, rules, startAt)) {
-            throw new BadRequestException(
-                "startAt is not a bookable slot for this service",
-            );
-        }
-        const endAt = new Date(
-            startAt.getTime() + service.durationMinutes * 60_000,
-        );
-
-        // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
-        //    the replay too, so replays cannot be used to probe for keys.
-        if (ipHash) {
-            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
-            if (!allowed) {
-                throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
-                    429,
-                );
-            }
-        }
-
-        // 4. Idempotency pre-check — replay an existing booking unchanged, but
-        //    only to the same booker: a key alone does not hand over someone
-        //    else's booking (or its meeting link).
-        if (input.idempotencyKey) {
-            const existing = await prisma.booking.findUnique({
-                where: {
-                    serviceId_idempotencyKey: {
-                        serviceId,
-                        idempotencyKey: input.idempotencyKey,
-                    },
-                },
-            });
-            if (existing) {
-                if (
-                    (existing.bookerEmail ?? "").toLowerCase() !==
-                    input.bookerEmail.trim().toLowerCase()
-                ) {
-                    throw new ConflictException(
-                        "That booking was already made. Refresh the page and book again.",
-                    );
-                }
-                return existing;
-            }
-        }
-
-        // 5. Atomic, serializable reservation (see the method doc for WHY).
-        return this.reserve(service, startAt, endAt, input, {
-            source: `booking:service:${serviceId}`,
-            actorUserId: null,
-        });
-    }
-
     /**
      * A booking the merchant makes for someone — on the phone, at the
      * counter — rather than one the booker makes on the booking page (#384).
      *
-     * The same reservation as {@link book}, so it cannot promise what the
+     * The same reservation as {@link PublicBookingsService.book}, so it cannot promise what the
      * public page could not: the time must be a real open slot of an ACTIVE
      * service, and the serializable capacity re-count still decides. What
      * differs is who is acting — `booking:write`, the service must belong to
@@ -937,14 +980,43 @@ export class BookingsService {
             idempotencyKey?: string;
             useClassPack?: boolean;
             packPurchaseId?: string;
+            staffId?: string;
+            paidWith?: PaidWith;
+            subscriptionId?: string;
         },
     ): Promise<Booking> {
         authorize(ctx, "booking:write");
-        const withPack = dto.useClassPack === true || !!dto.packPurchaseId;
-        // Spending someone's prepaid classes is its own power (ADR-007).
+        const withPack =
+            dto.useClassPack === true ||
+            !!dto.packPurchaseId ||
+            dto.paidWith === "PACK";
+        if (withPack && dto.paidWith && dto.paidWith !== "PACK") {
+            throw new BadRequestException({
+                message:
+                    "A booking is paid one way. Choose a pack or another way, not both.",
+                field: "paidWith",
+            });
+        }
+        const withMembership = dto.paidWith === "MEMBERSHIP";
+        if (withMembership && !dto.subscriptionId) {
+            throw new BadRequestException({
+                message: "Choose the membership this class comes out of.",
+                field: "subscriptionId",
+            });
+        }
+        if (!withMembership && dto.subscriptionId) {
+            throw new BadRequestException({
+                message:
+                    "A membership pays only a booking paid with a membership.",
+                field: "subscriptionId",
+            });
+        }
+        // Spending someone's prepaid classes is its own power (ADR-007) —
+        // a pack's, or a membership's month (U3).
         if (withPack) authorize(ctx, "pack:write");
+        if (withMembership) authorize(ctx, "subscription:write");
 
-        const { service, rules } = await this.loadBookableService(serviceId);
+        const { service, rules } = await loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Service not found");
         }
@@ -953,12 +1025,10 @@ export class BookingsService {
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
+        const staffing = await loadStaffing(service);
         if (
-            !isValidSlotStart(
-                this.toAvailabilityService(service),
-                rules,
-                startAt,
-            )
+            !staffing.perPerson &&
+            !isValidSlotStart(toAvailabilityService(service), rules, startAt)
         ) {
             throw new BadRequestException(
                 "That time is not an open slot for this service",
@@ -1016,15 +1086,38 @@ export class BookingsService {
             booker.idempotencyKey = dto.idempotencyKey;
         }
 
-        return this.reserve(
+        const person = await resolvePerson(
+            service,
+            rules,
+            staffing,
+            startAt,
+            dto.staffId,
+            "team",
+        );
+        const paidWith: PaidWith | null = withPack
+            ? "PACK"
+            : (dto.paidWith ?? null);
+
+        return reserve(
+            this.activation,
             service,
             startAt,
             endAt,
             booker,
             { source: "manual", actorUserId: ctx.userId },
-            withPack
+            withPack || withMembership
                 ? {
                       inTx: async (tx, booking) => {
+                          if (withMembership) {
+                              await useMembershipInTx(tx, {
+                                  organizationId: ctx.organizationId,
+                                  bookingId: booking.id,
+                                  contactId: booking.contactId ?? "",
+                                  subscriptionId: dto.subscriptionId ?? "",
+                                  startAt,
+                              });
+                              return;
+                          }
                           await redeemPackInTx(tx, {
                               organizationId: ctx.organizationId,
                               bookingId: booking.id,
@@ -1036,100 +1129,20 @@ export class BookingsService {
                               purchaseId: dto.packPurchaseId,
                           });
                       },
-                      // It may have been the pack's last class rather than
-                      // the slot, so this says only that something changed.
+                      // It may have been the pack's (or the month's) last
+                      // class rather than the slot, so this says only that
+                      // something changed.
                       onRace: "That changed while you were booking. Try again.",
                   }
                 : undefined,
+            {
+                ...person,
+                paidWith,
+                subscriptionId: withMembership
+                    ? (dto.subscriptionId ?? null)
+                    : null,
+            },
         );
-    }
-
-    /**
-     * The reservation itself, shared by the booking page and a booking made
-     * by hand: re-count inside a Serializable transaction, upsert the contact,
-     * write the CONFIRMED booking, its first history event and the notify job.
-     * See {@link book} for why the in-transaction re-count is the guarantee.
-     *
-     * `also.inTx` runs on the same transaction after the booking is written —
-     * spending a class pack on it, for one — so a refusal there takes the
-     * booking back with it, and a booking never exists half-paid. Losing a
-     * race then may be about what it touched rather than the slot, so the
-     * caller says what to tell the booker (`also.onRace`).
-     */
-    private async reserve(
-        service: Service,
-        startAt: Date,
-        endAt: Date,
-        input: BookInput,
-        by: ReserveBy,
-        also?: {
-            inTx: (
-                tx: Prisma.TransactionClient,
-                booking: Booking,
-            ) => Promise<void>;
-            onRace: string;
-        },
-    ): Promise<Booking> {
-        const serviceId = service.id;
-        const organizationId = service.organizationId;
-
-        let booked: Booking;
-        try {
-            booked = await prisma.$transaction(
-                async (tx) => {
-                    const booking = await this.reserveInTx(
-                        tx,
-                        service,
-                        startAt,
-                        endAt,
-                        input,
-                        by,
-                    );
-                    if (also) await also.inTx(tx, booking);
-                    return booking;
-                },
-                {
-                    isolationLevel:
-                        Prisma.TransactionIsolationLevel.Serializable,
-                },
-            );
-        } catch (err) {
-            const code = (err as { code?: string }).code;
-            // Idempotency race: two concurrent books with the same
-            // (serviceId, idempotencyKey) — the unique index rejects the second
-            // (P2002). Re-read and replay the winner instead of erroring.
-            if (input.idempotencyKey && code === "P2002") {
-                const existing = await prisma.booking.findUnique({
-                    where: {
-                        serviceId_idempotencyKey: {
-                            serviceId,
-                            idempotencyKey: input.idempotencyKey,
-                        },
-                    },
-                });
-                if (existing) return existing;
-            }
-            // Serialization failure — Postgres aborted the loser of a race.
-            // On its own, the only thing two bookings contend for is the slot.
-            if (code === "P2034") {
-                throw new ConflictException(
-                    also?.onRace ?? "This slot is fully booked",
-                );
-            }
-            throw err;
-        }
-
-        // Instrumentation lives OUTSIDE the try, not merely after the commit.
-        // Inside it, a throw from here would fall into the catch above and be
-        // re-thrown as if the booking had failed — a committed booking
-        // reported to the booker as an error. The catch is for database
-        // outcomes only.
-        //
-        // Safe on every booking: the ledger keeps only the first
-        // (deterministic dedupeKey), so there is no "is this their first?"
-        // query and no race between two concurrent bookings.
-        await this.activation?.firstBookingCreated(organizationId, booked.id);
-        return booked;
     }
 
     /**
@@ -1148,249 +1161,18 @@ export class BookingsService {
         input: BookInput,
         by: ReserveBy,
         course?: { courseId: string; enrollmentId: string },
+        person?: ReserveWith,
     ): Promise<Booking> {
-        const serviceId = service.id;
-        const organizationId = service.organizationId;
-        const email = input.bookerEmail.trim().toLowerCase();
-        const snapshot = this.buildSnapshot(service, input, startAt, endAt);
-
-        // Authoritative capacity gate — re-counted INSIDE the tx.
-        const confirmed = await tx.booking.count({
-            where: {
-                serviceId,
-                status: "CONFIRMED",
-                startAt: { lt: endAt },
-                endAt: { gt: startAt },
-            },
-        });
-        // Seats an open course still holds count as taken (ADR-007) — other
-        // courses' seats, for a course's own booking: its unsold seats are
-        // the ones it is filling.
-        const held = await courseSeatsHeld(
+        return reserveInTx(
             tx,
-            serviceId,
+            service,
             startAt,
             endAt,
-            course?.courseId,
+            input,
+            by,
+            course,
+            person,
         );
-        if (confirmed + held >= service.capacity) {
-            throw new ConflictException("This slot is fully booked");
-        }
-
-        const contact = await tx.contact.upsert({
-            where: {
-                organizationId_email: { organizationId, email },
-            },
-            update: this.contactUpdate(input),
-            create: {
-                organizationId,
-                email,
-                firstName: this.splitName(input.bookerName).first ?? null,
-                lastName: this.splitName(input.bookerName).last ?? null,
-                phone: input.bookerPhone ?? null,
-                source: by.source,
-            },
-        });
-
-        const booking = await tx.booking.create({
-            data: {
-                organizationId,
-                serviceId,
-                contactId: contact.id,
-                startAt,
-                endAt,
-                timezone: service.timezone,
-                status: "CONFIRMED",
-                snapshot: snapshot as Prisma.InputJsonValue,
-                bookerName: input.bookerName ?? null,
-                bookerEmail: email,
-                bookerPhone: input.bookerPhone ?? null,
-                idempotencyKey: input.idempotencyKey ?? null,
-                courseEnrollmentId: course?.enrollmentId ?? null,
-            },
-        });
-
-        // Where the history starts. No `fromStartAt`: there was no before.
-        // The actor is whoever made it by hand; a booker who did it
-        // themselves leaves it empty.
-        await tx.bookingEvent.create({
-            data: {
-                bookingId: booking.id,
-                organizationId,
-                type: BookingEventType.Booked,
-                toStartAt: startAt,
-                ...(by.actorUserId ? { actorUserId: by.actorUserId } : {}),
-            },
-            select: { id: true },
-        });
-
-        // A course session's booking is not notified: nothing sends these yet,
-        // and one enrolment would queue a dead letter per session (ADR-007).
-        if (course) return booking;
-
-        // Transactional outbox: a committed booking always has a queued
-        // notification job. The handler never landed: the worker dead-letters
-        // booking.notify until one is registered (see
-        // jobs/job-consumers.spec.ts).
-        await tx.job.create({
-            data: {
-                organizationId,
-                type: "booking.notify",
-                payload: {
-                    bookingId: booking.id,
-                    serviceId,
-                    contactId: contact.id,
-                },
-            },
-        });
-
-        return booking;
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
-
-    /**
-     * Load an ACTIVE, non-deleted bookable service + its rules, or throw
-     * (404/410). A service whose organization switched Appointments off is 410
-     * like an archived one: the booking would otherwise land behind a module
-     * the merchant can no longer open.
-     */
-    private async loadBookableService(
-        serviceId: string,
-    ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
-        const service = await prisma.service.findUnique({
-            where: { id: serviceId },
-            include: { availabilityRules: true },
-        });
-        if (service?.deletedAt !== null) {
-            throw new NotFoundException("Service not found");
-        }
-        if (service.status !== "ACTIVE") {
-            throw new GoneException("This service is not accepting bookings");
-        }
-        if (!(await appointmentsOpen(service.organizationId))) {
-            throw new GoneException(
-                "This business isn't taking online bookings right now",
-            );
-        }
-        const { availabilityRules, ...rest } = service;
-        return { service: rest, rules: availabilityRules };
-    }
-
-    /**
-     * What fills a service's time over `[from, to)`: its confirmed bookings,
-     * and the seats open courses still hold on their sessions (ADR-007).
-     */
-    private async busyOverlapping(
-        serviceId: string,
-        from: Date,
-        to: Date,
-    ): Promise<Interval[]> {
-        const [confirmed, held] = await Promise.all([
-            this.confirmedOverlapping(serviceId, from, to),
-            courseSeatIntervals(prisma, serviceId, from, to),
-        ]);
-        return [...confirmed, ...held];
-    }
-
-    /** Confirmed bookings overlapping `[from, to)` for a service (for capacity checks). */
-    private async confirmedOverlapping(
-        serviceId: string,
-        from: Date,
-        to: Date,
-    ): Promise<Interval[]> {
-        return prisma.booking.findMany({
-            where: {
-                serviceId,
-                status: "CONFIRMED",
-                startAt: { lt: to },
-                endAt: { gt: from },
-            },
-            select: { startAt: true, endAt: true },
-        });
-    }
-
-    /** Narrow a Prisma Service to the structural subset the pure module needs. */
-    private toAvailabilityService(service: Service): AvailabilityService {
-        return {
-            durationMinutes: service.durationMinutes,
-            bufferBeforeMinutes: service.bufferBeforeMinutes,
-            bufferAfterMinutes: service.bufferAfterMinutes,
-            capacity: service.capacity,
-            timezone: service.timezone,
-        };
-    }
-
-    /** The immutable snapshot of Service terms + booker frozen onto a Booking. */
-    private buildSnapshot(
-        service: Service,
-        input: BookInput,
-        startAt: Date,
-        endAt: Date,
-    ): Record<string, unknown> {
-        return {
-            service: {
-                id: service.id,
-                name: service.name,
-                durationMinutes: service.durationMinutes,
-                bufferBeforeMinutes: service.bufferBeforeMinutes,
-                bufferAfterMinutes: service.bufferAfterMinutes,
-                capacity: service.capacity,
-                timezone: service.timezone,
-                priceCents: service.priceCents,
-                currency: service.currency,
-                // Frozen like the rest: a link changed later reaches new
-                // bookings, never the ones already made (ADR-007).
-                locationType: service.locationType,
-                meetingUrl: service.meetingUrl,
-            },
-            slot: {
-                startAt: startAt.toISOString(),
-                endAt: endAt.toISOString(),
-            },
-            booker: {
-                name: input.bookerName ?? null,
-                email: input.bookerEmail.trim().toLowerCase(),
-                phone: input.bookerPhone ?? null,
-            },
-        };
-    }
-
-    /** Contact fields to update on a repeat booking (only supplied values). */
-    private contactUpdate(input: BookInput): Prisma.ContactUpdateInput {
-        const update: Prisma.ContactUpdateInput = {};
-        const { first, last } = this.splitName(input.bookerName);
-        if (first !== undefined) update.firstName = first;
-        if (last !== undefined) update.lastName = last;
-        if (input.bookerPhone !== undefined) update.phone = input.bookerPhone;
-        return update;
-    }
-
-    /** Split a single "full name" into first / last parts. */
-    private splitName(full: string | undefined): {
-        first?: string;
-        last?: string;
-    } {
-        if (!full) return {};
-        const parts = full.trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 0) return {};
-        if (parts.length === 1) return { first: parts[0] };
-        return { first: parts[0], last: parts.slice(1).join(" ") };
-    }
-
-    private parseRange(
-        fromISO: string,
-        toISO: string,
-    ): { from: Date; to: Date } {
-        const from = new Date(fromISO);
-        const to = new Date(toISO);
-        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-            throw new BadRequestException("from/to must be valid ISO instants");
-        }
-        if (from.getTime() >= to.getTime()) {
-            throw new BadRequestException("from must be before to");
-        }
-        return { from, to };
     }
 
     private assertValidTimezone(timezone: string): void {
@@ -1493,51 +1275,24 @@ export function resolveLocation(
     return { locationType, meetingUrl: parsed.toString() };
 }
 
-/**
- * What a public booking answers with (ADR-007): the booker's own booking and
- * nothing else — never the row, which carries the organization, the contact
- * and the IP hash. Read from the booking's frozen snapshot, so the first
- * answer and an idempotent replay are the same shape and the same link.
- */
-export interface PublicBooking {
-    reference: string;
-    startAt: string;
-    endAt: string;
-    serviceName: string;
-    online: boolean;
-    meetingUrl: string | null;
-}
+/** How early before the start the desk may check someone in. */
+export const CHECK_IN_EARLY_MS = 60 * 60_000;
 
-export function toPublicBooking(booking: {
-    id: string;
-    startAt: Date;
-    endAt: Date;
-    snapshot: unknown;
-    status?: string;
-}): PublicBooking {
-    const service = (
-        booking.snapshot as {
-            service?: {
-                name?: unknown;
-                locationType?: unknown;
-                meetingUrl?: unknown;
-            };
-        } | null
-    )?.service;
-    const online = service?.locationType === "ONLINE";
-    return {
-        reference: booking.id,
-        startAt: booking.startAt.toISOString(),
-        endAt: booking.endAt.toISOString(),
-        serviceName: typeof service?.name === "string" ? service.name : "",
-        online,
-        // A cancelled booking no longer holds a place in the class, so it no
-        // longer carries the way in.
-        meetingUrl:
-            online &&
-            booking.status !== "CANCELLED" &&
-            typeof service.meetingUrl === "string"
-                ? service.meetingUrl
-                : null,
-    };
+/**
+ * Why an outcome cannot be said yet, or null when it can: attendance from an
+ * hour before the start (someone walking in), a no-show once it has started.
+ */
+export function outcomeTooEarly(
+    outcome: BookingOutcome,
+    startAt: Date,
+    now: Date,
+): string | null {
+    const opensAt =
+        outcome === "ATTENDED"
+            ? startAt.getTime() - CHECK_IN_EARLY_MS
+            : startAt.getTime();
+    if (now.getTime() >= opensAt) return null;
+    return outcome === "ATTENDED"
+        ? "Check-in opens an hour before the appointment."
+        : "This appointment has not started yet.";
 }

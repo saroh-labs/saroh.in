@@ -45,6 +45,19 @@ export interface MemberView {
     siteIds: string[];
     /** Whether this row is the caller, so the UI can say "you". */
     isSelf: boolean;
+    /**
+     * When this person last used Saroh — the newest `Session.updatedAt` they
+     * hold — or `null` when they hold no session (never signed in, or every
+     * session has expired and been cleared).
+     *
+     * Sessions belong to a person, not to a business, so this is their last
+     * activity anywhere in Saroh, not in this organization. Accepted: the
+     * roster asks "is this person still around?", and Saroh has no per-
+     * business activity record to answer it more narrowly. Better Auth moves
+     * `updatedAt` at sign-in and when it refreshes a session (at most daily),
+     * so it is a floor — they were here at least this recently.
+     */
+    lastActiveAt: Date | null;
 }
 
 export interface InvitationView {
@@ -90,7 +103,7 @@ export class OrganizationMembersService {
     async list(ctx: OrganizationContext): Promise<MemberView[]> {
         authorize(ctx, "member:read");
 
-        const [memberships, grants] = await Promise.all([
+        const [memberships, grants, sessions] = await Promise.all([
             prisma.membership.findMany({
                 where: { organizationId: ctx.organizationId },
                 select: {
@@ -103,7 +116,23 @@ export class OrganizationMembersService {
                 where: { organizationId: ctx.organizationId },
                 select: { userId: true, siteId: true },
             }),
+            // One grouped read for the whole roster, not one per person.
+            prisma.session.groupBy({
+                by: ["userId"],
+                where: {
+                    user: {
+                        memberships: {
+                            some: { organizationId: ctx.organizationId },
+                        },
+                    },
+                },
+                _max: { updatedAt: true },
+            }),
         ]);
+
+        const lastActive = new Map(
+            sessions.map((s) => [s.userId, s._max.updatedAt]),
+        );
 
         const byUser = new Map<string, string[]>();
         for (const grant of grants) {
@@ -121,6 +150,7 @@ export class OrganizationMembersService {
             roleKey: m.role,
             siteIds: byUser.get(m.userId) ?? [],
             isSelf: m.userId === ctx.userId,
+            lastActiveAt: lastActive.get(m.userId) ?? null,
         }));
     }
 

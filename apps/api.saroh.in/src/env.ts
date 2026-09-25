@@ -1,6 +1,8 @@
 import { config as loadEnvFiles } from "dotenv";
 import { z } from "zod";
 
+import { TRUST_PROXY_MODES } from "./common/trust-proxy";
+
 /**
  * Typed, validated environment for api.saroh.in (NestJS).
  *
@@ -26,6 +28,13 @@ const envSchema = z.object({
         .enum(["development", "test", "production"])
         .default("development"),
     PORT: z.coerce.number().default(3333),
+    // Which proxies may say who the client is (`src/common/trust-proxy.ts`):
+    // the request's IP — every rate limiter's key — is the first address in
+    // `X-Forwarded-For` that is not one of them. `cloudflare` (default):
+    // Cloudflare's edge plus the private network, for Cloudflare → Traefik on
+    // Coolify, and portless locally. `private`: a proxy in front, no CDN.
+    // `none`: the API is reached directly (`dev:app`, a bare port).
+    TRUST_PROXY: z.enum(TRUST_PROXY_MODES).default("cloudflare"),
 
     // Data (REQUIRED — the one true prerequisite; the api cannot serve any
     // request without a database).

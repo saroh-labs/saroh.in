@@ -37,6 +37,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // Staff, their hours and the booking rules (U3) — both controllers.
+    "staff/staff.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
@@ -83,6 +85,8 @@ const NEVER: Record<string, string> = {
         "diagnosing an unhealthy provider must work when the module is off",
     "search/search.controller.ts": "spans modules; it should degrade, not 403",
     "saved-views/saved-views.controller.ts": "spans modules",
+    "calendar/calendar.controller.ts":
+        "spans every dated module, and drops a layer whose module is off itself",
     "customer-workspace/customer-workspace.controller.ts":
         "spans CRM, Commerce and Appointments at once",
     "notifications/notifications.controller.ts": "cross-cutting",

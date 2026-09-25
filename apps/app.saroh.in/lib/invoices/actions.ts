@@ -44,6 +44,33 @@ export async function voidInvoice(id: string, reason: string) {
     return res;
 }
 
+export async function creditInvoice(id: string, reason: string) {
+    const res = await api.creditInvoice(id, reason);
+    if (res.ok) refresh(id);
+    return res;
+}
+
+/**
+ * One invoice with its lines, for a quick look opened from a list. A read,
+ * so nothing is revalidated; a failure comes back as a message to show.
+ */
+export async function readInvoice(id: string) {
+    try {
+        const invoice = await api.getInvoice(id);
+        return invoice
+            ? ({ ok: true, data: invoice } as const)
+            : ({
+                  ok: false,
+                  error: "That invoice is not here any more.",
+              } as const);
+    } catch {
+        return {
+            ok: false,
+            error: "That invoice could not be loaded.",
+        } as const;
+    }
+}
+
 export async function reissueInvoice(id: string, reason: string) {
     const res = await api.reissueInvoice(id, reason);
     if (res.ok) refresh(id);

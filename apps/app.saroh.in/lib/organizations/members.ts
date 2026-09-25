@@ -1,12 +1,7 @@
+import type { ApiResult } from "@/lib/api/failure";
+import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
-import {
-    apiFetch,
-    destroy,
-    getList,
-    mutate,
-    orgBase,
-    readError,
-} from "@/lib/api/http";
+import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
 
 import type { OrganizationRole } from "./service";
 
@@ -29,6 +24,11 @@ export interface OrganizationMember {
     /** Sites this person may review. Empty for every role but REVIEWER. */
     siteIds: string[];
     isSelf: boolean;
+    /**
+     * Their newest session, anywhere in Saroh — sessions belong to a person,
+     * not a business. `null` when they hold none; absent from an older API.
+     */
+    lastActiveAt?: string | null;
 }
 
 export interface OrganizationInvitation {
@@ -70,15 +70,25 @@ export async function listInvitations(): Promise<OrganizationInvitation[]> {
     return (await res.json()) as OrganizationInvitation[];
 }
 
+/**
+ * Invite someone — or, for an address already invited, send it again: the API
+ * refreshes that invitation in place with a new link and a fresh week.
+ *
+ * Keeps the refusal's `field`, so "already in this workspace" can sit on the
+ * email field rather than in a toast.
+ */
 export async function inviteMember(
     input: InviteMemberInput,
-): Promise<CrmResult<OrganizationInvitation>> {
-    return mutate<OrganizationInvitation>(
-        "/invitations",
-        "POST",
-        input,
-        "Could not send that invitation.",
-    );
+): Promise<ApiResult<OrganizationInvitation>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/invitations`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as unknown;
+    if (res.ok) return { ok: true, data: data as OrganizationInvitation };
+    return toFailure(data, "Could not send that invitation.");
 }
 
 export async function updateMemberRole(
@@ -129,11 +139,12 @@ export async function acceptInvitation(
         `/organization-invitations/${encodeURIComponent(token)}/accept`,
         { method: "POST" },
     );
-    const data = (await res.json().catch(() => null)) as
-        (AcceptedInvitation & { message?: string }) | null;
+    const data = (await res
+        .json()
+        .catch(() => null)) as AcceptedInvitation | null;
     if (res.ok && data) return { ok: true, data };
     return {
         ok: false,
-        error: readError(data, "That invitation could not be accepted."),
+        error: toFailure(data, "That invitation could not be accepted.").error,
     };
 }

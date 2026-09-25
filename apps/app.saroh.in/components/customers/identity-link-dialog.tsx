@@ -20,15 +20,24 @@ import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
  * automatically — this dialog shows commerce Customers that matched THIS contact
  * on an exact email/phone, and a person confirms the link. Linking connects the
  * records (it does not merge them) and is reversible.
+ *
+ * Customer Detail opens it from its "Possible match — link?" notice and its
+ * More menu, so it can also be controlled, without a trigger of its own.
  */
 export function IdentityLinkDialog({
     contactId,
     suggestions,
+    open: controlled,
+    onOpenChange,
 }: {
     contactId: string;
     suggestions: IdentitySuggestion[];
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }) {
-    const [open, setOpen] = useState(false);
+    const [own, setOwn] = useState(false);
+    const open = controlled ?? own;
+    const setOpen = onOpenChange ?? setOwn;
     const [pending, startTransition] = useTransition();
 
     const confirm = (customerId: string) => {
@@ -45,12 +54,16 @@ export function IdentityLinkDialog({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                    Link commerce record
-                    {suggestions.length > 0 ? ` (${suggestions.length})` : ""}
-                </Button>
-            </DialogTrigger>
+            {controlled === undefined ? (
+                <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                        Link commerce record
+                        {suggestions.length > 0
+                            ? ` (${suggestions.length})`
+                            : ""}
+                    </Button>
+                </DialogTrigger>
+            ) : null}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Link a commerce customer</DialogTitle>

@@ -74,6 +74,7 @@ export class SubscriptionRenewHandler {
         const counts = {
             renewed: 0,
             advanced: 0,
+            uncharged: 0,
             ended: 0,
             skipped: 0,
             failed: 0,

@@ -20,11 +20,12 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import type { BookingDetail } from "./bookings.service";
+import type { BookingDetail, BookingsCalendar } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
     BookByHandDto,
+    BookingsRangeQueryDto,
     CreateServiceDto,
     RecordOutcomeDto,
     ReplaceRulesDto,
@@ -63,6 +64,20 @@ export class BookingsController {
     @Get()
     listServices(@OrgContext() ctx: OrganizationContext): Promise<Service[]> {
         return this.bookings.listServices(ctx);
+    }
+
+    /**
+     * The bookings calendar in one read (U4): every booking in `[from, to)`
+     * by person, class sessions with who is booked and how they paid.
+     * Declared BEFORE `:serviceId`, which would otherwise take "bookings" as
+     * a service id.
+     */
+    @Get("bookings")
+    calendarBookings(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: BookingsRangeQueryDto,
+    ): Promise<BookingsCalendar> {
+        return this.bookings.calendarBookings(ctx, query);
     }
 
     @Get(":serviceId")
@@ -136,8 +151,9 @@ export class BookingsController {
         @Param("serviceId") serviceId: string,
         @Query("from") from: string,
         @Query("to") to: string,
+        @Query("staffId") staffId?: string,
     ) {
-        return this.bookings.availability(ctx, serviceId, from, to);
+        return this.bookings.availability(ctx, serviceId, from, to, staffId);
     }
 
     // ── Bookings ────────────────────────────────────────────────────────────
@@ -203,11 +219,18 @@ export class BookingsController {
         return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
     }
 
+    /**
+     * `?returnCredit=true` when the business calls it off (a whole class):
+     * the class paid for goes back even inside the free-cancellation window.
+     */
     @Delete("bookings/:bookingId")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
+        @Query("returnCredit") returnCredit?: string,
     ): Promise<Booking> {
-        return this.bookings.cancelBooking(ctx, bookingId);
+        return this.bookings.cancelBooking(ctx, bookingId, undefined, {
+            returnCredit: returnCredit === "true",
+        });
     }
 }

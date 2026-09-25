@@ -30,6 +30,8 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         contact: { upsert: jest.fn(), findUnique: jest.fn() },
+        customerSubscription: { findFirst: jest.fn() },
+        invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
@@ -40,6 +42,18 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             findFirst: jest.fn().mockResolvedValue(null),
         },
+        // Staff (U3): nobody takes a service and there are no booking rules
+        // unless a test says so — every business before staff existed.
+        staffService: { findMany: jest.fn().mockResolvedValue([]) },
+        staffMember: { findMany: jest.fn().mockResolvedValue([]) },
+        bookingRules: { findUnique: jest.fn().mockResolvedValue(null) },
+        staffHours: { findMany: jest.fn().mockResolvedValue([]) },
+        staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
+        staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        businessProfile: {
+            findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
+        },
+        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
@@ -56,18 +70,14 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
-    GoneException,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import {
-    BookingsService,
-    type BookInput,
-    toPublicBooking,
-} from "./bookings.service";
-import { FixedWindowRateLimiter } from "./rate-limiter";
+import { BookingsService } from "./bookings.service";
+import { PublicBookingsService } from "./public-bookings.service";
+import type { BookInput } from "./reservation";
 
 const serviceFindUnique = prisma.service.findUnique as jest.Mock;
 const serviceCreate = prisma.service.create as jest.Mock;
@@ -147,333 +157,6 @@ function wireBookHappyPath() {
     bookingCreate.mockResolvedValue({ id: "bk_1", status: "CONFIRMED" });
     jobCreate.mockResolvedValue({ id: "job_1" });
 }
-
-describe("BookingsService.book — capacity-one reservation", () => {
-    beforeEach(() => jest.clearAllMocks());
-
-    it("creates a Contact, CONFIRMED Booking and booking.notify Job in one serializable tx", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-
-        const res = await service.book(
-            "svc_1",
-            baseInput({ idempotencyKey: undefined }),
-            "iphash",
-        );
-
-        expect(transaction).toHaveBeenCalledTimes(1);
-        // Serializable isolation was requested (the capacity-one guarantee).
-        expect(transaction.mock.calls[0][1]).toMatchObject({
-            isolationLevel: "Serializable",
-        });
-
-        expect(bookingCount).toHaveBeenCalledTimes(1);
-        expect(contactUpsert).toHaveBeenCalledTimes(1);
-        expect(bookingCreate).toHaveBeenCalledTimes(1);
-        expect(jobCreate).toHaveBeenCalledTimes(1);
-        expect(res).toEqual({ id: "bk_1", status: "CONFIRMED" });
-
-        // Booking is CONFIRMED, endAt = start + duration, tz carried from the service.
-        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
-            organizationId: "org_SVC",
-            serviceId: "svc_1",
-            contactId: "contact_1",
-            status: "CONFIRMED",
-            timezone: "UTC",
-            bookerEmail: "jane@example.com",
-        });
-        const created = bookingCreate.mock.calls[0][0].data;
-        expect(created.startAt.toISOString()).toBe(START);
-        expect(created.endAt.toISOString()).toBe("2026-07-20T10:00:00.000Z");
-
-        // The in-tx capacity re-count targets CONFIRMED overlaps of this slot.
-        expect(bookingCount.mock.calls[0][0].where).toMatchObject({
-            serviceId: "svc_1",
-            status: "CONFIRMED",
-        });
-
-        // Outbox job.
-        expect(jobCreate.mock.calls[0][0].data).toMatchObject({
-            organizationId: "org_SVC",
-            type: "booking.notify",
-            payload: { bookingId: "bk_1", serviceId: "svc_1" },
-        });
-    });
-
-    it("ISOLATION: every write is stamped with service.organizationId, never a client value", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-
-        await service.book("svc_1", baseInput(), "iphash");
-
-        expect(contactUpsert.mock.calls[0][0].where).toEqual({
-            organizationId_email: {
-                organizationId: "org_SVC",
-                email: "jane@example.com",
-            },
-        });
-        expect(bookingCreate.mock.calls[0][0].data.organizationId).toBe(
-            "org_SVC",
-        );
-        expect(jobCreate.mock.calls[0][0].data.organizationId).toBe("org_SVC");
-    });
-
-    it("409s when the in-tx re-count is already at capacity — creates nothing", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-        bookingCount.mockResolvedValue(1); // capacity is 1 → full
-
-        await expect(
-            service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(ConflictException);
-
-        expect(bookingCreate).not.toHaveBeenCalled();
-        expect(jobCreate).not.toHaveBeenCalled();
-    });
-
-    it("maps a Postgres serialization failure (P2034) to 409", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-        transaction.mockRejectedValueOnce({ code: "P2034" });
-
-        await expect(
-            service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it("replays an existing booking for a repeated (serviceId, idempotencyKey) — no tx", async () => {
-        const service = new BookingsService();
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-        const prev = { id: "bk_prev", bookerEmail: "jane@example.com" };
-        bookingFindUnique.mockResolvedValue(prev);
-
-        const res = await service.book(
-            "svc_1",
-            baseInput({ idempotencyKey: "idem_1" }),
-            "iphash",
-        );
-
-        expect(res).toEqual(prev);
-        expect(transaction).not.toHaveBeenCalled();
-        expect(bookingCreate).not.toHaveBeenCalled();
-    });
-
-    it("replays a key only to the booker who made it", async () => {
-        const service = new BookingsService();
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-        bookingFindUnique.mockResolvedValue({
-            id: "bk_prev",
-            bookerEmail: "someone.else@example.com",
-        });
-        await expect(
-            service.book(
-                "svc_1",
-                baseInput({ idempotencyKey: "idem_1" }),
-                "iphash",
-            ),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(bookingCreate).not.toHaveBeenCalled();
-    });
-
-    it("counts a replay against the rate limit, so keys cannot be probed freely", async () => {
-        const service = new BookingsService(
-            new FixedWindowRateLimiter(1, 60_000),
-        );
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-        bookingFindUnique.mockResolvedValue({
-            id: "bk_prev",
-            bookerEmail: "jane@example.com",
-        });
-        const input = baseInput({ idempotencyKey: "idem_1" });
-        await service.book("svc_1", input, "same_ip");
-        await expect(
-            service.book("svc_1", input, "same_ip"),
-        ).rejects.toMatchObject({ status: 429 });
-    });
-
-    it("backstops an idempotency race: catches P2002 and replays the winner", async () => {
-        const service = new BookingsService();
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-        // Pre-check finds nothing; the tx loses the unique race; re-read wins.
-        bookingFindUnique
-            .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce({ id: "bk_win" });
-        bookingCount.mockResolvedValue(0);
-        contactUpsert.mockResolvedValue({ id: "contact_1" });
-        bookingCreate.mockRejectedValue({ code: "P2002" });
-
-        const res = await service.book(
-            "svc_1",
-            baseInput({ idempotencyKey: "idem_1" }),
-            "iphash",
-        );
-
-        expect(res).toEqual({ id: "bk_win" });
-    });
-
-    it("400s an off-grid startAt (not an aligned slot) — no tx", async () => {
-        const service = new BookingsService();
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-
-        await expect(
-            service.book(
-                "svc_1",
-                baseInput({ startAt: "2026-07-20T09:15:00.000Z" }),
-                "iphash",
-            ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        expect(transaction).not.toHaveBeenCalled();
-    });
-
-    it("404s a missing/soft-deleted service and 410s an archived one", async () => {
-        const service = new BookingsService();
-
-        serviceFindUnique.mockResolvedValueOnce(null);
-        await expect(
-            service.book("nope", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(NotFoundException);
-
-        serviceFindUnique.mockResolvedValueOnce({
-            ...SERVICE,
-            status: "ARCHIVED",
-            availabilityRules: RULES,
-        });
-        await expect(
-            service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toBeInstanceOf(GoneException);
-    });
-
-    it("429s the N+1th rapid booking from the same ipHash (before the tx)", async () => {
-        const service = new BookingsService(
-            new FixedWindowRateLimiter(1, 60_000),
-        );
-        wireBookHappyPath();
-
-        await service.book("svc_1", baseInput(), "same_ip");
-
-        let status: number | undefined;
-        try {
-            await service.book("svc_1", baseInput(), "same_ip");
-        } catch (err) {
-            status = (err as { getStatus(): number }).getStatus();
-        }
-        expect(status).toBe(429);
-        expect(transaction).toHaveBeenCalledTimes(1);
-    });
-});
-
-describe("BookingsService — public booking follows the Appointments module", () => {
-    beforeEach(() => jest.clearAllMocks());
-
-    const FROM = "2026-07-20T00:00:00.000Z";
-    const TO = "2026-07-21T00:00:00.000Z";
-    const OFF_MESSAGE = "This business isn't taking online bookings right now";
-
-    function wireAvailability() {
-        serviceFindUnique.mockResolvedValue({
-            ...SERVICE,
-            availabilityRules: RULES,
-        });
-        moduleFindFirst.mockResolvedValue(null);
-        bookingFindMany.mockResolvedValue([]);
-    }
-
-    it("asks for the organization's APPOINTMENTS row in any state but ENABLED", async () => {
-        wireAvailability();
-
-        await new BookingsService().publicAvailability("svc_1", FROM, TO);
-
-        expect(moduleFindFirst).toHaveBeenCalledWith({
-            where: {
-                organizationId: "org_SVC",
-                moduleKey: "APPOINTMENTS",
-                status: { not: "ENABLED" },
-            },
-            select: { id: true },
-        });
-    });
-
-    it("410s availability when the org has switched Appointments off", async () => {
-        wireAvailability();
-        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
-
-        const attempt = new BookingsService().publicAvailability(
-            "svc_1",
-            FROM,
-            TO,
-        );
-        await expect(attempt).rejects.toBeInstanceOf(GoneException);
-        await expect(attempt).rejects.toThrow(OFF_MESSAGE);
-        expect(bookingFindMany).not.toHaveBeenCalled();
-    });
-
-    /*
-     * "Switched off" is decided by the query, so pin the query: any
-     * APPOINTMENTS row that is NOT ENABLED — DISABLED and ARCHIVED alike —
-     * counts, and a missing row does not. (This used to be an it.each over
-     * the two statuses whose mock answered the same for both, so it never
-     * distinguished them.)
-     */
-    it("counts any APPOINTMENTS row that is not ENABLED as switched off", async () => {
-        wireAvailability();
-        moduleFindFirst.mockResolvedValueOnce(null);
-        await new BookingsService().publicAvailability("svc_1", FROM, TO);
-        expect(moduleFindFirst.mock.calls[0][0].where).toMatchObject({
-            moduleKey: "APPOINTMENTS",
-            status: { not: "ENABLED" },
-        });
-    });
-
-    it("410s a booking when Appointments is switched off, before any write", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-        moduleFindFirst.mockResolvedValueOnce({ id: "om_1" });
-
-        await expect(
-            service.book("svc_1", baseInput(), "iphash"),
-        ).rejects.toThrow(OFF_MESSAGE);
-        expect(transaction).not.toHaveBeenCalled();
-        expect(bookingCreate).not.toHaveBeenCalled();
-    });
-
-    it("keeps booking open when the organization has no APPOINTMENTS row (or it is ENABLED)", async () => {
-        const service = new BookingsService();
-        wireBookHappyPath();
-
-        await expect(
-            service.book("svc_1", baseInput(), "iphash"),
-        ).resolves.toEqual({ id: "bk_1", status: "CONFIRMED" });
-
-        wireAvailability();
-        await expect(
-            service.publicAvailability("svc_1", FROM, TO),
-        ).resolves.toEqual(expect.any(Array));
-    });
-
-    it("still 404s a missing service without asking about the module", async () => {
-        serviceFindUnique.mockResolvedValueOnce(null);
-
-        await expect(
-            new BookingsService().publicAvailability("nope", FROM, TO),
-        ).rejects.toBeInstanceOf(NotFoundException);
-        expect(moduleFindFirst).not.toHaveBeenCalled();
-    });
-});
 
 describe("BookingsService — Service management authz + isolation", () => {
     beforeEach(() => jest.clearAllMocks());
@@ -606,6 +289,79 @@ describe("BookingsService — bookings management", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
+
+    it("cancelBooking lets a pay-now hold go: its draft voided, its pay token cleared (#508)", async () => {
+        const holdExpiresAt = new Date("2026-07-20T08:15:00.000Z");
+        const hold = {
+            id: "bk_1",
+            organizationId: "org_SVC",
+            status: "PENDING",
+            startAt: new Date(START),
+            holdExpiresAt,
+        };
+        bookingFindUnique
+            .mockResolvedValueOnce(hold) // ownership, outside
+            .mockResolvedValueOnce(hold) // under the locks
+            .mockResolvedValueOnce(hold) // releaseHoldInTx's own re-read
+            .mockResolvedValueOnce({ ...hold, status: "CANCELLED" });
+        const queryRaw = (prisma as unknown as { $queryRaw: jest.Mock })
+            .$queryRaw;
+        const invoiceUpdateMany = (
+            prisma as unknown as { invoice: { updateMany: jest.Mock } }
+        ).invoice.updateMany;
+        const now = new Date("2026-07-20T08:05:00.000Z");
+
+        const out = await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            now,
+        );
+
+        expect(out.status).toBe("CANCELLED");
+        expect(bookingUpdate).toHaveBeenCalledTimes(1);
+        expect(bookingUpdate.mock.calls[0][0].data).toEqual({
+            status: "CANCELLED",
+            cancelledAt: now,
+            // Kept, so the booker's page reads it as released.
+            holdExpiresAt,
+        });
+        expect(invoiceUpdateMany.mock.calls[0][0]).toMatchObject({
+            where: { bookingId: "bk_1", source: "BOOKING", status: "DRAFT" },
+            data: { status: "VOID", payTokenHash: null },
+        });
+        expect(eventCreate).toHaveBeenCalledTimes(1);
+        expect(eventCreate.mock.calls[0][0].data).toMatchObject({
+            type: "CANCELLED",
+            actorUserId: "user_1",
+        });
+        // Every lock taken invoice first, the webhook's order: the Booking
+        // row is never locked before its invoice.
+        const tables = (queryRaw.mock.calls as [TemplateStringsArray][]).map(
+            ([sql]) => /FROM "(\w+)"/.exec(sql.join("?"))?.[1],
+        );
+        expect(tables[0]).toBe("Invoice");
+        expect(tables.indexOf("Booking")).toBeGreaterThan(
+            tables.indexOf("Invoice"),
+        );
+    });
+
+    it("cancelBooking re-reads under the lock: a cancel that lost the race writes nothing", async () => {
+        bookingFindUnique
+            .mockResolvedValueOnce({
+                id: "bk_1",
+                organizationId: "org_SVC",
+                status: "CONFIRMED",
+            })
+            .mockResolvedValueOnce({
+                id: "bk_1",
+                organizationId: "org_SVC",
+                status: "CANCELLED",
+            });
+        const out = await new BookingsService().cancelBooking(ctx(), "bk_1");
+        expect(out.status).toBe("CANCELLED");
+        expect(bookingUpdate).not.toHaveBeenCalled();
+        expect(eventCreate).not.toHaveBeenCalled();
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -684,6 +440,87 @@ describe("BookingsService.rescheduleBooking", () => {
         });
     });
 
+    describe("a membership's class (#508)", () => {
+        // Mon 3 Aug 2026 10:00 UTC — the same weekly rule, next month.
+        const IN_AUGUST = "2026-08-03T10:00:00.000Z";
+        const findSub = (
+            prisma as unknown as {
+                customerSubscription: { findFirst: jest.Mock };
+            }
+        ).customerSubscription.findFirst;
+
+        function wireMembership(usedInMonth: number) {
+            wireReschedule({
+                paidWith: "MEMBERSHIP",
+                subscriptionId: "sub_1",
+            } as Partial<typeof BOOKING>);
+            findSub.mockResolvedValue({
+                id: "sub_1",
+                contactId: "contact_1",
+                status: "ACTIVE",
+                timezone: "UTC",
+                plan: { name: "Monthly 4", classesPerMonth: 4 },
+            });
+            // The slot's seats, then the month's classes.
+            bookingCount
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(usedInMonth);
+        }
+
+        it("refuses a month whose classes are used", async () => {
+            wireMembership(4);
+            await expect(
+                new BookingsService().rescheduleBooking(ctx(), "bk_1", {
+                    startAt: IN_AUGUST,
+                }),
+            ).rejects.toThrow(
+                "Monthly 4 includes 4 classes a month, and this month's are used.",
+            );
+            expect(bookingUpdate).not.toHaveBeenCalled();
+            const counted = bookingCount.mock.calls[1][0].where;
+            expect(counted).toMatchObject({
+                subscriptionId: "sub_1",
+                id: { not: "bk_1" },
+            });
+            expect(counted.startAt.gte).toEqual(
+                new Date("2026-08-01T00:00:00.000Z"),
+            );
+        });
+
+        it("moves it into a month with a class left", async () => {
+            wireMembership(3);
+            const moved = await new BookingsService().rescheduleBooking(
+                ctx(),
+                "bk_1",
+                { startAt: IN_AUGUST },
+            );
+            expect(moved.startAt).toEqual(new Date(IN_AUGUST));
+            // The subscription is locked before its month is counted.
+            expect(
+                (
+                    (prisma as unknown as { $queryRaw: jest.Mock }).$queryRaw
+                        .mock.calls as [TemplateStringsArray][]
+                ).some(([sql]) =>
+                    sql.join("?").includes("CustomerSubscription"),
+                ),
+            ).toBe(true);
+        });
+
+        it("moves it within its own month, leaving itself out of the count", async () => {
+            // Three others in July; with itself that is the month's four.
+            wireMembership(3);
+            const moved = await new BookingsService().rescheduleBooking(
+                ctx(),
+                "bk_1",
+                { startAt: AT_10 },
+            );
+            expect(moved.startAt).toEqual(new Date(AT_10));
+            expect(bookingCount.mock.calls[1][0].where).toMatchObject({
+                id: { not: "bk_1" },
+            });
+        });
+    });
+
     it("refuses to move a pack-paid class past the pack's expiry", async () => {
         wireReschedule();
         const findPaid = (
@@ -748,7 +585,10 @@ describe("BookingsService.rescheduleBooking", () => {
         // slot that overlaps where it already is: it would collide with itself.
         expect(bookingCount.mock.calls[0][0].where).toMatchObject({
             id: { not: "bk_1" },
-            status: "CONFIRMED",
+            OR: [
+                { status: "CONFIRMED" },
+                { status: "PENDING", holdExpiresAt: { gt: expect.any(Date) } },
+            ],
         });
     });
 
@@ -868,7 +708,7 @@ describe("BookingsService — the history a booking carries", () => {
         wireBookHappyPath();
         eventCreate.mockResolvedValue({ id: "ev_1" });
         bookingCreate.mockResolvedValue({ id: "bk_1", status: "CONFIRMED" });
-        await new BookingsService().book("svc_1", baseInput(), undefined);
+        await new PublicBookingsService().book("svc_1", baseInput(), undefined);
 
         const { data } = eventCreate.mock.calls[0][0];
         expect(data).toMatchObject({
@@ -905,63 +745,6 @@ describe("BookingsService — the history a booking carries", () => {
 
 // ---------------------------------------------------------------------------
 // The Appointments path's first value (#176)
-// ---------------------------------------------------------------------------
-
-describe("BookingsService.book — activation instrumentation", () => {
-    beforeEach(() => jest.clearAllMocks());
-
-    it("records the org's first booking, after the booking is committed", async () => {
-        wireBookHappyPath();
-        eventCreate.mockResolvedValue({ id: "ev_1" });
-        const firstBookingCreated = jest.fn().mockResolvedValue(undefined);
-        const service = new BookingsService(new FixedWindowRateLimiter(), {
-            firstBookingCreated,
-        } as unknown as ConstructorParameters<typeof BookingsService>[1]);
-
-        await service.book("svc_1", baseInput(), undefined);
-
-        // The org comes from the SERVICE, never the client — the booking
-        // command is unauthenticated.
-        expect(firstBookingCreated).toHaveBeenCalledWith("org_SVC", "bk_1");
-        // After the commit: the transaction must not be able to roll back
-        // because an analytics row could not be written.
-        expect(transaction).toHaveBeenCalledTimes(1);
-        expect(bookingCreate).toHaveBeenCalled();
-    });
-
-    it("never reports a committed booking as failed when instrumentation throws", async () => {
-        wireBookHappyPath();
-        eventCreate.mockResolvedValue({ id: "ev_1" });
-        const service = new BookingsService(new FixedWindowRateLimiter(), {
-            // ActivationEvents swallows its own errors, but the booking
-            // command must not depend on that: the emit sits outside the
-            // try/catch precisely so a throw here cannot be re-thrown as a
-            // booking failure to someone whose slot IS reserved.
-            firstBookingCreated: jest
-                .fn()
-                .mockRejectedValue(new Error("analytics is down")),
-        } as unknown as ConstructorParameters<typeof BookingsService>[1]);
-
-        const err = await service
-            .book("svc_1", baseInput(), undefined)
-            .catch((e: unknown) => e);
-        // It surfaces as the analytics error it is, NOT as a booking conflict
-        // or a lost reservation — and the booking row was written either way.
-        expect(bookingCreate).toHaveBeenCalled();
-        expect((err as Error).message).toBe("analytics is down");
-    });
-
-    it("works with no instrumentation wired at all", async () => {
-        wireBookHappyPath();
-        eventCreate.mockResolvedValue({ id: "ev_1" });
-        await expect(
-            new BookingsService().book("svc_1", baseInput(), undefined),
-        ).resolves.toMatchObject({ id: "bk_1" });
-    });
-});
-
-// ---------------------------------------------------------------------------
-// How the appointment went (#241)
 // ---------------------------------------------------------------------------
 
 const PAST = new Date("2026-07-21T00:00:00.000Z"); // a day after BOOKING's slot
@@ -1005,17 +788,39 @@ describe("BookingsService.recordOutcome", () => {
         });
     });
 
-    it("refuses an appointment that has not happened yet", async () => {
+    it("checks someone in who walks in, from an hour before the start", async () => {
+        bookingFindUnique.mockResolvedValue(BOOKING);
+        // The desk checks people in on arrival (U15), not after the hour.
+        const walkingIn = new Date("2026-07-20T08:15:00.000Z");
+        await new BookingsService().recordOutcome(
+            ctx(),
+            "bk_1",
+            "ATTENDED",
+            walkingIn,
+        );
+        expect(bookingUpdate).toHaveBeenCalled();
+    });
+
+    it("refuses attendance earlier than that, and a no-show before the start", async () => {
         bookingFindUnique.mockResolvedValue(BOOKING);
         // Nothing derives an outcome from time passing, and nothing lets a
-        // merchant assert one before the time has passed either.
-        const beforeItEnds = new Date("2026-07-20T09:30:00.000Z");
+        // merchant assert one before it could have happened either.
+        const tooEarly = new Date("2026-07-20T07:30:00.000Z");
         await expect(
             new BookingsService().recordOutcome(
                 ctx(),
                 "bk_1",
                 "ATTENDED",
-                beforeItEnds,
+                tooEarly,
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const beforeTheStart = new Date("2026-07-20T08:45:00.000Z");
+        await expect(
+            new BookingsService().recordOutcome(
+                ctx(),
+                "bk_1",
+                "NO_SHOW",
+                beforeTheStart,
             ),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(bookingUpdate).not.toHaveBeenCalled();
@@ -1106,63 +911,6 @@ describe("BookingsService.recordOutcome", () => {
         // A booking marked attended with no record of who said so would be
         // worse than no outcome at all.
         expect(transaction).toHaveBeenCalledTimes(1);
-    });
-});
-
-describe("BookingsService.publicServices — the website's services list (#255)", () => {
-    beforeEach(() => jest.clearAllMocks());
-    const serviceFindMany = prisma.service.findMany as jest.Mock;
-
-    const row = (id: string) => ({
-        id,
-        name: `Service ${id}`,
-        description: null,
-        durationMinutes: 30,
-        priceCents: 2500,
-        currency: "GBP",
-    });
-
-    it("returns services in the merchant's order and drops unknown ids", async () => {
-        serviceFindMany.mockResolvedValue([row("b"), row("a")]);
-        const result = await new BookingsService().publicServices([
-            "a",
-            "gone",
-            "b",
-        ]);
-        expect(result.map((s) => s.id)).toEqual(["a", "b"]);
-    });
-
-    it("asks only for active, undeleted services whose Appointments is not disabled", async () => {
-        serviceFindMany.mockResolvedValue([]);
-        await new BookingsService().publicServices(["a"]);
-        const { where, select } = serviceFindMany.mock.calls[0][0];
-        expect(where).toMatchObject({
-            id: { in: ["a"] },
-            deletedAt: null,
-            status: "ACTIVE",
-            organization: {
-                organizationModules: {
-                    none: {
-                        moduleKey: "APPOINTMENTS",
-                        status: { not: "ENABLED" },
-                    },
-                },
-            },
-        });
-        // Nothing internal leaves: no org, site, capacity or buffers.
-        expect(Object.keys(select).sort()).toEqual([
-            "currency",
-            "description",
-            "durationMinutes",
-            "id",
-            "name",
-            "priceCents",
-        ]);
-    });
-
-    it("does not query for an empty list", async () => {
-        expect(await new BookingsService().publicServices([])).toEqual([]);
-        expect(serviceFindMany).not.toHaveBeenCalled();
     });
 });
 
@@ -1375,63 +1123,13 @@ describe("online classes (ADR-007)", () => {
             ...ONLINE,
             availabilityRules: RULES,
         });
-        await new BookingsService().book("svc_1", baseInput(), "iphash");
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
         expect(
             bookingCreate.mock.calls[0][0].data.snapshot.service,
         ).toMatchObject({
             locationType: "ONLINE",
             meetingUrl: "https://meet.example.com/yoga",
         });
-    });
-});
-
-describe("toPublicBooking — what a booker is answered with", () => {
-    const booking = {
-        id: "bk_1",
-        organizationId: "org_SVC",
-        contactId: "contact_1",
-        ipHash: "iphash",
-        startAt: new Date(START),
-        endAt: new Date("2026-07-20T10:00:00.000Z"),
-        snapshot: {
-            service: {
-                name: "Evening yoga",
-                locationType: "ONLINE",
-                meetingUrl: "https://meet.example.com/yoga",
-            },
-        },
-    };
-
-    it("is the booker's own booking and nothing internal", () => {
-        expect(toPublicBooking(booking)).toEqual({
-            reference: "bk_1",
-            startAt: START,
-            endAt: "2026-07-20T10:00:00.000Z",
-            serviceName: "Evening yoga",
-            online: true,
-            meetingUrl: "https://meet.example.com/yoga",
-        });
-    });
-
-    it("reads the link frozen at booking, not the service as it is now", () => {
-        // The service's link has since changed; this booking keeps its own.
-        const view = toPublicBooking(booking);
-        expect(view.meetingUrl).toBe("https://meet.example.com/yoga");
-    });
-
-    it("has no link once the booking is cancelled", () => {
-        expect(
-            toPublicBooking({ ...booking, status: "CANCELLED" }),
-        ).toMatchObject({ online: true, meetingUrl: null });
-    });
-
-    it("has no link for an in-person booking, or one made before links existed", () => {
-        expect(
-            toPublicBooking({
-                ...booking,
-                snapshot: { service: { name: "Consult" } },
-            }),
-        ).toMatchObject({ online: false, meetingUrl: null });
     });
 });
 
@@ -1538,7 +1236,7 @@ describe("courses on a service's time (ADR-007)", () => {
     }
 
     it("counts the seats an open course still holds as taken, so a public booker cannot fill them", async () => {
-        const service = new BookingsService();
+        const service = new PublicBookingsService();
         wireBookHappyPath();
         serviceFindUnique.mockResolvedValue({
             ...SERVICE,
@@ -1623,18 +1321,519 @@ describe("courses on a service's time (ADR-007)", () => {
         moduleFindFirst.mockResolvedValue(null);
         (prisma.booking.findMany as jest.Mock).mockResolvedValue([]);
         // Without the course, the slot is open.
-        const open = await new BookingsService().publicAvailability(
+        const open = await new PublicBookingsService().publicAvailability(
             "svc_1",
             "2026-07-20T00:00:00.000Z",
             "2026-07-21T00:00:00.000Z",
         );
         expect(open.map((s) => s.startAt.toISOString())).toContain(START);
         heldSeats(2, 0);
-        const slots = await new BookingsService().publicAvailability(
+        const slots = await new PublicBookingsService().publicAvailability(
             "svc_1",
             "2026-07-20T00:00:00.000Z",
             "2026-07-21T00:00:00.000Z",
         );
         expect(slots.map((s) => s.startAt.toISOString())).not.toContain(START);
+    });
+});
+
+// ── Staff (U3) ─────────────────────────────────────────────────────────────
+
+describe("staff on bookings (U3)", () => {
+    const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+    const ASHA = { id: "staff_asha", name: "Asha" };
+    const BEN = { id: "staff_ben", name: "Ben" };
+
+    /** A one-to-one both take, Mon 9–10 each; nobody booked. */
+    function wireStaffed(people = [ASHA, BEN]) {
+        wireBookHappyPath();
+        db.staffService!.findMany!.mockResolvedValue(
+            people.map((staff) => ({ staff })),
+        );
+        db.staffHours!.findMany!.mockResolvedValue(
+            people.map((p) => ({
+                staffId: p.id,
+                dayOfWeek: 1,
+                startMinute: 540,
+                endMinute: 600,
+            })),
+        );
+        bookingFindMany.mockResolvedValue([]);
+    }
+
+    beforeEach(() => jest.clearAllMocks());
+    afterEach(() => {
+        db.staffService!.findMany!.mockResolvedValue([]);
+        db.staffHours!.findMany!.mockResolvedValue([]);
+        db.staffTimeOff!.findMany!.mockResolvedValue([]);
+        db.bookingRules!.findUnique!.mockResolvedValue(null);
+        bookingFindMany.mockResolvedValue([]);
+        bookingCount.mockResolvedValue(0);
+    });
+
+    it("books the first person free, and counts that person — not the service — in the transaction", async () => {
+        wireStaffed();
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
+
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_asha",
+        });
+        // Per person: one clash count on Asha, no service-wide count.
+        expect(bookingCount).toHaveBeenCalledTimes(1);
+        expect(bookingCount.mock.calls[0][0].where).toMatchObject({
+            staffId: "staff_asha",
+            OR: [
+                { status: "CONFIRMED" },
+                { status: "PENDING", holdExpiresAt: { gt: expect.any(Date) } },
+            ],
+        });
+        // Her row is locked before counting.
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+    });
+
+    it("gives the slot to the next person when the first is booked", async () => {
+        wireStaffed();
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_ben",
+        });
+    });
+
+    it("tells a public booker a time booked meanwhile went, as a conflict", async () => {
+        wireStaffed([ASHA]);
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        const refused = await new PublicBookingsService()
+            .book("svc_1", baseInput(), "iphash")
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(ConflictException);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a person who is off, without saying so to the public", async () => {
+        wireStaffed([ASHA]);
+        db.staffTimeOff!.findMany!.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date("2026-07-20T00:00:00Z"),
+                endAt: new Date("2026-07-21T00:00:00Z"),
+            },
+        ]);
+        const refused = await new PublicBookingsService()
+            .book("svc_1", baseInput({ staffId: "staff_asha" }), "iphash")
+            .catch((e: unknown) => e);
+        // Refused as a time that went — the same answer as booked, so the
+        // page shows what is left and time off never shows through.
+        expect(refused).toBeInstanceOf(ConflictException);
+        const body = (refused as ConflictException).getResponse() as {
+            message: string;
+        };
+        expect(body.message).not.toMatch(/off|leave|holiday|working/i);
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("tells the merchant why a named person can't: not working, or booked", async () => {
+        wireStaffed([ASHA]);
+        contactFindUnique.mockResolvedValue({
+            id: "c1",
+            organizationId: "org_SVC",
+            email: "a@example.com",
+            firstName: "A",
+            lastName: null,
+            phone: null,
+        });
+        db.staffTimeOff!.findMany!.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date("2026-07-20T00:00:00Z"),
+                endAt: new Date("2026-07-21T00:00:00Z"),
+            },
+        ]);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "c1",
+                staffId: "staff_asha",
+            }),
+        ).rejects.toMatchObject({
+            response: { message: "Asha isn't working then.", field: "staffId" },
+        });
+
+        db.staffTimeOff!.findMany!.mockResolvedValue([]);
+        bookingFindMany.mockResolvedValue([
+            {
+                staffId: "staff_asha",
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+            },
+        ]);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                contactId: "c1",
+                staffId: "staff_asha",
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                message: "Asha is already booked then.",
+                field: "staffId",
+            },
+        });
+    });
+
+    it("refuses when the person was booked elsewhere meanwhile (the in-transaction clash)", async () => {
+        wireStaffed([ASHA]);
+        bookingCount.mockResolvedValue(1);
+        await expect(
+            new PublicBookingsService().book("svc_1", baseInput(), "iphash"),
+        ).rejects.toMatchObject({ response: { field: "staffId" } });
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a public booking later than the latest-booking rule", async () => {
+        wireBookHappyPath();
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: 60,
+            freeCancelHours: null,
+        });
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+        jest.setSystemTime(new Date("2026-07-20T08:30:00Z"));
+        try {
+            await expect(
+                new PublicBookingsService().book(
+                    "svc_1",
+                    baseInput(),
+                    "iphash",
+                ),
+            ).rejects.toMatchObject({ response: { field: "startAt" } });
+        } finally {
+            jest.useRealTimers();
+        }
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("lists free starts per person, with ids only", async () => {
+        wireStaffed();
+        const slots = await new PublicBookingsService().publicAvailability(
+            "svc_1",
+            "2026-07-20T00:00:00Z",
+            "2026-07-21T00:00:00Z",
+            undefined,
+            new Date("2026-07-01T00:00:00Z"),
+        );
+        expect(slots).toEqual([
+            {
+                startAt: new Date(START),
+                endAt: new Date("2026-07-20T10:00:00.000Z"),
+                staffIds: ["staff_asha", "staff_ben"],
+            },
+        ]);
+    });
+
+    it("names who takes a service publicly by display name and id — nothing else", async () => {
+        wireStaffed();
+        const people = await new PublicBookingsService().publicServiceStaff(
+            "svc_1",
+        );
+        expect(people).toEqual([
+            { id: "staff_asha", name: "Asha" },
+            { id: "staff_ben", name: "Ben" },
+        ]);
+    });
+
+    it("keeps a class's own grid and capacity, naming its instructor", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            capacity: 10,
+            availabilityRules: RULES,
+        });
+        db.staffService!.findMany!.mockResolvedValue([{ staff: ASHA }]);
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
+        // Service-wide seats counted, then the instructor's clash — which
+        // leaves out the other places in the same session.
+        expect(bookingCount).toHaveBeenCalledTimes(2);
+        expect(bookingCount.mock.calls[1][0].where).toMatchObject({
+            staffId: "staff_asha",
+            NOT: { serviceId: "svc_1", startAt: new Date(START) },
+        });
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            staffId: "staff_asha",
+        });
+    });
+});
+
+describe("cancelling inside the free-cancellation window (U3)", () => {
+    const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+    const START_AT = new Date("2026-07-20T09:00:00Z");
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_1",
+            organizationId: "org_SVC",
+            status: "CONFIRMED",
+            startAt: START_AT,
+        });
+        bookingUpdate.mockResolvedValue({ id: "bk_1", status: "CANCELLED" });
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: 12,
+        });
+    });
+    afterEach(() => db.bookingRules!.findUnique!.mockResolvedValue(null));
+
+    it("before the window: the class goes back to its pack", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-19T20:00:00Z"),
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: false,
+        });
+        expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
+
+    it("inside it: the class stays used and the cancel is recorded as late", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-20T01:00:00Z"),
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: true,
+        });
+        expect(db.packRedemption!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("the business calling a class off gives the class back, even inside it", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-20T01:00:00Z"),
+            { returnCredit: true },
+        );
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: false,
+        });
+        expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
+});
+
+describe("the bookings calendar in one read (U4)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const staffFindMany = (
+        prisma as unknown as { staffMember: { findMany: jest.Mock } }
+    ).staffMember.findMany;
+
+    const RANGE = {
+        from: "2026-07-20T00:00:00.000Z",
+        to: "2026-07-27T00:00:00.000Z",
+    };
+    const PT = { id: "st_1", name: "Asha", title: "Trainer" };
+
+    function row(over: Record<string, unknown> = {}) {
+        return {
+            id: "bk_1",
+            serviceId: "svc_1",
+            startAt: new Date("2026-07-20T09:00:00Z"),
+            endAt: new Date("2026-07-20T10:00:00Z"),
+            timezone: "UTC",
+            status: "CONFIRMED",
+            outcome: null,
+            bookerName: null,
+            bookerEmail: "jane@example.com",
+            bookerPhone: null,
+            createdAt: new Date("2026-07-01T00:00:00Z"),
+            cancelledAt: null,
+            cancelledLate: false,
+            paidWith: null,
+            subscriptionId: null,
+            service: {
+                id: "svc_1",
+                name: "Personal training",
+                timezone: "UTC",
+                capacity: 1,
+                durationMinutes: 60,
+                priceCents: 150000,
+                currency: "INR",
+            },
+            contact: null,
+            staff: { id: "st_1", name: "Asha" },
+            packRedemption: null,
+            ...over,
+        };
+    }
+
+    const SPIN = {
+        id: "svc_spin",
+        name: "Spin",
+        timezone: "UTC",
+        capacity: 12,
+        durationMinutes: 45,
+        priceCents: 50000,
+        currency: "INR",
+    };
+
+    it("groups by person, with an Unassigned diary for bookings nobody takes", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([
+            row(),
+            row({ id: "bk_2", staff: null }),
+        ]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+
+        expect(res.timezone).toBe("UTC");
+        expect(res.diaries.map((d) => d.person?.name ?? "Unassigned")).toEqual([
+            "Asha",
+            "Unassigned",
+        ]);
+        expect(res.diaries[0].bookings.map((b) => b.id)).toEqual(["bk_1"]);
+        expect(res.diaries[1].bookings.map((b) => b.id)).toEqual(["bk_2"]);
+        // Scoped to the org and the range, never to an id the caller sent.
+        expect(bookingFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_SVC",
+                    startAt: { lt: new Date(RANGE.to) },
+                    endAt: { gt: new Date(RANGE.from) },
+                },
+            }),
+        );
+    });
+
+    it("gathers a class start into one session: places, who, and how each paid", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        const at = { serviceId: "svc_spin", service: SPIN };
+        bookingFindMany.mockResolvedValue([
+            row({
+                ...at,
+                id: "m",
+                paidWith: "MEMBERSHIP",
+                subscriptionId: "sub_1",
+            }),
+            row({
+                ...at,
+                id: "p",
+                packRedemption: {
+                    reversedAt: null,
+                    purchase: { pack: { name: "10 classes" } },
+                },
+            }),
+            row({ ...at, id: "d", paidWith: "DESK" }),
+            row({ ...at, id: "x", status: "CANCELLED", paidWith: "PAID" }),
+        ]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+        const [session] = res.diaries[0].classes;
+
+        expect(session.capacity).toBe(12);
+        expect(session.taken).toBe(3);
+        expect(session.staff).toEqual({ id: "st_1", name: "Asha" });
+        expect(
+            session.bookings.map((b) => [b.id, b.paidWith, b.packName]),
+        ).toEqual([
+            ["m", "MEMBERSHIP", null],
+            ["p", "PACK", "10 classes"],
+            ["d", "DESK", null],
+            ["x", "PAID", null],
+        ]);
+        expect(res.diaries[0].bookings).toEqual([]);
+    });
+
+    it("a Member sees the diary and the people on it, but no prices (DEC-020)", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+
+        const res = await new BookingsService().calendarBookings(
+            ctx({ role: "MEMBER" }),
+            RANGE,
+        );
+
+        expect(res.money).toBe(false);
+        const [booking] = res.diaries[0].bookings;
+        expect(booking.bookerEmail).toBe("jane@example.com");
+        expect(booking.service).not.toHaveProperty("priceCents");
+        expect(booking.service).not.toHaveProperty("currency");
+    });
+
+    it("an owner gets the prices", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+
+        const res = await new BookingsService().calendarBookings(ctx(), RANGE);
+
+        expect(res.money).toBe(true);
+        expect(res.diaries[0].bookings[0].service.priceCents).toBe(150000);
+    });
+
+    it("one person's diary: filtered to them; someone else's is a 404", async () => {
+        staffFindMany.mockResolvedValue([PT]);
+        bookingFindMany.mockResolvedValue([row()]);
+        await new BookingsService().calendarBookings(ctx(), {
+            ...RANGE,
+            staffId: "st_1",
+        });
+        expect(staffFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "st_1", organizationId: "org_SVC" },
+            }),
+        );
+        expect(bookingFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ staffId: "st_1" }),
+            }),
+        );
+
+        staffFindMany.mockResolvedValue([]);
+        await expect(
+            new BookingsService().calendarBookings(ctx(), {
+                ...RANGE,
+                staffId: "st_other",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("refuses a backwards or over-long range", async () => {
+        const service = new BookingsService();
+        await expect(
+            service.calendarBookings(ctx(), { from: RANGE.to, to: RANGE.from }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            service.calendarBookings(ctx(), {
+                from: "2020-01-01T00:00:00Z",
+                to: "2026-01-01T00:00:00Z",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(bookingFindMany).not.toHaveBeenCalled();
+    });
+
+    it("a reviewer, who reads no bookings, is refused", async () => {
+        await expect(
+            new BookingsService().calendarBookings(
+                ctx({ role: "REVIEWER" }),
+                RANGE,
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });

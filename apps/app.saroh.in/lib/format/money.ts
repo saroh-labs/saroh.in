@@ -81,3 +81,19 @@ export function formatCount(value: number): string {
         maximumFractionDigits: 1,
     }).format(value);
 }
+
+/** The sign a currency is written with ("₹" for INR), for a field's prefix. */
+export function currencySymbol(currency: string): string {
+    try {
+        const part = new Intl.NumberFormat(DISPLAY_LOCALE, {
+            style: "currency",
+            currency,
+            currencyDisplay: "narrowSymbol",
+        })
+            .formatToParts(0)
+            .find((p) => p.type === "currency");
+        return part?.value ?? currency;
+    } catch {
+        return currency;
+    }
+}

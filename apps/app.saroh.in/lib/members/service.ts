@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
 
 /**
@@ -63,14 +64,12 @@ async function mutate(
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (res.ok) return { ok: true, data: { ok: true } };
-    const data = (await res.json().catch(() => null)) as {
-        message?: string;
-        field?: "email";
-    } | null;
+    const data: unknown = await res.json().catch(() => null);
+    const failure = toFailure(data, "Something went wrong");
     return {
         ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: data?.field,
+        error: failure.error,
+        field: failure.field === "email" ? "email" : undefined,
     };
 }
 
@@ -111,12 +110,11 @@ export async function acceptInvitation(
     const res = await apiFetch(`/invitations/${token}/accept`, {
         method: "POST",
     });
-    const data = (await res.json().catch(() => null)) as {
-        storeId?: string;
-        message?: string;
-    } | null;
-    if (res.ok && data?.storeId) {
-        return { ok: true, storeId: data.storeId };
-    }
-    return { ok: false, error: data?.message ?? "Could not accept invitation" };
+    const data: unknown = await res.json().catch(() => null);
+    const storeId = (data as { storeId?: unknown } | null)?.storeId;
+    if (res.ok && typeof storeId === "string") return { ok: true, storeId };
+    return {
+        ok: false,
+        error: toFailure(data, "Could not accept invitation").error,
+    };
 }

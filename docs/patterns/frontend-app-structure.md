@@ -46,7 +46,7 @@ components/shared/             app shell, navigation, command menu
   `components/shared/app-shell.tsx` reads session, organizations, the active
   organization, modules and counts once per render and passes props down.
 - **Current** — **Navigation has one source.**
-  `components/shared/nav-items.tsx` feeds the sidebar, the mobile drawer and the
+  `components/shared/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A

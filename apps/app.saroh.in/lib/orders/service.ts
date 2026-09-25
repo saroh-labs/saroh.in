@@ -1,55 +1,24 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getJson, getList } from "@/lib/api/http";
+import { apiFetch } from "@/lib/api/http";
 
 /**
- * Orders data access for app.saroh.in. Forwards the session cookie to
- * api.saroh.in (store membership enforced). Money fields are decimal strings.
- * Server-only.
+ * One storefront's order writes for app.saroh.in: taking an order and
+ * recording its status or a payment by hand. Forwards the session cookie to
+ * api.saroh.in (store membership enforced). Server-only.
+ *
+ * Reads are elsewhere: the business-wide list in `business-service.ts`, and
+ * one order in `kitchen-service.ts` — the organization-scoped read that leaves
+ * money out for a role without a money read. This file's store-scoped read
+ * did not, and was removed with Order Detail's move (U14).
  */
 
 export type OrderStatus =
     "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 export type PaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
 
-export interface OrderSummary {
-    id: string;
-    orderId: string;
-    customerId: string;
-    status: OrderStatus;
-    paymentStatus: PaymentStatus;
-    total: string;
-    currency: string;
-    createdAt: string;
-    customer?: {
-        email: string;
-        firstName: string | null;
-        lastName: string | null;
-    } | null;
-}
-
-export interface OrderItem {
-    id: string;
-    productId: string;
-    quantity: number;
-    price: string;
-    product?: { name: string } | null;
-}
-
-export interface OrderDetail extends OrderSummary {
-    /** When anything on the order last changed. */
-    updatedAt: string | null;
-    subtotal: string;
-    tax: string;
-    shipping: string;
-    discount: string;
-    items: OrderItem[];
-    /** The code used, as it was when used — never the code as it is now. */
-    discountCode: { code: string; rule: string } | null;
-}
-
 export interface CreateOrderInput {
     customerId: string;
-    items: { productId: string; quantity: number }[];
+    items: { productId: string; variantId?: string; quantity: number }[];
     tax?: string;
     shipping?: string;
     discount?: string;
@@ -66,17 +35,6 @@ export interface UpdateOrderInput {
 export type OrderResult =
     | { ok: true; data: { id: string } }
     | { ok: false; error: string; field?: string };
-
-export function listOrders(storeId: string): Promise<OrderSummary[]> {
-    return getList<OrderSummary>(`/stores/${storeId}/orders`);
-}
-
-export function getOrder(
-    storeId: string,
-    orderId: string,
-): Promise<OrderDetail | null> {
-    return getJson<OrderDetail>(`/stores/${storeId}/orders/${orderId}`);
-}
 
 async function mutate(
     path: string,

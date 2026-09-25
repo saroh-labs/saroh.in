@@ -28,6 +28,7 @@ import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { mayAddStorefront } from "@/lib/business-limits";
+import { providerName } from "@/lib/payments/providers";
 import {
     newStorefrontHref,
     storefrontDetailsHref,
@@ -72,15 +73,6 @@ const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
     close: "18:00",
     closed: key === "SUN",
 }));
-
-/** What each provider is called on screen. */
-const PROVIDER_NAME: Record<string, string> = {
-    STRIPE: "Stripe",
-    RAZORPAY: "Razorpay",
-    CASHFREE: "Cashfree",
-    DODO: "Dodo Payments",
-};
-const providerName = (p: string) => PROVIDER_NAME[p] ?? p;
 
 const ordersLabel = (n: number) =>
     n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;

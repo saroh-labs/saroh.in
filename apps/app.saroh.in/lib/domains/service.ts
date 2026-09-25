@@ -72,6 +72,24 @@ export async function listSiteDomains(siteId: string): Promise<SiteDomain[]> {
     return all.filter((d) => d.siteId === siteId);
 }
 
+/**
+ * Every domain the business has, for Settings → Providers. `null` — not an
+ * empty list — when they cannot be read (Website switched off answers 404),
+ * so the page never says "no domains" about domains it did not see. Never
+ * throws: the domains are a detail on that page, not what it is for.
+ */
+export async function listOrgDomains(): Promise<SiteDomain[] | null> {
+    const base = await domainsBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(base);
+        if (!res.ok) return null;
+        return (await res.json()) as SiteDomain[];
+    } catch {
+        return null;
+    }
+}
+
 export async function claimDomain(
     siteId: string,
     hostname: string,

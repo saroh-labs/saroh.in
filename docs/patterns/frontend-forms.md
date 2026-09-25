@@ -10,7 +10,17 @@
 **Current** — React Hook Form, `zodResolver`, and the `@saroh/ui/form`
 primitives (`Form`, `FormField`, `FormItem`, `FormLabel`, `FormMessage`), made
 the standard in #109. Eleven forms in `app.saroh.in` use it, plus the `saroh.in`
-waitlist; `components/stores/product-form.tsx` is the reference.
+waitlist; `components/stores/product-form.tsx` is the reference for a single
+form.
+
+**Current** — **A long editor saves by section** (DEC-022):
+`components/commerce/product-editor-v2/` is the reference. Each section keeps
+its own react-hook-form (or a draft for lists like photos and variants) and
+reports two things through `useSection` — whether it is dirty, and the first
+thing it must fix. The shell turns those into the section's chip, border and
+save bar, the header's hint, the jump dots, Save all and the leave dialog.
+Section patches send only their own fields; the API judges the whole product
+after the patch.
 
 ## Rules
 

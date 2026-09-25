@@ -40,6 +40,10 @@ module.exports = {
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // #119 Home aggregator: pure ranking with mocked availability + counts.
         "<rootDir>/src/modules/home/**/*.spec.ts",
+        // U4 Business Calendar: the pure month bucketing and schedules, and
+        // the per-layer service with mocked availability + Prisma.
+        // calendar.db.spec.ts needs Postgres and runs in integration.
+        "<rootDir>/src/modules/calendar/**/*.spec.ts",
         // #123 provider health: state derivation + credential redaction, mocked
         // Prisma.
         "<rootDir>/src/modules/provider-health/**/*.spec.ts",
@@ -118,6 +122,9 @@ module.exports = {
         // booking command's capacity-one race, idempotency, org-from-Service,
         // rate-limit, cancel, and management authz. Never touch a DB, no network.
         "<rootDir>/src/modules/bookings/**/*.spec.ts",
+        // U3 staff: the pure hours rules and StaffService with a jest-mocked
+        // Prisma. staff.db.spec.ts needs Postgres and runs in integration.
+        "<rootDir>/src/modules/staff/**/*.spec.ts",
         // S5-001 orders lifecycle: the PURE order-state state machine and the
         // OrdersService.updateStatus guard spec with a jest-mocked Prisma (never
         // touch a DB). The legacy DB-backed orders.service.spec.ts stays in the
@@ -130,6 +137,20 @@ module.exports = {
         "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        // ADR-008 kitchen flow (U6): the pure stage machine, refund-by-line
+        // arithmetic, the order read's money hiding, and the kitchen service
+        // with a jest-mocked Prisma.
+        "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        "<rootDir>/src/modules/orders/order-refunds.spec.ts",
+        "<rootDir>/src/modules/orders/order-read.spec.ts",
+        "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
+        // Products v2: MRP, saving, shop switches and detail coherence — pure.
+        "<rootDir>/src/modules/products/product-rules.spec.ts",
+        "<rootDir>/src/modules/products/product-overview.spec.ts",
+        "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
+        "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
+        "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
+        "<rootDir>/src/modules/products/products.gate.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.
@@ -161,10 +182,19 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // U5 GST: the tax maths, the states and GSTINs, and the order
+        // invoice builder — pure.
+        "<rootDir>/src/modules/invoices/gst.spec.ts",
+        "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
+        // Which refunds make no credit note — a jest-mocked transaction.
+        "<rootDir>/src/modules/invoices/order-invoicing.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
+        // U7: collection dates and when a skip saves the charge.
+        "<rootDir>/src/modules/subscriptions/collections.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",

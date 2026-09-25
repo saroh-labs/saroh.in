@@ -8,6 +8,25 @@
 //
 // The bug was invisible precisely because nothing asserted the column. These
 // tests exist to make its return loud.
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = { create: jest.fn(), count: jest.fn() };
     const customer = { findFirst: jest.fn() };
@@ -69,10 +88,15 @@ function makeService(writable: { organizationId: string | null } | null) {
 beforeEach(() => {
     jest.clearAllMocks();
     customerFindFirst.mockResolvedValue({ id: CUSTOMER });
-    productFindFirst.mockResolvedValue({ price: "20.00" });
+    productFindFirst.mockResolvedValue({
+        name: "Widget",
+        price: "20.00",
+        categoryId: null,
+        variants: [],
+    });
     inventoryFindUnique.mockResolvedValue(null); // untracked — no stock plumbing
     orderCount.mockResolvedValue(0);
-    orderCreate.mockResolvedValue({ id: "order_1" });
+    orderCreate.mockResolvedValue({ id: "order_1", items: [] });
     settingsFindUnique.mockResolvedValue(null);
 });
 

@@ -43,6 +43,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { openingHoursText } from "./opening-hours-text";
 import { StorefrontsController } from "./storefronts.controller";
 import { StorefrontsService } from "./storefronts.service";
 
@@ -120,9 +121,13 @@ describe("StorefrontsController authorization", () => {
     it("lets an Admin change and close", async () => {
         await controller.update(as("ADMIN"), "st_1", { name: "x" });
         await controller.close(as("ADMIN"), "st_1");
-        expect(service.update).toHaveBeenCalledWith("org_1", "st_1", {
-            name: "x",
-        });
+        // Who saved, for the audit row a change of hours writes.
+        expect(service.update).toHaveBeenCalledWith(
+            "org_1",
+            "st_1",
+            { name: "x" },
+            "user_1",
+        );
         expect(service.close).toHaveBeenCalledWith("org_1", "st_1");
     });
 
@@ -325,5 +330,95 @@ describe("StorefrontsService — checkout, pause and a shop's week", () => {
         );
         await service.update("org_1", "st_1", { openingHours: week as never });
         expect(db.__tx.storeSettings.upsert).toHaveBeenCalled();
+    });
+});
+
+describe("opening hours in Settings › Activity (#509)", () => {
+    const day = (
+        d: string,
+        open = "09:00",
+        close = "18:00",
+        closed = false,
+    ) => ({
+        day: d,
+        open,
+        close,
+        closed,
+    });
+    const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI"].map((d) => day(d));
+
+    it("says a week as a person reads it, neighbouring days once", () => {
+        expect(
+            openingHoursText([
+                ...WEEKDAYS,
+                day("SAT", "10:00", "14:00"),
+                day("SUN", "00:00", "00:00", true),
+            ] as never),
+        ).toBe("Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed");
+        expect(openingHoursText(null)).toBeNull();
+    });
+
+    it("records a storefront's week before and after, by who saved it", async () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const service = new StorefrontsService({ record } as never);
+        const before = [...WEEKDAYS, day("SAT"), day("SUN")];
+        const after = [
+            ...WEEKDAYS,
+            day("SAT", "10:00", "14:00"),
+            day("SUN", "00:00", "00:00", true),
+        ];
+        db.storeSettings
+            .findUnique!.mockResolvedValueOnce({
+                taxRate: "0",
+                openingHours: before,
+            })
+            .mockResolvedValue({ taxRate: "0", openingHours: after });
+
+        await service.update(
+            "org_1",
+            "st_1",
+            { openingHours: after as never },
+            "user_1",
+        );
+
+        expect(record).toHaveBeenCalledWith({
+            action: "storefront.hours.update",
+            actorUserId: "user_1",
+            organizationId: "org_1",
+            targetType: "storefront",
+            targetId: "st_1",
+            outcome: "SUCCESS",
+            metadata: {
+                fields: ["openingHours"],
+                storefront: "High Street",
+                changes: [
+                    {
+                        field: "openingHours",
+                        before: "Mon–Sun 09:00–18:00",
+                        after: "Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed",
+                    },
+                ],
+            },
+        });
+    });
+
+    it("records nothing when the week is saved as it was, or nobody saved it", async () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const service = new StorefrontsService({ record } as never);
+        const week = [...WEEKDAYS, day("SAT"), day("SUN")];
+        db.storeSettings.findUnique!.mockResolvedValue({
+            taxRate: "0",
+            openingHours: week,
+        });
+
+        await service.update(
+            "org_1",
+            "st_1",
+            { openingHours: week as never },
+            "user_1",
+        );
+        await service.update("org_1", "st_1", { name: "Shop" });
+
+        expect(record).not.toHaveBeenCalled();
     });
 });

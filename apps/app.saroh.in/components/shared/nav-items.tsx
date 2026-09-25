@@ -2,19 +2,21 @@ import type { LucideIcon } from "lucide-react";
 import {
     BarChart3,
     Bell,
-    Blocks,
-    Briefcase,
     Building2,
+    Calendar,
     CalendarClock,
+    Clock,
+    CreditCard,
     Globe,
-    GraduationCap,
     Home,
     KanbanSquare,
-    Plug,
+    LayoutGrid,
+    Link2,
     ReceiptText,
+    SlidersHorizontal,
     Store,
     Target,
-    Ticket,
+    UserRound,
     Users,
 } from "lucide-react";
 
@@ -22,8 +24,8 @@ import { mayAddWebsite } from "@/lib/business-limits";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
- * `AppSidebar`, the mobile `MobileNav` drawer and the command menu, so the three
- * can never drift. Home is an ungrouped anchor.
+ * `AppSidebar`, the phone `TabBar` (and its sheet) and the command menu, so the
+ * three can never drift. Home is an ungrouped anchor.
  *
  * Only routes that exist today are listed — no speculative destinations. The
  * proposed IA in `docs/product-transformation/information-architecture.md` §2
@@ -52,6 +54,9 @@ import { mayAddWebsite } from "@/lib/business-limits";
 export type NavRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
 
 export type NavAction =
+    // The business itself: Home › Calendar reads the month across every
+    // module (the layers inside it gate themselves). Not a Reviewer's.
+    | "org:read"
     | "site:read"
     | "site:create"
     | "section:write"
@@ -60,10 +65,17 @@ export type NavAction =
     | "notification:read"
     | "org:settings:read"
     | "provider:read"
+    // Settings › Activity: who changed what. Owner and Admin, as the API
+    // keeps the audit stream.
+    | "audit:read"
     // The business-wide Orders list: customer names, emails and totals across
     // every storefront. Not in the read-only floor, so a Member or Reviewer
     // is not offered a row the API would refuse them.
     | "order:read"
+    // Moving an order through the kitchen (DEC-024): a Member holds it, and
+    // reaches the Orders list and an order's page through it — the kitchen's
+    // view, without money.
+    | "order:stage"
     // Leads and the pipeline (Owner and Admin by default; a Member reads
     // contacts, not the sales funnel).
     | "lead:read"
@@ -105,6 +117,7 @@ export type NavAction =
  */
 const REACHABLE: Record<NavRole, readonly NavAction[]> = {
     OWNER: [
+        "org:read",
         "site:read",
         "site:create",
         "section:write",
@@ -113,7 +126,9 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "audit:read",
         "order:read",
+        "order:stage",
         "discount:read",
         "store:read",
         "subscription:read",
@@ -128,6 +143,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pipeline:read",
     ],
     ADMIN: [
+        "org:read",
         "site:read",
         "site:create",
         "section:write",
@@ -136,7 +152,9 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "notification:read",
         "org:settings:read",
         "provider:read",
+        "audit:read",
         "order:read",
+        "order:stage",
         "discount:read",
         "store:read",
         "subscription:read",
@@ -151,6 +169,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pipeline:read",
     ],
     MEMBER: [
+        "org:read",
         "site:read",
         "member:read",
         "module:read",
@@ -158,6 +177,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "contact:read",
         "booking:read",
         "service:read",
+        "order:stage",
     ],
     REVIEWER: ["site:read"],
 };
@@ -170,10 +190,17 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
  * itself on a failed read is worse than one that offers a destination the
  * server then refuses.
  */
-export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
+export function navRoleCan(
+    role: NavRole | null,
+    action: NavAction | readonly NavAction[],
+): boolean {
     if (role === null) return true;
-    return REACHABLE[role].includes(action);
+    return anyOf(action).some((a) => REACHABLE[role].includes(a));
 }
+
+/** A destination some of whose actions reach it: any one will do. */
+const anyOf = (action: NavAction | readonly NavAction[]) =>
+    typeof action === "string" ? [action] : action;
 
 /**
  * May this actor reach something that needs `action`?
@@ -195,9 +222,10 @@ export function navRoleCan(role: NavRole | null, action: NavAction): boolean {
  */
 export function navCan(
     actor: { role: NavRole | null; actions?: readonly string[] | null },
-    action: NavAction,
+    action: NavAction | readonly NavAction[],
 ): boolean {
-    if (actor.actions) return actor.actions.includes(action);
+    const { actions } = actor;
+    if (actions) return anyOf(action).some((a) => actions.includes(a));
     return navRoleCan(actor.role, action);
 }
 
@@ -211,7 +239,15 @@ export function navCan(
  */
 export interface NavChild {
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
-    action?: NavAction;
+    /** Any one of several will do, e.g. Orders: `order:read` or `order:stage`. */
+    action?: NavAction | readonly NavAction[];
+    /**
+     * Withheld from an actor who holds `holds` but not `without`, whatever
+     * `action` says. The API's rule for the store's customers: the kitchen's
+     * roles — `order:stage` without `order:read` — reach the store but are
+     * refused its customer list, which is emails and spend (R7, #508).
+     */
+    refusedTo?: { holds: NavAction; without: NavAction };
     /**
      * Absent for a row that only NAMES something — a site whose real
      * destinations are the rows beneath it. A label row is not a link, so
@@ -221,6 +257,12 @@ export interface NavChild {
     href?: string;
     label: string;
     create?: boolean;
+    /**
+     * The capability this page belongs to, when its section spans more than
+     * one — Bookings holds Appointments pages and Courses. Filtered exactly
+     * like {@link NavItem.moduleKey}.
+     */
+    moduleKey?: string;
     /** One level further: what a site holds — its content and its settings. */
     children?: NavChild[];
 }
@@ -230,7 +272,7 @@ export interface NavItem {
     label: string;
     icon: LucideIcon;
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
-    action?: NavAction;
+    action?: NavAction | readonly NavAction[];
     /**
      * The merchant's own things beneath this destination (their sites, today).
      *
@@ -263,17 +305,16 @@ export interface NavGroup {
      */
     moduleKey?: string;
     /**
-     * Set the group off from the ones above it with a rule.
+     * Rule the group off and pin it to the foot of the rail.
      *
-     * This used to be `pinToBottom`, and `mt-auto` really did glue Settings to
-     * the foot of a full-height rail. With twelve destinations that left a
-     * vertical hole in the middle of the navigation big enough to read as a
-     * rendering fault — the rail looked broken rather than organised. A hairline
-     * says "configuration is a different kind of thing" in two pixels instead of
-     * two hundred, and Settings is still always last, which is what muscle
-     * memory actually keys on.
+     * It was pinned once before, then only ruled, because the gap above it
+     * read as a rendering fault on a rail with twelve destinations. It is
+     * pinned again by choice (2026-09-25): Workspace sits at the bottom, where
+     * account-level things live, apart from running the business. The space
+     * above it is a flexible spacer, never less than the old 10px, so a rail
+     * too long for the window scrolls with the rule still in place.
      */
-    separated?: boolean;
+    pinToBottom?: boolean;
     items: NavItem[];
 }
 
@@ -317,7 +358,21 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * from the marketing site.
  */
 export const NAV_GROUPS: NavGroup[] = [
-    { items: [{ href: "/", label: "Home", icon: Home }] },
+    {
+        items: [
+            { href: "/", label: "Home", icon: Home },
+            // Home › Calendar: one month of everything dated, after the
+            // "Saroh Business Calendar" design. Not module-gated — it spans
+            // modules, and each layer on it follows its own module and
+            // permission (the API leaves out what the viewer may not see).
+            {
+                href: "/calendar",
+                label: "Calendar",
+                icon: Calendar,
+                action: "org:read",
+            },
+        ],
+    },
     {
         // Grouped by PURPOSE rather than by module, following the canvas
         // design. A merchant does not think "Commerce" and "Appointments" —
@@ -354,7 +409,9 @@ export const NAV_GROUPS: NavGroup[] = [
                     {
                         href: "/commerce/orders",
                         label: "Orders",
-                        action: "order:read",
+                        // A Member at the counter reaches it through the
+                        // kitchen (DEC-024) and sees no money on it.
+                        action: ["order:read", "order:stage"],
                     },
                     {
                         href: "/commerce/products",
@@ -365,6 +422,11 @@ export const NAV_GROUPS: NavGroup[] = [
                         href: "/commerce/customers",
                         label: "Customers",
                         action: "store:read",
+                        // Emails and spend: not the counter's (R7, #508).
+                        refusedTo: {
+                            holds: "order:stage",
+                            without: "order:read",
+                        },
                     },
                     {
                         href: "/commerce/discounts",
@@ -379,15 +441,64 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                 ],
             },
-            // Billing (ADR-007): money a business is owed by a person —
-            // memberships and the invoices for them — under Payments, after
-            // the "Saroh Billing and Classes" design. Its pages nest like
-            // Sell's; each unit adds its row once its page exists.
+            // Bookings: "what is booked?" and "what can be booked?" as one
+            // section, after the "Saroh Bookings" design. They used to be four
+            // rows of their own (Schedule, Services, Courses, Class packs);
+            // the design nests them, as Sell nests its screens. Every address
+            // is unchanged — the section is presentation only.
+            //
+            // No `moduleKey` on the section itself: Courses is its own module
+            // (ADR-007), so a business may run courses without taking
+            // appointments. Each child carries its own key; a section whose
+            // every child is filtered away is dropped whole, and one whose
+            // landing page was filtered away lands on its first survivor
+            // (see `landOnFirstChild`).
             {
-                // The section, like Sell's `/commerce`: every Billing page is
-                // under it, so the rail opens and marks Billing on any of them.
+                href: "/bookings",
+                label: "Bookings",
+                icon: CalendarClock,
+                children: [
+                    {
+                        href: "/bookings",
+                        label: "Calendar",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                    {
+                        href: "/services",
+                        label: "Services",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                    // Who can be booked when, and the business's rules (U16).
+                    {
+                        href: "/bookings/availability",
+                        label: "Availability",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                    {
+                        href: "/courses",
+                        label: "Courses",
+                        moduleKey: "COURSES",
+                        action: "course:read",
+                    },
+                    // Booked time sold ahead (ADR-007).
+                    {
+                        href: "/class-packs",
+                        label: "Class packs",
+                        moduleKey: "APPOINTMENTS",
+                        action: "pack:read",
+                    },
+                ],
+            },
+            // Payments (ADR-007): money a business is owed by a person —
+            // memberships and the invoices for them, after the "Saroh Billing
+            // and Classes" design. The rail says Payments; the addresses stay
+            // `/billing/*`, which is where the old Billing links still land.
+            {
+                // The section, like Sell's `/commerce`: every Payments page is
+                // under it, so the rail opens and marks Payments on any of
+                // them. `/billing` itself redirects to Subscriptions.
                 href: "/billing",
-                label: "Billing",
+                label: "Payments",
                 icon: ReceiptText,
                 moduleKey: "PAYMENTS",
                 children: [
@@ -397,51 +508,18 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "subscription:read",
                     },
                     {
-                        href: "/billing/plans",
-                        label: "Plans",
-                        action: "subscription:read",
-                    },
-                    {
                         href: "/billing/invoices",
                         label: "Invoices",
                         action: "invoice:read",
                     },
+                    // Not in the design's section, but a plan is what a
+                    // subscription is made from and it has no other path.
+                    {
+                        href: "/billing/plans",
+                        label: "Plans",
+                        action: "subscription:read",
+                    },
                 ],
-            },
-            // Two destinations, two questions: "what is booked?" and "what can
-            // be booked?". They lost their own BOOKINGS heading in the regroup;
-            // the ordering keeps them adjacent so the pair still reads as one
-            // idea.
-            {
-                href: "/bookings",
-                label: "Schedule",
-                icon: CalendarClock,
-                moduleKey: "APPOINTMENTS",
-            },
-            {
-                href: "/services",
-                label: "Services",
-                icon: Briefcase,
-                moduleKey: "APPOINTMENTS",
-            },
-            // Courses is its own module (ADR-007): a business that takes
-            // bookings need not run courses, so it has its own switch and row.
-            {
-                href: "/courses",
-                label: "Courses",
-                icon: GraduationCap,
-                moduleKey: "COURSES",
-                action: "course:read",
-            },
-            // Class packs: booked time sold ahead, so under Appointments —
-            // but its own row, not nested under Schedule (ADR-007, 2026-09-22):
-            // Schedule and Services stay where merchants already find them.
-            {
-                href: "/class-packs",
-                label: "Class packs",
-                icon: Ticket,
-                moduleKey: "APPOINTMENTS",
-                action: "pack:read",
             },
             {
                 href: "/contacts",
@@ -486,7 +564,7 @@ export const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: "Workspace",
-        separated: true,
+        pinToBottom: true,
         items: [
             /*
              * Never module-gated — Settings → Modules is where a capability
@@ -503,35 +581,27 @@ export const NAV_GROUPS: NavGroup[] = [
              * named the payment and messaging providers the business runs on to
              * anyone who was not a MEMBER, REVIEWER included (#313).
              */
+            /*
+             * One Settings row (2026-09-25). Its pages are tabs on the
+             * settings screen itself (`SETTINGS_PAGES`), so the rail does not
+             * repeat them. Offered when the actor may open one of the
+             * business's pages; `/settings` then opens the first they may.
+             * Your profile is everyone's, but it is about the person, so it
+             * does not put Settings in a Reviewer's rail — they reach it from
+             * the account menu, as the design has it. Plan and billing needs
+             * `org:settings:read`, already listed. Notifications moved to the
+             * top bar (`NOTIFICATIONS_NAV`).
+             */
             {
-                href: "/notifications",
-                label: "Notifications",
-                icon: Bell,
-                action: "notification:read",
-            },
-            {
-                href: "/settings/organization",
-                label: "Business",
-                icon: Building2,
-                action: "org:settings:read",
-            },
-            {
-                href: "/settings/people",
-                label: "Team",
-                icon: Users,
-                action: "member:read",
-            },
-            {
-                href: "/settings/modules",
-                label: "Modules",
-                icon: Blocks,
-                action: "module:read",
-            },
-            {
-                href: "/settings/providers",
-                label: "Providers",
-                icon: Plug,
-                action: "provider:read",
+                href: "/settings",
+                label: "Settings",
+                icon: SlidersHorizontal,
+                action: [
+                    "org:settings:read",
+                    "member:read",
+                    "module:read",
+                    "provider:read",
+                ],
             },
         ],
     },
@@ -552,7 +622,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * its job. Groups without a `moduleKey` (Home, Notifications) are always kept.
  */
 /** The Website destination, the one that grows a tree today. */
-const WEBSITE_HREF = "/sites";
+export const WEBSITE_HREF = "/sites";
 
 /**
  * Hang the merchant's own sites under Website — for the command palette.
@@ -660,15 +730,23 @@ export function navRowsForModule(moduleKey: string): string[] {
     const rows: string[] = [];
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
-            if ((item.moduleKey ?? group.moduleKey) !== moduleKey) continue;
-            rows.push(item.label);
+            const own = item.moduleKey ?? group.moduleKey;
             // A section's screens count as rows: turning Commerce off takes
             // Storefronts, Products and Customers with it, and the merchant
-            // should be told the names they navigate by.
-            for (const child of item.children ?? []) {
-                // A child that repeats its parent's destination is the section
-                // landing page, not a second row.
-                if (child.href !== item.href) rows.push(child.label);
+            // should be told the names they navigate by. A section that spans
+            // modules (Bookings) names the ones this module owns.
+            const children = (item.children ?? []).filter(
+                (child) => (child.moduleKey ?? own) === moduleKey,
+            );
+            if (own !== moduleKey && children.length === 0) continue;
+            if (own === moduleKey) rows.push(item.label);
+            for (const child of children) {
+                // A child that repeats its parent's destination AND name is
+                // the section landing page, not a second row.
+                if (child.href === item.href && child.label === item.label) {
+                    continue;
+                }
+                rows.push(child.label);
             }
         }
     }
@@ -688,7 +766,19 @@ export function filterNavGroups(
             .filter((group) => allowed(group.moduleKey))
             .map((group) => ({
                 ...group,
-                items: group.items.filter((item) => allowed(item.moduleKey)),
+                items: group.items.flatMap((item) => {
+                    if (!allowed(item.moduleKey)) return [];
+                    if (!item.children?.some((c) => c.moduleKey)) {
+                        return [item];
+                    }
+                    const children = item.children.filter((child) =>
+                        allowed(child.moduleKey),
+                    );
+                    // A section every page of which belongs to a module
+                    // this business does not have is not offered at all.
+                    if (children.length === 0) return [];
+                    return [landOnFirstChild(item, children)];
+                }),
             }))
             // A heading with nothing under it is worse than no heading: it names a
             // capability the merchant does not have and then shows them nothing.
@@ -719,7 +809,9 @@ export function filterNavGroupsByRole(
                 if (item.action && !navCan(actor, item.action)) return [];
                 if (item.children === undefined) return [item];
                 const children = item.children.filter(
-                    (child) => !child.action || navCan(actor, child.action),
+                    (child) =>
+                        (!child.action || navCan(actor, child.action)) &&
+                        !refuses(actor, child.refusedTo),
                 );
                 // A section whose every page is refused is not offered as an
                 // empty heading. Only a section that HAD pages: Website with
@@ -727,10 +819,43 @@ export function filterNavGroupsByRole(
                 if (item.children.length > 0 && children.length === 0) {
                     return [];
                 }
-                return [{ ...item, children }];
+                return [landOnFirstChild(item, children)];
             }),
         }))
         .filter((group) => group.items.length > 0);
+}
+
+/**
+ * Does a child's {@link NavChild.refusedTo} withhold it from this actor?
+ * Fails open like {@link navCan}: an actor we cannot judge holds `without`
+ * too, so nothing is withheld.
+ */
+function refuses(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    rule: NavChild["refusedTo"],
+): boolean {
+    if (!rule) return false;
+    return navCan(actor, rule.holds) && !navCan(actor, rule.without);
+}
+
+/**
+ * A section with its children narrowed, still landing somewhere real.
+ *
+ * Bookings lands on its Calendar, which is also its first child. A business
+ * with Courses but not Appointments keeps the section for Courses — and a
+ * section row that still pointed at `/bookings` would open a capability it
+ * does not have. So when the child that WAS the landing page is gone, the
+ * section lands on the first page left. A section whose address is a page of
+ * its own (Sell's `/commerce`) keeps it.
+ */
+function landOnFirstChild(item: NavItem, children: NavChild[]): NavItem {
+    const landedOnChild = item.children?.some((c) => c.href === item.href);
+    const stillThere = children.some((c) => c.href === item.href);
+    const first = children.find((c) => c.href)?.href;
+    if (landedOnChild && !stillThere && first) {
+        return { ...item, href: first, children };
+    }
+    return { ...item, children };
 }
 
 /**
@@ -795,12 +920,187 @@ export function isNavChildCurrent(
     );
 }
 
+/**
+ * Pages that belong to a section without living under its address. Customer
+ * Detail (`/customers/:contactId`, U18) is rooted on the contact, so it is
+ * Sell › Customers where the business sells and Contacts where it does not:
+ * the first of its homes the actor's rail holds is where the rail says you
+ * are. Every other address is its own.
+ */
+const NAV_HOMES: readonly { prefix: string; homes: readonly string[] }[] = [
+    { prefix: "/customers/", homes: ["/commerce/customers", "/contacts"] },
+];
+
+export function navPathname(
+    pathname: string,
+    groups: readonly NavGroup[],
+): string {
+    const entry = NAV_HOMES.find((e) => pathname.startsWith(e.prefix));
+    if (!entry) return pathname;
+    const hrefs = new Set(
+        groups.flatMap((g) =>
+            g.items.flatMap((i) => [
+                i.href,
+                ...(i.children ?? []).map((c) => c.href),
+            ]),
+        ),
+    );
+    return entry.homes.find((h) => hrefs.has(h)) ?? pathname;
+}
+
 export function isNavItemActive(pathname: string, href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
+/**
+ * Is this row — or, for a section, any page in it — where you are?
+ *
+ * A section's pages need not live under its own address: Bookings is
+ * `/bookings`, and its Services and Courses are `/services` and `/courses`.
+ * Matching the section's address alone left the rail dark on half of it.
+ */
+export function isNavSectionActive(
+    pathname: string,
+    item: Pick<NavItem, "href" | "children">,
+): boolean {
+    return (
+        isNavItemActive(pathname, item.href) ||
+        (item.children ?? []).some((child) =>
+            isNavChildCurrent(pathname, child.href),
+        )
+    );
+}
+
+/**
+ * One settings tab. `action` is what the actor must hold to open it; left off,
+ * everyone signed in may (Your profile is about the person, not the
+ * business). `ownerOnly` narrows it further to the business's owner, by role:
+ * a plan and its invoices are the owner's to see, as the design has it.
+ */
+export interface SettingsPage {
+    href: string;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    action?: NavAction;
+    ownerOnly?: true;
+}
+
+/**
+ * The settings screen's tabs, in the design's order (2026-09-25): the
+ * business, who is on it, what it runs, what Saroh costs it, you, who
+ * changed what, and the services behind it. The settings layout draws them as vertical tabs and the
+ * command menu lists them, each only for an actor who may open it.
+ */
+export const SETTINGS_PAGES = [
+    {
+        href: "/settings/organization",
+        label: "Business",
+        description: "Name, address and the details on receipts",
+        icon: Building2,
+        action: "org:settings:read",
+    },
+    {
+        href: "/settings/people",
+        label: "Team",
+        description: "Who works here and what each role opens",
+        icon: Users,
+        action: "member:read",
+    },
+    {
+        href: "/settings/modules",
+        label: "Modules",
+        description: "What this business runs on",
+        icon: LayoutGrid,
+        action: "module:read",
+    },
+    {
+        href: "/settings/billing",
+        label: "Plan and billing",
+        description: "What Saroh costs and your invoices",
+        icon: CreditCard,
+        action: "org:settings:read",
+        ownerOnly: true,
+    },
+    {
+        href: "/settings/profile",
+        label: "Your profile",
+        description: "Your login and the alerts you get",
+        icon: UserRound,
+    },
+    {
+        href: "/settings/activity",
+        label: "Activity",
+        description: "Who changed what, and when",
+        icon: Clock,
+        // The design gates it on reading settings; the API keeps the audit
+        // stream to Owner and Admin, so the tab follows the API.
+        action: "audit:read",
+    },
+    {
+        href: "/settings/providers",
+        label: "Providers",
+        description: "Hosting, email and payments behind it",
+        icon: Link2,
+        action: "provider:read",
+    },
+] as const satisfies readonly SettingsPage[];
+
+/**
+ * May this actor open this settings page?
+ *
+ * The action as `navCan` judges it, and for an owner-only page the role too.
+ * A null role is "we do not know yet" and fails open, as everywhere in the
+ * nav: the page itself still refuses anyone who is not the owner.
+ */
+export function mayOpenSettingsPage(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    page: SettingsPage,
+): boolean {
+    if (page.action && !navCan(actor, page.action)) return false;
+    if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
+        return false;
+    }
+    return true;
+}
+
+/** The settings pages this actor may open, in tab order. */
+export function settingsPagesFor(actor: {
+    role: NavRole | null;
+    actions?: readonly string[] | null;
+}) {
+    return SETTINGS_PAGES.filter((page) => mayOpenSettingsPage(actor, page));
+}
+
 /** The Notifications item carries a live unread badge; identify it by route. */
 export const NOTIFICATIONS_HREF = "/notifications";
+
+/**
+ * Notifications lives in the top bar, not the rail (2026-09-25): it is about
+ * you, not a part of the business. The bell and the command menu both read
+ * it here, with the same permission the rail used.
+ */
+export const NOTIFICATIONS_NAV = {
+    href: NOTIFICATIONS_HREF,
+    label: "Notifications",
+    icon: Bell,
+    action: "notification:read",
+} as const satisfies Pick<NavItem, "href" | "label" | "icon" | "action">;
+
+/**
+ * What is waiting behind one destination: unread for Notifications, the Home
+ * read model's count for anything else. The rail, the tab bar and its sheet
+ * all read it here, so they cannot count differently.
+ */
+export function navCountFor(
+    href: string | undefined,
+    counts: NavCounts | undefined,
+    unread: number,
+): number {
+    if (!href) return 0;
+    if (href === NOTIFICATIONS_HREF) return unread;
+    return counts?.[href] ?? 0;
+}
 
 /**
  * Work waiting behind a destination, keyed by route.

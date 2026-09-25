@@ -14,6 +14,9 @@ jest.mock("@saroh/database", () => {
                 deleteMany: jest.fn(),
                 findMany: jest.fn(),
             },
+            user: { findMany: jest.fn() },
+            organizationInvitation: { findMany: jest.fn() },
+            membership: { findMany: jest.fn() },
         },
     };
 });
@@ -28,6 +31,9 @@ const updateMany = prisma.auditEvent.updateMany as jest.Mock;
 const del = prisma.auditEvent.delete as jest.Mock;
 const deleteMany = prisma.auditEvent.deleteMany as jest.Mock;
 const findMany = prisma.auditEvent.findMany as jest.Mock;
+const findUsers = prisma.user.findMany as jest.Mock;
+const findInvitations = prisma.organizationInvitation.findMany as jest.Mock;
+const findMemberships = prisma.membership.findMany as jest.Mock;
 
 describe("AuditService.record", () => {
     let service: AuditService;
@@ -120,8 +126,13 @@ describe("AuditService.listForOrganization", () => {
 
     it("caps an over-large limit and returns a cursor when more remain", async () => {
         // 101 rows for a requested limit of 100 → hasMore, one trimmed off.
-        const rows = Array.from({ length: 101 }, (_v, i) => ({ id: `e${i}` }));
+        const rows = Array.from({ length: 101 }, (_v, i) => ({
+            id: `e${i}`,
+            actorUserId: "user_1",
+        }));
         findMany.mockResolvedValue(rows);
+        findUsers.mockResolvedValue([]);
+        findMemberships.mockResolvedValue([]);
 
         const result = await service.listForOrganization("org_1", {
             limit: 5000,
@@ -130,5 +141,144 @@ describe("AuditService.listForOrganization", () => {
         expect(findMany.mock.calls[0][0].take).toBe(101); // 100 (cap) + 1
         expect(result.events).toHaveLength(100);
         expect(result.nextCursor).toBe("e99");
+    });
+});
+
+describe("AuditService.listForOrganization — who each event names", () => {
+    let service: AuditService;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        service = new AuditService();
+    });
+
+    it("narrows to the actions asked for", async () => {
+        findMany.mockResolvedValue([]);
+
+        await service.listForOrganization("org_1", {
+            actions: [AuditAction.ProfileUpdate, AuditAction.MembershipInvite],
+        });
+
+        expect(findMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            action: { in: ["profile.update", "membership.invite"] },
+        });
+    });
+
+    it("reads no people for an empty page", async () => {
+        findMany.mockResolvedValue([]);
+
+        await expect(service.listForOrganization("org_1")).resolves.toEqual({
+            events: [],
+            nextCursor: null,
+        });
+        expect(findUsers).not.toHaveBeenCalled();
+        expect(findInvitations).not.toHaveBeenCalled();
+        expect(findMemberships).not.toHaveBeenCalled();
+    });
+
+    it("names actors and targets in one query each, as they are now", async () => {
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                action: "membership.role.update",
+                actorUserId: "u_priya",
+                targetType: "membership",
+                targetId: "u_aditya",
+            },
+            {
+                id: "e2",
+                action: "membership.invite",
+                actorUserId: "u_priya",
+                targetType: "invitation",
+                targetId: "inv_1",
+            },
+            {
+                id: "e3",
+                action: "profile.update",
+                actorUserId: "u_gone",
+                targetType: "organization",
+                targetId: "org_1",
+            },
+        ]);
+        findUsers.mockResolvedValue([
+            { id: "u_priya", name: "Priya", email: "priya@rye.in" },
+            { id: "u_aditya", name: null, email: "aditya@rye.in" },
+        ]);
+        findInvitations.mockResolvedValue([
+            { id: "inv_1", email: "meera@rye.in" },
+        ]);
+        findMemberships.mockResolvedValue([
+            { userId: "u_priya", role: "OWNER" },
+            { userId: "u_aditya", role: "MEMBER" },
+        ]);
+
+        const { events } = await service.listForOrganization("org_1");
+
+        expect(findUsers).toHaveBeenCalledTimes(1);
+        expect(findUsers.mock.calls[0][0].where.id.in.sort()).toEqual([
+            "u_aditya",
+            "u_gone",
+            "u_priya",
+        ]);
+        // Invitations are read within the organization only.
+        expect(findInvitations).toHaveBeenCalledWith({
+            where: { id: { in: ["inv_1"] }, organizationId: "org_1" },
+            select: { id: true, email: true },
+        });
+        // Their role in THIS business now, in the same one-query-per-kind.
+        expect(findMemberships).toHaveBeenCalledTimes(1);
+        expect(findMemberships.mock.calls[0][0].where.organizationId).toBe(
+            "org_1",
+        );
+        expect(events.map((e) => [e.actor, e.target])).toEqual([
+            [
+                { name: "Priya", email: "priya@rye.in", role: "OWNER" },
+                { name: null, email: "aditya@rye.in", role: "MEMBER" },
+            ],
+            [
+                { name: "Priya", email: "priya@rye.in", role: "OWNER" },
+                { name: null, email: "meera@rye.in", role: null },
+            ],
+            // Someone no longer there is null, and an organization is not a
+            // person.
+            [null, null],
+        ]);
+    });
+});
+
+describe("AuditService.listForOrganization — what a change recorded", () => {
+    it("returns the metadata as recorded: the fields and their values", async () => {
+        jest.clearAllMocks();
+        const metadata = {
+            fields: ["invoicePrefix", "contactEmail"],
+            changes: [{ field: "invoicePrefix", before: "INV", after: "RC" }],
+        };
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                action: "profile.update",
+                actorUserId: "u_priya",
+                targetType: "organization",
+                targetId: "org_1",
+                metadata,
+            },
+        ]);
+        findUsers.mockResolvedValue([
+            { id: "u_priya", name: "Priya", email: "priya@rye.in" },
+        ]);
+        findMemberships.mockResolvedValue([]);
+
+        const { events } = await new AuditService().listForOrganization(
+            "org_1",
+        );
+
+        expect(events[0].metadata).toEqual(metadata);
+        // Someone who has left keeps their name, with no role here.
+        expect(events[0].actor).toEqual({
+            name: "Priya",
+            email: "priya@rye.in",
+            role: null,
+        });
     });
 });

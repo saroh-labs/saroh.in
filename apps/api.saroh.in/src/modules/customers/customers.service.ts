@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
 import type { CustomerListItemDto } from "./serialize";
@@ -14,8 +15,8 @@ import { serializeCustomerListItem } from "./serialize";
 
 /**
  * Store customers. Authorization delegates to StoresService (read = store
- * access, write = canWrite). Email is unique per store, not globally
- * (@@unique([storeId, email])).
+ * access, less the kitchen's stage-only roles; write = canWrite). Email is
+ * unique per store, not globally (@@unique([storeId, email])).
  */
 @Injectable()
 export class CustomersService {
@@ -35,12 +36,16 @@ export class CustomersService {
      * narrow select and are aggregated in `serialize`, because the three
      * figures are facts about Orders and the frontend would otherwise need
      * every order of every customer to work them out.
+     *
+     * Emails and spend, so it takes a read of the store's orders, not only a
+     * way into the store: a Member at the counter (`order:stage`, no
+     * `order:read`) is refused, as on the store's order list (R7, #508).
      */
     async list(
         storeId: string,
         userId: string,
     ): Promise<CustomerListItemDto[]> {
-        await this.stores.getForUser(storeId, userId);
+        await requireOrderRead(this.stores, storeId, userId, "customers");
         const customers = await prisma.customer.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
@@ -58,8 +63,9 @@ export class CustomersService {
         return customers.map(serializeCustomerListItem);
     }
 
+    /** One store customer, with the same rule as the list. */
     async get(storeId: string, customerId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        await requireOrderRead(this.stores, storeId, userId, "customers");
         const customer = await prisma.customer.findFirst({
             where: { id: customerId, storeId },
         });

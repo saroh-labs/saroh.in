@@ -50,6 +50,41 @@ files often show them (`backend-nestjs.md`). Gap: 38 source files were over when
 this was written, led by `sites.service.ts`, `site-editor.tsx` and
 `bookings.service.ts`. Seed data is exempt.
 
+Still over after #508 split the booking page and the bookings service (U10),
+each with why it stops there:
+
+- `bookings/bookings.service.ts` (1,298) — the merchant's side: service and
+  rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
+  hand behind one controller. Under 400 means one injectable per feature and
+  a controller and DI change, not a move.
+- `bookings/public-bookings.service.ts` (464) and `bookings/reservation.ts`
+  (418) — one class sharing its rate limiters, and one serializable write
+  with its helpers; a little over, and cutting them splits a method.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (626) — its state, effects
+  and handlers (the hold poll, confirm, letting a hold go) share one
+  component's state; the drawing is already in `steps/`. Less means a
+  reducer or hook seam, which is new logic.
+- Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
+  (1,173), `calendar/calendar.service.ts` (1,051),
+  `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
+- `organizations/organization-settings-form.tsx` (1,249) — one form holds
+  every Business card (profile, tax and invoices, address, number format)
+  and the cross-field rules that re-check them together; the number-format
+  editor already went to `invoice-number-fields.tsx`, the time zone picker
+  to `time-zone-select.tsx`, and the Hours card, which saves to the
+  storefronts, to `business-hours-section.tsx`. Less
+  means a card per file sharing one form context.
+- `organizations/team-screen.tsx` (1,106) — the Roles and People tabs, the
+  member drawer and the invite dialog share the screen's roster and role
+  state. Each piece is its own function already; moving them is a file split
+  with props threaded through, not yet done.
+- `shared/nav-items.tsx` (1,102) — the nav's data (`NAV_GROUPS`,
+  `SETTINGS_PAGES`) and every rule that filters it by role, module and
+  site; half of it is the table itself. Splitting data from rules is a move,
+  not yet made.
+- `modules/module-list.tsx` (430) — one list and its row, switch and state
+  tag; a little over, and the row carries most of it.
+
 ## 7. No `any`, no `@ts-ignore`
 
 **Adopted** — Gap: one `any` (`payments/crypto.ts`); no `@ts-ignore`. Suppress

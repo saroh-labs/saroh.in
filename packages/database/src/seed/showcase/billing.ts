@@ -724,6 +724,7 @@ export function planSubscriptions(
             price: rupees(p.pricePaise),
             currency: CURRENCY,
             interval: p.interval,
+            classesPerMonth: p.classesPerMonth ?? null,
             status: "ACTIVE",
             createdAt: since,
             updatedAt: p.earlier

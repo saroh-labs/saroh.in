@@ -7,7 +7,10 @@ import type {
     OrganizationSettingsInput,
     SettingsResult,
 } from "./settings-service";
-import { updateOrganizationSettings } from "./settings-service";
+import {
+    updateBusinessLogo,
+    updateOrganizationSettings,
+} from "./settings-service";
 
 /**
  * Save the active organization's identity. A thin Server Action over the API —
@@ -25,5 +28,18 @@ export async function saveOrganizationSettings(
         revalidatePath("/settings/organization");
         revalidatePath("/");
     }
+    return result;
+}
+
+/**
+ * Set the business logo to an uploaded library image, or take it off
+ * (`null`). The API checks the role, the image's owner, type and size.
+ */
+export async function saveBusinessLogo(
+    mediaId: string | null,
+): Promise<SettingsResult<OrganizationSettings>> {
+    const result = await updateBusinessLogo(mediaId);
+    // Invoices print it at the top.
+    if (result.ok) revalidatePath("/settings/organization");
     return result;
 }

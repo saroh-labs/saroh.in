@@ -8,10 +8,12 @@ import {
     IsISO8601,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -33,6 +35,13 @@ export type LocationType = (typeof LOCATION_TYPES)[number];
  */
 export const BOOKING_OUTCOMES = ["ATTENDED", "NO_SHOW"] as const;
 export type BookingOutcome = (typeof BOOKING_OUTCOMES)[number];
+
+/**
+ * How a booking was paid (U3): a membership's monthly classes, a class pack,
+ * paid for, or to be paid at the desk. Null on bookings nobody said about.
+ */
+export const PAID_WITH = ["MEMBERSHIP", "PACK", "PAID", "DESK"] as const;
+export type PaidWith = (typeof PAID_WITH)[number];
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -84,6 +93,22 @@ export class CreateServiceDto {
     @IsString()
     @MaxLength(3)
     currency?: string;
+
+    /**
+     * GST the price includes, in percent (ADR-008): on a registered
+     * business's tax invoice. Checked against GST's rates in the service.
+     * null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
 
     /** IANA timezone, e.g. "Asia/Kolkata". Validated against the tz database in the service. */
     @IsString()
@@ -158,6 +183,22 @@ export class UpdateServiceDto {
     @IsString()
     @MaxLength(3)
     currency?: string;
+
+    /**
+     * GST the price includes, in percent (ADR-008): on a registered
+     * business's tax invoice. Checked against GST's rates in the service.
+     * null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
 
     @IsOptional()
     @IsString()
@@ -250,6 +291,24 @@ export class BookServiceDto {
     @IsString()
     @MaxLength(128)
     idempotencyKey?: string;
+
+    /**
+     * The person to book with (U3), by the opaque id the availability read
+     * gave. Absent: whoever is free.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
+
+    /**
+     * How the booking page's booker pays (U19): NOW holds the place while
+     * they pay online, DESK books it to pay on the day. Absent: as before.
+     * There is no amount — the price is the service's, read on the server.
+     */
+    @IsOptional()
+    @IsIn(["NOW", "DESK"])
+    pay?: "NOW" | "DESK";
 }
 
 /**
@@ -304,6 +363,25 @@ export class BookByHandDto {
     @IsString()
     @MaxLength(64)
     packPurchaseId?: string;
+
+    /** Who takes it (U3). Absent: whoever is free, or the class's instructor. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
+
+    /**
+     * How it is paid (U3). PACK is the same as `useClassPack`; MEMBERSHIP
+     * needs `subscriptionId` and uses one of that month's classes.
+     */
+    @IsOptional()
+    @IsIn(PAID_WITH)
+    paidWith?: PaidWith;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    subscriptionId?: string;
 }
 
 /**
@@ -326,4 +404,22 @@ export class RescheduleBookingDto {
 export class RecordOutcomeDto {
     @IsIn(BOOKING_OUTCOMES)
     outcome!: BookingOutcome;
+}
+
+/**
+ * The bookings calendar's range (U4): `[from, to)` as ISO instants, and
+ * optionally one person's diary. Query text, so nothing is converted.
+ */
+export class BookingsRangeQueryDto {
+    @IsISO8601()
+    from!: string;
+
+    @IsISO8601()
+    to!: string;
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    staffId?: string;
 }

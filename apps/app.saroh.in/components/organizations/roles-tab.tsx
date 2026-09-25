@@ -47,8 +47,11 @@ const GROUP_LABEL: Record<string, string> = {
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
     { key: "", label: "Nothing — I will tick what it needs" },
-    { key: "MEMBER", label: "Member — see everything, change nothing" },
-    { key: "ADMIN", label: "Admin — everything day to day" },
+    {
+        key: "MEMBER",
+        label: "Member — runs the day · can see settings, can't change them or see money",
+    },
+    { key: "ADMIN", label: "Admin — everything except removing an owner" },
     { key: "REVIEWER", label: "Reviewer — look at websites and sign them off" },
 ] as const;
 
@@ -75,6 +78,7 @@ export function RolesTab({
     canEdit,
     organizationName,
     builtInBlurb,
+    builtInPlain,
 }: {
     roles: Role[];
     catalogue: RoleCatalogue | null;
@@ -83,6 +87,8 @@ export function RolesTab({
     organizationName: string;
     /** What each built-in is for, in the words the People tab already uses. */
     builtInBlurb: Record<string, string>;
+    /** The same in a few words, under each built-in's name in the list. */
+    builtInPlain: Record<string, string>;
 }) {
     const [activeKey, setActiveKey] = useState<string>(
         roles.find((r) => !r.system)?.key ?? "MEMBER",
@@ -109,11 +115,12 @@ export function RolesTab({
             {/* Sticks under the top bar, so switching roles never means
                 scrolling back up past fifty-odd permissions to find the list. */}
             <div className="min-w-0 max-w-[300px] flex-[0_1_262px] self-start overflow-hidden rounded-xl border border-border lg:sticky lg:top-[77px]">
-                <ListSection label="Built in">
+                <ListSection label="Roles">
                     {builtIns.map((role) => (
                         <RoleRow
                             key={role.key}
                             role={role}
+                            plain={builtInPlain[role.key]}
                             on={role.key === active.key}
                             onPick={() => setActiveKey(role.key)}
                         />
@@ -194,12 +201,19 @@ function ListSection({
     );
 }
 
+/**
+ * A role in the list: its name, and under it who holds it and what it opens
+ * — a built-in's in words ("can open everything"), a made role's as its count
+ * of permissions, since its ticks are the business's own.
+ */
 function RoleRow({
     role,
+    plain,
     on,
     onPick,
 }: {
     role: Role;
+    plain?: string;
     on: boolean;
     onPick: () => void;
 }) {
@@ -223,13 +237,11 @@ function RoleRow({
                 </span>
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">
                     {people} ·{" "}
-                    {role.actions.length === 1
-                        ? "1 permission"
-                        : `${role.actions.length} permissions`}
+                    {plain ??
+                        (role.actions.length === 1
+                            ? "1 permission"
+                            : `${role.actions.length} permissions`)}
                 </span>
-            </span>
-            <span className="max-w-[88px] shrink-0 truncate font-mono text-[11px] text-muted-foreground">
-                {role.key}
             </span>
         </button>
     );
@@ -333,18 +345,15 @@ function RoleDetail({
                     <h2 className="font-display text-[18px] font-semibold tracking-[-0.025em]">
                         {role.label}
                     </h2>
-                    <span className="rounded-full bg-muted px-2 py-[3px] font-mono text-[11px] text-neutral-700 dark:text-muted-foreground">
-                        {role.key}
-                    </span>
-                    <span className="ml-auto rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
-                        {role.system
-                            ? "Built in"
-                            : held === 0
-                              ? "Nobody holds it yet"
-                              : held === 1
-                                ? "1 person holds it"
-                                : `${held} people hold it`}
-                    </span>
+                    {role.system ? null : (
+                        <span className="ml-auto rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                            {held === 0
+                                ? "Nobody holds it yet"
+                                : held === 1
+                                  ? "1 person holds it"
+                                  : `${held} people hold it`}
+                        </span>
+                    )}
                 </div>
                 <p className="mt-[9px] text-[12.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
                     {blurb}
@@ -431,7 +440,7 @@ function RoleDetail({
                 className={cn(
                     "flex flex-wrap items-center gap-3 border-t border-muted px-4 py-[13px]",
                     canEdit && !role.system
-                        ? "sticky bottom-0 z-10 bg-card shadow-[0_-1px_0_hsl(var(--border)),0_-8px_16px_-12px_hsl(var(--foreground)/0.18)]"
+                        ? "sticky bottom-[var(--tab-bar-inset)] z-10 bg-card shadow-[0_-1px_0_hsl(var(--border)),0_-8px_16px_-12px_hsl(var(--foreground)/0.18)]"
                         : "bg-foreground/[0.03]",
                 )}
             >

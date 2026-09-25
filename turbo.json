@@ -79,6 +79,12 @@
             "dependsOn": ["^build"],
             "cache": false
         },
+        // The browser E2E job seeds the showcase: its specs are set in Rye & Co.,
+        // Pulse Fitness and Leela & Loom, which the base seed does not make.
+        "db:seed:showcase": {
+            "dependsOn": ["^build"],
+            "cache": false
+        },
         "dev": {
             "dependsOn": ["^build"],
             "cache": false,

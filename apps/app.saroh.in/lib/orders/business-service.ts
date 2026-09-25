@@ -27,13 +27,18 @@ export interface BusinessOrder {
     /** The storefront's own order number, e.g. "1042". */
     orderId: string;
     standing: OrderStanding;
-    total: string;
+    /**
+     * Null in the kitchen's view: a Member reaches the list through
+     * `order:stage` (DEC-024) and the API sends no totals to them.
+     */
+    total: string | null;
     currency: string;
     /** ISO; rendered in the viewer's timezone, never the server's. */
     placedAt: string;
     itemCount: number;
     store: { id: string; name: string };
-    customer: { id: string; name: string | null; email: string } | null;
+    /** `email` is left out of the kitchen's view. */
+    customer: { id: string; name: string | null; email?: string } | null;
 }
 
 /**

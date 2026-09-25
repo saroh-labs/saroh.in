@@ -24,6 +24,7 @@ jest.mock("@saroh/database", () => ({
             upsert: jest.fn(),
         },
         site: { findMany: jest.fn() },
+        session: { groupBy: jest.fn() },
         sitePreviewLink: { updateMany: jest.fn() },
         organization: { findUnique: jest.fn() },
         organizationRole: { findUnique: jest.fn() },
@@ -51,6 +52,7 @@ const db = prisma as unknown as {
     organizationInvitation: Record<string, jest.Mock>;
     siteReviewer: Record<string, jest.Mock>;
     site: Record<string, jest.Mock>;
+    session: Record<string, jest.Mock>;
     sitePreviewLink: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
     organizationRole: Record<string, jest.Mock>;
@@ -84,6 +86,7 @@ beforeEach(() => {
     db.siteReviewer.upsert.mockResolvedValue({});
     db.siteReviewer.deleteMany.mockResolvedValue({ count: 0 });
     db.sitePreviewLink.updateMany.mockResolvedValue({ count: 0 });
+    db.session.groupBy.mockResolvedValue([]);
 });
 
 describe("who may touch the roster", () => {
@@ -126,6 +129,44 @@ describe("who may touch the roster", () => {
     });
 });
 
+describe("when someone was last active", () => {
+    it("reads every member's newest session in one grouped query", async () => {
+        const seen = new Date("2026-09-24T10:00:00Z");
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "user_owner",
+                role: "OWNER",
+                user: { name: "Priya", email: "priya@example.test" },
+            },
+            {
+                userId: "user_2",
+                role: "MEMBER",
+                user: { name: null, email: "new@example.test" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.session.groupBy.mockResolvedValue([
+            { userId: "user_owner", _max: { updatedAt: seen } },
+        ]);
+
+        const roster = await service.list(ctx("OWNER"));
+
+        expect(db.session.groupBy).toHaveBeenCalledTimes(1);
+        expect(db.session.groupBy).toHaveBeenCalledWith({
+            by: ["userId"],
+            where: {
+                user: { memberships: { some: { organizationId: "org_1" } } },
+            },
+            _max: { updatedAt: true },
+        });
+        expect(roster.map((m) => [m.userId, m.lastActiveAt])).toEqual([
+            ["user_owner", seen],
+            // No session at all — never signed in, or every one expired.
+            ["user_2", null],
+        ]);
+    });
+});
+
 describe("inviting", () => {
     it("stores only a hash of the token and emails the link", async () => {
         await service.invite(ctx(), {
@@ -143,6 +184,38 @@ describe("inviting", () => {
         const written = db.organizationInvitation.upsert.mock.calls[0][0];
         expect(written.create.tokenHash).toBe(hashInviteToken(token));
         expect(written.create.tokenHash).not.toContain(token);
+    });
+
+    // Team → People's Resend is this: inviting an address that already has
+    // an invitation. It must be a fresh link and a fresh week, with the old
+    // link dead, not a second row.
+    it("sending again refreshes the invitation's link and week in place", async () => {
+        const before = Date.now();
+        await service.invite(ctx(), {
+            email: "reviewer@example.test",
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+
+        const [[, url]] = (sendOrganizationInvitationEmail as jest.Mock).mock
+            .calls;
+        const token = url.split("/join/")[1];
+        const written = db.organizationInvitation.upsert.mock.calls[0][0];
+        expect(written.where).toEqual({
+            organizationId_email: {
+                organizationId: "org_1",
+                email: "reviewer@example.test",
+            },
+        });
+        expect(written.update).toMatchObject({
+            tokenHash: hashInviteToken(token),
+            status: "PENDING",
+            acceptedAt: null,
+        });
+        const week = 7 * 24 * 60 * 60 * 1000;
+        expect(written.update.expiresAt.getTime()).toBeGreaterThanOrEqual(
+            before + week,
+        );
     });
 
     it("never returns a token to the inviter or the roster screen", async () => {
@@ -526,6 +599,8 @@ describe("invented roles on the roster", () => {
             "booking:read",
             "service:read",
             "contact:read",
+            // A Member moves kitchen stages (DEC-024).
+            "order:stage",
         ]);
         await service.updateRole(lead, "user_x", { role: "stock-clerk" });
         expect(db.membership.update.mock.calls[0][0].data).toEqual({

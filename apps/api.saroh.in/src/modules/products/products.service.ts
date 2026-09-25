@@ -5,13 +5,105 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import {
+    checkProductAllergens,
+    productAllergensFor,
+    saveProductAllergens,
+} from "../catalogue/allergens.service";
+import {
+    checkProductFieldValues,
+    productFieldsFor,
+    saveProductFieldValues,
+} from "../catalogue/fields.service";
+import { isGstRate } from "../invoices/gst";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
-import type { CreateProductDto, ProductStatus, UpdateProductDto } from "./dto";
-import { serializeProductDetail, serializeProductListItem } from "./serialize";
+import type {
+    CreateProductDto,
+    PatchProductDto,
+    ProductStatus,
+    UpdateProductDto,
+} from "./dto";
+import { promisesToMove } from "./open-promises";
+import {
+    assertDetailsCoherent,
+    assertMrpAtOrAbovePrice,
+    cleanShopFields,
+} from "./product-rules";
+import {
+    cleanDescription,
+    readShopFields,
+    serializeProductDetail,
+    serializeProductListItem,
+} from "./serialize";
+
+/** Everything a product page or the editor needs about one product. */
+export const PRODUCT_DETAIL_INCLUDE = {
+    category: { select: { id: true, name: true } },
+    variants: {
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        include: { inventory: true },
+    },
+    images: { orderBy: { position: "asc" } },
+    inventory: true,
+    option: {
+        select: {
+            id: true,
+            name: true,
+            values: {
+                select: { id: true, value: true },
+                orderBy: { position: "asc" },
+            },
+        },
+    },
+} satisfies Prisma.ProductInclude;
+
+/** Key points are one line each: trimmed, and blank lines dropped. */
+/**
+ * A product's GST rate (ADR-008): one GST has, or null to clear it. Refused
+ * on the rate's own field, so the editor can put the message there.
+ */
+function checkGstRate(rate: string | null | undefined): string | null {
+    if (rate === undefined || rate === null) return null;
+    if (!isGstRate(rate)) {
+        throw new BadRequestException({
+            message: `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            field: "gstRate",
+        });
+    }
+    return rate;
+}
+
+function cleanKeyPoints(points: string[] | undefined): string[] {
+    return (points ?? []).map((p) => p.trim()).filter((p) => p !== "");
+}
+
+/**
+ * Whether a write failed on the one unique a product has besides its id:
+ * its address in the store. Anything else is rethrown, not called a clash.
+ */
+function isSlugClash(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+    const { code, meta } = error as { code?: unknown; meta?: unknown };
+    if (code !== "P2002") return false;
+    // Driver adapters don't always name the target; when it is named, it
+    // must be the slug.
+    return meta === undefined || JSON.stringify(meta).includes("slug");
+}
+
+/** Never null over the wire in a patch: a null there means "not sent". */
+const REQUIRED_IN_PATCH = new Set<keyof PatchProductDto>([
+    "name",
+    "slug",
+    "price",
+    "status",
+    "madeHere",
+    "returnsMode",
+]);
 
 /**
  * Product catalog data layer. Authorization is delegated to StoresService so
@@ -43,10 +135,19 @@ export class ProductsService {
                 // Enough to draw a catalogue row: the variant count, the SKU
                 // the product is known by, and its stock.
                 _count: { select: { variants: true } },
+                // Every variant, briefly: an order is taken for one of them.
+                // Its stock too, for a product that counts per variant.
                 variants: {
-                    select: { sku: true },
-                    orderBy: { createdAt: "asc" },
-                    take: 1,
+                    select: {
+                        id: true,
+                        sku: true,
+                        title: true,
+                        price: true,
+                        inventory: {
+                            select: { quantity: true, lowStockAlert: true },
+                        },
+                    },
+                    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
                 inventory: { select: { quantity: true, lowStockAlert: true } },
             },
@@ -59,16 +160,22 @@ export class ProductsService {
         await this.stores.getForUser(storeId, userId);
         const product = await prisma.product.findFirst({
             where: { id: productId, storeId },
-            include: {
-                category: { select: { id: true, name: true } },
-                variants: { orderBy: { createdAt: "asc" } },
-                inventory: true,
-            },
+            include: PRODUCT_DETAIL_INCLUDE,
         });
         if (!product) {
             throw new NotFoundException("Product not found");
         }
-        return serializeProductDetail(product);
+        const detail = serializeProductDetail(product);
+        const [customFields, allergens, variantPromises] = await Promise.all([
+            productFieldsFor(storeId, product.id, product.categoryId),
+            productAllergensFor(product.id),
+            // Still counting as a whole: what each variant will take with it
+            // when it switches, so the editor can seed the counts.
+            detail.stockMode === "product" && product.variants.length > 0
+                ? promisesToMove(prisma, product.id, product.inventory != null)
+                : Promise.resolve({}),
+        ]);
+        return { ...detail, customFields, allergens, variantPromises };
     }
 
     async create(storeId: string, userId: string, dto: CreateProductDto) {
@@ -82,7 +189,28 @@ export class ProductsService {
         }
         await this.assertSlugFree(storeId, slug);
         await this.assertCategoryInStore(storeId, dto.categoryId);
+        await this.assertOptionInStore(storeId, dto.optionId);
+        assertMrpAtOrAbovePrice(dto.price, dto.mrp ?? null);
+        assertDetailsCoherent({
+            madeHere: dto.madeHere ?? true,
+            maker: dto.maker ?? null,
+            returnsMode: dto.returnsMode ?? "STOREFRONT",
+            returnsText: dto.returnsText ?? null,
+        });
+        const shopFields = cleanShopFields(dto.shopFields ?? {});
+        // Checked before the product exists, so a refused value or allergen
+        // never leaves a half-made product behind.
+        if (organizationId) {
+            if (dto.customFields)
+                await checkProductFieldValues(storeId, dto.customFields);
+            if (dto.contains || dto.mayContain)
+                await checkProductAllergens(storeId, {
+                    contains: dto.contains,
+                    mayContain: dto.mayContain,
+                });
+        }
 
+        let createdId: string;
         try {
             const product = await prisma.product.create({
                 data: {
@@ -90,27 +218,61 @@ export class ProductsService {
                     organizationId,
                     name: dto.name,
                     slug,
-                    description: dto.description ?? null,
+                    description: cleanDescription(dto.description),
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
+                    mrp: dto.mrp ?? null,
                     currency: dto.currency ?? "USD",
                     status: dto.status ?? "DRAFT",
+                    archivedAt: dto.status === "ARCHIVED" ? new Date() : null,
+                    howToUse: dto.howToUse ?? null,
+                    materials: dto.materials ?? null,
+                    keyPoints: cleanKeyPoints(dto.keyPoints),
+                    madeHere: dto.madeHere ?? true,
+                    maker: dto.maker ?? null,
+                    madeIn: dto.madeIn ?? null,
+                    supplierCode: dto.supplierCode ?? null,
+                    gstRate: checkGstRate(dto.gstRate),
+                    hsnCode: dto.hsnCode ?? null,
+                    warranty: dto.warranty ?? null,
+                    returnsMode: dto.returnsMode ?? "STOREFRONT",
+                    returnsText: dto.returnsText ?? null,
+                    shopFields,
+                    seoTitle: dto.seoTitle ?? null,
+                    seoDescription: dto.seoDescription ?? null,
+                    optionId: dto.optionId ?? null,
                 },
             });
-            if (organizationId) {
-                await this.activation?.firstProductCreated(
-                    organizationId,
-                    product.id,
-                );
-            }
-            return { id: product.id };
-        } catch {
+            createdId = product.id;
+        } catch (error) {
+            if (!isSlugClash(error)) throw error;
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
             });
         }
+        if (organizationId) {
+            if (dto.customFields) {
+                await saveProductFieldValues(
+                    storeId,
+                    createdId,
+                    organizationId,
+                    dto.customFields,
+                );
+            }
+            if (dto.contains || dto.mayContain) {
+                await saveProductAllergens(storeId, createdId, organizationId, {
+                    contains: dto.contains,
+                    mayContain: dto.mayContain,
+                });
+            }
+            await this.activation?.firstProductCreated(
+                organizationId,
+                createdId,
+            );
+        }
+        return { id: createdId };
     }
 
     async update(
@@ -122,7 +284,7 @@ export class ProductsService {
         await this.requireWrite(storeId, userId);
         const current = await prisma.product.findFirst({
             where: { id: productId, storeId },
-            select: { slug: true },
+            select: { slug: true, status: true },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
@@ -139,21 +301,206 @@ export class ProductsService {
                 data: {
                     name: dto.name,
                     slug,
-                    description: dto.description ?? null,
+                    description: cleanDescription(dto.description),
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
                     currency: dto.currency ?? "USD",
-                    ...(dto.status ? { status: dto.status } : {}),
+                    ...(dto.status
+                        ? {
+                              status: dto.status,
+                              // As patch() does: stamped on the way in,
+                              // cleared on the way out.
+                              ...(dto.status !== "ARCHIVED"
+                                  ? { archivedAt: null }
+                                  : current.status !== "ARCHIVED"
+                                    ? { archivedAt: new Date() }
+                                    : {}),
+                          }
+                        : {}),
                 },
             });
             return { id: productId };
-        } catch {
+        } catch (error) {
+            if (!isSlugClash(error)) throw error;
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
             });
         }
+    }
+
+    /**
+     * Save one section of the editor: only the fields present change.
+     *
+     * Cross-field rules are judged on the product AFTER the patch — an MRP
+     * sent alone is compared with the stored price, a returns mode sent alone
+     * with the stored text — so saving one section can never leave another
+     * incoherent. Returns the whole product so the section can re-baseline.
+     */
+    async patch(
+        storeId: string,
+        productId: string,
+        userId: string,
+        dto: PatchProductDto,
+    ) {
+        const organizationId = await this.requireWrite(storeId, userId);
+        const current = await prisma.product.findFirst({
+            where: { id: productId, storeId },
+            select: {
+                slug: true,
+                price: true,
+                mrp: true,
+                madeHere: true,
+                maker: true,
+                returnsMode: true,
+                returnsText: true,
+                shopFields: true,
+                status: true,
+                optionId: true,
+                _count: { select: { variants: true } },
+            },
+        });
+
+        if (!current) {
+            throw new NotFoundException("Product not found");
+        }
+
+        const has = (key: keyof PatchProductDto) =>
+            REQUIRED_IN_PATCH.has(key)
+                ? dto[key] != null
+                : dto[key] !== undefined;
+        const data: Record<string, unknown> = {};
+
+        if (has("name")) data.name = dto.name;
+        if (has("slug")) {
+            const slug = slugify(dto.slug ?? "");
+            if (slug !== current.slug) await this.assertSlugFree(storeId, slug);
+            data.slug = slug;
+        }
+        if (has("description"))
+            data.description = cleanDescription(dto.description);
+        if (has("categoryId")) {
+            await this.assertCategoryInStore(storeId, dto.categoryId);
+            data.categoryId = dto.categoryId ?? null;
+        }
+        if (has("optionId")) {
+            // Each variant's value belongs to the option it was made under;
+            // switching would orphan them all. A product from before options
+            // (none set, no variant with a value) may take its first one.
+            const next = dto.optionId ?? null;
+            // Any variant made under an option ties the product to it;
+            // variants from before options (no value) don't.
+            const firstOption =
+                current.optionId === null &&
+                next !== null &&
+                (await prisma.productVariant.count({
+                    where: { productId, optionValueId: { not: null } },
+                })) === 0;
+            if (
+                next !== current.optionId &&
+                current._count.variants > 0 &&
+                !firstOption
+            ) {
+                const option = next
+                    ? await prisma.productOption.findFirst({
+                          where: { id: next, storeId },
+                          select: { name: true },
+                      })
+                    : null;
+                throw new ConflictException({
+                    message: option
+                        ? `Remove the variants first to sell it by ${option.name.toLowerCase()} instead.`
+                        : "Remove the variants first to sell it without an option.",
+                    field: "optionId",
+                });
+            }
+            await this.assertOptionInStore(storeId, dto.optionId);
+            data.optionId = dto.optionId ?? null;
+        }
+        if (has("price")) data.price = dto.price;
+        if (has("gstRate")) data.gstRate = checkGstRate(dto.gstRate);
+        if (has("hsnCode")) data.hsnCode = dto.hsnCode ?? null;
+        if (has("mrp")) data.mrp = dto.mrp ?? null;
+        if (has("status")) {
+            data.status = dto.status;
+            // When it went, for the archived banner; cleared when it leaves.
+            if (dto.status === "ARCHIVED" && current.status !== "ARCHIVED")
+                data.archivedAt = new Date();
+            if (dto.status !== "ARCHIVED") data.archivedAt = null;
+        }
+        for (const key of [
+            "howToUse",
+            "materials",
+            "maker",
+            "madeIn",
+            "supplierCode",
+            "warranty",
+            "returnsText",
+            "seoTitle",
+            "seoDescription",
+        ] as const) {
+            if (has(key)) data[key] = dto[key] ?? null;
+        }
+        if (has("keyPoints")) data.keyPoints = cleanKeyPoints(dto.keyPoints);
+        if (has("madeHere")) data.madeHere = dto.madeHere;
+        if (has("returnsMode")) data.returnsMode = dto.returnsMode;
+        // Merged, not replaced: each section sends only the switches it
+        // shows, so two sections saved one after the other never undo each
+        // other's.
+        if (has("shopFields"))
+            data.shopFields = {
+                ...readShopFields(current.shopFields),
+                ...cleanShopFields(dto.shopFields ?? {}),
+            };
+        if (has("seoImageId")) {
+            if (dto.seoImageId)
+                await this.assertImageOfProduct(productId, dto.seoImageId);
+            data.seoImageId = dto.seoImageId ?? null;
+        }
+
+        const price = dto.price ?? current.price.toString();
+        const mrp = has("mrp")
+            ? (dto.mrp ?? null)
+            : (current.mrp?.toString() ?? null);
+        assertMrpAtOrAbovePrice(price, mrp, has("mrp") ? "mrp" : "price");
+        assertDetailsCoherent({
+            madeHere: dto.madeHere ?? current.madeHere,
+            maker: has("maker") ? (dto.maker ?? null) : current.maker,
+            returnsMode: dto.returnsMode ?? current.returnsMode,
+            returnsText: has("returnsText")
+                ? (dto.returnsText ?? null)
+                : current.returnsText,
+        });
+
+        // Custom field values first: a value its type refuses stops the
+        // whole section before anything is written.
+        if (dto.customFields && organizationId) {
+            await saveProductFieldValues(
+                storeId,
+                productId,
+                organizationId,
+                dto.customFields,
+            );
+        }
+        if ((dto.contains || dto.mayContain) && organizationId) {
+            await saveProductAllergens(storeId, productId, organizationId, {
+                contains: dto.contains,
+                mayContain: dto.mayContain,
+            });
+        }
+        if (Object.keys(data).length > 0) {
+            try {
+                await prisma.product.update({ where: { id: productId }, data });
+            } catch (error) {
+                if (!isSlugClash(error)) throw error;
+                throw new ConflictException({
+                    message: "That address is already used by another product",
+                    field: "slug",
+                });
+            }
+        }
+        return this.get(storeId, productId, userId);
     }
 
     /** Delete a product; variants + inventory cascade (schema onDelete: Cascade). */
@@ -242,6 +589,41 @@ export class ProductsService {
             throw new ConflictException({
                 message: "That slug is already taken",
                 field: "slug",
+            });
+        }
+    }
+
+    /** A product picks its option from its own store's options. */
+    private async assertOptionInStore(
+        storeId: string,
+        optionId?: string | null,
+    ): Promise<void> {
+        if (!optionId) return;
+        const option = await prisma.productOption.findFirst({
+            where: { id: optionId, storeId },
+            select: { id: true },
+        });
+        if (!option) {
+            throw new BadRequestException({
+                message: "Unknown option",
+                field: "optionId",
+            });
+        }
+    }
+
+    /** The sharing image is one of the product's own photos. */
+    private async assertImageOfProduct(
+        productId: string,
+        imageId: string,
+    ): Promise<void> {
+        const image = await prisma.productImage.findFirst({
+            where: { id: imageId, productId },
+            select: { id: true },
+        });
+        if (!image) {
+            throw new BadRequestException({
+                message: "Pick one of this product's photos",
+                field: "seoImageId",
             });
         }
     }

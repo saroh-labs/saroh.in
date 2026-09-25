@@ -15,6 +15,9 @@ interface DecimalLike {
 export interface OrderItemDto {
     id: string;
     productId: string;
+    /** The variant bought, when the line names one. */
+    variantId: string | null;
+    variant: { title: string } | null;
     quantity: number;
     price: string;
     product?: { name: string } | null;
@@ -77,6 +80,8 @@ interface RawSummary {
 interface RawItem {
     id: string;
     productId: string;
+    variantId?: string | null;
+    variant?: { title: string } | null;
     quantity: number;
     price: DecimalLike;
     product?: { name: string } | null;
@@ -132,6 +137,8 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,
+            variantId: i.variantId ?? null,
+            variant: i.variant ?? null,
             quantity: i.quantity,
             price: toMoneyString(i.price),
             product: i.product ?? null,
@@ -151,7 +158,8 @@ export interface OrganizationOrderDto {
     orderId: string;
     /** REFUNDED | CANCELLED | FULFILLED | UNFULFILLED — see `orderStanding`. */
     standing: ReturnType<typeof orderStanding>;
-    total: string;
+    /** Null in the kitchen's view (`order:stage` without `order:read`). */
+    total: string | null;
     currency: string;
     placedAt: Date;
     itemCount: number;
@@ -159,7 +167,8 @@ export interface OrganizationOrderDto {
     customer: {
         id: string;
         name: string | null;
-        email: string;
+        /** Left out of the kitchen's view. */
+        email?: string;
     } | null;
 }
 
@@ -188,7 +197,9 @@ interface RawOrganizationOrder {
  */
 export function serializeOrganizationOrder(
     order: RawOrganizationOrder,
+    view: { kitchenOnly?: boolean } = {},
 ): OrganizationOrderDto {
+    const kitchen = view.kitchenOnly === true;
     const name = [order.customer?.firstName, order.customer?.lastName]
         .filter(Boolean)
         .join(" ")
@@ -197,7 +208,7 @@ export function serializeOrganizationOrder(
         id: order.id,
         orderId: order.orderId,
         standing: orderStanding(order.status, order.paymentStatus),
-        total: toMoneyString(order.total),
+        total: kitchen ? null : toMoneyString(order.total),
         currency: order.currency,
         placedAt: order.createdAt,
         itemCount: order._count.items,
@@ -206,7 +217,7 @@ export function serializeOrganizationOrder(
             ? {
                   id: order.customerId,
                   name: name || null,
-                  email: order.customer.email,
+                  ...(kitchen ? {} : { email: order.customer.email }),
               }
             : null,
     };

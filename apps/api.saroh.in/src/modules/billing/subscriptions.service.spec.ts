@@ -234,3 +234,50 @@ describe("SubscriptionsService.cancel", () => {
         expectNoMerchantAccess();
     });
 });
+
+describe("SubscriptionsService.subscribe — the plan change in Activity (#509)", () => {
+    const withAudit = () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const service = new SubscriptionsService(
+            new PlansService(),
+            new FakeBillingProviderFactory(new FakeBillingProvider("RAZORPAY")),
+            { record } as never,
+        );
+        return { service, record };
+    };
+
+    it("records the plan it moved from and to, by name", async () => {
+        const { service, record } = withAudit();
+        planFindFirst.mockResolvedValue({ ...FREE_PLAN, name: "Free" });
+        subFindUnique.mockResolvedValue({
+            planId: "plan_pro",
+            plan: { name: "Pro" },
+        });
+        subUpsert.mockResolvedValue({ id: "sub_1", plan: FREE_PLAN });
+
+        await service.subscribe(ctx(), { planKey: "free" });
+
+        expect(record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "organization.plan.changed",
+                organizationId: "org_1",
+                actorUserId: "user_1",
+                metadata: { from: "Pro", to: "Free" },
+            }),
+        );
+    });
+
+    it("records nothing when the business is already on that plan", async () => {
+        const { service, record } = withAudit();
+        planFindFirst.mockResolvedValue({ ...FREE_PLAN, name: "Free" });
+        subFindUnique.mockResolvedValue({
+            planId: "plan_free",
+            plan: { name: "Free" },
+        });
+        subUpsert.mockResolvedValue({ id: "sub_1", plan: FREE_PLAN });
+
+        await service.subscribe(ctx(), { planKey: "free" });
+
+        expect(record).not.toHaveBeenCalled();
+    });
+});

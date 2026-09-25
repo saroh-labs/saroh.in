@@ -30,6 +30,8 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         "booking:read",
         "service:read",
         "contact:read",
+        // DEC-024: the kitchen — move an order's stage, see no money.
+        "order:stage",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds
@@ -114,6 +116,24 @@ describe("organization-policy: can()", () => {
             expect(can("MEMBER", action)).toBe(true);
         }
         for (const action of writeActions) {
+            expect(can("MEMBER", action)).toBe(false);
+        }
+    });
+});
+
+describe("the kitchen (DEC-024)", () => {
+    it("a Member moves stages, reads no order money and changes nothing else", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER"] as const) {
+            expect(can(role, "order:stage")).toBe(true);
+        }
+        expect(can("REVIEWER", "order:stage")).toBe(false);
+        for (const action of [
+            "order:read",
+            "order:write",
+            "payment:read",
+            "payment:manage",
+            "invoice:read",
+        ] as const) {
             expect(can("MEMBER", action)).toBe(false);
         }
     });

@@ -5,7 +5,7 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
-import { AuditService } from "./audit.service";
+import { AuditService, parseAuditActions } from "./audit.service";
 
 /**
  * Read access to an Organization's immutable audit stream (S1-009).
@@ -18,6 +18,10 @@ import { AuditService } from "./audit.service";
  * authenticates and `OrganizationGuard` resolves an authorized
  * `OrganizationContext` — then `authorize(ctx, "audit:read")` restricts reads to
  * OWNER/ADMIN via the central policy (a MEMBER or non-member is rejected 403).
+ *
+ * `actions` (comma-separated) narrows the stream to those actions; unknown
+ * ones are ignored. Each event names its actor and, for a membership or an
+ * invitation, its target, as they are now.
  */
 @Controller("organizations/:organizationId/audit")
 @UseGuards(BetterAuthGuard, OrganizationGuard)
@@ -29,6 +33,7 @@ export class AuditController {
         @OrgContext() ctx: OrganizationContext,
         @Query("limit") limit?: string,
         @Query("cursor") cursor?: string,
+        @Query("actions") actions?: string,
     ) {
         // Audit logs are sensitive: only OWNER/ADMIN may read them.
         authorize(ctx, "audit:read");
@@ -37,6 +42,7 @@ export class AuditController {
             // An absent query param is already `undefined`; the service treats
             // an empty-string cursor as "no cursor" too.
             cursor,
+            actions: parseAuditActions(actions),
         });
     }
 }

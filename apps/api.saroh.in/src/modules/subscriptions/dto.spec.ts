@@ -4,7 +4,14 @@
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
-import { CancelSubscriptionDto, PlanInputDto, SubscribeDto } from "./dto";
+import {
+    CancelSubscriptionDto,
+    ChangePlanDto,
+    CollectionScheduleDto,
+    PlanInputDto,
+    SkipCollectionDto,
+    SubscribeDto,
+} from "./dto";
 
 async function refused<T extends object>(
     cls: new () => T,
@@ -72,5 +79,42 @@ describe("what cancelling accepts", () => {
         expect(
             await refused(CancelSubscriptionDto, { when: "tomorrow" }),
         ).toContain("when");
+    });
+});
+
+describe("what a collection schedule accepts", () => {
+    it("takes an ISO weekday, or null to stop collecting", async () => {
+        expect(await refused(CollectionScheduleDto, { weekday: 6 })).toEqual(
+            [],
+        );
+        expect(await refused(CollectionScheduleDto, { weekday: null })).toEqual(
+            [],
+        );
+        expect(await refused(CollectionScheduleDto, { weekday: 0 })).toContain(
+            "weekday",
+        );
+        expect(await refused(CollectionScheduleDto, {})).toContain("weekday");
+    });
+
+    it("lets subscribing name the day, 1 to 7", async () => {
+        const base = { contactId: "c_1", planId: "plan_1" };
+        expect(
+            await refused(SubscribeDto, { ...base, collectionWeekday: 8 }),
+        ).toContain("collectionWeekday");
+    });
+});
+
+describe("what skipping and changing plan accept", () => {
+    it("skips a collection by YYYY-MM-DD", async () => {
+        expect(
+            await refused(SkipCollectionDto, { date: "2026-10-03" }),
+        ).toEqual([]);
+        expect(await refused(SkipCollectionDto, { date: "3 Oct" })).toContain(
+            "date",
+        );
+    });
+
+    it("needs the plan to move to", async () => {
+        expect(await refused(ChangePlanDto, {})).toContain("planId");
     });
 });

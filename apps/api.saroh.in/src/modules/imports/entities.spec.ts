@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import { ENTITY_DESCRIPTORS, isImportEntity } from "./entities";
 
 const products = ENTITY_DESCRIPTORS.products;

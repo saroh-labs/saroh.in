@@ -14,6 +14,9 @@ export interface PickedImage {
     height?: number;
     /** The file's size on disk, for the share-image limits (#220). */
     bytes?: number;
+    /** The library object it became, for places that keep the link. */
+    mediaId?: string;
+    filename?: string;
 }
 
 /**
@@ -43,29 +46,30 @@ export interface PickedImage {
  * image arrives. They are read from the file before the upload starts, so a
  * picked image never lands without them.
  */
-export function MediaPicker({
-    onPick,
-    label = "Choose a photo",
-    className,
-}: {
-    onPick: (image: PickedImage) => void;
-    label?: string;
-    className?: string;
-}) {
-    const inputId = useId();
-    const inputRef = useRef<HTMLInputElement>(null);
+/**
+ * The upload itself — read the size, mint a ticket, PUT the bytes with
+ * progress, confirm — for any control that takes a picture. `upload` hands
+ * back the picture, or null having set `error` to say why not.
+ */
+export function useImageUpload(
+    options: {
+        /** The library bucket; site images unless said. */
+        purpose?: "site-image" | "business-logo";
+        /** What to say when storage cannot serve the upload. */
+        unserved?: string;
+    } = {},
+) {
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [over, setOver] = useState(false);
     /*
-     * Whether the picker is still on screen. An upload from a phone can outlast
-     * the field that started it — the merchant picks another section or leaves
-     * the panel — and a late finish must not hand a picture to a field they
-     * have moved on from, or write state into a component that is gone. The
-     * upload itself is left to finish; only what it would write back is
-     * skipped. Set in the effect as well as the initialiser so a remount in
-     * development's double-invoked effects starts true again.
+     * Whether the control is still on screen. An upload from a phone can
+     * outlast the field that started it — the merchant picks another section
+     * or leaves the panel — and a late finish must not hand a picture to a
+     * field they have moved on from, or write state into a component that is
+     * gone. The upload itself is left to finish; only what it would write
+     * back is skipped. Set in the effect as well as the initialiser so a
+     * remount in development's double-invoked effects starts true again.
      */
     const mounted = useRef(true);
     useEffect(() => {
@@ -75,11 +79,11 @@ export function MediaPicker({
         };
     }, []);
 
-    async function handleFile(file: File) {
+    async function upload(file: File): Promise<PickedImage | null> {
         setError(null);
         if (!file.type.startsWith("image/")) {
             setError("That is not an image. Choose a JPG, PNG, WebP or GIF.");
-            return;
+            return null;
         }
         setBusy(true);
         setProgress(0);
@@ -93,10 +97,11 @@ export function MediaPicker({
                 contentType: file.type,
                 contentLength: file.size,
                 filename: file.name,
+                ...(options.purpose ? { purpose: options.purpose } : {}),
             });
             if (!ticket.ok) {
                 if (mounted.current) setError(ticket.error);
-                return;
+                return null;
             }
 
             await putWithProgress(
@@ -109,39 +114,68 @@ export function MediaPicker({
             );
 
             const done = await completeUpload(ticket.data.mediaId);
-            // Past the last wait: nothing below may reach a picker that has
-            // gone, least of all `onPick`.
-            if (!mounted.current) return;
+            // Past the last wait: nothing below may reach a control that has
+            // gone.
+            if (!mounted.current) return null;
             if (!done.ok) {
                 setError(done.error);
-                return;
+                return null;
             }
             if (!done.data.url) {
                 // The upload succeeded and nothing can serve it. Say that,
-                // rather than writing a src nobody can fetch into the section.
+                // rather than writing a src nobody can fetch.
                 setError(
-                    "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
+                    options.unserved ??
+                        "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
                 );
-                return;
+                return null;
             }
-            onPick({ src: done.data.url, ...dims, bytes: file.size });
+            return {
+                src: done.data.url,
+                ...dims,
+                bytes: file.size,
+                mediaId: ticket.data.mediaId,
+                filename: file.name,
+            };
         } catch (e) {
-            if (!mounted.current) return;
+            if (!mounted.current) return null;
             setError(
                 e instanceof Error && e.message
                     ? e.message
                     : "The upload did not go through. Try again.",
             );
+            return null;
         } finally {
             if (mounted.current) {
                 setBusy(false);
                 setProgress(null);
-                // Let the same file be chosen twice in a row — a retry after a
-                // failure is the common case, and a file input ignores a
-                // repeat.
-                if (inputRef.current) inputRef.current.value = "";
             }
         }
+    }
+
+    return { upload, busy, progress, error };
+}
+
+export function MediaPicker({
+    onPick,
+    label = "Choose a photo",
+    className,
+}: {
+    onPick: (image: PickedImage) => void;
+    label?: string;
+    className?: string;
+}) {
+    const inputId = useId();
+    const inputRef = useRef<HTMLInputElement>(null);
+    const { upload, busy, progress, error } = useImageUpload();
+    const [over, setOver] = useState(false);
+
+    async function handleFile(file: File) {
+        const picked = await upload(file);
+        // Let the same file be chosen twice in a row — a retry after a
+        // failure is the common case, and a file input ignores a repeat.
+        if (inputRef.current) inputRef.current.value = "";
+        if (picked) onPick(picked);
     }
 
     return (

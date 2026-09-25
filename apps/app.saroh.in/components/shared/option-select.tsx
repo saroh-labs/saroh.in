@@ -18,6 +18,8 @@ const NONE = "__none__";
 export interface Option<V extends string> {
     value: V;
     label: string;
+    /** Shown, but not choosable — "M — already a variant". */
+    disabled?: boolean;
 }
 
 /**
@@ -89,6 +91,7 @@ export function OptionSelect<V extends string>({
                     <SelectItem
                         key={o.value || NONE}
                         value={o.value === "" ? NONE : o.value}
+                        disabled={o.disabled}
                     >
                         {o.label}
                     </SelectItem>

@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 
 import {
     formatDayHeading,
+    formatMoment,
+    formatRecent,
     formatShortDate,
     formatShortDateTime,
 } from "@/lib/format/datetime";
@@ -47,7 +49,20 @@ export function ViewerDate({
      * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
      * `datetime` adds the time, for a timeline where the hour matters.
      */
-    variant?: "short" | "heading" | "datetime";
+    variant?:
+        | "short"
+        | "heading"
+        | "datetime"
+        | "dayMonth"
+        | "dayMonthLong"
+        | "time"
+        // "Today, 09:14" — a step on a timeline (Order Detail).
+        | "moment"
+        // "Today 09:14", "Yesterday", "22 Sep" — a log line (Settings ›
+        // Activity).
+        | "recent"
+        // "August 2026".
+        | "monthYear";
     className?: string;
 }) {
     const timeZone = useSyncExternalStore(
@@ -57,11 +72,38 @@ export function ViewerDate({
     );
 
     const text =
-        variant === "heading"
-            ? formatDayHeading(iso, timeZone)
-            : variant === "datetime"
-              ? formatShortDateTime(iso, timeZone)
-              : formatShortDate(iso, timeZone);
+        variant === "moment"
+            ? formatMoment(iso, timeZone)
+            : variant === "recent"
+              ? formatRecent(iso, timeZone)
+              : variant === "monthYear"
+                ? new Intl.DateTimeFormat("en-GB", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone,
+                  }).format(new Date(iso))
+                : variant === "heading"
+                  ? formatDayHeading(iso, timeZone)
+                  : variant === "datetime"
+                    ? formatShortDateTime(iso, timeZone)
+                    : variant === "dayMonth"
+                      ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
+                        // letters every month (ICU writes "Sept"), as the design does.
+                        dayMonth(iso, timeZone)
+                      : variant === "dayMonthLong"
+                        ? // "2 September" — said in a sentence.
+                          new Intl.DateTimeFormat("en-GB", {
+                              day: "numeric",
+                              month: "long",
+                              timeZone,
+                          }).format(new Date(iso))
+                        : variant === "time"
+                          ? new Intl.DateTimeFormat("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                timeZone,
+                            }).format(new Date(iso))
+                          : formatShortDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the
@@ -71,4 +113,33 @@ export function ViewerDate({
             {text}
         </time>
     );
+}
+
+const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+function dayMonth(iso: string, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        day: "numeric",
+        month: "numeric",
+        timeZone,
+    }).formatToParts(new Date(iso));
+    // en-GB pads a numeric day with numeric month ("02"); the design doesn't.
+    const day = String(
+        Number(parts.find((p) => p.type === "day")?.value ?? ""),
+    );
+    const month = Number(parts.find((p) => p.type === "month")?.value ?? "1");
+    return `${day} ${MONTHS[month - 1] ?? ""}`;
 }

@@ -22,6 +22,7 @@ import {
     RequireModule,
 } from "../capabilities/require-module.decorator";
 import {
+    CreditInvoiceDto,
     InvoiceInputDto,
     ListInvoicesQueryDto,
     OwedQueryDto,
@@ -112,6 +113,21 @@ export class InvoicesController {
         @Body() dto: VoidInvoiceDto,
     ) {
         return this.invoices.voidInvoice(ctx, id, dto);
+    }
+
+    /**
+     * Cancel an issued invoice with a credit note for all of it (ADR-008) —
+     * how a GST-registered business corrects one. Answers with the credit
+     * note.
+     */
+    @Post(":invoiceId/credit")
+    @HttpCode(201)
+    credit(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Body() dto: CreditInvoiceDto,
+    ) {
+        return this.invoices.credit(ctx, id, dto);
     }
 
     /** Void it and open a corrected draft; answers with the new draft. */

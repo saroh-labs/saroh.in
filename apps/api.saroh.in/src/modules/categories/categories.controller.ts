@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Put,
     UseGuards,
@@ -16,7 +17,13 @@ import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { CategoriesService } from "./categories.service";
-import { CreateCategoryDto, UpdateCategoryDto } from "./dto";
+import {
+    CreateCategoryDto,
+    MergeCategoryDto,
+    RenameCategoryDto,
+    RestoreCategoryDto,
+    UpdateCategoryDto,
+} from "./dto";
 
 @Controller("stores/:storeId/categories")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
@@ -56,5 +63,37 @@ export class CategoriesController {
         @Param("categoryId") categoryId: string,
     ) {
         return this.categories.remove(storeId, categoryId, user.id);
+    }
+
+    /** Undo of a merge or delete. */
+    @Post("restore")
+    @HttpCode(201)
+    restore(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Body() dto: RestoreCategoryDto,
+    ) {
+        return this.categories.restore(storeId, user.id, dto);
+    }
+
+    @Patch(":categoryId")
+    rename(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("categoryId") categoryId: string,
+        @Body() dto: RenameCategoryDto,
+    ) {
+        return this.categories.rename(storeId, categoryId, user.id, dto);
+    }
+
+    @Post(":categoryId/merge")
+    @HttpCode(200)
+    merge(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("categoryId") categoryId: string,
+        @Body() dto: MergeCategoryDto,
+    ) {
+        return this.categories.merge(storeId, categoryId, user.id, dto);
     }
 }

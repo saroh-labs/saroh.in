@@ -20,8 +20,9 @@ export function storefrontPeopleHref(storeId: string): string {
     return `/commerce/storefronts/${encodeURIComponent(storeId)}/people`;
 }
 
+/** The Categories tab of Product settings (#470). */
 export function productCategoriesHref(storeId: string): string {
-    return `/commerce/products/categories${q(storeId)}`;
+    return `/commerce/products/settings${q(storeId)}`;
 }
 
 export function importProductsHref(storeId?: string): string {

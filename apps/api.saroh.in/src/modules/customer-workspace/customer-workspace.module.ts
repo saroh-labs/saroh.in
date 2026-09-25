@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { ContactNotesService } from "./contact-notes.service";
+import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 
@@ -14,6 +16,11 @@ import { CustomerWorkspaceService } from "./customer-workspace.service";
 @Module({
     imports: [CapabilitiesModule, OrganizationsModule],
     controllers: [CustomerWorkspaceController],
-    providers: [CustomerWorkspaceService, OrganizationGuard],
+    providers: [
+        CustomerWorkspaceService,
+        CustomerDetailService,
+        ContactNotesService,
+        OrganizationGuard,
+    ],
 })
 export class CustomerWorkspaceModule {}

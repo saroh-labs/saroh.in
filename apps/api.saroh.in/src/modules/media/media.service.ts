@@ -205,10 +205,74 @@ export class MediaService {
             );
         }
 
+        // A product showing it keeps a live link to the object; deleting it
+        // would leave a broken photo on that product. Take it off first.
+        const onProducts = await prisma.productImage.count({
+            where: { mediaId: media.id },
+        });
+        if (onProducts > 0) {
+            throw new ConflictException(
+                onProducts === 1
+                    ? "This image is on a product. Take it off the product before deleting it."
+                    : `This image is on ${onProducts} products. Take it off them before deleting it.`,
+            );
+        }
+
+        // The business logo prints on its invoices; deleting it would leave
+        // them with a broken image. Remove it as the logo first.
+        const asLogo = await prisma.businessProfile.count({
+            where: { logoMediaId: media.id },
+        });
+        if (asLogo > 0) {
+            throw new ConflictException(
+                "This image is your business logo. Remove it in Settings → Business before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 
         return { id: media.id, deleted: true };
+    }
+
+    /**
+     * The address a READY library object is served from, for another module
+     * that stores a reference to it (a product photo). Tenant-scoped: another
+     * organization's id, or one still uploading, is not found. Null when
+     * storage has no public base configured (local dev without R2).
+     */
+    async readyObject(
+        organizationId: string,
+        mediaId: string,
+    ): Promise<{
+        id: string;
+        url: string | null;
+        contentType: string;
+        sizeBytes: number;
+    }> {
+        const media = await prisma.media.findUnique({
+            where: { id: mediaId },
+            select: {
+                id: true,
+                organizationId: true,
+                key: true,
+                status: true,
+                contentType: true,
+                sizeBytes: true,
+            },
+        });
+        if (
+            media?.organizationId !== organizationId ||
+            media.status !== "READY"
+        ) {
+            throw new NotFoundException("That photo is not in your library");
+        }
+        return {
+            id: media.id,
+            url: this.publicUrlFor(media.key),
+            contentType: media.contentType,
+            sizeBytes: media.sizeBytes,
+        };
     }
 
     /**
