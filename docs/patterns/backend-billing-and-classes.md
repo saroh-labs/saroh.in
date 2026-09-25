@@ -148,6 +148,19 @@
   again, refused once a line has a confirmed refund or the order a RETURNED
   entry. An edit refuses a variant the order's storefront doesn't sell and
   writes no entries.
+- **Track stock (#515, `stock/tracking.ts`)** — a product counts stock only
+  while `Product.stockTracked` and the business's
+  `BusinessProfile.stockTracking` (no profile: on) are both on. Turning
+  either off takes Product (or the profile) → its StockLevel rows by id, is
+  refused while any is promised ("N are promised to open orders — fulfil or
+  cancel them first"), and counts each shelf with stock to 0, so the log
+  still adds up; turning on writes nothing and every shelf starts at 0.
+  Reserve re-reads tracking after its row locks (a line whose product just
+  stopped counting is NONE for life); a kitchen undo or a put-back on a
+  product that no longer counts moves no stock. Readers spread
+  `COUNTING_ROWS`, so an untracked product's rows (kept at 0 for the log)
+  read as untracked, never Sold out. The switches need `store:write`,
+  never `inventory:write` alone.
 - **Subscriptions, plans, bookings and class packs never touch product
   stock.**
 

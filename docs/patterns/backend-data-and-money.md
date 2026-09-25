@@ -46,7 +46,11 @@
   (`soldQuantity`); every hold, sale, release and return reads those under
   the row's lock (`stock/reserve.ts`, #511 — see
   `backend-billing-and-classes.md`). Lock order: Order → Product (a change
-  to how it counts) → StockLevel rows by id (`products/stock-levels.ts`). `Inventory` and
+  to how it counts) → StockLevel rows by id (`products/stock-levels.ts`).
+  Whether a product counts stock is `Product.stockTracked` and the
+  business's `BusinessProfile.stockTracking` (#515), not whether it has a
+  row: an untracked product keeps its rows at 0 for the log, so every
+  reader filters with `COUNTING_ROWS` (`stock/tracking.ts`). `Inventory` and
   `VariantInventory` are no longer written. Every new table pairs its ids
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
