@@ -3,11 +3,21 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { BUSINESS_UNTRACKED, CANT_CHANGE_TRACKING } from "../stock/stock-words";
 import { count, recordEntry } from "../stock/stock.service";
+import type { ProductTracking } from "../stock/tracking";
+import {
+    businessTracksStock,
+    COUNTING_ROWS,
+    ensureShelves,
+    setProductTracking,
+    tracksStock,
+} from "../stock/tracking";
 import type {
     UpdateInventoryDto,
     UpdateVariantStockDto,
@@ -28,6 +38,8 @@ const SWITCH_NOTE = "Now counted per variant";
 
 export interface StockView {
     productId: string;
+    /** Track stock (#515): the product's switch and the business's. */
+    tracked: boolean;
     mode: "product" | "variant";
     /** The product's own row: all its stock, or (per variant) old promises. */
     quantity: number;
@@ -120,8 +132,9 @@ export class InventoryService {
                 field: "quantity",
             });
         }
-        const { shelf } = await prisma.$transaction((tx) =>
-            count(
+        const { shelf } = await prisma.$transaction(async (tx) => {
+            await this.startTracking(tx, scope, productId);
+            return count(
                 tx,
                 { organizationId, userId },
                 {
@@ -129,8 +142,8 @@ export class InventoryService {
                     counted: dto.quantity,
                     lowStockAlert: dto.lowStockAlert,
                 },
-            ),
-        );
+            );
+        });
         return {
             productId,
             quantity: shelf.onHand,
@@ -209,6 +222,15 @@ export class InventoryService {
                 await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ANY(${orderIds}::text[]) ORDER BY id FOR UPDATE`;
             }
             await lockProduct(tx, productId);
+            // Starting to track here: its other storefronts get their
+            // shelves once it counts per variant, below.
+            const started = await this.startTracking(tx, scope, productId, {
+                makeShelves: false,
+            });
+            const shelvesElsewhere = () =>
+                started
+                    ? ensureShelves(tx, organizationId, productId)
+                    : Promise.resolve();
             const rows = await lockProductStock(tx, productId);
             const firstSwitch = !rows.some((r) => r.variantId !== null);
             if (firstSwitch && !scope.canWrite) {
@@ -252,6 +274,7 @@ export class InventoryService {
                     }
                     await this.countTo(tx, rowId, next.onHand, userId);
                 }
+                await shelvesElsewhere();
                 return;
             }
 
@@ -297,8 +320,92 @@ export class InventoryService {
                 });
                 await lockStockLevels(tx, created);
             }
+            await shelvesElsewhere();
         });
         return this.view(storeId, productId);
+    }
+
+    /** Store-route alias of `setTrackingIn`. */
+    async setTracking(
+        storeId: string,
+        productId: string,
+        userId: string,
+        tracked: boolean,
+    ): Promise<ProductTracking> {
+        return this.setTrackingIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            tracked,
+        );
+    }
+
+    /**
+     * Track stock on or off for this product (#515), everywhere it sells.
+     * Changes how it sells, so it needs `store:write` — never
+     * `inventory:write` alone. Off is refused while open orders hold its
+     * units, and counts each shelf with stock to 0; on starts every shelf at
+     * 0 (`stock/tracking.ts`).
+     */
+    async setTrackingIn(
+        scope: ProductScope,
+        productId: string,
+        tracked: boolean,
+    ): Promise<ProductTracking> {
+        if (!scope.canWrite) {
+            throw new ForbiddenException(CANT_CHANGE_TRACKING);
+        }
+        return prisma.$transaction((tx) =>
+            setProductTracking(
+                tx,
+                { organizationId: scope.organizationId, userId: scope.userId },
+                productId,
+                tracked,
+            ),
+        );
+    }
+
+    /**
+     * Before a count from the product's own stock editor: the product must
+     * count stock. One that doesn't starts to — Track stock on, at 0 — for
+     * someone who can change products; a stock-only role is refused, as is
+     * any count while the business has Track stock off. Takes the product's
+     * lock, so Track stock can't go off under the count.
+     * Returns whether it started tracking.
+     */
+    private async startTracking(
+        tx: Prisma.TransactionClient,
+        scope: ProductScope,
+        productId: string,
+        opts: { makeShelves?: boolean } = {},
+    ): Promise<boolean> {
+        await lockProduct(tx, productId);
+        if (!(await businessTracksStock(tx, scope.organizationId))) {
+            throw new ConflictException({
+                message: BUSINESS_UNTRACKED,
+                field: "quantity",
+            });
+        }
+        const product = await tx.product.findFirst({
+            where: { id: productId, organizationId: scope.organizationId },
+            select: { stockTracked: true },
+        });
+        if (!product) throw new NotFoundException("Product not found");
+        if (product.stockTracked) return false;
+        if (!scope.canWrite) {
+            throw new ForbiddenException(CANT_CHANGE_TRACKING);
+        }
+        await setProductTracking(
+            tx,
+            { organizationId: scope.organizationId, userId: scope.userId },
+            productId,
+            true,
+            opts,
+        );
+        return true;
     }
 
     /**
@@ -384,9 +491,10 @@ export class InventoryService {
     }
 
     private async view(storeId: string, productId: string): Promise<StockView> {
-        const [rows, perVariant] = await Promise.all([
+        const [rows, perVariant, tracked] = await Promise.all([
             prisma.stockLevel.findMany({
-                where: { storeId, productId },
+                // An untracked product's shelves (kept at 0) read as none.
+                where: { storeId, productId, ...COUNTING_ROWS },
                 orderBy: { id: "asc" },
                 select: {
                     variantId: true,
@@ -396,10 +504,12 @@ export class InventoryService {
                 },
             }),
             countsPerVariant(prisma, productId),
+            tracksStock(prisma, productId),
         ]);
         const own = rows.find((r) => r.variantId === null);
         return {
             productId,
+            tracked,
             mode: perVariant ? "variant" : "product",
             quantity: own?.onHand ?? 0,
             reserved: own?.promised ?? 0,

@@ -232,6 +232,22 @@ jest.mock("@saroh/database", () => {
             }),
             count: jest.fn(() => Promise.resolve(mockDb.items.length)),
         },
+        // Every product tracks stock, and so does the business (#515).
+        product: {
+            findMany: jest.fn(
+                ({ where }: { where: { id: { in: string[] } } }) =>
+                    Promise.resolve(
+                        where.id.in.map((id) => ({
+                            id,
+                            stockTracked: true,
+                            organizationId: "org_1",
+                        })),
+                    ),
+            ),
+        },
+        businessProfile: {
+            findUnique: jest.fn(() => Promise.resolve(null)),
+        },
         // One shelf: the product's own row at the storefront ("sl_1"), its
         // on hand and promised kept in mockDb.inventory.
         stockLevel: {

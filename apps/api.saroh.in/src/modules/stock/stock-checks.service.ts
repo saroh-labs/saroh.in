@@ -9,6 +9,7 @@ import type { ResolveCheckDto } from "./dto";
 import type { StockReader } from "./stock-access";
 import { stockReader, stockWriter } from "./stock-access";
 import { COUNT_DIDNT_MATCH, shortBy } from "./stock-words";
+import { COUNTING_ROWS } from "./tracking";
 
 /**
  * Stock checks (#514): what the Stock screen asks someone to look at.
@@ -307,8 +308,9 @@ export class StockChecksService {
 
     /**
      * SALE_NOT_TAKEN: fulfilled lines that hold no shelf, at a storefront
-     * that counts the product — fulfilled after it started counting there
-     * (its first entry), so the sale should have come off the shelf.
+     * that counts the product — Track stock on for it and the business —
+     * fulfilled after it started counting there (its first entry, or Track
+     * stock last going on), so the sale should have come off the shelf.
      */
     private async saleChecks(reader: StockReader): Promise<Found[]> {
         const { organizationId } = reader;
@@ -349,12 +351,15 @@ export class StockChecksService {
                 productId: {
                     in: Array.from(new Set(lines.map((l) => l.productId))),
                 },
+                // Only products that count stock now (#515).
+                ...COUNTING_ROWS,
             },
             select: {
                 id: true,
                 storeId: true,
                 productId: true,
                 variantId: true,
+                product: { select: { stockTrackedAt: true } },
                 entries: {
                     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                     take: 1,
@@ -375,7 +380,14 @@ export class StockChecksService {
                     ? s.variantId === line.variantId
                     : s.variantId === null,
             );
-            const since = shelf?.entries[0]?.createdAt;
+            const firstEntry = shelf?.entries[0]?.createdAt;
+            // Counting since the later of its first entry and Track stock
+            // last going on: a sale while it was off isn't a missed one.
+            const trackedAt = shelf?.product.stockTrackedAt;
+            const since =
+                firstEntry && trackedAt && trackedAt > firstEntry
+                    ? trackedAt
+                    : firstEntry;
             if (!shelf || !since || line.order.updatedAt < since) continue;
             const orderWords = reader.seesOrders
                 ? `Order ${line.order.orderId}`

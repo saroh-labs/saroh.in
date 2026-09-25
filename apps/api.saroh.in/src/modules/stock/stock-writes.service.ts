@@ -16,9 +16,10 @@ import type {
     StockEntryDto,
 } from "./dto";
 import { stockWriter } from "./stock-access";
-import { movable } from "./stock-words";
+import { BUSINESS_UNTRACKED, movable } from "./stock-words";
 import type { ShelfView, StockActor, StockEntryView } from "./stock.service";
 import { adjust, countAll, move, returnByHand, reverse } from "./stock.service";
+import { businessTracksStock } from "./tracking";
 
 /**
  * The Stock API's writes (#514): count, record an entry, add (+N), move,
@@ -26,9 +27,9 @@ import { adjust, countAll, move, returnByHand, reverse } from "./stock.service";
  * who may count and move stock, and applies once per idempotency key — a
  * retried tap replays the first answer.
  *
- * A product that counts no stock anywhere is refused: starting to count it
- * is "Track stock", which changes how it sells (`store:write`, U6), not a
- * count.
+ * A product that doesn't track stock (its own switch, or the business's) is
+ * refused: starting to count it is "Track stock", which changes how it
+ * sells (`store:write`, #515 — `tracking.ts`), not a count.
  */
 
 export const UNTRACKED =
@@ -61,7 +62,7 @@ function after(shelf: ShelfView): ShelfAfter {
     return { ...shelf, canSell: movable(shelf) };
 }
 
-/** The product is this business's and counts stock somewhere. */
+/** The product is this business's and counts stock (#515). */
 async function assertTracked(
     tx: Tx,
     organizationId: string,
@@ -69,12 +70,32 @@ async function assertTracked(
 ): Promise<void> {
     const product = await tx.product.findFirst({
         where: { id: productId, organizationId },
-        select: { _count: { select: { stockLevels: true } } },
+        select: { stockTracked: true },
     });
     if (!product) throw new NotFoundException("Product not found");
-    if (product._count.stockLevels === 0) {
-        throw new ConflictException(UNTRACKED);
+    if (!(await businessTracksStock(tx, organizationId))) {
+        throw new ConflictException(BUSINESS_UNTRACKED);
     }
+    if (!product.stockTracked) throw new ConflictException(UNTRACKED);
+}
+
+/**
+ * Run a stock change on products that count stock: checked before (so a
+ * product with no shelf is never started by a count) and again after the
+ * change has taken its row locks — Track stock going off takes the same
+ * locks, so if it won the race the change is refused and rolled back.
+ */
+async function whileTracked<T>(
+    tx: Tx,
+    organizationId: string,
+    productIds: Iterable<string>,
+    change: () => Promise<T>,
+): Promise<T> {
+    const ids = Array.from(new Set(productIds));
+    for (const id of ids) await assertTracked(tx, organizationId, id);
+    const result = await change();
+    for (const id of ids) await assertTracked(tx, organizationId, id);
+    return result;
 }
 
 @Injectable()
@@ -108,24 +129,25 @@ export class StockWritesService {
     ): Promise<CountSaved> {
         const actor = stockWriter(ctx);
         return this.once("counts", actor, dto, async (tx) => {
-            for (const productId of new Set(
-                dto.counts.map((c) => c.productId),
-            )) {
-                await assertTracked(tx, actor.organizationId, productId);
-            }
-            const results = await countAll(
+            const results = await whileTracked(
                 tx,
-                actor,
-                dto.counts.map((c) => ({
-                    target: {
-                        storeId: c.storeId,
-                        productId: c.productId,
-                        variantId: c.variantId ?? null,
-                    },
-                    counted: c.counted,
-                    expected: c.expected ?? null,
-                    note: dto.note ?? null,
-                })),
+                actor.organizationId,
+                dto.counts.map((c) => c.productId),
+                () =>
+                    countAll(
+                        tx,
+                        actor,
+                        dto.counts.map((c) => ({
+                            target: {
+                                storeId: c.storeId,
+                                productId: c.productId,
+                                variantId: c.variantId ?? null,
+                            },
+                            counted: c.counted,
+                            expected: c.expected ?? null,
+                            note: dto.note ?? null,
+                        })),
+                    ),
             );
             return {
                 counted: results.length,
@@ -148,26 +170,30 @@ export class StockWritesService {
     ): Promise<{ entry: StockEntryView; shelf: ShelfAfter }> {
         const actor = stockWriter(ctx);
         return this.once("entries", actor, dto, async (tx) => {
-            await assertTracked(tx, actor.organizationId, dto.productId);
             const target = {
                 storeId: dto.storeId,
                 productId: dto.productId,
                 variantId: dto.variantId ?? null,
             };
-            const result =
-                dto.kind === "RETURNED"
-                    ? await returnByHand(tx, actor, {
-                          target,
-                          units: dto.units,
-                          orderId: dto.orderId ?? null,
-                          note: dto.note ?? null,
-                      })
-                    : await adjust(tx, actor, {
-                          target,
-                          kind: dto.kind,
-                          units: dto.units,
-                          note: dto.note ?? null,
-                      });
+            const result = await whileTracked(
+                tx,
+                actor.organizationId,
+                [dto.productId],
+                () =>
+                    dto.kind === "RETURNED"
+                        ? returnByHand(tx, actor, {
+                              target,
+                              units: dto.units,
+                              orderId: dto.orderId ?? null,
+                              note: dto.note ?? null,
+                          })
+                        : adjust(tx, actor, {
+                              target,
+                              kind: dto.kind,
+                              units: dto.units,
+                              note: dto.note ?? null,
+                          }),
+            );
             return { entry: result.entry, shelf: after(result.shelf) };
         });
     }
@@ -179,17 +205,22 @@ export class StockWritesService {
     ): Promise<{ entry: StockEntryView; shelf: ShelfAfter }> {
         const actor = stockWriter(ctx);
         return this.once("adjust", actor, dto, async (tx) => {
-            await assertTracked(tx, actor.organizationId, dto.productId);
-            const result = await adjust(tx, actor, {
-                target: {
-                    storeId: dto.storeId,
-                    productId: dto.productId,
-                    variantId: dto.variantId ?? null,
-                },
-                kind: "RECEIVED",
-                units: dto.units,
-                note: dto.note ?? null,
-            });
+            const result = await whileTracked(
+                tx,
+                actor.organizationId,
+                [dto.productId],
+                () =>
+                    adjust(tx, actor, {
+                        target: {
+                            storeId: dto.storeId,
+                            productId: dto.productId,
+                            variantId: dto.variantId ?? null,
+                        },
+                        kind: "RECEIVED",
+                        units: dto.units,
+                        note: dto.note ?? null,
+                    }),
+            );
             return { entry: result.entry, shelf: after(result.shelf) };
         });
     }
@@ -206,7 +237,6 @@ export class StockWritesService {
     }> {
         const actor = stockWriter(ctx);
         return this.once("moves", actor, dto, async (tx) => {
-            await assertTracked(tx, actor.organizationId, dto.productId);
             // The storefront it goes to must be this business's too.
             const to = await tx.store.count({
                 where: {
@@ -215,16 +245,22 @@ export class StockWritesService {
                 },
             });
             if (to === 0) throw new NotFoundException("Store not found");
-            const moved = await move(tx, actor, {
-                from: {
-                    storeId: dto.fromStoreId,
-                    productId: dto.productId,
-                    variantId: dto.variantId ?? null,
-                },
-                toStoreId: dto.toStoreId,
-                units: dto.units,
-                note: dto.note ?? null,
-            });
+            const moved = await whileTracked(
+                tx,
+                actor.organizationId,
+                [dto.productId],
+                () =>
+                    move(tx, actor, {
+                        from: {
+                            storeId: dto.fromStoreId,
+                            productId: dto.productId,
+                            variantId: dto.variantId ?? null,
+                        },
+                        toStoreId: dto.toStoreId,
+                        units: dto.units,
+                        note: dto.note ?? null,
+                    }),
+            );
             return { ...moved, entryIds: [moved.out.id, moved.in.id] };
         });
     }
@@ -236,10 +272,24 @@ export class StockWritesService {
     ): Promise<{ entries: StockEntryView[]; entryIds: string[] }> {
         const actor = stockWriter(ctx);
         return this.once("reverse", actor, dto, async (tx) => {
-            const entries = await reverse(tx, actor, {
-                entryIds: dto.entryIds,
-                note: dto.note ?? null,
+            // Undoing puts units back on a shelf: only one that counts.
+            const undoing = await tx.stockEntry.findMany({
+                where: {
+                    id: { in: dto.entryIds },
+                    organizationId: actor.organizationId,
+                },
+                select: { productId: true },
             });
+            const entries = await whileTracked(
+                tx,
+                actor.organizationId,
+                undoing.map((e) => e.productId),
+                () =>
+                    reverse(tx, actor, {
+                        entryIds: dto.entryIds,
+                        note: dto.note ?? null,
+                    }),
+            );
             return { entries, entryIds: entries.map((e) => e.id) };
         });
     }

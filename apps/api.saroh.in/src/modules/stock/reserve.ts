@@ -10,6 +10,7 @@ import {
     SOLD_OUT_WHILE_PAYING,
 } from "./stock-words";
 import { recordReturned, recordSold, reverseSale } from "./stock.service";
+import { untrackedAmong } from "./tracking";
 
 /**
  * Orders and the shelf (#511): how an order's lines hold, sell and give back
@@ -33,7 +34,11 @@ import { recordReturned, recordSold, reverseSale } from "./stock.service";
  *
  * A line whose product counted no stock when it was placed (`stockRow`
  * NONE) never holds, so it stays untracked for life. A line with no
- * `stockRow` has never held (an online order not yet paid).
+ * `stockRow` has never held (an online order not yet paid). Whether a
+ * product counts stock (Track stock, #515 — `tracking.ts`) is read after the
+ * row locks are taken, so a hold never lands on a shelf whose product just
+ * stopped counting, and a kitchen undo or a return on a product that no
+ * longer counts moves no stock.
  *
  * Lock order, every flow (docs/patterns/backend-billing-and-classes.md):
  * Order → StockLevel rows (by id) → PaymentRefund → payment intent →
@@ -180,6 +185,17 @@ async function tryHold(
         tx,
         chosen.flatMap((c) => (c.id ? [c.id] : [])),
     );
+    // Under the locks: Track stock can't go off while we hold them, and a
+    // product it went off for meanwhile holds nothing — its line is NONE.
+    const untracked = await untrackedAmong(
+        tx,
+        fresh.map((l) => l.productId),
+    );
+    for (const [i, line] of fresh.entries()) {
+        if (untracked.has(line.productId)) {
+            chosen[i] = { kind: "NONE", id: null };
+        }
+    }
 
     // What each row is asked for, over every line on it.
     const need = new Map<string, { units: number; line: Line }>();
@@ -287,6 +303,10 @@ export async function changeHold(
     );
     if (!line?.stockLevelId) return; // untracked, or never held
     await lockStockLevels(tx, [line.stockLevelId]);
+    // Its product stopped counting since (it held nothing then): no hold.
+    if ((await untrackedAmong(tx, [line.productId])).has(line.productId)) {
+        return;
+    }
     if (delta < 0) {
         await releaseOne(tx, line, -delta);
         return;
@@ -422,8 +442,21 @@ export async function uncommitLines(
         });
     }
     await lockStockLevels(tx, heldRowIds(lines));
+    const untracked = await untrackedAmong(
+        tx,
+        lines.map((l) => l.productId),
+    );
     for (const line of lines) {
         if (!line.stockLevelId || line.soldQuantity <= 0) continue;
+        if (untracked.has(line.productId)) {
+            // Its product no longer counts stock: nothing goes back on a
+            // shelf and nothing is held — the line just isn't sold yet.
+            await tx.orderItem.update({
+                where: { id: line.id },
+                data: { soldQuantity: 0 },
+            });
+            continue;
+        }
         await reverseSale(tx, {
             stockLevelId: line.stockLevelId,
             units: line.soldQuantity,
@@ -458,6 +491,7 @@ export async function returnableUnits(
         where: { orderId },
         select: {
             id: true,
+            productId: true,
             soldQuantity: true,
             stockLevelId: true,
             refundLines: {
@@ -466,10 +500,15 @@ export async function returnableUnits(
             },
         },
     });
+    // A product that no longer counts stock takes nothing back.
+    const untracked = await untrackedAmong(
+        tx,
+        items.map((i) => i.productId),
+    );
     return new Map(
         items.map((i) => [
             i.id,
-            i.stockLevelId
+            i.stockLevelId && !untracked.has(i.productId)
                 ? Math.max(
                       0,
                       i.soldQuantity -
@@ -557,11 +596,16 @@ export async function settleRefundStock(
     });
     await lockStockLevels(tx, heldRowIds(lines));
     const byId = new Map(lines.map((l) => [l.id, l]));
+    const untracked = await untrackedAmong(
+        tx,
+        lines.map((l) => l.productId),
+    );
     for (const asked of refund.lines) {
         const line = byId.get(asked.orderItemId);
         if (!line) continue;
         await releaseOne(tx, line, asked.quantity);
         if (asked.putBackQuantity <= 0 || !line.stockLevelId) continue;
+        if (untracked.has(line.productId)) continue; // writes no entry
         // What went back before this refund, settled only.
         const before = await tx.paymentRefundLine.aggregate({
             where: {

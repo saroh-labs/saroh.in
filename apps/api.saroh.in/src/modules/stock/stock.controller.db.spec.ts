@@ -21,6 +21,7 @@ import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
 import { StockChecksService } from "./stock-checks.service";
 import { StockReadsService } from "./stock-reads.service";
+import { StockTrackingService } from "./stock-tracking.service";
 import { StockWritesService, UNTRACKED } from "./stock-writes.service";
 import { StockController } from "./stock.controller";
 import { count } from "./stock.service";
@@ -46,6 +47,7 @@ describe("Stock API (DB)", () => {
         new StockReadsService(),
         new StockWritesService(idempotency),
         new StockChecksService(idempotency),
+        new StockTrackingService(),
     );
 
     const users: Record<string, string> = {};

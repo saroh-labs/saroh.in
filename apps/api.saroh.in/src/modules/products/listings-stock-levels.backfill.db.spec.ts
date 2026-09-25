@@ -471,6 +471,11 @@ describe("Listings and stock backfill (#510, DB)", () => {
     });
 
     it("leaves the storefront seeing the same list, detail and stock", async () => {
+        // What 20261005100000_stock_tracking does next (#515): a product
+        // with a shelf tracks stock. The suite's schema comes from db push,
+        // so the migration's backfill is replayed here.
+        await prisma.$executeRaw`UPDATE "Product" p SET "stockTracked" = true
+            WHERE EXISTS (SELECT 1 FROM "StockLevel" s WHERE s."productId" = p."id")`;
         const list = await products.list(hill, ownerId);
         const row = (id: string) => list.find((x) => x.id === id);
         expect(row(p.bread)).toMatchObject({
@@ -499,6 +504,7 @@ describe("Listings and stock backfill (#510, DB)", () => {
         ]);
         expect(await inventory.get(hill, p.bread, ownerId)).toEqual({
             productId: p.bread,
+            tracked: true,
             mode: "product",
             quantity: 8,
             reserved: 2,

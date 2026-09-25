@@ -96,6 +96,7 @@ beforeAll(async () => {
                 name,
                 slug: `${name.toLowerCase()}-${process.pid}`,
                 price,
+                stockTracked: true,
             },
         });
         await prisma.productListing.create({

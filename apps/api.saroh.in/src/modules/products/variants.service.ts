@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { recordEntry } from "../stock/stock.service";
+import { COUNTING_ROWS } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
 import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
@@ -57,7 +58,7 @@ export class VariantsService {
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             include: {
                 stockLevels: {
-                    where: { storeId },
+                    where: { storeId, ...COUNTING_ROWS },
                     select: {
                         onHand: true,
                         promised: true,

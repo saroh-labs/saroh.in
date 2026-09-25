@@ -15,6 +15,7 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { SetStockTrackingDto } from "../stock/dto";
 import { UpdateInventoryDto, UpdateVariantStockDto } from "./inventory.dto";
 import { InventoryService } from "./inventory.service";
 import {
@@ -123,5 +124,21 @@ export class ProductDetailsController {
         @Body() dto: UpdateInventoryDto,
     ) {
         return this.inventory.upsert(storeId, productId, user.id, dto);
+    }
+
+    /** Track stock on or off for the product (#515), by whoever can change it. */
+    @Put("stock-tracking")
+    setStockTracking(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: SetStockTrackingDto,
+    ) {
+        return this.inventory.setTracking(
+            storeId,
+            productId,
+            user.id,
+            dto.tracked,
+        );
     }
 }

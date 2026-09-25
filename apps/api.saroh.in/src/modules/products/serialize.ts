@@ -94,6 +94,8 @@ export interface ProductDto {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
+    stockTracked: boolean;
     createdAt: Date;
     updatedAt: Date;
     category?: { id: string; name: string } | null;
@@ -221,6 +223,7 @@ interface RawProduct {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    stockTracked: boolean;
     createdAt: Date;
     updatedAt: Date;
     category?: { id: string; name: string } | null;
@@ -337,6 +340,7 @@ export function serializeProduct(
         seoDescription: product.seoDescription,
         seoImageId: product.seoImageId,
         optionId: product.optionId,
+        stockTracked: product.stockTracked,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
         category: product.category ?? null,

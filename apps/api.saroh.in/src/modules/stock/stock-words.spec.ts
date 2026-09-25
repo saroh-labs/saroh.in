@@ -7,6 +7,7 @@ import {
     isHandMade,
     movable,
     moveRefusal,
+    promisedRefusal,
     shortBy,
     shortWords,
     STOCK_ENTRY_WORDS,
@@ -72,5 +73,14 @@ describe("stock words", () => {
         // Shown nothing: nothing to disagree with.
         expect(countMismatched(null, 9)).toBe(false);
         expect(countMismatched(undefined, 9)).toBe(false);
+    });
+
+    it("Track stock refuses to go off while units are promised (#515)", () => {
+        expect(promisedRefusal(3)).toBe(
+            "3 are promised to open orders — fulfil or cancel them first.",
+        );
+        expect(promisedRefusal(1)).toBe(
+            "1 is promised to open orders — fulfil or cancel them first.",
+        );
     });
 });
