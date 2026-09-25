@@ -1,17 +1,14 @@
 import {
     BadRequestException,
     ConflictException,
-    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { StoresService } from "../stores/stores.service";
-
 export const ALLERGEN_NAME_MAX = 30;
 
-/** What a food business adds in one step; a store starts with none. */
+/** What a food business adds in one step; a business starts with none. */
 export const COMMON_FOOD_ALLERGENS = [
     "Gluten",
     "Milk",
@@ -36,22 +33,16 @@ export interface ProductAllergensDto {
 }
 
 /**
- * A storefront's allergen list (#483): what the editor offers under
- * "Contains" and "May contain", named as customers will read it. One a
- * product lists can't be removed — the refusal says how many list it.
+ * The business's allergen list (#483, #529): what the editor offers under
+ * "Contains" and "May contain", named as customers will read it — one list,
+ * whatever storefront sells the product. One a product lists can't be
+ * removed — the refusal says how many list it.
  */
 @Injectable()
 export class AllergensService {
-    constructor(private readonly stores: StoresService) {}
-
-    async list(storeId: string, userId: string): Promise<AllergenView[]> {
-        await this.stores.getForUser(storeId, userId);
-        return this.views(storeId);
-    }
-
-    async views(storeId: string): Promise<AllergenView[]> {
+    async views(organizationId: string): Promise<AllergenView[]> {
         const rows = await prisma.storeAllergen.findMany({
-            where: { storeId },
+            where: { organizationId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             select: {
                 id: true,
@@ -70,13 +61,11 @@ export class AllergensService {
 
     /** One name, or several (the common list); duplicates are refused. */
     async add(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         names: string[],
     ): Promise<AllergenView[]> {
-        const organizationId = await this.requireOrg(storeId, userId);
         const existing = await prisma.storeAllergen.findMany({
-            where: { storeId },
+            where: { organizationId },
             select: { name: true },
         });
         const taken = new Set(existing.map((a) => a.name.toLowerCase()));
@@ -112,19 +101,17 @@ export class AllergensService {
         const start = existing.length;
         await prisma.storeAllergen.createMany({
             data: clean.map((name, i) => ({
-                storeId,
                 organizationId,
                 name,
                 position: start + i,
             })),
         });
-        return this.views(storeId);
+        return this.views(organizationId);
     }
 
-    async remove(storeId: string, allergenId: string, userId: string) {
-        await this.requireOrg(storeId, userId);
+    async remove(organizationId: string, allergenId: string) {
         const allergen = await prisma.storeAllergen.findFirst({
-            where: { id: allergenId, storeId },
+            where: { id: allergenId, organizationId },
             select: {
                 id: true,
                 name: true,
@@ -151,24 +138,6 @@ export class AllergensService {
         await prisma.storeAllergen.delete({ where: { id: allergenId } });
         return { id: allergen.id, name: allergen.name };
     }
-
-    private async requireOrg(storeId: string, userId: string): Promise<string> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (!writable) {
-            throw new ForbiddenException(
-                "Your role can't change product settings.",
-            );
-        }
-        if (!writable.organizationId) {
-            throw new BadRequestException(
-                "This storefront belongs to no business.",
-            );
-        }
-        return writable.organizationId;
-    }
 }
 
 /** A product's allergens, split the way the shop says them. */
@@ -190,38 +159,36 @@ export async function productAllergensFor(
     };
 }
 
-/** Every id is on this storefront's list; checked before anything is written. */
+/** Every id is on the business's list; checked before anything is written. */
 export async function checkProductAllergens(
-    storeId: string,
+    organizationId: string,
     input: { contains?: string[]; mayContain?: string[] },
 ): Promise<void> {
     const ids = [...(input.contains ?? []), ...(input.mayContain ?? [])];
     if (ids.length === 0) return;
     const found = await prisma.storeAllergen.count({
-        where: { storeId, id: { in: ids } },
+        where: { organizationId, id: { in: ids } },
     });
     if (found !== new Set(ids).size) {
         throw new BadRequestException({
-            message:
-                "An allergen in the list is not on this storefront's list.",
+            message: "An allergen in the list is not on your allergen list.",
             field: "allergens",
         });
     }
 }
 
 /**
- * The section PATCH's `contains` / `mayContain`: allergen ids of this
- * storefront. Each list given replaces that kind; one allergen can't be in
+ * The section PATCH's `contains` / `mayContain`: allergen ids of the
+ * business. Each list given replaces that kind; one allergen can't be in
  * both (Contains wins over May contain).
  */
 export async function saveProductAllergens(
-    storeId: string,
-    productId: string,
     organizationId: string,
+    productId: string,
     input: { contains?: string[]; mayContain?: string[] },
 ): Promise<void> {
     if (!input.contains && !input.mayContain) return;
-    await checkProductAllergens(storeId, input);
+    await checkProductAllergens(organizationId, input);
     const contains = new Set(input.contains ?? []);
     await prisma.$transaction(async (tx) => {
         for (const [kind, list] of [

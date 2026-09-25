@@ -11,8 +11,12 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { REQUIRE_MODULE_KEY } from "../capabilities/require-module.decorator";
-import { CatalogueController } from "../catalogue/catalogue.controller";
-import { CategoriesController } from "../categories/categories.controller";
+import { OrganizationCatalogueController } from "../catalogue/catalogue.controller";
+import { CatalogueController } from "../catalogue/store-catalogue.controller";
+import {
+    CategoriesController,
+    OrganizationCategoriesController,
+} from "../categories/categories.controller";
 import { ProductDetailsController } from "./product-details.controller";
 import { ProductsController } from "./products.controller";
 
@@ -27,6 +31,8 @@ describe("products area: sign-in and the COMMERCE gate", () => {
         ProductDetailsController,
         CategoriesController,
         CatalogueController,
+        OrganizationCategoriesController,
+        OrganizationCatalogueController,
     ];
 
     it.each(controllers.map((c) => [c.name, c] as const))(

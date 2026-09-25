@@ -25,6 +25,19 @@
   visitors.
 - **Current** — **Disabling a capability never deletes data;** deactivation runs a
   policy (§25, ADR-003).
+- **Current** — **Catalogue settings belong to the business** (#529, ADR-010):
+  categories, options, custom fields, defaults, allergens and the SKU pattern
+  are keyed by `organizationId`, with category slugs, option names and
+  defaults keys unique per business. Their `storeId` column is the storefront
+  a row was first made at and is never read. Services take the organization;
+  `CatalogueAccess` resolves it from an org route (`store:read` /
+  `store:write`) or, for the old `stores/:storeId/...` aliases, from the
+  storefront under its own access rules.
+- **Current** — **A backfill that merges rows is a TypeScript script** in
+  `packages/database/src/backfill/`, exported so the integration suite can seed
+  old-shape rows, run it twice and check the second run changes nothing
+  (`catalogue-settings.ts`). The migration that depends on it refuses to run,
+  before changing anything, while its precondition fails.
 
 ## Money — **Current**
 

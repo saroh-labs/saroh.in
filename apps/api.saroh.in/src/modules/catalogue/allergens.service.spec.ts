@@ -15,7 +15,7 @@ const tag = `${process.pid}-${Date.now()}`;
 describe("Allergens (DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
     const products = new ProductsService(stores);
-    const allergens = new AllergensService(stores);
+    const allergens = new AllergensService();
 
     let ownerId = "";
     let orgId = "";
@@ -65,23 +65,19 @@ describe("Allergens (DB)", () => {
     });
 
     it("starts empty, adds one, refuses it again ignoring case, and fills the common list around it", async () => {
-        expect(await allergens.list(storeId, ownerId)).toEqual([]);
-        await allergens.add(storeId, ownerId, ["Gluten"]);
-        await expect(
-            allergens.add(storeId, ownerId, ["gluten"]),
-        ).rejects.toThrow(/already on the list/);
-        const all = await allergens.add(
-            storeId,
-            ownerId,
-            COMMON_FOOD_ALLERGENS,
+        expect(await allergens.views(orgId)).toEqual([]);
+        await allergens.add(orgId, ["Gluten"]);
+        await expect(allergens.add(orgId, ["gluten"])).rejects.toThrow(
+            /already on the list/,
         );
+        const all = await allergens.add(orgId, COMMON_FOOD_ALLERGENS);
         expect(all.map((a) => a.name)).toEqual(COMMON_FOOD_ALLERGENS);
     });
 
     it("says nothing for a product with none, and splits contains from may contain", async () => {
         const none = await products.get(storeId, loafId, ownerId);
         expect(none.allergens).toEqual({ contains: [], mayContain: [] });
-        const list = await allergens.list(storeId, ownerId);
+        const list = await allergens.views(orgId);
         const id = (n: string) => list.find((a) => a.name === n)?.id ?? "";
         const after = await products.patch(storeId, loafId, ownerId, {
             contains: [id("Gluten")],
@@ -93,7 +89,7 @@ describe("Allergens (DB)", () => {
             "Nuts",
             "Sesame",
         ]);
-        const counts = await allergens.list(storeId, ownerId);
+        const counts = await allergens.views(orgId);
         expect(counts.find((a) => a.name === "Nuts")).toMatchObject({
             contains: 0,
             mayContain: 1,
@@ -101,13 +97,13 @@ describe("Allergens (DB)", () => {
     });
 
     it("refuses to remove one a product lists, and says how many", async () => {
-        const list = await allergens.list(storeId, ownerId);
+        const list = await allergens.views(orgId);
         const gluten = list.find((a) => a.name === "Gluten")?.id ?? "";
-        await expect(
-            allergens.remove(storeId, gluten, ownerId),
-        ).rejects.toThrow("Gluten is on 1 product — take it off them first.");
+        await expect(allergens.remove(orgId, gluten)).rejects.toThrow(
+            "Gluten is on 1 product — take it off them first.",
+        );
         const soy = list.find((a) => a.name === "Soy")?.id ?? "";
-        await expect(allergens.remove(storeId, soy, ownerId)).resolves.toEqual({
+        await expect(allergens.remove(orgId, soy)).resolves.toEqual({
             id: soy,
             name: "Soy",
         });
@@ -129,14 +125,12 @@ describe("Allergens (DB)", () => {
                 slug: `allergen-two-${tag}`,
             })
         ).id;
-        const [mustard] = await allergens.add(otherStoreId, ownerId, [
-            "Mustard",
-        ]);
+        const [mustard] = await allergens.add(otherOrgId, ["Mustard"]);
         await expect(
             products.patch(storeId, loafId, ownerId, {
                 contains: [mustard.id],
             }),
-        ).rejects.toThrow(/not on this storefront's list/);
+        ).rejects.toThrow(/not on your allergen list/);
         await expect(
             products.create(storeId, ownerId, {
                 name: "Mustard rye",
@@ -144,7 +138,7 @@ describe("Allergens (DB)", () => {
                 currency: "INR",
                 contains: [mustard.id],
             }),
-        ).rejects.toThrow(/not on this storefront's list/);
+        ).rejects.toThrow(/not on your allergen list/);
         expect(
             await prisma.product.count({
                 where: { storeId, name: "Mustard rye" },

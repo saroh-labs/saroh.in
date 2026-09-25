@@ -136,12 +136,14 @@ describe("create", () => {
         expect(db.__tx.discount!.create).not.toHaveBeenCalled();
     });
 
+    // Categories are the business's own (#529); products still belong to a
+    // storefront of the business.
     it.each([
-        ["COLLECTION", "category"],
-        ["PRODUCT", "product"],
+        ["COLLECTION", "category", { organizationId: "org_1" }],
+        ["PRODUCT", "product", { store: { organizationId: "org_1" } }],
     ] as const)(
-        "checks %s targets through their storefront's business",
-        async (appliesTo, model) => {
+        "checks %s targets are the business's",
+        async (appliesTo, model, scope) => {
             db[model].count!.mockResolvedValue(1);
             await service.create("org_1", {
                 code: "SCOPED",
@@ -151,10 +153,7 @@ describe("create", () => {
                 targetIds: ["t_1"],
             });
             expect(db[model].count).toHaveBeenCalledWith({
-                where: {
-                    id: { in: ["t_1"] },
-                    store: { organizationId: "org_1" },
-                },
+                where: { id: { in: ["t_1"] }, ...scope },
             });
         },
     );

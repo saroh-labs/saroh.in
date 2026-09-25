@@ -151,6 +151,8 @@ module.exports = {
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
+        // #529 the business's categories, with a mocked Prisma.
+        "<rootDir>/src/modules/categories/categories.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.

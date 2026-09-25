@@ -157,7 +157,7 @@ export class ProductsService {
 
     /** A single product with variants + inventory; 404 if no store access. */
     async get(storeId: string, productId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        const store = await this.stores.getForUser(storeId, userId);
         const product = await prisma.product.findFirst({
             where: { id: productId, storeId },
             include: PRODUCT_DETAIL_INCLUDE,
@@ -167,7 +167,11 @@ export class ProductsService {
         }
         const detail = serializeProductDetail(product);
         const [customFields, allergens, variantPromises] = await Promise.all([
-            productFieldsFor(storeId, product.id, product.categoryId),
+            productFieldsFor(
+                store.organizationId,
+                product.id,
+                product.categoryId,
+            ),
             productAllergensFor(product.id),
             // Still counting as a whole: what each variant will take with it
             // when it switches, so the editor can seed the counts.
@@ -202,9 +206,9 @@ export class ProductsService {
         // never leaves a half-made product behind.
         if (organizationId) {
             if (dto.customFields)
-                await checkProductFieldValues(storeId, dto.customFields);
+                await checkProductFieldValues(organizationId, dto.customFields);
             if (dto.contains || dto.mayContain)
-                await checkProductAllergens(storeId, {
+                await checkProductAllergens(organizationId, {
                     contains: dto.contains,
                     mayContain: dto.mayContain,
                 });
@@ -255,14 +259,13 @@ export class ProductsService {
         if (organizationId) {
             if (dto.customFields) {
                 await saveProductFieldValues(
-                    storeId,
-                    createdId,
                     organizationId,
+                    createdId,
                     dto.customFields,
                 );
             }
             if (dto.contains || dto.mayContain) {
-                await saveProductAllergens(storeId, createdId, organizationId, {
+                await saveProductAllergens(organizationId, createdId, {
                     contains: dto.contains,
                     mayContain: dto.mayContain,
                 });
@@ -404,7 +407,7 @@ export class ProductsService {
             ) {
                 const option = next
                     ? await prisma.productOption.findFirst({
-                          where: { id: next, storeId },
+                          where: { id: next, ...ofStoresBusiness(storeId) },
                           select: { name: true },
                       })
                     : null;
@@ -477,14 +480,13 @@ export class ProductsService {
         // whole section before anything is written.
         if (dto.customFields && organizationId) {
             await saveProductFieldValues(
-                storeId,
-                productId,
                 organizationId,
+                productId,
                 dto.customFields,
             );
         }
         if ((dto.contains || dto.mayContain) && organizationId) {
-            await saveProductAllergens(storeId, productId, organizationId, {
+            await saveProductAllergens(organizationId, productId, {
                 contains: dto.contains,
                 mayContain: dto.mayContain,
             });
@@ -593,14 +595,14 @@ export class ProductsService {
         }
     }
 
-    /** A product picks its option from its own store's options. */
+    /** A product picks its option from its business's options (#529). */
     private async assertOptionInStore(
         storeId: string,
         optionId?: string | null,
     ): Promise<void> {
         if (!optionId) return;
         const option = await prisma.productOption.findFirst({
-            where: { id: optionId, storeId },
+            where: { id: optionId, ...ofStoresBusiness(storeId) },
             select: { id: true },
         });
         if (!option) {
@@ -628,14 +630,14 @@ export class ProductsService {
         }
     }
 
-    /** A category attached to a product must belong to the same store. */
+    /** A product's category is one of its business's categories (#529). */
     private async assertCategoryInStore(
         storeId: string,
         categoryId?: string | null,
     ): Promise<void> {
         if (!categoryId) return;
         const category = await prisma.category.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, ...ofStoresBusiness(storeId) },
             select: { id: true },
         });
         if (!category) {
@@ -645,4 +647,12 @@ export class ProductsService {
             });
         }
     }
+}
+
+/**
+ * Catalogue settings belong to the business that owns the storefront
+ * (#529): a row of the same business, whichever storefront it was made at.
+ */
+function ofStoresBusiness(storeId: string) {
+    return { organization: { stores: { some: { id: storeId } } } };
 }

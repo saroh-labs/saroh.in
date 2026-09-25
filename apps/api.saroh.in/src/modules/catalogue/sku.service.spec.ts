@@ -5,6 +5,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { ProductsService } from "../products/products.service";
 import { VariantsService } from "../products/variants.service";
 import { StoresService } from "../stores/stores.service";
+import { CatalogueAccess } from "./catalogue-access";
 import { SkuService } from "./sku.service";
 
 /**
@@ -16,10 +17,10 @@ const tag = `${process.pid}-${Date.now()}`;
 
 describe("SKU pattern (DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
-    const categories = new CategoriesService(stores);
+    const categories = new CategoriesService();
     const products = new ProductsService(stores);
     const variants = new VariantsService(products);
-    const sku = new SkuService(stores);
+    const sku = new SkuService();
 
     let ownerId = "";
     let orgId = "";
@@ -44,9 +45,7 @@ describe("SKU pattern (DB)", () => {
                 slug: `sku-${tag}`,
             })
         ).id;
-        const serums = (
-            await categories.create(storeId, ownerId, { name: "Serums" })
-        ).id;
+        const serums = (await categories.create(orgId, { name: "Serums" })).id;
         serumId = (
             await products.create(storeId, ownerId, {
                 name: "Vitamin C Serum",
@@ -80,7 +79,7 @@ describe("SKU pattern (DB)", () => {
     });
 
     it("previews every variant, and a product with none", async () => {
-        const view = await sku.preview(storeId, ownerId, "{NAME3}{N}-{VALUE}");
+        const view = await sku.preview(orgId, "{NAME3}{N}-{VALUE}");
         expect(view.rows.map((r) => [r.now, r.next])).toEqual([
             ["OLD-15", "VIT01-15ML"],
             ["OLD-30", "VIT01-30ML"],
@@ -90,30 +89,30 @@ describe("SKU pattern (DB)", () => {
     });
 
     it("refuses a pattern that would name two variants alike", async () => {
-        const view = await sku.preview(storeId, ownerId, "{NAME3}");
+        const view = await sku.preview(orgId, "{NAME3}");
         expect(view.problem).toBe(
             "3 variants would share VIT. Add {N} so each one differs.",
         );
         await expect(
-            sku.save(storeId, ownerId, { pattern: "{NAME3}", suggest: true }),
+            sku.save(orgId, { pattern: "{NAME3}", suggest: true }),
         ).rejects.toThrow(/would share VIT/);
         await expect(
-            sku.save(storeId, ownerId, { pattern: "{SIZE}", suggest: true }),
+            sku.save(orgId, { pattern: "{SIZE}", suggest: true }),
         ).rejects.toThrow(/at least one part in braces|Only/);
     });
 
     it("saves, reads back with the product's number, and rewrites nothing", async () => {
-        await sku.save(storeId, ownerId, {
+        await sku.save(orgId, {
             pattern: "{CAT}-{NAME3}{N}-{VALUE}",
             suggest: false,
         });
-        const forOil = await sku.get(storeId, ownerId, oilId);
+        const forOil = await sku.get(orgId, oilId);
         expect(forOil).toEqual({
             pattern: "{CAT}-{NAME3}{N}-{VALUE}",
             suggest: false,
             n: 2,
         });
-        expect((await sku.get(storeId, ownerId)).n).toBe(3);
+        expect((await sku.get(orgId)).n).toBe(3);
         const skus = await prisma.productVariant.findMany({
             where: { productId: serumId },
             orderBy: { sku: "asc" },
@@ -128,12 +127,14 @@ describe("SKU pattern (DB)", () => {
                 data: { email: `sku-stranger-${tag}@example.com` },
             })
         ).id;
+        const access = new CatalogueAccess(stores);
         await expect(
-            sku.save(storeId, strangerId, {
-                pattern: "{NAME3}{N}",
-                suggest: true,
-            }),
-        ).rejects.toThrow();
+            access
+                .writeViaStore(storeId, strangerId)
+                .then((org) =>
+                    sku.save(org, { pattern: "{NAME3}{N}", suggest: true }),
+                ),
+        ).rejects.toThrow("Store not found");
         await prisma.user.delete({ where: { id: strangerId } });
     });
 });
