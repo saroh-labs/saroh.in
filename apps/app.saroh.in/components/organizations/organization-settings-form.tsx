@@ -15,7 +15,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FieldErrors } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
 import { BusinessSection } from "@/components/organizations/business-section";
+import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
 import {
     ADDRESS_API_KEY,
@@ -40,11 +41,11 @@ import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
     GST_RATE_OPTIONS,
     GST_STATES,
-    GSTIN_SHAPE,
     isHsnSac,
     PREFIX_SHAPE,
     rateOption,
 } from "@/lib/invoices/gst";
+import { GSTIN_EXAMPLE, gstinProblem } from "@/lib/invoices/gstin";
 import {
     defaultNumberFormat,
     formatFields,
@@ -100,17 +101,12 @@ const formSchema = z
         // The registered address (CGST rule 46); its state is gstState.
         ...registeredAddressShape,
     })
-    .refine(
-        (v) =>
-            !v.gstRegistered ||
-            GSTIN_SHAPE.test((v.taxId ?? "").trim().toUpperCase()),
-        {
-            path: ["taxId"],
-            message:
-                "A GST-registered business puts its 15-character GSTIN here.",
-        },
-    )
     .superRefine((v, ctx) => {
+        // Which part of the GSTIN is short or wrong, not just "15 characters".
+        const gstin = v.gstRegistered ? gstinProblem(v.taxId ?? "") : null;
+        if (gstin) {
+            ctx.addIssue({ code: "custom", path: ["taxId"], message: gstin });
+        }
         for (const { path, message } of addressProblems(v)) {
             ctx.addIssue({ code: "custom", path: [path], message });
         }
@@ -339,6 +335,16 @@ export function OrganizationSettingsForm({
     // preview reads it either way.
     const v = useWatch({ control: form.control }) as FormValues;
     const registered = v.gstRegistered;
+    // The form re-checks only the field that changed, and a rule that spans
+    // fields (a GSTIN or address a registration needs) can leave a refusal
+    // standing, and Save off, after everything is filled in. While any
+    // refusal shows, each change (and its first showing) re-checks the lot.
+    const showing = Object.keys(errors).length > 0;
+    const watched = JSON.stringify(v);
+    useEffect(() => {
+        if (showing) void form.trigger();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per change of the values (or a refusal appearing), not per render
+    }, [watched, showing]);
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && isDirty);
     // The number-format rules span four fields (and the prefix and GST
@@ -352,6 +358,18 @@ export function OrganizationSettingsForm({
                   prefix: prefixOf(v.invoicePrefix),
               })
             : null;
+    // Turning GST on needs a registered address, which lives on another
+    // tab. When the saved one is short, its fields join the Tax card, so
+    // one Save covers both rather than neither card being able to.
+    const addressInTax =
+        editing === "tax" &&
+        v.gstRegistered &&
+        addressProblems({ ...valuesOf(settings), gstRegistered: true }).length >
+            0;
+    /** Whether a field is on the card being edited. */
+    const onCard = (field: string) =>
+        sectionOf(field) === editing ||
+        (addressInTax && (ADDRESS_KEYS as readonly string[]).includes(field));
 
     const startEditing = (key: SectionKey) => {
         if (editing && editing !== key && isDirty) {
@@ -373,7 +391,7 @@ export function OrganizationSettingsForm({
     /** A refusal on a field of another section is said, since it is hidden. */
     function onInvalid(problems: FieldErrors<FormValues>) {
         const first = Object.entries(problems).find(
-            ([field]) => sectionOf(field) !== editing,
+            ([field]) => !onCard(field),
         );
         if (first) {
             showError(
@@ -432,7 +450,7 @@ export function OrganizationSettingsForm({
 
         if (!result.ok) {
             const field = result.field ? FIELD_OF[result.field] : undefined;
-            if (field && sectionOf(field) === editing) {
+            if (field && onCard(field)) {
                 form.setError(field, { message: result.error });
             } else showError(result.error);
             return;
@@ -480,11 +498,11 @@ export function OrganizationSettingsForm({
         if (NUMBER_FIELDS.some((key) => dirtyFields[key])) return;
         const fields = formatFields(defaultNumberFormat(on));
         for (const key of NUMBER_FIELDS) {
-            form.setValue(key, fields[key], {
-                shouldDirty: false,
-                shouldValidate: true,
-            });
+            form.setValue(key, fields[key], { shouldDirty: false });
         }
+        // Checked together once all four are in: one at a time, the first
+        // would be judged against the other three's old values.
+        void form.trigger(NUMBER_FIELDS);
     };
 
     const rows: Record<SectionKey, BusinessRow[]> = {
@@ -587,11 +605,7 @@ export function OrganizationSettingsForm({
 
     // Why Save is off, in the footer's words.
     const sectionErrors =
-        (editing
-            ? Object.keys(errors).filter(
-                  (field) => sectionOf(field) === editing,
-              ).length
-            : 0) +
+        (editing ? Object.keys(errors).filter(onCard).length : 0) +
         // The live number-format problem, until Save puts it on a field.
         (numberProblem && !NUMBER_FIELDS.some((key) => errors[key]) ? 1 : 0);
     const saveWhy = !isDirty
@@ -630,6 +644,58 @@ export function OrganizationSettingsForm({
         ),
         style: { "--b": basis } as React.CSSProperties,
     });
+
+    const addressFields = (
+        <>
+            {(
+                [
+                    [
+                        "addressLine1",
+                        "Address line 1",
+                        "100%",
+                        true,
+                        "address-line1",
+                    ],
+                    [
+                        "addressLine2",
+                        "Address line 2 (optional)",
+                        "100%",
+                        true,
+                        "address-line2",
+                    ],
+                    ["city", "City", "240px", true, "address-level2"],
+                    ["postalCode", "PIN code", "140px", false, "postal-code"],
+                ] as const
+            ).map(([name, label, basis, grow, auto]) => (
+                <FormField
+                    key={name}
+                    control={form.control}
+                    name={name}
+                    render={({ field }) => (
+                        <FormItem {...at(basis, grow)}>
+                            <FormLabel>{label}</FormLabel>
+                            <FormControl>
+                                <Input
+                                    {...field}
+                                    maxLength={name === "postalCode" ? 12 : 120}
+                                    inputMode={
+                                        name === "postalCode"
+                                            ? "numeric"
+                                            : undefined
+                                    }
+                                    autoComplete={auto}
+                                    className={cn(
+                                        name === "postalCode" && "font-mono",
+                                    )}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ))}
+        </>
+    );
 
     const fieldsOf: Record<SectionKey, React.ReactNode> = {
         identity: (
@@ -801,12 +867,21 @@ export function OrganizationSettingsForm({
                                             e.target.value.toUpperCase(),
                                         )
                                     }
-                                    className="font-mono"
+                                    placeholder={
+                                        registered ? GSTIN_EXAMPLE : undefined
+                                    }
+                                    maxLength={registered ? 20 : undefined}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    className="font-mono tracking-[0.04em]"
                                 />
                             </FormControl>
+                            {registered ? (
+                                <GstinGuide value={field.value ?? ""} />
+                            ) : null}
                             <FormDescription>
                                 {registered
-                                    ? "The first two digits set your state."
+                                    ? "15 characters: your state's code, your PAN, the entity number, Z, and a check character. The state code sets your state."
                                     : "Any VAT or tax registration number."}
                             </FormDescription>
                             <FormMessage />
@@ -915,6 +990,17 @@ export function OrganizationSettingsForm({
                         />
                     </>
                 ) : null}
+                {addressInTax ? (
+                    <>
+                        <p className="mt-2 basis-full border-t border-border pt-3 text-[13px] font-medium">
+                            Registered address
+                            <span className="ml-2 font-normal text-muted-foreground">
+                                A tax invoice prints it
+                            </span>
+                        </p>
+                        {addressFields}
+                    </>
+                ) : null}
                 <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
                     {registered
                         ? "Delivery is its own line on an invoice, printed with its SAC. "
@@ -925,66 +1011,7 @@ export function OrganizationSettingsForm({
                 </p>
             </>
         ),
-        address: (
-            <>
-                {(
-                    [
-                        [
-                            "addressLine1",
-                            "Address line 1",
-                            "100%",
-                            true,
-                            "address-line1",
-                        ],
-                        [
-                            "addressLine2",
-                            "Address line 2 (optional)",
-                            "100%",
-                            true,
-                            "address-line2",
-                        ],
-                        ["city", "City", "240px", true, "address-level2"],
-                        [
-                            "postalCode",
-                            "PIN code",
-                            "140px",
-                            false,
-                            "postal-code",
-                        ],
-                    ] as const
-                ).map(([name, label, basis, grow, auto]) => (
-                    <FormField
-                        key={name}
-                        control={form.control}
-                        name={name}
-                        render={({ field }) => (
-                            <FormItem {...at(basis, grow)}>
-                                <FormLabel>{label}</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        {...field}
-                                        maxLength={
-                                            name === "postalCode" ? 12 : 120
-                                        }
-                                        inputMode={
-                                            name === "postalCode"
-                                                ? "numeric"
-                                                : undefined
-                                        }
-                                        autoComplete={auto}
-                                        className={cn(
-                                            name === "postalCode" &&
-                                                "font-mono",
-                                        )}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                ))}
-            </>
-        ),
+        address: addressFields,
     };
 
     return (
