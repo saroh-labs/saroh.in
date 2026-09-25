@@ -156,6 +156,7 @@ async function emptyShelves(
             counted: 0,
             actorUserId: actor.userId,
             note: TRACKING_OFF_NOTE,
+            system: "TRACKING_OFF",
             // A shelf sold below 0 is counted up to it.
             allowNegative: true,
         });

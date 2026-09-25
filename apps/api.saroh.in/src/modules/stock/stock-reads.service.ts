@@ -8,8 +8,8 @@ import { stockLine } from "../products/product-overview";
 import type { StockLevelsQueryDto, StockLogQueryDto } from "./dto";
 import { stockReader } from "./stock-access";
 import {
+    canUndoEntry,
     countMismatched,
-    isHandMade,
     shortBy,
     STOCK_ENTRY_WORDS,
 } from "./stock-words";
@@ -432,7 +432,7 @@ export class StockReadsService {
                     pairId: e.pairId,
                     reversesId: e.reversesId,
                     undone,
-                    canUndo: reader.canWrite && isHandMade(e.kind) && !undone,
+                    canUndo: reader.canWrite && canUndoEntry(e) && !undone,
                     note: e.note,
                     createdAt: e.createdAt,
                     by:

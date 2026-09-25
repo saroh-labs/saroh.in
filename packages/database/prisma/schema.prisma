@@ -1081,6 +1081,8 @@ model CollectionProduct {
   createdAt DateTime @default(now())
 
   @@id([collectionId, productId])
+  // A hand-picked collection's products, in order.
+  @@index([collectionId, position])
   @@index([productId])
   @@index([organizationId])
 }
@@ -1271,6 +1273,12 @@ model StockEntry {
   // leaves the team keeps their entries. Null for the system.
   actorUserId String?
   note        String?
+  // Why Saroh wrote this entry, not a person or an order: TRACKING_OFF
+  // (Track stock turned off counted the shelf to 0), PER_VARIANT (the switch
+  // to counting each variant) or VARIANT_REMOVED (a removed variant's stock
+  // taken back to the product). Null for everything else. An entry Saroh
+  // wrote is never undone through the stock log.
+  system      String?
 
   createdAt DateTime @default(now())
 

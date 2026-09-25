@@ -10,13 +10,14 @@ import type { Prisma, StockEntryKind } from "@saroh/database";
 
 import { lockProduct, lockStockLevels } from "../products/stock-levels";
 import { clearSoldOut } from "./sold-out";
-import type { AdjustKind } from "./stock-words";
+import type { AdjustKind, StockSystemReason } from "./stock-words";
 import {
     adjustDelta,
     ALREADY_UNDONE,
     belowZeroRefusal,
     BUSINESS_UNTRACKED,
     cantReverse,
+    canUndoEntry,
     CLOSED_STOREFRONT,
     countMismatched,
     COUNTS_AS_A_WHOLE,
@@ -26,6 +27,7 @@ import {
     moveRefusal,
     orderReturnRefusal,
     shortBy,
+    SYSTEM_CANT_UNDO,
     UNTRACKED,
 } from "./stock-words";
 import { recordProductTracking } from "./tracking-audit";
@@ -93,6 +95,8 @@ export interface StockEntryView {
     reversesId: string | null;
     actorUserId: string | null;
     note: string | null;
+    /** Why Saroh wrote it; null for a person's or an order's. */
+    system: string | null;
     createdAt: Date;
 }
 
@@ -357,6 +361,11 @@ export interface RecordEntryInput {
     expected?: number | null;
     counted?: number | null;
     note?: string | null;
+    /**
+     * Saroh wrote it, not a person (Track stock off, the per-variant
+     * switch, a removed variant): the stock log never undoes it.
+     */
+    system?: StockSystemReason | null;
     /** A promise moving with this change (a sale takes its hold). */
     promisedDelta?: number;
     /**
@@ -421,6 +430,7 @@ export async function recordEntry(
             reversesId: input.reversesId ?? null,
             actorUserId: input.actorUserId ?? null,
             note: input.note ?? null,
+            system: input.system ?? null,
         },
     });
 }
@@ -754,7 +764,7 @@ export async function reverse(
     }
     const named = await tx.stockEntry.findMany({
         where: { id: { in: asked }, organizationId: actor.organizationId },
-        select: { id: true, kind: true, pairId: true },
+        select: { id: true, kind: true, pairId: true, system: true },
     });
     if (named.length !== asked.length) {
         throw new NotFoundException("Stock change not found");
@@ -763,6 +773,7 @@ export async function reverse(
         if (!isHandMade(e.kind)) {
             throw new ConflictException(cantReverse(e.kind));
         }
+        if (!canUndoEntry(e)) throw new ConflictException(SYSTEM_CANT_UNDO);
     }
     // A move is undone whole.
     const pairIds = named.flatMap((e) =>

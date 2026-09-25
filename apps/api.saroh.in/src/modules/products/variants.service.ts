@@ -377,6 +377,7 @@ export class VariantsService {
                         counted: current.onHand + row.onHand,
                         actorUserId: userId,
                         note: `Took back ${variant.title}'s stock`,
+                        system: "VARIANT_REMOVED",
                         allowNegative: true,
                     });
                 }

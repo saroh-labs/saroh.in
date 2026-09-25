@@ -420,7 +420,7 @@ export class InventoryService {
         stockLevelId: string,
         onHand: number,
         userId: string,
-        note?: string,
+        switched = false,
     ): Promise<void> {
         const row = await tx.stockLevel.findUniqueOrThrow({
             where: { id: stockLevelId },
@@ -432,7 +432,9 @@ export class InventoryService {
             quantity: onHand - row.onHand,
             counted: onHand,
             actorUserId: userId,
-            note: note ?? null,
+            // The switch to counting each variant is Saroh's count, never
+            // undone: undoing it would count the same units twice.
+            ...(switched ? { note: SWITCH_NOTE, system: "PER_VARIANT" } : {}),
         });
     }
 
@@ -471,7 +473,7 @@ export class InventoryService {
                 select: { id: true },
             });
             made.push(row.id);
-            await this.countTo(tx, row.id, next.onHand, userId, SWITCH_NOTE);
+            await this.countTo(tx, row.id, next.onHand, userId, true);
             await tx.orderItem.updateMany({
                 where: { ...linesToMove(productId, storeId), variantId },
                 data: { stockRow: "VARIANT", stockLevelId: row.id },
@@ -487,7 +489,7 @@ export class InventoryService {
                 data: { promised: left },
             });
             if (own.onHand !== left) {
-                await this.countTo(tx, own.id, left, userId, SWITCH_NOTE);
+                await this.countTo(tx, own.id, left, userId, true);
             }
         }
         return made;

@@ -48,6 +48,31 @@ export function isHandMade(kind: StockEntryKind): boolean {
     return HAND_MADE_KINDS.includes(kind);
 }
 
+/**
+ * Why Saroh wrote a COUNTED entry rather than a person
+ * (`StockEntry.system`): Track stock turned off, the switch to counting each
+ * variant, a removed variant's stock taken back. Such an entry is never
+ * undone — undoing the switch's count, say, would count the same units on
+ * the product and on its variants.
+ */
+export const STOCK_SYSTEM_REASONS = [
+    "TRACKING_OFF",
+    "PER_VARIANT",
+    "VARIANT_REMOVED",
+] as const;
+export type StockSystemReason = (typeof STOCK_SYSTEM_REASONS)[number];
+
+/** Whether the stock log may undo an entry: hand-made, and not Saroh's. */
+export function canUndoEntry(e: {
+    kind: StockEntryKind;
+    system: string | null;
+}): boolean {
+    return isHandMade(e.kind) && e.system === null;
+}
+
+export const SYSTEM_CANT_UNDO =
+    "Saroh made this change when stock tracking or variants changed, so it can't be undone. Count the shelf instead.";
+
 /** The signed change an adjustment of `units` makes. */
 export function adjustDelta(kind: AdjustKind, units: number): number {
     return ADJUST_SIGN[kind] * units;

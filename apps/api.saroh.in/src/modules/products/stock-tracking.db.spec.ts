@@ -33,6 +33,7 @@ import {
     BUSINESS_UNTRACKED,
     COUNTS_AS_A_WHOLE,
     COUNTS_PER_VARIANT,
+    SYSTEM_CANT_UNDO,
     TRACKING_OFF_NOTE,
 } from "../stock/stock-words";
 import { StockWritesService, UNTRACKED } from "../stock/stock-writes.service";
@@ -674,6 +675,64 @@ describe("the Stock API and the readers", () => {
             writes.reverse(owner(), { entryIds: [offEntry.id] }),
         ).rejects.toThrow(UNTRACKED);
         expect(await shelf(hill, oil)).toMatchObject({ onHand: 0 });
+    });
+
+    it("never undoes a count Saroh wrote: Track stock off, or the switch to variants", async () => {
+        const salt = await product("Sea salt", { hill: 4 });
+        await setTracking(owner(), salt, false);
+        await setTracking(owner(), salt, true);
+        const off = await prisma.stockEntry.findFirstOrThrow({
+            where: { productId: salt, note: TRACKING_OFF_NOTE },
+            select: { id: true, system: true },
+        });
+        expect(off.system).toBe("TRACKING_OFF");
+        await expect(
+            writes.reverse(owner(), { entryIds: [off.id] }),
+        ).rejects.toThrow(new ConflictException(SYSTEM_CANT_UNDO));
+        const log = await reads.log(owner(), { product: salt });
+        expect(log.entries.find((e) => e.id === off.id)).toMatchObject({
+            canUndo: false,
+        });
+
+        // The switch to per-variant stock: the product's own shelf is
+        // counted down to what lines without a variant hold.
+        const pepper = await product("Pepper", { hill: 6 });
+        const coarse = await prisma.productVariant.create({
+            data: { productId: pepper, title: "Coarse", sku: `PC-${tag}` },
+            select: { id: true },
+        });
+        await inventory.setVariantsIn(
+            await access.write(owner(), pepper, hill),
+            pepper,
+            {
+                variants: [
+                    { variantId: coarse.id, quantity: 6, lowStockAlert: 1 },
+                ],
+            },
+        );
+        const switched = await prisma.stockEntry.findMany({
+            where: { productId: pepper, system: "PER_VARIANT" },
+            select: { id: true, variantId: true },
+        });
+        expect(switched.map((e) => e.variantId).sort()).toEqual(
+            [coarse.id, null].sort(),
+        );
+        const own = switched.find((e) => e.variantId === null);
+        await expect(
+            writes.reverse(owner(), { entryIds: [own?.id ?? ""] }),
+        ).rejects.toThrow(SYSTEM_CANT_UNDO);
+        // A count by hand is still undone.
+        const byHand = await writes.counts(owner(), {
+            counts: [
+                {
+                    storeId: hill,
+                    productId: pepper,
+                    variantId: coarse.id,
+                    counted: 5,
+                },
+            ],
+        });
+        await writes.reverse(owner(), { entryIds: byHand.entryIds });
     });
 
     describe("never changes how a product counts", () => {
