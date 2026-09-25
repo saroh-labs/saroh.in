@@ -882,7 +882,13 @@ function MemberDrawer({
                             (current === "OWNER" || member.isSelf) ? (
                                 <button
                                     type="button"
-                                    onClick={() => onRemove(member)}
+                                    onClick={() => {
+                                        // A role picked and not saved must
+                                        // not follow the drawer to the next
+                                        // person it opens for.
+                                        setDraft(null);
+                                        onRemove(member);
+                                    }}
                                     className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                     Remove from {organizationName}
