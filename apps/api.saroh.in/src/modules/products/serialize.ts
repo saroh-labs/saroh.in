@@ -455,7 +455,8 @@ export function serializeCatalogueItem(
         };
     }
     // The whole catalogue: every variant, and the shelves added up.
-    const home = listings[0]?.storeId ?? product.storeId ?? "";
+    const home =
+        listings.length > 0 ? listings[0].storeId : (product.storeId ?? "");
     return {
         ...serializeProductListItem(
             {

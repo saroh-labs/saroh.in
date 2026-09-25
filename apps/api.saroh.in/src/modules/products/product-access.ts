@@ -202,8 +202,8 @@ export class ProductAccess {
             select: { id: true },
             take: 2,
         });
-        const first = open[0];
-        if (!first) {
+        const [first] = open;
+        if (open.length === 0) {
             throw new NotFoundException("This business has no storefront yet.");
         }
         if (whenUnnamed === "refuse" && open.length > 1) {
