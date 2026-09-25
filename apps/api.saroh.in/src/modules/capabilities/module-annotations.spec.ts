@@ -20,7 +20,7 @@ import { REQUIRE_MODULE_KEY } from "./require-module.decorator";
  * rule being tested.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { MODULE_KEYS } from "./module-registry";
@@ -46,6 +46,13 @@ const CLASS_LEVEL: Record<string, string> = {
     "content/post-categories.controller.ts": "WEBSITE",
     "automations/automations.controller.ts": "AUTOMATIONS",
     "categories/categories.controller.ts": "COMMERCE",
+    // #529: the business's catalogue settings, and the old per-storefront
+    // addresses kept for one release.
+    "catalogue/catalogue.controller.ts": "COMMERCE",
+    "catalogue/store-catalogue.controller.ts": "COMMERCE",
+    // The business's orders across its storefronts, and the storefronts.
+    "orders/organization-orders.controller.ts": "COMMERCE",
+    "stores/storefronts.controller.ts": "COMMERCE",
     "customers/customers.controller.ts": "COMMERCE",
     "discounts/discounts.controller.ts": "COMMERCE",
     "product-reviews/product-reviews.controller.ts": "COMMERCE",
@@ -107,6 +114,17 @@ const NEVER: Record<string, string> = {
     "stores/stores.controller.ts": "tenancy",
     "billing/billing.controller.ts": "billing is not a capability module",
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
+    "admin/admin-machinery.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-organizations.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-people.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-staff.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-waitlist.controller.ts":
+        "staff control plane, not a tenant surface",
+    "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
     "self-test/self-test.controller.ts": "diagnostics",
     // Public surfaces. A visitor has no organization context, so the guard
@@ -116,6 +134,8 @@ const NEVER: Record<string, string> = {
     // resource: public booking answers 410 when the organization switched
     // Appointments off (`bookings/appointments-open.ts`).
     "payments/public-payments.controller.ts": "public checkout",
+    "payments/public-invoices.controller.ts":
+        "a customer's invoice link — no session",
     "bookings/public-bookings.controller.ts": "public booking",
     "sites/public-sites.controller.ts": "published sites",
     "enquiry/enquiry.controller.ts": "public forms",
@@ -126,7 +146,33 @@ const NEVER: Record<string, string> = {
     "waitlist/waitlist.controller.ts": "public waitlist",
 };
 
+/** Controllers with a test of their own below, not a row above. */
+const OWN_TEST = ["analytics/analytics.controller.ts"];
+
+/** Every controller file under src/modules, as `<module>/<file>`. */
+function controllers(): string[] {
+    return readdirSync(MODULES_DIR, { recursive: true, encoding: "utf8" })
+        .map((f) => f.split("\\").join("/"))
+        .filter((f) => f.endsWith(".controller.ts"))
+        .sort();
+}
+
 describe("module enforcement rollout (#117)", () => {
+    // A controller in none of the lists is one nobody decided about: add it
+    // to CLASS_LEVEL, METHOD_LEVEL or NEVER (with the reason).
+    it("names every controller under src/modules in one of the lists", () => {
+        const named = new Set([
+            ...Object.keys(CLASS_LEVEL),
+            ...Object.keys(METHOD_LEVEL),
+            ...Object.keys(NEVER),
+            ...OWN_TEST,
+        ]);
+        expect(controllers().filter((f) => !named.has(f))).toEqual([]);
+        // And every one named still exists.
+        const found = new Set(controllers());
+        expect(Array.from(named).filter((f) => !found.has(f))).toEqual([]);
+    });
+
     it.each(Object.entries(CLASS_LEVEL))(
         "%s gates the whole controller on %s",
         (file, moduleKey) => {
