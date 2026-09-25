@@ -11,7 +11,12 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
             aggregate: jest.fn(),
         },
-        invoiceLine: { createMany: jest.fn(), deleteMany: jest.fn() },
+        invoiceLine: {
+            createMany: jest.fn(),
+            deleteMany: jest.fn(),
+            // A hand-written invoice has no supplementary invoices.
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         invoiceSequence: { upsert: jest.fn() },
         contact: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },

@@ -190,6 +190,107 @@ describe("a credit note", () => {
         expect(cn.cgstCents).toBe(810 + 450);
         expect(cn.taxType).toBe("INTRA");
     });
+
+    /** The original's lines, then a supplementary invoice's for an edit. */
+    const edited = (
+        change: Parameters<typeof buildCorrection>[1][number],
+    ): ReturnType<typeof original> => {
+        const base = original();
+        const supplementary = buildCorrection(
+            {
+                sellerGstin: base.sellerGstin,
+                sellerState: base.sellerState,
+                sellerAddress: base.sellerAddress,
+                placeOfSupply: base.placeOfSupply,
+                taxType: base.taxType,
+            },
+            [change],
+        );
+        return {
+            ...base,
+            lines: [
+                ...base.lines,
+                ...supplementary.lines.map((l) => ({
+                    description: l.description,
+                    quantity: l.quantity,
+                    unitPrice: (l.unitCents / 100).toFixed(2),
+                    amount: (l.amountCents / 100).toFixed(2),
+                    gstRate:
+                        l.rateBps === null ? null : String(l.rateBps / 100),
+                    hsnSac: l.code,
+                    orderItemId: l.orderItemId ?? null,
+                })),
+            ],
+        };
+    };
+
+    it("for a line an edit added credits it at that line's own rate and HSN", () => {
+        const withChai = edited({
+            description: "Masala chai",
+            quantity: 1,
+            unitCents: 10000,
+            rateBps: 500,
+            code: "09023020",
+            orderItemId: "item_chai",
+        });
+        const cn = buildCreditNote(withChai, 10000, [
+            { orderItemId: "item_chai", quantity: 1, amountCents: 10000 },
+        ]);
+        expect(cn.totalCents).toBe(10000);
+        expect(cn.lines).toHaveLength(1);
+        expect(cn.lines[0]).toMatchObject({
+            description: "Masala chai",
+            rateBps: 500,
+            code: "09023020",
+            orderItemId: "item_chai",
+        });
+        // 5% inside ₹100: ₹95.24 taxable, ₹4.76 tax.
+        expect(cn.lines[0].taxableCents).toBe(9524);
+        expect(cn.taxCents).toBe(476);
+    });
+
+    it("for a line whose units an edit raised, spans both invoiced lines of the item", () => {
+        const twoMore = edited({
+            description: "Almond croissant",
+            quantity: 2,
+            unitCents: 11800,
+            rateBps: 1800,
+            code: "19059020",
+            orderItemId: "item_pastry",
+        });
+        const cn = buildCreditNote(twoMore, 34200, [
+            { orderItemId: "item_pastry", quantity: 3, amountCents: 34200 },
+        ]);
+        expect(cn.totalCents).toBe(34200);
+        expect(cn.lines.map((l) => [l.quantity, l.amountCents])).toEqual([
+            [1, 11400],
+            [2, 22800],
+        ]);
+        expect(cn.lines.every((l) => l.rateBps === 1800)).toBe(true);
+        expect(cn.lines.every((l) => l.code === "19059020")).toBe(true);
+
+        // One unit back: it rides on one of the two lines, whole.
+        const one = buildCreditNote(twoMore, 11800, [
+            { orderItemId: "item_pastry", quantity: 1, amountCents: 11800 },
+        ]);
+        expect(one.lines).toHaveLength(1);
+        expect(one.lines[0].quantity).toBe(1);
+        expect(one.totalCents).toBe(11800);
+    });
+
+    it("for an amount alone reaches the lines an edit added", () => {
+        const withChai = edited({
+            description: "Masala chai",
+            quantity: 1,
+            unitCents: 10000,
+            rateBps: 500,
+            code: "09023020",
+            orderItemId: "item_chai",
+        });
+        const cn = buildCreditNote(withChai, 48920 + 10000);
+        expect(cn.totalCents).toBe(58920);
+        expect(cn.lines.map((l) => l.description)).toContain("Masala chai");
+    });
 });
 
 describe("an edit's correction", () => {

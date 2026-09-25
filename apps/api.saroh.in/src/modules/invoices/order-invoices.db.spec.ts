@@ -3,11 +3,12 @@
  * a verified payment webhook makes exactly one order invoice and a replayed
  * delivery none; a refund makes its credit note; the refund webhook settles
  * Saroh's own row by its reference, at the provider's amount, and a refund
- * the provider failed frees its money (#508 U2); what is owed leaves order
- * invoices out; issued invoices cannot be edited, deleted or — once the
- * business is GST-registered — voided; two invoices across 1 April land in
- * their own financial year's series; a Karnataka business billing a Goa café
- * charges IGST.
+ * the provider failed frees its money (#508 U2); a credit note sees the
+ * lines an edit added on a supplementary invoice (#508 U3); what is owed
+ * leaves order invoices out; issued invoices cannot be edited, deleted or —
+ * once the business is GST-registered — voided; two invoices across 1 April
+ * land in their own financial year's series; a Karnataka business billing a
+ * Goa café charges IGST.
  *
  * Only the app env is stubbed (for the credential key); the provider and the
  * webhook verifier are the network-free fakes. Runs in the integration
@@ -38,7 +39,12 @@ import {
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { InvoicesService } from "./invoices.service";
 import { financialYear } from "./numbering";
-import { creditNoteForRefund, ensureOrderInvoice } from "./order-invoicing";
+import {
+    correctOrderInvoiceForEdit,
+    creditNoteForRefund,
+    ensureOrderInvoice,
+} from "./order-invoicing";
+import { toCents } from "./totals";
 
 const WEBHOOK_SECRET = "whsec_gst_test";
 
@@ -626,6 +632,213 @@ describe("the refund webhook settles at the provider's amount (real database)", 
                 })
             ).status,
         ).toBe("CREDITED");
+    });
+});
+
+describe("credit notes see every invoiced line (real database)", () => {
+    let chai: string;
+
+    beforeAll(async () => {
+        chai = (
+            await prisma.product.create({
+                data: {
+                    storeId,
+                    organizationId: rye.organizationId,
+                    name: "Masala chai",
+                    slug: `chai-gst-${process.pid}`,
+                    price: "100.00",
+                    gstRate: "5",
+                    hsnCode: "09023020",
+                },
+            })
+        ).id;
+    });
+
+    /**
+     * A paid order edited up before preparing: one masala chai (₹100, 5%)
+     * added on a supplementary invoice, its difference paid online.
+     */
+    async function editedUpOrder() {
+        const order = await unpaidOrder();
+        await deliver({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${order.id}`,
+            providerPaymentRef: `pay_${order.id}`,
+        });
+        const item = await prisma.orderItem.create({
+            data: {
+                orderId: order.id,
+                productId: chai,
+                quantity: 1,
+                price: "100.00",
+            },
+        });
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { subtotal: "578.00", total: "589.20" },
+        });
+        await prisma.$transaction((tx) =>
+            correctOrderInvoiceForEdit(tx, {
+                orderId: order.id,
+                changes: [
+                    {
+                        orderItemId: item.id,
+                        productId: chai,
+                        description: "Masala chai",
+                        deltaQuantity: 1,
+                        unitCents: 10000,
+                    },
+                ],
+                note: "Added masala chai",
+                createdByUserId: null,
+                settled: false,
+            }),
+        );
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: rye.organizationId,
+                orderId: order.id,
+                provider: "RAZORPAY",
+                providerIntentId: `prov_diff_${order.id}`,
+                amountCents: 10000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+            },
+        });
+        await deliver({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_diff_${order.id}`,
+            providerPaymentRef: `pay_diff_${order.id}`,
+        });
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { orderId: order.id, kind: "INVOICE" },
+        });
+        return { id: order.id, invoiceId: invoice.id, chaiItem: item.id };
+    }
+
+    const creditNotes = (invoiceId: string) =>
+        prisma.invoice.findMany({
+            where: { relatedInvoiceId: invoiceId, kind: "CREDIT_NOTE" },
+            include: { lines: true },
+            orderBy: { createdAt: "asc" },
+        });
+
+    it("refunding the line an edit added credits it at its own rate and HSN", async () => {
+        const order = await editedUpOrder();
+
+        const refund = await payments.initiateRefund(rye, order.id, {
+            lines: [{ itemId: order.chaiItem, quantity: 1 }],
+        });
+
+        const notes = await creditNotes(order.invoiceId);
+        expect(notes).toHaveLength(1);
+        expect(notes[0].paymentRefundId).toBe(refund.refundId);
+        expect(toCents(notes[0].total.toString())).toBe(refund.amountCents);
+        expect(notes[0].lines).toHaveLength(1);
+        expect(notes[0].lines[0]).toMatchObject({
+            description: "Masala chai",
+            hsnSac: "09023020",
+            orderItemId: order.chaiItem,
+        });
+        expect(notes[0].lines[0].gstRate?.toString()).toBe("5");
+    });
+
+    it("a full refund of an edited-up order is credited by the refund's own notes; nothing is left to credit after", async () => {
+        const order = await editedUpOrder();
+
+        const refund = await payments.initiateRefund(rye, order.id);
+        expect(refund.amountCents).toBe(58920);
+        // The webhook settles each part; the last closes the order.
+        for (const part of refund.refunds) {
+            await deliver({
+                eventType: "refund.processed",
+                outcome: "REFUNDED",
+                providerIntentId: (
+                    await prisma.paymentIntent.findUniqueOrThrow({
+                        where: { id: part.paymentIntentId },
+                    })
+                ).providerIntentId,
+                providerRefundId: part.providerRefundId,
+                refundReference: part.id,
+                refundAmountCents: part.amountCents,
+            });
+        }
+
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .paymentStatus,
+        ).toBe("REFUNDED");
+        const notes = await creditNotes(order.invoiceId);
+        // One note per refund row, each keyed on it: the rest-of-order
+        // credit found nothing left.
+        expect(notes).toHaveLength(refund.refunds.length);
+        expect(notes.every((n) => n.paymentRefundId !== null)).toBe(true);
+        for (const part of refund.refunds) {
+            const note = notes.find((n) => n.paymentRefundId === part.id);
+            expect(toCents(note!.total.toString())).toBe(part.amountCents);
+        }
+        // No credit note line at a rate its item was not invoiced at.
+        const rates = new Map([
+            ["Sourdough", "0"],
+            ["Croissant", "18"],
+            ["Delivery", "18"],
+            ["Masala chai", "5"],
+        ]);
+        const lines = notes.flatMap((n) => n.lines);
+        for (const line of lines) {
+            expect(line.gstRate?.toString()).toBe(rates.get(line.description));
+        }
+        // The chai's money comes back as chai, at 5% — not spread over the
+        // original invoice's rates — so the notes hand back exactly the GST
+        // the invoice and its supplementary invoice charged.
+        expect(lines.map((l) => l.description)).toContain("Masala chai");
+        const charged = await prisma.invoice.aggregate({
+            where: {
+                OR: [
+                    { id: order.invoiceId },
+                    {
+                        relatedInvoiceId: order.invoiceId,
+                        kind: "SUPPLEMENTARY",
+                    },
+                ],
+            },
+            _sum: { tax: true },
+        });
+        expect(notes.reduce((s, n) => s + toCents(n.tax.toString()), 0)).toBe(
+            toCents((charged._sum.tax ?? 0).toString()),
+        );
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: order.invoiceId },
+                })
+            ).status,
+        ).toBe("CREDITED");
+    });
+
+    it("an order never edited is credited as before", async () => {
+        const order = await unpaidOrder();
+        await deliver({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${order.id}`,
+            providerPaymentRef: `pay_${order.id}`,
+        });
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { orderId: order.id, kind: "INVOICE" },
+        });
+
+        const refund = await payments.initiateRefund(rye, order.id);
+
+        const notes = await creditNotes(invoice.id);
+        expect(notes).toHaveLength(1);
+        expect(notes[0].paymentRefundId).toBe(refund.refundId);
+        expect(notes[0].total.toString()).toBe("489.2");
+        expect(notes[0].lines.map((l) => l.description).sort()).toEqual(
+            ["Croissant", "Delivery", "Sourdough"].sort(),
+        );
     });
 });
 
