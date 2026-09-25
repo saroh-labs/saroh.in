@@ -26,6 +26,9 @@ describe("searchSettings", () => {
         expect(searchSettings("pin code", owner)[0]?.href).toBe(
             "/settings/organization?section=address",
         );
+        expect(
+            searchSettings("number format", owner).map((h) => h.href),
+        ).toEqual(["/settings/organization?section=tax"]);
     });
 
     it("matches the page's name as well, as the design does", () => {
