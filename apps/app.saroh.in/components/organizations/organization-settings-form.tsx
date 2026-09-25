@@ -34,6 +34,7 @@ import {
 } from "@/components/organizations/use-leave-guard";
 import { countryName, CountrySelect } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
+import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
     GST_RATE_OPTIONS,
     GST_STATES,
@@ -46,6 +47,7 @@ import { sampleInvoiceNumber } from "@/lib/invoices/invoice-number";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { BUSINESS_TAB_PARAM } from "@/lib/settings/search";
 
 /** Allow an empty string (field left blank / cleared) or a valid value. */
 const optionalText = (schema: z.ZodString) =>
@@ -264,7 +266,12 @@ export function OrganizationSettingsForm({
     // What the API last said, so the cards read the saved values at once
     // rather than waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
-    const [tab, setTab] = useState<SectionKey>("identity");
+    // In the address, so Search settings can open the tab a setting is on.
+    const [tab, setTab] = useTabParam(
+        BUSINESS_TAB_PARAM,
+        SECTION_KEYS,
+        "identity",
+    );
     const [editing, setEditing] = useState<SectionKey | null>(null);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),

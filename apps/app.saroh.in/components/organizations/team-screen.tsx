@@ -33,6 +33,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { navFor } from "@/components/shared/nav-items";
+import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
     inviteMember,
     removeMember,
@@ -45,6 +46,7 @@ import type {
 } from "@/lib/organizations/members";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { OrganizationRole } from "@/lib/organizations/service";
+import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { RolesTab } from "./roles-tab";
 
@@ -101,6 +103,9 @@ function isBuiltIn(key: string): key is OrganizationRole {
     return (ROLES as readonly string[]).includes(key);
 }
 
+/** The Team screen's two views, as `?view=` names them. */
+const TEAM_TABS = ["roles", "people"] as const;
+
 /**
  * Team (Settings → People), after the "Saroh Team Roles" design.
  *
@@ -147,7 +152,8 @@ export function TeamScreen({
     /** `null` = availability unknown; every capability then reads as on. */
     moduleKeys: string[] | null;
 }) {
-    const [tab, setTab] = useState<"roles" | "people">("people");
+    // In the address, so Search settings can open Roles.
+    const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
 
