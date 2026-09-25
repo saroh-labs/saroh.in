@@ -208,7 +208,7 @@ const SECTIONS = {
     identity: {
         title: "Identity",
         lead: "How the business is named and registered",
-        fields: ["name", "legalName", "type", "country"],
+        fields: ["name", "legalName", "type"],
     },
     contact: {
         title: "Contact",
@@ -221,7 +221,6 @@ const SECTIONS = {
         fields: [
             "gstRegistered",
             "taxId",
-            "gstState",
             "invoicePrefix",
             "numberParts",
             "numberSeparator",
@@ -234,7 +233,14 @@ const SECTIONS = {
     address: {
         title: "Registered address",
         lead: "Printed under your legal name",
-        fields: ["addressLine1", "addressLine2", "city", "postalCode"],
+        fields: [
+            "addressLine1",
+            "addressLine2",
+            "city",
+            "postalCode",
+            "gstState",
+            "country",
+        ],
     },
 } as const satisfies Record<
     string,
@@ -269,22 +275,27 @@ const NUMBER_FIELDS = [
 const stateName = (code: string) =>
     GST_STATES.find((s) => s.value === code)?.label ?? "";
 
-/** The state a GST invoice names: the one chosen, else the GSTIN's. */
+/**
+ * The state a GST invoice names: the GSTIN's (the API takes no other for a
+ * registered business), else the one stored.
+ */
 function gstStateOf(v: Pick<FormValues, "gstState" | "taxId">): {
     name: string;
     fromGstin: boolean;
 } {
-    if (v.gstState) return { name: stateName(v.gstState), fromGstin: false };
-    const fromId = stateName((v.taxId ?? "").trim().slice(0, 2));
-    return { name: fromId, fromGstin: fromId !== "" };
+    const fromId = stateName((v.taxId ?? "").trim().slice(0, 2).toUpperCase());
+    if (fromId) return { name: fromId, fromGstin: true };
+    return { name: stateName(v.gstState), fromGstin: false };
 }
 
 function addressText(v: FormValues): string {
+    // As the API prints it: no first line, no address.
+    if (!v.addressLine1.trim()) return "";
     return [
         v.addressLine1,
         v.addressLine2,
         [v.city, v.postalCode].filter((x) => x.trim()).join(" "),
-        v.gstRegistered ? gstStateOf(v).name : "",
+        v.gstRegistered ? gstStateOf(v).name : stateName(v.gstState),
     ]
         .map((x) => x.trim())
         .filter((x) => x !== "")
@@ -438,6 +449,19 @@ export function OrganizationSettingsForm({
         if (values.gstRegistered && dirtyFields.gstRegistered) {
             profile.taxId = values.taxId?.trim().toUpperCase() ?? "";
         }
+        // A registered business's state and country are its GSTIN's; a
+        // state picked before is replaced, so the API doesn't refuse the pair.
+        if (
+            values.gstRegistered &&
+            (dirtyFields.gstRegistered || dirtyFields.taxId)
+        ) {
+            tax.state = (values.taxId ?? "").trim().slice(0, 2).toUpperCase();
+            if (values.country !== "IN") profile.country = "IN";
+        }
+        // Another country's address has no Indian state.
+        if (dirtyFields.country && !["", "IN"].includes(values.country ?? "")) {
+            tax.state = "";
+        }
 
         const result = await saveOrganizationSettings({
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
@@ -520,10 +544,6 @@ export function OrganizationSettingsForm({
                         ?.label ?? "",
             },
             {
-                label: "Country",
-                value: saved.country ? countryName(saved.country) : "",
-            },
-            {
                 label: "Trading since",
                 value: tradingSince,
                 empty: "No orders yet",
@@ -594,6 +614,10 @@ export function OrganizationSettingsForm({
                 value: addressText(saved),
                 empty: "No registered address yet",
             },
+            {
+                label: "Country",
+                value: saved.country ? countryName(saved.country) : "",
+            },
         ],
     };
     const notes: Partial<Record<SectionKey, string>> = {
@@ -616,7 +640,9 @@ export function OrganizationSettingsForm({
             ? `${sectionErrors} things to fix`
             : "";
 
-    const liveState = gstStateOf(v);
+    const liveState = registered
+        ? gstStateOf(v)
+        : { name: stateName(v.gstState), fromGstin: false };
     const tabIndex = SECTION_KEYS.indexOf(tab);
     const onTabKeys = (e: React.KeyboardEvent) => {
         const n = SECTION_KEYS.length;
@@ -645,6 +671,8 @@ export function OrganizationSettingsForm({
         style: { "--b": basis } as React.CSSProperties,
     });
 
+    // States are India's (GST's list); another country's address has none.
+    const inIndia = registered || ["", "IN"].includes(v.country ?? "");
     const addressFields = (
         <>
             {(
@@ -694,6 +722,66 @@ export function OrganizationSettingsForm({
                     )}
                 />
             ))}
+            {inIndia ? (
+                <FormField
+                    control={form.control}
+                    name="gstState"
+                    render={({ field }) => (
+                        <FormItem {...at("240px")}>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                                <OptionSelect
+                                    // A registered business's state is its
+                                    // GSTIN's: the API takes no other.
+                                    value={
+                                        registered
+                                            ? (v.taxId ?? "")
+                                                  .trim()
+                                                  .slice(0, 2)
+                                                  .toUpperCase()
+                                            : field.value
+                                    }
+                                    onValueChange={field.onChange}
+                                    options={[
+                                        { value: "", label: "Choose a state" },
+                                        ...GST_STATES,
+                                    ]}
+                                    disabled={registered}
+                                    className="w-full"
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                {registered
+                                    ? "Set by your GSTIN."
+                                    : "Printed with the address."}
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ) : null}
+            <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                    <FormItem {...at("220px")}>
+                        <FormLabel>Country</FormLabel>
+                        <FormControl>
+                            <CountrySelect
+                                value={registered ? "IN" : (field.value ?? "")}
+                                onValueChange={field.onChange}
+                                disabled={registered}
+                            />
+                        </FormControl>
+                        <FormDescription>
+                            {registered
+                                ? "GST registration is Indian."
+                                : "Where the business is registered."}
+                        </FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
         </>
     );
 
@@ -754,25 +842,6 @@ export function OrganizationSettingsForm({
                             <FormDescription>
                                 An individual trades in their own name; a
                                 company is registered as one.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                        <FormItem {...at("220px")}>
-                            <FormLabel>Country</FormLabel>
-                            <FormControl>
-                                <CountrySelect
-                                    value={field.value ?? ""}
-                                    onValueChange={field.onChange}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                Where the business is registered.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
@@ -888,39 +957,6 @@ export function OrganizationSettingsForm({
                         </FormItem>
                     )}
                 />
-                {registered ? (
-                    <FormField
-                        control={form.control}
-                        name="gstState"
-                        render={({ field }) => (
-                            <FormItem {...at("240px")}>
-                                <FormLabel>State</FormLabel>
-                                <FormControl>
-                                    <OptionSelect
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                        options={[
-                                            {
-                                                value: "",
-                                                label: stateName(
-                                                    (v.taxId ?? "").slice(0, 2),
-                                                )
-                                                    ? `From the GSTIN — ${stateName((v.taxId ?? "").slice(0, 2))}`
-                                                    : "From the GSTIN",
-                                            },
-                                            ...GST_STATES,
-                                        ]}
-                                        className="w-full"
-                                    />
-                                </FormControl>
-                                <FormDescription>
-                                    A sale to another state is IGST.
-                                </FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                ) : null}
                 <FormField
                     control={form.control}
                     name="invoicePrefix"
