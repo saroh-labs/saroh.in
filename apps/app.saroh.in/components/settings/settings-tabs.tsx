@@ -8,7 +8,8 @@ import { SETTINGS_PAGES } from "@/components/shared/nav-items";
 
 /**
  * The settings screen's tabs ("Saroh Settings" design): Business, Team,
- * Modules and Providers in a 232px column on Paper, ruled off from the page.
+ * Modules, Plan and billing, Your profile and Providers in a 232px column on
+ * Paper, ruled off from the page.
  * Each says in a line what it holds. The current one takes the white surface
  * and the 2px Saffron marker, as the rail's current page does, so the two
  * lists read as one system.

@@ -8,9 +8,9 @@ import { requireSession } from "@/lib/session";
 
 /**
  * `/settings` opens the first settings tab this person may open (2026-09-25):
- * Business for an owner. The tabs are the screen now, so the index of cards
- * that used to be here would only have been a step before them. Your own
- * sign-in details stay on accounts.saroh.in, reached from the account menu.
+ * Business for an owner, Your profile for someone who reaches nothing of the
+ * business's. The tabs are the screen now, so the index of cards that used
+ * to be here would only have been a step before them.
  */
 export const metadata = { title: "Settings" };
 

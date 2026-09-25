@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { NavGroup, NavRole } from "@/components/shared/nav-items";
 import {
     NAV_GROUPS,
+    SETTINGS_PAGES,
     filterNavGroups,
     filterNavGroupsByRole,
     isNavChildCurrent,
     isNavItemActive,
     isNavSectionActive,
+    mayOpenSettingsPage,
     navCan,
     navCountFor,
     navFor,
@@ -178,6 +180,8 @@ describe("what each role is offered", () => {
             "/settings/organization",
             "/settings/people",
             "/settings/modules",
+            "/settings/billing",
+            "/settings/profile",
             "/settings/providers",
         ]);
         expect(offered).toContain("/sites/site_1");
@@ -211,6 +215,7 @@ describe("what each role is offered", () => {
         expect(tabsFor({ role: "MEMBER" })).toEqual([
             "/settings/people",
             "/settings/modules",
+            "/settings/profile",
         ]);
         expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
@@ -392,7 +397,11 @@ describe("navFor — an invented role", () => {
                 role: "MEMBER",
                 actions: ["member:read", "module:read"],
             }),
-        ).toEqual(["/settings/people", "/settings/modules"]);
+        ).toEqual([
+            "/settings/people",
+            "/settings/modules",
+            "/settings/profile",
+        ]);
     });
 
     it("can offer MORE than the floor the role maps to", () => {
@@ -412,7 +421,11 @@ describe("navFor — an invented role", () => {
                 role: "MEMBER",
                 actions: ["org:settings:read", "member:read"],
             }),
-        ).toEqual(["/settings/organization", "/settings/people"]);
+        ).toEqual([
+            "/settings/organization",
+            "/settings/people",
+            "/settings/profile",
+        ]);
     });
 
     it("falls back to the role map when permissions were not loaded", () => {
@@ -958,5 +971,68 @@ describe("Customer Detail sits in the section that holds customers (U18)", () =>
             "/commerce/orders/o_1",
         );
         expect(navPathname("/customers", groups)).toBe("/customers");
+    });
+});
+
+describe("settings tabs — owner only, and everyone's", () => {
+    it("keeps Plan and billing to the owner, by role", () => {
+        // An admin holds org:settings:read and every other business tab, and
+        // is still not offered what Saroh charges the business.
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/billing");
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/organization");
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/billing");
+        // Resolved permissions do not make an invented role the owner.
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "billing:read"],
+            }),
+        ).not.toContain("/settings/billing");
+    });
+
+    it("still needs the page's action as well as the role", () => {
+        const billing = SETTINGS_PAGES.find(
+            (page) => page.href === "/settings/billing",
+        );
+        expect(billing).toBeDefined();
+        if (!billing) return;
+        expect(
+            mayOpenSettingsPage(
+                { role: "OWNER", actions: ["member:read"] },
+                billing,
+            ),
+        ).toBe(false);
+        expect(
+            mayOpenSettingsPage(
+                { role: "OWNER", actions: ["org:settings:read"] },
+                billing,
+            ),
+        ).toBe(true);
+    });
+
+    it("fails open on a role it does not know, as the rail does", () => {
+        expect(tabsFor({ role: null })).toContain("/settings/billing");
+    });
+
+    it("offers Your profile to everyone, a reviewer included", () => {
+        for (const role of ROLES) {
+            expect(tabsFor({ role })).toContain("/settings/profile");
+        }
+        expect(tabsFor({ role: "REVIEWER" })).toEqual(["/settings/profile"]);
+        // An invented role granted nothing of the business still has itself.
+        expect(tabsFor({ role: "MEMBER", actions: [] })).toEqual([
+            "/settings/profile",
+        ]);
+    });
+
+    it("lists the tabs in the design's order", () => {
+        expect(SETTINGS_PAGES.map((page) => page.label)).toEqual([
+            "Business",
+            "Team",
+            "Modules",
+            "Plan and billing",
+            "Your profile",
+            "Providers",
+        ]);
     });
 });

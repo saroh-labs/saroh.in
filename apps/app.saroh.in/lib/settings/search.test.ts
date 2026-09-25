@@ -58,13 +58,29 @@ describe("searchSettings", () => {
     });
 
     it("offers only the pages this person may open", () => {
-        // A Member reads the roster and the modules, not the business's
-        // details or its providers.
+        // A Member reads the roster and the modules, and their own profile —
+        // not the business's details, its plan or its providers.
         const hits = searchSettings("", member, { limit: 99 });
         expect(new Set(hits.map((h) => h.where))).toEqual(
-            new Set(["Team", "Modules"]),
+            new Set(["Team", "Modules", "Your profile"]),
         );
         expect(searchSettings("gstin", member)).toEqual([]);
+    });
+
+    it("finds the plan for the owner alone, and alerts for anyone", () => {
+        expect(searchSettings("invoices from", owner)).toEqual([
+            {
+                label: "Invoices from Saroh",
+                where: "Plan and billing",
+                href: "/settings/billing",
+            },
+        ]);
+        expect(searchSettings("plan", { role: "ADMIN" })).toEqual([]);
+        for (const actor of [owner, member, { role: "REVIEWER" as const }]) {
+            expect(searchSettings("alerts", actor)[0]?.href).toBe(
+                "/settings/profile",
+            );
+        }
     });
 
     it("prefers the permissions the API resolved over the role's name", () => {

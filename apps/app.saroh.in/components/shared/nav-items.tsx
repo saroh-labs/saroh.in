@@ -5,6 +5,7 @@ import {
     Building2,
     Calendar,
     CalendarClock,
+    CreditCard,
     Globe,
     Home,
     KanbanSquare,
@@ -14,6 +15,7 @@ import {
     SlidersHorizontal,
     Store,
     Target,
+    UserRound,
     Users,
 } from "lucide-react";
 
@@ -574,11 +576,15 @@ export const NAV_GROUPS: NavGroup[] = [
              * anyone who was not a MEMBER, REVIEWER included (#313).
              */
             /*
-             * One Settings row (2026-09-25). Its four pages are tabs on the
+             * One Settings row (2026-09-25). Its pages are tabs on the
              * settings screen itself (`SETTINGS_PAGES`), so the rail does not
-             * repeat them. Offered when the actor may open any one of them;
-             * `/settings` then opens the first they may. Notifications moved
-             * to the top bar (`NOTIFICATIONS_NAV`).
+             * repeat them. Offered when the actor may open one of the
+             * business's pages; `/settings` then opens the first they may.
+             * Your profile is everyone's, but it is about the person, so it
+             * does not put Settings in a Reviewer's rail — they reach it from
+             * the account menu, as the design has it. Plan and billing needs
+             * `org:settings:read`, already listed. Notifications moved to the
+             * top bar (`NOTIFICATIONS_NAV`).
              */
             {
                 href: "/settings",
@@ -960,10 +966,25 @@ export function isNavSectionActive(
 }
 
 /**
- * The settings screen's tabs, in order (2026-09-25): the business, who is on
- * it, what it runs, and what those depend on. The settings layout draws them
- * as vertical tabs and the command menu lists them, each only for an actor
- * who may open it — the same actions the rail row checks.
+ * One settings tab. `action` is what the actor must hold to open it; left off,
+ * everyone signed in may (Your profile is about the person, not the
+ * business). `ownerOnly` narrows it further to the business's owner, by role:
+ * a plan and its invoices are the owner's to see, as the design has it.
+ */
+export interface SettingsPage {
+    href: string;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    action?: NavAction;
+    ownerOnly?: true;
+}
+
+/**
+ * The settings screen's tabs, in the design's order (2026-09-25): the
+ * business, who is on it, what it runs, what Saroh costs it, you, and the
+ * services behind it. The settings layout draws them as vertical tabs and the
+ * command menu lists them, each only for an actor who may open it.
  */
 export const SETTINGS_PAGES = [
     {
@@ -988,23 +1009,52 @@ export const SETTINGS_PAGES = [
         action: "module:read",
     },
     {
+        href: "/settings/billing",
+        label: "Plan and billing",
+        description: "What Saroh costs and your invoices",
+        icon: CreditCard,
+        action: "org:settings:read",
+        ownerOnly: true,
+    },
+    {
+        href: "/settings/profile",
+        label: "Your profile",
+        description: "Your login and the alerts you get",
+        icon: UserRound,
+    },
+    {
         href: "/settings/providers",
         label: "Providers",
         description: "Hosting, email and payments behind it",
         icon: Link2,
         action: "provider:read",
     },
-] as const satisfies readonly (Pick<
-    NavItem,
-    "href" | "label" | "icon" | "action"
-> & { description: string })[];
+] as const satisfies readonly SettingsPage[];
+
+/**
+ * May this actor open this settings page?
+ *
+ * The action as `navCan` judges it, and for an owner-only page the role too.
+ * A null role is "we do not know yet" and fails open, as everywhere in the
+ * nav: the page itself still refuses anyone who is not the owner.
+ */
+export function mayOpenSettingsPage(
+    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    page: SettingsPage,
+): boolean {
+    if (page.action && !navCan(actor, page.action)) return false;
+    if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
+        return false;
+    }
+    return true;
+}
 
 /** The settings pages this actor may open, in tab order. */
 export function settingsPagesFor(actor: {
     role: NavRole | null;
     actions?: readonly string[] | null;
 }) {
-    return SETTINGS_PAGES.filter((page) => navCan(actor, page.action));
+    return SETTINGS_PAGES.filter((page) => mayOpenSettingsPage(actor, page));
 }
 
 /** The Notifications item carries a live unread badge; identify it by route. */
