@@ -56,6 +56,17 @@
   old-shape rows, run it twice and check the second run changes nothing
   (`catalogue-settings.ts`). The migration that depends on it refuses to run,
   before changing anything, while its precondition fails.
+- **Current** — **A row's `promised` is the sum of its open lines'
+  `heldQuantity`; a closed order's lines hold nothing** (#511). Anything that
+  writes lines or rows outside `stock/reserve.ts` — a backfill, a seed —
+  keeps it or is checked against it (`backfill/held-stock.ts`):
+  `heldStockMismatches` lists breaks (the showcase check and the base seed
+  stop on one), seeds make open orders hold with `holdOpenLines` (on hand
+  rises by what is held, so what a row can sell stays the seeded number),
+  and `reconcileHeldStock` repairs: lines holding more than their row
+  promised are capped oldest order first, the rest become `stockRow` NONE;
+  a row promising more is only reported (Stock checks shows it). The #510
+  backfill runs it last; `held-stock.cli.ts [--dry-run]` runs it alone.
 - **Current** — **Joining two rows re-points everything first, then proves
   nothing is left** (#530, `merge-same-products.ts`): a product merge moves
   order lines, shelves, listings, reviews, photos, codes, field values and

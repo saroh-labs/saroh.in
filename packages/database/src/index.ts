@@ -17,5 +17,8 @@ export * from "./rls-proxy";
 export * from "./backfill/catalogue-settings";
 // The #510 backfill, exported for the same reason.
 export * from "./backfill/listings-stock-levels";
+// What open orders hold against each row's promised: the check, the repair
+// and the seeds' hold (#510, #511), exported for the same reason.
+export * from "./backfill/held-stock";
 // The #530 same-product merge, exported for the same reason.
 export * from "./backfill/merge-same-products";

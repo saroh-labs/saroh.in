@@ -321,6 +321,12 @@ describe("Listings and stock backfill (#510, DB)", () => {
             stockLevels: 4,
             // The open bread, S and variant-less Tee lines, and the sold bread.
             orderLines: 4,
+            // Each row promised what its open lines hold: nothing to cap.
+            heldStock: {
+                capped: [],
+                promisedMore: [],
+                strayLinesCleared: [],
+            },
         });
         expect(report.slugsSuffixed).toEqual([
             {
@@ -466,6 +472,12 @@ describe("Listings and stock backfill (#510, DB)", () => {
             listingVariants: 0,
             stockLevels: 0,
             orderLines: 0,
+            heldStock: {
+                capped: [],
+                promisedMore: [],
+                strayLinesCleared: [],
+                dryRun: false,
+            },
         });
         expect(await snapshot()).toEqual(before);
     });

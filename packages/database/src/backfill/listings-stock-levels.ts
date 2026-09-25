@@ -22,7 +22,17 @@
  * 5. every line of an open or fulfilled order that holds or held stock names
  *    its StockLevel (the row it recorded, or for a line from before rows
  *    were recorded, its variant's row if it has one, else the product's) and
- *    holds its quantity while open, nothing once fulfilled.
+ *    holds its quantity while open, nothing once fulfilled;
+ * 6. every row's promised is compared with what its open lines now hold
+ *    (held-stock.ts). Step 5 gives an open line its whole quantity, but the
+ *    old counter — or a seed that wrote orders without promising them — may
+ *    never have set those units aside. Where a row's lines hold more than it
+ *    promised, what it promised is shared out oldest order first and a line
+ *    left with nothing stops holding (stockRow NONE), so a cancel or a
+ *    fulfilment never moves units the row never promised; where a row
+ *    promises more than its lines hold, it is left for Stock checks. Every
+ *    such row and line is in the report (`heldStock`), and the CLI prints
+ *    each one.
  *
  * Steps 1 and 2 read and write only columns that exist before and after the
  * migration, so the script can run on either side of it: the migration
@@ -38,6 +48,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 import type { TransactionClient } from "../transaction";
+import type { HeldStockReport } from "./held-stock";
+import { reconcileHeldStock } from "./held-stock";
 
 export interface ListingsBackfillReport {
     /** Products given their storefront's business. */
@@ -55,6 +67,8 @@ export interface ListingsBackfillReport {
     listingVariants: number;
     stockLevels: number;
     orderLines: number;
+    /** Step 6: rows capped to what they promised, and rows left. */
+    heldStock: HeldStockReport | null;
 }
 
 const OPEN = ["PENDING", "PROCESSING"];
@@ -71,6 +85,7 @@ export async function backfillListingsStockLevels(
         listingVariants: 0,
         stockLevels: 0,
         orderLines: 0,
+        heldStock: null,
     };
 
     await fillOrganizations(db, report);
@@ -95,6 +110,7 @@ export async function backfillListingsStockLevels(
             { timeout: 120_000 },
         );
     }
+    report.heldStock = await reconcileHeldStock(db);
     return report;
 }
 
