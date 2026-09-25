@@ -67,6 +67,8 @@ describe("Same-product merge (#530, DB)", () => {
                 optionId: skus.length > 0 ? sizeOptionId : null,
                 description: spec.description ?? null,
                 createdAt: spec.createdAt,
+                // A product with a shelf tracks stock (#515's backfill).
+                stockTracked: spec.tracked !== false,
             },
         });
         p[key] = made.id;
@@ -725,5 +727,168 @@ describe("Same-product merge (#530, DB)", () => {
                 where: { organizationId: orgId, action: MERGE_REPORT_ACTION },
             }),
         ).toBe(2);
+    });
+
+    describe("on a later run", () => {
+        const category = async (name: string, parentId?: string) =>
+            (
+                await prisma.category.create({
+                    data: {
+                        organizationId: orgId,
+                        name,
+                        slug: `${name.toLowerCase()}-${tag}`,
+                        parentId: parentId ?? null,
+                    },
+                })
+            ).id;
+        /** What a run kept apart in this business. */
+        const keptApart = async () =>
+            (await mergeSameProducts(prisma, at(30))).reports.find(
+                (r) => r.organizationId === orgId,
+            )?.keptApart ?? [];
+
+        it("keeps apart twins a live code reaches through a category above one of them", async () => {
+            const clothes = await category("Clothes");
+            const tops = await category("Tops", clothes);
+            const knits = await category("Knits", clothes);
+            await product("kurta", {
+                name: "Kurta",
+                storeId: hill,
+                createdAt: at(1),
+            });
+            await product("kurtaOnline", {
+                name: "Kurta",
+                storeId: online,
+                createdAt: at(2),
+            });
+            await prisma.product.update({
+                where: { id: p.kurta },
+                data: { categoryId: tops },
+            });
+            await prisma.product.update({
+                where: { id: p.kurtaOnline },
+                data: { categoryId: knits },
+            });
+            await prisma.discount.create({
+                data: {
+                    organizationId: orgId,
+                    code: `CLOTHES-${tag}`.toUpperCase(),
+                    kind: "PERCENTAGE",
+                    percentBps: 1000,
+                    appliesTo: "COLLECTION",
+                    categories: { create: [{ categoryId: clothes }] },
+                },
+            });
+            expect(await keptApart()).toContainEqual(
+                expect.objectContaining({
+                    productId: p.kurtaOnline,
+                    apartFrom: p.kurta,
+                    reason: "live-discount",
+                }),
+            );
+            expect(
+                await prisma.product.count({
+                    where: { id: { in: [p.kurta, p.kurtaOnline] } },
+                }),
+            ).toBe(2);
+        });
+
+        it("keeps apart twins whose Track stock differs, shelves or not", async () => {
+            await product("tea", {
+                name: "Tea",
+                storeId: hill,
+                createdAt: at(1),
+            });
+            await product("teaOnline", {
+                name: "Tea",
+                storeId: online,
+                createdAt: at(2),
+            });
+            // Track stock turned off Online: its shelves stay, at 0.
+            await prisma.product.update({
+                where: { id: p.teaOnline },
+                data: { stockTracked: false },
+            });
+            expect(await keptApart()).toContainEqual(
+                expect.objectContaining({
+                    productId: p.teaOnline,
+                    reason: "different-tracking",
+                }),
+            );
+            expect(
+                await prisma.product.count({ where: { id: p.teaOnline } }),
+            ).toBe(1);
+        });
+
+        it("moves hand-picked collections and a storefront's Sold out onto the product that stays", async () => {
+            await product("stole", {
+                name: "Stole",
+                storeId: hill,
+                createdAt: at(1),
+                tracked: false,
+            });
+            await product("stoleOnline", {
+                name: "Stole",
+                storeId: online,
+                createdAt: at(2),
+                tracked: false,
+            });
+            // Online marked its stole Sold out by hand, and put it in a
+            // hand-picked collection, second.
+            const marked = at(3);
+            await prisma.productListing.updateMany({
+                where: { productId: p.stoleOnline, storeId: online },
+                data: { soldOutAt: marked, soldOutByUserId: "someone" },
+            });
+            const winter = await prisma.collection.create({
+                data: {
+                    organizationId: orgId,
+                    name: "Winter",
+                    slug: `winter-${tag}`,
+                },
+            });
+            await prisma.collectionProduct.createMany({
+                data: [
+                    {
+                        collectionId: winter.id,
+                        organizationId: orgId,
+                        productId: p.kurta,
+                        position: 0,
+                    },
+                    {
+                        collectionId: winter.id,
+                        organizationId: orgId,
+                        productId: p.stoleOnline,
+                        position: 1,
+                    },
+                ],
+            });
+
+            await mergeSameProducts(prisma, at(30));
+            expect(
+                await prisma.product.count({ where: { id: p.stoleOnline } }),
+            ).toBe(0);
+            expect(
+                await prisma.collectionProduct.findMany({
+                    where: { collectionId: winter.id },
+                    orderBy: { position: "asc" },
+                    select: { productId: true, position: true },
+                }),
+            ).toEqual([
+                { productId: p.kurta, position: 0 },
+                { productId: p.stole, position: 1 },
+            ]);
+            expect(
+                await prisma.productListing.findUniqueOrThrow({
+                    where: {
+                        storeId_productId: {
+                            storeId: online,
+                            productId: p.stole,
+                        },
+                    },
+                    select: { soldOutAt: true, soldOutByUserId: true },
+                }),
+            ).toEqual({ soldOutAt: marked, soldOutByUserId: "someone" });
+        });
     });
 });

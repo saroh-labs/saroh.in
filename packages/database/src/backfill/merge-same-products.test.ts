@@ -23,6 +23,7 @@ function product(over: Partial<Candidate> & { id: string }): Candidate {
             { id: `${over.id}-m`, sku: "LS-M", price: m("1300"), mrp: null },
         ],
         stockLevels: [{ variantId: `${over.id}-s` }],
+        stockTracked: true,
         ...over,
     };
 }
@@ -74,6 +75,10 @@ describe("the clearly-the-same rule (#530)", () => {
                 product({ id: "b", stockLevels: [{ variantId: null }] }),
             ),
         ).toBe("different-tracking");
+        // Track stock off keeps its shelves, at 0: it counts nothing (#515).
+        expect(whyApart(a, product({ id: "b", stockTracked: false }))).toBe(
+            "different-tracking",
+        );
         expect(whyApart(a, product({ id: "b", status: "ARCHIVED" }))).toBe(
             "different-status",
         );

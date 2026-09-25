@@ -110,6 +110,8 @@ export interface Candidate {
         mrp: Money | null;
     }[];
     stockLevels: { variantId: string | null }[];
+    /** Track stock (#515): off keeps its shelves, at 0, for the log. */
+    stockTracked: boolean;
 }
 
 interface Money {
@@ -119,9 +121,12 @@ interface Money {
 const key = (s: string) => s.trim().toLowerCase();
 const money = (m: Money | null) => (m ? m.toFixed(2) : null);
 
-/** How it counts stock: nowhere, as a whole, or per variant. */
+/**
+ * How it counts stock: not at all (Track stock off — its shelves stay, at 0,
+ * for the log — or no shelf anywhere), as a whole, or per variant.
+ */
 function tracking(p: Candidate): string {
-    if (p.stockLevels.length === 0) return "none";
+    if (!p.stockTracked || p.stockLevels.length === 0) return "none";
     return p.stockLevels.some((r) => r.variantId) ? "variant" : "whole";
 }
 
@@ -272,6 +277,7 @@ async function mergeOrganization(
                 select: { id: true, sku: true, price: true, mrp: true },
             },
             stockLevels: { select: { variantId: true } },
+            stockTracked: true,
         },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
@@ -341,7 +347,9 @@ async function mergeOrganization(
  * Would one product in place of these reach further under a live code? A
  * product code naming some of them but not all would then reach the others'
  * storefronts; a category code would reach a product whose category it did
- * not cover, when their categories differ.
+ * not cover, when their categories differ. A category code also covers
+ * every category below the one it names (as redemption and collections'
+ * category tree read it), so each category counts with the ones above it.
  */
 async function widensDiscount(
     tx: TransactionClient,
@@ -367,15 +375,33 @@ async function widensDiscount(
 
     const categories = new Set(cluster.map((p) => p.categoryId));
     if (categories.size < 2) return false;
+    const own = Array.from(categories).filter((c): c is string => !!c);
+    if (own.length === 0) return false;
+    const reached = await withAncestors(tx, own);
     const covered = await tx.discountCategory.count({
-        where: {
-            categoryId: {
-                in: Array.from(categories).filter((c): c is string => !!c),
-            },
-            discount: live,
-        },
+        where: { categoryId: { in: reached }, discount: live },
     });
     return covered > 0;
+}
+
+/** These categories and every one above each of them. */
+async function withAncestors(
+    tx: TransactionClient,
+    ids: readonly string[],
+): Promise<string[]> {
+    const out = new Set<string>();
+    let next = [...ids];
+    while (next.length > 0) {
+        next = next.filter((id) => !out.has(id));
+        for (const id of next) out.add(id);
+        if (next.length === 0) break;
+        const rows = await tx.category.findMany({
+            where: { id: { in: next } },
+            select: { parentId: true },
+        });
+        next = rows.flatMap((r) => (r.parentId ? [r.parentId] : []));
+    }
+    return Array.from(out);
 }
 
 /**

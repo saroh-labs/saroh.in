@@ -8,7 +8,10 @@
  * - its shelves: each StockLevel row moves across with its numbers and the
  *   order lines holding on it; a row at a storefront where the survivor
  *   already has one is added into it;
- * - its listings, with the variants each sells;
+ * - its listings, with the variants each sells and a storefront's
+ *   hand-marked Sold out (#515) — where the survivor is listed there
+ *   already, its own mark stands and the loser's is reported;
+ * - hand-picked collections (#516), once each, at the loser's place;
  * - reviews;
  * - photos and videos, up to 15 and 3 — the same picture once; a variant
  *   with no photo of its own takes its twin's;
@@ -146,7 +149,7 @@ export async function mergeProductInto(
     });
 
     await moveStock(tx, survivorId, loserId, variantMap, drop);
-    await moveListings(tx, ids, variantMap);
+    await moveListings(tx, ids, variantMap, drop);
 
     await tx.productReview.updateMany({
         where: { productId: loserId },
@@ -168,6 +171,23 @@ export async function mergeProductInto(
         skipDuplicates: true,
     });
     await tx.discountProduct.deleteMany({ where: { productId: loserId } });
+
+    // Hand-picked collections: each once, at the loser's place. (The
+    // loser's rows would go with it: CollectionProduct cascades.)
+    const memberships = await tx.collectionProduct.findMany({
+        where: { productId: loserId },
+        select: {
+            collectionId: true,
+            organizationId: true,
+            position: true,
+            createdAt: true,
+        },
+    });
+    await tx.collectionProduct.createMany({
+        data: memberships.map((m) => ({ ...m, productId: survivorId })),
+        skipDuplicates: true,
+    });
+    await tx.collectionProduct.deleteMany({ where: { productId: loserId } });
 
     await moveFieldValues(tx, survivorId, loserId, drop);
     await moveAllergens(tx, survivorId, loserId, drop);
@@ -251,32 +271,47 @@ async function moveListings(
     tx: TransactionClient,
     ids: { organizationId: string; survivorId: string; loserId: string },
     variantMap: Map<string, string>,
+    drop: (what: string, value: unknown) => void,
 ): Promise<void> {
     const { organizationId, survivorId, loserId } = ids;
     const listings = await tx.productListing.findMany({
         where: { productId: loserId },
-        include: { variants: { select: { variantId: true } } },
+        include: {
+            variants: { select: { variantId: true } },
+            store: { select: { name: true } },
+        },
         orderBy: { id: "asc" },
     });
     for (const listing of listings) {
-        const there =
-            (await tx.productListing.findUnique({
-                where: {
-                    storeId_productId: {
-                        storeId: listing.storeId,
-                        productId: survivorId,
-                    },
+        const mine = await tx.productListing.findUnique({
+            where: {
+                storeId_productId: {
+                    storeId: listing.storeId,
+                    productId: survivorId,
                 },
-                select: { id: true },
-            })) ??
+            },
+            select: { id: true, soldOutAt: true },
+        });
+        // Listed there already: its own Sold out (or not) stands.
+        if (mine && listing.soldOutAt && !mine.soldOutAt) {
+            drop(
+                `sold out at ${listing.store.name}`,
+                listing.soldOutAt.toISOString(),
+            );
+        }
+        const there =
+            mine ??
             (await tx.productListing.create({
                 data: {
                     organizationId,
                     storeId: listing.storeId,
                     productId: survivorId,
                     createdAt: listing.createdAt,
+                    // A storefront that marked it Sold out still refuses it.
+                    soldOutAt: listing.soldOutAt,
+                    soldOutByUserId: listing.soldOutByUserId,
                 },
-                select: { id: true },
+                select: { id: true, soldOutAt: true },
             }));
         await tx.productListingVariant.createMany({
             data: listing.variants.flatMap((v) => {
@@ -460,6 +495,7 @@ async function assertNothingNames(
         photos: await tx.productImage.count({ where: { productId } }),
         reviews: await tx.productReview.count({ where: { productId } }),
         discountCodes: await tx.discountProduct.count({ where: { productId } }),
+        collections: await tx.collectionProduct.count({ where: { productId } }),
         fieldValues: await tx.productFieldValue.count({ where: { productId } }),
         allergens: await tx.productAllergen.count({ where: { productId } }),
         inventory:
