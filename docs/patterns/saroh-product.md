@@ -3,8 +3,8 @@
 > **Read when:** designing or changing anything a merchant sees, deciding what
 > to build, or writing copy, a claim or a status.
 > Sources: `PRODUCT.md` (the short brief), `docs/PRODUCT_STRATEGY.md` (§ numbers
-> below), ADR-001 to ADR-006 and DEC-010 to DEC-018. Where this file and those
-> disagree, they win — fix this file in the same change.
+> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030. Where
+> this file and those disagree, they win — fix this file in the same change.
 
 These are the product facts that change engineering rules. The technical
 pattern files refer back here.

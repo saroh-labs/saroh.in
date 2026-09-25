@@ -50,7 +50,11 @@
   Whether a product counts stock is `Product.stockTracked` and the
   business's `BusinessProfile.stockTracking` (#515), not whether it has a
   row: an untracked product keeps its rows at 0 for the log, so every
-  reader filters with `COUNTING_ROWS` (`stock/tracking.ts`). `Inventory` and
+  reader filters with `COUNTING_ROWS` (`stock/tracking.ts`). An untracked
+  product has no count and sells unless a storefront marked it sold out by
+  hand (`ProductListing.soldOutAt`, `stock/sold-out.ts`): `reserve.ts`
+  refuses a fresh line for it there as it refuses a counted Sold out, and
+  turning tracking on clears it. `Inventory` and
   `VariantInventory` are no longer written. Every new table pairs its ids
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row

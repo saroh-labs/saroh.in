@@ -161,6 +161,17 @@
   `COUNTING_ROWS`, so an untracked product's rows (kept at 0 for the log)
   read as untracked, never Sold out. The switches need `store:write`,
   never `inventory:write` alone.
+- **Sold out by hand (#515, `stock/sold-out.ts`)** — an untracked product
+  sells unless a storefront marked it sold out (`ProductListing.soldOutAt`,
+  `PUT …/products/:id/sold-out`, `inventory:write` or `store:write`; a
+  product that counts stock is a 409). `tryHold` refuses a fresh line for
+  it at that storefront with the counted Sold out's words, so a staff order
+  is refused and a paid checkout is refunded (`reserveOnPayment`); lines
+  that held before are never re-judged. It takes the Product lock, writes
+  no stock entry, and is recorded as `product.sold-out.mark` / `.clear` in
+  the audit stream (Settings → Activity). Turning tracking on — the
+  product's switch, or the business's for products whose own switch is
+  on — clears it.
 - **Subscriptions, plans, bookings and class packs never touch product
   stock.**
 
