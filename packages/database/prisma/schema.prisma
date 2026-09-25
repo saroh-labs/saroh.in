@@ -3135,6 +3135,8 @@ model Booking {
   @@index([subscriptionId])
   // The sweep job's read: holds whose time ran out.
   @@index([status, holdExpiresAt])
+  // The whole-business calendar's month: every booking in a date range.
+  @@index([organizationId, startAt])
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
