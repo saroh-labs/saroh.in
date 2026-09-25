@@ -28,7 +28,7 @@ export function SettingsTabs({ hrefs }: { hrefs: readonly string[] }) {
             aria-label="Settings"
             className={cn(
                 "flex gap-1 overflow-x-auto border-b border-border bg-background px-3 py-2.5",
-                "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-visible min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
+                "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-y-auto min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
             )}
         >
             {pages.map((page) => {

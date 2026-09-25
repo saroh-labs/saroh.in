@@ -14,10 +14,13 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { FieldErrors } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -154,6 +157,34 @@ const TEXT_FIELDS = [
     },
 ] as const;
 
+/**
+ * The form's two tabs (2026-09-25): who the business is, and how it is taxed
+ * and invoiced. One form and one Save across both — the tabs only choose which
+ * half is on screen, so an edit on one survives a look at the other.
+ */
+const TABS = [
+    { id: "details", label: "Details" },
+    { id: "tax", label: "Tax & invoices" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
+/** Every field on the Tax & invoices tab; the rest are on Details. */
+const TAX_FIELDS = new Set<string>([
+    "taxId",
+    "gstRegistered",
+    "gstState",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "postalCode",
+    "invoicePrefix",
+    "deliveryRate",
+    "deliverySac",
+]);
+
+const tabOf = (field: string): TabId =>
+    TAX_FIELDS.has(field) ? "tax" : "details";
+
 function valuesOf(settings: OrganizationSettings): FormValues {
     const type = settings.profile?.type;
     return {
@@ -205,6 +236,17 @@ export function OrganizationSettingsForm({
         control: form.control,
         name: "gstRegistered",
     });
+    const [tab, setTab] = useState<TabId>("details");
+    // A tab with an edit not yet saved carries a dot, so an edit made on one
+    // tab is not forgotten while the other is on screen.
+    const unsaved = (id: TabId) =>
+        Object.keys(dirtyFields).some((field) => tabOf(field) === id);
+
+    /** A field the check refused may be on the tab not shown: show it. */
+    function onInvalid(errors: FieldErrors<FormValues>) {
+        const first = Object.keys(errors).at(0);
+        if (first) setTab(tabOf(first));
+    }
 
     async function onSubmit(values: FormValues) {
         const profile = Object.fromEntries(
@@ -251,8 +293,10 @@ export function OrganizationSettingsForm({
 
         if (!result.ok) {
             const field = result.field ? FIELD_OF[result.field] : undefined;
-            if (field) form.setError(field, { message: result.error });
-            else showError(result.error);
+            if (field) {
+                form.setError(field, { message: result.error });
+                setTab(tabOf(field));
+            } else showError(result.error);
             return;
         }
 
@@ -269,10 +313,48 @@ export function OrganizationSettingsForm({
     return (
         <Form {...form}>
             <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
                 className="grid max-w-[620px] gap-5"
             >
-                <FormCard>
+                <div
+                    role="group"
+                    aria-label="Business settings"
+                    className="flex gap-0.5 border-b border-border"
+                >
+                    {TABS.map((t) => {
+                        const on = t.id === tab;
+                        const dirty = unsaved(t.id);
+                        return (
+                            <button
+                                key={t.id}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => setTab(t.id)}
+                                className={cn(
+                                    "flex items-center gap-2 rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
+                                    on
+                                        ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
+                                        : "font-medium text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {t.label}
+                                {dirty ? (
+                                    <>
+                                        <span
+                                            aria-hidden
+                                            className="size-1.5 rounded-full bg-highlight"
+                                        />
+                                        <span className="sr-only">
+                                            , unsaved changes
+                                        </span>
+                                    </>
+                                ) : null}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <FormCard className={cn(tab !== "details" && "hidden")}>
                     <FormField
                         control={form.control}
                         name="name"
@@ -381,37 +463,57 @@ export function OrganizationSettingsForm({
                         )}
                     />
 
-                    {TEXT_FIELDS.slice(1).map(({ key, label, note }) => (
-                        <FormField
-                            key={key}
-                            control={form.control}
-                            name={key}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{label}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            readOnly={!canEdit}
-                                            type={
-                                                key === "contactEmail"
-                                                    ? "email"
-                                                    : key === "website"
-                                                      ? "url"
-                                                      : "text"
-                                            }
-                                        />
-                                    </FormControl>
-                                    <FormDescription>{note}</FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    ))}
+                    {TEXT_FIELDS.slice(1)
+                        .filter(({ key }) => key !== "taxId")
+                        .map(({ key, label, note }) => (
+                            <FormField
+                                key={key}
+                                control={form.control}
+                                name={key}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>{label}</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                readOnly={!canEdit}
+                                                type={
+                                                    key === "contactEmail"
+                                                        ? "email"
+                                                        : key === "website"
+                                                          ? "url"
+                                                          : "text"
+                                                }
+                                            />
+                                        </FormControl>
+                                        <FormDescription>
+                                            {note}
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        ))}
                 </FormCard>
 
-                <h2 className="mt-2 text-[13px] font-semibold">GST</h2>
-                <FormCard>
+                <FormCard className={cn(tab !== "tax" && "hidden")}>
+                    <FormField
+                        control={form.control}
+                        name="taxId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>{TEXT_FIELDS[1].label}</FormLabel>
+                                <FormControl>
+                                    <Input {...field} readOnly={!canEdit} />
+                                </FormControl>
+                                <FormDescription>
+                                    {TEXT_FIELDS[1].note}
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
                     <FormField
                         control={form.control}
                         name="gstRegistered"
