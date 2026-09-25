@@ -2,6 +2,7 @@
 // skip saves a charge, and what the next few look like.
 import {
     collectionDates,
+    collectionToCome,
     dateKey,
     dateValue,
     everyCollectionSkipped,
@@ -141,5 +142,25 @@ describe("dates", () => {
         expect(localDate(at("2026-10-02T20:00:00Z"), "Asia/Kolkata")).toBe(
             "2026-10-03",
         );
+    });
+});
+
+describe("collectionToCome", () => {
+    // September 2026's Saturdays: 5, 12, 19 and 26.
+    const september = {
+        start: at("2026-09-01T00:00:00Z"),
+        end: at("2026-10-01T00:00:00Z"),
+    };
+    const come = (today: string, skipped: string[] = []) =>
+        collectionToCome(september, SATURDAY, "UTC", today, new Set(skipped));
+
+    it("counts today and later, never a date behind", () => {
+        expect(come("2026-09-26")).toBe(true);
+        expect(come("2026-09-27")).toBe(false);
+    });
+
+    it("needs one of them not skipped", () => {
+        expect(come("2026-09-20", ["2026-09-26"])).toBe(false);
+        expect(come("2026-09-19", ["2026-09-26"])).toBe(true);
     });
 });

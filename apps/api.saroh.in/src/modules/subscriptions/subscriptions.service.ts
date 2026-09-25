@@ -19,6 +19,7 @@ import { allows, authorize } from "../organizations/organization-policy";
 import type { UpcomingCollection } from "./collections";
 import {
     collectionDates,
+    collectionToCome,
     dateKey,
     dateValue,
     everyCollectionSkipped,
@@ -1196,10 +1197,11 @@ export class SubscriptionsService {
 
     /**
      * After an undone skip or a new collection day: when the current period
-     * has begun, has a collection that is not skipped, and has no invoice at
-     * all — the renewal left it uncharged because every collection was
-     * skipped — invoice it now. A voided invoice counts as one: someone chose
-     * that. `sub` carries the schedule as it now stands.
+     * has begun, has a collection still to come (today or later) that is not
+     * skipped, and has no invoice at all — the renewal left it uncharged
+     * because every collection was skipped — invoice it now. A voided invoice
+     * counts as one: someone chose that. `sub` carries the schedule as it now
+     * stands.
      */
     private async chargeIfUncharged(
         tx: Tx,
@@ -1210,13 +1212,34 @@ export class SubscriptionsService {
             start: sub.currentPeriodStart,
             end: sub.currentPeriodEnd,
         };
+        const now = new Date();
         if (
             sub.status !== "ACTIVE" ||
             sub.collectionWeekday === null ||
-            period.start > new Date() ||
-            collectionDates(period, sub.collectionWeekday, sub.timezone)
-                .length === 0 ||
-            (await this.allSkipped(tx, sub, period))
+            period.start > now
+        ) {
+            return;
+        }
+        const dates = collectionDates(
+            period,
+            sub.collectionWeekday,
+            sub.timezone,
+        );
+        const skips = await tx.subscriptionSkip.findMany({
+            where: {
+                subscriptionId: sub.id,
+                date: { in: dates.map(dateValue) },
+            },
+            select: { date: true },
+        });
+        if (
+            !collectionToCome(
+                period,
+                sub.collectionWeekday,
+                sub.timezone,
+                localDate(now, sub.timezone),
+                new Set(skips.map((k) => dateKey(k.date))),
+            )
         ) {
             return;
         }

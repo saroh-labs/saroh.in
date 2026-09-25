@@ -102,6 +102,24 @@ export function everyCollectionSkipped(
 }
 
 /**
+ * True when a period still has a collection to come — today or later — that
+ * is not skipped: what charging it now, outside its renewal, needs. A new
+ * collection day whose dates in the period are all behind today gives it no
+ * collection, and a collection that never happens is not charged for.
+ */
+export function collectionToCome(
+    period: Period,
+    weekday: number,
+    timezone: string,
+    today: string,
+    skipped: ReadonlySet<string>,
+): boolean {
+    return collectionDates(period, weekday, timezone).some(
+        (d) => d >= today && !skipped.has(d),
+    );
+}
+
+/**
  * The next `count` collections from `from` (today's included, though it can
  * no longer be changed), stopping before `until` when the subscription is set
  * to end. Skipped ones are listed and marked, so a screen can offer Undo.
