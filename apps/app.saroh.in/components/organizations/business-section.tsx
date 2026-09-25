@@ -12,6 +12,23 @@ export interface BusinessRow {
     mono?: boolean;
     /** A locked fact's reason, e.g. "From your first order". */
     tag?: string;
+    /** Shown but not kept yet: the row carries a "Coming soon" pill. */
+    soon?: boolean;
+}
+
+/**
+ * The "Coming soon" pill ("Saroh Settings" design): something the screen
+ * shows that Saroh doesn't keep yet, said rather than pretended.
+ */
+export function ComingSoon() {
+    return (
+        <Badge
+            variant="draft"
+            className="flex-none px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+        >
+            Coming soon
+        </Badge>
+    );
 }
 
 /**
@@ -149,6 +166,7 @@ export function BusinessSection({
                                             {row.tag}
                                         </Badge>
                                     ) : null}
+                                    {row.soon ? <ComingSoon /> : null}
                                 </dd>
                             </div>
                         ))}

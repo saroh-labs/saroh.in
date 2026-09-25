@@ -67,10 +67,11 @@ each with why it stops there:
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
   `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
-- `organizations/organization-settings-form.tsx` (1,169) — one form holds
-  every Business card (profile, tax and invoices, registered address, number
-  format) and the cross-field rules that re-check them together; the
-  number-format editor already went to `invoice-number-fields.tsx`. Less
+- `organizations/organization-settings-form.tsx` (1,205) — one form holds
+  every Business card (profile, tax and invoices, address, number format)
+  and the cross-field rules that re-check them together; the number-format
+  editor already went to `invoice-number-fields.tsx`, and the Hours card,
+  which saves to the storefronts, to `business-hours-section.tsx`. Less
   means a card per file sharing one form context.
 - `organizations/team-screen.tsx` (1,106) — the Roles and People tabs, the
   member drawer and the invite dialog share the screen's roster and role

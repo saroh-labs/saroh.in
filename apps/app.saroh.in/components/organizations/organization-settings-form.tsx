@@ -20,6 +20,10 @@ import type { FieldErrors } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import {
+    BusinessHoursSection,
+    HOURS_SECTION,
+} from "@/components/organizations/business-hours-section";
 import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
@@ -59,6 +63,7 @@ import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { BUSINESS_TAB_PARAM } from "@/lib/settings/search";
+import type { StorefrontHoursRead } from "@/lib/stores/storefronts";
 
 /** Allow an empty string (field left blank / cleared) or a valid value. */
 const optionalText = (schema: z.ZodString) =>
@@ -200,9 +205,10 @@ function valuesOf(settings: OrganizationSettings): FormValues {
 }
 
 /**
- * The four tabs, one card each ("Saroh Settings" design), in the order a
+ * The four cards this form saves ("Saroh Settings" design), in the order a
  * customer's invoice reads: who the business is, how to reach it, how it is
- * taxed and numbered, where it is registered.
+ * taxed and numbered, where it is registered. Hours sit between the last
+ * two as a tab, but save to the storefronts (`business-hours-section.tsx`).
  */
 const SECTIONS = {
     identity: {
@@ -231,7 +237,7 @@ const SECTIONS = {
         ],
     },
     address: {
-        title: "Registered address",
+        title: "Address",
         lead: "Printed under your legal name",
         fields: [
             "addressLine1",
@@ -248,6 +254,12 @@ const SECTIONS = {
 >;
 type SectionKey = keyof typeof SECTIONS;
 const SECTION_KEYS = Object.keys(SECTIONS) as SectionKey[];
+
+/** The tabs, in the design's order. */
+type TabKey = SectionKey | "hours";
+const TAB_KEYS: TabKey[] = ["identity", "contact", "tax", "hours", "address"];
+const titleOf = (key: TabKey) =>
+    key === "hours" ? HOURS_SECTION.title : SECTIONS[key].title;
 
 const sectionOf = (field: string): SectionKey =>
     SECTION_KEYS.find((key) =>
@@ -326,21 +338,25 @@ function addressText(v: FormValues): string {
 export function OrganizationSettingsForm({
     settings: initial,
     canEdit,
+    hours,
+    canEditHours,
 }: {
     settings: OrganizationSettings;
     canEdit: boolean;
+    /** The storefronts' opening hours, for the Hours tab. */
+    hours: StorefrontHoursRead;
+    /** May change the storefronts, which is where hours are kept. */
+    canEditHours: boolean;
 }) {
     const router = useRouter();
     // What the API last said, so the cards read the saved values at once
     // rather than waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
     // In the address, so Search settings can open the tab a setting is on.
-    const [tab, setTab] = useTabParam(
-        BUSINESS_TAB_PARAM,
-        SECTION_KEYS,
-        "identity",
-    );
-    const [editing, setEditing] = useState<SectionKey | null>(null);
+    const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
+    const [editing, setEditing] = useState<TabKey | null>(null);
+    // The Hours card keeps its own form; whether it has changes, from it.
+    const [hoursDirty, setHoursDirty] = useState(false);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: valuesOf(initial),
@@ -361,8 +377,10 @@ export function OrganizationSettingsForm({
         if (showing) void form.trigger();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per change of the values (or a refusal appearing), not per render
     }, [watched, showing]);
+    // Whether the open card has changes, whichever form holds it.
+    const editDirty = editing === "hours" ? hoursDirty : isDirty;
     // An open edit with changes holds the way off this page.
-    const { leaveTo, stay } = useLeaveGuard(editing !== null && isDirty);
+    const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
     // The number-format rules span four fields (and the prefix and GST
     // switch), but the form re-checks only the field that changed, so the
     // rule is worked out here from what is on screen: a part ticked in shows
@@ -387,11 +405,9 @@ export function OrganizationSettingsForm({
         sectionOf(field) === editing ||
         (addressInTax && (ADDRESS_KEYS as readonly string[]).includes(field));
 
-    const startEditing = (key: SectionKey) => {
-        if (editing && editing !== key && isDirty) {
-            showInfo(
-                `Finish or cancel your edit in ${SECTIONS[editing].title} first`,
-            );
+    const startEditing = (key: TabKey) => {
+        if (editing && editing !== key && editDirty) {
+            showInfo(`Finish or cancel your edit in ${titleOf(editing)} first`);
             setTab(editing);
             return;
         }
@@ -417,7 +433,8 @@ export function OrganizationSettingsForm({
     }
 
     async function onSubmit(values: FormValues) {
-        if (!editing) return;
+        // Hours save through their own card's form.
+        if (!editing || editing === "hours") return;
         const profile = Object.fromEntries(
             PROFILE_KEYS.filter((key) => dirtyFields[key]).map((key) => [
                 key,
@@ -648,9 +665,9 @@ export function OrganizationSettingsForm({
     const liveState = registered
         ? gstStateOf(v)
         : { name: indianState(v), fromGstin: false };
-    const tabIndex = SECTION_KEYS.indexOf(tab);
+    const tabIndex = TAB_KEYS.indexOf(tab);
     const onTabKeys = (e: React.KeyboardEvent) => {
-        const n = SECTION_KEYS.length;
+        const n = TAB_KEYS.length;
         const next =
             e.key === "ArrowRight"
                 ? (tabIndex + 1) % n
@@ -663,8 +680,8 @@ export function OrganizationSettingsForm({
                       : null;
         if (next === null) return;
         e.preventDefault();
-        setTab(SECTION_KEYS[next]);
-        document.getElementById(`business-tab-${SECTION_KEYS[next]}`)?.focus();
+        setTab(TAB_KEYS[next]);
+        document.getElementById(`business-tab-${TAB_KEYS[next]}`)?.focus();
     };
 
     /** One field's wrapper, at the width the design gives it. */
@@ -1061,9 +1078,11 @@ export function OrganizationSettingsForm({
                 role="tablist"
                 aria-label="Business details"
                 onKeyDown={onTabKeys}
-                className="-mt-1.5 mb-[18px] flex flex-wrap gap-0.5 border-b border-border"
+                // One line however narrow: the strip scrolls sideways, with
+                // no scrollbar drawn, rather than wrapping under itself.
+                className="-mt-1.5 mb-[18px] flex flex-nowrap gap-0.5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-                {SECTION_KEYS.map((key) => {
+                {TAB_KEYS.map((key) => {
                     const on = key === tab;
                     return (
                         <button
@@ -1072,17 +1091,21 @@ export function OrganizationSettingsForm({
                             type="button"
                             role="tab"
                             aria-selected={on}
-                            aria-controls="business-panel"
+                            aria-controls={
+                                key === "hours"
+                                    ? "business-hours-panel"
+                                    : "business-panel"
+                            }
                             tabIndex={on ? 0 : -1}
                             onClick={() => setTab(key)}
                             className={cn(
-                                "flex items-center gap-[7px] px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
+                                "flex shrink-0 items-center gap-[7px] whitespace-nowrap px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
                                     : "font-medium text-muted-foreground hover:text-foreground",
                             )}
                         >
-                            {SECTIONS[key].title}
+                            {titleOf(key)}
                             {editing === key && !on ? (
                                 <span
                                     aria-label="Editing"
@@ -1095,42 +1118,55 @@ export function OrganizationSettingsForm({
             </div>
 
             <div className="flex flex-wrap items-start gap-5">
-                <form
-                    id="business-panel"
-                    role="tabpanel"
-                    aria-labelledby={`business-tab-${tab}`}
-                    onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-                    className="grid min-w-0 flex-[1_1_460px] gap-4"
-                >
-                    <BusinessSection
-                        title={SECTIONS[tab].title}
-                        lead={SECTIONS[tab].lead}
-                        rows={rows[tab]}
-                        note={notes[tab]}
-                        editing={editing === tab}
-                        canEdit={canEdit}
-                        onEdit={() => startEditing(tab)}
-                        onCancel={cancel}
-                        saveOff={!isDirty || sectionErrors > 0}
-                        saving={isSubmitting}
-                        saveWhy={saveWhy}
-                        top={
-                            tab === "identity" ? (
-                                <BusinessLogoRow
-                                    logoUrl={settings.logo?.url ?? null}
-                                    name={settings.name}
-                                    canEdit={canEdit}
-                                    onSaved={setSettings}
-                                />
-                            ) : undefined
-                        }
+                {tab === "hours" ? null : (
+                    <form
+                        id="business-panel"
+                        role="tabpanel"
+                        aria-labelledby={`business-tab-${tab}`}
+                        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                        className="grid min-w-0 flex-[1_1_460px] gap-4"
                     >
-                        {fieldsOf[tab]}
-                    </BusinessSection>
-                </form>
+                        <BusinessSection
+                            title={SECTIONS[tab].title}
+                            lead={SECTIONS[tab].lead}
+                            rows={rows[tab]}
+                            note={notes[tab]}
+                            editing={editing === tab}
+                            canEdit={canEdit}
+                            onEdit={() => startEditing(tab)}
+                            onCancel={cancel}
+                            saveOff={!isDirty || sectionErrors > 0}
+                            saving={isSubmitting}
+                            saveWhy={saveWhy}
+                            top={
+                                tab === "identity" ? (
+                                    <BusinessLogoRow
+                                        logoUrl={settings.logo?.url ?? null}
+                                        name={settings.name}
+                                        canEdit={canEdit}
+                                        onSaved={setSettings}
+                                    />
+                                ) : undefined
+                            }
+                        >
+                            {fieldsOf[tab]}
+                        </BusinessSection>
+                    </form>
+                )}
+                {/* Mounted on every tab, so an unsaved week survives a look
+                    elsewhere, as the other cards' fields do. */}
+                <BusinessHoursSection
+                    hours={hours}
+                    hidden={tab !== "hours"}
+                    editing={editing === "hours"}
+                    canEdit={canEdit && canEditHours}
+                    onEdit={() => startEditing("hours")}
+                    onDone={() => setEditing(null)}
+                    onDirty={setHoursDirty}
+                />
 
                 <BusinessPrintPreview
-                    live={editing !== null && isDirty}
+                    live={editing !== null && editing !== "hours" && isDirty}
                     logoUrl={settings.logo?.url ?? null}
                     registered={registered}
                     number={number(v)}
@@ -1154,7 +1190,7 @@ export function OrganizationSettingsForm({
             </div>
             <LeaveDialog
                 to={leaveTo}
-                section={editing ? SECTIONS[editing].title : "Business"}
+                section={editing ? titleOf(editing) : "Business"}
                 onKeep={() => {
                     stay();
                     if (editing) setTab(editing);

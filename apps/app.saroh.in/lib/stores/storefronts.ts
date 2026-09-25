@@ -120,6 +120,64 @@ export async function listCheckoutProviders(): Promise<
     }
 }
 
+/** A storefront's week, for Business → Hours. */
+export interface StorefrontHours {
+    id: string;
+    name: string;
+    openingHours: OpeningHoursDay[] | null;
+}
+
+/**
+ * What Business → Hours can say about the storefronts' hours: each one's
+ * week, or why there are none to read — Sell switched off (the storefront
+ * routes answer 404) or a person the API won't show them to.
+ */
+export type StorefrontHoursRead =
+    | { state: "ok"; storefronts: StorefrontHours[] }
+    | { state: "sell-off" }
+    | { state: "unavailable" };
+
+/**
+ * Every storefront's opening hours, one read per storefront (a business has
+ * one or two).
+ *
+ * Tolerant, like {@link listCheckoutProviders}: the Business page must not be
+ * taken down — or turned into a 403 — by one of its tabs, so a refusal or a
+ * failure is said on the tab rather than thrown.
+ */
+export async function listStorefrontHours(): Promise<StorefrontHoursRead> {
+    const base = await orgBase();
+    if (!base) return { state: "unavailable" };
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (res.status === 404) return { state: "sell-off" };
+        if (!res.ok) return { state: "unavailable" };
+        const stores = (await res.json()) as StorefrontSummary[];
+        const weeks = await Promise.all(
+            stores.map(async (s): Promise<StorefrontHours | null> => {
+                const one = await apiFetch(
+                    `${base}/storefronts/${encodeURIComponent(s.id)}`,
+                );
+                if (!one.ok) return null;
+                const body = (await one.json()) as StorefrontSettings;
+                return {
+                    id: body.id,
+                    name: body.name,
+                    openingHours: body.openingHours,
+                };
+            }),
+        );
+        // A storefront that couldn't be read would be saved over blind.
+        if (weeks.some((w) => w === null)) return { state: "unavailable" };
+        return {
+            state: "ok",
+            storefronts: weeks.filter((w) => w !== null),
+        };
+    } catch {
+        return { state: "unavailable" };
+    }
+}
+
 export async function getStorefront(
     storeId: string,
 ): Promise<StorefrontSettings | null> {
