@@ -29,6 +29,10 @@ a note saying so.
 - **Current** — **The Organization connects its own messaging provider** for real
   sends; Saroh-owned email is only for identity mail and a template test to the
   signed-in user's own verified address (DEC-011).
+- **Current** — **Settings → Providers is one row per provider, connected
+  first** (DEC-036): a disconnected one stays listed as theirs, only what the
+  API can connect is offered, and a row shows only what the API sends as
+  public (a checkout's public key, a sending address), never a credential.
 - **Current** — **Credentials are encrypted at rest** (AES-256-GCM,
   `payments/crypto.ts`) and never returned; reads are redacted views.
 - **Current** — **Adapters sanitise errors:** never surface an auth header, a

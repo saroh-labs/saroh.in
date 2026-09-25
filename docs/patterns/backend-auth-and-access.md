@@ -139,8 +139,11 @@ what the API allows.
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator
   context (`roleKey: "platform-operator"`, the operator's own `userId`), so the
-  business's rules hold (it always keeps an owner) and its audit stream names
-  the operator. There is no write-mode view-as.
+  business's rules hold (it always keeps an owner) and the change is never put
+  down to one of its members. The business's own Activity shows it as "Saroh
+  support" — never the operator's name, email or user id: the role key marks
+  the row `metadata.byOperator` (`auditMetadata()` in `audit.service.ts`), and
+  the admin ledger keeps who it was (DEC-035). There is no write-mode view-as.
 - **Current** — **A suspended or closing business takes no new activity.**
   `OrganizationGuard` refuses writes and the public enquiry, booking and
   payment paths refuse outright; reads still pass and the site stays up, so its
