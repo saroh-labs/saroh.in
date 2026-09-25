@@ -13,6 +13,7 @@ import {
     shortBy,
     STOCK_ENTRY_WORDS,
 } from "./stock-words";
+import { businessTracksStock } from "./tracking";
 
 /**
  * What the Stock screen, the quick look and the product page read (#514):
@@ -62,8 +63,13 @@ export interface StockLevelRow {
 export interface StockLevelsView {
     storefronts: { id: string; name: string }[];
     rows: StockLevelRow[];
-    /** Products that don't count stock (no shelf anywhere): they always sell. */
+    /**
+     * Products that don't track stock (#515) — Track stock off for the
+     * product, or for the whole business: they always sell.
+     */
     untracked: { productId: string; name: string; status: string }[];
+    /** The business's Track stock switch; off, every product is untracked. */
+    tracking: boolean;
     canWrite: boolean;
 }
 
@@ -186,7 +192,7 @@ export class StockReadsService {
             organizationId,
             ...(query.product ? { id: query.product } : {}),
         };
-        const [products, levels] = await Promise.all([
+        const [products, levels, tracking] = await Promise.all([
             prisma.product.findMany({
                 where: productWhere,
                 orderBy: [{ name: "asc" }, { id: "asc" }],
@@ -195,6 +201,7 @@ export class StockReadsService {
                     name: true,
                     status: true,
                     image: true,
+                    stockTracked: true,
                     variants: {
                         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                         select: { id: true, title: true, sku: true },
@@ -222,6 +229,7 @@ export class StockReadsService {
                     lowStockAlert: true,
                 },
             }),
+            businessTracksStock(prisma, organizationId),
         ]);
         const changes = await lastChanges(
             organizationId,
@@ -238,7 +246,7 @@ export class StockReadsService {
         const untracked: StockLevelsView["untracked"] = [];
         for (const product of products) {
             const shelves = byProduct.get(product.id) ?? [];
-            if (shelves.length === 0) {
+            if (!tracking || !product.stockTracked) {
                 untracked.push({
                     productId: product.id,
                     name: product.name,
@@ -329,7 +337,13 @@ export class StockReadsService {
                 });
             }
         }
-        return { storefronts, rows, untracked, canWrite: reader.canWrite };
+        return {
+            storefronts,
+            rows,
+            untracked,
+            tracking,
+            canWrite: reader.canWrite,
+        };
     }
 
     /**

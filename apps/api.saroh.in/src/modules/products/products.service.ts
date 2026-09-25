@@ -20,6 +20,7 @@ import {
     saveProductFieldValues,
 } from "../catalogue/fields.service";
 import { isGstRate } from "../invoices/gst";
+import { COUNTING_ROWS } from "../stock/tracking";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -68,7 +69,10 @@ export const productDetailInclude = (storeId: string) =>
         variants: {
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             include: {
-                stockLevels: { where: { storeId }, ...STOCK_ROW },
+                stockLevels: {
+                    where: { storeId, ...COUNTING_ROWS },
+                    ...STOCK_ROW,
+                },
                 listings: {
                     where: { listing: { storeId } },
                     select: { id: true },
@@ -76,7 +80,10 @@ export const productDetailInclude = (storeId: string) =>
             },
         },
         images: { orderBy: { position: "asc" } },
-        stockLevels: { where: { storeId, variantId: null }, ...STOCK_ROW },
+        stockLevels: {
+            where: { storeId, variantId: null, ...COUNTING_ROWS },
+            ...STOCK_ROW,
+        },
         option: {
             select: {
                 id: true,
@@ -200,7 +207,7 @@ export class ProductsService {
                         title: true,
                         price: true,
                         stockLevels: {
-                            where: { storeId: { in: open } },
+                            where: { storeId: { in: open }, ...COUNTING_ROWS },
                             select: { storeId: true, ...STOCK_ROW.select },
                         },
                         listings: {
@@ -211,7 +218,11 @@ export class ProductsService {
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
                 stockLevels: {
-                    where: { storeId: { in: open }, variantId: null },
+                    where: {
+                        storeId: { in: open },
+                        variantId: null,
+                        ...COUNTING_ROWS,
+                    },
                     select: { storeId: true, ...STOCK_ROW.select },
                 },
             },
@@ -249,7 +260,10 @@ export class ProductsService {
                         sku: true,
                         title: true,
                         price: true,
-                        stockLevels: { where: { storeId }, ...STOCK_ROW },
+                        stockLevels: {
+                            where: { storeId, ...COUNTING_ROWS },
+                            ...STOCK_ROW,
+                        },
                         listings: {
                             where: { listing: { storeId } },
                             select: { id: true },
@@ -258,7 +272,7 @@ export class ProductsService {
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
                 stockLevels: {
-                    where: { storeId, variantId: null },
+                    where: { storeId, variantId: null, ...COUNTING_ROWS },
                     ...STOCK_ROW,
                 },
             },

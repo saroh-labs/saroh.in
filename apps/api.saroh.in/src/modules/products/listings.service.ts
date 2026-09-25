@@ -6,8 +6,14 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { COUNTING_ROWS } from "../stock/tracking";
 import type { StockCounts } from "./stock-levels";
-import { asCounts, lockProduct, STOCK_LEVEL_SELECT } from "./stock-levels";
+import {
+    asCounts,
+    firstRow,
+    lockProduct,
+    STOCK_LEVEL_SELECT,
+} from "./stock-levels";
 
 /**
  * One storefront's view of a catalogue product (#510): whether it sells the
@@ -89,28 +95,35 @@ export async function listAt(
         });
     }
 
-    // Its shelf here, in the way it counts everywhere else.
+    // Its shelf here, in the way it counts everywhere else — for a product
+    // that tracks stock (#515); one that doesn't gets a shelf when Track
+    // stock goes on.
+    const product = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        select: { stockTracked: true },
+    });
+    if (!product.stockTracked) return;
     const rows = await tx.stockLevel.findMany({
         where: { productId },
         select: STOCK_LEVEL_SELECT,
         orderBy: { id: "asc" },
     });
-    if (rows.length === 0) return; // counts no stock anywhere
     const perVariant = rows.some((r) => r.variantId !== null);
     const here = rows.filter((r) => r.storeId === storeId);
     // A new row warns where the same shelf warns at another storefront.
     const warnAt = (variantId: string | null) =>
         rows.find((r) => r.variantId === variantId)?.lowStockAlert ??
-        rows[0].lowStockAlert;
+        firstRow(rows)?.lowStockAlert;
 
     if (!perVariant) {
         if (here.length === 0) {
+            const lowStockAlert = warnAt(null);
             await tx.stockLevel.create({
                 data: {
                     organizationId,
                     storeId,
                     productId,
-                    lowStockAlert: warnAt(null),
+                    ...(lowStockAlert === undefined ? {} : { lowStockAlert }),
                 },
             });
         }
@@ -231,7 +244,7 @@ export class ListingsService {
                 select: { variants: { select: { variantId: true } } },
             }),
             prisma.stockLevel.findMany({
-                where: { storeId, productId, organizationId },
+                where: { storeId, productId, organizationId, ...COUNTING_ROWS },
                 select: STOCK_LEVEL_SELECT,
             }),
         ]);

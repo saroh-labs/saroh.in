@@ -21,6 +21,7 @@ import {
     reorderVariants as reorderVariantsApi,
     replaceProductImages as replaceProductImagesApi,
     setInventory as setInventoryApi,
+    setProductStockTracking as setProductStockTrackingApi,
     setVariantStock as setVariantStockApi,
     updateCategory as updateCategoryApi,
     updateProduct as updateProductApi,
@@ -86,6 +87,14 @@ export async function setInventory(
     Result<{ quantity: number; reserved: number; lowStockAlert: number }>
 > {
     return setInventoryApi(storeId, productId, input);
+}
+
+/** Track stock on or off for a product (#515); Owner/Admin only. */
+export async function setProductStockTracking(
+    productId: string,
+    tracked: boolean,
+) {
+    return setProductStockTrackingApi(productId, tracked);
 }
 
 /** One section of a product; the API judges the whole product after it. */

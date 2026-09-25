@@ -184,6 +184,8 @@ export interface ProductDetail extends Product {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
+    stockTracked: boolean;
     images: ProductImage[];
     stockMode: "product" | "variant";
     /**
@@ -482,6 +484,31 @@ export function setInventory(
     );
 }
 
+/** What turning Track stock on or off did (#515). */
+export interface StockTrackingResult {
+    productId: string;
+    tracked: boolean;
+    /** The business's switch: off, and no product counts stock. */
+    businessTracks: boolean;
+    /** Shelves counted to 0 by turning it off. */
+    counted: number;
+}
+
+/**
+ * Track stock on or off for a product, everywhere it sells. Owner/Admin only
+ * (`store:write`). Off is refused while open orders hold its units ("N are
+ * promised to open orders — fulfil or cancel them first") and counts each
+ * shelf to 0; on starts each shelf at 0, Sold out until counted.
+ */
+export function setProductStockTracking(productId: string, tracked: boolean) {
+    return mutateProduct<StockTrackingResult>(
+        productId,
+        "/stock-tracking",
+        "PUT",
+        { tracked },
+    );
+}
+
 // ---- Products v2: one section at a time (#461, #462) ----
 
 /** Any subset of a product's own fields — one editor section's save. */
@@ -553,6 +580,8 @@ export function replaceProductImages(
 
 export interface StockView {
     productId: string;
+    /** Track stock (#515): the product's switch and the business's. */
+    tracked: boolean;
     mode: "product" | "variant";
     quantity: number;
     reserved: number;

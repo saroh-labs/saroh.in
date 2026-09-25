@@ -18,6 +18,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { SetStockTrackingDto } from "../stock/dto";
 import type { ProductStatus } from "./dto";
 import {
     CreateProductDto,
@@ -309,6 +310,24 @@ export class OrganizationProductsController {
             await this.access.write(ctx, productId, storefront),
             productId,
             dto,
+        );
+    }
+
+    /**
+     * Track stock on or off for the product everywhere it sells (#515):
+     * `store:write`, never `inventory:write` alone. Off is refused while
+     * open orders hold its units and counts each shelf to 0.
+     */
+    @Put(":productId/stock-tracking")
+    async setStockTracking(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("productId") productId: string,
+        @Body() dto: SetStockTrackingDto,
+    ) {
+        return this.inventory.setTrackingIn(
+            await this.access.write(ctx, productId),
+            productId,
+            dto.tracked,
         );
     }
 }

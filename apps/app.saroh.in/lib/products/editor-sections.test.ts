@@ -193,6 +193,7 @@ function product(over: Partial<ProductDetail> = {}): ProductDetail {
         customFields: [],
         allergens: { contains: [], mayContain: [] },
         inventory: null,
+        stockTracked: false,
         howToUse: "Two drops, morning and night.",
         materials: null,
         keyPoints: [],

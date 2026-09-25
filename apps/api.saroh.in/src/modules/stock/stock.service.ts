@@ -187,6 +187,16 @@ async function resolveRowId(
     });
     if (found) return found.id;
     if (!create) throw new NotFoundException("Stock not found");
+    // A product with no shelf anywhere starts counting with its first one
+    // (Track stock on, #515). Callers decide who may start it: the Stock
+    // API never does, the product's own count needs `store:write`.
+    const shelves = await tx.stockLevel.count({ where: { productId } });
+    if (shelves === 0) {
+        await tx.product.updateMany({
+            where: { id: productId, stockTracked: false },
+            data: { stockTracked: true, stockTrackedAt: new Date() },
+        });
+    }
     const made = await tx.stockLevel.create({
         data: { organizationId, storeId, productId, variantId },
         select: { id: true },

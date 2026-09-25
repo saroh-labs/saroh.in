@@ -4,6 +4,7 @@ import {
     ArrayMaxSize,
     ArrayMinSize,
     IsArray,
+    IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
@@ -216,4 +217,10 @@ export class StockLogQueryDto {
     @Min(1)
     @Max(200)
     limit?: number;
+}
+
+/** Track stock on or off — a product, or the whole business (#515). */
+export class SetStockTrackingDto {
+    @IsBoolean({ message: "Say whether to track stock." })
+    tracked!: boolean;
 }

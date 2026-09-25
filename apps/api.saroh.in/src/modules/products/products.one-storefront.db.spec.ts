@@ -99,6 +99,7 @@ describe("Products at one storefront (characterization, DB)", () => {
 
         expect(await inventory.get(storeId, id, ownerId)).toEqual({
             productId: id,
+            tracked: true,
             mode: "product",
             quantity: 8,
             reserved: 0,

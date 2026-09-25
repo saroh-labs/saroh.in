@@ -138,6 +138,21 @@ export const CLOSED_STOREFRONT =
 
 export const ALREADY_UNDONE = "This change has already been undone.";
 
+/** Track stock can't go off while open orders hold units (#515). */
+export function promisedRefusal(promised: number): string {
+    return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders — fulfil or cancel them first.`;
+}
+
+export const BUSINESS_UNTRACKED =
+    "Your business doesn't track stock. Turn on Track stock to count it.";
+
+/** Track stock changes how products sell, so it is Owner/Admin's to change. */
+export const CANT_CHANGE_TRACKING =
+    "Only someone who can change products can turn Track stock on or off.";
+
+/** The note on the count that empties a shelf when Track stock goes off. */
+export const TRACKING_OFF_NOTE = "Track stock turned off";
+
 /** Why an entry can't be undone through the stock module. */
 export function cantReverse(kind: StockEntryKind): string {
     switch (kind) {

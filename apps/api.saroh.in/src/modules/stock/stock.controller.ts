@@ -5,6 +5,7 @@ import {
     HttpCode,
     Param,
     Post,
+    Put,
     Query,
     UseGuards,
 } from "@nestjs/common";
@@ -21,12 +22,14 @@ import {
     MoveStockDto,
     ResolveCheckDto,
     ReverseStockDto,
+    SetStockTrackingDto,
     StockEntryDto,
     StockLevelsQueryDto,
     StockLogQueryDto,
 } from "./dto";
 import { StockChecksService } from "./stock-checks.service";
 import { StockReadsService } from "./stock-reads.service";
+import { StockTrackingService } from "./stock-tracking.service";
 import { StockWritesService } from "./stock-writes.service";
 
 /**
@@ -45,6 +48,7 @@ export class StockController {
         private readonly reads: StockReadsService,
         private readonly writes: StockWritesService,
         private readonly checks: StockChecksService,
+        private readonly tracking: StockTrackingService,
     ) {}
 
     /** Levels: a row per product or variant, a cell per storefront. */
@@ -113,6 +117,24 @@ export class StockController {
     @Get("checks")
     listChecks(@OrgContext() ctx: OrganizationContext) {
         return this.checks.list(ctx);
+    }
+
+    /** The business's Track stock switch (#515). */
+    @Get("tracking")
+    getTracking(@OrgContext() ctx: OrganizationContext) {
+        return this.tracking.get(ctx);
+    }
+
+    /**
+     * Turn Track stock on or off for every product (`store:write`). Off is
+     * refused while anything is promised; it counts every shelf to 0.
+     */
+    @Put("tracking")
+    setTracking(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetStockTrackingDto,
+    ) {
+        return this.tracking.set(ctx, dto.tracked);
     }
 
     @Post("checks/:key/resolve")

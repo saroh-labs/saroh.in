@@ -6,6 +6,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { StockChecksService } from "./stock-checks.service";
 import { StockReadsService } from "./stock-reads.service";
+import { StockTrackingService } from "./stock-tracking.service";
 import { StockWritesService } from "./stock-writes.service";
 import { StockController } from "./stock.controller";
 import { StockService } from "./stock.service";
@@ -27,6 +28,7 @@ import { StockService } from "./stock.service";
         StockReadsService,
         StockWritesService,
         StockChecksService,
+        StockTrackingService,
         IdempotencyService,
         OrganizationGuard,
     ],

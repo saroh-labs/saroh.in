@@ -65,12 +65,14 @@ describe("Stock API: sign-in, the organization and the COMMERCE gate", () => {
                 "adjust",
                 "counts",
                 "entries",
+                "getTracking",
                 "levels",
                 "listChecks",
                 "log",
                 "move",
                 "resolveCheck",
                 "reverse",
+                "setTracking",
             ].sort(),
         );
     });

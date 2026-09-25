@@ -129,6 +129,9 @@ export async function duplicateProduct(
             seoTitle: source.seoTitle,
             seoDescription: source.seoDescription,
             optionId: source.optionId,
+            // Tracks stock as the original does (#515), from 0.
+            stockTracked: source.stockTracked,
+            stockTrackedAt: source.stockTracked ? new Date() : null,
         },
         select: { id: true },
     });
