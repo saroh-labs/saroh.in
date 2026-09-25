@@ -144,6 +144,7 @@ model Organization {
   productListings        ProductListing[]
   productListingVariants ProductListingVariant[]
   stockLevels            StockLevel[]
+  stockEntries           StockEntry[]
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
@@ -561,8 +562,9 @@ model Store {
   allergens         StoreAllergen[]
 
   // What it sells from the business's catalogue, and its shelf (#510).
-  listings    ProductListing[]
-  stockLevels StockLevel[]
+  listings     ProductListing[]
+  stockLevels  StockLevel[]
+  stockEntries StockEntry[]
 
   // The target of (storeId, organizationId) foreign keys: a listing or a
   // stock row can only name a storefront of its own business.
@@ -705,6 +707,7 @@ model Product {
   listings        ProductListing[]
   listingVariants ProductListingVariant[]
   stockLevels     StockLevel[]
+  stockEntries    StockEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -752,8 +755,9 @@ model ProductVariant {
   orderItems OrderItem[]
 
   // The storefronts that sell it, and its shelf at each (#510).
-  listings    ProductListingVariant[]
-  stockLevels StockLevel[]
+  listings     ProductListingVariant[]
+  stockLevels  StockLevel[]
+  stockEntries StockEntry[]
 
   createdAt DateTime @default(now())
 
@@ -1115,12 +1119,83 @@ model StockLevel {
   updatedAt DateTime @updatedAt
 
   orderItems OrderItem[]
+  entries    StockEntry[]
 
+  @@unique([id, organizationId])
   @@unique([storeId, productId], map: "StockLevel_storeId_productId_whole_key", where: raw("\"variantId\" IS NULL"))
   @@unique([storeId, variantId], map: "StockLevel_storeId_variantId_key", where: raw("\"variantId\" IS NOT NULL"))
   @@index([productId])
   @@index([variantId])
   @@index([organizationId])
+}
+
+// The stock log (#513): one entry for every change to what is on a shelf —
+// never a promise — so a row's entries add up to its on hand, and each entry
+// reads before + quantity = after. Entries are never edited or deleted; Undo
+// writes a REVERSED entry pointing at the one it undoes. A move is two
+// entries (−N here, +N there) sharing a pairId. A count keeps what the
+// counter was shown (expected) and what they counted; the shelf had moved
+// meanwhile when expected differs from before ("Count didn't match").
+// Store, product and variant repeat the row's, for filtering the log.
+enum StockEntryKind {
+  SOLD
+  RETURNED
+  BAKED
+  RECEIVED
+  WASTED
+  COUNTED
+  MOVED
+  REVERSED
+}
+
+model StockEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  stockLevelId String
+  stockLevel   StockLevel      @relation(fields: [stockLevelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  storeId      String
+  store        Store           @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId    String
+  product      Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId    String?
+  variant      ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  kind     StockEntryKind
+  // Signed change to on hand.
+  quantity Int
+  before   Int
+  after    Int
+
+  // COUNTED only: what the counter was shown, and what they counted.
+  expected Int?
+  counted  Int?
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // The two sides of a move, or of undoing one.
+  pairId  String?
+
+  // On a REVERSED entry: the entry it undoes. Unique, so nothing is undone twice.
+  reversesId String?     @unique
+  reverses   StockEntry? @relation("StockEntryReversal", fields: [reversesId], references: [id], onDelete: SetNull)
+  reversedBy StockEntry? @relation("StockEntryReversal")
+
+  // Who made the change. Not a foreign key, like OrderEvent: someone who
+  // leaves the team keeps their entries. Null for the system.
+  actorUserId String?
+  note        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([stockLevelId, createdAt])
+  @@index([storeId, createdAt])
+  @@index([productId])
+  @@index([variantId])
+  @@index([orderId])
+  @@index([pairId])
 }
 
 // ============================================================================
@@ -1243,7 +1318,8 @@ model Order {
   // A typed courier tracking link — no courier integration (ADR-008).
   trackingUrl String?
 
-  events OrderEvent[]
+  events       OrderEvent[]
+  stockEntries StockEntry[]
 
   // Its invoice, and the credit notes and supplementary invoices that
   // correct it (ADR-008, U5). The order stays the ledger.
