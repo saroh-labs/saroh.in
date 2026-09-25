@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { formatRecent } from "@/lib/format/datetime";
 
 import type { AuditEventRow } from "./activity";
-import { FIELD_PHRASES, activityLine, activityLines } from "./activity";
+import { activityLine, activityLines } from "./activity";
+import { FIELD_PHRASES } from "./activity-changes";
 
 const sanjay = { name: "Sanjay", email: "sanjay@ryeandco.in" };
 const priya = { name: "Priya", email: "priya@ryeandco.in" };

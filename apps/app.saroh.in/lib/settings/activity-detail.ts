@@ -1,19 +1,14 @@
-import type {
-    AuditEventRow,
-    ChangeValue,
-    RecordedChange,
-    RoleLabels,
-} from "./activity";
+import type { AuditEventRow, RoleLabels } from "./activity";
+import { personName, roleName } from "./activity";
+import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
     FIELD_PHRASES,
     fieldsOf,
     moduleName,
-    personName,
     record,
     recordedChanges,
-    roleName,
     text,
-} from "./activity";
+} from "./activity-changes";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
