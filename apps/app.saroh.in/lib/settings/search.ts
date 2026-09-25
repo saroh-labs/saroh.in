@@ -53,6 +53,7 @@ const team = (label: string, value: string): SettingsEntry => ({
 /** In the design's order: Business by its tabs, then Team, Modules, Providers. */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
+    business("Logo", "identity"),
     business("Legal name", "identity"),
     business("Type of business", "identity"),
     business("Country", "identity"),
