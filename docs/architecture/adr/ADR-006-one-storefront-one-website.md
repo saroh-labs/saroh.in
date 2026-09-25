@@ -1,6 +1,6 @@
 # ADR-006 — One storefront and one website per business, for now
 
-**Status:** Accepted — 2026-09-22
+**Status:** Accepted — 2026-09-22 · **superseded for storefronts** by [ADR-010](./ADR-010-several-storefronts-one-catalogue.md) (2026-09-25); the one-website cap stands
 **Part of:** [#386](https://github.com/saroh-labs/saroh.in/issues/386) — the CRUD flows for every module
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-003](./ADR-003-organization-modules.md) (modules) · [ADR-004](./ADR-004-site-owns-a-post.md) (a Site owns a Post) · DEC-014 (entitlements)
 
