@@ -97,12 +97,59 @@
   `paymentRefundId`, so the refund path and the refund webhook make one),
   `correctOrderInvoiceForEdit`, `invoiceSupersededPayment`,
   `creditRestOfOrder`. Lock order: order, intent, invoice — the webhook
-  (intent, then invoice) never takes them the other way. Never write an order's
-  `Invoice` rows anywhere else.
+  (intent, then invoice) never takes them the other way; the full order,
+  with stock and refunds, is under "Orders and the shelf" below. Never write
+  an order's `Invoice` rows anywhere else.
 - **Every owed or spent sum over invoices spreads `OWED_WHERE`**
   (`invoice-state.ts`): no order paper, no credit notes.
 - **A registered business's `Order.tax` is informational** — the GST inside
   the total, never added to it (`gstInsideOrder`).
+
+## Orders and the shelf — **Current** (#511, DEC-032)
+
+- **One lock order, every flow:** Order → StockLevel rows (sorted by id,
+  `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
+  A status change (cancel, fulfil), the kitchen, an edit, a refund request
+  and the refund webhook all take the order's row lock first. The refund
+  webhook resolves the order id from the intent **without** a lock, then
+  locks the Order and its shelves (`lockOrderShelves`), and only then the
+  refund row (`matchRefund`) — so it and a cancel on the same order take
+  turns instead of deadlocking. The one flow that starts earlier is a paid
+  online order (`reserveOnPayment`): intent → Order → StockLevel, never an
+  intent while it holds a row.
+- **Every stock move of an order goes through `stock/reserve.ts`** on the
+  caller's transaction; `orders/order-inventory.ts` maps a status change
+  onto it. A line holds `heldQuantity` on the row it recorded: release(n)
+  gives back min(n, held), and fulfilling sells what it still holds, not
+  its quantity — so a line refund, a cancel, a kitchen undo and an edit
+  combine without releasing twice. Holding is a promise (no log entry);
+  selling, a kitchen undo and a return are shelf changes (SOLD, REVERSED,
+  RETURNED entries). A line placed while its product counted no stock is
+  `NONE` for life.
+- **Staff orders hold when made**, under the rows' locks with a conditional
+  can-sell update; the refusal is the storefront's words from
+  `stock/stock-words.ts` — "Sourdough — Sold out", "… — Only 2 left at Hill
+  Road". An online order holds only when paid: `reserveOnPayment` is
+  idempotent per intent, and a payment that lost the last unit records one
+  refusal (`CAPTURED_NEEDS_REFUND`) and one PENDING refund of the whole
+  payment keyed `sold-out:<intent>`, sent after commit
+  (`PaymentsService.sendAutomaticRefund`) and confirmed by the refund
+  webhook (DEC-026).
+- **A refund moves stock only in the transaction that moves it into
+  SUCCEEDED** — the provider's word, never the request — so a redelivered
+  webhook changes nothing. By line, each line gives back min(refunded,
+  held); a line already fulfilled holds nothing. "Put N back in stock"
+  (`PaymentRefundLine.putBackQuantity`, off unless asked, checked when the
+  refund is asked for: never more than the line sold less what refunds put
+  back) writes a RETURNED entry then; a refund that fails puts nothing back.
+  A line-less refund (the provider's dashboard) releases only when it brings
+  the order to fully refunded; an edit's difference never does.
+- **A kitchen undo of a fulfilment** reverses each line's sale and holds it
+  again, refused once a line has a confirmed refund or the order a RETURNED
+  entry. An edit refuses a variant the order's storefront doesn't sell and
+  writes no entries.
+- **Subscriptions, plans, bookings and class packs never touch product
+  stock.**
 
 ## Paying an invoice from a link — **Current**
 
