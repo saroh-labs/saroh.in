@@ -32,7 +32,7 @@ export default async function ProvidersSettingsPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                breadcrumb={["Workspace", "Providers"]}
+                breadcrumb={["Settings", "Providers"]}
                 title="Providers"
             />
             {/* Three outcomes, three states. "Nothing to show" was previously

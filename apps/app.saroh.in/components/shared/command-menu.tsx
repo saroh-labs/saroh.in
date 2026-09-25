@@ -30,7 +30,13 @@ import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 
 import type { NavAction, NavRole } from "./nav-items";
-import { WEBSITE_HREF, navCan, navFor } from "./nav-items";
+import {
+    NOTIFICATIONS_NAV,
+    WEBSITE_HREF,
+    navCan,
+    navFor,
+    settingsPagesFor,
+} from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -468,6 +474,52 @@ export function CommandMenu({
                         </CommandGroup>
                     );
                 })}
+                {/*
+                 * The settings screen's tabs. The rail offers one Settings row
+                 * now, so its pages are listed here, matched on their own
+                 * names and on "settings".
+                 */}
+                {(() => {
+                    const pages = settingsPagesFor({
+                        role,
+                        actions: permissions,
+                    }).filter(
+                        (page) => matches("Settings") || matches(page.label),
+                    );
+                    if (pages.length === 0) return null;
+                    return (
+                        <CommandGroup heading="Settings">
+                            {pages.map((page) => (
+                                <CommandItem
+                                    key={page.href}
+                                    value={page.href}
+                                    onSelect={() => go(page.href)}
+                                >
+                                    <page.icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    {page.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    );
+                })()}
+                {/*
+                 * Notifications left the rail for the top bar, so the nav
+                 * groups above no longer carry it; it stays one search away.
+                 */}
+                {navCan(
+                    { role, actions: permissions },
+                    NOTIFICATIONS_NAV.action,
+                ) && matches(NOTIFICATIONS_NAV.label) ? (
+                    <CommandGroup heading="You">
+                        <CommandItem
+                            value={NOTIFICATIONS_NAV.href}
+                            onSelect={() => go(NOTIFICATIONS_NAV.href)}
+                        >
+                            <NOTIFICATIONS_NAV.icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                            {NOTIFICATIONS_NAV.label}
+                        </CommandItem>
+                    </CommandGroup>
+                ) : null}
                 {/*
                  * The merchant's own things, flattened out of the tree the
                  * rail draws (#212). This menu read `group.items` alone, so

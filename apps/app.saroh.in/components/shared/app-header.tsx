@@ -4,6 +4,7 @@ import Link from "next/link";
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
 import { HelpLink } from "@/components/shared/help-link";
+import { NotificationsLink } from "@/components/shared/notifications-link";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserMenu } from "@/components/shared/user-menu";
@@ -13,7 +14,8 @@ import type { Organization } from "@/lib/organizations/service";
  * The top bar, across the full width above the rail (the "Saroh Products
  * Screen" design). Left: the mark, a slash, and the business switcher — the
  * business is the one scope above a screen, so it is said once, here. Right:
- * search, help, and your account. Everything else is the rail's job.
+ * search, notifications, help, and your account. Everything else is the
+ * rail's job.
  *
  * It sits on Paper with the rail, so the working area below is the one white
  * surface. Presentational: `AppShell` fetches session, organization and
@@ -32,6 +34,11 @@ type AppHeaderProps =
           user: HeaderUser;
           organizations: Organization[];
           activeOrg: Organization | null;
+          /**
+           * Unread notifications, or `null` when the actor may not read
+           * them — then there is no bell.
+           */
+          unread: number | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -52,7 +59,7 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, user } = props;
+    const { organizations, activeOrg, user, unread } = props;
 
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
@@ -78,6 +85,7 @@ export function AppHeader(props: AppHeaderProps) {
             ) : null}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 <CommandTrigger />
+                {unread !== null ? <NotificationsLink unread={unread} /> : null}
                 <HelpLink />
                 <ThemeToggle />
                 {/* Renders nothing while only one skin is offered. */}

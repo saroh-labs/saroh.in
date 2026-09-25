@@ -31,12 +31,13 @@ const ownerNav = (moduleKeys: string[] | null = EVERYTHING) =>
 const labels = (tabs: { label: string }[]) => tabs.map((t) => t.label);
 
 describe("seats", () => {
-    it("seats Home, Sell, Notifications and Insights by default", () => {
+    it("seats Home, Sell, Calendar and Insights by default", () => {
+        // Notifications is in the top bar (2026-09-25); Calendar has its seat.
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Notifications",
+            "Calendar",
             "Insights",
         ]);
         expect(nav.tabs).toHaveLength(TAB_SEATS);
@@ -51,7 +52,7 @@ describe("seats", () => {
             "Home",
             "Payments",
             "Sell",
-            "Notifications",
+            "Calendar",
         ]);
     });
 
@@ -60,14 +61,14 @@ describe("seats", () => {
             "Home",
             "Sell",
             "Calendar",
-            "Notifications",
+            "Insights",
         ]);
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/commerce/orders",
         });
         const tabs = labels(nav.tabs);
-        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Notifications"]);
+        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Insights"]);
         expect(new Set(tabs).size).toBe(tabs.length);
         expect(tabs).toHaveLength(TAB_SEATS);
     });
@@ -81,7 +82,7 @@ describe("seats", () => {
             "Home",
             "Calendar",
             "Sell",
-            "Notifications",
+            "Insights",
         ]);
         expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
             true,
@@ -182,15 +183,15 @@ describe("the sheet", () => {
         const workspace = nav.groups.find((g) => g.label === WORKSPACE_HEADING);
         const rowLabels = workspace?.rows.map((r) => r.label) ?? [];
         expect(rowLabels).toContain("Website");
-        expect(rowLabels).toContain("Team");
+        expect(rowLabels).toContain("Settings");
         for (const seated of labels(nav.tabs)) {
             expect(rowLabels).not.toContain(seated);
         }
-        const team = groups
+        const settings = groups
             .flatMap((g) => g.items)
-            .find((i) => i.label === "Team");
-        expect(workspace?.rows.find((r) => r.label === "Team")?.icon).toBe(
-            team?.icon,
+            .find((i) => i.label === "Settings");
+        expect(workspace?.rows.find((r) => r.label === "Settings")?.icon).toBe(
+            settings?.icon,
         );
     });
 
@@ -251,9 +252,10 @@ describe("counts", () => {
             unread: 5,
         });
         expect(nav.tabs.find((t) => t.label === "Sell")?.count).toBe(4);
-        expect(nav.tabs.find((t) => t.label === "Notifications")?.count).toBe(
-            5,
-        );
+        // Unread rides on the top bar's bell now, not on a tab.
+        expect(
+            nav.tabs.find((t) => t.label === "Notifications"),
+        ).toBeUndefined();
     });
 
     it("sums on More what is waiting only in the sheet", () => {

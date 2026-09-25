@@ -99,6 +99,7 @@ test.describe("a reviewer", () => {
         }
         for (const gone of [
             "/notifications",
+            "/settings",
             "/settings/organization",
             "/settings/people",
             "/settings/modules",

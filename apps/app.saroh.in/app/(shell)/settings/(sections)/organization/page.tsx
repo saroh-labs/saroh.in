@@ -34,7 +34,7 @@ export default async function OrganizationSettingsPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                breadcrumb={["Workspace", "Business"]}
+                breadcrumb={["Settings", "Business"]}
                 title="Business"
             />
             {settings ? (

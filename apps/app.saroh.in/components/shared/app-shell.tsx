@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
+import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
 import { TabBar } from "@/components/shared/tab-bar";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
@@ -160,6 +161,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 user={session.user}
                 organizations={organizations}
                 activeOrg={activeOrg}
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
             />
             <div className="flex min-h-0 flex-1">
                 <AppSidebar

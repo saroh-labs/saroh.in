@@ -19,7 +19,7 @@ export default async function ModulesSettingsPage() {
 
     return (
         <PageContainer>
-            <PageHeader breadcrumb={["Workspace", "Modules"]} title="Modules" />
+            <PageHeader breadcrumb={["Settings", "Modules"]} title="Modules" />
             <ModuleCatalog modules={modules} />
         </PageContainer>
     );

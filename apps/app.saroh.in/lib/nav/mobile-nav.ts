@@ -28,7 +28,7 @@ export const TAB_SEATS = 4;
 export const DEFAULT_PREFERENCE = [
     "Home",
     "Sell",
-    "Notifications",
+    "Calendar",
     "Insights",
 ] as const;
 
@@ -99,12 +99,17 @@ const pagesOf = (item: NavItem) =>
  */
 export function seatPreference(currentSection: string | null): string[] {
     if (!currentSection) return [...DEFAULT_PREFERENCE];
-    return [
-        "Home",
-        currentSection,
-        currentSection === "Sell" ? "Calendar" : "Sell",
-        "Notifications",
-    ];
+    // Notifications moved to the top bar (2026-09-25), so its seat goes to
+    // the next of the design's defaults not already seated.
+    return Array.from(
+        new Set([
+            "Home",
+            currentSection,
+            currentSection === "Sell" ? "Calendar" : "Sell",
+            "Calendar",
+            "Insights",
+        ]),
+    );
 }
 
 /** The one plain row that holds the second seat while you are on it. */

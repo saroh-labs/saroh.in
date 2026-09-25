@@ -194,7 +194,7 @@ export function TeamScreen({
                 content, as the design spaces them. */}
             <div className="space-y-3">
                 <PageHeader
-                    breadcrumb={["Workspace", "Team"]}
+                    breadcrumb={["Settings", "Team"]}
                     title="Team"
                     description="Who can reach this business, and what each role may open."
                     className="mb-0"

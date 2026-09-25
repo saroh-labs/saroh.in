@@ -8,11 +8,13 @@ import {
     isNavChildCurrent,
     isNavItemActive,
     isNavSectionActive,
+    navCan,
     navCountFor,
     navFor,
     navPathname,
     navRoleCan,
     navRowsForModule,
+    settingsPagesFor,
 } from "@/components/shared/nav-items";
 
 /**
@@ -155,6 +157,10 @@ describe("navRoleCan", () => {
     });
 });
 
+/** The settings tabs an actor is offered, by address. */
+const tabsFor = (actor: Parameters<typeof settingsPagesFor>[0]) =>
+    settingsPagesFor(actor).map((page) => page.href);
+
 describe("what each role is offered", () => {
     it("offers an owner the whole workspace", () => {
         const offered = hrefs(
@@ -164,8 +170,16 @@ describe("what each role is offered", () => {
                 sites: SITES,
             }),
         );
-        expect(offered).toContain("/settings/providers");
-        expect(offered).toContain("/notifications");
+        // Settings is one rail row; its pages are the settings screen's tabs,
+        // and Notifications is in the top bar (2026-09-25).
+        expect(offered).toContain("/settings");
+        expect(offered).not.toContain("/notifications");
+        expect(tabsFor({ role: "OWNER" })).toEqual([
+            "/settings/organization",
+            "/settings/people",
+            "/settings/modules",
+            "/settings/providers",
+        ]);
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_2");
     });
@@ -193,11 +207,12 @@ describe("what each role is offered", () => {
                 sites: SITES,
             }),
         );
-        expect(offered).toContain("/settings/people");
-        expect(offered).toContain("/settings/modules");
-        expect(offered).not.toContain("/notifications");
-        expect(offered).not.toContain("/settings/providers");
-        expect(offered).not.toContain("/settings/organization");
+        expect(offered).toContain("/settings");
+        expect(tabsFor({ role: "MEMBER" })).toEqual([
+            "/settings/people",
+            "/settings/modules",
+        ]);
+        expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
         expect(offered).not.toContain("/sites/new");
         expect(offered).not.toContain("/sites/site_1");
@@ -334,11 +349,11 @@ describe("what the two filters each answer", () => {
         // not. Neither filter can answer the other's question.
         const noModules = filterNavGroups(NAV_GROUPS, []);
         expect(hrefs(filterNavGroupsByRole(noModules, "OWNER"))).toContain(
-            "/settings/modules",
+            "/settings",
         );
         expect(
             hrefs(filterNavGroupsByRole(NAV_GROUPS, "REVIEWER")),
-        ).not.toContain("/settings/modules");
+        ).not.toContain("/settings");
     });
 
     it("shows the full nav to every role when availability is unknown", () => {
@@ -371,11 +386,13 @@ describe("navFor — an invented role", () => {
                 sites,
             }),
         );
-        expect(hrefs).toContain("/settings/people");
-        expect(hrefs).toContain("/settings/modules");
-        expect(hrefs).not.toContain("/settings/organization");
-        expect(hrefs).not.toContain("/settings/providers");
-        expect(hrefs).not.toContain("/notifications");
+        expect(hrefs).toContain("/settings");
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["member:read", "module:read"],
+            }),
+        ).toEqual(["/settings/people", "/settings/modules"]);
     });
 
     it("can offer MORE than the floor the role maps to", () => {
@@ -388,8 +405,14 @@ describe("navFor — an invented role", () => {
             }),
         );
         // Business details is OWNER/ADMIN in the shipped map. A business may
-        // grant it to a role it invented, and the rail has to follow.
-        expect(hrefs).toContain("/settings/organization");
+        // grant it to a role it invented, and the tabs have to follow.
+        expect(hrefs).toContain("/settings");
+        expect(
+            tabsFor({
+                role: "MEMBER",
+                actions: ["org:settings:read", "member:read"],
+            }),
+        ).toEqual(["/settings/organization", "/settings/people"]);
     });
 
     it("falls back to the role map when permissions were not loaded", () => {

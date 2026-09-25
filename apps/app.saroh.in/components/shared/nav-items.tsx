@@ -11,6 +11,7 @@ import {
     KanbanSquare,
     Plug,
     ReceiptText,
+    Settings,
     Store,
     Target,
     Users,
@@ -263,7 +264,7 @@ export interface NavItem {
     label: string;
     icon: LucideIcon;
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
-    action?: NavAction;
+    action?: NavAction | readonly NavAction[];
     /**
      * The merchant's own things beneath this destination (their sites, today).
      *
@@ -572,35 +573,23 @@ export const NAV_GROUPS: NavGroup[] = [
              * named the payment and messaging providers the business runs on to
              * anyone who was not a MEMBER, REVIEWER included (#313).
              */
+            /*
+             * One Settings row (2026-09-25). Its four pages are tabs on the
+             * settings screen itself (`SETTINGS_PAGES`), so the rail does not
+             * repeat them. Offered when the actor may open any one of them;
+             * `/settings` then opens the first they may. Notifications moved
+             * to the top bar (`NOTIFICATIONS_NAV`).
+             */
             {
-                href: "/notifications",
-                label: "Notifications",
-                icon: Bell,
-                action: "notification:read",
-            },
-            {
-                href: "/settings/organization",
-                label: "Business",
-                icon: Building2,
-                action: "org:settings:read",
-            },
-            {
-                href: "/settings/people",
-                label: "Team",
-                icon: Users,
-                action: "member:read",
-            },
-            {
-                href: "/settings/modules",
-                label: "Modules",
-                icon: Blocks,
-                action: "module:read",
-            },
-            {
-                href: "/settings/providers",
-                label: "Providers",
-                icon: Plug,
-                action: "provider:read",
+                href: "/settings",
+                label: "Settings",
+                icon: Settings,
+                action: [
+                    "org:settings:read",
+                    "member:read",
+                    "module:read",
+                    "provider:read",
+                ],
             },
         ],
     },
@@ -970,8 +959,64 @@ export function isNavSectionActive(
     );
 }
 
+/**
+ * The settings screen's tabs, in order (2026-09-25): the business, who is on
+ * it, what it runs, and what those depend on. The settings layout draws them
+ * as vertical tabs and the command menu lists them, each only for an actor
+ * who may open it — the same actions the rail row checks.
+ */
+export const SETTINGS_PAGES = [
+    {
+        href: "/settings/organization",
+        label: "Business",
+        icon: Building2,
+        action: "org:settings:read",
+    },
+    {
+        href: "/settings/people",
+        label: "Team",
+        icon: Users,
+        action: "member:read",
+    },
+    {
+        href: "/settings/modules",
+        label: "Modules",
+        icon: Blocks,
+        action: "module:read",
+    },
+    {
+        href: "/settings/providers",
+        label: "Providers",
+        icon: Plug,
+        action: "provider:read",
+    },
+] as const satisfies readonly Pick<
+    NavItem,
+    "href" | "label" | "icon" | "action"
+>[];
+
+/** The settings pages this actor may open, in tab order. */
+export function settingsPagesFor(actor: {
+    role: NavRole | null;
+    actions?: readonly string[] | null;
+}) {
+    return SETTINGS_PAGES.filter((page) => navCan(actor, page.action));
+}
+
 /** The Notifications item carries a live unread badge; identify it by route. */
 export const NOTIFICATIONS_HREF = "/notifications";
+
+/**
+ * Notifications lives in the top bar, not the rail (2026-09-25): it is about
+ * you, not a part of the business. The bell and the command menu both read
+ * it here, with the same permission the rail used.
+ */
+export const NOTIFICATIONS_NAV = {
+    href: NOTIFICATIONS_HREF,
+    label: "Notifications",
+    icon: Bell,
+    action: "notification:read",
+} as const satisfies Pick<NavItem, "href" | "label" | "icon" | "action">;
 
 /**
  * What is waiting behind one destination: unread for Notifications, the Home
