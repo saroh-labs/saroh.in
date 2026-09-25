@@ -16,6 +16,7 @@ jest.mock("@saroh/database", () => {
             },
             user: { findMany: jest.fn() },
             organizationInvitation: { findMany: jest.fn() },
+            membership: { findMany: jest.fn() },
         },
     };
 });
@@ -32,6 +33,7 @@ const deleteMany = prisma.auditEvent.deleteMany as jest.Mock;
 const findMany = prisma.auditEvent.findMany as jest.Mock;
 const findUsers = prisma.user.findMany as jest.Mock;
 const findInvitations = prisma.organizationInvitation.findMany as jest.Mock;
+const findMemberships = prisma.membership.findMany as jest.Mock;
 
 describe("AuditService.record", () => {
     let service: AuditService;
@@ -130,6 +132,7 @@ describe("AuditService.listForOrganization", () => {
         }));
         findMany.mockResolvedValue(rows);
         findUsers.mockResolvedValue([]);
+        findMemberships.mockResolvedValue([]);
 
         const result = await service.listForOrganization("org_1", {
             limit: 5000,
@@ -171,6 +174,7 @@ describe("AuditService.listForOrganization — who each event names", () => {
         });
         expect(findUsers).not.toHaveBeenCalled();
         expect(findInvitations).not.toHaveBeenCalled();
+        expect(findMemberships).not.toHaveBeenCalled();
     });
 
     it("names actors and targets in one query each, as they are now", async () => {
@@ -204,6 +208,10 @@ describe("AuditService.listForOrganization — who each event names", () => {
         findInvitations.mockResolvedValue([
             { id: "inv_1", email: "meera@rye.in" },
         ]);
+        findMemberships.mockResolvedValue([
+            { userId: "u_priya", role: "OWNER" },
+            { userId: "u_aditya", role: "MEMBER" },
+        ]);
 
         const { events } = await service.listForOrganization("org_1");
 
@@ -218,18 +226,59 @@ describe("AuditService.listForOrganization — who each event names", () => {
             where: { id: { in: ["inv_1"] }, organizationId: "org_1" },
             select: { id: true, email: true },
         });
+        // Their role in THIS business now, in the same one-query-per-kind.
+        expect(findMemberships).toHaveBeenCalledTimes(1);
+        expect(findMemberships.mock.calls[0][0].where.organizationId).toBe(
+            "org_1",
+        );
         expect(events.map((e) => [e.actor, e.target])).toEqual([
             [
-                { name: "Priya", email: "priya@rye.in" },
-                { name: null, email: "aditya@rye.in" },
+                { name: "Priya", email: "priya@rye.in", role: "OWNER" },
+                { name: null, email: "aditya@rye.in", role: "MEMBER" },
             ],
             [
-                { name: "Priya", email: "priya@rye.in" },
-                { name: null, email: "meera@rye.in" },
+                { name: "Priya", email: "priya@rye.in", role: "OWNER" },
+                { name: null, email: "meera@rye.in", role: null },
             ],
             // Someone no longer there is null, and an organization is not a
             // person.
             [null, null],
         ]);
+    });
+});
+
+describe("AuditService.listForOrganization — what a change recorded", () => {
+    it("returns the metadata as recorded: the fields and their values", async () => {
+        jest.clearAllMocks();
+        const metadata = {
+            fields: ["invoicePrefix", "contactEmail"],
+            changes: [{ field: "invoicePrefix", before: "INV", after: "RC" }],
+        };
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                action: "profile.update",
+                actorUserId: "u_priya",
+                targetType: "organization",
+                targetId: "org_1",
+                metadata,
+            },
+        ]);
+        findUsers.mockResolvedValue([
+            { id: "u_priya", name: "Priya", email: "priya@rye.in" },
+        ]);
+        findMemberships.mockResolvedValue([]);
+
+        const { events } = await new AuditService().listForOrganization(
+            "org_1",
+        );
+
+        expect(events[0].metadata).toEqual(metadata);
+        // Someone who has left keeps their name, with no role here.
+        expect(events[0].actor).toEqual({
+            name: "Priya",
+            email: "priya@rye.in",
+            role: null,
+        });
     });
 });

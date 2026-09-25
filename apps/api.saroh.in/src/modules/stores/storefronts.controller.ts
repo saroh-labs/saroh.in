@@ -56,7 +56,12 @@ export class StorefrontsController {
         @Body() dto: UpdateStorefrontDto,
     ) {
         authorize(ctx, "store:write");
-        return this.storefronts.update(ctx.organizationId, storeId, dto);
+        return this.storefronts.update(
+            ctx.organizationId,
+            storeId,
+            dto,
+            ctx.userId,
+        );
     }
 
     @Delete(":storeId")

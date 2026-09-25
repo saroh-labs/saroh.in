@@ -3,11 +3,20 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { recordableChanges } from "../audit/audit-changes";
+import {
+    AuditAction,
+    AuditOutcome,
+    AuditService,
+} from "../audit/audit.service";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
+import { openingHoursText } from "./opening-hours-text";
 import type { OpeningHoursDay, UpdateStorefrontDto } from "./storefronts.dto";
 
 /** What the schema falls back to before a storefront ever saves settings. */
@@ -79,6 +88,9 @@ export interface StorefrontSettings extends StorefrontSummary {
  */
 @Injectable()
 export class StorefrontsService {
+    // Optional so the unit specs build it bare; the module provides it.
+    constructor(@Optional() private readonly audit?: AuditService) {}
+
     async list(organizationId: string): Promise<StorefrontSummary[]> {
         const stores = await prisma.store.findMany({
             where: { organizationId, deletedAt: null },
@@ -165,10 +177,16 @@ export class StorefrontsService {
         };
     }
 
+    /**
+     * `actorUserId` is who is saving, for the audit row a change of hours
+     * writes; without one (a caller that is not a person) nothing is
+     * recorded.
+     */
     async update(
         organizationId: string,
         storeId: string,
         dto: UpdateStorefrontDto,
+        actorUserId?: string,
     ): Promise<StorefrontSettings> {
         const current = await this.get(organizationId, storeId);
 
@@ -297,7 +315,45 @@ export class StorefrontsService {
             }
         });
 
-        return this.get(organizationId, storeId);
+        const saved = await this.get(organizationId, storeId);
+        if (dto.openingHours !== undefined && actorUserId) {
+            await this.recordHours(organizationId, actorUserId, current, saved);
+        }
+        return saved;
+    }
+
+    /**
+     * A change of opening hours in Settings › Activity (#509): the week
+     * before and after, as text, and which storefront. A save that leaves
+     * the week as it was records nothing.
+     */
+    private async recordHours(
+        organizationId: string,
+        actorUserId: string,
+        before: StorefrontSettings,
+        after: StorefrontSettings,
+    ): Promise<void> {
+        const changes = recordableChanges([
+            {
+                field: "openingHours",
+                before: openingHoursText(before.openingHours),
+                after: openingHoursText(after.openingHours),
+            },
+        ]);
+        if (changes.length === 0) return;
+        await this.audit?.record({
+            action: AuditAction.StorefrontHoursUpdate,
+            actorUserId,
+            organizationId,
+            targetType: "storefront",
+            targetId: after.id,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: ["openingHours"],
+                storefront: after.name,
+                changes: changes as unknown as Prisma.InputJsonArray,
+            },
+        });
     }
 
     /**

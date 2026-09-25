@@ -79,6 +79,8 @@ describe("ModuleLifecycleService", () => {
                     action: "organization.module.enabled",
                     actorUserId: "user_1",
                     targetId: "CRM",
+                    // Named as the business reads it, for Activity (#509).
+                    metadata: { module: "CRM", enabled: true },
                 }),
             }),
         );
@@ -141,6 +143,7 @@ describe("ModuleLifecycleService", () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     action: "organization.module.disabled",
+                    metadata: { module: "Website", enabled: false },
                 }),
             }),
         );

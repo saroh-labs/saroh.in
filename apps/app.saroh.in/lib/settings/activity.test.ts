@@ -135,6 +135,105 @@ describe("activityLine — settings saves", () => {
     });
 });
 
+describe("activityLine — values a save recorded (#509)", () => {
+    it("says a short value in the sentence", () => {
+        expect(
+            said({
+                actor: priya,
+                metadata: {
+                    fields: ["invoicePrefix"],
+                    changes: [
+                        { field: "invoicePrefix", before: "INV", after: "RC" },
+                    ],
+                },
+            }),
+        ).toBe("Priya changed the invoice prefix to RC → Tax and invoices");
+    });
+
+    it("says a cleared value, a GST registration and a logo in words", () => {
+        const one = (field: string, before: unknown, after: unknown) =>
+            said({
+                metadata: {
+                    fields: [field],
+                    changes: [{ field, before, after }],
+                },
+            });
+        expect(one("deliverySacCode", "996813", null)).toBe(
+            "Sanjay cleared the delivery SAC → Tax and invoices",
+        );
+        expect(one("gstRegistered", false, true)).toBe(
+            "Sanjay registered the business for GST → Tax and invoices",
+        );
+        expect(one("logo", null, "removed")).toBe(
+            "Sanjay removed the logo → Identity",
+        );
+    });
+
+    it("leaves a long value to the sheet", () => {
+        expect(
+            said({
+                metadata: {
+                    fields: ["addressLine1", "city"],
+                    changes: [
+                        {
+                            field: "registeredAddress",
+                            before: null,
+                            after: "14 Hill Road, Indiranagar, Bengaluru 560038",
+                        },
+                    ],
+                },
+            }),
+        ).toBe("Sanjay updated the registered address → Address");
+    });
+
+    it("names every field when a save changed several, values or not", () => {
+        expect(
+            said({
+                metadata: {
+                    fields: ["invoicePrefix", "contactEmail"],
+                    changes: [
+                        { field: "invoicePrefix", before: "INV", after: "RC" },
+                    ],
+                },
+            }),
+        ).toBe(
+            "Sanjay updated the invoice prefix and the contact email → Tax and invoices",
+        );
+    });
+
+    it("says opening hours, modules and plans", () => {
+        expect(
+            said({
+                action: "storefront.hours.update",
+                targetType: "storefront",
+                metadata: { fields: ["openingHours"], changes: [] },
+            }),
+        ).toBe("Sanjay changed the opening hours → Hours");
+        expect(
+            said({
+                action: "organization.module.enabled",
+                targetType: "module",
+                targetId: "PAYMENTS",
+                metadata: { module: "Payments", enabled: true },
+            }),
+        ).toBe("Sanjay switched on Payments → Modules");
+        // A row from before the name was recorded says the key in words.
+        expect(
+            said({
+                action: "organization.module.disabled",
+                targetId: "COMMERCE",
+                metadata: null,
+            }),
+        ).toBe("Sanjay switched off Commerce → Modules");
+        expect(
+            said({
+                action: "organization.plan.changed",
+                metadata: { from: "Free", to: "Pro" },
+            }),
+        ).toBe("Sanjay moved the plan from Free to Pro → Plan and billing");
+    });
+});
+
 describe("activityLine — the team", () => {
     it("names who was invited, and as what", () => {
         expect(

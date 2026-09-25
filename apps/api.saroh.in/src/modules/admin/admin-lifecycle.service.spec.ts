@@ -287,6 +287,29 @@ describe("AdminLifecycleService — plan, trial and limits", () => {
         );
     });
 
+    it("tells the business's own history which plan it moved to (#509)", async () => {
+        planFind.mockResolvedValue({ ...pro, name: "Pro" });
+        subFind.mockResolvedValue({
+            planId: "plan_free",
+            provider: null,
+            plan: { name: "Free" },
+        });
+        const { service } = build();
+        await service.changePlan({
+            staff,
+            organizationId: "org_1",
+            reason: "Upgrade agreed on call",
+            planId: "plan_pro",
+        });
+        expect(tenantAudit).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "organization.plan.changed",
+                organizationId: "org_1",
+                metadata: { from: "Free", to: "Pro", byOperator: true },
+            }),
+        });
+    });
+
     it("refuses a plan that is no longer offered", async () => {
         planFind.mockResolvedValue({ ...pro, active: false });
         const { service } = build();

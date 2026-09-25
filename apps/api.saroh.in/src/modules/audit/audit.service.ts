@@ -25,6 +25,12 @@ export const AuditAction = {
     ProductReviewReply: "product-review.reply",
     ProductReviewHide: "product-review.hide",
     ProductReviewUnhide: "product-review.unhide",
+    // Written by `ModuleLifecycleService` inside its own transaction; listed
+    // here so the read can ask for them.
+    ModuleEnable: "organization.module.enabled",
+    ModuleDisable: "organization.module.disabled",
+    PlanChange: "organization.plan.changed",
+    StorefrontHoursUpdate: "storefront.hours.update",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -110,9 +116,11 @@ export class AuditService {
      * only the settings ones, not a review being hidden).
      *
      * Each event carries who did it — and, for a membership or an invitation,
-     * who it was about — as they are NOW: the row stores bare ids by design,
-     * so names are looked up at read time, in one query per kind, never
-     * written into the append-only stream. The reader already holds
+     * who it was about — as they are NOW, with their current role: the row
+     * stores bare ids by design, so names and roles are looked up at read
+     * time, in one query per kind, never written into the append-only
+     * stream. Its `metadata` comes back as recorded: the fields a settings
+     * save touched, and for newer saves their values before and after. The reader already holds
      * `audit:read` (Owner/Admin), who see the same names and invited
      * addresses on the Team page.
      */
@@ -164,10 +172,16 @@ export class AuditService {
                 invitationIds.add(event.targetId);
             }
         }
-        const [users, invitations] = await Promise.all([
+        const [users, memberships, invitations] = await Promise.all([
             prisma.user.findMany({
                 where: { id: { in: [...userIds] } },
                 select: { id: true, name: true, email: true },
+            }),
+            // Their role here now — the role key, which the reader names —
+            // and none for someone no longer on the team.
+            prisma.membership.findMany({
+                where: { organizationId, userId: { in: [...userIds] } },
+                select: { userId: true, role: true },
             }),
             invitationIds.size > 0
                 ? prisma.organizationInvitation.findMany({
@@ -178,11 +192,19 @@ export class AuditService {
                   })
                 : Promise.resolve([]),
         ]);
+        const roles = new Map(memberships.map((m) => [m.userId, m.role]));
         const people = new Map<string, AuditPerson>(
-            users.map((u) => [u.id, { name: u.name, email: u.email }]),
+            users.map((u) => [
+                u.id,
+                { name: u.name, email: u.email, role: roles.get(u.id) ?? null },
+            ]),
         );
         for (const invitation of invitations) {
-            people.set(invitation.id, { name: null, email: invitation.email });
+            people.set(invitation.id, {
+                name: null,
+                email: invitation.email,
+                role: null,
+            });
         }
         return events.map((event) => ({
             ...event,
@@ -201,6 +223,11 @@ export class AuditService {
 export interface AuditPerson {
     name: string | null;
     email: string;
+    /**
+     * Their role key in this business now ("ADMIN", or one it invented);
+     * null for someone no longer on the team, or an invitation.
+     */
+    role: string | null;
 }
 
 /** An audit row as the read endpoint returns it: the row, and who it names. */

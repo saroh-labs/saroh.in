@@ -1,8 +1,18 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Optional,
+} from "@nestjs/common";
 import type { Plan, Subscription } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import {
+    AuditAction,
+    AuditOutcome,
+    AuditService,
+} from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
 import type { CancelSubscriptionDto, SubscribeDto } from "./dto";
 import { PlansService } from "./plans.service";
@@ -34,6 +44,8 @@ export class SubscriptionsService {
         private readonly plans: PlansService,
         @Inject(BILLING_PROVIDER_FACTORY)
         private readonly providers: BillingProviderFactory,
+        // Optional so the unit specs build it bare; the module provides it.
+        @Optional() private readonly audit?: AuditService,
     ) {}
 
     /** The org's current subscription (with its plan), or null if unsubscribed. */
@@ -61,10 +73,30 @@ export class SubscriptionsService {
         authorize(ctx, "billing:manage");
 
         const plan = await this.plans.resolveActiveByKey(dto.planKey);
+        const was = await prisma.subscription.findUnique({
+            where: { organizationId: ctx.organizationId },
+            select: { planId: true, plan: { select: { name: true } } },
+        });
 
-        return plan.priceCents === 0
-            ? this.subscribeFree(ctx, plan)
-            : this.subscribePaid(ctx, plan, dto.provider);
+        const subscription =
+            plan.priceCents === 0
+                ? await this.subscribeFree(ctx, plan)
+                : await this.subscribePaid(ctx, plan, dto.provider);
+
+        // A change of plan, from what to what, by the plans' names (#509).
+        // Resubscribing to the plan it is on changes nothing to report.
+        if (was?.planId !== plan.id) {
+            await this.audit?.record({
+                action: AuditAction.PlanChange,
+                actorUserId: ctx.userId,
+                organizationId: ctx.organizationId,
+                targetType: "subscription",
+                targetId: subscription.id,
+                outcome: AuditOutcome.Success,
+                metadata: { from: was?.plan.name ?? null, to: plan.name },
+            });
+        }
+        return subscription;
     }
 
     /**

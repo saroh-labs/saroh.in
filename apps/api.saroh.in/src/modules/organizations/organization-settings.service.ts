@@ -3,10 +3,12 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { recordableChanges } from "../audit/audit-changes";
 import {
     AuditAction,
     AuditOutcome,
@@ -29,6 +31,7 @@ import {
 } from "./business-tax-settings";
 import type { UpdateOrganizationDto } from "./dto";
 import { authorize } from "./organization-policy";
+import { settingsChanges, settingsSnapshot } from "./settings-audit";
 
 /** The org's editable identity: display name plus optional business profile. */
 export interface OrganizationSettings {
@@ -269,7 +272,19 @@ export class OrganizationSettingsService {
             return this.read(ctx.organizationId);
         }
 
-        const settings = await prisma.$transaction(async (tx) => {
+        const read = {
+            where: { id: ctx.organizationId },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                businessProfile: { select: PROFILE_SELECT },
+            },
+        } as const;
+        const { settings, before } = await prisma.$transaction(async (tx) => {
+            // As it was, inside the write's own transaction, so the audit
+            // row's "before" is what this save replaced.
+            const before = await tx.organization.findUnique(read);
             if (dto.name !== undefined) {
                 await tx.organization.update({
                     where: { id: ctx.organizationId },
@@ -289,23 +304,18 @@ export class OrganizationSettingsService {
                 });
             }
 
-            const organization = await tx.organization.findUnique({
-                where: { id: ctx.organizationId },
-                select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                    businessProfile: { select: PROFILE_SELECT },
-                },
-            });
+            const organization = await tx.organization.findUnique(read);
             if (!organization) {
                 throw new NotFoundException("Organization not found");
             }
-            return organization;
+            return { settings: organization, before };
         });
 
-        // Field NAMES only, never values: the profile carries tax ids and
-        // contact emails, and the audit stream must stay PII-free (S1-009).
+        // Every field by name, as older readers expect; the business details
+        // also as they were and became. What may carry a value is decided in
+        // one place (`audit/audit-changes.ts`): never the contact email or
+        // the website, which stay names only (S1-009).
+        const now = new Date();
         await this.audit.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
@@ -313,7 +323,14 @@ export class OrganizationSettingsService {
             targetType: "organization",
             targetId: ctx.organizationId,
             outcome: AuditOutcome.Success,
-            metadata: { fields: changed },
+            metadata: {
+                fields: changed,
+                changes: settingsChanges(
+                    changed,
+                    settingsSnapshot(before, now),
+                    settingsSnapshot(settings, now),
+                ) as unknown as Prisma.InputJsonArray,
+            },
         });
 
         return {
@@ -358,12 +375,16 @@ export class OrganizationSettingsService {
             });
         }
         const data = { logoMediaId: media.id, logoUrl: media.url };
+        const had = await prisma.businessProfile.findUnique({
+            where: { organizationId: ctx.organizationId },
+            select: { logoUrl: true },
+        });
         await prisma.businessProfile.upsert({
             where: { organizationId: ctx.organizationId },
             create: { organizationId: ctx.organizationId, ...data },
             update: data,
         });
-        await this.recordLogo(ctx);
+        await this.recordLogo(ctx, had?.logoUrl ? "changed" : "added");
         return this.read(ctx.organizationId);
     }
 
@@ -380,11 +401,18 @@ export class OrganizationSettingsService {
             },
             data: { logoMediaId: null, logoUrl: null },
         });
-        if (count > 0) await this.recordLogo(ctx);
+        if (count > 0) await this.recordLogo(ctx, "removed");
         return this.read(ctx.organizationId);
     }
 
-    private recordLogo(ctx: OrganizationContext) {
+    /**
+     * The logo by what happened to it — never its address, which is a
+     * storage URL, not something a person reads.
+     */
+    private recordLogo(
+        ctx: OrganizationContext,
+        what: "added" | "changed" | "removed",
+    ) {
         return this.audit.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
@@ -392,7 +420,12 @@ export class OrganizationSettingsService {
             targetType: "organization",
             targetId: ctx.organizationId,
             outcome: AuditOutcome.Success,
-            metadata: { fields: ["logo"] },
+            metadata: {
+                fields: ["logo"],
+                changes: recordableChanges([
+                    { field: "logo", before: null, after: what },
+                ]) as unknown as Prisma.InputJsonArray,
+            },
         });
     }
 

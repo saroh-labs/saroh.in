@@ -22,6 +22,9 @@ import type { ReactNode } from "react";
  * reads and links; changes happen on the record's own page. Escape, the
  * backdrop and Close all close it, and focus goes back to the row that
  * opened it (Radix returns it to the trigger).
+ *
+ * `side="bottom"` rises from the foot of the screen instead, at most 85% of
+ * its height with rounded top corners — how a phone shows it.
  */
 export function QuickLook({
     open,
@@ -33,6 +36,7 @@ export function QuickLook({
     footer,
     titleClassName,
     leading,
+    side = "right",
     children,
 }: {
     open: boolean;
@@ -50,13 +54,21 @@ export function QuickLook({
     titleClassName?: string;
     /** Before the title: a subscriber's initials. Decorative. */
     leading?: ReactNode;
+    /** Where it comes in from: the right (the default), or the bottom. */
+    side?: "right" | "bottom";
     children: ReactNode;
 }) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
+                side={side}
                 closeButton={false}
-                className="flex w-full flex-col gap-0 bg-background p-0 focus:outline-none sm:max-w-[460px]"
+                className={cn(
+                    "flex w-full flex-col gap-0 bg-background p-0 focus:outline-none",
+                    side === "bottom"
+                        ? "max-h-[85dvh] overflow-hidden rounded-t-2xl"
+                        : "sm:max-w-[460px]",
+                )}
                 // Focus lands on the sheet, not its first link, so nothing
                 // opens already ringed; Tab moves in from there.
                 onOpenAutoFocus={(e) => {
