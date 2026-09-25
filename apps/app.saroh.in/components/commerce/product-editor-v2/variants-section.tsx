@@ -472,7 +472,7 @@ export function VariantsSection({
                             })}
                         </div>
                         <Link
-                            href={productSettingsHref(storeId, "options")}
+                            href={productSettingsHref("options")}
                             className="text-[12px] text-brand hover:text-foreground"
                         >
                             Manage options

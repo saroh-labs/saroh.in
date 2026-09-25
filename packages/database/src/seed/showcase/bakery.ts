@@ -776,7 +776,6 @@ export async function seedBakery(
             update: { name, position: i },
             create: {
                 id: rowId,
-                storeId,
                 organizationId: orgId,
                 name,
                 position: i,
@@ -788,11 +787,12 @@ export async function seedBakery(
     const categoryId: Record<string, string> = {};
     for (const c of CATEGORIES) {
         const row = await prisma.category.upsert({
-            where: { storeId_slug: { storeId, slug: c.key } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.key },
+            },
+            update: { name: c.name },
             create: {
                 id: sid("category", c.key),
-                storeId,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.key,

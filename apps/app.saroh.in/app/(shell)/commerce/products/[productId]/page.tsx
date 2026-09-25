@@ -74,7 +74,7 @@ export default async function ProductPage({
     const view = query.view === "customer" ? "customer" : "team";
     // The details sheet picks a category; only a writer opens it.
     const categories = overview.canWrite
-        ? await listCategories(store.id).catch(() => [])
+        ? await listCategories().catch(() => [])
         : [];
     // A hint for which controls to draw; the API decides regardless.
     const may = (action: string) =>

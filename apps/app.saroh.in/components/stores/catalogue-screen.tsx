@@ -404,12 +404,7 @@ export function CatalogueScreen({
                     first ? (
                         <>
                             <Button variant="outline" asChild>
-                                <Link
-                                    href={productSettingsHref(
-                                        store?.id ??
-                                            (many ? undefined : first.id),
-                                    )}
-                                >
+                                <Link href={productSettingsHref()}>
                                     <Settings2 className="mr-1.5 size-4" />
                                     Settings
                                 </Link>

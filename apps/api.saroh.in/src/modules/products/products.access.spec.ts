@@ -1,6 +1,7 @@
-import { NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { CatalogueAccess } from "../catalogue/catalogue-access";
 import { CatalogueService } from "../catalogue/catalogue.service";
 import { OptionsService } from "../catalogue/options.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -26,8 +27,14 @@ describe("products area access by role (DB)", () => {
     const products = new ProductsService(stores);
     const overview = new ProductOverviewService(products, stores);
     const inventory = new InventoryService(products);
-    const options = new OptionsService(stores);
-    const catalogue = new CatalogueService(stores, options);
+    const options = new OptionsService();
+    const catalogue = new CatalogueService(options);
+    const access = new CatalogueAccess(stores);
+    // The settings through the storefront's address, as the app reads them.
+    const settingsVia = async (userId: string) => {
+        const scope = await access.readViaStore(storeId, userId);
+        return catalogue.get(scope.organizationId, scope.canWrite);
+    };
 
     const users: Record<string, string> = {};
     let orgId = "";
@@ -86,7 +93,7 @@ describe("products area access by role (DB)", () => {
     it("a Member reads the product page and the settings", async () => {
         const view = await overview.get(storeId, productId, users.MEMBER);
         expect(view.canWrite).toBe(false);
-        const settings = await catalogue.get(storeId, users.MEMBER);
+        const settings = await settingsVia(users.MEMBER);
         expect(settings.canWrite).toBe(false);
     });
 
@@ -97,21 +104,26 @@ describe("products area access by role (DB)", () => {
         await expect(
             inventory.upsert(storeId, productId, users.MEMBER, { quantity: 3 }),
         ).rejects.toThrow(NotFoundException);
+        // Settings say why (#529): the Member can see them, not change them.
         await expect(
-            options.create(storeId, users.MEMBER, { name: "Shade" }),
-        ).rejects.toThrow(NotFoundException);
+            access
+                .writeViaStore(storeId, users.MEMBER)
+                .then((org) => options.create(org, { name: "Shade" })),
+        ).rejects.toThrow(ForbiddenException);
         await expect(
-            catalogue.saveDefaults(storeId, users.MEMBER, {
-                entries: [{ key: "all", lowStockAlert: 5 }],
-            }),
-        ).rejects.toThrow(NotFoundException);
+            access.writeViaStore(storeId, users.MEMBER).then((org) =>
+                catalogue.saveDefaults(org, {
+                    entries: [{ key: "all", lowStockAlert: 5 }],
+                }),
+            ),
+        ).rejects.toThrow(ForbiddenException);
     });
 
     it("a Reviewer does not open products", async () => {
         await expect(
             overview.get(storeId, productId, users.REVIEWER),
         ).rejects.toThrow(NotFoundException);
-        await expect(catalogue.get(storeId, users.REVIEWER)).rejects.toThrow(
+        await expect(settingsVia(users.REVIEWER)).rejects.toThrow(
             NotFoundException,
         );
     });
@@ -121,10 +133,13 @@ describe("products area access by role (DB)", () => {
             mrp: "999",
         });
         expect(after.mrp).toBe("999.00");
-        const created = await options.create(storeId, users.ADMIN, {
-            name: "Size",
-            values: ["50 ml"],
-        });
+        const created = await options.create(
+            await access.writeViaStore(storeId, users.ADMIN),
+            {
+                name: "Size",
+                values: ["50 ml"],
+            },
+        );
         expect(created.id).toBeTruthy();
         const view = await overview.get(storeId, productId, users.ADMIN);
         expect(view.canWrite).toBe(true);

@@ -31,12 +31,10 @@ const SHOWN = 8;
  * two the same SKU is refused with the part that would fix it.
  */
 export function SkuTab({
-    storeId,
     settings,
     preview: initialPreview,
     canWrite,
 }: {
-    storeId: string;
     settings: SkuSettings;
     preview: SkuPreview | null;
     canWrite: boolean;
@@ -67,7 +65,7 @@ export function SkuTab({
         if (patternProblem(pattern)) return;
         let live = true;
         const t = setTimeout(() => {
-            void previewSkuPattern(storeId, pattern.trim()).then((p) => {
+            void previewSkuPattern(pattern.trim()).then((p) => {
                 if (live && p) setPreview(p);
             });
         }, 300);
@@ -75,7 +73,7 @@ export function SkuTab({
             live = false;
             clearTimeout(t);
         };
-    }, [pattern, storeId]);
+    }, [pattern]);
 
     const rows = preview?.rows ?? [];
     const counts: Partial<Record<string, number>> = {};
@@ -85,7 +83,7 @@ export function SkuTab({
         if (problem || !dirty) return;
         const before = saved;
         start(async () => {
-            const res = await saveSkuPattern(storeId, pattern.trim(), suggest);
+            const res = await saveSkuPattern(pattern.trim(), suggest);
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -97,7 +95,6 @@ export function SkuTab({
                 () =>
                     start(async () => {
                         const undo = await saveSkuPattern(
-                            storeId,
                             before.pattern,
                             before.suggest,
                         );

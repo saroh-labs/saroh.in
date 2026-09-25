@@ -1,12 +1,10 @@
 import {
     BadRequestException,
-    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { StoresService } from "../stores/stores.service";
 import type { FieldType } from "./field-rules";
 import { checkFieldValue, FIELD_TYPES, fieldNameProblem } from "./field-rules";
 
@@ -37,20 +35,14 @@ const asType = (t: string): FieldType =>
  * Custom fields (#482): things a product records beyond the standard
  * details, asked of the products in the categories each names. Team only
  * unless switched on for the shop. A deleted field keeps its values (the
- * row is soft-deleted), so Undo brings back everything typed into it.
+ * row is soft-deleted), so Undo brings back everything typed into it. The
+ * fields are the business's (#529), asked of every storefront's products.
  */
 @Injectable()
 export class FieldsService {
-    constructor(private readonly stores: StoresService) {}
-
-    async list(storeId: string, userId: string): Promise<FieldView[]> {
-        await this.stores.getForUser(storeId, userId);
-        return this.views(storeId);
-    }
-
-    async views(storeId: string): Promise<FieldView[]> {
+    async views(organizationId: string): Promise<FieldView[]> {
         const fields = await prisma.productField.findMany({
-            where: { storeId, deletedAt: null },
+            where: { organizationId, deletedAt: null },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             select: {
                 id: true,
@@ -63,7 +55,7 @@ export class FieldsService {
         });
         const counts = await prisma.product.groupBy({
             by: ["categoryId"],
-            where: { storeId, categoryId: { not: null } },
+            where: { store: { organizationId }, categoryId: { not: null } },
             _count: { _all: true },
         });
         const inCategory = new Map<string, number>();
@@ -88,19 +80,16 @@ export class FieldsService {
     }
 
     async create(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         input: { name: string; type: FieldType },
     ): Promise<FieldView> {
-        const organizationId = await this.requireOrg(storeId, userId);
         const name = input.name.trim();
-        await this.assertName(storeId, name);
+        await this.assertName(organizationId, name);
         const position = await prisma.productField.count({
-            where: { storeId, deletedAt: null },
+            where: { organizationId, deletedAt: null },
         });
         const field = await prisma.productField.create({
             data: {
-                storeId,
                 organizationId,
                 name,
                 type: input.type,
@@ -108,28 +97,25 @@ export class FieldsService {
             },
             select: { id: true },
         });
-        return this.one(storeId, field.id);
+        return this.one(organizationId, field.id);
     }
 
     async update(
-        storeId: string,
+        organizationId: string,
         fieldId: string,
-        userId: string,
         input: { name?: string; onShop?: boolean; categoryIds?: string[] },
     ): Promise<FieldView> {
-        await this.requireOrg(storeId, userId);
-        await this.requireField(storeId, fieldId);
+        await this.requireField(organizationId, fieldId);
         if (input.name !== undefined) {
-            await this.assertName(storeId, input.name.trim(), fieldId);
+            await this.assertName(organizationId, input.name.trim(), fieldId);
         }
         if (input.categoryIds) {
             const found = await prisma.category.count({
-                where: { storeId, id: { in: input.categoryIds } },
+                where: { organizationId, id: { in: input.categoryIds } },
             });
             if (found !== new Set(input.categoryIds).size) {
                 throw new BadRequestException({
-                    message:
-                        "A category in the list is not in this storefront.",
+                    message: "A category in the list is not one of yours.",
                     field: "categoryIds",
                 });
             }
@@ -160,13 +146,12 @@ export class FieldsService {
                 });
             }
         });
-        return this.one(storeId, fieldId);
+        return this.one(organizationId, fieldId);
     }
 
     /** Soft: the field and its values come back with Undo. */
-    async remove(storeId: string, fieldId: string, userId: string) {
-        await this.requireOrg(storeId, userId);
-        const field = await this.requireField(storeId, fieldId);
+    async remove(organizationId: string, fieldId: string) {
+        const field = await this.requireField(organizationId, fieldId);
         await prisma.productField.update({
             where: { id: fieldId },
             data: { deletedAt: new Date() },
@@ -174,32 +159,38 @@ export class FieldsService {
         return { id: field.id, name: field.name };
     }
 
-    async restore(storeId: string, fieldId: string, userId: string) {
-        await this.requireOrg(storeId, userId);
+    async restore(organizationId: string, fieldId: string) {
         const field = await prisma.productField.findFirst({
-            where: { id: fieldId, storeId, deletedAt: { not: null } },
+            where: { id: fieldId, organizationId, deletedAt: { not: null } },
             select: { id: true, name: true },
         });
         if (!field) throw new NotFoundException("Field not found");
-        await this.assertName(storeId, field.name, fieldId);
+        await this.assertName(organizationId, field.name, fieldId);
         await prisma.productField.update({
             where: { id: fieldId },
             data: { deletedAt: null },
         });
-        return this.one(storeId, fieldId);
+        return this.one(organizationId, fieldId);
     }
 
-    private async one(storeId: string, fieldId: string): Promise<FieldView> {
-        const all = await this.views(storeId);
+    private async one(
+        organizationId: string,
+        fieldId: string,
+    ): Promise<FieldView> {
+        const all = await this.views(organizationId);
         const found = all.find((f) => f.id === fieldId);
         if (!found) throw new NotFoundException("Field not found");
         return found;
     }
 
-    private async assertName(storeId: string, name: string, except?: string) {
+    private async assertName(
+        organizationId: string,
+        name: string,
+        except?: string,
+    ) {
         const others = await prisma.productField.findMany({
             where: {
-                storeId,
+                organizationId,
                 deletedAt: null,
                 ...(except ? { id: { not: except } } : {}),
             },
@@ -214,44 +205,26 @@ export class FieldsService {
         }
     }
 
-    private async requireField(storeId: string, fieldId: string) {
+    private async requireField(organizationId: string, fieldId: string) {
         const field = await prisma.productField.findFirst({
-            where: { id: fieldId, storeId, deletedAt: null },
+            where: { id: fieldId, organizationId, deletedAt: null },
             select: { id: true, name: true },
         });
         if (!field) throw new NotFoundException("Field not found");
         return field;
     }
-
-    private async requireOrg(storeId: string, userId: string): Promise<string> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (!writable) {
-            throw new ForbiddenException(
-                "Your role can't change product settings.",
-            );
-        }
-        if (!writable.organizationId) {
-            throw new BadRequestException(
-                "This storefront belongs to no business.",
-            );
-        }
-        return writable.organizationId;
-    }
 }
 
 /** The fields a product's category asks for, with the product's values. */
 export async function productFieldsFor(
-    storeId: string,
+    organizationId: string,
     productId: string,
     categoryId: string | null,
 ): Promise<ProductFieldDto[]> {
     if (!categoryId) return [];
     const fields = await prisma.productField.findMany({
         where: {
-            storeId,
+            organizationId,
             deletedAt: null,
             categories: { some: { categoryId } },
         },
@@ -274,28 +247,24 @@ export async function productFieldsFor(
 }
 
 /**
- * A product's values, from the section PATCH: each checked against its
- * field's type, "" or null clearing it. A field from another storefront, or
- * a deleted one, is refused.
- */
-/**
- * Check custom field values without writing: every id is one of this
- * storefront's live fields and every value suits its type. Create runs it
- * before the product exists, so a refused value never leaves one behind.
+ * Check custom field values without writing: every id is one of the
+ * business's live fields and every value suits its type, "" or null clearing
+ * it. Create runs it before the product exists, so a refused value never
+ * leaves one behind; another business's field, or a deleted one, is refused.
  */
 export async function checkProductFieldValues(
-    storeId: string,
+    organizationId: string,
     values: Record<string, string | null>,
 ): Promise<{ fieldId: string; value: string | null }[]> {
     const ids = Object.keys(values);
     if (ids.length === 0) return [];
     const fields = await prisma.productField.findMany({
-        where: { storeId, deletedAt: null, id: { in: ids } },
+        where: { organizationId, deletedAt: null, id: { in: ids } },
         select: { id: true, name: true, type: true },
     });
     if (fields.length !== ids.length) {
         throw new BadRequestException({
-            message: "A field in the list is not one of this storefront's.",
+            message: "A field in the list is not one of yours.",
             field: "customFields",
         });
     }
@@ -312,12 +281,11 @@ export async function checkProductFieldValues(
 }
 
 export async function saveProductFieldValues(
-    storeId: string,
-    productId: string,
     organizationId: string,
+    productId: string,
     values: Record<string, string | null>,
 ): Promise<void> {
-    const cleaned = await checkProductFieldValues(storeId, values);
+    const cleaned = await checkProductFieldValues(organizationId, values);
     if (cleaned.length === 0) return;
     await prisma.$transaction(
         cleaned.map(({ fieldId, value }) =>

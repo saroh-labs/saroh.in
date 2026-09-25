@@ -1,24 +1,34 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
+import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
 import { StoresModule } from "../stores/stores.module";
 import { AllergensService } from "./allergens.service";
-import { CatalogueController } from "./catalogue.controller";
+import { CatalogueAccess } from "./catalogue-access";
+import { OrganizationCatalogueController } from "./catalogue.controller";
 import { CatalogueService } from "./catalogue.service";
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
 import { SkuService } from "./sku.service";
+import { CatalogueController } from "./store-catalogue.controller";
 
 @Module({
-    imports: [StoresModule, CapabilitiesModule],
-    controllers: [CatalogueController],
+    imports: [
+        StoresModule,
+        CapabilitiesModule,
+        forwardRef(() => OrganizationsModule),
+    ],
+    controllers: [OrganizationCatalogueController, CatalogueController],
     providers: [
+        CatalogueAccess,
         CatalogueService,
         OptionsService,
         SkuService,
         FieldsService,
         AllergensService,
+        OrganizationGuard,
     ],
-    exports: [CatalogueService],
+    exports: [CatalogueService, CatalogueAccess],
 })
 export class CatalogueModule {}

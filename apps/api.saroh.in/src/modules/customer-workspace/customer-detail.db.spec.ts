@@ -32,7 +32,7 @@ const availability = {
 } as unknown as ModuleAvailabilityService;
 
 const stores = new StoresService(new FeatureFlagService());
-const allergens = new AllergensService(stores);
+const allergens = new AllergensService();
 const details = new CustomerDetailService(availability);
 const notes = new ContactNotesService();
 const workspace = new CustomerWorkspaceService(availability);
@@ -186,7 +186,7 @@ describe("Customer detail (DB)", () => {
     });
 
     it("keeps a note's allergens, and refuses to remove one a note names", async () => {
-        const [nuts] = await allergens.add(storeId, ownerId, ["Nuts"]);
+        const [nuts] = await allergens.add(ctx.organizationId, ["Nuts"]);
 
         const note = await notes.create(ctx, contactId, {
             body: "Severe nut allergy",
@@ -198,21 +198,22 @@ describe("Customer detail (DB)", () => {
         expect(detail.allergens).toEqual([{ id: nuts.id, name: "Nuts" }]);
 
         await expect(
-            allergens.remove(storeId, nuts.id, ownerId),
+            allergens.remove(ctx.organizationId, nuts.id),
         ).rejects.toThrow(
             "Nuts is in 1 customer note — take it off them first.",
         );
 
         await notes.remove(ctx, contactId, note.id);
         await expect(
-            allergens.remove(storeId, nuts.id, ownerId),
+            allergens.remove(ctx.organizationId, nuts.id),
         ).resolves.toEqual({ id: nuts.id, name: "Nuts" });
     });
 
     it("matches a note's allergen on every storefront that lists the same name", async () => {
-        // Two storefronts each keep their own "Peanuts" (#508 R6): a note
-        // written against the first must still warn on the second's order.
-        const [peanuts, sesame] = await allergens.add(storeId, ownerId, [
+        // Storefronts kept their own lists (#508 R6); until the #529 backfill
+        // merges them a business can hold two "Peanuts", and a note written
+        // against one must still warn on an order that names the other.
+        const [peanuts, sesame] = await allergens.add(ctx.organizationId, [
             "Peanuts",
             "Sesame",
         ]);
@@ -303,7 +304,7 @@ describe("Customer detail (DB)", () => {
 
         await expect(
             notes.create(ctx, contactId, { allergenIds: [mustard.id] }),
-        ).rejects.toThrow(/not on your storefront's allergen list/);
+        ).rejects.toThrow(/not on your allergen list/);
         expect(await prisma.contactNote.count({ where: { contactId } })).toBe(
             0,
         );

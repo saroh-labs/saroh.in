@@ -1,5 +1,5 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getJson, getList } from "@/lib/api/http";
+import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
 
 /**
  * Catalog data access for app.saroh.in — products, categories, variants, and
@@ -266,10 +266,14 @@ export function deleteProduct(storeId: string, productId: string) {
     return mutate(`/stores/${storeId}/products/${productId}`, "DELETE");
 }
 
-// ---- Categories ----
+// ---- Categories: the business's (#529), whatever storefront sells ----
 
-export function listCategories(storeId: string): Promise<Category[]> {
-    return getList<Category>(`/stores/${storeId}/categories`);
+const NO_BUSINESS = "Pick a business first, then try again.";
+
+export async function listCategories(): Promise<Category[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return getList<Category>(`${base}/catalogue/categories`);
 }
 
 export interface CategoryInput {
@@ -278,20 +282,36 @@ export interface CategoryInput {
     parentId?: string | null;
 }
 
-export function createCategory(storeId: string, input: CategoryInput) {
-    return mutate(`/stores/${storeId}/categories`, "POST", input);
+export async function createCategory(
+    input: CategoryInput,
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(`${base}/catalogue/categories`, "POST", input);
 }
 
-export function updateCategory(
-    storeId: string,
+export async function updateCategory(
     categoryId: string,
     input: CategoryInput,
-) {
-    return mutate(`/stores/${storeId}/categories/${categoryId}`, "PUT", input);
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(
+        `${base}/catalogue/categories/${encodeURIComponent(categoryId)}`,
+        "PUT",
+        input,
+    );
 }
 
-export function deleteCategory(storeId: string, categoryId: string) {
-    return mutate(`/stores/${storeId}/categories/${categoryId}`, "DELETE");
+export async function deleteCategory(
+    categoryId: string,
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(
+        `${base}/catalogue/categories/${encodeURIComponent(categoryId)}`,
+        "DELETE",
+    );
 }
 
 // ---- Options (Settings → Options) ----
@@ -304,8 +324,10 @@ export interface ProductOptionView {
     values: { id: string; value: string; variantCount: number }[];
 }
 
-export function listOptions(storeId: string): Promise<ProductOptionView[]> {
-    return getList<ProductOptionView>(`/stores/${storeId}/options`);
+export async function listOptions(): Promise<ProductOptionView[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return getList<ProductOptionView>(`${base}/catalogue/options`);
 }
 
 // ---- Variants ----

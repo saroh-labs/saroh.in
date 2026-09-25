@@ -36,12 +36,12 @@ export async function loadEditorContext(
         defaults,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
-        listCategories(store.id),
-        listOptions(store.id).catch(() => []),
+        listCategories(),
+        listOptions().catch(() => []),
         resolveActiveOrganization(),
-        getSkuSettings(store.id, product?.id).catch(() => null),
-        listAllergens(store.id).catch(() => null),
-        getEffectiveDefaults(store.id, product?.categoryId ?? null).catch(
+        getSkuSettings(product?.id).catch(() => null),
+        listAllergens().catch(() => null),
+        getEffectiveDefaults(product?.categoryId ?? null).catch(
             (error: unknown) => {
                 // A forbidden() or redirect from the read is the page's to
                 // handle, not a failure to fall back from.
@@ -55,7 +55,7 @@ export async function loadEditorContext(
         storeName: store.name,
         currency: settings?.currency ?? "INR",
         categories: categories.map((c) => ({ id: c.id, name: c.name })),
-        categoriesHref: productCategoriesHref(store.id),
+        categoriesHref: productCategoriesHref(),
         options,
         canWrite: canWriteProducts(organization),
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },

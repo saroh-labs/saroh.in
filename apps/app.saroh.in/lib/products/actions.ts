@@ -49,20 +49,17 @@ export async function deleteProduct(storeId: string, productId: string) {
     return deleteProductApi(storeId, productId);
 }
 
-export async function createCategory(storeId: string, input: CategoryInput) {
-    return createCategoryApi(storeId, input);
+/** A category of the business (#529), made from any storefront's product. */
+export async function createCategory(input: CategoryInput) {
+    return createCategoryApi(input);
 }
 
-export async function updateCategory(
-    storeId: string,
-    categoryId: string,
-    input: CategoryInput,
-) {
-    return updateCategoryApi(storeId, categoryId, input);
+export async function updateCategory(categoryId: string, input: CategoryInput) {
+    return updateCategoryApi(categoryId, input);
 }
 
-export async function deleteCategory(storeId: string, categoryId: string) {
-    return deleteCategoryApi(storeId, categoryId);
+export async function deleteCategory(categoryId: string) {
+    return deleteCategoryApi(categoryId);
 }
 
 export async function createVariant(

@@ -19,7 +19,7 @@ const strangerEmail = `prod-stranger-${process.pid}@example.com`;
 describe("Products catalog (dev DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
     const products = new ProductsService(stores);
-    const categories = new CategoriesService(stores);
+    const categories = new CategoriesService();
     const variants = new VariantsService(products);
     const inventory = new InventoryService(products);
 
@@ -69,11 +69,11 @@ describe("Products catalog (dev DB)", () => {
     });
 
     it("creates a category", async () => {
-        const res = await categories.create(storeId, ownerId, {
+        const res = await categories.create(orgId, {
             name: "Apparel",
         });
         categoryId = res.id;
-        const list = await categories.list(storeId, ownerId);
+        const list = await categories.list(orgId);
         expect(list.some((c) => c.id === categoryId)).toBe(true);
     });
 
@@ -168,13 +168,13 @@ describe("Products catalog (dev DB)", () => {
     });
 
     it("rejects a category cycle", async () => {
-        const child = await categories.create(storeId, ownerId, {
+        const child = await categories.create(orgId, {
             name: "Shirts",
             parentId: categoryId,
         });
         // Make the parent a child of its own child → loop.
         await expect(
-            categories.update(storeId, categoryId, ownerId, {
+            categories.update(orgId, categoryId, {
                 name: "Apparel",
                 slug: "apparel",
                 parentId: child.id,
@@ -184,7 +184,7 @@ describe("Products catalog (dev DB)", () => {
 
     it("blocks deleting a category that has children", async () => {
         await expect(
-            categories.remove(storeId, categoryId, ownerId),
+            categories.remove(orgId, categoryId),
         ).rejects.toBeInstanceOf(ConflictException);
     });
 

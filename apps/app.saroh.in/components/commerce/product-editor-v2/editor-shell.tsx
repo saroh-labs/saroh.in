@@ -118,7 +118,7 @@ function EditorBody({
     async function categoryChanged(categoryId: string) {
         if (!creating) return;
         categoryAsked.current = categoryId;
-        const next = await effectiveDefaults(storeId, categoryId || null).catch(
+        const next = await effectiveDefaults(categoryId || null).catch(
             () => null,
         );
         // Only the latest pick counts; a slower earlier answer is dropped.

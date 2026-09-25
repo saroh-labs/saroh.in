@@ -19,11 +19,12 @@ import type { ContactNoteDto } from "./dto";
  * contain" exactly. Each id is checked against the organization's list
  * before anything is written; a note needs text, an allergen, or both.
  *
- * Every storefront keeps its own list, so "Peanuts" on one is a different id
- * from "Peanuts" on the next (#508 R6). A note is written with one id per
- * name; when it is read, each named allergen is widened to every storefront's
- * allergen of the same name (`matchAllergens`), so the banner warns on an
- * order from any storefront — including one opened after the note.
+ * The allergen list is the business's (#529): one "Peanuts", whatever
+ * storefront sells the product, so a note's allergen warns on an order from
+ * any storefront. Storefronts kept their own lists before that (#508 R6), and
+ * until the #529 backfill has merged them a business can still hold two rows
+ * of one name; so when a note is read, each named allergen is widened to
+ * every allergen of the same name in the business (`matchAllergens`).
  *
  * Reading needs `contact:read` — a Member at the counter must see an allergy.
  * Writing needs `contact:write` (Owner/Admin today).
@@ -98,13 +99,13 @@ export async function loadContactNotes(
     );
 }
 
-/** An allergen's name as storefronts are compared: "peanuts " is "Peanuts". */
+/** An allergen's name as lists are compared: "peanuts " is "Peanuts". */
 const allergenKey = (name: string) => name.trim().toLowerCase();
 
 /**
- * Widen each note's allergens to every storefront's allergen of the same
- * name, so matching stays by id (ADR-008) and still crosses storefronts.
- * Read fresh each time: a storefront added later is covered with no backfill.
+ * Widen each note's allergens to every allergen of the same name in the
+ * business, so matching stays by id (ADR-008) and covers rows of one name
+ * the #529 backfill has not merged yet. Read fresh each time.
  */
 async function withMatches(
     db: typeof prisma,
@@ -162,10 +163,10 @@ async function withAuthors(
 }
 
 /**
- * The allergens a note may name: every storefront's list in the
- * organization, one per name (the first storefront's id wins), in list order.
- * The chosen id stands for the name across storefronts: a read widens it to
- * every storefront's allergen of that name (`withMatches`).
+ * The allergens a note may name: the business's list, one per name (the
+ * first row's id wins where two share a name), in list order. The chosen id
+ * stands for the name: a read widens it to every allergen of that name
+ * (`withMatches`).
  */
 export async function allergenChoices(
     db: typeof prisma,
@@ -186,7 +187,7 @@ export async function allergenChoices(
 
 /**
  * Every allergen the notes name, once per name, in the order first named —
- * two notes naming two storefronts' "Peanuts" list it once.
+ * two notes naming two rows of "Peanuts" list it once.
  */
 export function notedAllergens(
     notes: ContactNoteView[],
@@ -344,7 +345,7 @@ export class ContactNotesService {
         if (found !== allergenIds.length) {
             throw new BadRequestException({
                 message:
-                    "An allergen in the note is not on your storefront's allergen list.",
+                    "An allergen in the note is not on your allergen list.",
                 field: "allergenIds",
             });
         }

@@ -307,6 +307,11 @@ model BusinessProfile {
   logoMedia   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
   logoUrl     String?
 
+  // Products (#484, the business's since #529): how the editor suggests a
+  // SKU. Null = the built-in pattern; suggestions off leave the SKU empty.
+  skuPattern String?
+  skuSuggest Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -767,11 +772,14 @@ model ProductImage {
   @@index([organizationId])
 }
 
-// Store-wide variant option names ("Size", "Shade") and their values.
+// The business's variant option names ("Size", "Shade") and their values.
 model ProductOption {
   id             String       @id @default(cuid())
-  storeId        String
-  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -783,8 +791,8 @@ model ProductOption {
 
   createdAt DateTime @default(now())
 
-  @@unique([storeId, name])
-  @@index([organizationId])
+  @@unique([organizationId, name])
+  @@index([storeId])
 }
 
 model ProductOptionValue {
@@ -807,8 +815,11 @@ model ProductOptionValue {
 // key is the category's id and a null field falls through to "all".
 model CatalogueDefaults {
   id             String       @id @default(cuid())
-  storeId        String
-  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -823,8 +834,8 @@ model CatalogueDefaults {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([storeId, key])
-  @@index([organizationId])
+  @@unique([organizationId, key])
+  @@index([storeId])
 }
 
 /// A thing a product records beyond the standard details (#482) — "Keeps
@@ -832,8 +843,11 @@ model CatalogueDefaults {
 /// Team only unless `onShop`. Deleting one keeps its values for 30 days.
 model ProductField {
   id             String       @id @default(cuid())
-  storeId        String
-  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -881,12 +895,15 @@ model ProductFieldValue {
   @@index([organizationId])
 }
 
-/// A storefront's allergen list (#483) — what the editor offers under
-/// "Contains" and "May contain". A new store starts with none.
+/// The business's allergen list (#483, #529) — what the editor offers under
+/// "Contains" and "May contain". A new business starts with none.
 model StoreAllergen {
   id             String       @id @default(cuid())
-  storeId        String
-  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -925,12 +942,15 @@ model ProductAllergen {
   @@index([organizationId])
 }
 
+// The business's product categories (#529): one list, whatever storefront
+// sells the product. Slugs are unique per business.
 model Category {
-  id             String        @id @default(cuid())
-  storeId        String
-  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  id             String       @id @default(cuid())
+  // The storefront it was first made at; nothing reads it (see ProductOption).
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   name     String
   slug     String
@@ -946,9 +966,8 @@ model Category {
   defaults      CatalogueDefaults[]
   fields        ProductFieldCategory[]
 
-  @@unique([storeId, slug])
+  @@unique([organizationId, slug])
   @@index([storeId])
-  @@index([organizationId])
 }
 
 // Inventory tracking
@@ -1475,8 +1494,8 @@ model StoreSettings {
   theme        String  @default("light") // light, dark, custom
   primaryColor String?
 
-  // Products (#484): how the editor suggests a SKU. Null = the built-in
-  // pattern; suggestions off leave the editor's SKU empty.
+  // Products (#484). Moved to the business (BusinessProfile, #529) and no
+  // longer read; dropped in a later deploy.
   skuPattern String?
   skuSuggest Boolean @default(true)
 

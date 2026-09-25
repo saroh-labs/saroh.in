@@ -35,13 +35,7 @@ import {
  * products value is used. Saved products keep theirs unless the merchant
  * chooses to update the ones still on the old value.
  */
-export function DefaultsTab({
-    storeId,
-    catalogue,
-}: {
-    storeId: string;
-    catalogue: CatalogueView;
-}) {
+export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { setDirty } = useUnsaved();
     const [pending, start] = useTransition();
@@ -80,7 +74,6 @@ export function DefaultsTab({
         if (problem || !dirty) return;
         start(async () => {
             const res = await saveDefaults(
-                storeId,
                 rows.map(toEntry),
                 applyExisting && hit.count > 0,
             );
@@ -98,7 +91,7 @@ export function DefaultsTab({
                     : "Defaults saved. Existing products keep their values.",
                 () =>
                     start(async () => {
-                        const undo = await undoDefaults(storeId, res.data);
+                        const undo = await undoDefaults(res.data);
                         if (!undo.ok) showError(undo.error);
                         router.refresh();
                     }),
