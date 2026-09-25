@@ -65,7 +65,10 @@ hour.
     may never have set those units aside. Where a row's open lines hold more
     than it promised, it shares what was promised out oldest order first,
     and a line left with nothing stops holding. It prints every row and line
-    it changed, and every row it left for Stock checks. Keep the output.
+    it changed, and every row it left for Stock checks. Keep the output. On
+    the dataset above it took 6.7 s, capping 16,000 rows. Run on the old
+    rows without the SQL copy, doing the whole copy itself, it took 18.7 s.
+    It works in chunks of 1,000 products or lines, one transaction each.
 
 4. **Verify** (read-only). Both queries must return no rows:
 

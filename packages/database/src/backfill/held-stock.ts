@@ -89,6 +89,7 @@ export async function heldStockMismatches(
             FROM "OrderItem" i
             JOIN "Order" o ON o.id = i."orderId"
             WHERE o.status::text = ANY(${open}::text[]) AND i."stockLevelId" IS NOT NULL
+              AND (${orgs}::text[] IS NULL OR o."organizationId" = ANY(${orgs}::text[]))
             GROUP BY i."stockLevelId"
         ) h ON h."stockLevelId" = s.id
         WHERE s.promised <> COALESCE(h.held, 0)
@@ -248,51 +249,62 @@ async function reconcileOrganization(
         throw new OrdersMoved();
     }
 
-    for (const line of found.lines) {
-        await tx.orderItem.update({
-            where: { id: line.orderItemId },
+    if (found.lines.length > 0) {
+        await tx.orderItem.updateMany({
+            where: { id: { in: found.lines.map((l) => l.orderItemId) } },
             data: { heldQuantity: 0 },
         });
-        report.strayLinesCleared.push(line);
+        report.strayLinesCleared.push(...found.lines);
     }
     // Clearing an open line on no row changes no row's sum; a closed line
     // never counted. So `found.rows` still stands.
-    for (const row of found.rows) {
-        if (row.held < row.promised) {
-            report.promisedMore.push(row);
-            continue;
-        }
-        const lines = await tx.$queryRaw<
-            {
-                id: string;
-                orderId: string;
-                createdAt: Date;
-                quantity: number;
-                heldQuantity: number;
-                soldQuantity: number;
-            }[]
-        >`
-            SELECT i.id, i."orderId", o."createdAt", i.quantity, i."heldQuantity", i."soldQuantity"
-            FROM "OrderItem" i
-            JOIN "Order" o ON o.id = i."orderId"
-            WHERE i."stockLevelId" = ${row.stockLevelId}
-              AND o.status::text = ANY(${[...OPEN_ORDER_STATUSES]}::text[])
-              AND i."heldQuantity" > 0
-            ORDER BY o."createdAt", o.id, i.id`;
+    const over = found.rows.filter((row) => row.held >= row.promised);
+    report.promisedMore.push(
+        ...found.rows.filter((row) => row.held < row.promised),
+    );
+    if (over.length === 0) return;
+    // Every open holding line on those rows, read once, oldest order first.
+    const lines = await tx.$queryRaw<
+        {
+            id: string;
+            stockLevelId: string;
+            orderId: string;
+            createdAt: Date;
+            quantity: number;
+            heldQuantity: number;
+            soldQuantity: number;
+        }[]
+    >`
+        SELECT i.id, i."stockLevelId", i."orderId", o."createdAt", i.quantity,
+               i."heldQuantity", i."soldQuantity"
+        FROM "OrderItem" i
+        JOIN "Order" o ON o.id = i."orderId"
+        WHERE i."stockLevelId" = ANY(${over.map((r) => r.stockLevelId)}::text[])
+          AND o.status::text = ANY(${[...OPEN_ORDER_STATUSES]}::text[])
+          AND i."heldQuantity" > 0
+        ORDER BY o."createdAt", o.id, i.id`;
+    const onRow = new Map<string, typeof lines>();
+    for (const line of lines) {
+        onRow.set(line.stockLevelId, [
+            ...(onRow.get(line.stockLevelId) ?? []),
+            line,
+        ]);
+    }
+    const cappedIds: string[] = [];
+    const keeps: number[] = [];
+    const unhelds: boolean[] = [];
+    for (const row of over) {
         let left = Math.max(0, row.promised);
         const capped: CappedLine[] = [];
-        for (const line of lines) {
+        for (const line of onRow.get(row.stockLevelId) ?? []) {
             const keep = Math.min(line.heldQuantity, left);
             left -= keep;
             if (keep === line.heldQuantity) continue;
             // A line that sold units keeps its row, so a return lands on it.
             const unheld = keep === 0 && line.soldQuantity === 0;
-            await tx.orderItem.update({
-                where: { id: line.id },
-                data: unheld
-                    ? { heldQuantity: 0, stockRow: "NONE", stockLevelId: null }
-                    : { heldQuantity: keep },
-            });
+            cappedIds.push(line.id);
+            keeps.push(keep);
+            unhelds.push(unheld);
             capped.push({
                 orderItemId: line.id,
                 orderId: line.orderId,
@@ -304,6 +316,18 @@ async function reconcileOrganization(
             });
         }
         report.capped.push({ ...row, lines: capped });
+    }
+    // One write for every capped line: an unheld one holds nothing and no
+    // longer names its row (stockRow NONE).
+    if (cappedIds.length > 0) {
+        await tx.$executeRaw`
+            UPDATE "OrderItem" AS i
+            SET "heldQuantity" = v."keep",
+                "stockRow" = CASE WHEN v."unheld" THEN 'NONE'::"StockRow" ELSE i."stockRow" END,
+                "stockLevelId" = CASE WHEN v."unheld" THEN NULL ELSE i."stockLevelId" END
+            FROM unnest(${cappedIds}::text[], ${keeps}::int[], ${unhelds}::boolean[])
+                AS v(id, "keep", "unheld")
+            WHERE i.id = v.id`;
     }
 }
 

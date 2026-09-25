@@ -41,14 +41,16 @@
  * Steps 3–5 need the new tables and are skipped before it.
  *
  * Idempotent: a second run finds nothing to do and changes nothing. Each
- * business runs in its own transaction. Run it right after the migration;
- * it is not a repair tool once the new code has written stock.
+ * business runs step by step in chunks of `CHUNK` products or order lines,
+ * each chunk one transaction that reads its rows once and writes them in a
+ * statement or two — a large business never holds one long transaction.
+ * Run it right after the migration; it is not a repair tool once the new
+ * code has written stock.
  *
  * Run: `pnpm --filter @saroh/database exec tsx src/backfill/listings-stock-levels.cli.ts`
  */
 import type { PrismaClient } from "@prisma/client";
 
-import type { TransactionClient } from "../transaction";
 import type { HeldStockReport } from "./held-stock";
 import { reconcileHeldStock } from "./held-stock";
 
@@ -74,6 +76,10 @@ export interface ListingsBackfillReport {
 
 const OPEN = ["PENDING", "PROCESSING"];
 const FULFILLED = ["SHIPPED", "DELIVERED"];
+
+/** Products or order lines per transaction. */
+const CHUNK = 1000;
+const CHUNK_TIMEOUT = { timeout: 120_000 };
 
 export async function backfillListingsStockLevels(
     db: PrismaClient,
@@ -102,14 +108,9 @@ export async function backfillListingsStockLevels(
         orderBy: { id: "asc" },
     });
     for (const org of orgs) {
-        await db.$transaction(
-            async (tx) => {
-                await listProducts(tx, org.id, report);
-                await copyStock(tx, org.id, report);
-                await linkOrderLines(tx, org.id, report);
-            },
-            { timeout: 120_000 },
-        );
+        await listProducts(db, org.id, report);
+        await copyStock(db, org.id, report);
+        await linkOrderLines(db, org.id, report);
     }
     report.heldStock = await reconcileHeldStock(db);
     return report;
@@ -213,80 +214,88 @@ async function suffixSlugs(
 // ---- 3. Listings ----
 
 async function listProducts(
-    tx: TransactionClient,
+    db: PrismaClient,
     organizationId: string,
     report: ListingsBackfillReport,
 ): Promise<void> {
-    const products = await tx.product.findMany({
-        where: {
-            organizationId,
-            storeId: { not: null },
-            listings: { none: {} },
-        },
-        select: {
-            id: true,
-            storeId: true,
-            createdAt: true,
-            variants: { select: { id: true } },
-        },
-        orderBy: { id: "asc" },
-    });
-    for (const product of products) {
-        if (!product.storeId) continue;
-        const listing = await tx.productListing.create({
-            data: {
-                organizationId,
-                storeId: product.storeId,
-                productId: product.id,
-                createdAt: product.createdAt,
-            },
-            select: { id: true },
-        });
-        report.listings += 1;
-        if (product.variants.length > 0) {
-            const made = await tx.productListingVariant.createMany({
-                data: product.variants.map((v) => ({
+    // Each chunk lists what it read, so the next read starts past it.
+    for (;;) {
+        const listed = await db.$transaction(async (tx) => {
+            const products = await tx.product.findMany({
+                where: {
                     organizationId,
-                    listingId: listing.id,
-                    productId: product.id,
-                    variantId: v.id,
-                })),
+                    storeId: { not: null },
+                    listings: { none: {} },
+                },
+                select: {
+                    id: true,
+                    storeId: true,
+                    createdAt: true,
+                    variants: { select: { id: true } },
+                },
+                orderBy: { id: "asc" },
+                take: CHUNK,
             });
-            report.listingVariants += made.count;
-        }
+            const made = await tx.productListing.createManyAndReturn({
+                data: products.flatMap((p) =>
+                    p.storeId
+                        ? [
+                              {
+                                  organizationId,
+                                  storeId: p.storeId,
+                                  productId: p.id,
+                                  createdAt: p.createdAt,
+                              },
+                          ]
+                        : [],
+                ),
+                select: { id: true, productId: true },
+            });
+            report.listings += made.length;
+            const listingOf = new Map(made.map((l) => [l.productId, l.id]));
+            const variants = await tx.productListingVariant.createMany({
+                data: products.flatMap((p) => {
+                    const listingId = listingOf.get(p.id);
+                    return listingId
+                        ? p.variants.map((v) => ({
+                              organizationId,
+                              listingId,
+                              productId: p.id,
+                              variantId: v.id,
+                          }))
+                        : [];
+                }),
+            });
+            report.listingVariants += variants.count;
+            return products.length;
+        }, CHUNK_TIMEOUT);
+        if (listed < CHUNK) return;
     }
 }
 
 // ---- 4. Stock ----
 
 async function copyStock(
-    tx: TransactionClient,
+    db: PrismaClient,
     organizationId: string,
     report: ListingsBackfillReport,
 ): Promise<void> {
-    const products = await tx.product.findMany({
-        where: {
-            organizationId,
-            storeId: { not: null },
-            OR: [
-                { inventory: { isNot: null } },
-                { variants: { some: { inventory: { isNot: null } } } },
-            ],
-        },
-        select: {
-            id: true,
-            storeId: true,
-            inventory: {
-                select: {
-                    quantity: true,
-                    reserved: true,
-                    lowStockAlert: true,
-                    updatedAt: true,
+    let after: string | undefined;
+    for (;;) {
+        const read = await db.$transaction(async (tx) => {
+            const products = await tx.product.findMany({
+                where: {
+                    organizationId,
+                    storeId: { not: null },
+                    OR: [
+                        { inventory: { isNot: null } },
+                        { variants: { some: { inventory: { isNot: null } } } },
+                    ],
+                    ...(after ? { id: { gt: after } } : {}),
                 },
-            },
-            variants: {
                 select: {
                     id: true,
+                    storeId: true,
                     inventory: {
                         select: {
                             quantity: true,
@@ -295,105 +304,188 @@ async function copyStock(
                             updatedAt: true,
                         },
                     },
+                    variants: {
+                        select: {
+                            id: true,
+                            inventory: {
+                                select: {
+                                    quantity: true,
+                                    reserved: true,
+                                    lowStockAlert: true,
+                                    updatedAt: true,
+                                },
+                            },
+                        },
+                    },
                 },
-            },
-        },
-        orderBy: { id: "asc" },
-    });
-    for (const product of products) {
-        const storeId = product.storeId;
-        if (!storeId) continue;
-        // Already on StockLevel: the new code owns its numbers now.
-        const counted = await tx.stockLevel.count({
-            where: { storeId, productId: product.id },
-        });
-        if (counted > 0) continue;
-        const rows = [
-            ...(product.inventory
-                ? [{ variantId: null, ...product.inventory }]
-                : []),
-            ...product.variants.flatMap((v) =>
-                v.inventory ? [{ variantId: v.id, ...v.inventory }] : [],
-            ),
-        ];
-        for (const row of rows) {
-            await tx.stockLevel.create({
-                data: {
-                    organizationId,
-                    storeId,
-                    productId: product.id,
-                    variantId: row.variantId,
-                    onHand: row.quantity,
-                    promised: row.reserved,
-                    lowStockAlert: row.lowStockAlert,
-                    updatedAt: row.updatedAt,
-                },
+                orderBy: { id: "asc" },
+                take: CHUNK,
             });
-            report.stockLevels += 1;
-        }
+            // Already on StockLevel at its storefront: the new code owns its
+            // numbers now.
+            const counted = await tx.stockLevel.findMany({
+                where: { productId: { in: products.map((p) => p.id) } },
+                select: { productId: true, storeId: true },
+            });
+            const has = new Set(
+                counted.map((r) => `${r.productId}:${r.storeId}`),
+            );
+            const made = await tx.stockLevel.createMany({
+                data: products.flatMap((product) => {
+                    const storeId = product.storeId;
+                    if (!storeId || has.has(`${product.id}:${storeId}`)) {
+                        return [];
+                    }
+                    return [
+                        ...(product.inventory
+                            ? [{ variantId: null, ...product.inventory }]
+                            : []),
+                        ...product.variants.flatMap((v) =>
+                            v.inventory
+                                ? [{ variantId: v.id, ...v.inventory }]
+                                : [],
+                        ),
+                    ].map((row) => ({
+                        organizationId,
+                        storeId,
+                        productId: product.id,
+                        variantId: row.variantId,
+                        onHand: row.quantity,
+                        promised: row.reserved,
+                        lowStockAlert: row.lowStockAlert,
+                        updatedAt: row.updatedAt,
+                    }));
+                }),
+            });
+            report.stockLevels += made.count;
+            return products;
+        }, CHUNK_TIMEOUT);
+        if (read.length < CHUNK) return;
+        after = read[read.length - 1].id;
     }
 }
 
 // ---- 5. Order lines ----
 
 async function linkOrderLines(
-    tx: TransactionClient,
+    db: PrismaClient,
     organizationId: string,
     report: ListingsBackfillReport,
 ): Promise<void> {
-    const lines = await tx.orderItem.findMany({
-        where: {
-            stockLevelId: null,
-            OR: [{ stockRow: null }, { stockRow: { not: "NONE" } }],
-            order: {
-                store: { organizationId },
-                status: { in: [...OPEN, ...FULFILLED] },
-            },
-        },
-        select: {
-            id: true,
-            productId: true,
-            variantId: true,
-            quantity: true,
-            stockRow: true,
-            order: { select: { storeId: true, status: true } },
-        },
-        orderBy: { id: "asc" },
-    });
-    for (const line of lines) {
-        const storeId = line.order.storeId;
-        const variantRow = line.variantId
-            ? await tx.stockLevel.findFirst({
-                  where: { storeId, variantId: line.variantId },
-                  select: { id: true },
-              })
-            : null;
-        const productRow = await tx.stockLevel.findFirst({
-            where: { storeId, productId: line.productId, variantId: null },
-            select: { id: true },
-        });
-        let row: { id: string } | null;
-        let kind: "PRODUCT" | "VARIANT" | null;
-        if (line.stockRow === "VARIANT") {
-            [row, kind] = [variantRow, "VARIANT"];
-        } else if (line.stockRow === "PRODUCT") {
-            [row, kind] = [productRow, "PRODUCT"];
-        } else {
-            // From before rows were recorded: the guess its release made.
-            row = variantRow ?? productRow;
-            kind = variantRow ? "VARIANT" : productRow ? "PRODUCT" : null;
-        }
-        if (!row || !kind) continue;
-        await tx.orderItem.update({
-            where: { id: line.id },
-            data: {
-                stockLevelId: row.id,
-                stockRow: kind,
-                heldQuantity: OPEN.includes(line.order.status)
-                    ? line.quantity
-                    : 0,
-            },
-        });
-        report.orderLines += 1;
+    let after: string | undefined;
+    for (;;) {
+        const read = await db.$transaction(async (tx) => {
+            const lines = await tx.orderItem.findMany({
+                where: {
+                    stockLevelId: null,
+                    OR: [{ stockRow: null }, { stockRow: { not: "NONE" } }],
+                    order: {
+                        store: { organizationId },
+                        status: { in: [...OPEN, ...FULFILLED] },
+                    },
+                    ...(after ? { id: { gt: after } } : {}),
+                },
+                select: {
+                    id: true,
+                    productId: true,
+                    variantId: true,
+                    quantity: true,
+                    stockRow: true,
+                    order: { select: { storeId: true, status: true } },
+                },
+                orderBy: { id: "asc" },
+                take: CHUNK,
+            });
+            if (lines.length === 0) return lines;
+            // Every row these lines could name, read once.
+            const rows = await tx.stockLevel.findMany({
+                where: {
+                    storeId: {
+                        in: Array.from(
+                            new Set(lines.map((l) => l.order.storeId)),
+                        ),
+                    },
+                    OR: [
+                        {
+                            variantId: {
+                                in: lines.flatMap((l) =>
+                                    l.variantId ? [l.variantId] : [],
+                                ),
+                            },
+                        },
+                        {
+                            variantId: null,
+                            productId: {
+                                in: Array.from(
+                                    new Set(lines.map((l) => l.productId)),
+                                ),
+                            },
+                        },
+                    ],
+                },
+                select: {
+                    id: true,
+                    storeId: true,
+                    productId: true,
+                    variantId: true,
+                },
+            });
+            const variantRows = new Map(
+                rows.flatMap((r) =>
+                    r.variantId ? [[`${r.storeId}:${r.variantId}`, r.id]] : [],
+                ),
+            );
+            const productRows = new Map(
+                rows.flatMap((r) =>
+                    r.variantId ? [] : [[`${r.storeId}:${r.productId}`, r.id]],
+                ),
+            );
+            const ids: string[] = [];
+            const rowIds: string[] = [];
+            const kinds: string[] = [];
+            const held: number[] = [];
+            for (const line of lines) {
+                const storeId = line.order.storeId;
+                const variantRow = line.variantId
+                    ? (variantRows.get(`${storeId}:${line.variantId}`) ?? null)
+                    : null;
+                const productRow =
+                    productRows.get(`${storeId}:${line.productId}`) ?? null;
+                let row: string | null;
+                let kind: "PRODUCT" | "VARIANT" | null;
+                if (line.stockRow === "VARIANT") {
+                    [row, kind] = [variantRow, "VARIANT"];
+                } else if (line.stockRow === "PRODUCT") {
+                    [row, kind] = [productRow, "PRODUCT"];
+                } else {
+                    // From before rows were recorded: the guess its release
+                    // made.
+                    row = variantRow ?? productRow;
+                    kind = variantRow
+                        ? "VARIANT"
+                        : productRow
+                          ? "PRODUCT"
+                          : null;
+                }
+                if (!row || !kind) continue;
+                ids.push(line.id);
+                rowIds.push(row);
+                kinds.push(kind);
+                held.push(OPEN.includes(line.order.status) ? line.quantity : 0);
+            }
+            if (ids.length > 0) {
+                await tx.$executeRaw`
+                    UPDATE "OrderItem" AS i
+                    SET "stockLevelId" = v."row", "stockRow" = v."kind"::"StockRow",
+                        "heldQuantity" = v."held"
+                    FROM unnest(${ids}::text[], ${rowIds}::text[], ${kinds}::text[], ${held}::int[])
+                        AS v(id, "row", "kind", "held")
+                    WHERE i.id = v.id`;
+            }
+            report.orderLines += ids.length;
+            return lines;
+        }, CHUNK_TIMEOUT);
+        if (read.length < CHUNK) return;
+        after = read[read.length - 1].id;
     }
 }
