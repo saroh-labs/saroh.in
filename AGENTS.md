@@ -31,6 +31,15 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
 
+## UX design audits
+
+Whenever the user asks for a UX audit, design audit, usability audit, or a
+design review of any screen (for example "let's do the UX design audit",
+"audit this screen", "review the UX"), read **AUDIT-PLAYBOOK.md** first and
+follow it exactly. That means loading all 14 skills it lists with
+`read_skill_prompt` (in Claude Code, the Skill tool) before auditing. The user
+shouldn't have to name the file or the skills.
+
 ## Triggers — read before you change
 
 Not every agent loads skills on its own — Claude Code in this repo does not — so
@@ -40,6 +49,7 @@ the right-hand files **before** writing code.
 | When you are about to…                                                                                     | Read first                                                                                     |
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Make any change                                                                                            | `docs/patterns/00-universal.md`                                                                |
+| Audit or review the UX or design of a screen                                                               | `AUDIT-PLAYBOOK.md`                                                                            |
 | Run the stack, seed or pick a database, or check a change in a browser by hand                             | `docs/architecture/LOCAL_DEV.md`                                                               |
 | Design or change anything a merchant sees, decide what to build, or write copy, a claim or a status        | `docs/patterns/saroh-product.md` · `PRODUCT.md`                                                |
 | Debug anything non-obvious                                                                                 | `docs/architecture/DEV_LEARNINGS.md`                                                           |
