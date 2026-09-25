@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import { PLAN } from "../data";
 import type { Db } from "../helpers";
-import { id } from "../helpers";
+import { id, listProductAt } from "../helpers";
 import { SHOWCASE_KEY, SHOWCASE_SEED, TIMEZONE } from "./data";
 import { addMinutes, earliest, hashKey, istAt, istWeekday } from "./people";
 import type { Period } from "./periods";
@@ -829,6 +829,14 @@ export async function seedBakery(
                 createdAt: istAt(now, -200 + i, 11 * 60),
                 ...data,
             },
+        });
+        // Sold at the counter's storefront (#510). Baked fresh, so it counts
+        // no stock: no StockLevel, and its lines hold nothing.
+        await listProductAt(prisma, {
+            id: sid("listing", i),
+            orgId,
+            storeId,
+            productId,
         });
         productIds.push(productId);
     }

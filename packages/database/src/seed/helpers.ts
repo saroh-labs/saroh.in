@@ -569,3 +569,100 @@ export async function publishSeedPost(
         data: { currentPublicationId: publication.id, publishedAt },
     });
 }
+
+/**
+ * Sell a product at a storefront (#510): its `ProductListing` there and, for
+ * a product with variants, a `ProductListingVariant` for each — a product's
+ * variants are all sold where it is. Keyed on the listing's own uniques, so a
+ * re-run finds what the last one wrote. Returns the listing's id.
+ */
+export async function listProductAt(
+    prisma: Db,
+    a: {
+        id: string;
+        orgId: string;
+        storeId: string;
+        productId: string;
+        variants?: readonly { id: string; variantId: string }[];
+    },
+): Promise<string> {
+    const listing = await prisma.productListing.upsert({
+        where: {
+            storeId_productId: { storeId: a.storeId, productId: a.productId },
+        },
+        update: {},
+        create: {
+            id: a.id,
+            organizationId: a.orgId,
+            storeId: a.storeId,
+            productId: a.productId,
+        },
+    });
+    for (const v of a.variants ?? []) {
+        await prisma.productListingVariant.upsert({
+            where: {
+                listingId_variantId: {
+                    listingId: listing.id,
+                    variantId: v.variantId,
+                },
+            },
+            update: {},
+            create: {
+                id: v.id,
+                organizationId: a.orgId,
+                listingId: listing.id,
+                productId: a.productId,
+                variantId: v.variantId,
+            },
+        });
+    }
+    return listing.id;
+}
+
+/**
+ * A storefront's shelf of a product (`variantId` null: counted as a whole) or
+ * of one variant (#510). Its uniques are partial, so it is found and then
+ * written rather than upserted. `promised` and `lowStockAlert` change only
+ * when given. Returns the row's id.
+ */
+export async function setStockLevel(
+    prisma: Db,
+    a: {
+        id: string;
+        orgId: string;
+        storeId: string;
+        productId: string;
+        variantId?: string | null;
+        onHand: number;
+        promised?: number;
+        lowStockAlert?: number;
+    },
+): Promise<string> {
+    const variantId = a.variantId ?? null;
+    const data = {
+        onHand: a.onHand,
+        ...(a.promised === undefined ? {} : { promised: a.promised }),
+        ...(a.lowStockAlert === undefined
+            ? {}
+            : { lowStockAlert: a.lowStockAlert }),
+    };
+    const found = await prisma.stockLevel.findFirst({
+        where: { storeId: a.storeId, productId: a.productId, variantId },
+        select: { id: true },
+    });
+    if (found) {
+        await prisma.stockLevel.update({ where: { id: found.id }, data });
+        return found.id;
+    }
+    await prisma.stockLevel.create({
+        data: {
+            id: a.id,
+            organizationId: a.orgId,
+            storeId: a.storeId,
+            productId: a.productId,
+            variantId,
+            ...data,
+        },
+    });
+    return a.id;
+}
