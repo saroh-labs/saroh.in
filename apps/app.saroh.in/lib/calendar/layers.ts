@@ -298,7 +298,11 @@ export function describeItem(
                 item.subtitle,
                 item.kind === "no_show"
                     ? { label: "No-show", tone: "bad" }
-                    : null,
+                    : // A pay-now hold keeps its place while the customer
+                      // pays: not a booking yet. The diary's word for it.
+                      item.kind === "held"
+                      ? { label: "Awaiting payment", tone: "accent" }
+                      : null,
             );
         case "classes":
             return line(

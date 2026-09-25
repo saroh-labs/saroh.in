@@ -6,8 +6,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { holdsPlace } from "../bookings/booking-hold";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -59,15 +60,29 @@ import { collectionsInMonth, upcomingRenewals } from "./schedules";
  * ## Money
  *
  * Takings go only to a role that reads the merchant's money (`payment:read`
- * and `invoice:read`, ADR-008), and count each rupee once: paid orders plus
- * paid invoices that are not an order's own (ADR-008: every order has one).
+ * and `invoice:read`, ADR-008), and count each rupee once: orders plus paid
+ * invoices that are not an order's own (ADR-008: every order has one).
  * Order amounts need `payment:read`; subscription and invoice amounts ride
  * with their own reads.
+ *
+ * Takings are dated when the money moved, not when the order was placed: an
+ * order's money on the day its invoice was paid (online or recorded by hand
+ * — `ensureOrderInvoice` stamps both), an edit's difference on the day its
+ * supplementary invoice was paid, and a refund taken off on the day its
+ * credit note was issued. A pay-later order placed on the 30th and paid on
+ * the 2nd is the 2nd's money.
  *
  * The Invoices layer is the paper that has no other layer: an order's own
  * invoice is its order, and a renewal's charge is its renewal on the
  * Subscriptions layer (when that layer is shown). Listing them again would
  * say the day held twice as much.
+ *
+ * ## Holds
+ *
+ * Bookings and classes read through `holdsPlace` (the rule every capacity
+ * count and clash check uses): a pay-now hold whose time ran out holds
+ * nothing and is not on the calendar; a live one takes its place and shows
+ * as `held` — never as booked, since nobody has paid for it yet.
  *
  * ## Days
  *
@@ -253,6 +268,7 @@ export class CalendarService {
                     window,
                     zone.zone,
                     orderAmounts,
+                    money,
                 ),
             ),
             attempt("collections", sees.collections, () =>
@@ -271,10 +287,10 @@ export class CalendarService {
                 ),
             ),
             attempt("bookings", sees.bookings, () =>
-                this.readBookings(organizationId, window, zone.zone),
+                this.readBookings(organizationId, window, zone.zone, now),
             ),
             attempt("classes", sees.classes, () =>
-                this.readClasses(organizationId, window, zone.zone),
+                this.readClasses(organizationId, window, zone.zone, now),
             ),
         ]);
 
@@ -372,31 +388,51 @@ export class CalendarService {
         }
     }
 
+    /**
+     * Orders placed this month (the layer) and, for a viewer who reads
+     * money, the order money that moved this month (the takings) — two
+     * reads, because the money is dated by the order's paper, not by when
+     * the order was placed.
+     */
     private async readOrders(
         organizationId: string,
         window: { start: Date; end: Date },
         zone: string,
         amounts: boolean,
+        money: boolean,
     ): Promise<{ items: DatedItem[]; takings: TakingEntry[] }> {
-        const rows = await this.db.order.findMany({
-            where: {
-                organizationId,
-                createdAt: { gte: window.start, lt: window.end },
-            },
-            orderBy: { createdAt: "asc" },
-            select: {
-                id: true,
-                orderId: true,
-                status: true,
-                paymentStatus: true,
-                total: true,
-                currency: true,
-                createdAt: true,
-                customer: {
-                    select: { firstName: true, lastName: true, email: true },
+        const [rows, taken] = await Promise.all([
+            this.db.order.findMany({
+                where: {
+                    organizationId,
+                    createdAt: { gte: window.start, lt: window.end },
                 },
-            },
-        });
+                orderBy: { createdAt: "asc" },
+                select: {
+                    id: true,
+                    orderId: true,
+                    status: true,
+                    paymentStatus: true,
+                    total: true,
+                    currency: true,
+                    createdAt: true,
+                    customer: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                        },
+                    },
+                    invoices: {
+                        where: { kind: "INVOICE" },
+                        select: { id: true },
+                    },
+                },
+            }),
+            money
+                ? this.readOrderTakings(organizationId, window, zone)
+                : Promise.resolve([]),
+        ]);
         return {
             items: rows.map((o) => ({
                 layer: "orders" as const,
@@ -416,14 +452,86 @@ export class CalendarService {
                     link: { type: "order" as const, id: o.id },
                 },
             })),
-            takings: rows
-                .filter((o) => o.paymentStatus === "PAID")
-                .map((o) => ({
-                    date: dayOf(o.createdAt, zone),
-                    currency: o.currency,
-                    amount: o.total,
-                })),
+            takings: [
+                ...taken,
+                // A paid order with no invoice (placed before orders were
+                // invoiced) has no payment date on record: when it was
+                // placed is the best there is, as it always was.
+                ...(money ? rows : [])
+                    .filter(
+                        (o) =>
+                            o.paymentStatus === "PAID" &&
+                            o.invoices.length === 0,
+                    )
+                    .map((o) => ({
+                        date: dayOf(o.createdAt, zone),
+                        currency: o.currency,
+                        amount: o.total,
+                    })),
+            ],
         };
+    }
+
+    /**
+     * The order money that moved this month, from the order's own paper
+     * (ADR-008): its invoice on the day it was paid — online or recorded by
+     * hand, `ensureOrderInvoice` stamps both — and each supplementary
+     * invoice (an edit's difference) on the day it was paid, less each
+     * credit note (a refund, or an edit down) on the day it was issued. An
+     * invoice later credited in full still took its money the day it was
+     * paid; its credit note gives it back on its own day. Each rupee once:
+     * this is the only read that counts an order's paper — the Invoices
+     * layer leaves it out.
+     */
+    private async readOrderTakings(
+        organizationId: string,
+        window: { start: Date; end: Date },
+        zone: string,
+    ): Promise<TakingEntry[]> {
+        const between = { gte: window.start, lt: window.end };
+        const paper = await this.db.invoice.findMany({
+            where: {
+                organizationId,
+                orderId: { not: null },
+                status: { notIn: ["DRAFT", "VOID"] },
+                OR: [
+                    {
+                        kind: { in: ["INVOICE", "SUPPLEMENTARY"] },
+                        paidAt: between,
+                    },
+                    { kind: "CREDIT_NOTE", issuedAt: between },
+                ],
+            },
+            select: {
+                kind: true,
+                total: true,
+                currency: true,
+                paidAt: true,
+                issuedAt: true,
+            },
+        });
+        return paper.flatMap((inv): TakingEntry[] => {
+            if (inv.kind === "CREDIT_NOTE") {
+                return inv.issuedAt
+                    ? [
+                          {
+                              date: dayOf(inv.issuedAt, zone),
+                              currency: inv.currency,
+                              amount: fromMinor(-toMinor(inv.total)),
+                          },
+                      ]
+                    : [];
+            }
+            return inv.paidAt
+                ? [
+                      {
+                          date: dayOf(inv.paidAt, zone),
+                          currency: inv.currency,
+                          amount: inv.total,
+                      },
+                  ]
+                : [];
+        });
     }
 
     /**
@@ -798,16 +906,21 @@ export class CalendarService {
         return { items, overdue, takings };
     }
 
-    /** One-to-one bookings that stand (not cancelled), by start. */
+    /**
+     * One-to-one bookings that take their place, by start: confirmed ones,
+     * and pay-now holds still inside their time (`held`). A hold that ran
+     * out is not there.
+     */
     private async readBookings(
         organizationId: string,
         window: { start: Date; end: Date },
         zone: string,
+        now: Date,
     ): Promise<DatedItem[]> {
         const rows = await this.db.booking.findMany({
             where: {
                 organizationId,
-                status: { not: "CANCELLED" },
+                ...holdsPlace(now),
                 startAt: { gte: window.start, lt: window.end },
                 service: { capacity: { lte: 1 } },
             },
@@ -827,43 +940,54 @@ export class CalendarService {
                 },
             },
         });
-        return rows.map((b) => ({
-            layer: "bookings" as const,
-            date: dayOf(b.startAt, zone),
-            item: {
-                id: b.id,
-                kind:
-                    b.outcome === "NO_SHOW"
-                        ? "no_show"
-                        : b.outcome === "ATTENDED"
-                          ? "attended"
-                          : "booked",
-                // "Personal training · Asha Rao", then "With Ravi · Paid
-                // online" — what it is and who, then with whom and how paid.
-                title: `${b.service.name} · ${bookerLabel(b)}`,
-                subtitle:
-                    [
-                        b.staff ? `With ${b.staff.name}` : null,
-                        b.paidWith ? PAID_WITH[b.paidWith] : null,
-                    ]
-                        .filter(Boolean)
-                        .join(" · ") || null,
-                at: b.startAt.toISOString(),
-                link: { type: "booking" as const, id: b.id },
-            },
-        }));
+        return rows.map((b) => {
+            const held = b.status === "PENDING";
+            return {
+                layer: "bookings" as const,
+                date: dayOf(b.startAt, zone),
+                item: {
+                    id: b.id,
+                    kind: held
+                        ? "held"
+                        : b.outcome === "NO_SHOW"
+                          ? "no_show"
+                          : b.outcome === "ATTENDED"
+                            ? "attended"
+                            : "booked",
+                    // "Personal training · Asha Rao", then "With Ravi · Paid
+                    // online" — what it is and who, then with whom and how
+                    // paid. A hold is not paid yet: its kind says so, and it
+                    // names no way it was paid.
+                    title: `${b.service.name} · ${bookerLabel(b)}`,
+                    subtitle:
+                        [
+                            b.staff ? `With ${b.staff.name}` : null,
+                            !held && b.paidWith ? PAID_WITH[b.paidWith] : null,
+                        ]
+                            .filter(Boolean)
+                            .join(" · ") || null,
+                    at: b.startAt.toISOString(),
+                    link: { type: "booking" as const, id: b.id },
+                },
+            };
+        });
     }
 
-    /** Class sessions with anyone on them: one item per start. */
+    /**
+     * Class sessions with anyone on them: one item per start. A live hold
+     * takes a seat — the count the booking page sells against — and is
+     * named as held, not booked; a hold that ran out takes none.
+     */
     private async readClasses(
         organizationId: string,
         window: { start: Date; end: Date },
         zone: string,
+        now: Date,
     ): Promise<DatedItem[]> {
         const rows = await this.db.booking.findMany({
             where: {
                 organizationId,
-                status: { not: "CANCELLED" },
+                ...holdsPlace(now),
                 startAt: { gte: window.start, lt: window.end },
                 service: { capacity: { gt: 1 } },
             },
@@ -871,6 +995,7 @@ export class CalendarService {
             select: {
                 serviceId: true,
                 startAt: true,
+                status: true,
                 service: { select: { name: true, capacity: true } },
                 staff: { select: { name: true } },
             },
@@ -883,7 +1008,8 @@ export class CalendarService {
                 name: string;
                 capacity: number;
                 staff: string | null;
-                taken: number;
+                booked: number;
+                held: number;
             }
         >();
         for (const r of rows) {
@@ -894,9 +1020,11 @@ export class CalendarService {
                 name: r.service.name,
                 capacity: r.service.capacity,
                 staff: null,
-                taken: 0,
+                booked: 0,
+                held: 0,
             };
-            s.taken += 1;
+            if (r.status === "PENDING") s.held += 1;
+            else s.booked += 1;
             s.staff ??= r.staff?.name ?? null;
             sessions.set(key, s);
         }
@@ -905,9 +1033,14 @@ export class CalendarService {
             date: dayOf(s.startAt, zone),
             item: {
                 id: key,
-                kind: s.taken >= s.capacity ? "full" : "class",
+                kind: s.booked + s.held >= s.capacity ? "full" : "class",
                 title: s.name,
-                subtitle: [`${s.taken} of ${s.capacity} booked`, s.staff]
+                // "3 of 10 booked · 1 held · Meera".
+                subtitle: [
+                    `${s.booked} of ${s.capacity} booked`,
+                    s.held > 0 ? `${s.held} held` : null,
+                    s.staff,
+                ]
                     .filter(Boolean)
                     .join(" · "),
                 at: s.startAt.toISOString(),

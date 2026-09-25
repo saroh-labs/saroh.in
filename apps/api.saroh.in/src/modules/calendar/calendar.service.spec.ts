@@ -33,7 +33,25 @@ function order(id: string, createdAt: string, over: object = {}) {
         currency: "INR",
         createdAt: new Date(createdAt),
         customer,
+        // No invoice: dated by its placing, like an order from before
+        // orders were invoiced.
+        invoices: [],
         ...over,
+    };
+}
+
+/** One of an order's own papers, as the takings read selects it. */
+function paper(
+    kind: "INVOICE" | "SUPPLEMENTARY" | "CREDIT_NOTE",
+    total: string,
+    at: Date,
+) {
+    return {
+        kind,
+        total,
+        currency: "INR",
+        paidAt: kind === "CREDIT_NOTE" ? null : at,
+        issuedAt: at,
     };
 }
 
@@ -96,6 +114,8 @@ interface Fixture {
     subs?: object[];
     subscriptionInvoices?: object[];
     invoices?: object[];
+    /** Orders' own paper: invoices, supplementaries and credit notes. */
+    orderPaper?: object[];
     bookings?: object[];
     classes?: object[];
     failInvoices?: boolean;
@@ -113,15 +133,22 @@ function build(
             ),
     } as unknown as ModuleAvailabilityService;
 
-    const invoiceRead = jest.fn((args: { where: { source?: string } }) => {
-        if (args.where.source === "SUBSCRIPTION") {
-            return Promise.resolve(f.subscriptionInvoices ?? []);
-        }
-        if (f.failInvoices) {
-            return Promise.reject(new Error("invoices table is mid-migration"));
-        }
-        return Promise.resolve(f.invoices ?? []);
-    });
+    const invoiceRead = jest.fn(
+        (args: { where: { source?: string; orderId?: unknown } }) => {
+            if (args.where.source === "SUBSCRIPTION") {
+                return Promise.resolve(f.subscriptionInvoices ?? []);
+            }
+            if (args.where.orderId) {
+                return Promise.resolve(f.orderPaper ?? []);
+            }
+            if (f.failInvoices) {
+                return Promise.reject(
+                    new Error("invoices table is mid-migration"),
+                );
+            }
+            return Promise.resolve(f.invoices ?? []);
+        },
+    );
 
     const db = {
         businessProfile: {
@@ -414,8 +441,13 @@ describe("CalendarService.month", () => {
             paidAt,
         };
         const { service } = build(undefined, {
-            orders: [order("o1", "2026-09-05T04:00:00Z")],
+            orders: [
+                order("o1", "2026-09-05T04:00:00Z", {
+                    invoices: [{ id: "inv_order" }],
+                }),
+            ],
             invoices: [ordersOwn, renewalPaid, handWritten],
+            orderPaper: [paper("INVOICE", "250", paidAt)],
         });
         const res = await service.month(OWNER, "2026-09", NOW);
 
@@ -427,6 +459,157 @@ describe("CalendarService.month", () => {
         // The order (250) once, the renewal (1200) and the hand-written
         // invoice (4000): the order's own invoice adds nothing.
         expect(fifth.takings).toEqual([{ currency: "INR", amount: "5450.00" }]);
+    });
+
+    it("an order's money is dated by its paper: paid invoices in, credit notes out", async () => {
+        const { service, db } = build(["COMMERCE", "PAYMENTS"], {
+            // Placed on 30 Sep, so not among October's orders; its invoice
+            // was paid on 2 Oct.
+            orders: [],
+            orderPaper: [
+                paper("INVOICE", "1000", new Date("2026-10-02T06:00:00Z")),
+                // Cash at the counter, recorded by hand on the 3rd.
+                paper("INVOICE", "400", new Date("2026-10-03T08:00:00Z")),
+                // ₹1,000 paid and ₹300 of it refunded on the 6th.
+                paper("INVOICE", "1000", new Date("2026-10-06T05:00:00Z")),
+                paper("CREDIT_NOTE", "300", new Date("2026-10-06T09:00:00Z")),
+                // An edit's difference, paid on the 7th.
+                paper("SUPPLEMENTARY", "150", new Date("2026-10-07T05:00:00Z")),
+            ],
+        });
+        const res = await service.month(OWNER, "2026-10", NOW);
+        const day = (d: string) => res.days.find((x) => x.date === d)!;
+
+        expect(day("2026-10-02").takings).toEqual([
+            { currency: "INR", amount: "1000.00" },
+        ]);
+        expect(day("2026-10-03").takings).toEqual([
+            { currency: "INR", amount: "400.00" },
+        ]);
+        expect(day("2026-10-06").takings).toEqual([
+            { currency: "INR", amount: "700.00" },
+        ]);
+        expect(day("2026-10-07").takings).toEqual([
+            { currency: "INR", amount: "150.00" },
+        ]);
+        expect(res.takings?.total).toEqual([
+            { currency: "INR", amount: "2250.00" },
+        ]);
+        // Paid and issued inside the business's month; never a draft or a
+        // voided paper.
+        expect(db.invoice.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    orderId: { not: null },
+                    status: { notIn: ["DRAFT", "VOID"] },
+                    OR: [
+                        {
+                            kind: { in: ["INVOICE", "SUPPLEMENTARY"] },
+                            paidAt: {
+                                gte: new Date("2026-09-30T18:30:00Z"),
+                                lt: new Date("2026-10-31T18:30:00Z"),
+                            },
+                        },
+                        {
+                            kind: "CREDIT_NOTE",
+                            issuedAt: {
+                                gte: new Date("2026-09-30T18:30:00Z"),
+                                lt: new Date("2026-10-31T18:30:00Z"),
+                            },
+                        },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("an order placed and invoiced is not also counted on its placing", async () => {
+        const { service } = build(["COMMERCE", "PAYMENTS"], {
+            // Paid (its invoice exists), but the payment fell in October.
+            orders: [
+                order("o1", "2026-09-30T10:00:00Z", {
+                    invoices: [{ id: "inv_o1" }],
+                }),
+            ],
+            orderPaper: [],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.days[29].layers.orders?.count).toBe(1);
+        expect(res.days[29].takings).toEqual([]);
+        expect(res.takings?.total).toEqual([]);
+    });
+
+    it("a viewer without money reads no order paper", async () => {
+        const { service, db } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+        });
+        await service.month(
+            {
+                ...OWNER,
+                role: "ADMIN",
+                actions: new Set(["org:read", "order:read"] as const),
+            },
+            "2026-09",
+            NOW,
+        );
+        expect(db.invoice.findMany).not.toHaveBeenCalled();
+    });
+
+    it("a live hold is held, not booked, and not said to be paid", async () => {
+        const { service, db } = build(["APPOINTMENTS"], {
+            bookings: [
+                {
+                    id: "bk_hold",
+                    startAt: new Date("2026-09-22T04:30:00Z"),
+                    status: "PENDING",
+                    outcome: null,
+                    paidWith: "PAID",
+                    bookerName: "Asha",
+                    bookerEmail: null,
+                    service: { name: "Physio" },
+                    staff: { name: "Ravi" },
+                    contact: null,
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+
+        expect(res.days[21].layers.bookings?.items[0]).toMatchObject({
+            kind: "held",
+            subtitle: "With Ravi",
+        });
+        // Only what takes a place is read: confirmed, or a hold inside its
+        // time — the rule the booking page's capacity counts use.
+        for (const call of db.booking.findMany.mock.calls) {
+            expect(call[0].where).toMatchObject({
+                OR: [
+                    { status: "CONFIRMED" },
+                    { status: "PENDING", holdExpiresAt: { gt: NOW } },
+                ],
+            });
+        }
+    });
+
+    it("a live hold takes a class seat and is named as held", async () => {
+        const at = new Date("2026-09-08T01:30:00Z");
+        const spin = {
+            serviceId: "svc_spin",
+            startAt: at,
+            status: "CONFIRMED",
+            service: { name: "Spin", capacity: 2 },
+            staff: { name: "Meera" },
+        };
+        const { service } = build(["APPOINTMENTS"], {
+            classes: [spin, { ...spin, status: "PENDING" }],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.days[7].layers.classes?.items).toEqual([
+            expect.objectContaining({
+                kind: "full",
+                subtitle: "1 of 2 booked · 1 held · Meera",
+            }),
+        ]);
     });
 
     it("a renewal's charge stays on the Invoices layer for someone who cannot see subscriptions", async () => {

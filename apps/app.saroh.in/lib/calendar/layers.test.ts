@@ -319,6 +319,27 @@ describe("how things read", () => {
         });
     });
 
+    it("a pay-now hold reads as held, not as a booking", () => {
+        expect(
+            describeItem(
+                "bookings",
+                item({
+                    kind: "held",
+                    title: "Physio · Asha Rao",
+                    subtitle: "With Ravi",
+                    at: "2026-09-18T04:30:00Z",
+                    link: { type: "booking", id: "b1" },
+                }),
+                at,
+            ),
+        ).toEqual({
+            title: "10:00 Physio · Asha Rao",
+            sub: "With Ravi",
+            flag: { label: "Awaiting payment", tone: "accent" },
+            href: "/bookings/b1",
+        });
+    });
+
     it("links every kind of record somewhere that exists", () => {
         expect(linkHref({ type: "booking", id: "b1" })).toBe("/bookings/b1");
         expect(linkHref({ type: "subscription", id: "s1" })).toBe(
