@@ -24,6 +24,7 @@ jest.mock("@saroh/database", () => ({
             upsert: jest.fn(),
         },
         site: { findMany: jest.fn() },
+        session: { groupBy: jest.fn() },
         sitePreviewLink: { updateMany: jest.fn() },
         organization: { findUnique: jest.fn() },
         organizationRole: { findUnique: jest.fn() },
@@ -51,6 +52,7 @@ const db = prisma as unknown as {
     organizationInvitation: Record<string, jest.Mock>;
     siteReviewer: Record<string, jest.Mock>;
     site: Record<string, jest.Mock>;
+    session: Record<string, jest.Mock>;
     sitePreviewLink: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
     organizationRole: Record<string, jest.Mock>;
@@ -84,6 +86,7 @@ beforeEach(() => {
     db.siteReviewer.upsert.mockResolvedValue({});
     db.siteReviewer.deleteMany.mockResolvedValue({ count: 0 });
     db.sitePreviewLink.updateMany.mockResolvedValue({ count: 0 });
+    db.session.groupBy.mockResolvedValue([]);
 });
 
 describe("who may touch the roster", () => {
@@ -123,6 +126,44 @@ describe("who may touch the roster", () => {
         await expect(service.listInvitations(ctx("ADMIN"))).resolves.toEqual(
             [],
         );
+    });
+});
+
+describe("when someone was last active", () => {
+    it("reads every member's newest session in one grouped query", async () => {
+        const seen = new Date("2026-09-24T10:00:00Z");
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "user_owner",
+                role: "OWNER",
+                user: { name: "Priya", email: "priya@example.test" },
+            },
+            {
+                userId: "user_2",
+                role: "MEMBER",
+                user: { name: null, email: "new@example.test" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.session.groupBy.mockResolvedValue([
+            { userId: "user_owner", _max: { updatedAt: seen } },
+        ]);
+
+        const roster = await service.list(ctx("OWNER"));
+
+        expect(db.session.groupBy).toHaveBeenCalledTimes(1);
+        expect(db.session.groupBy).toHaveBeenCalledWith({
+            by: ["userId"],
+            where: {
+                user: { memberships: { some: { organizationId: "org_1" } } },
+            },
+            _max: { updatedAt: true },
+        });
+        expect(roster.map((m) => [m.userId, m.lastActiveAt])).toEqual([
+            ["user_owner", seen],
+            // No session at all — never signed in, or every one expired.
+            ["user_2", null],
+        ]);
     });
 });
 
