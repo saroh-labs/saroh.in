@@ -44,10 +44,15 @@ test.describe("new order at a GST-registered business", () => {
         await expect(page.getByLabel(/^Tax/)).toHaveCount(0);
         await expect(page.getByText("prices include GST")).toBeVisible();
         await expect(page.getByText("Includes GST")).toBeVisible();
-        // 2 × ₹480, GST inside; nothing added on top.
-        await expect(page.getByText("Total ₹960")).toBeVisible();
+        // 2 × ₹480, GST inside; nothing added on top. Exact: the summary's
+        // "Subtotal ₹960 · …" line also contains "total ₹960".
+        await expect(
+            page.getByText("Total ₹960", { exact: true }),
+        ).toBeVisible();
 
         await page.getByLabel("Discount", { exact: true }).fill("60");
-        await expect(page.getByText("Total ₹900")).toBeVisible();
+        await expect(
+            page.getByText("Total ₹900", { exact: true }),
+        ).toBeVisible();
     });
 });

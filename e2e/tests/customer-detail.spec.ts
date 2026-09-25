@@ -22,8 +22,6 @@ const PULSE = "seed_sc_pulse_org";
 const NORTHWIND = "seed_org";
 const PRIYA = "seed_sc_rc_contact_priya";
 const PRIYA_STORE = "seed_sc_rc_customer_priya";
-/** A Pulse member with a pack, a late cancel and classes to come. */
-const MEERA = "seed_sc_pulse_contact_38";
 /** A Northwind contact whose same-email store customer nobody has linked. */
 const KARTHIK = "seed_contact_7";
 
@@ -72,6 +70,62 @@ test.beforeAll(async ({ browser }) => {
 });
 
 const tab = (page: Page, name: RegExp) => page.getByRole("tab", { name });
+
+/**
+ * A Pulse member with an active membership, a late cancel or no-show behind
+ * them, and a class to come.
+ *
+ * Found, not named. The showcase lays Pulse's diary out relative to NOW, so
+ * which member has a class booked next changes with the day the seed runs:
+ * the id this used to name (Meera, contact 38) had nothing upcoming on
+ * 25 Sep, and the page rightly opened her bookings on Past. The claim is about
+ * a member like that, so the test asks the API for one.
+ */
+async function memberWithClassesToCome(page: Page): Promise<string> {
+    const headers = { "x-organization-id": PULSE };
+    const base = `${urls.API_URL}/organizations/${PULSE}`;
+    const from = new Date().toISOString();
+    const to = new Date(Date.now() + 14 * 86_400_000).toISOString();
+    const diary = await page.request.get(
+        `${base}/services/bookings?from=${from}&to=${to}`,
+        { headers },
+    );
+    expect(diary.ok()).toBe(true);
+    const { diaries } = (await diary.json()) as {
+        diaries: {
+            bookings: {
+                status: string;
+                contact: { id: string } | null;
+            }[];
+        }[];
+    };
+    const candidates = new Set<string>();
+    for (const b of diaries.flatMap((d) => d.bookings)) {
+        if (b.status === "CONFIRMED" && b.contact) candidates.add(b.contact.id);
+    }
+    for (const id of candidates) {
+        const res = await page.request.get(`${base}/customers/${id}/detail`, {
+            headers,
+        });
+        if (!res.ok()) continue;
+        const detail = (await res.json()) as {
+            bookings: {
+                upcoming: unknown[];
+                past: { cancelledLate: boolean; outcome: string | null }[];
+            };
+            subscriptions: { rows: { status: string }[] };
+        };
+        if (
+            detail.bookings.upcoming.length > 0 &&
+            detail.subscriptions.rows.some((s) => s.status === "ACTIVE") &&
+            detail.bookings.past.some(
+                (b) => b.cancelledLate || b.outcome === "NO_SHOW",
+            )
+        )
+            return id;
+    }
+    throw new Error("No Pulse member with a late cancel and a class to come");
+}
 
 test.describe("customer detail", () => {
     test("a bakery customer: orders, subscription and invoices", async ({
@@ -123,7 +177,7 @@ test.describe("customer detail", () => {
 
     test("a gym member: classes left and what is booked", async ({ page }) => {
         await signIn(page, PULSE);
-        await page.goto(`/customers/${MEERA}`);
+        await page.goto(`/customers/${await memberWithClassesToCome(page)}`);
         await expect(page.getByText("Member", { exact: true })).toBeVisible();
         for (const name of [/^Bookings/, /^Membership/, /^Invoices/])
             await expect(tab(page, name)).toBeVisible();
