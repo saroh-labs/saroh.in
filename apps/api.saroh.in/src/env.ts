@@ -1,6 +1,8 @@
 import { config as loadEnvFiles } from "dotenv";
 import { z } from "zod";
 
+import { TRUST_PROXY_MODES } from "./common/trust-proxy";
+
 /**
  * Typed, validated environment for api.saroh.in (NestJS).
  *
@@ -26,14 +28,13 @@ const envSchema = z.object({
         .enum(["development", "test", "production"])
         .default("development"),
     PORT: z.coerce.number().default(3333),
-    // How many reverse proxies stand between the client and the API, each
-    // appending to `X-Forwarded-For` — Express's `trust proxy` hop count. The
-    // request's IP (the rate limiters' key) is read that many hops back.
-    // Default 1: Traefik on Coolify in production and development, portless
-    // locally. 0 when the API is reached directly (`dev:app`, a bare port);
-    // one more for each proxy in front — a proxying CDN, say. Too high lets a
-    // client choose its own address; too low makes every client the proxy.
-    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
+    // Which proxies may say who the client is (`src/common/trust-proxy.ts`):
+    // the request's IP — every rate limiter's key — is the first address in
+    // `X-Forwarded-For` that is not one of them. `cloudflare` (default):
+    // Cloudflare's edge plus the private network, for Cloudflare → Traefik on
+    // Coolify, and portless locally. `private`: a proxy in front, no CDN.
+    // `none`: the API is reached directly (`dev:app`, a bare port).
+    TRUST_PROXY: z.enum(TRUST_PROXY_MODES).default("cloudflare"),
 
     // Data (REQUIRED — the one true prerequisite; the api cannot serve any
     // request without a database).

@@ -3,7 +3,7 @@ import { BadRequestException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { createHash } from "node:crypto";
 
-import { trustProxyHops } from "../../common/trust-proxy";
+import { trustProxy } from "../../common/trust-proxy";
 import { PublicBookingsController } from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
 
@@ -124,8 +124,12 @@ describe("the caller's address behind a proxy (#508)", () => {
         app = undefined;
     });
 
-    /** The controller over HTTP, with `hops` proxies trusted as main.ts does. */
-    async function serve(hops: number) {
+    /**
+     * The controller over HTTP, trusting proxies as main.ts does. The test
+     * connects from 127.0.0.1, which stands in for Traefik on the private
+     * network; `X-Forwarded-For` is the chain Traefik would pass on.
+     */
+    async function serve(mode: string | undefined) {
         const publicHold = jest.fn().mockResolvedValue({
             state: "HELD",
             holdExpiresAt: null,
@@ -138,35 +142,65 @@ describe("the caller's address behind a proxy (#508)", () => {
             ],
         }).compile();
         app = moduleRef.createNestApplication({ logger: false });
-        trustProxyHops(app, hops);
+        trustProxy(app, mode);
         await app.listen(0, "127.0.0.1");
         const url = await app.getUrl();
-        const poll = (forwardedFor: string) =>
-            fetch(`${url}/public/services/holds/tok_1`, {
-                headers: { "x-forwarded-for": forwardedFor },
+        const seen = async (forwardedFor?: string) => {
+            const res = await fetch(`${url}/public/services/holds/tok_1`, {
+                headers: forwardedFor
+                    ? { "x-forwarded-for": forwardedFor }
+                    : {},
             });
-        return { publicHold, poll };
+            expect(res.status).toBe(200);
+            const [, ipHash] = publicHold.mock.calls.at(-1) as [string, string];
+            return ipHash;
+        };
+        return { seen };
     }
 
-    it("hashes the client the proxy names, not the proxy", async () => {
-        const { publicHold, poll } = await serve(1);
-        // A client's own claim, then the one the proxy appended.
-        const res = await poll("10.9.9.9, 203.0.113.7");
-        expect(res.status).toBe(200);
-        expect(publicHold).toHaveBeenCalledWith("tok_1", sha("203.0.113.7"));
+    const LOCAL = [sha("127.0.0.1"), sha("::ffff:127.0.0.1")];
+    // A Cloudflare edge address (162.158.0.0/15).
+    const EDGE = "162.158.12.34";
+
+    it("through Cloudflare, sees the customer, not Cloudflare", async () => {
+        const { seen } = await serve("cloudflare");
+        expect(await seen(`198.51.100.23, ${EDGE}`)).toBe(sha("198.51.100.23"));
     });
 
-    it("reads the raw string SKIP_ENV_VALIDATION leaves as a hop count", async () => {
-        const { publicHold, poll } = await serve("1" as unknown as number);
-        await poll("10.9.9.9, 203.0.113.7");
-        expect(publicHold).toHaveBeenCalledWith("tok_1", sha("203.0.113.7"));
+    it("through Cloudflare, ignores what the customer claims before it", async () => {
+        const { seen } = await serve("cloudflare");
+        // The customer sent "10.9.9.9"; Cloudflare appended who really called.
+        expect(await seen(`10.9.9.9, 203.0.113.7, ${EDGE}`)).toBe(
+            sha("203.0.113.7"),
+        );
     });
 
-    it("believes no forwarded address when no proxy is trusted", async () => {
-        const { publicHold, poll } = await serve(0);
-        await poll("203.0.113.7");
-        const [, ipHash] = publicHold.mock.calls[0] as [string, string];
-        expect(ipHash).not.toBe(sha("203.0.113.7"));
-        expect([sha("127.0.0.1"), sha("::ffff:127.0.0.1")]).toContain(ipHash);
+    it("straight to Traefik, skipping Cloudflare, a caller cannot pose as anyone", async () => {
+        const { seen } = await serve("cloudflare");
+        // A forged chain ending in a Cloudflare address, then the caller's
+        // real address as Traefik appends it.
+        expect(await seen(`6.6.6.6, ${EDGE}, 203.0.113.9`)).toBe(
+            sha("203.0.113.9"),
+        );
+    });
+
+    it("private: trusts the proxy in front, not a CDN", async () => {
+        const { seen } = await serve("private");
+        expect(await seen("203.0.113.7")).toBe(sha("203.0.113.7"));
+        expect(await seen(`198.51.100.23, ${EDGE}`)).toBe(sha(EDGE));
+    });
+
+    it("none: believes no forwarded address", async () => {
+        const { seen } = await serve("none");
+        expect(LOCAL).toContain(await seen("203.0.113.7"));
+    });
+
+    it("an unset or unknown mode, as SKIP_ENV_VALIDATION leaves it, trusts nothing", async () => {
+        for (const mode of [undefined, "2", "yes"]) {
+            const { seen } = await serve(mode);
+            expect(LOCAL).toContain(await seen("203.0.113.7"));
+            await app?.close();
+            app = undefined;
+        }
     });
 });

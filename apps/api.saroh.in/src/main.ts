@@ -31,7 +31,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
-import { trustProxyHops } from "./common/trust-proxy";
+import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
 
@@ -99,7 +99,7 @@ async function bootstrap() {
 
     // The client's address from behind the proxies in front (#508), before
     // anything reads `req.ip`.
-    trustProxyHops(app, env.TRUST_PROXY_HOPS);
+    trustProxy(app, env.TRUST_PROXY);
 
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.

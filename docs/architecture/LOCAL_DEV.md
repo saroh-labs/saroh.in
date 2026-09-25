@@ -33,9 +33,10 @@ looks equivalent and is not:
   back to the login screen forever.
 - The `.localhost` names match production, so what you verify locally is the
   shape that ships.
-- The API trusts one proxy hop by default (`TRUST_PROXY_HOPS=1`): portless
-  here, Traefik on Coolify. Reached on a bare port, a client's own
-  `X-Forwarded-For` would be believed — set `TRUST_PROXY_HOPS=0` if you must
+- The API reads the client's address past the proxies it trusts
+  (`TRUST_PROXY=cloudflare` by default: Cloudflare's edge and the private
+  network, which includes portless here). Reached on a bare port, a client's
+  own `X-Forwarded-For` would be believed — set `TRUST_PROXY=none` if you must
   run it that way.
 
 **Set `BETTER_AUTH_TRUSTED_ORIGINS` when you run the stack yourself.** Unset, it
