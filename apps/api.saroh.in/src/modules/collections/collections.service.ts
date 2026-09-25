@@ -16,6 +16,7 @@ import type {
     ProductCollectionsDto,
     UpdateCollectionDto,
 } from "./dto";
+import { COLLECTION_PRODUCTS_MAX } from "./dto";
 import type { WebsitePlacement } from "./website-pages";
 import { websitePagesFor } from "./website-pages";
 
@@ -119,6 +120,14 @@ export function writeCollections(ctx: OrganizationContext): string {
  * Every method takes the organization the caller was proved to belong to;
  * a collection, product or category of another business is not found.
  */
+/** Why an add would take a hand-picked collection past its cap. */
+export function tooManyProducts(has: number): string {
+    const room = Math.max(0, COLLECTION_PRODUCTS_MAX - has);
+    return room > 0
+        ? `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products; this one has room for ${room} more.`
+        : `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products, and this one is full.`;
+}
+
 @Injectable()
 export class CollectionsService {
     async list(organizationId: string): Promise<CollectionSummary[]> {
@@ -325,13 +334,26 @@ export class CollectionsService {
         await this.requireHandPicked(organizationId, collectionId);
         await requireProducts(organizationId, productIds);
         await prisma.$transaction(async (tx) => {
-            const last = await tx.collectionProduct.aggregate({
+            const members = await tx.collectionProduct.findMany({
                 where: { collectionId },
-                _max: { position: true },
+                select: { productId: true, position: true },
             });
-            const start = (last._max.position ?? -1) + 1;
+            const had = new Set(members.map((m) => m.productId));
+            const adding = Array.from(new Set(productIds)).filter(
+                (id) => !had.has(id),
+            );
+            // A hand-picked collection holds COLLECTION_PRODUCTS_MAX at
+            // most, so setProducts can always send its whole list.
+            if (members.length + adding.length > COLLECTION_PRODUCTS_MAX) {
+                throw new BadRequestException({
+                    message: tooManyProducts(members.length),
+                    field: "productIds",
+                });
+            }
+            const start =
+                members.reduce((n, m) => Math.max(n, m.position), -1) + 1;
             await tx.collectionProduct.createMany({
-                data: productIds.map((productId, i) => ({
+                data: adding.map((productId, i) => ({
                     collectionId,
                     organizationId,
                     productId,
@@ -442,23 +464,48 @@ export class CollectionsService {
                     collectionId: { notIn: dto.collectionIds },
                 },
             });
-            for (const collectionId of dto.collectionIds) {
-                const last = await tx.collectionProduct.aggregate({
-                    where: { collectionId },
+            if (dto.collectionIds.length === 0) return;
+            // One read for every collection's size and last place, one write
+            // for the new memberships (each goes at the end).
+            const [sizes, already] = await Promise.all([
+                tx.collectionProduct.groupBy({
+                    by: ["collectionId"],
+                    where: { collectionId: { in: dto.collectionIds } },
                     _max: { position: true },
-                });
-                await tx.collectionProduct.createMany({
-                    data: [
-                        {
-                            collectionId,
-                            organizationId,
-                            productId,
-                            position: (last._max.position ?? -1) + 1,
-                        },
-                    ],
-                    skipDuplicates: true,
+                    _count: { _all: true },
+                    orderBy: { collectionId: "asc" },
+                }),
+                tx.collectionProduct.findMany({
+                    where: {
+                        productId,
+                        collectionId: { in: dto.collectionIds },
+                    },
+                    select: { collectionId: true },
+                }),
+            ]);
+            const inIt = new Set(already.map((m) => m.collectionId));
+            const byId = new Map(sizes.map((g) => [g.collectionId, g]));
+            const joining = dto.collectionIds.filter((id) => !inIt.has(id));
+            const full = joining.find(
+                (id) =>
+                    (byId.get(id)?._count._all ?? 0) >= COLLECTION_PRODUCTS_MAX,
+            );
+            if (full) {
+                const name = wanted.find((c) => c.id === full)?.name ?? "";
+                throw new BadRequestException({
+                    message: `${name} already holds ${COLLECTION_PRODUCTS_MAX} products, the most a collection can.`,
+                    field: "collectionIds",
                 });
             }
+            await tx.collectionProduct.createMany({
+                data: joining.map((collectionId) => ({
+                    collectionId,
+                    organizationId,
+                    productId,
+                    position: (byId.get(collectionId)?._max.position ?? -1) + 1,
+                })),
+                skipDuplicates: true,
+            });
         });
         return this.forProduct(organizationId, productId);
     }

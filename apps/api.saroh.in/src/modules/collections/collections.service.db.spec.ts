@@ -433,6 +433,96 @@ describe("Collections (DB)", () => {
         expect(ids((await collections.get(orgId, a.id)).products)).toEqual([]);
     });
 
+    it("a hand-picked collection holds 500 products at most", async () => {
+        const many = Array.from({ length: 501 }, (_, i) => ({
+            id: `cap-${i}-${tag}`,
+            organizationId: orgId,
+            storeId,
+            name: `Cap ${i}`,
+            slug: `cap-${i}-${tag}`,
+            price: "10.00",
+            status: "PUBLISHED",
+        }));
+        await prisma.product.createMany({ data: many });
+        const made = await collections.create(orgId, { name: "Everything" });
+        await prisma.collectionProduct.createMany({
+            data: many.slice(0, 499).map((p, position) => ({
+                collectionId: made.id,
+                organizationId: orgId,
+                productId: p.id,
+                position,
+            })),
+        });
+        const [p499, p500] = [many[499].id, many[500].id];
+        const refused = await collections
+            .addProducts(orgId, made.id, [p499, p500])
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(BadRequestException);
+        expect((refused as BadRequestException).getResponse()).toMatchObject({
+            field: "productIds",
+            message:
+                "A collection holds up to 500 products; this one has room for 1 more.",
+        });
+        // One more fits; naming one it has already adds nothing.
+        await collections.addProducts(orgId, made.id, [p499, many[0].id]);
+        expect(
+            await prisma.collectionProduct.count({
+                where: { collectionId: made.id },
+            }),
+        ).toBe(500);
+        const last = await prisma.collectionProduct.findUniqueOrThrow({
+            where: {
+                collectionId_productId: {
+                    collectionId: made.id,
+                    productId: p499,
+                },
+            },
+            select: { position: true },
+        });
+        expect(last.position).toBe(499);
+        // Nor can the product page put a 501st in it.
+        await expect(
+            collections.setForProduct(orgId, p500, {
+                collectionIds: [made.id],
+            }),
+        ).rejects.toThrow(
+            "Everything already holds 500 products, the most a collection can.",
+        );
+    });
+
+    it("the product page puts a product at the end of each collection it joins", async () => {
+        const [a, b, c] = await Promise.all(
+            ["Honey", "Ghee", "Oats"].map((n) => product(n)),
+        );
+        const first = await collections.create(orgId, {
+            name: "Morning shelf",
+            productIds: [a, b],
+        });
+        const second = await collections.create(orgId, {
+            name: "Pantry staples",
+        });
+        await collections.setForProduct(orgId, c, {
+            collectionIds: [first.id, second.id],
+        });
+        expect(ids((await collections.get(orgId, first.id)).products)).toEqual([
+            a,
+            b,
+            c,
+        ]);
+        expect(ids((await collections.get(orgId, second.id)).products)).toEqual(
+            [c],
+        );
+        // Saving it again moves nothing.
+        await collections.setForProduct(orgId, c, {
+            collectionIds: [first.id, second.id],
+        });
+        expect(ids((await collections.get(orgId, first.id)).products)).toEqual([
+            a,
+            b,
+            c,
+        ]);
+    });
+
     it("the product overview lists its collections and the (empty) website pages", async () => {
         const bagel = await product("Bagel", cakes);
         const picked = await collections.create(orgId, {
