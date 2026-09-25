@@ -62,10 +62,11 @@ export function listWords(words: readonly string[]): string {
 }
 
 /**
- * The accent line under a module that is on: what turning it off changes.
- * Only what this screen knows to be true — the modules that go with it and
- * the rows that leave the rail. A module with neither (it works behind the
- * other rows) gets no line rather than an invented consequence.
+ * What turning a module off changes, said when someone asks to ("Turn off
+ * Appointments? …"). Only what this screen knows to be true — the modules
+ * that go with it and the rows that leave the rail. A module with neither
+ * (it works in the background) gets no sentence rather than an invented
+ * consequence, and so goes off without being asked about.
  */
 export function offImpact({
     rows,
@@ -88,7 +89,8 @@ export function offImpact({
         );
     }
     if (parts.length === 0) return null;
-    return `If you turn it off: ${parts.join(", and ")}. Nothing is deleted.`;
+    const said = parts.join(", and ");
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)}. Nothing is deleted.`;
 }
 
 /**

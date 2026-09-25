@@ -3,9 +3,8 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useId, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { navRowsForModule } from "@/components/shared/nav-items";
 import { setModuleStatusAction } from "@/lib/modules/actions";
@@ -23,12 +22,14 @@ import {
  * a row, and under each name what it is for.
  *
  * Turning a module off is entirely reversible — nothing is deleted — so it
- * takes UNDO, not a confirmation. A dialog in front of a reversible change
- * trains people to dismiss dialogs, which is what makes the irreversible ones
- * dangerous. What the row and the toast say is the other half: "Sell off"
- * tells a merchant nothing; "Orders, Products and Customers leave the rail"
- * tells them exactly what changes, and the rows are read from the nav itself
- * so the sentence cannot drift from what the rail does.
+ * takes UNDO, and never a modal. Where it changes something a person would
+ * miss, the row asks first, in place ("Turn off Appointments? Courses turns
+ * off with it…", Turn off / Keep it on, focus on Keep): the consequence is
+ * read at the moment it matters instead of sitting under every switch. What
+ * it says is the point: "Sell off" tells a merchant nothing; "Orders,
+ * Products and Customers leave the rail" tells them exactly what changes,
+ * and the rows are read from the nav itself so the sentence cannot drift
+ * from what the rail does. A module with nothing to say goes off at once.
  */
 export function ModuleList({ modules }: { modules: ModuleView[] }) {
     const canManage = modules.some((m) => m.canManage);
@@ -68,14 +69,15 @@ const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
         label: "Sell",
         note: "Orders, products, customers and storefronts.",
     },
+    PAYMENTS: { note: "Take subscriptions, send invoices and sell plans." },
     WEBSITE: { note: "Pages, posts and a domain." },
     APPOINTMENTS: { note: "A calendar, services and bookings." },
     COURSES: { note: "A run of dated sessions with seats and a price." },
     COMMUNICATIONS: {
-        note: "Email and WhatsApp to customers and leads. Works behind the other rows rather than adding one of its own.",
+        note: "Email and WhatsApp to your customers and leads. Works in the background — no new menu item.",
     },
     AUTOMATIONS: {
-        note: "Follow-ups that run on their own. Works behind the other rows rather than adding one of its own.",
+        note: "Follow-ups that run on their own. No new menu item.",
     },
     INSIGHTS: { note: "Figures across whatever else is turned on." },
 };
@@ -92,7 +94,7 @@ function noteOf(modules: ModuleView[], module: ModuleView): string {
         DISPLAY[module.key]?.note ??
         (rows.length > 0
             ? `${listWords(rows)} in the rail.`
-            : "Works behind the other rows rather than adding one of its own.");
+            : "Works in the background — no new menu item.");
     // "Needs Appointments." from the API's dependencies, not the copy, so
     // it is said of every module that has one.
     const needs = module.dependencies.map((d) => labelOf(modules, d));
@@ -122,8 +124,16 @@ function ModuleRow({
     first: boolean;
 }) {
     const [pending, startTransition] = useTransition();
+    const [asking, setAsking] = useState(false);
+    const keepRef = useRef<HTMLButtonElement>(null);
+    const rowRef = useRef<HTMLDivElement>(null);
     const labelId = useId();
     const noteId = useId();
+    // Asking moves focus to "Keep it on" — the safe answer, as the design
+    // has it — so Enter or Space never turns a module off by accident.
+    useEffect(() => {
+        if (asking) keepRef.current?.focus();
+    }, [asking]);
     const on = module.lifecycle === "ENABLED";
     const label = labelOf(modules, module.key);
 
@@ -182,9 +192,8 @@ function ModuleRow({
         );
     };
 
-    const flip = () => {
-        if (!module.canManage || blocked || pending) return;
-        if (!on) return turnOn([module.key]);
+    const turnOff = () => {
+        setAsking(false);
         // Off: what needs it first, then the module itself.
         const offOrder = [...dependents, module.key];
         run(
@@ -202,10 +211,26 @@ function ModuleRow({
         );
     };
 
+    const flip = () => {
+        if (!module.canManage || blocked || pending) return;
+        if (!on) return turnOn([module.key]);
+        // A second press while asking is the answer "yes".
+        if (impact && !asking) return setAsking(true);
+        turnOff();
+    };
+
+    const keepOn = () => {
+        setAsking(false);
+        rowRef.current
+            ?.querySelector<HTMLButtonElement>('[role="switch"]')
+            ?.focus();
+    };
+
     const locked = !module.canManage || blocked;
 
     return (
         <div
+            ref={rowRef}
             className={cn(
                 "flex items-center gap-3.5 px-[18px] py-3.5",
                 !first && "border-t border-border/70",
@@ -228,15 +253,37 @@ function ModuleRow({
                 >
                     {noteOf(modules, module)}
                 </p>
-                {impact ? (
-                    <p className="mt-1.5 flex items-start gap-1.5 text-pretty text-[12px] leading-[1.45] text-highlight-subtle-foreground">
-                        <TriangleAlert
-                            aria-hidden
-                            className="mt-0.5 size-[13px] shrink-0"
-                            strokeWidth={2}
-                        />
-                        <span>{impact}</span>
-                    </p>
+                {asking && impact ? (
+                    <div
+                        role="alert"
+                        onKeyDown={(e) => {
+                            if (e.key === "Escape") keepOn();
+                        }}
+                        className="mt-2.5 grid gap-2 rounded-[9px] border border-highlight-border bg-brand-subtle px-3 py-2.5"
+                    >
+                        <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
+                            <strong>Turn off {label}?</strong> {impact}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            <Button
+                                type="button"
+                                size="sm"
+                                disabled={pending}
+                                onClick={turnOff}
+                            >
+                                Turn off
+                            </Button>
+                            <Button
+                                ref={keepRef}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={keepOn}
+                            >
+                                Keep it on
+                            </Button>
+                        </div>
+                    </div>
                 ) : null}
                 {blocked && module.canManage ? (
                     <Button
