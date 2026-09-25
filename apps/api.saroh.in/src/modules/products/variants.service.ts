@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { recordEntry } from "../stock/stock.service";
 import type { ProductScope } from "./product-access";
 import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
@@ -283,7 +284,7 @@ export class VariantsService {
     }
 
     async removeIn(scope: ProductScope, productId: string, variantId: string) {
-        const { organizationId } = scope;
+        const { organizationId, userId } = scope;
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
             select: { id: true, title: true },
@@ -310,7 +311,8 @@ export class VariantsService {
             await tx.productVariant.delete({ where: { id: variantId } });
             // At each storefront, the last variant counting its own stock
             // takes its count back to the product, so the product does not
-            // silently lose its stock.
+            // silently lose its stock. The product's shelf logs it as a
+            // count (#513); the variant's shelf goes with the variant.
             for (const row of own) {
                 const others = rows.some(
                     (r) =>
@@ -322,23 +324,37 @@ export class VariantsService {
                 const whole = rows.find(
                     (r) => r.storeId === row.storeId && r.variantId === null,
                 );
-                if (whole) {
+                let wholeId = whole?.id;
+                if (wholeId) {
                     await tx.stockLevel.update({
-                        where: { id: whole.id },
-                        data: {
-                            onHand: { increment: row.onHand },
-                            lowStockAlert: row.lowStockAlert,
-                        },
+                        where: { id: wholeId },
+                        data: { lowStockAlert: row.lowStockAlert },
                     });
                 } else {
-                    await tx.stockLevel.create({
+                    const made = await tx.stockLevel.create({
                         data: {
                             organizationId,
                             storeId: row.storeId,
                             productId,
-                            onHand: row.onHand,
                             lowStockAlert: row.lowStockAlert,
                         },
+                        select: { id: true },
+                    });
+                    wholeId = made.id;
+                }
+                if (row.onHand !== 0) {
+                    const current = await tx.stockLevel.findUniqueOrThrow({
+                        where: { id: wholeId },
+                        select: { onHand: true },
+                    });
+                    await recordEntry(tx, {
+                        stockLevelId: wholeId,
+                        kind: "COUNTED",
+                        quantity: row.onHand,
+                        counted: current.onHand + row.onHand,
+                        actorUserId: userId,
+                        note: `Took back ${variant.title}'s stock`,
+                        allowNegative: true,
                     });
                 }
             }

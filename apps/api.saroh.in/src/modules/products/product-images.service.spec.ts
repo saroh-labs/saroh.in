@@ -71,6 +71,7 @@ const media = {
 
 const scope = {
     organizationId: "org_1",
+    userId: "user_1",
     storeId: "store_1",
     canWrite: true,
     may: () => Promise.resolve(true),

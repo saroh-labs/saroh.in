@@ -2,6 +2,7 @@ import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { lockStockLevels } from "../products/stock-levels";
+import { recordSold, reverseSale } from "../stock/stock.service";
 
 /**
  * Inventory effect of an order, modelled as reserve → commit → release.
@@ -25,6 +26,11 @@ import { lockStockLevels } from "../products/stock-levels";
  *
  * Rows are locked in id order before they are read (lock order: Order →
  * StockLevel), so two orders for the last unit take turns.
+ *
+ * A move that changes what is on the shelf writes it to the stock log
+ * (#513): fulfilling writes SOLD, taking a fulfilment back writes REVERSED
+ * against that sale. Holding and releasing are promises and write nothing.
+ * (U2 moves this onto the stock module's reserve and commit.)
  *
  *   effect(RESERVED)  = { promised: +q, onHand:  0 }   // held, not consumed
  *   effect(COMMITTED) = { promised:  0, onHand: -q }   // consumed on fulfil
@@ -105,6 +111,7 @@ function nextStock(
 /** What a line records about its stock, read fresh inside the transaction. */
 interface Recorded {
     id: string;
+    orderId: string;
     productId: string;
     variantId: string | null;
     stockRow: StockRowKind | null;
@@ -120,6 +127,7 @@ async function recordedLines(
         where: { id: { in: lines.map((l) => l.id) } },
         select: {
             id: true,
+            orderId: true,
             productId: true,
             variantId: true,
             stockRow: true,
@@ -132,6 +140,7 @@ async function recordedLines(
             i.id,
             {
                 id: i.id,
+                orderId: i.orderId,
                 productId: i.productId,
                 variantId: i.variantId,
                 stockRow: i.stockRow,
@@ -240,16 +249,36 @@ async function move(
     from: StockPhase,
     to: StockPhase,
     q: number,
+    orderId: string,
 ): Promise<boolean> {
     const row = await tx.stockLevel.findUnique({
         where: { id: rowId },
         select: { onHand: true, promised: true },
     });
     if (!row) return false;
-    await tx.stockLevel.update({
-        where: { id: rowId },
-        data: nextStock(row, from, to, q),
-    });
+    const next = nextStock(row, from, to, q);
+    const shelf = next.onHand - row.onHand;
+    const promised = next.promised - row.promised;
+    if (shelf < 0) {
+        await recordSold(tx, {
+            stockLevelId: rowId,
+            units: -shelf,
+            orderId,
+            releasePromised: -promised,
+        });
+    } else if (shelf > 0) {
+        await reverseSale(tx, {
+            stockLevelId: rowId,
+            units: shelf,
+            orderId,
+            rehold: promised,
+        });
+    } else {
+        await tx.stockLevel.update({
+            where: { id: rowId },
+            data: { promised: next.promised },
+        });
+    }
     return true;
 }
 
@@ -269,10 +298,11 @@ export async function adjustReservation(
     if (delta === 0) return;
     const recorded = await recordedLines(tx, [line]);
     const rowId = (await heldRows(tx, recorded)).get(line.id);
-    if (!rowId) return;
+    const orderId = recorded.get(line.id)?.orderId;
+    if (!rowId || !orderId) return;
     const [from, to]: [StockPhase, StockPhase] =
         delta > 0 ? ["RELEASED", "RESERVED"] : ["RESERVED", "RELEASED"];
-    if (await move(tx, rowId, from, to, Math.abs(delta))) {
+    if (await move(tx, rowId, from, to, Math.abs(delta), orderId)) {
         await tx.orderItem.update({
             where: { id: line.id },
             data: { heldQuantity: { increment: delta } },
@@ -324,9 +354,10 @@ export async function applyInventoryTransition(
 
     for (const line of lines) {
         const rowId = rowOf.get(line.id);
+        const orderId = recorded.get(line.id)?.orderId;
         // NONE: the product counted no stock when the line was placed.
-        if (!rowId) continue;
-        if (await move(tx, rowId, from, to, line.quantity)) {
+        if (!rowId || !orderId) continue;
+        if (await move(tx, rowId, from, to, line.quantity, orderId)) {
             await tx.orderItem.update({
                 where: { id: line.id },
                 data: {

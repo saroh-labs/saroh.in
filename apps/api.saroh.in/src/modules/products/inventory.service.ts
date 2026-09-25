@@ -1,11 +1,13 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { count, recordEntry } from "../stock/stock.service";
 import type {
     UpdateInventoryDto,
     UpdateVariantStockDto,
@@ -16,11 +18,13 @@ import { ProductsService } from "./products.service";
 import type { StockLevelRow } from "./stock-levels";
 import {
     countsPerVariant,
-    firstRow,
     lockProduct,
     lockProductStock,
     lockStockLevels,
 } from "./stock-levels";
+
+/** Why a count was written when the product switched to per-variant stock. */
+const SWITCH_NOTE = "Now counted per variant";
 
 export interface StockView {
     productId: string;
@@ -43,6 +47,11 @@ export interface StockView {
  * variant) or per variant (a row each) — never both for the same units.
  * `reserved` (StockLevel.promised) belongs to Orders and is read-only here;
  * this service sets on-hand counts and warning levels.
+ *
+ * Every count goes through the stock module (#513), so it writes a COUNTED
+ * entry in the same transaction, and needs whoever sets it to be able to
+ * count and move stock (`canWriteStock`). A count may go below what is
+ * promised; the shelf then reads "N short".
  *
  * Switching to per-variant stock is one save of every variant's count at the
  * storefront the editor is open at, and every unit is counted once. It
@@ -84,7 +93,7 @@ export class InventoryService {
         dto: UpdateInventoryDto,
     ) {
         return this.upsertIn(
-            await this.products.access.writeViaStore(
+            await this.products.access.stockViaStore(
                 storeId,
                 userId,
                 productId,
@@ -95,19 +104,15 @@ export class InventoryService {
     }
 
     /**
-     * Set the product's own count here; refused once it counts per variant.
-     *
-     * TODO(U4, #513): route this through the stock module so the change
-     * writes a "Counted" StockEntry in the same transaction, and gate it on
-     * `canWriteStock` (inventory:write or store:write). Until the stock log
-     * exists it sets the StockLevel row directly, as it has since #510.
+     * Count the product's own shelf here (a COUNTED entry); refused once it
+     * counts per variant. A shelf that counted nothing starts counting.
      */
     async upsertIn(
         scope: ProductScope,
         productId: string,
         dto: UpdateInventoryDto,
     ) {
-        const { organizationId, storeId } = scope;
+        const { organizationId, storeId, userId } = scope;
         if (await countsPerVariant(prisma, productId)) {
             throw new ConflictException({
                 message:
@@ -115,43 +120,31 @@ export class InventoryService {
                 field: "quantity",
             });
         }
-        const row = await prisma.$transaction(async (tx) => {
-            const rows = await lockProductStock(tx, productId, storeId);
-            const own = firstRow(rows);
-            if (own) {
-                return tx.stockLevel.update({
-                    where: { id: own.id },
-                    data: {
-                        onHand: dto.quantity,
-                        ...(dto.lowStockAlert != null
-                            ? { lowStockAlert: dto.lowStockAlert }
-                            : {}),
-                    },
-                });
-            }
-            return tx.stockLevel.create({
-                data: {
-                    organizationId,
-                    storeId,
-                    productId,
-                    onHand: dto.quantity,
-                    lowStockAlert: dto.lowStockAlert ?? 10,
+        const { shelf } = await prisma.$transaction((tx) =>
+            count(
+                tx,
+                { organizationId, userId },
+                {
+                    target: { storeId, productId, variantId: null },
+                    counted: dto.quantity,
+                    lowStockAlert: dto.lowStockAlert,
                 },
-            });
-        });
+            ),
+        );
         return {
             productId,
-            quantity: row.onHand,
-            reserved: row.promised,
-            lowStockAlert: row.lowStockAlert,
+            quantity: shelf.onHand,
+            reserved: shelf.promised,
+            lowStockAlert: shelf.lowStockAlert,
         };
     }
 
     /**
-     * Set every variant's on-hand count and warning level here at once. The
+     * Count every variant's shelf and set its warning level here at once. The
      * list must name each variant of the product exactly once, so no variant
-     * is left uncounted. A count below what that variant already promises to
-     * open orders here is refused.
+     * is left uncounted. A count below what a variant promises is saved; the
+     * shelf reads "N short". Switching the product to per-variant stock the
+     * first time changes how it counts, so that needs `store:write`.
      */
     async setVariants(
         storeId: string,
@@ -160,7 +153,7 @@ export class InventoryService {
         dto: UpdateVariantStockDto,
     ): Promise<StockView> {
         return this.setVariantsIn(
-            await this.products.access.writeViaStore(
+            await this.products.access.stockViaStore(
                 storeId,
                 userId,
                 productId,
@@ -170,13 +163,13 @@ export class InventoryService {
         );
     }
 
-    /** See `setVariants`. TODO(U4, #513): write stock entries here too. */
+    /** See `setVariants`. Every shelf it changes gets a COUNTED entry. */
     async setVariantsIn(
         scope: ProductScope,
         productId: string,
         dto: UpdateVariantStockDto,
     ): Promise<StockView> {
-        const { organizationId, storeId } = scope;
+        const { organizationId, storeId, userId } = scope;
         const variants = await prisma.productVariant.findMany({
             where: { productId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -218,25 +211,18 @@ export class InventoryService {
             await lockProduct(tx, productId);
             const rows = await lockProductStock(tx, productId);
             const firstSwitch = !rows.some((r) => r.variantId !== null);
+            if (firstSwitch && !scope.canWrite) {
+                throw new ForbiddenException(
+                    "Counting each variant changes how this product counts stock. Ask someone who can change products.",
+                );
+            }
 
             const here = rows.filter((r) => r.storeId === storeId);
             const moving = firstSwitch
                 ? await promisesToMove(tx, productId, storeId)
                 : {};
-            const promisedNow = new Map(
-                here.map((r) => [r.variantId, r.promised] as const),
-            );
             const counts = new Map<string, { onHand: number; warn: number }>();
             for (const input of dto.variants) {
-                const promised = firstSwitch
-                    ? (moving[input.variantId] ?? 0)
-                    : (promisedNow.get(input.variantId) ?? 0);
-                if (input.quantity < promised) {
-                    throw new BadRequestException({
-                        message: `${byId.get(input.variantId)?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
-                        field: "variants",
-                    });
-                }
                 counts.set(input.variantId, {
                     onHand: input.quantity,
                     warn: input.lowStockAlert,
@@ -244,28 +230,27 @@ export class InventoryService {
             }
 
             if (!firstSwitch) {
-                for (const [variantId, count] of Array.from(counts)) {
-                    const row = here.find((r) => r.variantId === variantId);
-                    if (row) {
+                for (const [variantId, next] of Array.from(counts)) {
+                    let rowId = here.find((r) => r.variantId === variantId)?.id;
+                    if (rowId) {
                         await tx.stockLevel.update({
-                            where: { id: row.id },
-                            data: {
-                                onHand: count.onHand,
-                                lowStockAlert: count.warn,
-                            },
+                            where: { id: rowId },
+                            data: { lowStockAlert: next.warn },
                         });
                     } else {
-                        await tx.stockLevel.create({
+                        const made = await tx.stockLevel.create({
                             data: {
                                 organizationId,
                                 storeId,
                                 productId,
                                 variantId,
-                                onHand: count.onHand,
-                                lowStockAlert: count.warn,
+                                lowStockAlert: next.warn,
                             },
+                            select: { id: true },
                         });
+                        rowId = made.id;
                     }
+                    await this.countTo(tx, rowId, next.onHand, userId);
                 }
                 return;
             }
@@ -290,6 +275,7 @@ export class InventoryService {
                 const free = own ? Math.max(0, own.onHand - own.promised) : 0;
                 const created = await this.switchStore(tx, {
                     organizationId,
+                    userId,
                     storeId: store,
                     productId,
                     own,
@@ -316,15 +302,42 @@ export class InventoryService {
     }
 
     /**
+     * Count a locked row to `onHand`: one COUNTED entry, even when nothing
+     * changed (a count that agrees is still a count).
+     */
+    private async countTo(
+        tx: Prisma.TransactionClient,
+        stockLevelId: string,
+        onHand: number,
+        userId: string,
+        note?: string,
+    ): Promise<void> {
+        const row = await tx.stockLevel.findUniqueOrThrow({
+            where: { id: stockLevelId },
+            select: { onHand: true },
+        });
+        await recordEntry(tx, {
+            stockLevelId,
+            kind: "COUNTED",
+            quantity: onHand - row.onHand,
+            counted: onHand,
+            actorUserId: userId,
+            note: note ?? null,
+        });
+    }
+
+    /**
      * One storefront's side of the first switch: a row per variant holding
      * what its open lines here promise, those lines moved onto it, and the
      * product's own row left holding only what lines without a variant
-     * promise. Returns the rows it made.
+     * promise. Each shelf that changes gets a COUNTED entry. Returns the
+     * rows it made.
      */
     private async switchStore(
         tx: Prisma.TransactionClient,
         input: {
             organizationId: string;
+            userId: string;
             storeId: string;
             productId: string;
             own: StockLevelRow | undefined;
@@ -332,22 +345,23 @@ export class InventoryService {
             counts: Map<string, { onHand: number; warn: number }>;
         },
     ): Promise<string[]> {
-        const { organizationId, storeId, productId, own, promises } = input;
+        const { organizationId, userId, storeId, productId, own, promises } =
+            input;
         const made: string[] = [];
-        for (const [variantId, count] of Array.from(input.counts)) {
+        for (const [variantId, next] of Array.from(input.counts)) {
             const row = await tx.stockLevel.create({
                 data: {
                     organizationId,
                     storeId,
                     productId,
                     variantId,
-                    onHand: count.onHand,
                     promised: promises[variantId] ?? 0,
-                    lowStockAlert: count.warn,
+                    lowStockAlert: next.warn,
                 },
                 select: { id: true },
             });
             made.push(row.id);
+            await this.countTo(tx, row.id, next.onHand, userId, SWITCH_NOTE);
             await tx.orderItem.updateMany({
                 where: { ...linesToMove(productId, storeId), variantId },
                 data: { stockRow: "VARIANT", stockLevelId: row.id },
@@ -360,8 +374,11 @@ export class InventoryService {
             const left = Math.max(0, own.promised - moved);
             await tx.stockLevel.update({
                 where: { id: own.id },
-                data: { onHand: left, promised: left },
+                data: { promised: left },
             });
+            if (own.onHand !== left) {
+                await this.countTo(tx, own.id, left, userId, SWITCH_NOTE);
+            }
         }
         return made;
     }

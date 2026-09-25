@@ -8,7 +8,11 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { OrgAction } from "../organizations/organization-actions";
-import { allows, authorize } from "../organizations/organization-policy";
+import {
+    allows,
+    authorize,
+    canWriteStock,
+} from "../organizations/organization-policy";
 import { StoresService } from "../stores/stores.service";
 
 /**
@@ -22,6 +26,8 @@ import { StoresService } from "../stores/stores.service";
  */
 export interface ProductScope {
     organizationId: string;
+    /** Who is asking — recorded on the stock entries they write. */
+    userId: string;
     /** The storefront whose shelf and listing are read or written. */
     storeId: string;
     /** The caller may change products (`store:write`). */
@@ -83,6 +89,7 @@ export class ProductAccess {
         const { organizationId, canWrite } = this.business(ctx);
         return {
             organizationId,
+            userId: ctx.userId,
             storeId: await this.storefrontFor(
                 organizationId,
                 productId,
@@ -106,6 +113,7 @@ export class ProductAccess {
         const organizationId = this.writeBusiness(ctx);
         return {
             organizationId,
+            userId: ctx.userId,
             storeId: await this.storefrontFor(
                 organizationId,
                 productId,
@@ -127,6 +135,7 @@ export class ProductAccess {
         if (productId) await this.assertListed(storeId, productId);
         return {
             organizationId: store.organizationId,
+            userId,
             storeId,
             canWrite: await this.stores.canWrite(storeId, userId),
             may: (action) => this.stores.memberAllows(storeId, userId, action),
@@ -151,8 +160,73 @@ export class ProductAccess {
         if (productId) await this.assertListed(storeId, productId);
         return {
             organizationId: writable.organizationId,
+            userId,
             storeId,
             canWrite: true,
+            may: (action) => this.stores.memberAllows(storeId, userId, action),
+        };
+    }
+
+    /**
+     * Count or set stock of one product at a storefront (#513): the caller
+     * must be able to count and move stock (`canWriteStock` — inventory:write,
+     * or store:write, which implies it). `canWrite` says whether they may
+     * also change how the product counts (switching it to per-variant).
+     */
+    async stock(
+        ctx: OrganizationContext,
+        productId: string,
+        storefront?: string,
+    ): Promise<ProductScope> {
+        authorize(ctx, "store:read");
+        if (!canWriteStock(ctx)) {
+            throw new ForbiddenException(
+                "Your role can't count or move stock.",
+            );
+        }
+        const organizationId = ctx.organizationId;
+        return {
+            organizationId,
+            userId: ctx.userId,
+            storeId: await this.storefrontFor(
+                organizationId,
+                productId,
+                storefront,
+                "first",
+            ),
+            canWrite: allows(ctx, "store:write"),
+            may: (action) => Promise.resolve(allows(ctx, action)),
+        };
+    }
+
+    /**
+     * Store-route alias of `stock`: someone who can change the storefront,
+     * or whose membership may count and move stock, where the product is
+     * listed. Anything else is not found, as on every alias.
+     */
+    async stockViaStore(
+        storeId: string,
+        userId: string,
+        productId: string,
+    ): Promise<ProductScope> {
+        const store = await this.stores.getForUser(storeId, userId);
+        const canWrite = await this.stores.canWrite(storeId, userId);
+        if (
+            !canWrite &&
+            !(await this.stores.memberAllows(
+                storeId,
+                userId,
+                "inventory:write",
+            ))
+        ) {
+            throw new NotFoundException("Store not found");
+        }
+        await this.assertListed(storeId, productId);
+        return {
+            organizationId: store.organizationId,
+            userId,
+            storeId,
+            canWrite,
             may: (action) => this.stores.memberAllows(storeId, userId, action),
         };
     }

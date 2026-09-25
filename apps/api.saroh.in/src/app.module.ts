@@ -47,6 +47,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StaffModule } from "./modules/staff/staff.module";
+import { StockModule } from "./modules/stock/stock.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
@@ -90,6 +91,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         StoresModule,
         MembersModule,
         ProductsModule,
+        StockModule,
         CategoriesModule,
         CatalogueModule,
         CustomersModule,
