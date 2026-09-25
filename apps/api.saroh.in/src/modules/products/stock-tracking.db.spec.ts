@@ -41,6 +41,7 @@ import { count } from "../stock/stock.service";
 import { setProductTracking } from "../stock/tracking";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
+import { OrganizationProductsController } from "./organization-products.controller";
 import { ProductAccess } from "./product-access";
 import { ProductsService } from "./products.service";
 
@@ -863,6 +864,63 @@ describe("the Stock API and the readers", () => {
         expect(list.find((p) => p.id === soap)).toMatchObject({
             inventory: null,
         });
+    });
+
+    it("the product's stock routes let a stock-only role count, not change how it counts", async () => {
+        // Only the routes' own services are used here.
+        const unused = null as never;
+        const controller = new OrganizationProductsController(
+            access,
+            products,
+            unused,
+            unused,
+            unused,
+            inventory,
+            unused,
+        );
+        const flour = await product("Flour", { hill: 5 });
+        const counted = await controller.setInventory(
+            clerk(),
+            flour,
+            { quantity: 3 },
+            hill,
+        );
+        expect(counted).toMatchObject({ quantity: 3 });
+        expect(await shelf(hill, flour)).toMatchObject({ onHand: 3 });
+
+        // Switching it to count each variant changes how it counts.
+        const fine = await prisma.productVariant.create({
+            data: { productId: flour, title: "Fine", sku: `FL-F-${tag}` },
+            select: { id: true },
+        });
+        await expect(
+            controller.setVariantStock(
+                clerk(),
+                flour,
+                {
+                    variants: [
+                        { variantId: fine.id, quantity: 3, lowStockAlert: 1 },
+                    ],
+                },
+                hill,
+            ),
+        ).rejects.toThrow(ForbiddenException);
+        // As does starting to track one that doesn't.
+        const yeast = await product("Yeast", {});
+        await expect(
+            controller.setInventory(clerk(), yeast, { quantity: 2 }, hill),
+        ).rejects.toThrow(ForbiddenException);
+        // A role with neither is refused outright.
+        const reader: OrganizationContext = {
+            organizationId: orgId,
+            userId: clerkId,
+            role: "MEMBER",
+            roleKey: "reader",
+            actions: resolveCapabilities("reader", ["store:read"]),
+        };
+        await expect(
+            controller.setInventory(reader, flour, { quantity: 1 }, hill),
+        ).rejects.toThrow("Your role can't count or move stock.");
     });
 
     it("the product's own count starts tracking for an owner, never for a stock-only role", async () => {

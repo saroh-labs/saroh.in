@@ -286,7 +286,12 @@ export class OrganizationProductsController {
         );
     }
 
-    /** Every variant's count at once; switches the product to per-variant. */
+    /**
+     * Every variant's count at once: whoever may count and move stock
+     * (`inventory:write`, or `store:write`). Switching the product to
+     * per-variant stock the first time changes how it counts, so
+     * `setVariantsIn` asks `store:write` for that.
+     */
     @Put(":productId/inventory/variants")
     async setVariantStock(
         @OrgContext() ctx: OrganizationContext,
@@ -295,12 +300,17 @@ export class OrganizationProductsController {
         @Query("storefront") storefront?: string,
     ) {
         return this.inventory.setVariantsIn(
-            await this.access.write(ctx, productId, storefront),
+            await this.access.stock(ctx, productId, storefront),
             productId,
             dto,
         );
     }
 
+    /**
+     * Count the product's own shelf: whoever may count and move stock, as
+     * on the old storefront route. Starting to track a product with its
+     * first count needs `store:write` (`upsertIn`).
+     */
     @Put(":productId/inventory")
     async setInventory(
         @OrgContext() ctx: OrganizationContext,
@@ -309,7 +319,7 @@ export class OrganizationProductsController {
         @Query("storefront") storefront?: string,
     ) {
         return this.inventory.upsertIn(
-            await this.access.write(ctx, productId, storefront),
+            await this.access.stock(ctx, productId, storefront),
             productId,
             dto,
         );
