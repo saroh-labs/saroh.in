@@ -358,15 +358,6 @@ describe("Variants and stock per variant (DB)", () => {
             const detail = await products.get(storeId, tonerId, ownerId);
             expect(detail.variantPromises).toEqual({ [t.S]: 2 });
 
-            await expect(
-                inventory.setVariants(storeId, tonerId, ownerId, {
-                    variants: [
-                        { variantId: t.S, quantity: 1, lowStockAlert: 2 },
-                        { variantId: t.M, quantity: 0, lowStockAlert: 2 },
-                    ],
-                }),
-            ).rejects.toThrow("S has 2 promised to open orders");
-
             // S starts at what was free (8) plus its own promise (2).
             await inventory.setVariants(storeId, tonerId, ownerId, {
                 variants: [
@@ -388,21 +379,19 @@ describe("Variants and stock per variant (DB)", () => {
             expect(await own(tonerId)).toEqual({ quantity: 0, reserved: 0 });
         });
 
-        it("refuses a count below what a variant has promised since", async () => {
+        it("saves a count below what a variant has promised since (#513)", async () => {
             await orders.create(storeId, ownerId, {
                 customerId,
                 items: [{ productId: tonerId, variantId: t.S, quantity: 3 }],
             });
-            const refused = inventory.setVariants(storeId, tonerId, ownerId, {
+            // The shelf holds what was counted; the gap reads "1 short".
+            await inventory.setVariants(storeId, tonerId, ownerId, {
                 variants: [
                     { variantId: t.S, quantity: 2, lowStockAlert: 2 },
                     { variantId: t.M, quantity: 0, lowStockAlert: 2 },
                 ],
             });
-            await expect(refused).rejects.toThrow(BadRequestException);
-            await expect(refused).rejects.toThrow(
-                "S has 3 promised to open orders — on hand can't go below that.",
-            );
+            expect(await stockOf(t.S)).toEqual({ quantity: 2, reserved: 3 });
         });
     });
 

@@ -311,7 +311,56 @@ describe("Products: organization routes and storefront aliases (DB)", () => {
         ).toEqual({ onHand: 7 });
     });
 
-    // U4 (#513) adds the stock log; then the alias's inventory PUT routes
-    // through the stock module and writes exactly one "Counted" entry.
-    it.todo("a stock write through the alias writes one StockEntry (U4, #513)");
+    it("a stock write through the alias writes one StockEntry (#513)", async () => {
+        const { id } = await products.create(hill, users.OWNER, {
+            name: "Logged",
+            price: "20.00",
+        });
+        await inventory.upsert(hill, id, users.OWNER, { quantity: 7 });
+        await inventory.upsert(hill, id, users.OWNER, { quantity: 4 });
+        const entries = await prisma.stockEntry.findMany({
+            where: { productId: id },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: {
+                kind: true,
+                storeId: true,
+                before: true,
+                quantity: true,
+                after: true,
+                actorUserId: true,
+            },
+        });
+        // One entry per write, each a count by whoever made it.
+        expect(entries).toEqual([
+            {
+                kind: "COUNTED",
+                storeId: hill,
+                before: 0,
+                quantity: 7,
+                after: 7,
+                actorUserId: users.OWNER,
+            },
+            {
+                kind: "COUNTED",
+                storeId: hill,
+                before: 7,
+                quantity: -3,
+                after: 4,
+                actorUserId: users.OWNER,
+            },
+        ]);
+        // The organization route writes the same way.
+        await inventory.upsertIn(
+            await access.stock(ctx("OWNER"), id, hill),
+            id,
+            { quantity: 5 },
+        );
+        expect(
+            await prisma.stockEntry.count({ where: { productId: id } }),
+        ).toBe(3);
+        // A Member can't count: 403 on the organization route.
+        await expect(access.stock(ctx("MEMBER"), id, hill)).rejects.toThrow(
+            ForbiddenException,
+        );
+    });
 });

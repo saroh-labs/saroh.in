@@ -152,6 +152,8 @@ module.exports = {
         "<rootDir>/src/modules/products/product-images.service.spec.ts",
         // #530 the merge report: Owner/Admin only, with a mocked Prisma.
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
+        // #513 the stock log's words and arithmetic — pure.
+        "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",

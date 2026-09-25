@@ -28,6 +28,7 @@ const mockDb = {
     items: [] as Record<string, unknown>[],
     events: [] as MockEvent[],
     inventory: { quantity: 10, reserved: 0 },
+    entries: [] as { id: string; kind: string }[],
     locks: 0,
 };
 
@@ -159,6 +160,7 @@ jest.mock("@saroh/database", () => {
                             .filter((x) => where.id.in.includes(x.id as string))
                             .map((i) => ({
                                 id: i.id,
+                                orderId: mockDb.order.id,
                                 productId: i.productId,
                                 variantId: null,
                                 stockRow: i.stockRow ?? null,
@@ -195,15 +197,56 @@ jest.mock("@saroh/database", () => {
                     promised: mockDb.inventory.reserved,
                 }),
             ),
+            findUniqueOrThrow: jest.fn(() =>
+                Promise.resolve({
+                    id: "sl_1",
+                    organizationId: "org_1",
+                    storeId: "store_1",
+                    productId: "prod_1",
+                    variantId: null,
+                    onHand: mockDb.inventory.quantity,
+                    promised: mockDb.inventory.reserved,
+                    lowStockAlert: 10,
+                }),
+            ),
+            // A shelf change sets on hand and may move the promise with it
+            // (#513); a promise alone sets only promised.
             update: jest.fn(
-                ({ data }: { data: { onHand: number; promised: number } }) => {
+                ({
+                    data,
+                }: {
+                    data: {
+                        onHand?: number;
+                        promised?: number | { increment: number };
+                    };
+                }) => {
+                    const promised =
+                        typeof data.promised === "object"
+                            ? mockDb.inventory.reserved +
+                              data.promised.increment
+                            : (data.promised ?? mockDb.inventory.reserved);
                     mockDb.inventory = {
-                        quantity: data.onHand,
-                        reserved: data.promised,
+                        quantity: data.onHand ?? mockDb.inventory.quantity,
+                        reserved: promised,
                     };
                     return Promise.resolve({});
                 },
             ),
+        },
+        // The stock log (#513): what the order flows wrote to it.
+        stockEntry: {
+            findFirst: jest.fn(() =>
+                Promise.resolve(
+                    [...mockDb.entries]
+                        .reverse()
+                        .find((e) => e.kind === "SOLD") ?? null,
+                ),
+            ),
+            create: jest.fn(({ data }: { data: Record<string, unknown> }) => {
+                const entry = { id: `se_${mockDb.entries.length}`, ...data };
+                mockDb.entries.push(entry as { id: string; kind: string });
+                return Promise.resolve(entry);
+            }),
         },
         paymentIntent: {
             findMany: jest.fn(({ where }: { where: { status?: string } }) =>
@@ -270,6 +313,7 @@ function reset(over: Record<string, unknown> = {}) {
     mockDb.locks = 0;
     mockDb.events = [];
     mockDb.inventory = { quantity: 10, reserved: 3 };
+    mockDb.entries = [];
     mockDb.order = {
         id: "order_1",
         organizationId: "org_1",
@@ -357,6 +401,8 @@ describe("moving through the kitchen", () => {
         ).toBe(true);
         // Collected commits the held stock: 3 leave the shelf.
         expect(mockDb.inventory).toEqual({ quantity: 7, reserved: 0 });
+        // ...and the stock log says so, once (#513).
+        expect(mockDb.entries.map((e) => e.kind)).toEqual(["SOLD"]);
         // Every move took the order's row lock first.
         expect(mockDb.locks).toBe(3);
     });

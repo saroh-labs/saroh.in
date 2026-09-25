@@ -95,3 +95,14 @@ describe("capability catalogue", () => {
         expect(CAPABILITY_BY_ACTION.get("module:manage")?.note).toBeDefined();
     });
 });
+
+describe("Count and move stock (#513)", () => {
+    it("is on the list, grantable, with a label an owner reads", () => {
+        const stock = CAPABILITY_BY_ACTION.get("inventory:write");
+        expect(stock?.label).toBe("Count and move stock");
+        expect(stock?.group).toBe("sell");
+        expect(grantableCapabilities().map((c) => c.action)).toContain(
+            "inventory:write",
+        );
+    });
+});
