@@ -623,6 +623,54 @@ describe("CustomerDetailService", () => {
         expect(detail.bookings?.upcoming).toHaveLength(1);
     });
 
+    // #531: products belong to the business, so the same product bought at
+    // two storefronts is one product id, whichever storefront the order was
+    // placed at; orders are read by business, never by where a product lives.
+    it("names one catalogue product the same wherever it was ordered", async () => {
+        const { svc, db } = make();
+        const ONLINE = { id: "store_2", name: "Online" };
+        db.order.findMany.mockResolvedValue([
+            ORDER,
+            {
+                ...ORDER,
+                id: "ord_2",
+                orderId: "ORD-002",
+                store: ONLINE,
+                items: [
+                    {
+                        productId: "prod_1",
+                        quantity: 1,
+                        product: { name: "Sourdough loaf" },
+                        variant: null,
+                    },
+                ],
+            },
+        ]);
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        const lines = detail.orders?.rows.map((r) => ({
+            storefront: r.via.storefront.name,
+            product: r.items[0]?.productId,
+            name: r.items[0]?.name,
+        }));
+        expect(lines).toEqual([
+            {
+                storefront: "Rye & Co.",
+                product: "prod_1",
+                name: "Sourdough loaf",
+            },
+            { storefront: "Online", product: "prod_1", name: "Sourdough loaf" },
+        ]);
+        const where = (
+            db.order.findMany.mock.calls[0] as [{ where: object }]
+        )[0].where;
+        expect(where).toEqual({
+            organizationId: "org_1",
+            customerId: { in: ["cust_1"] },
+        });
+    });
+
     it("is a 404 for a contact in another organization", async () => {
         const { svc, db } = make();
         db.contact.findFirst.mockResolvedValue(null);

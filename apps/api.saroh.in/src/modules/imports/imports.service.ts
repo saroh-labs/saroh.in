@@ -88,8 +88,8 @@ export class ImportsService {
         entity: ImportEntity,
         dto: PreviewImportDto,
     ): Promise<PreviewResult> {
-        await this.requireWrite(storeId, userId);
-        return this.plan(storeId, entity, dto);
+        const organizationId = await this.requireWrite(storeId, userId);
+        return this.plan(storeId, organizationId, entity, dto);
     }
 
     async apply(
@@ -99,7 +99,7 @@ export class ImportsService {
         dto: ApplyImportDto,
     ): Promise<ApplyResult> {
         const organizationId = await this.requireWrite(storeId, userId);
-        const { plan } = await this.plan(storeId, entity, dto);
+        const { plan } = await this.plan(storeId, organizationId, entity, dto);
 
         if (!isApplicable(plan)) {
             throw new BadRequestException({
@@ -163,6 +163,7 @@ export class ImportsService {
 
     private async plan(
         storeId: string,
+        organizationId: string | null,
         entity: ImportEntity,
         dto: PreviewImportDto,
     ): Promise<PreviewResult> {
@@ -192,7 +193,11 @@ export class ImportsService {
             records: parsed.records,
             mapping,
             policy: dto.policy ?? "SKIP",
-            existingKeys: await this.existingKeys(storeId, entity),
+            existingKeys: await this.existingKeys(
+                storeId,
+                organizationId,
+                entity,
+            ),
             requiredFields: descriptor.requiredFields,
             keyOf: descriptor.keyOf,
             validateRow: descriptor.validateRow,
@@ -203,12 +208,16 @@ export class ImportsService {
 
     private async existingKeys(
         storeId: string,
+        organizationId: string | null,
         entity: ImportEntity,
     ): Promise<Set<string>> {
         if (entity === "products") {
-            // A product's address is unique in its business (#510).
+            // A product's address is unique in its business (#510): a row
+            // whose slug the catalogue has updates that product, whichever
+            // storefront sells it (#531).
+            if (!organizationId) return new Set();
             const rows = await prisma.product.findMany({
-                where: { organization: { stores: { some: { id: storeId } } } },
+                where: { organizationId },
                 select: { slug: true },
             });
             return new Set(rows.map((r) => r.slug));
@@ -261,9 +270,17 @@ export class ImportsService {
                     storeId,
                 });
             } else {
-                await tx.product.update({
+                // The catalogue's product, now also sold here (a listing it
+                // already has is kept as it is).
+                const product = await tx.product.update({
                     where: { organizationId_slug: { organizationId, slug } },
                     data,
+                    select: { id: true },
+                });
+                await listAt(tx, {
+                    organizationId,
+                    productId: product.id,
+                    storeId,
                 });
             }
             return;

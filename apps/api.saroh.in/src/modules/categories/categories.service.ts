@@ -237,7 +237,7 @@ export class CategoriesService {
             }
             const moved = await tx.product.updateMany({
                 where: {
-                    store: { organizationId },
+                    organizationId,
                     id: { in: dto.productIds },
                     categoryId: dto.movedTo ?? null,
                 },
