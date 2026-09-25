@@ -40,7 +40,7 @@ import {
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { reserveOnPayment, soldOutRefundKey, uncommitLines } from "./reserve";
 import { SOLD_OUT_WHILE_PAYING } from "./stock-words";
-import { count } from "./stock.service";
+import { count, returnByHand } from "./stock.service";
 
 const WEBHOOK_SECRET = "whsec_reserve_test";
 const tag = `${process.pid}-${Date.now()}`;
@@ -600,6 +600,93 @@ describe("refunds and the shelf", () => {
                 putBack: [{ itemId: openItem, quantity: 1 }],
             }),
         ).rejects.toThrow("None of that line can go back in stock");
+    });
+
+    it("a return recorded by hand counts: a refund can't put the same units back again", async () => {
+        const plate = await product("Plate", { hill: 10 });
+        const order = await place(hill, [{ productId: plate, quantity: 3 }]);
+        await pay(order);
+        await fulfil(order);
+        const item = await line(order, plate);
+        const byHand = (units: number) =>
+            prisma.$transaction((tx) =>
+                returnByHand(
+                    tx,
+                    { organizationId: orgId, userId: ownerId },
+                    {
+                        target: { storeId: hill, productId: plate },
+                        units,
+                        orderId: order,
+                    },
+                ),
+            );
+        // Never more than the order sold from this shelf.
+        await expect(byHand(4)).rejects.toThrow(
+            "Only 3 of that order can come back to this shelf.",
+        );
+        await byHand(2);
+        expect(await shelf(hill, plate)).toMatchObject({ onHand: 9 });
+
+        const returnable = async () =>
+            (await kitchen.read(owner, order)).items[0].returnable;
+        expect(await returnable()).toBe(1);
+        await expect(
+            payments.initiateRefund(owner, order, {
+                lines: [{ itemId: item, quantity: 2 }],
+                putBack: [{ itemId: item, quantity: 2 }],
+            }),
+        ).rejects.toThrow("Only 1 of that line can go back in stock.");
+        const refund = await payments.initiateRefund(owner, order, {
+            lines: [{ itemId: item, quantity: 1 }],
+            putBack: [{ itemId: item, quantity: 1 }],
+        });
+        // Still being confirmed: its put-back is spoken for.
+        await expect(byHand(1)).rejects.toThrow(
+            "Nothing from that order can come back to this shelf",
+        );
+        await confirmRefund(order, refund.providerRefundId);
+        const row = await shelf(hill, plate);
+        expect(row).toMatchObject({ onHand: 10 });
+        expect(await entriesOf(row.id, order)).toEqual([
+            { kind: "SOLD", quantity: -3 },
+            { kind: "RETURNED", quantity: 2 },
+            { kind: "RETURNED", quantity: 1 },
+        ]);
+        expect(await returnable()).toBe(0);
+    });
+
+    it("a hand return between a refund's request and its confirmation: the refund puts back only what is left", async () => {
+        const bowl = await product("Soup bowl", { hill: 10 });
+        const order = await place(hill, [{ productId: bowl, quantity: 2 }]);
+        await pay(order);
+        await fulfil(order);
+        const item = await line(order, bowl);
+        const refund = await payments.initiateRefund(owner, order, {
+            lines: [{ itemId: item, quantity: 1 }],
+            putBack: [{ itemId: item, quantity: 1 }],
+        });
+        // The other unit comes back by hand while the refund is confirmed.
+        await prisma.$transaction((tx) =>
+            returnByHand(
+                tx,
+                { organizationId: orgId, userId: ownerId },
+                {
+                    target: { storeId: hill, productId: bowl },
+                    units: 1,
+                    orderId: order,
+                },
+            ),
+        );
+        await confirmRefund(order, refund.providerRefundId);
+        const row = await shelf(hill, bowl);
+        expect(row).toMatchObject({ onHand: 10 });
+        expect(
+            (await entriesOf(row.id, order)).map((e) => [e.kind, e.quantity]),
+        ).toEqual([
+            ["SOLD", -2],
+            ["RETURNED", 1],
+            ["RETURNED", 1],
+        ]);
     });
 
     it("a put-back on a shelf sold below none settles, and the order is refunded", async () => {

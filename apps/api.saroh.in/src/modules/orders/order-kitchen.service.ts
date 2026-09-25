@@ -24,6 +24,7 @@ import {
 } from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto } from "./dto";
 import {
     adjustReservation,
@@ -109,6 +110,10 @@ export class OrderKitchenService {
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
+            // The refund sheet's "Put N back in stock" (a money reader's).
+            ...(money
+                ? { returnable: await returnableUnits(prisma, order.id) }
+                : {}),
         });
     }
 

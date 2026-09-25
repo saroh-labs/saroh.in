@@ -133,6 +133,13 @@ export function putBackRefusal(returnable: number): string {
         : "None of that line can go back in stock — it wasn't handed over, or it's back already.";
 }
 
+/** Why a return recorded by hand can't bring back that many of an order. */
+export function orderReturnRefusal(returnable: number): string {
+    return returnable > 0
+        ? `Only ${returnable} of that order can come back to this shelf.`
+        : "Nothing from that order can come back to this shelf — none was sold from it, or it's back already.";
+}
+
 export const CLOSED_STOREFRONT =
     "This storefront is closed, so its stock can't change.";
 

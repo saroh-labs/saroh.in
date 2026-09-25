@@ -289,6 +289,12 @@ export interface ReadOptions {
     now: Date;
     /** Payments on superseded edit charges not yet handed back. */
     owedBack?: { id: string; amountCents: number }[];
+    /**
+     * What each line can put back on the shelf (`returnableUnits`, #511):
+     * counts returns recorded by hand and products that stopped counting.
+     * Without it, sold less what refunds put back.
+     */
+    returnable?: ReadonlyMap<string, number>;
 }
 
 const cents = (v: DecimalLike) => Math.round(Number(v.toString()) * 100);
@@ -407,16 +413,18 @@ export function serializeOrderRead(
             allergens: allergensOf(i.product?.allergens ?? []),
             quantity: i.quantity,
             refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),
-            returnable: i.stockLevelId
-                ? Math.max(
-                      0,
-                      (i.soldQuantity ?? 0) -
-                          i.refundLines.reduce(
-                              (s, r) => s + (r.putBackQuantity ?? 0),
-                              0,
-                          ),
-                  )
-                : 0,
+            returnable:
+                opts.returnable?.get(i.id) ??
+                (i.stockLevelId
+                    ? Math.max(
+                          0,
+                          (i.soldQuantity ?? 0) -
+                              i.refundLines.reduce(
+                                  (s, r) => s + (r.putBackQuantity ?? 0),
+                                  0,
+                              ),
+                      )
+                    : 0),
             ...(opts.money ? { price: toMoneyString(i.price) } : {}),
         })),
         events: order.events.map((e) => ({

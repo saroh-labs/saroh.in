@@ -10,7 +10,12 @@ import {
     sellRefusal,
     SOLD_OUT_WHILE_PAYING,
 } from "./stock-words";
-import { recordReturned, recordSold, reverseSale } from "./stock.service";
+import {
+    orderReturnableOnRow,
+    recordReturned,
+    recordSold,
+    reverseSale,
+} from "./stock.service";
 import { untrackedAmong } from "./tracking";
 
 /**
@@ -521,11 +526,20 @@ export async function uncommitLines(
 
 /**
  * How many of each line a refund may put back on the shelf: what it sold
- * less what refunds (pending or settled) already put back. Read under the
- * order's lock, when the refund is asked for.
+ * less what refunds (pending or settled) already put back — and never more
+ * than its order can still bring back to that shelf, which also counts a
+ * return recorded by hand on the Stock screen (`orderReturnableOnRow`). Read
+ * under the order's lock, when the refund is asked for.
  */
 export async function returnableUnits(
-    tx: Tx,
+    tx: Pick<
+        Tx,
+        | "orderItem"
+        | "stockEntry"
+        | "paymentRefundLine"
+        | "product"
+        | "businessProfile"
+    >,
     orderId: string,
 ): Promise<Map<string, number>> {
     const items = await tx.orderItem.findMany({
@@ -546,17 +560,26 @@ export async function returnableUnits(
         tx,
         items.map((i) => i.productId),
     );
+    const rowLeft = new Map<string, number>();
+    for (const rowId of new Set(
+        items.flatMap((i) => (i.stockLevelId ? [i.stockLevelId] : [])),
+    )) {
+        rowLeft.set(rowId, await orderReturnableOnRow(tx, orderId, rowId));
+    }
     return new Map(
         items.map((i) => [
             i.id,
             i.stockLevelId && !untracked.has(i.productId)
                 ? Math.max(
                       0,
-                      i.soldQuantity -
-                          i.refundLines.reduce(
-                              (s, r) => s + r.putBackQuantity,
-                              0,
-                          ),
+                      Math.min(
+                          i.soldQuantity -
+                              i.refundLines.reduce(
+                                  (s, r) => s + r.putBackQuantity,
+                                  0,
+                              ),
+                          rowLeft.get(i.stockLevelId) ?? 0,
+                      ),
                   )
                 : 0,
         ]),
@@ -654,9 +677,18 @@ export async function settleRefundStock(
             },
             _sum: { putBackQuantity: true },
         });
+        // Nor more than the order can still bring back to that shelf: a
+        // return recorded by hand counts. (This refund is SUCCEEDED by now,
+        // so its own put-back isn't counted as still to come.)
+        const onRow = await orderReturnableOnRow(
+            tx,
+            line.orderId,
+            line.stockLevelId,
+        );
         const units = Math.min(
             asked.putBackQuantity,
             line.soldQuantity - (before._sum.putBackQuantity ?? 0),
+            onRow,
         );
         if (units <= 0) continue;
         await recordReturned(tx, {

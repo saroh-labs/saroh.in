@@ -24,6 +24,7 @@ import {
     isHandMade,
     movable,
     moveRefusal,
+    orderReturnRefusal,
     shortBy,
     UNTRACKED,
 } from "./stock-words";
@@ -556,10 +557,49 @@ export async function adjust(
 }
 
 /**
+ * What an order can still bring back to one shelf (#511, #514): what its
+ * lines sold from it, less the Returned entries naming the order there — a
+ * refund's put-back and a return recorded by hand alike — less what refunds
+ * still being confirmed will put back. Read under the row's lock.
+ */
+export async function orderReturnableOnRow(
+    tx: Pick<Tx, "orderItem" | "stockEntry" | "paymentRefundLine">,
+    orderId: string,
+    stockLevelId: string,
+): Promise<number> {
+    const [sold, returned, pending] = await Promise.all([
+        tx.orderItem.aggregate({
+            where: { orderId, stockLevelId },
+            _sum: { soldQuantity: true },
+        }),
+        tx.stockEntry.aggregate({
+            where: { orderId, stockLevelId, kind: "RETURNED" },
+            _sum: { quantity: true },
+        }),
+        tx.paymentRefundLine.aggregate({
+            where: {
+                orderItem: { orderId, stockLevelId },
+                paymentRefund: { status: { notIn: ["SUCCEEDED", "FAILED"] } },
+            },
+            _sum: { putBackQuantity: true },
+        }),
+    ]);
+    return Math.max(
+        0,
+        (sold._sum.soldQuantity ?? 0) -
+            (returned._sum.quantity ?? 0) -
+            (pending._sum.putBackQuantity ?? 0),
+    );
+}
+
+/**
  * Units a customer brought back, recorded by hand (the Stock screen's
  * entries sheet, #514): RETURNED +units, naming the order when there is
- * one. Like a refund's return, it comes back only through a count — the
- * stock log never undoes a return.
+ * one — then no more than that order sold from this shelf less what came
+ * back already (`orderReturnableOnRow`), so a refund's "Put back in stock"
+ * and a hand-recorded return never put the same units back twice. Like a
+ * refund's return, it comes back only through a count — the stock log never
+ * undoes a return.
  */
 export async function returnByHand(
     tx: Tx,
@@ -585,6 +625,15 @@ export async function returnByHand(
         if (!order) throw new NotFoundException("Order not found");
     }
     const row = await lockTarget(tx, actor, input.target, true);
+    if (input.orderId) {
+        const can = await orderReturnableOnRow(tx, input.orderId, row.id);
+        if (input.units > can) {
+            throw new ConflictException({
+                message: orderReturnRefusal(can),
+                field: "units",
+            });
+        }
+    }
     const entry = await recordEntry(tx, {
         stockLevelId: row.id,
         kind: "RETURNED",

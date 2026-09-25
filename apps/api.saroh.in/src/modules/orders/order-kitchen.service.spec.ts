@@ -159,6 +159,23 @@ jest.mock("@saroh/database", () => {
             ),
         },
         orderItem: {
+            aggregate: jest.fn(
+                ({ where }: { where: { stockLevelId?: string } }) =>
+                    Promise.resolve({
+                        _sum: {
+                            soldQuantity: mockDb.items
+                                .filter(
+                                    (i) =>
+                                        i.stockLevelId === where.stockLevelId,
+                                )
+                                .reduce(
+                                    (n, i) =>
+                                        n + ((i.soldQuantity as number) ?? 0),
+                                    0,
+                                ),
+                        },
+                    }),
+            ),
             // What each line records about its stock, and its order's
             // storefront (#510).
             // (#511: with what it holds and sold, by id or by order).
@@ -189,6 +206,7 @@ jest.mock("@saroh/database", () => {
                                 soldQuantity: i.soldQuantity ?? 0,
                                 product: { name: i.name },
                                 order: { storeId: "store_1" },
+                                refundLines: [],
                             })),
                     ),
             ),
@@ -301,10 +319,25 @@ jest.mock("@saroh/database", () => {
                 },
             ),
         },
-        // A refund confirmed on a line (#511): none here.
-        paymentRefundLine: { count: jest.fn(() => Promise.resolve(0)) },
+        // A refund confirmed on a line (#511): none here, and none putting
+        // anything back.
+        paymentRefundLine: {
+            count: jest.fn(() => Promise.resolve(0)),
+            aggregate: jest.fn(() =>
+                Promise.resolve({ _sum: { putBackQuantity: 0 } }),
+            ),
+        },
         // The stock log (#513): what the order flows wrote to it.
         stockEntry: {
+            aggregate: jest.fn(() =>
+                Promise.resolve({
+                    _sum: {
+                        quantity: mockDb.entries
+                            .filter((e) => e.kind === "RETURNED")
+                            .reduce((n, e) => n + (e.quantity as number), 0),
+                    },
+                }),
+            ),
             count: jest.fn(() =>
                 Promise.resolve(
                     mockDb.entries.filter((e) => e.kind === "RETURNED").length,

@@ -307,6 +307,37 @@ describe("Stock API (DB)", () => {
         });
     });
 
+    /** A fulfilled order that sold `units` of a product from Hill Road. */
+    async function soldFrom(productId: string, units: number) {
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId: hill, productId, variantId: null },
+            select: { id: true },
+        });
+        return prisma.order.create({
+            data: {
+                storeId: hill,
+                organizationId: orgId,
+                orderId: `SA-${Math.random().toString(36).slice(2, 8)}`,
+                customerId,
+                status: "DELIVERED",
+                subtotal: "0",
+                total: "0",
+                items: {
+                    create: [
+                        {
+                            productId,
+                            quantity: units,
+                            price: "0",
+                            stockRow: "PRODUCT",
+                            stockLevelId: row.id,
+                            soldQuantity: units,
+                        },
+                    ],
+                },
+            },
+        });
+    }
+
     describe("writes", () => {
         it("adjust +5 writes a received entry and the levels read reflects it", async () => {
             const id = await product("Baguette", 2);
@@ -416,16 +447,7 @@ describe("Stock API (DB)", () => {
                 quantity: -2,
                 note: "Dropped",
             });
-            const order = await prisma.order.create({
-                data: {
-                    storeId: hill,
-                    organizationId: orgId,
-                    orderId: `SA-${Math.random().toString(36).slice(2, 8)}`,
-                    customerId,
-                    subtotal: "0",
-                    total: "0",
-                },
-            });
+            const order = await soldFrom(id, 1);
             const returned = await api.entries(owner(), {
                 storeId: hill,
                 productId: id,
@@ -713,16 +735,7 @@ describe("Stock API (DB)", () => {
 
         it("names people only for audit:read, and orders only for order:read", async () => {
             const id = await product("Eccles cake", 4);
-            const order = await prisma.order.create({
-                data: {
-                    storeId: hill,
-                    organizationId: orgId,
-                    orderId: `SA-${Math.random().toString(36).slice(2, 8)}`,
-                    customerId,
-                    subtotal: "0",
-                    total: "0",
-                },
-            });
+            const order = await soldFrom(id, 1);
             await api.entries(owner(), {
                 storeId: hill,
                 productId: id,
