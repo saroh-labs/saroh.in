@@ -52,14 +52,25 @@ export async function priceOrderLines(
 ): Promise<PricedLine[]> {
     const lines: PricedLine[] = [];
     for (const item of items) {
+        // Sold here (#510): the product is listed at the order's
+        // storefront, and a variant only if that storefront sells it.
         const product = await prisma.product.findFirst({
-            where: { id: item.productId, storeId },
+            where: { id: item.productId, listings: { some: { storeId } } },
             // The category too: a collection code matches on it.
             select: {
                 name: true,
                 price: true,
                 categoryId: true,
-                variants: { select: { id: true, price: true } },
+                variants: {
+                    select: {
+                        id: true,
+                        price: true,
+                        listings: {
+                            where: { listing: { storeId } },
+                            select: { id: true },
+                        },
+                    },
+                },
             },
         });
         if (!product) {
@@ -79,6 +90,12 @@ export async function priceOrderLines(
                     message: item.variantId
                         ? `That option of ${product.name} no longer exists.`
                         : `Choose which one of ${product.name} is being bought.`,
+                    field: "items",
+                });
+            }
+            if (variant.listings.length === 0) {
+                throw new BadRequestException({
+                    message: `That option of ${product.name} isn't sold at this storefront.`,
                     field: "items",
                 });
             }

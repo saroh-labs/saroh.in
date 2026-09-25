@@ -150,12 +150,23 @@ jest.mock("@saroh/database", () => {
             ),
         },
         orderItem: {
-            findUnique: jest.fn(({ where }: { where: { id: string } }) => {
-                const i = mockDb.items.find((x) => x.id === where.id);
-                return Promise.resolve(
-                    i ? { stockRow: i.stockRow, variantId: null } : null,
-                );
-            }),
+            // What each line records about its stock, and its order's
+            // storefront (#510).
+            findMany: jest.fn(
+                ({ where }: { where: { id: { in: string[] } } }) =>
+                    Promise.resolve(
+                        mockDb.items
+                            .filter((x) => where.id.in.includes(x.id as string))
+                            .map((i) => ({
+                                id: i.id,
+                                productId: i.productId,
+                                variantId: null,
+                                stockRow: i.stockRow ?? null,
+                                stockLevelId: i.stockLevelId ?? null,
+                                order: { storeId: "store_1" },
+                            })),
+                    ),
+            ),
             update: jest.fn(
                 ({ where, data }: { where: { id: string }; data: object }) => {
                     const i = mockDb.items.find((x) => x.id === where.id);
@@ -169,15 +180,31 @@ jest.mock("@saroh/database", () => {
             }),
             count: jest.fn(() => Promise.resolve(mockDb.items.length)),
         },
-        inventory: {
-            count: jest.fn(() => Promise.resolve(1)),
-            findUnique: jest.fn(() => Promise.resolve({ ...mockDb.inventory })),
-            update: jest.fn(({ data }: { data: object }) => {
-                Object.assign(mockDb.inventory, data);
-                return Promise.resolve({ ...mockDb.inventory });
-            }),
+        // One shelf: the product's own row at the storefront ("sl_1"), its
+        // on hand and promised kept in mockDb.inventory.
+        stockLevel: {
+            findFirst: jest.fn(
+                ({ where }: { where: { variantId?: string | null } }) =>
+                    Promise.resolve(
+                        where.variantId === null ? { id: "sl_1" } : null,
+                    ),
+            ),
+            findUnique: jest.fn(() =>
+                Promise.resolve({
+                    onHand: mockDb.inventory.quantity,
+                    promised: mockDb.inventory.reserved,
+                }),
+            ),
+            update: jest.fn(
+                ({ data }: { data: { onHand: number; promised: number } }) => {
+                    mockDb.inventory = {
+                        quantity: data.onHand,
+                        reserved: data.promised,
+                    };
+                    return Promise.resolve({});
+                },
+            ),
         },
-        variantInventory: { count: jest.fn(() => Promise.resolve(0)) },
         paymentIntent: {
             findMany: jest.fn(({ where }: { where: { status?: string } }) =>
                 Promise.resolve(
@@ -282,6 +309,7 @@ function reset(over: Record<string, unknown> = {}) {
             quantity: 3,
             price: "120.00",
             stockRow: "PRODUCT",
+            stockLevelId: "sl_1",
             name: "Croissant",
         },
     ];

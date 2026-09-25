@@ -32,9 +32,9 @@ jest.mock("@saroh/database", () => {
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
     };
-    // Settling a held line locks the product's row and reads the row the
-    // line recorded; none recorded here, and the product counts no stock.
-    const orderItem = { findUnique: jest.fn().mockResolvedValue(null) };
+    // Settling a held line reads the row the line recorded (#510); none
+    // recorded here, and the product counts no stock.
+    const orderItem = { findMany: jest.fn().mockResolvedValue([]) };
     const $queryRaw = jest.fn().mockResolvedValue([]);
     // A status change is a step on the order's timeline (ADR-008).
     const orderEvent = { create: jest.fn() };

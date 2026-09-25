@@ -417,6 +417,9 @@ export class OrdersService {
         }
 
         await prisma.$transaction(async (tx) => {
+            // Lock order (#510): the Order before its StockLevel rows, as a
+            // product switching to variants takes them.
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
             if (statusChanging) {
                 await applyInventoryTransition(
                     tx,

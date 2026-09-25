@@ -9,6 +9,7 @@
 import { toMoneyString } from "../../common/money";
 import { bpsToRate, rateToBps } from "../invoices/gst";
 import { sanitizeRichHtml } from "../sites/sanitize";
+import { asCounts, firstRow } from "./stock-levels";
 
 interface DecimalLike {
     toString(): string;
@@ -34,6 +35,8 @@ export interface VariantDto {
     position: number;
     /** Its own stock row, once the product counts per variant. */
     inventory: VariantStockDto | null;
+    /** Whether the storefront read from sells it (#510); else "Not sold here". */
+    soldHere: boolean;
     createdAt: Date;
 }
 
@@ -61,6 +64,7 @@ export type ShopFieldsDto = Record<string, boolean>;
 
 export interface ProductDto {
     id: string;
+    /** The storefront it was read at (#510: a product belongs to the business). */
     storeId: string;
     name: string;
     slug: string;
@@ -147,8 +151,17 @@ interface RawVariant {
     optionValueId?: string | null;
     imageId?: string | null;
     position?: number;
-    inventory?: VariantStockDto | null;
+    /** Its shelf at the storefront read from (#510): one row or none. */
+    stockLevels?: StockRowLike[];
+    /** Its listing rows at that storefront: none means "Not sold here". */
+    listings?: unknown[];
     createdAt: Date;
+}
+
+interface StockRowLike {
+    onHand: number;
+    promised: number;
+    lowStockAlert: number;
 }
 
 interface RawImage {
@@ -169,7 +182,7 @@ interface RawImage {
 
 interface RawProduct {
     id: string;
-    storeId: string;
+    storeId: string | null;
     name: string;
     slug: string;
     description: string | null;
@@ -205,11 +218,8 @@ interface RawProduct {
 interface RawProductDetail extends RawProduct {
     variants: RawVariant[];
     images: RawImage[];
-    inventory: {
-        quantity: number;
-        reserved: number;
-        lowStockAlert: number;
-    } | null;
+    /** The product's own row at the storefront read from (variant null). */
+    stockLevels: StockRowLike[];
     option: {
         id: string;
         name: string;
@@ -258,13 +268,10 @@ export function serializeVariant(variant: RawVariant): VariantDto {
         optionValueId: variant.optionValueId ?? null,
         imageId: variant.imageId ?? null,
         position: variant.position ?? 0,
-        inventory: variant.inventory
-            ? {
-                  quantity: variant.inventory.quantity,
-                  reserved: variant.inventory.reserved,
-                  lowStockAlert: variant.inventory.lowStockAlert,
-              }
-            : null,
+        inventory: ((row) => (row ? asCounts(row) : null))(
+            firstRow(variant.stockLevels ?? []),
+        ),
+        soldHere: variant.listings ? variant.listings.length > 0 : true,
         createdAt: variant.createdAt,
     };
 }
@@ -282,10 +289,13 @@ export function cleanDescription(
     return clean === "" ? null : clean;
 }
 
-export function serializeProduct(product: RawProduct): ProductDto {
+export function serializeProduct(
+    product: RawProduct,
+    storeId: string,
+): ProductDto {
     return {
         id: product.id,
-        storeId: product.storeId,
+        storeId,
         name: product.name,
         slug: product.slug,
         description: cleanDescription(product.description),
@@ -329,9 +339,11 @@ interface RawProductListItem extends RawProduct {
         sku: string;
         title: string;
         price: DecimalLike | null;
-        inventory?: { quantity: number; lowStockAlert: number } | null;
+        stockLevels?: StockRowLike[];
+        listings?: unknown[];
     }[];
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    /** The product's own row at the storefront read from (variant null). */
+    stockLevels: StockRowLike[];
 }
 
 /**
@@ -343,59 +355,53 @@ interface RawProductListItem extends RawProduct {
 function listStock(
     product: RawProductListItem,
 ): { quantity: number; lowStockAlert: number } | null {
-    const rows = product.variants.flatMap((v) =>
-        v.inventory ? [v.inventory] : [],
-    );
+    const own = firstRow(product.stockLevels);
+    const rows = product.variants.flatMap((v) => v.stockLevels ?? []);
     if (rows.length === 0) {
-        return product.inventory
-            ? {
-                  quantity: product.inventory.quantity,
-                  lowStockAlert: product.inventory.lowStockAlert,
-              }
+        return own
+            ? { quantity: own.onHand, lowStockAlert: own.lowStockAlert }
             : null;
     }
     return {
-        quantity:
-            rows.reduce((n, r) => n + r.quantity, 0) +
-            (product.inventory?.quantity ?? 0),
+        quantity: rows.reduce((n, r) => n + r.onHand, 0) + (own?.onHand ?? 0),
         lowStockAlert: Math.min(...rows.map((r) => r.lowStockAlert)),
     };
 }
 
 export function serializeProductListItem(
     product: RawProductListItem,
+    storeId: string,
 ): ProductListItemDto {
     return {
-        ...serializeProduct(product),
+        ...serializeProduct(product, storeId),
         variantCount: product._count.variants,
         sku: product.variants[0]?.sku ?? null,
-        variants: product.variants.map((v) => ({
-            id: v.id,
-            sku: v.sku,
-            title: v.title,
-            price: v.price ? toMoneyString(v.price) : null,
-        })),
+        // An order is taken only for a variant this storefront sells.
+        variants: product.variants
+            .filter((v) => (v.listings ? v.listings.length > 0 : true))
+            .map((v) => ({
+                id: v.id,
+                sku: v.sku,
+                title: v.title,
+                price: v.price ? toMoneyString(v.price) : null,
+            })),
         inventory: listStock(product),
     };
 }
 
 export function serializeProductDetail(
     product: RawProductDetail,
+    storeId: string,
 ): ProductDetailDto {
+    const own = firstRow(product.stockLevels);
     return {
-        ...serializeProduct(product),
+        ...serializeProduct(product, storeId),
         variants: product.variants.map(serializeVariant),
         images: product.images.map(serializeImage),
-        stockMode: product.variants.some((v) => v.inventory)
+        stockMode: product.variants.some((v) => (v.stockLevels ?? []).length)
             ? "variant"
             : "product",
         option: product.option,
-        inventory: product.inventory
-            ? {
-                  quantity: product.inventory.quantity,
-                  reserved: product.inventory.reserved,
-                  lowStockAlert: product.inventory.lowStockAlert,
-              }
-            : null,
+        inventory: own ? asCounts(own) : null,
     };
 }
