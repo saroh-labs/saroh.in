@@ -212,6 +212,34 @@ export function allergyCheck(
     return out;
 }
 
+/** A note as the contact's detail read sends it. */
+export interface DetailAllergyNote {
+    body: string;
+    /** As written: one per name. */
+    allergens: AllergenRef[];
+    /**
+     * Each named allergen's id on every storefront with the same name — what
+     * an order from any storefront is checked against (#508 R6).
+     */
+    matchAllergens?: AllergenRef[];
+}
+
+/**
+ * The notes `allergyCheck` reads: each note that names an allergen, with the
+ * ids from every storefront so a second storefront's "Peanuts" still hits.
+ * Falls back to the note's own ids if the API has not sent the wider list.
+ */
+export function allergyNotesFrom(rows: DetailAllergyNote[]): AllergyNote[] {
+    return rows
+        .filter((n) => n.allergens.length > 0)
+        .map((n) => ({
+            body: n.body,
+            allergens: n.matchAllergens?.length
+                ? n.matchAllergens
+                : n.allergens,
+        }));
+}
+
 export function allergenWords(list: AllergenRef[]): string {
     return listed(list.map((a) => a.name.toLowerCase()));
 }

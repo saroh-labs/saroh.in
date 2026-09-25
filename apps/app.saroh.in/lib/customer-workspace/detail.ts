@@ -25,7 +25,10 @@ export interface Storefront {
 export interface DetailNote {
     id: string;
     body: string;
+    /** As written: one chip per name. */
     allergens: { id: string; name: string }[];
+    /** Every storefront's allergen of those names; Order Detail checks these. */
+    matchAllergens: { id: string; name: string }[];
     createdByUserId: string | null;
     author: string | null;
     createdAt: string;

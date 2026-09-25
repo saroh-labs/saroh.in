@@ -1,6 +1,8 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 
+import type { DetailAllergyNote } from "./lifecycle";
+import { allergyNotesFrom } from "./lifecycle";
 import type { AllergyNote, KitchenStage, OrderRead } from "./read";
 
 /**
@@ -23,7 +25,8 @@ export async function getOrderRead(orderId: string): Promise<OrderRead | null> {
 
 /**
  * What the customer's notes say they are allergic to, from the contact's
- * detail read (U8) — each note that names allergens, by id.
+ * detail read (U8) — each note that names allergens, by the ids of every
+ * storefront's allergen of that name.
  *
  * `null` when it could not be read: the banner then says the notes could not
  * be checked, rather than saying nothing, because silence reads as "no
@@ -41,12 +44,10 @@ export async function getAllergyNotes(
         );
         if (!res.ok) return null;
         const body = (await res.json()) as {
-            notes: { rows: AllergyNote[] } | null;
+            notes: { rows: DetailAllergyNote[] } | null;
         };
         if (!body.notes) return null;
-        return body.notes.rows
-            .filter((n) => n.allergens.length > 0)
-            .map((n) => ({ body: n.body, allergens: n.allergens }));
+        return allergyNotesFrom(body.notes.rows);
     } catch {
         // An unreachable API: the banner names the notes as unchecked.
         return null;

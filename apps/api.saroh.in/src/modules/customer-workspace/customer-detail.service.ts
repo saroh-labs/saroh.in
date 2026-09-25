@@ -302,7 +302,10 @@ export interface CustomerDetail {
         /** The allergens a new note may name (the storefronts' lists). */
         allergenChoices: { id: string; name: string }[];
     } | null;
-    /** Every allergen the notes name, once — what Order Detail matches on. */
+    /**
+     * Every allergen the notes name, once per name. Order Detail checks each
+     * note's `matchAllergens` instead, which cross storefronts.
+     */
     allergens: { id: string; name: string }[] | null;
     linkedCustomers?: LinkedCustomer[] | null;
     possibleMatches?: PossibleMatch[] | null;
