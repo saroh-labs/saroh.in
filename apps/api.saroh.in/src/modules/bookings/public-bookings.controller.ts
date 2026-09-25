@@ -14,17 +14,17 @@ import { createHash } from "node:crypto";
 
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
+import type { AvailableSlot } from "./booking-slots";
+import { BookServiceDto } from "./dto";
 import type {
-    AvailableSlot,
     PublicBooking,
     PublicBookingPage,
     PublicDays,
-    PublicHold,
     PublicService,
-    PublicStaff,
-} from "./bookings.service";
-import { BookingsService, toPublicBooking } from "./bookings.service";
-import { BookServiceDto } from "./dto";
+} from "./public-booking-page";
+import { toPublicBooking } from "./public-booking-page";
+import type { PublicHold, PublicStaff } from "./public-bookings.service";
+import { PublicBookingsService } from "./public-bookings.service";
 
 /** The section contract's cap on a services list (#255). */
 const MAX_PUBLIC_SERVICE_IDS = 24;
@@ -36,18 +36,18 @@ const MAX_PUBLIC_SERVICE_IDS = 24;
  * no client-supplied org.
  *
  * The owning organization is derived entirely from the target Service inside
- * {@link BookingsService}, so this unauthenticated endpoint can only ever create
+ * {@link PublicBookingsService}, so this unauthenticated endpoint can only ever create
  * rows in the org that owns the Service it targets. Mirrors the guardless
  * enquiry controller (S3-002).
  */
 @Controller("public/services")
 export class PublicBookingsController {
-    constructor(private readonly bookings: BookingsService) {}
+    constructor(private readonly bookings: PublicBookingsService) {}
 
     /**
      * The services a website's services list shows, `?ids=a,b,c`, in that
      * order (#255). Only services that may be offered come back; see
-     * {@link BookingsService.publicServices}.
+     * {@link PublicBookingsService.publicServices}.
      */
     @Get()
     services(@Query("ids") ids?: unknown): Promise<PublicService[]> {
@@ -189,7 +189,7 @@ export type PublicBookingResult = PublicBooking & {
  */
 @Controller("public/sites")
 export class PublicBookingPageController {
-    constructor(private readonly bookings: BookingsService) {}
+    constructor(private readonly bookings: PublicBookingsService) {}
 
     @Get(":siteId/booking")
     @Header("Cache-Control", "no-store")

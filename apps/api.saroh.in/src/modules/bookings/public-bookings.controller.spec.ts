@@ -4,13 +4,13 @@ import { Test } from "@nestjs/testing";
 import { createHash } from "node:crypto";
 
 import { trustProxyHops } from "../../common/trust-proxy";
-import { BookingsService } from "./bookings.service";
 import { PublicBookingsController } from "./public-bookings.controller";
+import { PublicBookingsService } from "./public-bookings.service";
 
 function build() {
     const bookings = {
         publicServices: jest.fn().mockResolvedValue([]),
-    } as unknown as BookingsService;
+    } as unknown as PublicBookingsService;
     return { controller: new PublicBookingsController(bookings), bookings };
 }
 
@@ -88,7 +88,7 @@ describe("PublicBookingsController.book (ADR-007)", () => {
             .mockResolvedValue({ booking: row, payToken: null });
         const controller = new PublicBookingsController({
             bookOnline,
-        } as unknown as BookingsService);
+        } as unknown as PublicBookingsService);
 
         const first = await controller.book("svc_1", dto, "1.2.3.4");
         // The service replays an existing booking for the same key.
@@ -133,7 +133,9 @@ describe("the caller's address behind a proxy (#508)", () => {
         });
         const moduleRef = await Test.createTestingModule({
             controllers: [PublicBookingsController],
-            providers: [{ provide: BookingsService, useValue: { publicHold } }],
+            providers: [
+                { provide: PublicBookingsService, useValue: { publicHold } },
+            ],
         }).compile();
         app = moduleRef.createNestApplication({ logger: false });
         trustProxyHops(app, hops);

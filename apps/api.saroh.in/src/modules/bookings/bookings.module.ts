@@ -14,6 +14,7 @@ import {
     PublicBookingPageController,
     PublicBookingsController,
 } from "./public-bookings.controller";
+import { PublicBookingsService } from "./public-bookings.service";
 import {
     RELEASE_HOLDS_TYPE,
     ReleaseHoldsHandler,
@@ -28,8 +29,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * {@link BookingsController}, which needs {@link OrganizationsModule} via
  * forwardRef for the `OrganizationContextService` that `OrganizationGuard`
  * uses) and a guardless public surface (the {@link PublicBookingsController}
- * booking command, whose org is derived from the target Service). Both share the
- * single {@link BookingsService}.
+ * booking command, whose org is derived from the target Service). The first
+ * is served by {@link BookingsService}, the second by
+ * {@link PublicBookingsService}; both write through the same reservation.
  */
 @Module({
     imports: [
@@ -43,7 +45,12 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicBookingsController,
         PublicBookingPageController,
     ],
-    providers: [BookingsService, ReleaseHoldsHandler, OrganizationGuard],
+    providers: [
+        BookingsService,
+        PublicBookingsService,
+        ReleaseHoldsHandler,
+        OrganizationGuard,
+    ],
     exports: [BookingsService],
 })
 export class BookingsModule implements OnModuleInit, OnModuleDestroy {
