@@ -449,6 +449,51 @@ export async function adjust(
     return { entry, shelf: shelf(after) };
 }
 
+/**
+ * Units a customer brought back, recorded by hand (the Stock screen's
+ * entries sheet, #514): RETURNED +units, naming the order when there is
+ * one. Like a refund's return, it comes back only through a count — the
+ * stock log never undoes a return.
+ */
+export async function returnByHand(
+    tx: Tx,
+    actor: StockActor,
+    input: {
+        target: StockTarget;
+        units: number;
+        orderId?: string | null;
+        note?: string | null;
+    },
+): Promise<{ entry: StockEntryView; shelf: ShelfView }> {
+    if (!Number.isInteger(input.units) || input.units <= 0) {
+        throw new BadRequestException({
+            message: "Enter how many, 1 or more.",
+            field: "units",
+        });
+    }
+    if (input.orderId) {
+        const order = await tx.order.findFirst({
+            where: { id: input.orderId, organizationId: actor.organizationId },
+            select: { id: true },
+        });
+        if (!order) throw new NotFoundException("Order not found");
+    }
+    const row = await lockTarget(tx, actor.organizationId, input.target, true);
+    const entry = await recordEntry(tx, {
+        stockLevelId: row.id,
+        kind: "RETURNED",
+        quantity: input.units,
+        orderId: input.orderId ?? null,
+        actorUserId: actor.userId,
+        note: input.note ?? null,
+    });
+    const after = await tx.stockLevel.findUniqueOrThrow({
+        where: { id: row.id },
+        select: ROW_SELECT,
+    });
+    return { entry, shelf: shelf(after) };
+}
+
 // ---------------------------------------------------------------------------
 // Moves
 // ---------------------------------------------------------------------------
@@ -731,6 +776,7 @@ export class StockService {
     readonly count = count;
     readonly countAll = countAll;
     readonly adjust = adjust;
+    readonly returnByHand = returnByHand;
     readonly move = move;
     readonly reverse = reverse;
     readonly recordSold = recordSold;

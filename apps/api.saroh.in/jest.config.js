@@ -154,6 +154,8 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
+        // #514 the Stock API: sign-in, organization and COMMERCE gates.
+        "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
