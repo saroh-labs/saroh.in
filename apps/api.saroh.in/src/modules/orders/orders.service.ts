@@ -1,7 +1,6 @@
 import {
     BadRequestException,
     ConflictException,
-    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -17,6 +16,7 @@ import {
     ensureOrderInvoice,
     loadTaxProfile,
 } from "../invoices/order-invoicing";
+import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -522,26 +522,13 @@ export class OrdersService {
 
     /**
      * Reading a storefront's orders — with their totals — takes `order:read`,
-     * not only a way into the store. Commerce opened to `order:stage` for the
-     * kitchen (DEC-024), and a Member holds that and `store:read` but no money
-     * read: without this, this older read handed them every order's prices,
-     * which the organization-scoped read Order Detail uses leaves out.
-     *
-     * It refuses exactly the kitchen's roles — `order:stage` without
-     * `order:read` — so everyone who reached it before (and a legacy store
-     * grant, which has no membership to ask) is unchanged.
+     * not only a way into the store (the rule is shared with the customer
+     * list; see `requireOrderRead`). Without it this older read handed a
+     * Member at the counter every order's prices, which the
+     * organization-scoped read Order Detail uses leaves out.
      */
-    private async requireOrderRead(storeId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
-        const [stage, read] = await Promise.all([
-            this.stores.memberAllows(storeId, userId, "order:stage"),
-            this.stores.memberAllows(storeId, userId, "order:read"),
-        ]);
-        if (stage && !read) {
-            throw new ForbiddenException(
-                "Your role doesn't include reading this storefront's orders.",
-            );
-        }
+    private requireOrderRead(storeId: string, userId: string) {
+        return requireOrderRead(this.stores, storeId, userId, "orders");
     }
 
     private async requireWrite(

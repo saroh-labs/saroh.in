@@ -230,6 +230,15 @@ test.describe("customer detail, as a Member", () => {
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
         await expect(tab(page, /^Notes/)).toBeVisible();
+        // Sell › Customers is refused to the counter (R7, #508): the crumb
+        // leads back to Contacts instead.
+        const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
+        await expect(
+            crumbs.getByRole("link", { name: "Contacts" }),
+        ).toBeVisible();
+        await expect(
+            crumbs.getByRole("link", { name: "Customers" }),
+        ).toHaveCount(0);
         for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
             await expect(tab(page, name)).toHaveCount(0);
         await expect(page.getByRole("main")).not.toContainText("₹");
