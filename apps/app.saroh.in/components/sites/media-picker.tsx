@@ -51,7 +51,14 @@ export interface PickedImage {
  * progress, confirm — for any control that takes a picture. `upload` hands
  * back the picture, or null having set `error` to say why not.
  */
-export function useImageUpload() {
+export function useImageUpload(
+    options: {
+        /** The library bucket; site images unless said. */
+        purpose?: "site-image" | "business-logo";
+        /** What to say when storage cannot serve the upload. */
+        unserved?: string;
+    } = {},
+) {
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -90,6 +97,7 @@ export function useImageUpload() {
                 contentType: file.type,
                 contentLength: file.size,
                 filename: file.name,
+                ...(options.purpose ? { purpose: options.purpose } : {}),
             });
             if (!ticket.ok) {
                 if (mounted.current) setError(ticket.error);
@@ -117,7 +125,8 @@ export function useImageUpload() {
                 // The upload succeeded and nothing can serve it. Say that,
                 // rather than writing a src nobody can fetch.
                 setError(
-                    "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
+                    options.unserved ??
+                        "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
                 );
                 return null;
             }

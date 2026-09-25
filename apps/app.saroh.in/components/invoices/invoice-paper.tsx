@@ -19,7 +19,8 @@ export function paperTitle(
 
 /**
  * The invoice as the customer receives it, after "Saroh Invoice Detail": a
- * tax invoice for a GST-registered business — the seller's legal name,
+ * tax invoice for a GST-registered business — the seller's logo (today's,
+ * not frozen on issue: it is not a GST particular), legal name,
  * registered address (frozen on issue, like the GSTIN), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
  * of supply, HSN/SAC and rate on every line, taxable value and CGST + SGST
@@ -94,6 +95,14 @@ export function InvoicePaper({
         >
             <header className="flex flex-wrap items-start gap-4 border-b-2 border-foreground pb-4">
                 <div className="min-w-0 flex-[1_1_200px]">
+                    {business?.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
+                        <img
+                            src={business.logo}
+                            alt=""
+                            className="mb-2 size-10 rounded-lg object-cover"
+                        />
+                    ) : null}
                     <p className="font-display text-[20px] font-semibold tracking-[-0.02em]">
                         {businessName}
                     </p>

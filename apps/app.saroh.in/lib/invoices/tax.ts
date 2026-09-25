@@ -3,10 +3,11 @@ import { printedAddress } from "@/lib/organizations/registered-address";
 import type { RegisteredAddress } from "@/lib/organizations/settings-service";
 
 /**
- * The business's GST standing and what its paper prints at the top: name,
- * legal name, registered address, contact email, GSTIN and state. Read from the OWNER/ADMIN
- * settings endpoint; a role that may read invoices but not settings gets
- * null, and the screens leave those lines off rather than fail.
+ * The business's GST standing and what its paper prints at the top: logo,
+ * name, legal name, registered address, contact email, GSTIN and state.
+ * Read from the OWNER/ADMIN settings endpoint; a role that may read
+ * invoices but not settings gets null, and the screens leave those lines
+ * off rather than fail.
  */
 export interface InvoiceBusiness {
     name: string;
@@ -20,6 +21,8 @@ export interface InvoiceBusiness {
      * issued invoice prints the one frozen on it.
      */
     address: string | null;
+    /** The logo printed at the top, as it is today. */
+    logo: string | null;
 }
 
 export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
@@ -41,6 +44,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             stateName: string | null;
         };
         registeredAddress?: RegisteredAddress;
+        logo?: { url: string } | null;
     };
     const registered = s.tax?.registered ?? false;
     return {
@@ -53,6 +57,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             ? { code: s.tax.state, name: s.tax.stateName }
             : null,
         address: printedAddress(s.registeredAddress),
+        logo: s.logo?.url ?? null,
     };
 }
 

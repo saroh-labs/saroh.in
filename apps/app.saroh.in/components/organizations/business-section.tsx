@@ -31,6 +31,7 @@ export function BusinessSection({
     saveOff,
     saving,
     saveWhy,
+    top,
     children,
 }: {
     /** Names the card for a screen reader and the Edit button. */
@@ -46,6 +47,11 @@ export function BusinessSection({
     saveOff: boolean;
     saving: boolean;
     saveWhy: string;
+    /**
+     * A row under the header, reading or editing alike — Identity's logo,
+     * which saves on its own.
+     */
+    top?: React.ReactNode;
     /** The section's fields, shown while editing. */
     children: React.ReactNode;
 }) {
@@ -71,6 +77,8 @@ export function BusinessSection({
                     </Button>
                 ) : null}
             </div>
+
+            {top}
 
             {editing ? (
                 <>

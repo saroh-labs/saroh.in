@@ -217,3 +217,15 @@ export class UpdateOrganizationDto {
     @Type(() => RegisteredAddressDto)
     registeredAddress?: RegisteredAddressDto;
 }
+
+/**
+ * Set the business logo to an image the business uploaded to its library
+ * (`POST /organizations/:id/media/upload-url`, then `/complete`).
+ */
+export class SetLogoDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "mediaId is required" })
+    @MaxLength(64)
+    mediaId!: string;
+}

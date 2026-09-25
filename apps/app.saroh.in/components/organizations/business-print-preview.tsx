@@ -8,6 +8,7 @@
  */
 export function BusinessPrintPreview({
     live,
+    logoUrl,
     registered,
     number,
     legalName,
@@ -21,6 +22,8 @@ export function BusinessPrintPreview({
 }: {
     /** A section is being edited: say the preview shows the unsaved edit. */
     live: boolean;
+    /** The logo printed above the legal name, when there is one. */
+    logoUrl: string | null;
     registered: boolean;
     number: string;
     legalName: string;
@@ -57,6 +60,14 @@ export function BusinessPrintPreview({
                         {number}
                     </span>
                 </div>
+                {logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
+                    <img
+                        src={logoUrl}
+                        alt=""
+                        className="mb-2 size-9 rounded-lg object-cover"
+                    />
+                ) : null}
                 <div className="font-display text-[15px] font-semibold tracking-[-0.01em]">
                     {legalName}
                 </div>

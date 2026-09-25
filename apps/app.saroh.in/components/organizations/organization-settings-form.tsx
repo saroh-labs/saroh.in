@@ -20,6 +20,7 @@ import type { FieldErrors } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
 import { BusinessSection } from "@/components/organizations/business-section";
@@ -920,6 +921,16 @@ export function OrganizationSettingsForm({
                         saveOff={!isDirty || sectionErrors > 0}
                         saving={isSubmitting}
                         saveWhy={saveWhy}
+                        top={
+                            tab === "identity" ? (
+                                <BusinessLogoRow
+                                    logoUrl={settings.logo?.url ?? null}
+                                    name={settings.name}
+                                    canEdit={canEdit}
+                                    onSaved={setSettings}
+                                />
+                            ) : undefined
+                        }
                     >
                         {fieldsOf[tab]}
                     </BusinessSection>
@@ -927,6 +938,7 @@ export function OrganizationSettingsForm({
 
                 <BusinessPrintPreview
                     live={editing !== null && isDirty}
+                    logoUrl={settings.logo?.url ?? null}
                     registered={registered}
                     number={number(v)}
                     legalName={

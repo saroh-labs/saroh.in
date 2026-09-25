@@ -13,6 +13,8 @@ jest.mock("@saroh/database", () => {
             },
             // Products showing an object; default "none" as for publications.
             productImage: { count: jest.fn().mockResolvedValue(0) },
+            // Businesses using it as their logo; default "none".
+            businessProfile: { count: jest.fn().mockResolvedValue(0) },
             // The delete guard counts publications referencing a key. Default
             // to "none", so existing remove tests keep their meaning.
             $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
@@ -42,6 +44,7 @@ const update = prisma.media.update as jest.Mock;
 const del = prisma.media.delete as jest.Mock;
 const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 const productImageCount = prisma.productImage.count as jest.Mock;
+const logoCount = prisma.businessProfile.count as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -308,6 +311,26 @@ describe("MediaService.remove", () => {
         await expect(service.remove(ctx(), "media_1")).rejects.toThrow(
             /on 2 products/,
         );
+        expect(deleteObject).not.toHaveBeenCalled();
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it("refuses to delete the business logo", async () => {
+        const deleteObject = jest.fn();
+        const service = new MediaService(fakeStorage({ deleteObject }));
+        findUnique.mockResolvedValue({
+            id: "media_1",
+            organizationId: "org_1",
+            key: SIGNED.key,
+        });
+        logoCount.mockResolvedValueOnce(1);
+
+        await expect(service.remove(ctx(), "media_1")).rejects.toThrow(
+            /business logo/,
+        );
+        expect(logoCount).toHaveBeenCalledWith({
+            where: { logoMediaId: "media_1" },
+        });
         expect(deleteObject).not.toHaveBeenCalled();
         expect(del).not.toHaveBeenCalled();
     });

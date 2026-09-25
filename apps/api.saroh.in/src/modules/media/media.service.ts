@@ -218,6 +218,17 @@ export class MediaService {
             );
         }
 
+        // The business logo prints on its invoices; deleting it would leave
+        // them with a broken image. Remove it as the logo first.
+        const asLogo = await prisma.businessProfile.count({
+            where: { logoMediaId: media.id },
+        });
+        if (asLogo > 0) {
+            throw new ConflictException(
+                "This image is your business logo. Remove it in Settings → Business before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 
@@ -233,10 +244,22 @@ export class MediaService {
     async readyObject(
         organizationId: string,
         mediaId: string,
-    ): Promise<{ id: string; url: string | null }> {
+    ): Promise<{
+        id: string;
+        url: string | null;
+        contentType: string;
+        sizeBytes: number;
+    }> {
         const media = await prisma.media.findUnique({
             where: { id: mediaId },
-            select: { id: true, organizationId: true, key: true, status: true },
+            select: {
+                id: true,
+                organizationId: true,
+                key: true,
+                status: true,
+                contentType: true,
+                sizeBytes: true,
+            },
         });
         if (
             media?.organizationId !== organizationId ||
@@ -244,7 +267,12 @@ export class MediaService {
         ) {
             throw new NotFoundException("That photo is not in your library");
         }
-        return { id: media.id, url: this.publicUrlFor(media.key) };
+        return {
+            id: media.id,
+            url: this.publicUrlFor(media.key),
+            contentType: media.contentType,
+            sizeBytes: media.sizeBytes,
+        };
     }
 
     /**
