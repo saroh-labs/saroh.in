@@ -294,6 +294,19 @@ model BusinessProfile {
   deliveryGstRate Decimal @default(18) @db.Decimal(5, 2)
   deliverySacCode String?
 
+  // The month the business's financial year starts, 1–12 (4: April, India's
+  // year and every existing business's). A registered business's invoice
+  // numbers restart with each year: RC/26-27/0001.
+  financialYearStartMonth Int @default(4)
+
+  // The logo printed at the top of the business's invoices and receipts: a
+  // library object, and the address it is served from, taken when it was
+  // set (the product-photo pattern). The library refuses to delete it while
+  // it is the logo; the SetNull is only a backstop.
+  logoMediaId String?
+  logoMedia   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+  logoUrl     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -466,6 +479,8 @@ model Media {
 
   // Products that show this object. Taking it off a product never deletes it.
   productImages ProductImage[]
+  // The business whose logo it is (at most one: a logo is per business).
+  businessLogos BusinessProfile[] @relation("BusinessLogo")
 
   @@index([organizationId])
 }

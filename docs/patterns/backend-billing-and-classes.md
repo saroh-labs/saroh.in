@@ -47,9 +47,13 @@
   IGST. Registered → tax invoice; unregistered → receipt. A registered
   business's orders ignore the storefront's old add-on tax.
 - **Numbering:** `InvoiceSequence` per business **and series** — prefix +
-  financial year (April–March) when registered, plain prefix otherwise; credit
-  notes on their own series; the full number ≤ 16 characters; never renumber
-  an existing invoice.
+  financial year when registered, plain prefix otherwise; credit notes on
+  their own series; the full number ≤ 16 characters; never renumber an
+  existing invoice. The year starts in the business's
+  `financialYearStartMonth` (default 4, April–March: "26-27"; January carries
+  one year, "2026"). The series key is the label, so moving the month
+  mid-year continues whichever series today's new label names — possibly an
+  earlier year's, after its last number.
 - **Tax settings are Owner/Admin only.**
 - **Where it lives:** the maths is pure — `invoices/gst.ts` (split, spread,
   place of supply), `invoices/gst-states.ts` (state codes, GSTIN checks),

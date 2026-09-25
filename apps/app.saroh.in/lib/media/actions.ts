@@ -16,6 +16,8 @@ export async function createUpload(input: {
     contentType: string;
     contentLength: number;
     filename: string;
+    /** The library bucket; site images unless said. */
+    purpose?: "site-image" | "business-logo";
 }) {
     return createUploadApi(input);
 }

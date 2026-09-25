@@ -12,6 +12,8 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { MediaService } from "../media/media.service";
+import { logoProblem } from "./business-logo";
 import type {
     RegisteredAddressView,
     TaxSettingsView,
@@ -51,6 +53,11 @@ export interface OrganizationSettings {
      * state (`tax.state`) — one field, registered or not.
      */
     registeredAddress: RegisteredAddressView;
+    /**
+     * The logo printed at the top of invoices and receipts, where it is
+     * served from and the library object it is; null until one is set.
+     */
+    logo: { url: string; mediaId: string | null } | null;
 }
 
 /** What the settings read selects from the profile. */
@@ -67,6 +74,9 @@ const PROFILE_SELECT = {
     invoicePrefix: true,
     deliveryGstRate: true,
     deliverySacCode: true,
+    financialYearStartMonth: true,
+    logoMediaId: true,
+    logoUrl: true,
     addressLine1: true,
     addressLine2: true,
     city: true,
@@ -86,6 +96,9 @@ interface ProfileRow {
     invoicePrefix: string | null;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    financialYearStartMonth: number;
+    logoMediaId: string | null;
+    logoUrl: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -98,6 +111,7 @@ function splitProfile(p: ProfileRow | null) {
             profile: null,
             tax: taxView(null),
             registeredAddress: addressView(null),
+            logo: null,
         };
     }
     const {
@@ -106,6 +120,9 @@ function splitProfile(p: ProfileRow | null) {
         invoicePrefix: _p,
         deliveryGstRate: _d,
         deliverySacCode: _c,
+        financialYearStartMonth: _f,
+        logoMediaId,
+        logoUrl,
         addressLine1: _a1,
         addressLine2: _a2,
         city: _ci,
@@ -116,6 +133,7 @@ function splitProfile(p: ProfileRow | null) {
         profile,
         tax: taxView(p),
         registeredAddress: addressView(p),
+        logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
     };
 }
 
@@ -147,7 +165,10 @@ type ProfileData = Partial<Record<ProfileField, string | undefined>>;
  */
 @Injectable()
 export class OrganizationSettingsService {
-    constructor(private readonly audit: AuditService) {}
+    constructor(
+        private readonly audit: AuditService,
+        private readonly media: MediaService,
+    ) {}
 
     /** The org's current editable identity. OWNER/ADMIN only. */
     async get(ctx: OrganizationContext): Promise<OrganizationSettings> {
@@ -301,6 +322,71 @@ export class OrganizationSettingsService {
             ...splitProfile(settings.businessProfile),
             tradingSince: await this.firstOrderAt(ctx.organizationId),
         };
+    }
+
+    /**
+     * Set the business logo to a library object the business uploaded
+     * (`org:update`). It must be READY, this business's, and a logo's type
+     * and size ({@link logoProblem}); its address is taken now, as a product
+     * photo's is. Replacing leaves the old image in the library.
+     */
+    async setLogo(
+        ctx: OrganizationContext,
+        mediaId: string,
+    ): Promise<OrganizationSettings> {
+        authorize(ctx, "org:update");
+        const media = await this.media.readyObject(ctx.organizationId, mediaId);
+        const problem = logoProblem(media);
+        if (problem) {
+            throw new BadRequestException({
+                message: problem,
+                details: { field: "logo" },
+            });
+        }
+        if (!media.url) {
+            throw new BadRequestException({
+                message:
+                    "Uploaded, but storage is not set up to serve images yet, so the logo cannot print.",
+                details: { field: "logo" },
+            });
+        }
+        const data = { logoMediaId: media.id, logoUrl: media.url };
+        await prisma.businessProfile.upsert({
+            where: { organizationId: ctx.organizationId },
+            create: { organizationId: ctx.organizationId, ...data },
+            update: data,
+        });
+        await this.recordLogo(ctx);
+        return this.read(ctx.organizationId);
+    }
+
+    /**
+     * Take the logo off (`org:update`). The image stays in the library;
+     * paper printed from now on carries the name alone.
+     */
+    async removeLogo(ctx: OrganizationContext): Promise<OrganizationSettings> {
+        authorize(ctx, "org:update");
+        const { count } = await prisma.businessProfile.updateMany({
+            where: {
+                organizationId: ctx.organizationId,
+                logoUrl: { not: null },
+            },
+            data: { logoMediaId: null, logoUrl: null },
+        });
+        if (count > 0) await this.recordLogo(ctx);
+        return this.read(ctx.organizationId);
+    }
+
+    private recordLogo(ctx: OrganizationContext) {
+        return this.audit.record({
+            action: AuditAction.ProfileUpdate,
+            actorUserId: ctx.userId,
+            organizationId: ctx.organizationId,
+            targetType: "organization",
+            targetId: ctx.organizationId,
+            outcome: AuditOutcome.Success,
+            metadata: { fields: ["logo"] },
+        });
     }
 
     private async read(organizationId: string): Promise<OrganizationSettings> {

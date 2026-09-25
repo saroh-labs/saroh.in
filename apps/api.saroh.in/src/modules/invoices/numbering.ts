@@ -51,17 +51,38 @@ export function prefixProblem(prefix: string): string | null {
     return null;
 }
 
+/** The month a financial year starts in when the business chose none: April. */
+export const DEFAULT_FY_START_MONTH = 4;
+
+/** Whether `month` is a month a financial year can start in, 1–12. */
+export function isFyStartMonth(month: unknown): month is number {
+    return (
+        typeof month === "number" &&
+        Number.isInteger(month) &&
+        month >= 1 &&
+        month <= 12
+    );
+}
+
 /**
- * The Indian financial year a moment falls in, April to March, as the short
- * form a number carries: 23 September 2026 → "26-27". Read in the business's
- * own zone, so an invoice at ten past midnight on 1 April is next year's.
+ * The financial year a moment falls in, as the short form a number carries.
+ * The year starts on the 1st of `startMonth` — April, India's year, unless
+ * the business chose another: 23 September 2026 → "26-27", the two years it
+ * spans. A year that starts in January spans one and carries it whole:
+ * "2026". Read in the business's own zone, so an invoice at ten past
+ * midnight on the 1st is the new year's.
  */
 export function financialYear(
     at: Date,
     timezone: string = DEFAULT_TIMEZONE,
+    startMonth: number = DEFAULT_FY_START_MONTH,
 ): string {
+    const month = isFyStartMonth(startMonth)
+        ? startMonth
+        : DEFAULT_FY_START_MONTH;
     const local = DateTime.fromJSDate(at, { zone: timezone });
-    const start = local.month >= 4 ? local.year : local.year - 1;
+    const start = local.month >= month ? local.year : local.year - 1;
+    if (month === 1) return String(start);
     const yy = (y: number) => String(y % 100).padStart(2, "0");
     return `${yy(start)}-${yy(start + 1)}`;
 }
@@ -76,6 +97,14 @@ export function financialYear(
  *    registered), credit notes INVCN.
  *
  * A supplementary invoice is an invoice and shares the invoices' series.
+ *
+ * A registered series IS its year's label, so a business that moves the
+ * month its year starts carries on in the series today's label names under
+ * the new month: the same label (April → July, in September: still 26-27)
+ * keeps counting; a label never used starts at 0001; a label an earlier
+ * year used (April → October, in September, turns today back into 25-26)
+ * continues after that year's last number. No number is issued twice and
+ * nothing already issued is renumbered.
  */
 export function seriesFor(input: {
     registered: boolean;
@@ -83,6 +112,8 @@ export function seriesFor(input: {
     kind: InvoiceKind;
     at: Date;
     timezone?: string | null;
+    /** The month the business's financial year starts; absent, April. */
+    fyStartMonth?: number | null;
 }): InvoiceSeries {
     const base = input.prefix ?? LEGACY_SERIES.key;
     const head = input.kind === "CREDIT_NOTE" ? `${base}CN` : base;
@@ -97,7 +128,12 @@ export function seriesFor(input: {
         return s;
     };
     if (input.registered) {
-        const key = `${head}/${financialYear(input.at, input.timezone ?? DEFAULT_TIMEZONE)}`;
+        const year = financialYear(
+            input.at,
+            input.timezone ?? DEFAULT_TIMEZONE,
+            input.fyStartMonth ?? DEFAULT_FY_START_MONTH,
+        );
+        const key = `${head}/${year}`;
         return { key, format: (n) => guard(`${key}/${pad(n)}`) };
     }
     if (head === LEGACY_SERIES.key) return LEGACY_SERIES;

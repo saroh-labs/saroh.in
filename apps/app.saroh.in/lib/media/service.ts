@@ -61,6 +61,8 @@ export async function createUpload(input: {
     contentType: string;
     contentLength: number;
     filename: string;
+    /** The library bucket; site images unless said. */
+    purpose?: "site-image" | "business-logo";
 }): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -69,7 +71,7 @@ export async function createUpload(input: {
         // One bucket for everything a site shows: hero, gallery, share card.
         // Bucketing by section would split a merchant's photographs by where
         // they happened to be used first.
-        body: JSON.stringify({ ...input, purpose: "site-image" }),
+        body: JSON.stringify({ purpose: "site-image", ...input }),
     });
     const data: unknown = await res.json().catch(() => null);
     if (res.ok && data && typeof data === "object" && "uploadUrl" in data) {

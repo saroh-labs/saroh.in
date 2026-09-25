@@ -12,6 +12,7 @@ jest.mock("@saroh/database", () => {
         businessProfile: {
             upsert: jest.fn(),
             findUnique: jest.fn(),
+            updateMany: jest.fn(),
         },
         membership: {
             findMany: jest.fn(),
@@ -34,6 +35,7 @@ import { prisma } from "@saroh/database";
 import type { OrgRole } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction } from "../audit/audit.service";
+import type { MediaService } from "../media/media.service";
 import type { UpdateOrganizationDto } from "./dto";
 import { OrganizationSettingsService } from "./organization-settings.service";
 
@@ -41,6 +43,7 @@ const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const orgUpdate = prisma.organization.update as jest.Mock;
 const profileUpsert = prisma.businessProfile.upsert as jest.Mock;
 const profileFindUnique = prisma.businessProfile.findUnique as jest.Mock;
+const profileUpdateMany = prisma.businessProfile.updateMany as jest.Mock;
 const membershipFindMany = prisma.membership.findMany as jest.Mock;
 const membershipCount = prisma.membership.count as jest.Mock;
 const orderFindFirst = prisma.order.findFirst as jest.Mock;
@@ -54,7 +57,9 @@ const ctx = (role: OrgRole = "OWNER") => ({
 describe("OrganizationSettingsService", () => {
     const record = jest.fn().mockResolvedValue(undefined);
     const audit = { record } as unknown as AuditService;
-    const service = new OrganizationSettingsService(audit);
+    const readyObject = jest.fn();
+    const media = { readyObject } as unknown as MediaService;
+    const service = new OrganizationSettingsService(audit, media);
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -468,8 +473,63 @@ describe("OrganizationSettingsService", () => {
                     invoicePrefix: "RC",
                     deliveryRate: "18",
                     deliverySac: "996813",
+                    // Not stored on this row: April, as every business was.
+                    financialYearStart: 4,
                 });
                 expect(settings.profile).not.toHaveProperty("gstRegistered");
+            });
+        });
+
+        describe("financial year start", () => {
+            it("stores the month the year starts, as a tax setting", async () => {
+                await service.update(ctx(), {
+                    tax: { financialYearStart: 7 },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        update: { financialYearStartMonth: 7 },
+                    }),
+                );
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        metadata: { fields: ["financialYearStartMonth"] },
+                    }),
+                );
+            });
+
+            it("refuses a month that is not one, and writes nothing", async () => {
+                await expect(
+                    service.update(ctx(), { tax: { financialYearStart: 13 } }),
+                ).rejects.toMatchObject({
+                    response: { details: { field: "financialYearStart" } },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("is Owner/Admin: a Member is refused", async () => {
+                await expect(
+                    service.update(ctx("MEMBER"), {
+                        tax: { financialYearStart: 1 },
+                    }),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(profileUpsert).not.toHaveBeenCalled();
+            });
+
+            it("reads back the stored month", async () => {
+                orgFindUnique.mockResolvedValue({
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                    businessProfile: {
+                        legalName: null,
+                        gstRegistered: false,
+                        deliveryGstRate: { toString: () => "18.00" },
+                        financialYearStartMonth: 1,
+                    },
+                });
+                expect((await service.get(ctx())).tax.financialYearStart).toBe(
+                    1,
+                );
             });
         });
 
@@ -482,6 +542,104 @@ describe("OrganizationSettingsService", () => {
             });
             const written = orgUpdate.mock.calls[0][0] as { data: object };
             expect(written.data).not.toHaveProperty("slug");
+        });
+    });
+
+    describe("logo", () => {
+        const png = {
+            id: "media_1",
+            url: "https://media.saroh.test/org/org_1/business-logo/a.png",
+            contentType: "image/png",
+            sizeBytes: 40_000,
+        };
+
+        it("sets a ready library image as the logo, and reads it back", async () => {
+            readyObject.mockResolvedValue(png);
+            orgFindUnique.mockResolvedValue({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: {
+                    legalName: null,
+                    deliveryGstRate: { toString: () => "18.00" },
+                    logoMediaId: "media_1",
+                    logoUrl: png.url,
+                },
+            });
+
+            const settings = await service.setLogo(ctx("ADMIN"), "media_1");
+
+            // Tenant-scoped: the library answers for this business only.
+            expect(readyObject).toHaveBeenCalledWith("org_1", "media_1");
+            expect(profileUpsert).toHaveBeenCalledWith({
+                where: { organizationId: "org_1" },
+                create: {
+                    organizationId: "org_1",
+                    logoMediaId: "media_1",
+                    logoUrl: png.url,
+                },
+                update: { logoMediaId: "media_1", logoUrl: png.url },
+            });
+            expect(settings.logo).toEqual({ url: png.url, mediaId: "media_1" });
+            expect(settings.profile).not.toHaveProperty("logoUrl");
+            expect(record).toHaveBeenCalledWith(
+                expect.objectContaining({ metadata: { fields: ["logo"] } }),
+            );
+        });
+
+        it("refuses an SVG, and an image of 1 MB or more", async () => {
+            readyObject.mockResolvedValueOnce({
+                ...png,
+                contentType: "image/svg+xml",
+            });
+            await expect(service.setLogo(ctx(), "media_1")).rejects.toThrow(
+                /PNG, JPG or WebP/,
+            );
+            readyObject.mockResolvedValueOnce({
+                ...png,
+                sizeBytes: 1024 * 1024 + 1,
+            });
+            await expect(service.setLogo(ctx(), "media_1")).rejects.toThrow(
+                /under 1 MB/,
+            );
+            expect(profileUpsert).not.toHaveBeenCalled();
+        });
+
+        it("refuses an image storage cannot serve", async () => {
+            readyObject.mockResolvedValueOnce({ ...png, url: null });
+            await expect(
+                service.setLogo(ctx(), "media_1"),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(profileUpsert).not.toHaveBeenCalled();
+        });
+
+        it("is Owner/Admin: a Member can neither set nor remove it", async () => {
+            await expect(
+                service.setLogo(ctx("MEMBER"), "media_1"),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                service.removeLogo(ctx("MEMBER")),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(readyObject).not.toHaveBeenCalled();
+            expect(profileUpsert).not.toHaveBeenCalled();
+            expect(profileUpdateMany).not.toHaveBeenCalled();
+        });
+
+        it("removes it, leaving the image in the library", async () => {
+            profileUpdateMany.mockResolvedValue({ count: 1 });
+            const settings = await service.removeLogo(ctx());
+            expect(profileUpdateMany).toHaveBeenCalledWith({
+                where: { organizationId: "org_1", logoUrl: { not: null } },
+                data: { logoMediaId: null, logoUrl: null },
+            });
+            expect(settings.logo).toBeNull();
+            expect(record).toHaveBeenCalledTimes(1);
+        });
+
+        it("removing when there is none writes no audit row", async () => {
+            profileUpdateMany.mockResolvedValue({ count: 0 });
+            await service.removeLogo(ctx());
+            expect(record).not.toHaveBeenCalled();
         });
     });
 

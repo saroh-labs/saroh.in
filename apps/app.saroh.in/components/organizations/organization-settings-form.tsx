@@ -20,6 +20,7 @@ import type { FieldErrors } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
 import { BusinessSection } from "@/components/organizations/business-section";
@@ -43,7 +44,13 @@ import {
     PREFIX_SHAPE,
     rateOption,
 } from "@/lib/invoices/gst";
-import { sampleInvoiceNumber } from "@/lib/invoices/invoice-number";
+import {
+    financialYear,
+    financialYearSpan,
+    FY_DEFAULT_START,
+    MONTHS,
+    sampleInvoiceNumber,
+} from "@/lib/invoices/invoice-number";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -73,6 +80,8 @@ const formSchema = z
                 (v) => v === "" || PREFIX_SHAPE.test(v.toUpperCase()),
                 "One to three letters or digits, like RC.",
             ),
+        // The month the financial year starts, "1"–"12".
+        financialYearStart: z.string(),
         deliveryRate: z.string(),
         deliverySac: z
             .string()
@@ -118,6 +127,7 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     invoicePrefix: "invoicePrefix",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
+    financialYearStart: "financialYearStart",
     addressLine1: "addressLine1",
     addressLine2: "addressLine2",
     city: "city",
@@ -151,6 +161,9 @@ function valuesOf(settings: OrganizationSettings): FormValues {
         invoicePrefix: settings.tax?.invoicePrefix ?? "",
         deliveryRate: settings.tax?.deliveryRate ?? "18",
         deliverySac: settings.tax?.deliverySac ?? "",
+        financialYearStart: String(
+            settings.tax?.financialYearStart ?? FY_DEFAULT_START,
+        ),
         addressLine1: settings.registeredAddress?.line1 ?? "",
         addressLine2: settings.registeredAddress?.line2 ?? "",
         city: settings.registeredAddress?.city ?? "",
@@ -181,6 +194,7 @@ const SECTIONS = {
             "gstRegistered",
             "taxId",
             "gstState",
+            "financialYearStart",
             "invoicePrefix",
             "deliveryRate",
             "deliverySac",
@@ -203,16 +217,8 @@ const sectionOf = (field: string): SectionKey =>
         (SECTIONS[key].fields as readonly string[]).includes(field),
     ) ?? "identity";
 
-/**
- * India's financial year, which the API numbers invoices by (`numbering.ts`).
- * The design lets a business choose the month it starts; the API has one
- * year, April to March, so it is said here rather than offered.
- */
-const FINANCIAL_YEAR_ROW: BusinessRow = {
-    label: "Financial year",
-    value: "April – March",
-    tag: "Invoice numbers restart each April",
-};
+/** The months a financial year can start in, for the picker. */
+const FY_MONTHS = MONTHS.map((label, i) => ({ value: String(i + 1), label }));
 
 const stateName = (code: string) =>
     GST_STATES.find((s) => s.value === code)?.label ?? "";
@@ -337,6 +343,9 @@ export function OrganizationSettingsForm({
             ...(dirtyFields.deliverySac
                 ? { deliverySac: values.deliverySac.trim() }
                 : {}),
+            ...(dirtyFields.financialYearStart
+                ? { financialYearStart: Number(values.financialYearStart) }
+                : {}),
         };
         const registeredAddress = Object.fromEntries(
             ADDRESS_KEYS.filter((key) => dirtyFields[key]).map((key) => [
@@ -384,8 +393,16 @@ export function OrganizationSettingsForm({
         ? new Date(settings.tradingSince).getUTCFullYear().toString()
         : "";
     const number = (x: FormValues) =>
-        sampleInvoiceNumber(x.invoicePrefix, x.gstRegistered);
+        sampleInvoiceNumber(
+            x.invoicePrefix,
+            x.gstRegistered,
+            Number(x.financialYearStart),
+        );
     const savedState = gstStateOf(saved);
+    const fyRow: BusinessRow = {
+        label: "Financial year",
+        value: financialYearSpan(Number(saved.financialYearStart)),
+    };
 
     const rows: Record<SectionKey, BusinessRow[]> = {
         identity: [
@@ -437,7 +454,7 @@ export function OrganizationSettingsForm({
                           ? `${savedState.name}${savedState.fromGstin ? " · from the GSTIN" : ""}`
                           : "",
                   },
-                  FINANCIAL_YEAR_ROW,
+                  fyRow,
                   {
                       label: "Invoice numbers",
                       value: number(saved),
@@ -461,7 +478,7 @@ export function OrganizationSettingsForm({
                       empty: "None",
                       mono: true,
                   },
-                  FINANCIAL_YEAR_ROW,
+                  fyRow,
                   {
                       label: "Invoice numbers",
                       value: number(saved),
@@ -739,6 +756,37 @@ export function OrganizationSettingsForm({
                 ) : null}
                 <FormField
                     control={form.control}
+                    name="financialYearStart"
+                    render={({ field }) => (
+                        <FormItem {...at("200px", false)}>
+                            <FormLabel>Financial year starts</FormLabel>
+                            <FormControl>
+                                <OptionSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    options={FY_MONTHS}
+                                    className="w-full"
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                {/* An unregistered business's numbers run
+                                    on without a year (PF-0001), so the
+                                    restart is said only for a registered
+                                    one. */}
+                                {`Runs ${financialYearSpan(Number(field.value))}. Invoice numbers restart at 0001 each year${registered ? "" : " once you're GST-registered"}.`}
+                                {/* Moving the month mid-year: the API
+                                    carries on in the series today's label
+                                    names (`seriesFor`). */}
+                                {registered && dirtyFields.financialYearStart
+                                    ? ` Nothing issued is renumbered; the next invoice is numbered in the ${financialYear(new Date(), Number(field.value))} series.`
+                                    : null}
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
                     name="invoicePrefix"
                     render={({ field }) => (
                         <FormItem {...at("140px", false)}>
@@ -927,6 +975,16 @@ export function OrganizationSettingsForm({
                         saveOff={!isDirty || sectionErrors > 0}
                         saving={isSubmitting}
                         saveWhy={saveWhy}
+                        top={
+                            tab === "identity" ? (
+                                <BusinessLogoRow
+                                    logoUrl={settings.logo?.url ?? null}
+                                    name={settings.name}
+                                    canEdit={canEdit}
+                                    onSaved={setSettings}
+                                />
+                            ) : undefined
+                        }
                     >
                         {fieldsOf[tab]}
                     </BusinessSection>
@@ -934,6 +992,7 @@ export function OrganizationSettingsForm({
 
                 <BusinessPrintPreview
                     live={editing !== null && isDirty}
+                    logoUrl={settings.logo?.url ?? null}
                     registered={registered}
                     number={number(v)}
                     legalName={

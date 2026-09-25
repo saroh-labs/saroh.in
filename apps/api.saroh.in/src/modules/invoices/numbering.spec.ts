@@ -206,3 +206,109 @@ describe("issuing across 1 April", () => {
         expect(new Set([march, april, april2]).size).toBe(3);
     });
 });
+
+describe("a financial year the business chose", () => {
+    const kolkata = "Asia/Kolkata";
+
+    it("starts on the 1st of the month chosen, in the business's own time", () => {
+        // July to June.
+        expect(
+            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 7),
+        ).toBe("26-27");
+        expect(
+            financialYear(new Date("2026-06-30T10:00:00Z"), kolkata, 7),
+        ).toBe("25-26");
+        // 1 July 00:10 in India is still 30 June in UTC.
+        expect(
+            financialYear(new Date("2026-06-30T18:40:00Z"), kolkata, 7),
+        ).toBe("26-27");
+        // October to September: late September is still the year before.
+        expect(
+            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 10),
+        ).toBe("25-26");
+    });
+
+    it("a year from January spans one calendar year and carries it whole", () => {
+        expect(
+            financialYear(new Date("2026-09-23T10:00:00Z"), kolkata, 1),
+        ).toBe("2026");
+        expect(
+            financialYear(new Date("2026-12-31T18:40:00Z"), kolkata, 1),
+        ).toBe("2027");
+        const s = seriesFor({
+            registered: true,
+            prefix: "ABC",
+            kind: "CREDIT_NOTE",
+            at: new Date("2026-09-23T10:00:00Z"),
+            fyStartMonth: 1,
+        });
+        expect(s.format(9999)).toBe("ABCCN/2026/9999");
+    });
+
+    it("absent or out of range, it is April", () => {
+        const at = new Date("2026-03-15T10:00:00Z");
+        expect(financialYear(at, kolkata, 0)).toBe("25-26");
+        expect(financialYear(at, kolkata, 13)).toBe("25-26");
+        expect(
+            seriesFor({
+                registered: true,
+                prefix: "RC",
+                kind: "INVOICE",
+                at,
+                fyStartMonth: null,
+            }).key,
+        ).toBe("RC/25-26");
+    });
+
+    it("an unregistered business's plain series has no year to restart", () => {
+        expect(
+            seriesFor({
+                registered: false,
+                prefix: "PF",
+                kind: "INVOICE",
+                at: new Date("2026-09-23T10:00:00Z"),
+                fyStartMonth: 1,
+            }).key,
+        ).toBe("PF");
+    });
+});
+
+describe("moving the start month mid-year", () => {
+    // RC/25-26 ran April 2025 to March 2026 and reached 0312; RC/26-27 has
+    // reached 0057 by 23 September 2026, when the business changes month.
+    const at = new Date("2026-09-23T10:00:00Z");
+    async function after(fyStartMonth: number) {
+        const { tx, rows } = fakeSequencer();
+        rows.set("org_1|RC/25-26", 312);
+        rows.set("org_1|RC/26-27", 57);
+        const next = await nextInvoiceNumber(
+            tx as never,
+            "org_1",
+            seriesFor({
+                registered: true,
+                prefix: "RC",
+                kind: "INVOICE",
+                at,
+                fyStartMonth,
+            }),
+        );
+        return { next, rows };
+    }
+
+    it("a month that keeps today's label keeps counting", async () => {
+        // July: July 2026 to June 2027 is still 26-27.
+        expect((await after(7)).next).toBe("RC/26-27/0058");
+    });
+
+    it("a label never used starts at 0001", async () => {
+        expect((await after(1)).next).toBe("RC/2026/0001");
+    });
+
+    it("a label an earlier year used continues after its last number, never repeating one", async () => {
+        // October: today falls in October 2025 to September 2026, "25-26".
+        const { next, rows } = await after(10);
+        expect(next).toBe("RC/25-26/0313");
+        // What 26-27 issued is untouched.
+        expect(rows.get("org_1|RC/26-27")).toBe(57);
+    });
+});

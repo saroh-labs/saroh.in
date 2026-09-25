@@ -28,6 +28,8 @@ export interface TaxSettings {
     /** Percent, e.g. "18". */
     deliveryRate: string;
     deliverySac: string | null;
+    /** The month the financial year starts, 1–12; absent from an older API: April. */
+    financialYearStart?: number;
 }
 
 /**
@@ -54,6 +56,16 @@ export interface OrganizationSettings {
     tax?: TaxSettings;
     /** Absent only from an API older than the registered address. */
     registeredAddress?: RegisteredAddress;
+    /**
+     * The logo printed at the top of invoices and receipts; null until one
+     * is set, absent from an API older than it.
+     */
+    logo?: BusinessLogo | null;
+}
+
+export interface BusinessLogo {
+    url: string;
+    mediaId: string | null;
 }
 
 export interface TaxSettingsInput {
@@ -62,6 +74,7 @@ export interface TaxSettingsInput {
     invoicePrefix?: string;
     deliveryRate?: string;
     deliverySac?: string;
+    financialYearStart?: number;
 }
 
 export interface OrganizationSettingsInput {
@@ -106,6 +119,35 @@ export async function updateOrganizationSettings(
 
     if (!res.ok || !data) {
         return toFailure(data, "Could not save your organization.");
+    }
+    return { ok: true, data };
+}
+
+/**
+ * Set the business logo to an image already uploaded to the library, or
+ * take it off (`mediaId` null; the image stays in the library).
+ */
+export async function updateBusinessLogo(
+    mediaId: string | null,
+): Promise<SettingsResult<OrganizationSettings>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active organization." };
+
+    const res = await apiFetch(
+        `${base}/logo`,
+        mediaId
+            ? { method: "PUT", body: JSON.stringify({ mediaId }) }
+            : { method: "DELETE" },
+    );
+    const data = (await res
+        .json()
+        .catch(() => null)) as OrganizationSettings | null;
+
+    if (!res.ok || !data) {
+        return toFailure(
+            data,
+            mediaId ? "Could not save the logo." : "Could not remove the logo.",
+        );
     }
     return { ok: true, data };
 }
