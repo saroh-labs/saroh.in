@@ -101,7 +101,8 @@ with why it stops there:
   line loader, one lock order and the invariant (promised = sum of held).
   Online payment (`reserveOnPayment`) is the natural cut once the online
   checkout calls it.
-- `collections/collections.service.ts` (803) — hand-picked and automatic
+- `collections/collections.service.ts` (818; the cards' website pages,
+  #524) — hand-picked and automatic
   collections, their products and a product's collections, around the one
   category tree. The product page's reads (`forProduct`, `setForProduct`)
   could move to their own service, as the controller's product routes
@@ -127,6 +128,11 @@ with why it stops there:
   `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
   (481) — one-off backfills, each one exported unit that the integration
   suite runs twice. The merge is already split, into deciding and moving.
+- `stores/catalogue-screen.tsx` (412; 401 before the Collections chip,
+  #524) — the Products list's rows, paging, bulk bar, quick look and
+  delete confirm share its list state. The Collections chip's cards and
+  sheet went to their own `commerce/collections/collections-panel.tsx`,
+  passed in as a slot; the list's reload and paging are the next seam.
 - `sites/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
