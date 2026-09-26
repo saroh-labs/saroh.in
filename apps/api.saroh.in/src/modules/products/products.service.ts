@@ -8,6 +8,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import {
     checkProductAllergens,
@@ -171,12 +172,11 @@ function isSlugClash(error: unknown): boolean {
  */
 function isLockConflict(error: unknown): boolean {
     if (typeof error !== "object" || error === null) return false;
-    const { code, meta, message } = error as {
-        code?: unknown;
+    const { meta, message } = error as {
         meta?: unknown;
         message?: unknown;
     };
-    if (code === "P2034") return true;
+    if (isSerializationFailure(error)) return true;
     const text = `${JSON.stringify(meta ?? null)} ${typeof message === "string" ? message : ""}`;
     return text.includes("40P01") || text.includes("deadlock detected");
 }

@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
@@ -449,7 +450,7 @@ export class ClassPacksService {
                         PrismaNamespace.TransactionIsolationLevel.Serializable,
                 },
             );
-        const code = (err: unknown) => (err as { code?: string }).code;
+        const code = prismaErrorCode;
         let purchaseId: string;
         try {
             try {
