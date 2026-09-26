@@ -305,6 +305,68 @@ describe("Stock API (DB)", () => {
             const view = await api.levels(ctx("MEMBER"), {});
             expect(view.canWrite).toBe(false);
         });
+
+        it("pages by product, and every page lists the untracked", async () => {
+            const all = await api.levels(owner(), {});
+            expect(all.nextCursor).toBeNull();
+            const products = Array.from(
+                new Set(all.rows.map((r) => r.productId)),
+            );
+            expect(products.length).toBeGreaterThan(2);
+
+            const first = await api.levels(owner(), { limit: 2 });
+            expect(
+                Array.from(new Set(first.rows.map((r) => r.productId))),
+            ).toEqual(products.slice(0, 2));
+            expect(first.nextCursor).toBe(products[1]);
+            expect(first.untracked).toEqual(all.untracked);
+            expect(first.needsYou).toBe(all.needsYou);
+
+            const seen = [...products.slice(0, 2)];
+            let cursor: string | null = first.nextCursor;
+            while (cursor) {
+                const page = await api.levels(owner(), { limit: 2, cursor });
+                seen.push(
+                    ...Array.from(new Set(page.rows.map((r) => r.productId))),
+                );
+                cursor = page.nextCursor;
+            }
+            expect(seen).toEqual(products);
+            await expect(
+                api.levels(owner(), { limit: 2, cursor: otherProduct }),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it("searches names and SKUs, and keeps only what needs someone", async () => {
+            const low = await product(`Rye ${tag}`, 1);
+            await prisma.stockLevel.update({
+                where: { id: (await shelf(hill, low)).id },
+                data: { lowStockAlert: 4 },
+            });
+            const found = await api.levels(owner(), { q: `rye ${tag}` });
+            expect(found.rows.map((r) => r.productId)).toEqual([low]);
+
+            const needs = await api.levels(owner(), { needs: true });
+            expect(needs.rows.some((r) => r.productId === low)).toBe(true);
+            expect(
+                needs.rows.every((r) =>
+                    r.cells.some(
+                        (c) =>
+                            c.word === "LOW" ||
+                            c.word === "SOLD_OUT" ||
+                            c.short > 0,
+                    ),
+                ),
+            ).toBe(true);
+            expect(needs.needsYou).toBe(needs.rows.length);
+            // The last change says who, for a role that reads the audit trail.
+            const [row] = found.rows;
+            expect(row.lastChange).toMatchObject({
+                kind: "COUNTED",
+                by: "Asha Rao",
+            });
+            expect(found.timezone).toBe("Asia/Kolkata");
+        });
     });
 
     /** A fulfilled order that sold `units` of a product from Hill Road. */

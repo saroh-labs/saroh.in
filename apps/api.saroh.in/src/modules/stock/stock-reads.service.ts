@@ -3,17 +3,24 @@ import type { Prisma, StockEntryKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import type { StockWord } from "../products/product-overview";
-import { stockLine } from "../products/product-overview";
+import { businessTimezone } from "../bookings/staff-availability";
 import type { StockLevelsQueryDto, StockLogQueryDto } from "./dto";
+import type { StockLevelsView } from "./levels-read";
+import { readLevels } from "./levels-read";
 import { stockReader } from "./stock-access";
 import {
     canUndoEntry,
     countMismatched,
-    shortBy,
     STOCK_ENTRY_WORDS,
 } from "./stock-words";
-import { businessTracksStock } from "./tracking";
+
+export { openStorefronts } from "./levels-read";
+export type {
+    LastChange,
+    StockCell,
+    StockLevelRow,
+    StockLevelsView,
+} from "./levels-read";
 
 /**
  * What the Stock screen, the quick look and the product page read (#514):
@@ -21,63 +28,6 @@ import { businessTracksStock } from "./tracking";
  * storefront — and the log. Every number comes from StockLevel and
  * StockEntry; the screens only turn them into words (`lib/stock/levels.ts`).
  */
-
-export interface LastChange {
-    at: Date;
-    kind: StockEntryKind;
-    quantity: number;
-}
-
-/** One storefront's shelf of one row. */
-export interface StockCell {
-    storeId: string;
-    /** Null where this storefront has no shelf for it yet. */
-    stockLevelId: string | null;
-    /** The storefront sells it; false reads "Not sold here". */
-    soldHere: boolean;
-    onHand: number;
-    promised: number;
-    /** On hand minus promised, never below 0 — what the shop sells. */
-    canSell: number;
-    /** Promised units not on the shelf ("N short"). */
-    short: number;
-    warnAt: number;
-    word: StockWord | "NOT_SOLD_HERE";
-    lastChange: LastChange | null;
-}
-
-export interface StockLevelRow {
-    productId: string;
-    productName: string;
-    productStatus: string;
-    image: string | null;
-    /** Null: the product counted as a whole. */
-    variantId: string | null;
-    variantTitle: string | null;
-    sku: string | null;
-    cells: StockCell[];
-    /** The latest change at any storefront. */
-    lastChange: LastChange | null;
-}
-
-export interface StockLevelsView {
-    storefronts: { id: string; name: string }[];
-    rows: StockLevelRow[];
-    /**
-     * Products that don't track stock (#515) — Track stock off for the
-     * product, or for the whole business: they sell unless a storefront
-     * marked them Sold out by hand (`soldOutAt`, its storefront ids).
-     */
-    untracked: {
-        productId: string;
-        name: string;
-        status: string;
-        soldOutAt: string[];
-    }[];
-    /** The business's Track stock switch; off, every product is untracked. */
-    tracking: boolean;
-    canWrite: boolean;
-}
 
 export interface StockLogEntry {
     id: string;
@@ -116,244 +66,24 @@ export interface StockLogView {
     nextCursor: string | null;
     seesPeople: boolean;
     seesOrders: boolean;
+    /** The business's zone, for the log's days and times. */
+    timezone: string;
 }
 
 const DEFAULT_LOG_PAGE = 50;
-
-/** Open storefronts of the business, first made first. */
-export function openStorefronts(organizationId: string, only?: string) {
-    return prisma.store.findMany({
-        where: {
-            organizationId,
-            deletedAt: null,
-            ...(only ? { id: only } : {}),
-        },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: { id: true, name: true },
-    });
-}
-
-/** The latest entry on each row. */
-async function lastChanges(
-    organizationId: string,
-    stockLevelIds: string[],
-): Promise<Map<string, LastChange>> {
-    if (stockLevelIds.length === 0) return new Map();
-    const rows = await prisma.$queryRaw<
-        {
-            stockLevelId: string;
-            kind: StockEntryKind;
-            quantity: number;
-            createdAt: Date;
-        }[]
-    >`SELECT DISTINCT ON ("stockLevelId") "stockLevelId", "kind"::text AS "kind", "quantity", "createdAt"
-      FROM "StockEntry"
-      WHERE "organizationId" = ${organizationId}
-        AND "stockLevelId" = ANY(${stockLevelIds}::text[])
-      ORDER BY "stockLevelId", "createdAt" DESC, "id" DESC`;
-    return new Map(
-        rows.map((r) => [
-            r.stockLevelId,
-            { at: r.createdAt, kind: r.kind, quantity: r.quantity },
-        ]),
-    );
-}
-
-function latest(changes: (LastChange | null)[]): LastChange | null {
-    let out: LastChange | null = null;
-    for (const c of changes) {
-        if (c && (!out || c.at > out.at)) out = c;
-    }
-    return out;
-}
 
 @Injectable()
 export class StockReadsService {
     /**
      * Stock levels: every product that counts stock, a row per variant when
-     * it counts per variant, a cell per open storefront. A storefront that
-     * doesn't sell it reads "Not sold here", with any stock still on its
-     * shelf shown.
+     * it counts per variant, a cell per open storefront — a page at a time
+     * when `limit` is given (`levels-read.ts`).
      */
-    async levels(
+    levels(
         ctx: OrganizationContext,
         query: StockLevelsQueryDto,
     ): Promise<StockLevelsView> {
-        const reader = stockReader(ctx);
-        const { organizationId } = reader;
-        const storefronts = await openStorefronts(
-            organizationId,
-            query.storefront,
-        );
-        if (query.storefront && storefronts.length === 0) {
-            throw new NotFoundException("Store not found");
-        }
-        if (query.product) {
-            const found = await prisma.product.count({
-                where: { id: query.product, organizationId },
-            });
-            if (found === 0) throw new NotFoundException("Product not found");
-        }
-        const productWhere: Prisma.ProductWhereInput = {
-            organizationId,
-            ...(query.product ? { id: query.product } : {}),
-        };
-        const [products, levels, tracking] = await Promise.all([
-            prisma.product.findMany({
-                where: productWhere,
-                orderBy: [{ name: "asc" }, { id: "asc" }],
-                select: {
-                    id: true,
-                    name: true,
-                    status: true,
-                    image: true,
-                    stockTracked: true,
-                    variants: {
-                        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-                        select: { id: true, title: true, sku: true },
-                    },
-                    listings: {
-                        select: {
-                            storeId: true,
-                            soldOutAt: true,
-                            variants: { select: { variantId: true } },
-                        },
-                    },
-                },
-            }),
-            prisma.stockLevel.findMany({
-                where: {
-                    organizationId,
-                    ...(query.product ? { productId: query.product } : {}),
-                },
-                select: {
-                    id: true,
-                    storeId: true,
-                    productId: true,
-                    variantId: true,
-                    onHand: true,
-                    promised: true,
-                    lowStockAlert: true,
-                },
-            }),
-            businessTracksStock(prisma, organizationId),
-        ]);
-        const changes = await lastChanges(
-            organizationId,
-            levels.map((l) => l.id),
-        );
-        const byProduct = new Map<string, typeof levels>();
-        for (const level of levels) {
-            const list = byProduct.get(level.productId) ?? [];
-            list.push(level);
-            byProduct.set(level.productId, list);
-        }
-
-        const rows: StockLevelRow[] = [];
-        const untracked: StockLevelsView["untracked"] = [];
-        for (const product of products) {
-            const shelves = byProduct.get(product.id) ?? [];
-            if (!tracking || !product.stockTracked) {
-                untracked.push({
-                    productId: product.id,
-                    name: product.name,
-                    status: product.status,
-                    soldOutAt: product.listings.flatMap((l) =>
-                        l.soldOutAt ? [l.storeId] : [],
-                    ),
-                });
-                continue;
-            }
-            const listings = new Map(
-                product.listings.map((l) => [
-                    l.storeId,
-                    new Set(l.variants.map((v) => v.variantId)),
-                ]),
-            );
-            const perVariant = shelves.some((s) => s.variantId !== null);
-            const lines: {
-                variantId: string | null;
-                title: string | null;
-                sku: string | null;
-            }[] = perVariant
-                ? product.variants.map((v) => ({
-                      variantId: v.id,
-                      title: v.title,
-                      sku: v.sku,
-                  }))
-                : [
-                      {
-                          variantId: null,
-                          title: null,
-                          sku: product.variants[0]?.sku ?? null,
-                      },
-                  ];
-            // In per-variant mode the product's own shelf only carries
-            // promises of lines without a variant; shown while it holds any.
-            if (
-                perVariant &&
-                shelves.some(
-                    (s) =>
-                        s.variantId === null &&
-                        (s.onHand !== 0 || s.promised !== 0),
-                )
-            ) {
-                lines.push({ variantId: null, title: null, sku: null });
-            }
-            for (const line of lines) {
-                const cells = storefronts.map((store): StockCell => {
-                    const shelf = shelves.find(
-                        (s) =>
-                            s.storeId === store.id &&
-                            s.variantId === line.variantId,
-                    );
-                    const sold = listings.get(store.id);
-                    const soldHere =
-                        sold !== undefined &&
-                        (line.variantId === null || sold.has(line.variantId));
-                    const counts = stockLine({
-                        quantity: shelf?.onHand ?? 0,
-                        reserved: shelf?.promised ?? 0,
-                        lowStockAlert: shelf?.lowStockAlert ?? 0,
-                    });
-                    return {
-                        storeId: store.id,
-                        stockLevelId: shelf?.id ?? null,
-                        soldHere,
-                        onHand: counts.onHand,
-                        promised: counts.promised,
-                        canSell: counts.canSell,
-                        short: shortBy({
-                            onHand: counts.onHand,
-                            promised: counts.promised,
-                        }),
-                        warnAt: counts.warnAt,
-                        word: soldHere ? counts.word : "NOT_SOLD_HERE",
-                        lastChange: shelf
-                            ? (changes.get(shelf.id) ?? null)
-                            : null,
-                    };
-                });
-                rows.push({
-                    productId: product.id,
-                    productName: product.name,
-                    productStatus: product.status,
-                    image: product.image,
-                    variantId: line.variantId,
-                    variantTitle: line.title,
-                    sku: line.sku,
-                    cells,
-                    lastChange: latest(cells.map((c) => c.lastChange)),
-                });
-            }
-        }
-        return {
-            storefronts,
-            rows,
-            untracked,
-            tracking,
-            canWrite: reader.canWrite,
-        };
+        return readLevels(stockReader(ctx), query);
     }
 
     /**
@@ -448,6 +178,7 @@ export class StockReadsService {
             nextCursor: more ? entries[entries.length - 1].id : null,
             seesPeople: reader.seesPeople,
             seesOrders: reader.seesOrders,
+            timezone: await businessTimezone(prisma, organizationId),
         };
     }
 

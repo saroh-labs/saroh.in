@@ -78,7 +78,7 @@ each with why it stops there:
   member drawer and the invite dialog share the screen's roster and role
   state. Each piece is its own function already; moving them is a file split
   with props threaded through, not yet done.
-- `shared/nav-items.tsx` (1,140) — the nav's data (`NAV_GROUPS`,
+- `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
@@ -106,10 +106,11 @@ with why it stops there:
   category tree. The product page's reads (`forProduct`, `setForProduct`)
   could move to their own service, as the controller's product routes
   already are.
-- `stock/stock-reads.service.ts` (486) and `stock/stock-checks.service.ts`
-  (418) — the Stock screen's levels and log, and its four checks. Each is
-  one reader. A little over, and cutting one splits a query from the words
-  it builds.
+- `stock/levels-read.ts` (442) and `stock/stock-checks.service.ts`
+  (438) — the Stock screen's levels, and its four checks. Each is one
+  reader, now paged (#527). The levels left `stock-reads.service.ts` (217
+  now, the log) when paging grew them; a little over, and cutting one
+  splits a query from the words it builds.
 - `products/serialize.ts` (596), `products/inventory.service.ts` (545) and
   `products/variants.service.ts` (474) — grew with listings, stock per
   storefront, Track stock and the per-variant switch. `inventory.service`'s

@@ -68,10 +68,13 @@ export function AppSidebar({
     actions = null,
     counts,
     storefronts = null,
+    stockTracked = null,
     collapsed: collapsedAtLoad = false,
 }: {
     /** How many storefronts; with several the row reads "Storefronts". */
     storefronts?: number | null;
+    /** The business tracks stock; off, Sell › Stock is not offered. */
+    stockTracked?: boolean | null;
     /** The person collapsed the rail to icons; read from `RAIL_COOKIE`. */
     collapsed?: boolean;
     unread?: number;
@@ -87,7 +90,13 @@ export function AppSidebar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const groups = navFor({ role, actions, moduleKeys, storefronts });
+    const groups = navFor({
+        role,
+        actions,
+        moduleKeys,
+        storefronts,
+        stockTracked,
+    });
     const pathname = navPathname(usePathname(), groups);
     const [collapsed, setCollapsed] = useState(collapsedAtLoad);
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);

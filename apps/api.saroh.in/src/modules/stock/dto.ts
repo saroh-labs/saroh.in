@@ -174,6 +174,52 @@ export class StockLevelsQueryDto {
     @IsOptional()
     @IsString()
     product?: string;
+
+    /** Products whose name or a variant's SKU holds this. */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(100)
+    q?: string;
+
+    /** Only rows that need someone: short, sold out or low. */
+    @IsOptional()
+    @Transform(
+        ({ value }: { value: unknown }) =>
+            value === true || value === "true" || value === "1",
+    )
+    @IsBoolean()
+    needs?: boolean;
+
+    /** The last product of the page before; the next page starts after it. */
+    @IsOptional()
+    @IsString()
+    cursor?: string;
+
+    /** Products a page. Left out, every row comes back. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+}
+
+/** `GET …/stock/checks` */
+export class StockChecksQueryDto {
+    /** The last check of the page before (its key). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+
+    /** Checks a page. Left out, every open check comes back. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
 }
 
 /** `GET …/stock/log` */

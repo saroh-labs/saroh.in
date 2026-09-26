@@ -249,6 +249,11 @@ export interface NavChild {
      */
     refusedTo?: { holds: NavAction; without: NavAction };
     /**
+     * Offered only while the business tracks stock (#527): Sell › Stock
+     * has nothing to show when every product sells without a count.
+     */
+    whenTracking?: boolean;
+    /**
      * Absent for a row that only NAMES something — a site whose real
      * destinations are the rows beneath it. A label row is not a link, so
      * two children cannot both claim to be "the site" and the current-page
@@ -358,6 +363,7 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * from the marketing site.
  */
 const STOREFRONTS_HREF = "/commerce/storefronts";
+const STOCK_HREF = "/commerce/stock";
 
 export const NAV_GROUPS: NavGroup[] = [
     {
@@ -419,6 +425,14 @@ export const NAV_GROUPS: NavGroup[] = [
                         href: "/commerce/products",
                         label: "Products",
                         action: "store:read",
+                    },
+                    {
+                        // Levels, the log and the checks (#527). Reading
+                        // stock is reading the catalogue.
+                        href: STOCK_HREF,
+                        label: "Stock",
+                        action: "store:read",
+                        whenTracking: true,
                     },
                     {
                         href: "/commerce/customers",
@@ -875,6 +889,7 @@ export function navFor({
     moduleKeys,
     sites,
     storefronts,
+    stockTracked,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
@@ -895,8 +910,13 @@ export function navFor({
      * reads "Storefronts" (ADR-010). `null` or absent keeps the singular.
      */
     storefronts?: number | null;
+    /**
+     * The business's Track stock switch (#515). Off, Sell › Stock is not
+     * offered; `null` or absent (unknown) fails open.
+     */
+    stockTracked?: boolean | null;
 }): NavGroup[] {
-    const groups = filterNavGroupsByRole(
+    const tracked = filterNavGroupsByRole(
         filterNavGroups(
             sites ? navGroupsWithSites(NAV_GROUPS, sites, role) : NAV_GROUPS,
             moduleKeys,
@@ -904,7 +924,23 @@ export function navFor({
         role,
         actions,
     );
+    const groups = stockTracked === false ? withoutStockRows(tracked) : tracked;
     return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+}
+
+/** The rows that need the business to track stock, taken out. */
+function withoutStockRows(groups: NavGroup[]): NavGroup[] {
+    return groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) =>
+            item.children
+                ? {
+                      ...item,
+                      children: item.children.filter((c) => !c.whenTracking),
+                  }
+                : item,
+        ),
+    }));
 }
 
 /** The Storefront row, named for a business that has several. */

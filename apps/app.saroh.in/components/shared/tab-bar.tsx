@@ -32,9 +32,12 @@ export function TabBar({
     actions = null,
     counts,
     storefronts = null,
+    stockTracked = null,
 }: {
     /** How many storefronts; with several the row reads "Storefronts". */
     storefronts?: number | null;
+    /** The business tracks stock; off, Sell › Stock is not offered. */
+    stockTracked?: boolean | null;
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
@@ -45,7 +48,13 @@ export function TabBar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const groups = navFor({ role, actions, moduleKeys, storefronts });
+    const groups = navFor({
+        role,
+        actions,
+        moduleKeys,
+        storefronts,
+        stockTracked,
+    });
     const nav = buildMobileNav({
         groups,
         pathname: navPathname(usePathname(), groups),

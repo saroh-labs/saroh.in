@@ -23,6 +23,7 @@ import {
     ResolveCheckDto,
     ReverseStockDto,
     SetStockTrackingDto,
+    StockChecksQueryDto,
     StockEntryDto,
     StockLevelsQueryDto,
     StockLogQueryDto,
@@ -115,8 +116,11 @@ export class StockController {
 
     /** What needs looking at: short, counts, sales, promises. */
     @Get("checks")
-    listChecks(@OrgContext() ctx: OrganizationContext) {
-        return this.checks.list(ctx);
+    listChecks(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: StockChecksQueryDto,
+    ) {
+        return this.checks.list(ctx, query);
     }
 
     /** The business's Track stock switch (#515). */
