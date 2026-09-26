@@ -64,7 +64,11 @@ test.describe("Products list", () => {
         try {
             // Search reaches it by name; the row opens the quick look.
             await page.goto(`/commerce/products?q=${encodeURIComponent(name)}`);
-            await page.getByRole("button", { name }).first().click();
+            // The row's own button — its name leads; "More actions for …"
+            // beside it only contains it.
+            await page
+                .getByRole("button", { name: new RegExp(`^${name}`) })
+                .click();
             const look = page.getByRole("dialog", { name });
             await expect(look).toBeVisible();
             await expect(look.getByText("1 of 1")).toBeVisible();
