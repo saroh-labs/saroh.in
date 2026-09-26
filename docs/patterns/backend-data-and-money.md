@@ -27,6 +27,10 @@
   `RLS_ENFORCEMENT` they are lazy and run in one GUC'd transaction; a promise
   from anywhere else is refused. `TEST_RLS=on` runs the integration suite the
   way enforcement will (#53).
+- **Current** — **Read a lost serializable race with `isSerializationFailure()`**
+  (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
+  never `code === "P2034"`. Through the pg driver adapter it can arrive with no
+  code, and the booker got a 500 instead of "fully booked" (#106).
 - **Current** — **Publications are immutable,** and the public renderer reads only
   them (ADR-002). No draft table is ever on the public read path.
   **A public write that depends on what the site shows reads the publication
