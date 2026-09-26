@@ -1,10 +1,12 @@
 import { PartialNotice } from "@saroh/ui/data-state";
 
+import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { PageContainer } from "@/components/shared/page-container";
 import { CatalogueScreen } from "@/components/stores/catalogue-screen";
 import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
+import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import {
     invitableOrders,
@@ -12,14 +14,14 @@ import {
     reviewSummary,
 } from "@/lib/product-reviews/service";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
-import { filterChoices } from "@/lib/products/filter-choices";
+import { choicesFrom } from "@/lib/products/filter-choices";
 import {
     catalogueFilter,
     listHref,
     readListQuery,
 } from "@/lib/products/list-query";
 import type { CataloguePage } from "@/lib/products/service";
-import { listCataloguePage } from "@/lib/products/service";
+import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -74,17 +76,24 @@ export default async function CataloguePage({
         query.storefront = null;
     }
 
-    const [page, reviews, tracking, choices] = await Promise.all([
-        stores.length > 0
-            ? listCataloguePage(
-                  // The Reviews view still counts the chips: one row will do.
-                  onReviews ? { limit: 1 } : catalogueFilter(query),
-              ).then((p) => p ?? NO_PAGE)
-            : NO_PAGE,
-        canReadReviews ? listReviews().catch(() => null) : Promise.resolve([]),
-        getStockTracking().catch(() => null),
-        filterChoices(),
-    ]);
+    const [page, reviews, tracking, categories, collections] =
+        await Promise.all([
+            stores.length > 0
+                ? listCataloguePage(
+                      // The Reviews view still counts the chips: one row will do.
+                      onReviews ? { limit: 1 } : catalogueFilter(query),
+                  ).then((p) => p ?? NO_PAGE)
+                : NO_PAGE,
+            canReadReviews
+                ? listReviews().catch(() => null)
+                : Promise.resolve([]),
+            getStockTracking().catch(() => null),
+            // The Filter's choices and the Collections chip's cards (#524).
+            // Either failing leaves its part out, said, never the list.
+            listCategories().catch(() => null),
+            listCollections().catch(() => null),
+        ]);
+    const choices = choicesFrom(categories, collections);
 
     const active: ProductsTab = onReviews
         ? "reviews"
@@ -139,6 +148,7 @@ export default async function CataloguePage({
     }
 
     const ratings = canReadReviews ? await reviewSummary().catch(() => []) : [];
+    const canWrite = canWriteProducts(organization);
 
     return (
         <PageContainer width="full">
@@ -150,8 +160,28 @@ export default async function CataloguePage({
                 notice={notice}
                 ratings={ratings}
                 choices={choices}
-                canWrite={canWriteProducts(organization)}
+                canWrite={canWrite}
                 canStock={canStockProducts(organization)}
+                collectionCount={collections ? collections.length : null}
+                collectionsPanel={
+                    active === "collections" ? (
+                        <CollectionsPanel
+                            collections={collections}
+                            categories={categories ?? []}
+                            canWrite={canWrite}
+                            activeId={query.collection}
+                            hrefs={Object.fromEntries(
+                                (collections ?? []).map((c) => [
+                                    c.id,
+                                    listHref(query, { collection: c.id }),
+                                ]),
+                            )}
+                            clearHref={listHref(query, { collection: null })}
+                            openNew={params.new === "collection"}
+                            closeNewHref={listHref(query)}
+                        />
+                    ) : null
+                }
             />
         </PageContainer>
     );

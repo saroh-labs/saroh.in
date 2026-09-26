@@ -135,12 +135,23 @@ export function openOrderLine(
     return `${orderRef(order.orderNumber)} ${first} — ${what}, ${status}`;
 }
 
+/**
+ * The collections it shows in now — a hand-picked one keeps an archived
+ * product but doesn't show it. The Overview's card, the tab's count and
+ * the Collections tab all count these (#524).
+ */
+export function shownCollections(
+    placement: ProductPlacement,
+): ProductPlacement["collections"] {
+    return placement.collections.filter((c) => c.showing);
+}
+
 /** "In 2 collections" and their names; "In no collection" and "—". */
 export function collectionsSummary(placement: ProductPlacement): {
     count: string;
     names: string;
 } {
-    const shown = placement.collections.filter((c) => c.showing);
+    const shown = shownCollections(placement);
     return {
         count:
             shown.length === 0

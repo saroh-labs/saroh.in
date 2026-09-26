@@ -63,6 +63,8 @@ export function CatalogueScreen({
     choices,
     canWrite,
     canStock,
+    collectionsPanel,
+    collectionCount = null,
 }: {
     query: ListQuery;
     /** The first page, read on the server. */
@@ -78,6 +80,10 @@ export function CatalogueScreen({
     canWrite: boolean;
     /** Count and move stock: "+N · Add" in the quick look. */
     canStock: boolean;
+    /** The Collections chip's cards and sheet (#524), under the chips. */
+    collectionsPanel?: ReactNode;
+    /** How many collections there are; null when they couldn't be read. */
+    collectionCount?: number | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -255,7 +261,11 @@ export function CatalogueScreen({
         );
     }
 
-    const empty = emptyCopy(query, store?.name ?? (many ? null : first.name));
+    const empty = emptyCopy(
+        query,
+        store?.name ?? (many ? null : first.name),
+        collectionCount,
+    );
     const countLabel =
         `${data.total} ${data.total === 1 ? "product" : "products"}` +
         (store
@@ -283,6 +293,7 @@ export function CatalogueScreen({
             />
             {tabs}
             {notice}
+            {collectionsPanel}
             <div aria-busy={navigating} className="pt-0.5">
                 <DataView
                     viewId="catalogue"
@@ -343,7 +354,7 @@ export function CatalogueScreen({
                         />
                     )}
                     emptyState={emptyState(empty, {
-                        view: query.view,
+                        query,
                         go,
                         canWrite,
                         storeId: (store ?? first).id,
