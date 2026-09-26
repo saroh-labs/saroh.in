@@ -10,7 +10,7 @@ import { NeedsYou } from "@/components/commerce/needs-you";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type { ProductRating } from "@/lib/product-reviews/service";
-import { deleteProduct, updateProduct } from "@/lib/products/actions";
+import { deleteProduct, setProductStatus } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { catalogueRows } from "@/lib/products/catalogue";
 import type { FilterChoices } from "@/lib/products/filter-choices";
@@ -165,13 +165,28 @@ export function CatalogueScreen({
         status: ProductStatus,
         clear?: () => void,
     ) {
-        const before = targets.map((r) => ({ ...r, was: r.status }));
         const results = await Promise.all(
-            targets.map((r) =>
-                updateProduct(r.id, { name: r.name, price: r.price, status }),
-            ),
+            targets.map((r) => setProductStatus(r.id, status)),
         );
-        const failed = results.filter((r) => !r.ok).length;
+        // Undo puts back only what changed.
+        const before: { id: string; was: ProductStatus }[] = [];
+        let why: string | undefined;
+        targets.forEach((r, i) => {
+            const res = results[i];
+            if (res.ok) before.push({ id: r.id, was: r.status });
+            else why ??= res.error;
+        });
+        const failed = targets.length - before.length;
+        if (before.length === 0) {
+            // Nothing changed: say why, and offer no Undo for it.
+            showError(
+                targets.length === 1
+                    ? "It couldn't be changed."
+                    : `None of the ${targets.length} could be changed.`,
+                why,
+            );
+            return;
+        }
         if (failed > 0) {
             showError(
                 `${failed} of ${targets.length} could not be changed.`,
@@ -191,13 +206,7 @@ export function CatalogueScreen({
                   : `${targets.length} products published.`;
         showUndo(said, () => {
             void Promise.all(
-                before.map((r) =>
-                    updateProduct(r.id, {
-                        name: r.name,
-                        price: r.price,
-                        status: r.was,
-                    }),
-                ),
+                before.map((r) => setProductStatus(r.id, r.was)),
             ).then(() => reload());
         });
     }

@@ -9,8 +9,8 @@ import type {
     InventoryInput,
     NewProductInput,
     ProductImageInput,
-    ProductInput,
     ProductPatch,
+    ProductStatus,
     Result,
     VariantInput,
 } from "./service";
@@ -29,7 +29,6 @@ import {
     setProductStockTracking as setProductStockTrackingApi,
     setVariantStock as setVariantStockApi,
     updateCategory as updateCategoryApi,
-    updateProduct as updateProductApi,
     updateVariant as updateVariantApi,
 } from "./service";
 
@@ -44,10 +43,6 @@ import {
 /** A new product, sold at `storeId`. */
 export async function createProduct(storeId: string, input: NewProductInput) {
     return createProductApi(storeId, input);
-}
-
-export async function updateProduct(productId: string, input: ProductInput) {
-    return updateProductApi(productId, input);
 }
 
 /** Delete it from the catalogue, and so from every storefront. */
@@ -109,6 +104,18 @@ export async function setProductSoldOut(
     soldOut: boolean,
 ) {
     return setProductSoldOutApi(productId, storefrontId, soldOut);
+}
+
+/**
+ * On sale, a draft, or archived — the list's Stop selling and Sell again.
+ * Only the status is sent: the whole-product PUT also wants the slug, which
+ * a list row doesn't carry, so it refused every one of these.
+ */
+export async function setProductStatus(
+    productId: string,
+    status: ProductStatus,
+) {
+    return patchProductApi(null, productId, { status });
 }
 
 /** One section of a product; the API judges the whole product after it. */

@@ -417,10 +417,6 @@ export function createProduct(storeId: string, input: NewProductInput) {
     return mutateProduct(undefined, at(storeId), "POST", input);
 }
 
-export function updateProduct(productId: string, input: ProductInput) {
-    return mutateProduct(productId, "", "PUT", input);
-}
-
 /**
  * A draft copy (#518): "… (copy)", sold where the original is, stock at 0.
  * Returns the copy as `getProduct` reads it at `storeId`.
@@ -638,7 +634,7 @@ export interface ProductPatch {
 
 /** One section's save; returns the product as `storeId` sees it. */
 export function patchProduct(
-    storeId: string,
+    storeId: string | null,
     productId: string,
     patch: ProductPatch,
 ) {
