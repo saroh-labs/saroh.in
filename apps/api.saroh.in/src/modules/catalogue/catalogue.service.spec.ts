@@ -7,6 +7,7 @@ import { InventoryService } from "../products/inventory.service";
 import { ProductsService } from "../products/products.service";
 import { VariantsService } from "../products/variants.service";
 import { StoresService } from "../stores/stores.service";
+import { CatalogueAccess } from "./catalogue-access";
 import { CatalogueService } from "./catalogue.service";
 import { OptionsService } from "./options.service";
 
@@ -19,9 +20,9 @@ const tag = `${process.pid}-${Date.now()}`;
 
 describe("Catalogue settings (DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
-    const categories = new CategoriesService(stores);
-    const options = new OptionsService(stores);
-    const catalogue = new CatalogueService(stores, options);
+    const categories = new CategoriesService();
+    const options = new OptionsService();
+    const catalogue = new CatalogueService(options);
     const products = new ProductsService(stores);
     const variants = new VariantsService(products);
     const inventory = new InventoryService(products);
@@ -51,14 +52,9 @@ describe("Catalogue settings (DB)", () => {
                 slug: `cat-${tag}`,
             })
         ).id;
-        faceCare = (
-            await categories.create(storeId, ownerId, { name: "Face care" })
-        ).id;
-        serums = (await categories.create(storeId, ownerId, { name: "Serums" }))
-            .id;
-        dresses = (
-            await categories.create(storeId, ownerId, { name: "Dresses" })
-        ).id;
+        faceCare = (await categories.create(orgId, { name: "Face care" })).id;
+        serums = (await categories.create(orgId, { name: "Serums" })).id;
+        dresses = (await categories.create(orgId, { name: "Dresses" })).id;
         for (let i = 0; i < 4; i++) {
             serumIds.push(
                 (
@@ -84,17 +80,17 @@ describe("Catalogue settings (DB)", () => {
     describe("categories", () => {
         it("refuses a name another category has, ignoring case", async () => {
             await expect(
-                categories.create(storeId, ownerId, { name: "serums" }),
+                categories.create(orgId, { name: "serums" }),
             ).rejects.toThrow(/already a category called Serums/);
             await expect(
-                categories.rename(storeId, faceCare, ownerId, {
+                categories.rename(orgId, faceCare, {
                     name: "SERUMS",
                 }),
             ).rejects.toThrow(/use Merge/);
         });
 
         it("allows a case-only rename of itself, and reports the old name", async () => {
-            const res = await categories.rename(storeId, faceCare, ownerId, {
+            const res = await categories.rename(orgId, faceCare, {
                 name: "Face Care",
             });
             expect(res).toEqual({
@@ -105,7 +101,7 @@ describe("Catalogue settings (DB)", () => {
         });
 
         it("merges Serums into Face care, and Undo puts the same four back", async () => {
-            const removal = await categories.merge(storeId, serums, ownerId, {
+            const removal = await categories.merge(orgId, serums, {
                 intoId: faceCare,
             });
             expect(removal.productIds.sort()).toEqual([...serumIds].sort());
@@ -118,7 +114,7 @@ describe("Catalogue settings (DB)", () => {
                 0,
             );
 
-            const restored = await categories.restore(storeId, ownerId, {
+            const restored = await categories.restore(orgId, {
                 name: removal.name,
                 slug: removal.slug,
                 parentId: removal.parentId,
@@ -135,14 +131,14 @@ describe("Catalogue settings (DB)", () => {
         });
 
         it("Undo leaves a product that was moved again since", async () => {
-            const removal = await categories.remove(storeId, serums, ownerId);
+            const removal = await categories.remove(orgId, serums);
             expect(removal.movedTo).toBeNull();
             // Someone files one serum under Dresses before pressing Undo.
             await prisma.product.update({
                 where: { id: serumIds[0] },
                 data: { categoryId: dresses },
             });
-            const restored = await categories.restore(storeId, ownerId, {
+            const restored = await categories.restore(orgId, {
                 name: removal.name,
                 slug: removal.slug,
                 movedTo: null,
@@ -163,45 +159,44 @@ describe("Catalogue settings (DB)", () => {
                     categories: { create: { categoryId: dresses } },
                 },
             });
-            await expect(
-                categories.remove(storeId, dresses, ownerId),
-            ).rejects.toThrow(/discount code applies to Dresses/);
+            await expect(categories.remove(orgId, dresses)).rejects.toThrow(
+                /discount code applies to Dresses/,
+            );
         });
 
         it("refuses a category as its own parent, and a loop", async () => {
             await expect(
-                categories.update(storeId, faceCare, ownerId, {
+                categories.update(orgId, faceCare, {
                     name: "Face Care",
                     slug: "face-care",
                     parentId: faceCare,
                 }),
             ).rejects.toThrow(/its own parent/);
             const toners = (
-                await categories.create(storeId, ownerId, {
+                await categories.create(orgId, {
                     name: "Toners",
                     parentId: faceCare,
                 })
             ).id;
             await expect(
-                categories.update(storeId, faceCare, ownerId, {
+                categories.update(orgId, faceCare, {
                     name: "Face Care",
                     slug: "face-care",
                     parentId: toners,
                 }),
             ).rejects.toThrow(/category loop/);
-            await expect(
-                categories.remove(storeId, faceCare, ownerId),
-            ).rejects.toThrow(/sub-categories first/);
+            await expect(categories.remove(orgId, faceCare)).rejects.toThrow(
+                /sub-categories first/,
+            );
         });
 
         it("Undo of a delete brings back its defaults and its custom fields", async () => {
             const toners = await prisma.category.findFirstOrThrow({
-                where: { storeId, name: "Toners" },
+                where: { organizationId: orgId, name: "Toners" },
                 select: { id: true },
             });
             await prisma.catalogueDefaults.create({
                 data: {
-                    storeId,
                     organizationId: orgId,
                     key: toners.id,
                     categoryId: toners.id,
@@ -211,37 +206,32 @@ describe("Catalogue settings (DB)", () => {
             });
             const field = await prisma.productField.create({
                 data: {
-                    storeId,
                     organizationId: orgId,
                     name: "Skin type",
                     categories: { create: { categoryId: toners.id } },
                 },
             });
 
-            const removal = await categories.remove(
-                storeId,
-                toners.id,
-                ownerId,
-            );
+            const removal = await categories.remove(orgId, toners.id);
             expect(removal.defaults).toMatchObject({
                 howToUse: "Pat onto clean skin.",
                 lowStockAlert: 4,
             });
             expect(removal.fieldIds).toEqual([field.id]);
 
-            const restored = await categories.restore(storeId, ownerId, {
+            const restored = await categories.restore(orgId, {
                 name: removal.name,
                 slug: removal.slug,
                 parentId: removal.parentId,
                 movedTo: removal.movedTo,
                 productIds: removal.productIds,
                 defaults: removal.defaults,
-                // One that is not this store's field is left out.
+                // One that is not the business's field is left out.
                 fieldIds: [...removal.fieldIds, "not-a-field"],
             });
             expect(
                 await prisma.catalogueDefaults.findFirst({
-                    where: { storeId, key: restored.id },
+                    where: { organizationId: orgId, key: restored.id },
                     select: { howToUse: true, lowStockAlert: true },
                 }),
             ).toEqual({ howToUse: "Pat onto clean skin.", lowStockAlert: 4 });
@@ -259,23 +249,23 @@ describe("Catalogue settings (DB)", () => {
 
         it("creates an option with values, refusing duplicates ignoring case", async () => {
             sizeId = (
-                await options.create(storeId, ownerId, {
+                await options.create(orgId, {
                     name: "Size",
                     values: ["S", "M", " m ", "L", ""],
                 })
             ).id;
-            const [size] = await options.list(storeId, ownerId);
+            const [size] = await options.views(orgId);
             expect(size.values.map((v) => v.value)).toEqual(["S", "M", "L"]);
             await expect(
-                options.create(storeId, ownerId, { name: "size" }),
+                options.create(orgId, { name: "size" }),
             ).rejects.toThrow(ConflictException);
             await expect(
-                options.addValue(storeId, sizeId, ownerId, { value: "l" }),
+                options.addValue(orgId, sizeId, { value: "l" }),
             ).rejects.toThrow(/already a value/);
         });
 
         it("guards a value a variant uses and an option a product uses", async () => {
-            const [size] = await options.list(storeId, ownerId);
+            const [size] = await options.views(orgId);
             const m = size.values.find((v) => v.value === "M");
             const dress = (
                 await products.create(storeId, ownerId, {
@@ -292,41 +282,38 @@ describe("Catalogue settings (DB)", () => {
                 optionValueId: m?.id,
             });
             await expect(
-                options.removeValue(storeId, sizeId, m?.id ?? "", ownerId),
+                options.removeValue(orgId, sizeId, m?.id ?? ""),
             ).rejects.toThrow(/used by a variant/);
-            await expect(
-                options.remove(storeId, sizeId, ownerId),
-            ).rejects.toThrow(/Used by 1 product —/);
+            await expect(options.remove(orgId, sizeId)).rejects.toThrow(
+                /Used by 1 product —/,
+            );
 
             const s = size.values.find((v) => v.value === "S");
             const removed = await options.removeValue(
-                storeId,
+                orgId,
                 sizeId,
                 s?.id ?? "",
-                ownerId,
             );
             expect(removed.value).toBe("S");
         });
 
         it("hands back a deleted option's values for Undo", async () => {
             const shade = (
-                await options.create(storeId, ownerId, {
+                await options.create(orgId, {
                     name: "Shade",
                     values: ["Ivory", "Honey"],
                 })
             ).id;
-            const removed = await options.remove(storeId, shade, ownerId);
+            const removed = await options.remove(orgId, shade);
             expect(removed).toMatchObject({
                 name: "Shade",
                 values: ["Ivory", "Honey"],
             });
-            await options.create(storeId, ownerId, {
+            await options.create(orgId, {
                 name: removed.name,
                 values: removed.values,
             });
-            const names = (await options.list(storeId, ownerId)).map(
-                (o) => o.name,
-            );
+            const names = (await options.views(orgId)).map((o) => o.name);
             expect(names).toContain("Shade");
         });
     });
@@ -338,7 +325,7 @@ describe("Catalogue settings (DB)", () => {
                     howToUse: "Two drops, morning and night.",
                 });
             }
-            const view = await catalogue.get(storeId, ownerId);
+            const view = await catalogue.get(orgId, true);
             expect(view.canWrite).toBe(true);
             expect(
                 view.categories.find((c) => c.id === serums)?.productCount,
@@ -364,14 +351,14 @@ describe("Catalogue settings (DB)", () => {
                 lowStockAlert: 2,
             });
 
-            const saved = await catalogue.saveDefaults(storeId, ownerId, {
+            const saved = await catalogue.saveDefaults(orgId, {
                 entries: [
                     { key: "all", lowStockAlert: 5, returnsMode: "STOREFRONT" },
                     { key: serums, lowStockAlert: 3 },
                 ],
                 updateExisting: true,
             });
-            const alerts = await prisma.inventory.findMany({
+            const alerts = await prisma.stockLevel.findMany({
                 where: { productId: { in: serumIds } },
                 select: { productId: true, lowStockAlert: true },
             });
@@ -385,57 +372,59 @@ describe("Catalogue settings (DB)", () => {
             expect(byId[serumIds[3]]).toBe(3);
             expect(saved.updatedCount).toBe(3);
 
-            await catalogue.undoDefaults(storeId, ownerId, {
+            await catalogue.undoDefaults(orgId, {
                 entries: saved.previous,
                 products: saved.updated.products,
                 stock: saved.updated.stock,
             });
-            const back = await prisma.inventory.findMany({
+            const back = await prisma.stockLevel.findMany({
                 where: { productId: { in: serumIds } },
                 select: { lowStockAlert: true },
             });
             expect(back.map((b) => b.lowStockAlert).sort()).toEqual(
                 [10, 10, 10, 2].sort(),
             );
-            const view = await catalogue.get(storeId, ownerId);
+            const view = await catalogue.get(orgId, true);
             expect(view.defaults.entries.all).toMatchObject({
                 lowStockAlert: null,
             });
         });
 
         it("leaves products alone when not asked to update them", async () => {
-            const saved = await catalogue.saveDefaults(storeId, ownerId, {
+            const saved = await catalogue.saveDefaults(orgId, {
                 entries: [
                     { key: "all", lowStockAlert: 7, returnsMode: "STOREFRONT" },
                 ],
             });
             expect(saved.updatedCount).toBe(0);
-            const view = await catalogue.get(storeId, ownerId);
+            const view = await catalogue.get(orgId, true);
             expect(view.defaults.entries.all.lowStockAlert).toBe(7);
         });
 
         it("refuses All products without a warning level, and an own rule without text", async () => {
             await expect(
-                catalogue.saveDefaults(storeId, ownerId, {
+                catalogue.saveDefaults(orgId, {
                     entries: [{ key: "all", lowStockAlert: null }],
                 }),
             ).rejects.toThrow(/Warn at/);
             await expect(
-                catalogue.saveDefaults(storeId, ownerId, {
+                catalogue.saveDefaults(orgId, {
                     entries: [{ key: dresses, returnsMode: "OWN" }],
                 }),
             ).rejects.toThrow(/returns rule/);
         });
 
         it("gives the editor's prefill to someone who can read the store, and no one else", async () => {
+            const access = new CatalogueAccess(stores);
+            const prefill = async (userId: string, categoryId: string | null) =>
+                catalogue.effective(
+                    (await access.readViaStore(storeId, userId)).organizationId,
+                    categoryId,
+                );
             for (const categoryId of [serums, dresses, null]) {
-                expect(
-                    await catalogue.effectiveForUser(
-                        storeId,
-                        ownerId,
-                        categoryId,
-                    ),
-                ).toEqual(await catalogue.effective(storeId, categoryId));
+                expect(await prefill(ownerId, categoryId)).toEqual(
+                    await catalogue.effective(orgId, categoryId),
+                );
             }
             const strangerId = (
                 await prisma.user.create({
@@ -443,9 +432,9 @@ describe("Catalogue settings (DB)", () => {
                 })
             ).id;
             try {
-                await expect(
-                    catalogue.effectiveForUser(storeId, strangerId, serums),
-                ).rejects.toThrow(NotFoundException);
+                await expect(prefill(strangerId, serums)).rejects.toThrow(
+                    NotFoundException,
+                );
             } finally {
                 await prisma.user.delete({ where: { id: strangerId } });
             }

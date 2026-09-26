@@ -27,7 +27,6 @@ export interface CategoryChoice {
  * it clears the category rather than leaving it alone.
  */
 export function CategoryPicker({
-    storeId,
     value,
     onChange,
     categories,
@@ -36,7 +35,6 @@ export function CategoryPicker({
     disabled,
     id,
 }: {
-    storeId: string;
     value: string;
     onChange: (id: string) => void;
     categories: CategoryChoice[];
@@ -56,7 +54,7 @@ export function CategoryPicker({
 
     function create() {
         start(async () => {
-            const res = await createCategory(storeId, { name: q });
+            const res = await createCategory({ name: q });
             if (!res.ok) {
                 showError(res.error);
                 return;

@@ -1,10 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import type { ProductPlacement } from "../collections/collections.service";
+import { productPlacement } from "../collections/collections.service";
 import { discountState } from "../discounts/discount-state";
 import type { OrgAction } from "../organizations/organization-policy";
-import { StoresService } from "../stores/stores.service";
+import type { ProductScope } from "./product-access";
 import type { RatingSummary, StockLine, StockTotals } from "./product-overview";
 import { ratingSummary, stockLine, stockTotals } from "./product-overview";
 import { savingPercent } from "./product-rules";
@@ -56,6 +59,7 @@ export interface OverviewReviews {
     summary: RatingSummary;
     toAnswer: number;
     hiddenCount: number;
+    /** Published ones waiting for a reply first, then the rest (#518). */
     latest: OverviewReview[];
 }
 
@@ -90,14 +94,37 @@ export interface ProductOverview {
     lastChanged: Date;
     storefront: { id: string; name: string };
     canWrite: boolean;
+    /** The caller may count and move stock here (`canWriteStock`, #518). */
+    canStock: boolean;
+    /** The caller may reply to reviews (`product-review:write`, #518). */
+    canReply: boolean;
     orders: Panel<OverviewOrders>;
     reviews: Panel<OverviewReviews>;
     discounts: Panel<OverviewDiscount[]>;
+    /**
+     * The collections it is in and the live website pages that show it
+     * (#516). `website.showsProducts` is false until the website has a
+     * block that can show products (#473): "The website doesn't show
+     * products yet."
+     */
+    placement: Panel<ProductPlacement>;
 }
 
 const OPEN_STATUSES = ["PENDING", "PROCESSING"];
 const RECENT_ORDERS = 20;
 const LATEST_REVIEWS = 20;
+
+const REVIEW_SELECT = {
+    id: true,
+    rating: true,
+    body: true,
+    displayName: true,
+    customerId: true,
+    status: true,
+    reply: true,
+    createdAt: true,
+    orderItem: { select: { variantId: true } },
+} satisfies Prisma.ProductReviewSelect;
 
 /**
  * Everything the product page shows, in one read: the product, its stock by
@@ -108,21 +135,32 @@ const LATEST_REVIEWS = 20;
 export class ProductOverviewService {
     private readonly logger = new Logger(ProductOverviewService.name);
 
-    constructor(
-        private readonly products: ProductsService,
-        private readonly stores: StoresService,
-    ) {}
+    constructor(private readonly products: ProductsService) {}
 
+    /** Store-route alias of `getIn`. */
     async get(
         storeId: string,
         productId: string,
         userId: string,
         now: Date = new Date(),
     ): Promise<ProductOverview> {
-        const product = await this.products.get(storeId, productId, userId);
+        return this.getIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+            now,
+        );
+    }
+
+    async getIn(
+        scope: ProductScope,
+        productId: string,
+        now: Date = new Date(),
+    ): Promise<ProductOverview> {
+        const { storeId, organizationId } = scope;
+        const product = await this.products.getIn(scope, productId);
         const store = await prisma.store.findUniqueOrThrow({
             where: { id: storeId },
-            select: { id: true, name: true, organizationId: true },
+            select: { id: true, name: true },
         });
 
         const variantLines = product.variants.flatMap((v) =>
@@ -138,18 +176,23 @@ export class ProductOverviewService {
                 ? stockTotals(variantLines, product.inventory)
                 : stockTotals(productLine ? [productLine] : [], null);
 
-        const [canWrite, orders, reviews, discounts] = await Promise.all([
-            this.stores.canWrite(storeId, userId),
-            this.panel(storeId, userId, "order:read", "orders", () =>
-                this.orders(productId, now),
-            ),
-            this.panel(storeId, userId, "product-review:read", "reviews", () =>
-                this.reviews(productId, product),
-            ),
-            this.panel(storeId, userId, "discount:read", "discounts", () =>
-                this.discounts(store.organizationId, storeId, product, now),
-            ),
-        ]);
+        const [orders, reviews, discounts, placement, canStock, canReply] =
+            await Promise.all([
+                this.panel(scope, "order:read", "orders", () =>
+                    this.orders(productId, now),
+                ),
+                this.panel(scope, "product-review:read", "reviews", () =>
+                    this.reviews(productId, product),
+                ),
+                this.panel(scope, "discount:read", "discounts", () =>
+                    this.discounts(organizationId, storeId, product, now),
+                ),
+                this.panel(scope, "store:read", "collections", () =>
+                    productPlacement(organizationId, productId),
+                ),
+                scope.canStock(),
+                scope.may("product-review:write"),
+            ]);
 
         return {
             product,
@@ -162,22 +205,24 @@ export class ProductOverviewService {
             price: priceRange(product),
             lastChanged: lastChanged(product),
             storefront: { id: store.id, name: store.name },
-            canWrite,
+            canWrite: scope.canWrite,
+            canStock,
+            canReply,
             orders,
             reviews,
             discounts,
+            placement,
         };
     }
 
     private async panel<T>(
-        storeId: string,
-        userId: string,
+        scope: ProductScope,
         action: OrgAction,
         name: string,
         load: () => Promise<T>,
     ): Promise<Panel<T>> {
         try {
-            if (!(await this.stores.memberAllows(storeId, userId, action))) {
+            if (!(await scope.may(action))) {
                 return { status: "forbidden" };
             }
             return { status: "ok", data: await load() };
@@ -278,34 +323,39 @@ export class ProductOverviewService {
         productId: string,
         product: ProductDetailDto,
     ): Promise<OverviewReviews> {
-        const [published, hiddenCount, toAnswer, latest] = await Promise.all([
-            prisma.productReview.findMany({
-                where: { productId, status: "PUBLISHED" },
-                select: { rating: true },
-            }),
-            prisma.productReview.count({
-                where: { productId, status: "HIDDEN" },
-            }),
-            prisma.productReview.count({
-                where: { productId, status: "PUBLISHED", reply: null },
-            }),
-            prisma.productReview.findMany({
-                where: { productId },
-                orderBy: { createdAt: "desc" },
-                take: LATEST_REVIEWS,
-                select: {
-                    id: true,
-                    rating: true,
-                    body: true,
-                    displayName: true,
-                    customerId: true,
-                    status: true,
-                    reply: true,
-                    createdAt: true,
-                    orderItem: { select: { variantId: true } },
-                },
-            }),
-        ]);
+        const waiting = { productId, status: "PUBLISHED", reply: null };
+        const [published, hiddenCount, toAnswer, unanswered] =
+            await Promise.all([
+                prisma.productReview.findMany({
+                    where: { productId, status: "PUBLISHED" },
+                    select: { rating: true },
+                }),
+                prisma.productReview.count({
+                    where: { productId, status: "HIDDEN" },
+                }),
+                prisma.productReview.count({ where: waiting }),
+                prisma.productReview.findMany({
+                    where: waiting,
+                    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+                    take: LATEST_REVIEWS,
+                    select: REVIEW_SELECT,
+                }),
+            ]);
+        // Reviews waiting for a reply first (#518), then the rest, newest
+        // first in each: the tab opens on what needs an answer.
+        const rest =
+            unanswered.length < LATEST_REVIEWS
+                ? await prisma.productReview.findMany({
+                      where: {
+                          productId,
+                          id: { notIn: unanswered.map((r) => r.id) },
+                      },
+                      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+                      take: LATEST_REVIEWS - unanswered.length,
+                      select: REVIEW_SELECT,
+                  })
+                : [];
+        const latest = [...unanswered, ...rest];
         const titles = new Map(product.variants.map((v) => [v.id, v.title]));
         return {
             summary: ratingSummary(published.map((r) => r.rating)),

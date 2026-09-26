@@ -36,11 +36,9 @@ const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
  * here takes effect at once; a delete keeps what was typed, with Undo.
  */
 export function FieldsTab({
-    storeId,
     catalogue,
     fields,
 }: {
-    storeId: string;
     catalogue: CatalogueView;
     fields: FieldView[];
 }) {
@@ -129,7 +127,6 @@ export function FieldsTab({
                                                         run(async () => {
                                                             const res =
                                                                 await updateField(
-                                                                    storeId,
                                                                     f.id,
                                                                     {
                                                                         onShop: o.on,
@@ -147,7 +144,6 @@ export function FieldsTab({
                                                                     run(
                                                                         async () => {
                                                                             await updateField(
-                                                                                storeId,
                                                                                 f.id,
                                                                                 {
                                                                                     onShop: f.onShop,
@@ -181,10 +177,7 @@ export function FieldsTab({
                                             onClick={() =>
                                                 run(async () => {
                                                     const res =
-                                                        await removeField(
-                                                            storeId,
-                                                            f.id,
-                                                        );
+                                                        await removeField(f.id);
                                                     if (!res.ok)
                                                         return showError(
                                                             res.error,
@@ -195,7 +188,6 @@ export function FieldsTab({
                                                             run(async () => {
                                                                 const undo =
                                                                     await restoreField(
-                                                                        storeId,
                                                                         f.id,
                                                                     );
                                                                 if (!undo.ok)
@@ -231,7 +223,6 @@ export function FieldsTab({
                                                     run(async () => {
                                                         const res =
                                                             await updateField(
-                                                                storeId,
                                                                 f.id,
                                                                 {
                                                                     categoryIds:
@@ -288,13 +279,12 @@ export function FieldsTab({
                             e.preventDefault();
                             if (!nl || err) return;
                             run(async () => {
-                                const res = await addField(storeId, nl, type);
+                                const res = await addField(nl, type);
                                 if (!res.ok) return showError(res.error);
                                 setName("");
                                 showUndo(`${nl} added.`, () =>
                                     run(async () => {
                                         const undo = await removeField(
-                                            storeId,
                                             res.data.id,
                                         );
                                         if (!undo.ok) showError(undo.error);

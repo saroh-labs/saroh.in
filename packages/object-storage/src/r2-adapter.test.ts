@@ -204,6 +204,37 @@ describe("createR2Storage — head/delete via mocked S3 client", () => {
         await storage.deleteObject("org/o/k.png");
         expect(send).toHaveBeenCalledTimes(1);
     });
+
+    it("readObjectStart asks for a byte range and returns the bytes", async () => {
+        const send = vi.fn().mockResolvedValue({
+            Body: {
+                transformToByteArray: () =>
+                    Promise.resolve(new Uint8Array([1, 2, 3, 4])),
+            },
+        });
+        const { storage } = setup({
+            s3Client: { send } as unknown as S3Client,
+        });
+        const bytes = await storage.readObjectStart("org/o/v.mp4", 12);
+        expect(bytes).toEqual(new Uint8Array([1, 2, 3, 4]));
+        const command = send.mock.calls[0]?.[0] as GetObjectCommand;
+        expect(command.input).toMatchObject({
+            Bucket: "media-bucket",
+            Key: "org/o/v.mp4",
+            Range: "bytes=0-11",
+        });
+    });
+
+    it("readObjectStart resolves null on a 404", async () => {
+        const send = vi.fn().mockRejectedValue({
+            name: "NoSuchKey",
+            $metadata: { httpStatusCode: 404 },
+        });
+        const { storage } = setup({
+            s3Client: { send } as unknown as S3Client,
+        });
+        expect(await storage.readObjectStart("org/o/gone.mp4", 12)).toBeNull();
+    });
 });
 
 describe("createR2Storage — port shape", () => {

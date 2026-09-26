@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { StockDraft } from "./editor-sections";
+import type { PhotoDraft, StockDraft } from "./editor-sections";
 import {
     basicsFrom,
     basicsPatch,
@@ -9,10 +9,13 @@ import {
     descriptionPatch,
     detailsFrom,
     detailsPatch,
+    formatDuration,
     isEmptyHtml,
     madeByFrom,
     madeByPatch,
     madeBySchema,
+    mediaCounter,
+    mediaFileProblem,
     mergeDraft,
     partitionSections,
     photosFrom,
@@ -177,6 +180,7 @@ describe("the editor's header and Save all", () => {
 function product(over: Partial<ProductDetail> = {}): ProductDetail {
     return {
         id: "p1",
+        storeId: "s1",
         name: "Rose Hydra Serum",
         slug: "rose-hydra-serum",
         description: null,
@@ -190,6 +194,7 @@ function product(over: Partial<ProductDetail> = {}): ProductDetail {
         customFields: [],
         allergens: { contains: [], mayContain: [] },
         inventory: null,
+        stockTracked: false,
         howToUse: "Two drops, morning and night.",
         materials: null,
         keyPoints: [],
@@ -331,6 +336,10 @@ describe("each section's values and patch", () => {
                 position: 0,
                 creditName: null,
                 creditUrl: null,
+                kind: "photo",
+                durationSec: null,
+                posterMediaId: null,
+                posterUrl: null,
             },
         ]);
         const added = [
@@ -375,6 +384,128 @@ describe("each section's values and patch", () => {
         expect(
             samePhotos(drafts, [{ ...drafts[0], alt: "Another word" }]),
         ).toBe(false);
+    });
+});
+
+describe("15 photos and 3 videos (#517)", () => {
+    const photo = (n: number): PhotoDraft => ({
+        id: `p${n}`,
+        url: `https://cdn.example.test/p${n}.jpg`,
+        alt: "",
+        width: null,
+        height: null,
+        creditName: null,
+        creditUrl: null,
+    });
+    const video = (n: number): PhotoDraft => ({
+        ...photo(100 + n),
+        kind: "video",
+        url: `https://cdn.example.test/v${n}.mp4`,
+        durationSec: 24,
+    });
+    const MB = 1024 * 1024;
+
+    it("counts photos and videos apart", () => {
+        expect(mediaCounter([])).toBe("0 of 15 photos · 0 of 3 videos");
+        expect(mediaCounter([photo(1), video(1), photo(2)])).toBe(
+            "2 of 15 photos · 1 of 3 videos",
+        );
+    });
+
+    it("takes a 15th photo and a 3rd video, and no more", () => {
+        const fourteen = Array.from({ length: 14 }, (_, i) => photo(i));
+        const jpg = { type: "image/jpeg", size: 2 * MB };
+        const mp4 = { type: "video/mp4", size: 20 * MB };
+        expect(mediaFileProblem(jpg, fourteen)).toBe("");
+        expect(mediaFileProblem(jpg, [...fourteen, photo(99)])).toBe(
+            "Already 15 photos — take one off first.",
+        );
+        expect(mediaFileProblem(mp4, [video(1), video(2)])).toBe("");
+        expect(mediaFileProblem(mp4, [video(1), video(2), video(3)])).toBe(
+            "Already 3 videos — take one off first.",
+        );
+        // A full set of photos still takes a video, and the other way round.
+        expect(mediaFileProblem(mp4, [...fourteen, photo(99)])).toBe("");
+        expect(mediaFileProblem(jpg, [video(1), video(2), video(3)])).toBe("");
+    });
+
+    it("says why a file can't go on, before it is uploaded", () => {
+        expect(
+            mediaFileProblem({ type: "video/quicktime", size: 60 * MB }, []),
+        ).toBe(
+            "That video is over 50 MB. Keep it under a minute, or export it smaller.",
+        );
+        expect(
+            mediaFileProblem({ type: "video/quicktime", size: 50 * MB }, []),
+        ).toBe("");
+        expect(
+            mediaFileProblem({ type: "application/pdf", size: MB }, []),
+        ).toBe(
+            "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.",
+        );
+        expect(mediaFileProblem({ type: "video/webm", size: MB }, [])).toBe(
+            "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.",
+        );
+    });
+
+    it("sends a new video by its upload, with its length and poster", () => {
+        expect(
+            photosInput([
+                {
+                    mediaId: "mv",
+                    url: "https://cdn.example.test/pour.mp4",
+                    alt: "Pouring it",
+                    width: 1080,
+                    height: 1920,
+                    creditName: null,
+                    creditUrl: null,
+                    kind: "video",
+                    durationSec: 24,
+                    posterMediaId: "mp",
+                    posterUrl: "https://cdn.example.test/pour.jpg",
+                },
+                video(1),
+            ]),
+        ).toEqual([
+            {
+                kind: "video",
+                mediaId: "mv",
+                alt: "Pouring it",
+                durationSec: 24,
+                posterMediaId: "mp",
+            },
+            { id: "p101", alt: "" },
+        ]);
+    });
+
+    it("leaves a product with 5 photos as it was", () => {
+        const five = photosFrom(
+            Array.from({ length: 5 }, (_, i) => ({
+                id: `img${i}`,
+                url: `https://cdn.example.test/${i}.jpg`,
+                mediaId: null,
+                alt: `View ${i}`,
+                width: null,
+                height: null,
+                position: i,
+                creditName: null,
+                creditUrl: null,
+                kind: "photo" as const,
+                durationSec: null,
+                posterMediaId: null,
+                posterUrl: null,
+            })),
+        );
+        expect(mediaCounter(five)).toBe("5 of 15 photos · 0 of 3 videos");
+        expect(photosInput(five)).toEqual(
+            five.map((p) => ({ id: p.id, alt: p.alt })),
+        );
+    });
+
+    it("writes a video's length as its badge shows it", () => {
+        expect(formatDuration(24)).toBe("0:24");
+        expect(formatDuration(65)).toBe("1:05");
+        expect(formatDuration(null)).toBe("");
     });
 });
 

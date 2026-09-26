@@ -204,6 +204,22 @@ describe("what each role is offered", () => {
         expect(offeredWith(SITES)).not.toContain("/sites/new");
     });
 
+    it("names the row Storefronts only once there are several (ADR-010)", () => {
+        const label = (storefronts?: number | null) =>
+            navFor({
+                role: "OWNER",
+                moduleKeys: AVAILABLE_TO.OWNER,
+                storefronts,
+            })
+                .flatMap((g) => g.items)
+                .flatMap((i) => [i, ...(i.children ?? [])])
+                .find((row) => row.href === "/commerce/storefronts")?.label;
+        expect(label()).toBe("Storefront");
+        expect(label(null)).toBe("Storefront");
+        expect(label(1)).toBe("Storefront");
+        expect(label(2)).toBe("Storefronts");
+    });
+
     it("does not offer a member what it would be refused", () => {
         const offered = hrefs(
             navFor({

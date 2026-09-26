@@ -59,6 +59,8 @@ let storeId: string;
 let customerId: string;
 let bread: string;
 let pastry: string;
+// Each product's shelf at the storefront (#510: StockLevel).
+const shelf: Record<string, string> = {};
 let eventSeq = 0;
 
 beforeAll(async () => {
@@ -94,16 +96,22 @@ beforeAll(async () => {
                 name,
                 slug: `${name.toLowerCase()}-${process.pid}`,
                 price,
+                stockTracked: true,
             },
         });
-        await prisma.inventory.create({
-            data: {
-                storeId,
-                organizationId: org.id,
-                productId: p.id,
-                quantity: stock,
-            },
+        await prisma.productListing.create({
+            data: { storeId, organizationId: org.id, productId: p.id },
         });
+        shelf[p.id] = (
+            await prisma.stockLevel.create({
+                data: {
+                    storeId,
+                    organizationId: org.id,
+                    productId: p.id,
+                    onHand: stock,
+                },
+            })
+        ).id;
         return p.id;
     };
     // Every paidOrder() holds its units straight on the rows, without the
@@ -146,25 +154,29 @@ async function paidOrder(
                         quantity: 1,
                         price: "250.00",
                         stockRow: "PRODUCT",
+                        stockLevelId: shelf[bread],
+                        heldQuantity: 1,
                     },
                     {
                         productId: pastry,
                         quantity: 3,
                         price: "120.00",
                         stockRow: "PRODUCT",
+                        stockLevelId: shelf[pastry],
+                        heldQuantity: 3,
                     },
                 ],
             },
         },
         include: { items: true },
     });
-    await prisma.inventory.update({
-        where: { productId: bread },
-        data: { reserved: { increment: 1 } },
+    await prisma.stockLevel.update({
+        where: { id: shelf[bread] },
+        data: { promised: { increment: 1 } },
     });
-    await prisma.inventory.update({
-        where: { productId: pastry },
-        data: { reserved: { increment: 3 } },
+    await prisma.stockLevel.update({
+        where: { id: shelf[pastry] },
+        data: { promised: { increment: 3 } },
     });
     if (over.paid !== false) {
         // One payment for the total, or the total paid in parts (an edit's
@@ -203,10 +215,11 @@ async function paidOrder(
 }
 
 async function stock(productId: string) {
-    return prisma.inventory.findUniqueOrThrow({
-        where: { productId },
-        select: { quantity: true, reserved: true },
+    const row = await prisma.stockLevel.findUniqueOrThrow({
+        where: { id: shelf[productId] },
+        select: { onHand: true, promised: true },
     });
+    return { quantity: row.onHand, reserved: row.promised };
 }
 
 async function webhook(event: Record<string, unknown>) {

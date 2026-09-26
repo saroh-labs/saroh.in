@@ -173,6 +173,7 @@ export function useKitchen({
                     startTransition(async () => {
                         const res = await refundLines(order.id, {
                             lines: choice.lines,
+                            putBack: choice.putBack,
                             idempotencyKey: key,
                         });
                         resolve();
@@ -192,13 +193,23 @@ export function useKitchen({
                             refresh();
                             return;
                         }
+                        const back = choice.putBack.reduce(
+                            (n, p) => n + p.quantity,
+                            0,
+                        );
+                        const notes = [
+                            order.invoices?.length
+                                ? "A credit note is made against its invoice."
+                                : null,
+                            back > 0
+                                ? `${back} go${back === 1 ? "es" : ""} back in stock when ${refundTo} confirms it.`
+                                : null,
+                        ].filter((n): n is string => n !== null);
                         showSuccess(
                             choice.lines === null
                                 ? "Refunded in full."
                                 : `Refunded ${sent}. The rest of the order stands.`,
-                            order.invoices?.length
-                                ? "A credit note is made against its invoice."
-                                : undefined,
+                            notes.length > 0 ? notes.join(" ") : undefined,
                         );
                         refresh();
                     });

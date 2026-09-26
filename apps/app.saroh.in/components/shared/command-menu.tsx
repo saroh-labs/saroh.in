@@ -25,6 +25,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import type { StorefrontAllowance } from "@/lib/business-limits";
 import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
@@ -130,7 +131,10 @@ const ACTIONS: {
     icon: typeof UserRound;
     moduleKey?: string;
     action?: NavAction;
-    /** Offered only while the business may still make one (ADR-006). */
+    /**
+     * Offered only while the business may still make one: one website
+     * (ADR-006), storefronts up to the plan (ADR-010).
+     */
     limit?: "website" | "storefront";
 }[] = [
     {
@@ -220,7 +224,7 @@ export function CommandMenu({
     // the quick actions the palette offers.
     actions: permissions = null,
     sites = [],
-    storefrontCount = null,
+    storefronts = null,
 }: {
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
@@ -236,15 +240,24 @@ export function CommandMenu({
      * in `NAV_GROUPS` rather than in the sidebar alone.
      */
     sites?: { id: string; name: string }[];
-    /** How many storefronts the business has; `null` = unknown, and offered. */
-    storefrontCount?: number | null;
+    /**
+     * How many storefronts the business has and may have; `null` = unknown,
+     * and "New storefront" is offered.
+     */
+    storefronts?: StorefrontAllowance | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = navFor({ role, actions: permissions, moduleKeys, sites });
+    const groups = navFor({
+        role,
+        actions: permissions,
+        moduleKeys,
+        sites,
+        storefronts: storefronts?.used ?? null,
+    });
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(
@@ -252,9 +265,7 @@ export function CommandMenu({
             (!a.moduleKey || !available || available.has(a.moduleKey)) &&
             (!a.action || navCan({ role, actions: permissions }, a.action)) &&
             (a.limit !== "website" || mayAddWebsite(sites.length)) &&
-            (a.limit !== "storefront" ||
-                storefrontCount === null ||
-                mayAddStorefront(storefrontCount)),
+            (a.limit !== "storefront" || mayAddStorefront(storefronts)),
     );
 
     useEffect(() => {

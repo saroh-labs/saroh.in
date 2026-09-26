@@ -95,6 +95,7 @@ export class PaymentsController {
         return this.payments.initiateRefund(ctx, orderId, {
             reason: dto.reason,
             lines: dto.lines,
+            putBack: dto.putBack,
             idempotencyKey: dto.idempotencyKey,
         });
     }

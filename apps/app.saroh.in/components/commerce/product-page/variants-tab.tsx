@@ -10,9 +10,12 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview, StockLine } from "@/lib/products/overview-rules";
 import { customersSee } from "@/lib/products/overview-rules";
+import type { ProductTracking } from "@/lib/products/tracking";
+import { TRACKING_LOCKED, untrackedShort } from "@/lib/products/tracking";
 
 import { StateLink, TabState } from "./panel-state";
 import { SheetButton } from "./sheet-button";
+import { StopTrackingButton } from "./tracking-actions";
 import { Tile, VariantDrawer, WORD_BADGE } from "./variant-drawer";
 
 /**
@@ -24,11 +27,26 @@ import { Tile, VariantDrawer, WORD_BADGE } from "./variant-drawer";
 export function ProductVariantsTab({
     overview,
     storeId,
+    tracking,
 }: {
     overview: ProductOverview;
     storeId: string;
+    tracking: ProductTracking;
 }) {
-    const { product, stock } = overview;
+    const { product } = overview;
+    const counts = tracking.counts;
+    // Untracked (#515): no count anywhere, so never a number or "Sold out".
+    const stock = counts
+        ? overview.stock
+        : { ...overview.stock, variants: [], product: null };
+    const stop =
+        counts && tracking.control === "change" ? (
+            <StopTrackingButton
+                productId={product.id}
+                productName={product.name}
+                storeId={storeId}
+            />
+        ) : null;
     const [openId, setOpenId] = useState<string | null>(null);
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency) ?? amount;
@@ -44,14 +62,20 @@ export function ProductVariantsTab({
                 <TabState
                     icon={Box}
                     title="Sold as itself"
-                    description={`No sizes or shades, so every order is for "${product.name}" at ${money(product.price)}.${stock.product ? "" : " There is no stock count yet either."}`}
+                    description={`No sizes or shades, so every order is for "${product.name}" at ${money(product.price)}.${
+                        !counts
+                            ? ` ${untrackedShort(product.storefronts ?? [])}`
+                            : stock.product
+                              ? ""
+                              : " There is no stock count yet either."
+                    }`}
                 >
                     {overview.canWrite ? (
                         <>
                             <StateLink href={edit("variants")}>
                                 Add variants
                             </StateLink>
-                            {stock.product ? null : (
+                            {stock.product || !counts ? null : (
                                 <StateLink href={edit("stock")}>
                                     Add stock
                                 </StateLink>
@@ -59,6 +83,9 @@ export function ProductVariantsTab({
                         </>
                     ) : null}
                 </TabState>
+                {stop ? (
+                    <div className="flex justify-center">{stop}</div>
+                ) : null}
             </div>
         );
     }
@@ -67,18 +94,32 @@ export function ProductVariantsTab({
         <div className="flex flex-col gap-3">
             <Card className="rounded-[12px] bg-card p-0">
                 <div className="overflow-x-auto px-[18px] pt-1.5">
-                    <table className="w-full min-w-[640px] table-fixed text-[13px]">
-                        <colgroup>
-                            <col className="w-[26%]" />
-                            <col className="w-[16%]" />
-                            <col className="w-20" />
-                            <col className="w-20" />
-                            <col className="w-20" />
-                            <col className="w-20" />
-                            <col />
-                        </colgroup>
+                    <table
+                        className={cn(
+                            "w-full table-fixed text-[13px]",
+                            counts ? "min-w-[640px]" : "min-w-[360px]",
+                        )}
+                    >
+                        {counts ? (
+                            <colgroup>
+                                <col className="w-[26%]" />
+                                <col className="w-[16%]" />
+                                <col className="w-20" />
+                                <col className="w-20" />
+                                <col className="w-20" />
+                                <col className="w-20" />
+                                <col />
+                            </colgroup>
+                        ) : (
+                            <colgroup>
+                                <col className="w-[45%]" />
+                                <col className="w-[30%]" />
+                                <col />
+                            </colgroup>
+                        )}
                         <caption className="sr-only">
-                            Variants of {product.name} with price and stock
+                            Variants of {product.name} with price
+                            {counts ? " and stock" : ""}
                         </caption>
                         <thead>
                             <tr className="border-b border-border text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
@@ -100,30 +141,34 @@ export function ProductVariantsTab({
                                 >
                                     Price
                                 </th>
-                                <th
-                                    scope="col"
-                                    className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
-                                >
-                                    On hand
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
-                                >
-                                    Promised
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
-                                >
-                                    Can sell
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-1.5 pb-[7px] pt-2.5 font-semibold"
-                                >
-                                    Customers see
-                                </th>
+                                {counts ? (
+                                    <>
+                                        <th
+                                            scope="col"
+                                            className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
+                                        >
+                                            On hand
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
+                                        >
+                                            Promised
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            className="px-1.5 pb-[7px] pt-2.5 text-right font-semibold"
+                                        >
+                                            Can sell
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            className="px-1.5 pb-[7px] pt-2.5 font-semibold"
+                                        >
+                                            Customers see
+                                        </th>
+                                    </>
+                                ) : null}
                             </tr>
                         </thead>
                         <tbody>
@@ -167,40 +212,52 @@ export function ProductVariantsTab({
                                                 </span>
                                             ) : null}
                                         </td>
-                                        <Num value={line?.onHand} />
-                                        <Num value={line?.promised} />
-                                        <Num value={line?.canSell} strong />
-                                        <td className="px-1.5 py-[11px]">
-                                            {line ? (
-                                                <Badge
-                                                    variant={
-                                                        WORD_BADGE[line.word]
-                                                    }
-                                                    className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-                                                >
-                                                    {customersSee(line)}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    Counted with the product
-                                                </span>
-                                            )}
-                                        </td>
+                                        {counts ? (
+                                            <>
+                                                <Num value={line?.onHand} />
+                                                <Num value={line?.promised} />
+                                                <Num
+                                                    value={line?.canSell}
+                                                    strong
+                                                />
+                                                <td className="px-1.5 py-[11px]">
+                                                    {line ? (
+                                                        <Badge
+                                                            variant={
+                                                                WORD_BADGE[
+                                                                    line.word
+                                                                ]
+                                                            }
+                                                            className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                        >
+                                                            {customersSee(line)}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Counted with the
+                                                            product
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </>
+                                        ) : null}
                                     </tr>
                                 );
                             })}
-                            <tr className="border-t border-border text-[12.5px] text-muted-foreground">
-                                <td
-                                    className="px-1.5 pb-0 pt-[11px]"
-                                    colSpan={3}
-                                >
-                                    Whole product
-                                </td>
-                                <Num value={stock.totals.onHand} muted />
-                                <Num value={stock.totals.promised} muted />
-                                <Num value={stock.totals.canSell} strong />
-                                <td />
-                            </tr>
+                            {counts ? (
+                                <tr className="border-t border-border text-[12.5px] text-muted-foreground">
+                                    <td
+                                        className="px-1.5 pb-0 pt-[11px]"
+                                        colSpan={3}
+                                    >
+                                        Whole product
+                                    </td>
+                                    <Num value={stock.totals.onHand} muted />
+                                    <Num value={stock.totals.promised} muted />
+                                    <Num value={stock.totals.canSell} strong />
+                                    <td />
+                                </tr>
+                            ) : null}
                         </tbody>
                     </table>
                 </div>
@@ -208,16 +265,27 @@ export function ProductVariantsTab({
                     {overview.canWrite ? (
                         <SheetButton
                             kind="stock"
-                            label="Edit prices and stock"
+                            label={
+                                counts ? "Edit prices and stock" : "Edit prices"
+                            }
                             product={product}
                             storeId={storeId}
+                            counts={counts}
                         />
                     ) : null}
-                    <p className="text-[11.5px] text-muted-foreground">
-                        {stock.mode === "product"
-                            ? "Stock is counted for the product as a whole. Count each variant on its own in the editor's Stock section."
-                            : "Can sell is on hand minus what is promised to orders — the number the shop uses. Open a variant for its orders, reviews and photo."}
+                    <p className="min-w-0 flex-[1_1_240px] text-[11.5px] text-muted-foreground">
+                        {!counts
+                            ? `${untrackedShort(product.storefronts ?? [])} Open a variant for its orders, reviews and photo.`
+                            : stock.mode === "product"
+                              ? "Stock is counted for the product as a whole. Count each variant on its own in the editor's Stock section."
+                              : "Can sell is on hand minus what is promised to orders — the number the shop uses. Open a variant for its orders, reviews and photo."}
                     </p>
+                    {stop}
+                    {counts && tracking.control === "locked" ? (
+                        <p className="text-[11.5px] text-muted-foreground">
+                            {TRACKING_LOCKED}
+                        </p>
+                    ) : null}
                 </div>
             </Card>
 
@@ -226,6 +294,7 @@ export function ProductVariantsTab({
                 storeId={storeId}
                 variantId={openId}
                 onClose={() => setOpenId(null)}
+                counts={counts}
             />
         </div>
     );

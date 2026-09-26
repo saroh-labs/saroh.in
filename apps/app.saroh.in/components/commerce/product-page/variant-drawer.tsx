@@ -21,6 +21,7 @@ import {
     customersSee,
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
+import { untrackedShort } from "@/lib/products/tracking";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -37,11 +38,14 @@ export function VariantDrawer({
     storeId,
     variantId,
     onClose,
+    counts = true,
 }: {
     overview: ProductOverview;
     storeId: string;
     variantId: string | null;
     onClose: () => void;
+    /** The product counts stock (Track stock, #515). */
+    counts?: boolean;
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
@@ -49,9 +53,10 @@ export function VariantDrawer({
     const edit = (section: "variants" | "stock") =>
         productEditHref(storeId, product.id, section);
     const open = product.variants.find((v) => v.id === variantId) ?? null;
-    const openLine = open
-        ? (stock.variants.find((l) => l.variantId === open.id) ?? null)
-        : null;
+    const openLine =
+        open && counts
+            ? (stock.variants.find((l) => l.variantId === open.id) ?? null)
+            : null;
     const orders =
         overview.orders.status === "ok" ? overview.orders.data : null;
     const reviews =
@@ -59,7 +64,7 @@ export function VariantDrawer({
 
     const photo = open
         ? (product.images.find((i) => i.id === open.imageId) ??
-          product.images.at(0))
+          product.images.find((i) => i.kind !== "video"))
         : undefined;
     const mineOrders =
         open && orders
@@ -164,7 +169,11 @@ export function VariantDrawer({
                                     </>
                                 ) : (
                                     <p className="text-muted-foreground">
-                                        Counted with the product as a whole.
+                                        {counts
+                                            ? "Counted with the product as a whole."
+                                            : untrackedShort(
+                                                  product.storefronts ?? [],
+                                              )}
                                     </p>
                                 )}
                             </DrawerSection>

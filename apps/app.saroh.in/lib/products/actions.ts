@@ -21,6 +21,8 @@ import {
     reorderVariants as reorderVariantsApi,
     replaceProductImages as replaceProductImagesApi,
     setInventory as setInventoryApi,
+    setProductSoldOut as setProductSoldOutApi,
+    setProductStockTracking as setProductStockTrackingApi,
     setVariantStock as setVariantStockApi,
     updateCategory as updateCategoryApi,
     updateProduct as updateProductApi,
@@ -30,64 +32,52 @@ import {
 /**
  * Server Actions for the catalog. Thin wrappers that forward the session cookie
  * to api.saroh.in; the api resolves the caller from the session and enforces
- * store membership + write role. The UI calls these, never api directly.
+ * the business role. The UI calls these, never api directly. Products are the
+ * business's (#531); a `storeId` names the storefront whose shelf or listing
+ * the action is about.
  */
 
+/** A new product, sold at `storeId`. */
 export async function createProduct(storeId: string, input: NewProductInput) {
     return createProductApi(storeId, input);
 }
 
-export async function updateProduct(
-    storeId: string,
-    productId: string,
-    input: ProductInput,
-) {
-    return updateProductApi(storeId, productId, input);
+export async function updateProduct(productId: string, input: ProductInput) {
+    return updateProductApi(productId, input);
 }
 
-export async function deleteProduct(storeId: string, productId: string) {
-    return deleteProductApi(storeId, productId);
+/** Delete it from the catalogue, and so from every storefront. */
+export async function deleteProduct(productId: string) {
+    return deleteProductApi(productId);
 }
 
-export async function createCategory(storeId: string, input: CategoryInput) {
-    return createCategoryApi(storeId, input);
+/** A category of the business (#529), made from any storefront's product. */
+export async function createCategory(input: CategoryInput) {
+    return createCategoryApi(input);
 }
 
-export async function updateCategory(
-    storeId: string,
-    categoryId: string,
-    input: CategoryInput,
-) {
-    return updateCategoryApi(storeId, categoryId, input);
+export async function updateCategory(categoryId: string, input: CategoryInput) {
+    return updateCategoryApi(categoryId, input);
 }
 
-export async function deleteCategory(storeId: string, categoryId: string) {
-    return deleteCategoryApi(storeId, categoryId);
+export async function deleteCategory(categoryId: string) {
+    return deleteCategoryApi(categoryId);
 }
 
-export async function createVariant(
-    storeId: string,
-    productId: string,
-    input: VariantInput,
-) {
-    return createVariantApi(storeId, productId, input);
+export async function createVariant(productId: string, input: VariantInput) {
+    return createVariantApi(productId, input);
 }
 
 export async function updateVariant(
-    storeId: string,
     productId: string,
     variantId: string,
     input: VariantInput,
 ) {
-    return updateVariantApi(storeId, productId, variantId, input);
+    return updateVariantApi(productId, variantId, input);
 }
 
-export async function deleteVariant(
-    storeId: string,
-    productId: string,
-    variantId: string,
-) {
-    return deleteVariantApi(storeId, productId, variantId);
+export async function deleteVariant(productId: string, variantId: string) {
+    return deleteVariantApi(productId, variantId);
 }
 
 export async function setInventory(
@@ -100,6 +90,23 @@ export async function setInventory(
     return setInventoryApi(storeId, productId, input);
 }
 
+/** Track stock on or off for a product (#515); Owner/Admin only. */
+export async function setProductStockTracking(
+    productId: string,
+    tracked: boolean,
+) {
+    return setProductStockTrackingApi(productId, tracked);
+}
+
+/** Sold out by hand at one storefront, or available again (#515). */
+export async function setProductSoldOut(
+    productId: string,
+    storefrontId: string,
+    soldOut: boolean,
+) {
+    return setProductSoldOutApi(productId, storefrontId, soldOut);
+}
+
 /** One section of a product; the API judges the whole product after it. */
 export async function patchProduct(
     storeId: string,
@@ -110,11 +117,10 @@ export async function patchProduct(
 }
 
 export async function replaceProductImages(
-    storeId: string,
     productId: string,
     images: ProductImageInput[],
 ) {
-    return replaceProductImagesApi(storeId, productId, images);
+    return replaceProductImagesApi(productId, images);
 }
 
 export async function setVariantStock(

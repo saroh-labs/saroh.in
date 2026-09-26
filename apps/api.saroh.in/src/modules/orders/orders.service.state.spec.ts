@@ -32,9 +32,9 @@ jest.mock("@saroh/database", () => {
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
     };
-    // Settling a held line locks the product's row and reads the row the
-    // line recorded; none recorded here, and the product counts no stock.
-    const orderItem = { findUnique: jest.fn().mockResolvedValue(null) };
+    // Settling a held line reads the row the line recorded (#510); none
+    // recorded here, and the product counts no stock.
+    const orderItem = { findMany: jest.fn().mockResolvedValue([]) };
     const $queryRaw = jest.fn().mockResolvedValue([]);
     // A status change is a step on the order's timeline (ADR-008).
     const orderEvent = { create: jest.fn() };
@@ -64,7 +64,6 @@ import { OrdersService } from "./orders.service";
 const orderFindFirst = prisma.order.findFirst as jest.Mock;
 const orderUpdate = prisma.order.update as jest.Mock;
 const inventoryFindUnique = prisma.inventory.findUnique as jest.Mock;
-const txMock = prisma.$transaction as jest.Mock;
 const eventCreate = prisma.orderEvent.create as jest.Mock;
 
 const STORE = "store_1";
@@ -108,7 +107,9 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             service.updateStatus(STORE, ORDER, USER, { status: "PROCESSING" }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 
@@ -125,7 +126,9 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             service.updateStatus(STORE, ORDER, USER, { paymentStatus: "PAID" }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 
@@ -237,7 +240,9 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 

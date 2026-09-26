@@ -169,7 +169,8 @@ export function VariantsSection({
     };
     const mrpNote = (mrp: string | null) =>
         `Above the MRP of ${symbol}${trimMoney(mrp ?? product.mrp ?? "")}. Lower it, or raise the MRP in Basics.`;
-    const photos = product.images;
+    // A variant shows a photo of its own, never a video.
+    const photos = product.images.filter((i) => i.kind !== "video");
 
     const skuCount: Record<string, number> = {};
     for (const r of rows) {
@@ -252,7 +253,7 @@ export function VariantsSection({
                         !!id && !rows.some((r) => r.id === id),
                 );
             for (const goneId of goneIds) {
-                const res = await deleteVariant(storeId, product.id, goneId);
+                const res = await deleteVariant(product.id, goneId);
                 if (res.ok) saved = saved.filter((b) => b.id !== goneId);
                 else why ??= res.error;
             }
@@ -285,7 +286,7 @@ export function VariantsSection({
                 };
                 const was = base.find((b) => b.id && b.id === r.id);
                 if (!r.id) {
-                    const res = await createVariant(storeId, product.id, input);
+                    const res = await createVariant(product.id, input);
                     if (!res.ok) {
                         why ??= res.error;
                         continue;
@@ -294,12 +295,7 @@ export function VariantsSection({
                     replace(r.key, { id: res.data.id });
                     saved = [...saved, { ...r, id: res.data.id }];
                 } else if (was && !sameRows([r], [was])) {
-                    const res = await updateVariant(
-                        storeId,
-                        product.id,
-                        r.id,
-                        input,
-                    );
+                    const res = await updateVariant(product.id, r.id, input);
                     if (res.ok)
                         saved = saved.map((b) => (b.id === r.id ? r : b));
                     else why ??= res.error;
@@ -471,7 +467,7 @@ export function VariantsSection({
                             })}
                         </div>
                         <Link
-                            href={productSettingsHref(storeId, "options")}
+                            href={productSettingsHref("options")}
                             className="text-[12px] text-brand hover:text-foreground"
                         >
                             Manage options

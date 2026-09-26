@@ -31,7 +31,10 @@ export function TabBar({
     role = null,
     actions = null,
     counts,
+    storefronts = null,
 }: {
+    /** How many storefronts; with several the row reads "Storefronts". */
+    storefronts?: number | null;
     unread?: number;
     /** `null` = availability unknown; see `filterNavGroups`. */
     moduleKeys?: string[] | null;
@@ -42,7 +45,7 @@ export function TabBar({
     /** Work waiting behind a route; see `NavCounts`. */
     counts?: NavCounts;
 }) {
-    const groups = navFor({ role, actions, moduleKeys });
+    const groups = navFor({ role, actions, moduleKeys, storefronts });
     const nav = buildMobileNav({
         groups,
         pathname: navPathname(usePathname(), groups),

@@ -48,19 +48,18 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
-import { StorefrontPartial } from "@/components/stores/storefront-partial";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { ratingLabel, rowRating } from "@/lib/product-reviews/describe";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, updateProduct } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
-import { inStorefront, mergeCatalogue } from "@/lib/products/catalogue";
+import { catalogueRows, inStorefront } from "@/lib/products/catalogue";
 import {
     newProductHref,
     productHref,
     productSettingsHref,
 } from "@/lib/products/links";
-import type { ProductListItem, ProductStatus } from "@/lib/products/service";
+import type { CatalogueProduct, ProductStatus } from "@/lib/products/service";
 import { importProductsHref, newStorefrontHref } from "@/lib/stores/links";
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
@@ -122,11 +121,14 @@ function initials(name: string): string {
 /**
  * Stock as words, coloured only to reinforce them: out is Destructive 700,
  * at or under the product's own threshold is Saffron 700, and anything else
- * is plain. Untracked is said, never shown as zero.
+ * is plain. Untracked is said, never shown as zero — "Sold out" when it was
+ * marked sold out by hand (#515), else "Not tracked".
  */
 function stockOf(row: CatalogueRow): { text: string; tone: string } {
     if (row.stock === null) {
-        return { text: "Not tracked", tone: "text-muted-foreground" };
+        return row.soldOut
+            ? { text: "Sold out", tone: "text-destructive-subtle-foreground" }
+            : { text: "Not tracked", tone: "text-muted-foreground" };
     }
     if (row.stock <= 0) {
         return {
@@ -156,20 +158,14 @@ function Thumb({ name, size = 30 }: { name: string; size?: 30 | 52 }) {
     );
 }
 
-/** The storefront a row opens in: the first place that sells it. */
-function homeOf(row: CatalogueRow) {
-    return row.places[0];
-}
-
 /**
  * Sell → Products, after the "Saroh Products Screen" design.
  *
- * The catalogue belongs to the business. Products are still stored per
- * storefront, so this reads every storefront's list and merges them by SKU
- * (`mergeCatalogue`): a product sold in two places is one row that names both,
- * and says "varies" where their prices differ. A storefront is a filter on
- * that one catalogue, not a scope with its own — so "All storefronts" is a
- * real answer, and it is where the page lands.
+ * The catalogue belongs to the business (#531): one row per product, naming
+ * each storefront that sells it. A storefront is a filter on that one
+ * catalogue — it shows what that storefront lists, with its shelf — not a
+ * scope with its own, so "All storefronts" is a real answer, and it is
+ * where the page lands.
  *
  * The row is the action: anywhere on it opens a read-only preview, and the
  * product's own page is one step further. Selection gives the bulk bar; the
@@ -179,21 +175,19 @@ function homeOf(row: CatalogueRow) {
  */
 export function CatalogueScreen({
     stores,
-    productsByStore,
+    products,
     initialView,
-    missing = [],
     tabs,
     ratings = [],
 }: {
     stores: { id: string; name: string }[];
-    productsByStore: Record<string, ProductListItem[]>;
+    /** The business's catalogue, one entry per product. */
+    products: CatalogueProduct[];
     initialView?: string;
     /** Products | Reviews, under the header. */
     tabs?: ReactNode;
     /** Published review averages per product id. */
     ratings?: ProductRating[];
-    /** Storefronts whose list could not be read; see `StorefrontPartial`. */
-    missing?: { id: string; name: string }[];
 }) {
     const router = useRouter();
     const [storeId, setStoreId] = useState<string | null>(null);
@@ -205,10 +199,7 @@ export function CatalogueScreen({
         null,
     );
 
-    const catalogue = useMemo(
-        () => mergeCatalogue(stores, productsByStore),
-        [stores, productsByStore],
-    );
+    const catalogue = useMemo(() => catalogueRows(products), [products]);
     const rows = useMemo(() => {
         const scoped = storeId
             ? catalogue.flatMap((r) => {
@@ -228,32 +219,21 @@ export function CatalogueScreen({
     );
     const first = stores.at(0);
 
-    /** Every place a set of rows lives, in the storefront being viewed. */
-    const placesOf = (targets: CatalogueRow[]) =>
-        targets.flatMap((r) =>
-            r.places.filter((p) => !storeId || p.storeId === storeId),
-        );
-
     async function setStatus(
         targets: CatalogueRow[],
         status: ProductStatus,
         clear?: () => void,
     ) {
-        const places = placesOf(targets);
-        const before = places.map((p) => ({ ...p, was: p.product.status }));
+        const before = targets.map((r) => ({ ...r, was: r.status }));
         const results = await Promise.all(
-            places.map((p) =>
-                updateProduct(p.storeId, p.product.id, {
-                    name: p.product.name,
-                    price: p.product.price,
-                    status,
-                }),
+            targets.map((r) =>
+                updateProduct(r.id, { name: r.name, price: r.price, status }),
             ),
         );
         const failed = results.filter((r) => !r.ok).length;
         if (failed > 0) {
             showError(
-                `${failed} of ${places.length} could not be changed.`,
+                `${failed} of ${targets.length} could not be changed.`,
                 "The rest were saved. Try the others again.",
             );
         }
@@ -266,11 +246,11 @@ export function CatalogueScreen({
                 : `${targets.length} products ${verb}.`;
         showUndo(said, () => {
             void Promise.all(
-                before.map((p) =>
-                    updateProduct(p.storeId, p.product.id, {
-                        name: p.product.name,
-                        price: p.product.price,
-                        status: p.was,
+                before.map((r) =>
+                    updateProduct(r.id, {
+                        name: r.name,
+                        price: r.price,
+                        status: r.was,
                     }),
                 ),
             ).then(() => router.refresh());
@@ -280,13 +260,12 @@ export function CatalogueScreen({
     async function confirmDelete() {
         const targets = pendingDelete ?? [];
         setPendingDelete(null);
-        const places = placesOf(targets);
         const results = await Promise.all(
-            places.map((p) => deleteProduct(p.storeId, p.product.id)),
+            targets.map((r) => deleteProduct(r.id)),
         );
         const failed = results.filter((r) => !r.ok).length;
         if (failed > 0) {
-            showError(`${failed} of ${places.length} could not be deleted.`);
+            showError(`${failed} of ${targets.length} could not be deleted.`);
         }
         setPreview(null);
         router.refresh();
@@ -321,10 +300,7 @@ export function CatalogueScreen({
                                 ? ` · ${r.places.map((p) => p.storeName).join(" · ")}`
                                 : null}
                             {(() => {
-                                const rating = rowRating(
-                                    r.places.map((p) => p.product.id),
-                                    ratingById,
-                                );
+                                const rating = rowRating([r.id], ratingById);
                                 return rating ? (
                                     <>
                                         {" · "}
@@ -384,11 +360,6 @@ export function CatalogueScreen({
                     <span className="tracking-[-0.02em]">
                         {formatMoneyMajor(r.price, r.currency) ?? "—"}
                     </span>
-                    {r.varies && !storeId ? (
-                        <span className="rounded-full bg-brand-subtle px-1.5 py-px font-sans text-[11px] font-semibold text-brand-subtle-foreground">
-                            varies
-                        </span>
-                    ) : null}
                 </span>
             ),
         },
@@ -404,12 +375,7 @@ export function CatalogueScreen({
                     first ? (
                         <>
                             <Button variant="outline" asChild>
-                                <Link
-                                    href={productSettingsHref(
-                                        store?.id ??
-                                            (many ? undefined : first.id),
-                                    )}
-                                >
+                                <Link href={productSettingsHref()}>
                                     <Settings2 className="mr-1.5 size-4" />
                                     Settings
                                 </Link>
@@ -471,11 +437,6 @@ export function CatalogueScreen({
             />
 
             {tabs}
-
-            <StorefrontPartial
-                missing={missing}
-                missingWhat="products sold only there"
-            />
 
             {stores.length === 0 ? (
                 <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
@@ -656,7 +617,7 @@ export function CatalogueScreen({
                         ? `Delete “${pendingDelete[0]?.name ?? "this product"}”?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
-                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${store ? store.name : many ? "every storefront that sells it" : (first?.name ?? "your storefront")}. Past orders keep their record. This cannot be undone.`}
+                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every storefront that sells it" : (first?.name ?? "your storefront")}. Past orders keep their record. This cannot be undone.`}
                 confirmLabel={
                     pendingDelete?.length === 1
                         ? "Delete product"
@@ -729,12 +690,10 @@ function ProductPreview({
     storeId: string | null;
     onClose: () => void;
 }) {
-    const home = row ? homeOf(row) : undefined;
     const place =
-        row && storeId
-            ? (row.places.find((p) => p.storeId === storeId) ?? home)
-            : home;
-    const href = place ? productHref(place.storeId, place.product.id) : "#";
+        (storeId ? row?.places.find((p) => p.storeId === storeId) : null) ??
+        row?.places[0];
+    const href = row ? productHref(place?.storeId, row.id) : "#";
     const stock = row ? stockOf(row) : null;
 
     return (
@@ -780,11 +739,6 @@ function ProductPreview({
                                             row.currency,
                                         ) ?? "—"}
                                     </span>
-                                    {row.varies ? (
-                                        <span className="ml-2 text-[12px] text-muted-foreground">
-                                            varies by storefront
-                                        </span>
-                                    ) : null}
                                 </PreviewRow>
                                 <PreviewRow label="Inventory">
                                     <span
@@ -798,9 +752,11 @@ function ProductPreview({
                                 </PreviewRow>
                                 <PreviewRow label="Sold at">
                                     <span className="text-[13px]">
-                                        {row.places
-                                            .map((p) => p.storeName)
-                                            .join(" · ")}
+                                        {row.places.length > 0
+                                            ? row.places
+                                                  .map((p) => p.storeName)
+                                                  .join(" · ")
+                                            : "No storefront just now"}
                                     </span>
                                 </PreviewRow>
                                 <PreviewRow label="Updated" last>

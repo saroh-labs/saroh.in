@@ -1,26 +1,33 @@
 /**
- * Where a product lives in the workspace. Products are stored per
- * storefront, so the storefront travels in the address: the page needs it to
- * read and write, and a link someone shares must still open the right one.
+ * Where a product lives in the workspace. A product belongs to the business
+ * (#531), so its id alone opens it; `?storefront=` says which storefront's
+ * shelf and listing the page shows, so a link someone shares opens the same
+ * view. Left out, the page shows the first storefront that sells it.
  */
+
+/** `?storefront=…`, or nothing when no storefront is named. */
+function storefrontQuery(storeId: string | null | undefined): string {
+    return storeId ? `?storefront=${encodeURIComponent(storeId)}` : "";
+}
 
 /** The product page: what it is, how it sells, what people say. */
 export function productHref(
-    storeId: string,
+    storeId: string | null | undefined,
     productId: string,
     tab?: ProductTab,
 ): string {
-    const base = `/commerce/products/${encodeURIComponent(productId)}?storefront=${encodeURIComponent(storeId)}`;
-    return tab && tab !== "overview" ? `${base}&tab=${tab}` : base;
+    const base = `/commerce/products/${encodeURIComponent(productId)}${storefrontQuery(storeId)}`;
+    if (!tab || tab === "overview") return base;
+    return `${base}${base.includes("?") ? "&" : "?"}tab=${tab}`;
 }
 
 /** The full editor, optionally opened at one section. */
 export function productEditHref(
-    storeId: string,
+    storeId: string | null | undefined,
     productId: string,
     section?: EditorSection,
 ): string {
-    const base = `/commerce/products/${encodeURIComponent(productId)}/edit?storefront=${encodeURIComponent(storeId)}`;
+    const base = `/commerce/products/${encodeURIComponent(productId)}/edit${storefrontQuery(storeId)}`;
     return section ? `${base}#sec-${section}` : base;
 }
 
@@ -45,17 +52,10 @@ export function isSettingsTab(value: string | undefined): value is SettingsTab {
     return (SETTINGS_TABS as readonly string[]).includes(value ?? "");
 }
 
-/** Product settings for one storefront's catalogue, at a tab. */
-export function productSettingsHref(
-    storeId?: string,
-    tab?: SettingsTab,
-): string {
-    const params = new URLSearchParams();
-    if (storeId) params.set("storefront", storeId);
-    if (tab && tab !== "categories") params.set("tab", tab);
-    const q = params.toString();
-    return q
-        ? `/commerce/products/settings?${q}`
+/** Product settings — the business's (#529), whatever storefront — at a tab. */
+export function productSettingsHref(tab?: SettingsTab): string {
+    return tab && tab !== "categories"
+        ? `/commerce/products/settings?tab=${tab}`
         : "/commerce/products/settings";
 }
 

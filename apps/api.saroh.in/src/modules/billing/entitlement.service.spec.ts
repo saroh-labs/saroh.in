@@ -144,6 +144,29 @@ describe("EntitlementService.check", () => {
             service().check("org_1", "sites", 1),
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it("gives an unsubscribed business five storefronts (ADR-010)", async () => {
+        subFindUnique.mockResolvedValue(null);
+
+        expect(FREE_ENTITLEMENTS.storefronts).toBe(5);
+        await expect(service().check("org_1", "storefronts", 4)).resolves.toBe(
+            true,
+        );
+        await expect(
+            service().check("org_1", "storefronts", 5),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("follows a plan's own storefronts number", async () => {
+        subFindUnique.mockResolvedValue(subscribedWith({ storefronts: 2 }));
+
+        await expect(service().check("org_1", "storefronts", 1)).resolves.toBe(
+            true,
+        );
+        await expect(
+            service().check("org_1", "storefronts", 2),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
 });
 
 describe("EntitlementService.can", () => {

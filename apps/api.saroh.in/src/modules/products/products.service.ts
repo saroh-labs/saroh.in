@@ -20,6 +20,12 @@ import {
     saveProductFieldValues,
 } from "../catalogue/fields.service";
 import { isGstRate } from "../invoices/gst";
+import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
+import { COUNTING_ROWS } from "../stock/tracking";
+import {
+    assertCurrencyChangeAllowed,
+    defaultProductCurrency,
+} from "../stores/currency";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -28,39 +34,83 @@ import type {
     ProductStatus,
     UpdateProductDto,
 } from "./dto";
+import { listAt } from "./listings.service";
 import { promisesToMove } from "./open-promises";
+import type { ProductScope } from "./product-access";
+import { ProductAccess } from "./product-access";
+import { duplicateProduct } from "./product-duplicate";
 import {
     assertDetailsCoherent,
     assertMrpAtOrAbovePrice,
     cleanShopFields,
 } from "./product-rules";
+import type { CatalogueItemDto } from "./serialize";
 import {
     cleanDescription,
     readShopFields,
+    serializeCatalogueItem,
     serializeProductDetail,
     serializeProductListItem,
 } from "./serialize";
+import { lockProduct, lockProductStock } from "./stock-levels";
 
-/** Everything a product page or the editor needs about one product. */
-export const PRODUCT_DETAIL_INCLUDE = {
-    category: { select: { id: true, name: true } },
-    variants: {
-        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        include: { inventory: true },
-    },
-    images: { orderBy: { position: "asc" } },
-    inventory: true,
-    option: {
-        select: {
-            id: true,
-            name: true,
-            values: {
-                select: { id: true, value: true },
-                orderBy: { position: "asc" },
+const STOCK_ROW = {
+    select: { onHand: true, promised: true, lowStockAlert: true },
+} as const;
+
+/** Sold at `storeId` (#510): the product has a listing there. */
+export function listedAt(storeId: string) {
+    return {
+        listings: { some: { storeId } },
+    } satisfies Prisma.ProductWhereInput;
+}
+
+/**
+ * Everything a product page or the editor needs about one product, as the
+ * storefront `storeId` sees it: its shelf there and which variants it sells.
+ */
+export const productDetailInclude = (storeId: string) =>
+    ({
+        category: { select: { id: true, name: true } },
+        variants: {
+            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+            include: {
+                stockLevels: {
+                    where: { storeId, ...COUNTING_ROWS },
+                    ...STOCK_ROW,
+                },
+                listings: {
+                    where: { listing: { storeId } },
+                    select: { id: true },
+                },
             },
         },
-    },
-} satisfies Prisma.ProductInclude;
+        images: { orderBy: { position: "asc" } },
+        stockLevels: {
+            where: { storeId, variantId: null, ...COUNTING_ROWS },
+            ...STOCK_ROW,
+        },
+        // Where it sells, and where it is marked Sold out by hand (#515).
+        listings: {
+            where: { store: { deletedAt: null } },
+            orderBy: [{ store: { createdAt: "asc" } }, { storeId: "asc" }],
+            select: {
+                storeId: true,
+                soldOutAt: true,
+                store: { select: { name: true } },
+            },
+        },
+        option: {
+            select: {
+                id: true,
+                name: true,
+                values: {
+                    select: { id: true, value: true },
+                    orderBy: { position: "asc" },
+                },
+            },
+        },
+    }) satisfies Prisma.ProductInclude;
 
 /** Key points are one line each: trimmed, and blank lines dropped. */
 /**
@@ -95,6 +145,23 @@ function isSlugClash(error: unknown): boolean {
     return meta === undefined || JSON.stringify(meta).includes("slug");
 }
 
+/**
+ * Postgres gave up on the transaction over a lock: a deadlock (40P01) or a
+ * write conflict, which Prisma reports as P2034, or as a raw query's P2010
+ * naming the Postgres code.
+ */
+function isLockConflict(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+    const { code, meta, message } = error as {
+        code?: unknown;
+        meta?: unknown;
+        message?: unknown;
+    };
+    if (code === "P2034") return true;
+    const text = `${JSON.stringify(meta ?? null)} ${typeof message === "string" ? message : ""}`;
+    return text.includes("40P01") || text.includes("deadlock detected");
+}
+
 /** Never null over the wire in a patch: a null there means "not sent". */
 const REQUIRED_IN_PATCH = new Set<keyof PatchProductDto>([
     "name",
@@ -106,29 +173,111 @@ const REQUIRED_IN_PATCH = new Set<keyof PatchProductDto>([
 ]);
 
 /**
- * Product catalog data layer. Authorization is delegated to StoresService so
- * the same membership rules apply everywhere: reads require store access
- * (getForUser throws 404 for non-members — no existence leak), writes require
- * canWrite (owner or a write-capable member). Prices are Decimal in the DB and
- * serialize to strings over HTTP (money stays exact).
+ * The business's catalogue (#531). Every method that does the work takes a
+ * `ProductScope` — the business, the storefront whose shelf is read, and
+ * what the caller may do — resolved by `ProductAccess` from either the
+ * organization route or an old storefront route. The storefront-shaped
+ * methods (`list(storeId, userId)`, `get(storeId, productId, userId)`, …)
+ * are those routes' aliases: resolve, then call the scoped method. Prices
+ * are Decimal in the DB and serialize to strings over HTTP (money stays
+ * exact).
  */
 @Injectable()
 export class ProductsService {
+    /** Who may do what; shared by the variants, stock and photos services. */
+    readonly access: ProductAccess;
+
     constructor(
-        private readonly stores: StoresService,
+        stores: StoresService,
         // @Optional for the same reason ModuleLifecycleService's is: this
         // service is also constructed directly in DB-backed specs, which pass
         // only what they exercise. Requiring it made every such construction
         // throw on first write. `app.bootstrap.spec` asserts it IS resolved in
         // the real graph, so optional here cannot become silently inert (#176).
         @Optional() private readonly activation?: ActivationEvents,
-    ) {}
+        @Optional() access?: ProductAccess,
+    ) {
+        this.access = access ?? new ProductAccess(stores);
+    }
 
-    /** Catalog for a store the caller can access, optionally filtered by status. */
-    async list(storeId: string, userId: string, status?: ProductStatus) {
-        await this.stores.getForUser(storeId, userId); // assert read access
+    /**
+     * The business's catalogue: one row per product, with each storefront
+     * that sells it and its stock there. `storefront` narrows it to the
+     * products that storefront sells (a filter by listing, not a scope).
+     */
+    async catalogue(
+        organizationId: string,
+        filter: { status?: ProductStatus; storefront?: string } = {},
+    ): Promise<CatalogueItemDto[]> {
+        const { status, storefront } = filter;
+        const stores = await prisma.store.findMany({
+            where: { organizationId, deletedAt: null },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { id: true, name: true },
+        });
+        if (storefront && !stores.some((s) => s.id === storefront)) {
+            throw new NotFoundException("Store not found");
+        }
+        const open = stores.map((s) => s.id);
         const products = await prisma.product.findMany({
-            where: { storeId, ...(status ? { status } : {}) },
+            where: {
+                organizationId,
+                ...(storefront ? listedAt(storefront) : {}),
+                ...(status ? { status } : {}),
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+            include: {
+                category: { select: { id: true, name: true } },
+                _count: { select: { variants: true } },
+                listings: {
+                    where: { storeId: { in: open } },
+                    select: { storeId: true, soldOutAt: true },
+                },
+                variants: {
+                    select: {
+                        id: true,
+                        sku: true,
+                        title: true,
+                        price: true,
+                        stockLevels: {
+                            where: { storeId: { in: open }, ...COUNTING_ROWS },
+                            select: { storeId: true, ...STOCK_ROW.select },
+                        },
+                        listings: {
+                            where: { listing: { storeId: { in: open } } },
+                            select: { listing: { select: { storeId: true } } },
+                        },
+                    },
+                    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                },
+                stockLevels: {
+                    where: {
+                        storeId: { in: open },
+                        variantId: null,
+                        ...COUNTING_ROWS,
+                    },
+                    select: { storeId: true, ...STOCK_ROW.select },
+                },
+            },
+        });
+        return products.map((p) =>
+            serializeCatalogueItem(p, stores, storefront),
+        );
+    }
+
+    /** Store-route alias of `listIn`. */
+    async list(storeId: string, userId: string, status?: ProductStatus) {
+        return this.listIn(
+            await this.access.readViaStore(storeId, userId),
+            status,
+        );
+    }
+
+    /** What one storefront sells, optionally filtered by status. */
+    async listIn(scope: ProductScope, status?: ProductStatus) {
+        const { storeId } = scope;
+        const products = await prisma.product.findMany({
+            where: { ...listedAt(storeId), ...(status ? { status } : {}) },
             orderBy: { createdAt: "desc" },
             include: {
                 category: { select: { id: true, name: true } },
@@ -136,50 +285,81 @@ export class ProductsService {
                 // the product is known by, and its stock.
                 _count: { select: { variants: true } },
                 // Every variant, briefly: an order is taken for one of them.
-                // Its stock too, for a product that counts per variant.
+                // Its stock here too, for a product that counts per variant,
+                // and whether this storefront sells it.
                 variants: {
                     select: {
                         id: true,
                         sku: true,
                         title: true,
                         price: true,
-                        inventory: {
-                            select: { quantity: true, lowStockAlert: true },
+                        stockLevels: {
+                            where: { storeId, ...COUNTING_ROWS },
+                            ...STOCK_ROW,
+                        },
+                        listings: {
+                            where: { listing: { storeId } },
+                            select: { id: true },
                         },
                     },
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 },
-                inventory: { select: { quantity: true, lowStockAlert: true } },
+                stockLevels: {
+                    where: { storeId, variantId: null, ...COUNTING_ROWS },
+                    ...STOCK_ROW,
+                },
+                // Marked Sold out by hand here (#515).
+                listings: {
+                    where: { storeId },
+                    select: { storeId: true, soldOutAt: true },
+                },
             },
         });
-        return products.map(serializeProductListItem);
+        return products.map((p) => serializeProductListItem(p, storeId));
     }
 
-    /** A single product with variants + inventory; 404 if no store access. */
+    /** Store-route alias of `getIn`. */
     async get(storeId: string, productId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        return this.getIn(
+            await this.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    /** One product with its variants, as the scope's storefront sees it. */
+    async getIn(scope: ProductScope, productId: string) {
+        const { storeId, organizationId } = scope;
         const product = await prisma.product.findFirst({
-            where: { id: productId, storeId },
-            include: PRODUCT_DETAIL_INCLUDE,
+            where: { id: productId, organizationId },
+            include: productDetailInclude(storeId),
         });
         if (!product) {
             throw new NotFoundException("Product not found");
         }
-        const detail = serializeProductDetail(product);
+        const detail = serializeProductDetail(product, storeId);
         const [customFields, allergens, variantPromises] = await Promise.all([
-            productFieldsFor(storeId, product.id, product.categoryId),
+            productFieldsFor(organizationId, product.id, product.categoryId),
             productAllergensFor(product.id),
             // Still counting as a whole: what each variant will take with it
             // when it switches, so the editor can seed the counts.
             detail.stockMode === "product" && product.variants.length > 0
-                ? promisesToMove(prisma, product.id, product.inventory != null)
+                ? promisesToMove(prisma, product.id, storeId)
                 : Promise.resolve({}),
         ]);
         return { ...detail, customFields, allergens, variantPromises };
     }
 
+    /** Store-route alias of `createIn`: made and listed at `storeId`. */
     async create(storeId: string, userId: string, dto: CreateProductDto) {
-        const organizationId = await this.requireWrite(storeId, userId);
+        return this.createIn(
+            await this.access.writeViaStore(storeId, userId),
+            dto,
+        );
+    }
+
+    /** A new catalogue product, listed at the scope's storefront. */
+    async createIn(scope: ProductScope, dto: CreateProductDto) {
+        const { organizationId, storeId } = scope;
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -187,9 +367,9 @@ export class ProductsService {
                 field: "slug",
             });
         }
-        await this.assertSlugFree(storeId, slug);
-        await this.assertCategoryInStore(storeId, dto.categoryId);
-        await this.assertOptionInStore(storeId, dto.optionId);
+        await this.assertSlugFree(organizationId, slug);
+        await this.assertCategoryOf(organizationId, dto.categoryId);
+        await this.assertOptionOf(organizationId, dto.optionId);
         assertMrpAtOrAbovePrice(dto.price, dto.mrp ?? null);
         assertDetailsCoherent({
             madeHere: dto.madeHere ?? true,
@@ -200,51 +380,68 @@ export class ProductsService {
         const shopFields = cleanShopFields(dto.shopFields ?? {});
         // Checked before the product exists, so a refused value or allergen
         // never leaves a half-made product behind.
-        if (organizationId) {
-            if (dto.customFields)
-                await checkProductFieldValues(storeId, dto.customFields);
-            if (dto.contains || dto.mayContain)
-                await checkProductAllergens(storeId, {
-                    contains: dto.contains,
-                    mayContain: dto.mayContain,
-                });
-        }
+        if (dto.customFields)
+            await checkProductFieldValues(organizationId, dto.customFields);
+        if (dto.contains || dto.mayContain)
+            await checkProductAllergens(organizationId, {
+                contains: dto.contains,
+                mayContain: dto.mayContain,
+            });
 
         let createdId: string;
         try {
-            const product = await prisma.product.create({
-                data: {
-                    storeId,
+            // The business's product, sold at the storefront it is made at.
+            createdId = await prisma.$transaction(async (tx) => {
+                // Left out: the storefront's currency, else the business's
+                // (DEC-030) — never a USD guess.
+                const currency =
+                    dto.currency ??
+                    (await defaultProductCurrency(tx, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    undefined;
+                const product = await tx.product.create({
+                    data: {
+                        storeId,
+                        organizationId,
+                        name: dto.name,
+                        slug,
+                        description: cleanDescription(dto.description),
+                        image: dto.image ?? null,
+                        categoryId: dto.categoryId ?? null,
+                        price: dto.price,
+                        mrp: dto.mrp ?? null,
+                        currency,
+                        status: dto.status ?? "DRAFT",
+                        archivedAt:
+                            dto.status === "ARCHIVED" ? new Date() : null,
+                        howToUse: dto.howToUse ?? null,
+                        materials: dto.materials ?? null,
+                        keyPoints: cleanKeyPoints(dto.keyPoints),
+                        madeHere: dto.madeHere ?? true,
+                        maker: dto.maker ?? null,
+                        madeIn: dto.madeIn ?? null,
+                        supplierCode: dto.supplierCode ?? null,
+                        gstRate: checkGstRate(dto.gstRate),
+                        hsnCode: dto.hsnCode ?? null,
+                        warranty: dto.warranty ?? null,
+                        returnsMode: dto.returnsMode ?? "STOREFRONT",
+                        returnsText: dto.returnsText ?? null,
+                        shopFields,
+                        seoTitle: dto.seoTitle ?? null,
+                        seoDescription: dto.seoDescription ?? null,
+                        optionId: dto.optionId ?? null,
+                    },
+                    select: { id: true },
+                });
+                await listAt(tx, {
                     organizationId,
-                    name: dto.name,
-                    slug,
-                    description: cleanDescription(dto.description),
-                    image: dto.image ?? null,
-                    categoryId: dto.categoryId ?? null,
-                    price: dto.price,
-                    mrp: dto.mrp ?? null,
-                    currency: dto.currency ?? "USD",
-                    status: dto.status ?? "DRAFT",
-                    archivedAt: dto.status === "ARCHIVED" ? new Date() : null,
-                    howToUse: dto.howToUse ?? null,
-                    materials: dto.materials ?? null,
-                    keyPoints: cleanKeyPoints(dto.keyPoints),
-                    madeHere: dto.madeHere ?? true,
-                    maker: dto.maker ?? null,
-                    madeIn: dto.madeIn ?? null,
-                    supplierCode: dto.supplierCode ?? null,
-                    gstRate: checkGstRate(dto.gstRate),
-                    hsnCode: dto.hsnCode ?? null,
-                    warranty: dto.warranty ?? null,
-                    returnsMode: dto.returnsMode ?? "STOREFRONT",
-                    returnsText: dto.returnsText ?? null,
-                    shopFields,
-                    seoTitle: dto.seoTitle ?? null,
-                    seoDescription: dto.seoDescription ?? null,
-                    optionId: dto.optionId ?? null,
-                },
+                    productId: product.id,
+                    storeId,
+                });
+                return product.id;
             });
-            createdId = product.id;
         } catch (error) {
             if (!isSlugClash(error)) throw error;
             throw new ConflictException({
@@ -252,48 +449,67 @@ export class ProductsService {
                 field: "slug",
             });
         }
-        if (organizationId) {
-            if (dto.customFields) {
-                await saveProductFieldValues(
-                    storeId,
-                    createdId,
-                    organizationId,
-                    dto.customFields,
-                );
-            }
-            if (dto.contains || dto.mayContain) {
-                await saveProductAllergens(storeId, createdId, organizationId, {
-                    contains: dto.contains,
-                    mayContain: dto.mayContain,
-                });
-            }
-            await this.activation?.firstProductCreated(
+        if (dto.customFields) {
+            await saveProductFieldValues(
                 organizationId,
                 createdId,
+                dto.customFields,
             );
         }
+        if (dto.contains || dto.mayContain) {
+            await saveProductAllergens(organizationId, createdId, {
+                contains: dto.contains,
+                mayContain: dto.mayContain,
+            });
+        }
+        await this.activation?.firstProductCreated(organizationId, createdId);
         return { id: createdId };
     }
 
+    /** Store-route alias of `updateIn`. */
     async update(
         storeId: string,
         productId: string,
         userId: string,
         dto: UpdateProductDto,
     ) {
-        await this.requireWrite(storeId, userId);
+        return this.updateIn(
+            await this.access.writeViaStore(storeId, userId, productId),
+            productId,
+            dto,
+        );
+    }
+
+    async updateIn(
+        scope: ProductScope,
+        productId: string,
+        dto: UpdateProductDto,
+    ) {
+        const { organizationId } = scope;
         const current = await prisma.product.findFirst({
-            where: { id: productId, storeId },
-            select: { slug: true, status: true },
+            where: { id: productId, organizationId },
+            select: { slug: true, status: true, currency: true },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
         }
         const slug = slugify(dto.slug);
-        if (current.slug !== slug) {
-            await this.assertSlugFree(storeId, slug);
+        // Left out, the product keeps its currency. Changed, every
+        // storefront that sells it must sell in the new one (DEC-030).
+        if (dto.currency && dto.currency !== current.currency) {
+            await assertCurrencyChangeAllowed(prisma, {
+                productId,
+                name: dto.name,
+                currency: dto.currency,
+            });
         }
-        await this.assertCategoryInStore(storeId, dto.categoryId ?? undefined);
+        if (current.slug !== slug) {
+            await this.assertSlugFree(organizationId, slug);
+        }
+        await this.assertCategoryOf(
+            organizationId,
+            dto.categoryId ?? undefined,
+        );
 
         try {
             await prisma.product.update({
@@ -305,7 +521,7 @@ export class ProductsService {
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
-                    currency: dto.currency ?? "USD",
+                    ...(dto.currency ? { currency: dto.currency } : {}),
                     ...(dto.status
                         ? {
                               status: dto.status,
@@ -344,9 +560,22 @@ export class ProductsService {
         userId: string,
         dto: PatchProductDto,
     ) {
-        const organizationId = await this.requireWrite(storeId, userId);
+        return this.patchIn(
+            await this.access.writeViaStore(storeId, userId, productId),
+            productId,
+            dto,
+        );
+    }
+
+    /** One editor section's save (see `patch`); returns the whole product. */
+    async patchIn(
+        scope: ProductScope,
+        productId: string,
+        dto: PatchProductDto,
+    ) {
+        const { organizationId } = scope;
         const current = await prisma.product.findFirst({
-            where: { id: productId, storeId },
+            where: { id: productId, organizationId },
             select: {
                 slug: true,
                 price: true,
@@ -375,13 +604,14 @@ export class ProductsService {
         if (has("name")) data.name = dto.name;
         if (has("slug")) {
             const slug = slugify(dto.slug ?? "");
-            if (slug !== current.slug) await this.assertSlugFree(storeId, slug);
+            if (slug !== current.slug)
+                await this.assertSlugFree(organizationId, slug);
             data.slug = slug;
         }
         if (has("description"))
             data.description = cleanDescription(dto.description);
         if (has("categoryId")) {
-            await this.assertCategoryInStore(storeId, dto.categoryId);
+            await this.assertCategoryOf(organizationId, dto.categoryId);
             data.categoryId = dto.categoryId ?? null;
         }
         if (has("optionId")) {
@@ -404,7 +634,7 @@ export class ProductsService {
             ) {
                 const option = next
                     ? await prisma.productOption.findFirst({
-                          where: { id: next, storeId },
+                          where: { id: next, organizationId },
                           select: { name: true },
                       })
                     : null;
@@ -415,7 +645,7 @@ export class ProductsService {
                     field: "optionId",
                 });
             }
-            await this.assertOptionInStore(storeId, dto.optionId);
+            await this.assertOptionOf(organizationId, dto.optionId);
             data.optionId = dto.optionId ?? null;
         }
         if (has("price")) data.price = dto.price;
@@ -475,16 +705,15 @@ export class ProductsService {
 
         // Custom field values first: a value its type refuses stops the
         // whole section before anything is written.
-        if (dto.customFields && organizationId) {
+        if (dto.customFields) {
             await saveProductFieldValues(
-                storeId,
-                productId,
                 organizationId,
+                productId,
                 dto.customFields,
             );
         }
-        if ((dto.contains || dto.mayContain) && organizationId) {
-            await saveProductAllergens(storeId, productId, organizationId, {
+        if (dto.contains || dto.mayContain) {
+            await saveProductAllergens(organizationId, productId, {
                 contains: dto.contains,
                 mayContain: dto.mayContain,
             });
@@ -500,14 +729,53 @@ export class ProductsService {
                 });
             }
         }
-        return this.get(storeId, productId, userId);
+        return this.getIn(scope, productId);
     }
 
-    /** Delete a product; variants + inventory cascade (schema onDelete: Cascade). */
+    /** Store-route alias of `duplicateIn`. */
+    async duplicate(storeId: string, productId: string, userId: string) {
+        return this.duplicateIn(
+            await this.access.writeViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    /**
+     * A draft copy of the product (#518; `duplicateProduct` says what is
+     * copied), read back at the scope's storefront so the editor can open it.
+     */
+    async duplicateIn(scope: ProductScope, productId: string) {
+        const { organizationId, storeId } = scope;
+        let copyId: string;
+        try {
+            copyId = await prisma.$transaction((tx) =>
+                duplicateProduct(tx, { organizationId, productId, storeId }),
+            );
+        } catch (error) {
+            // Another copy took the same suffix in the meantime.
+            if (!isSlugClash(error)) throw error;
+            throw new ConflictException(
+                "Another copy was being made at the same time. Try again.",
+            );
+        }
+        return this.getIn(scope, copyId);
+    }
+
+    /**
+     * Delete a product; its variants, listings and stock rows cascade
+     * (schema onDelete: Cascade).
+     */
     async remove(storeId: string, productId: string, userId: string) {
-        await this.requireWrite(storeId, userId);
+        return this.removeIn(
+            await this.access.writeViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    /** Delete the catalogue product, from every storefront that sells it. */
+    async removeIn(scope: ProductScope, productId: string) {
         const product = await prisma.product.findFirst({
-            where: { id: productId, storeId },
+            where: { id: productId, organizationId: scope.organizationId },
             select: { id: true },
         });
         if (!product) {
@@ -516,74 +784,62 @@ export class ProductsService {
         // An order line keeps its product (the history of what was sold, and
         // now of what was reviewed), so the database refuses the delete — which
         // used to surface as a bare 500. Say it, and say what to do instead.
-        const sold = await prisma.orderItem.count({ where: { productId } });
-        if (sold > 0) {
+        try {
+            await prisma.$transaction(async (tx) => {
+                // The lock order every stock writer keeps (backend-data-and-
+                // money.md): the product FOR NO KEY UPDATE, then its shelves.
+                // A count or receive already holding a shelf finishes first —
+                // its entry's key check doesn't wait on NO KEY UPDATE — and
+                // the checks below then see what it wrote.
+                await lockProduct(tx, productId);
+                await lockProductStock(tx, productId);
+                const sold = await tx.orderItem.count({ where: { productId } });
+                if (sold > 0) {
+                    throw new ConflictException(
+                        "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+                    );
+                }
+                // The stock log is never edited (DEC-032): deleting the
+                // product would take its entries with it, and any units on
+                // a shelf would vanish with no entry saying so.
+                const [logged, stocked] = await Promise.all([
+                    tx.stockEntry.count({ where: { productId } }),
+                    tx.stockLevel.count({
+                        where: { productId, onHand: { not: 0 } },
+                    }),
+                ]);
+                if (logged > 0 || stocked > 0) {
+                    throw new ConflictException(PRODUCT_HAS_STOCK_HISTORY);
+                }
+                // Its rows go first, under the locks held, and the product
+                // last: only that delete takes it FOR UPDATE, once nothing
+                // below it is left to wait on.
+                await tx.collectionProduct.deleteMany({ where: { productId } });
+                await tx.productListing.deleteMany({ where: { productId } });
+                await tx.stockLevel.deleteMany({ where: { productId } });
+                await tx.product.delete({ where: { id: productId } });
+            });
+        } catch (error) {
+            // An order line written for it right now can still meet the
+            // final delete; nothing was changed, so asking again is safe.
+            if (!isLockConflict(error)) throw error;
             throw new ConflictException(
-                "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+                "Someone is changing this product right now. Try deleting it again.",
             );
         }
-        await prisma.product.delete({ where: { id: productId } });
         return { id: productId };
     }
 
     /**
-     * Assert write access AND return the owning Organization id, so every
-     * create in this service can stamp `organizationId` (#173). Returning it
-     * here rather than looking it up at each call site makes the stamp hard to
-     * forget: the guard you must call already hands you the value.
+     * Product slugs are unique per business (#510,
+     * @@unique([organizationId, slug])).
      */
-    private async requireWrite(
-        storeId: string,
-        userId: string,
-    ): Promise<string | null> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (writable === null) {
-            throw new NotFoundException("Store not found");
-        }
-        return writable.organizationId;
-    }
-
-    /** Assert the caller can read the store AND the product lives in it. */
-    async assertProductReadable(
-        storeId: string,
-        productId: string,
-        userId: string,
+    private async assertSlugFree(
+        organizationId: string,
+        slug: string,
     ): Promise<void> {
-        await this.stores.getForUser(storeId, userId);
-        await this.assertProductInStore(storeId, productId);
-    }
-
-    /** Assert the caller can write the store AND the product lives in it. */
-    async assertProductWritable(
-        storeId: string,
-        productId: string,
-        userId: string,
-    ): Promise<string | null> {
-        const organizationId = await this.requireWrite(storeId, userId);
-        await this.assertProductInStore(storeId, productId);
-        return organizationId;
-    }
-
-    private async assertProductInStore(
-        storeId: string,
-        productId: string,
-    ): Promise<void> {
-        const product = await prisma.product.findFirst({
-            where: { id: productId, storeId },
-            select: { id: true },
-        });
-        if (!product) {
-            throw new NotFoundException("Product not found");
-        }
-    }
-
-    /** Product slugs are unique per store (@@unique([storeId, slug])). */
-    private async assertSlugFree(storeId: string, slug: string): Promise<void> {
         const existing = await prisma.product.findUnique({
-            where: { storeId_slug: { storeId, slug } },
+            where: { organizationId_slug: { organizationId, slug } },
         });
         if (existing) {
             throw new ConflictException({
@@ -593,14 +849,14 @@ export class ProductsService {
         }
     }
 
-    /** A product picks its option from its own store's options. */
-    private async assertOptionInStore(
-        storeId: string,
+    /** A product picks its option from its business's options (#529). */
+    private async assertOptionOf(
+        organizationId: string,
         optionId?: string | null,
     ): Promise<void> {
         if (!optionId) return;
         const option = await prisma.productOption.findFirst({
-            where: { id: optionId, storeId },
+            where: { id: optionId, organizationId },
             select: { id: true },
         });
         if (!option) {
@@ -617,7 +873,7 @@ export class ProductsService {
         imageId: string,
     ): Promise<void> {
         const image = await prisma.productImage.findFirst({
-            where: { id: imageId, productId },
+            where: { id: imageId, productId, kind: "photo" },
             select: { id: true },
         });
         if (!image) {
@@ -628,14 +884,14 @@ export class ProductsService {
         }
     }
 
-    /** A category attached to a product must belong to the same store. */
-    private async assertCategoryInStore(
-        storeId: string,
+    /** A product's category is one of its business's categories (#529). */
+    private async assertCategoryOf(
+        organizationId: string,
         categoryId?: string | null,
     ): Promise<void> {
         if (!categoryId) return;
         const category = await prisma.category.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, organizationId },
             select: { id: true },
         });
         if (!category) {

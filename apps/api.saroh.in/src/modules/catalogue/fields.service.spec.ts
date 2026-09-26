@@ -16,9 +16,9 @@ const tag = `${process.pid}-${Date.now()}`;
 
 describe("Custom fields (DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
-    const categories = new CategoriesService(stores);
+    const categories = new CategoriesService();
     const products = new ProductsService(stores);
-    const fields = new FieldsService(stores);
+    const fields = new FieldsService();
 
     let ownerId = "";
     let orgId = "";
@@ -44,11 +44,8 @@ describe("Custom fields (DB)", () => {
                 slug: `fields-${tag}`,
             })
         ).id;
-        serums = (await categories.create(storeId, ownerId, { name: "Serums" }))
-            .id;
-        dresses = (
-            await categories.create(storeId, ownerId, { name: "Dresses" })
-        ).id;
+        serums = (await categories.create(orgId, { name: "Serums" })).id;
+        dresses = (await categories.create(orgId, { name: "Dresses" })).id;
         serumId = (
             await products.create(storeId, ownerId, {
                 name: "Vitamin C Serum",
@@ -68,7 +65,7 @@ describe("Custom fields (DB)", () => {
     });
 
     it("adds a field team only and in no category, and refuses a duplicate name", async () => {
-        const f = await fields.create(storeId, ownerId, {
+        const f = await fields.create(orgId, {
             name: "Skin type",
             type: "TEXT",
         });
@@ -79,7 +76,7 @@ describe("Custom fields (DB)", () => {
             productCount: 0,
         });
         await expect(
-            fields.create(storeId, ownerId, {
+            fields.create(orgId, {
                 name: "skin TYPE",
                 type: "TEXT",
             }),
@@ -87,20 +84,20 @@ describe("Custom fields (DB)", () => {
     });
 
     it("is asked of its categories, and checks each value by type", async () => {
-        const shelf = await fields.create(storeId, ownerId, {
+        const shelf = await fields.create(orgId, {
             name: "Opened shelf life (months)",
             type: "NUMBER",
         });
-        const skin = (await fields.list(storeId, ownerId)).find(
+        const skin = (await fields.views(orgId)).find(
             (f) => f.name === "Skin type",
         );
         expect(skin).toBeDefined();
         for (const id of [shelf.id, skin?.id ?? ""]) {
-            await fields.update(storeId, id, ownerId, {
+            await fields.update(orgId, id, {
                 categoryIds: [serums],
             });
         }
-        const after = await fields.update(storeId, shelf.id, ownerId, {
+        const after = await fields.update(orgId, shelf.id, {
             onShop: true,
         });
         expect(after).toMatchObject({ onShop: true, productCount: 1 });
@@ -122,10 +119,10 @@ describe("Custom fields (DB)", () => {
     });
 
     it("stops asking once out of the category, and keeps the value", async () => {
-        const skin = (await fields.list(storeId, ownerId)).find(
+        const skin = (await fields.views(orgId)).find(
             (f) => f.name === "Skin type",
         );
-        await fields.update(storeId, skin?.id ?? "", ownerId, {
+        await fields.update(orgId, skin?.id ?? "", {
             categoryIds: [dresses],
         });
         const now = await products.get(storeId, serumId, ownerId);
@@ -139,14 +136,14 @@ describe("Custom fields (DB)", () => {
     });
 
     it("undoes a delete with the values typed into it", async () => {
-        const shelf = (await fields.list(storeId, ownerId)).find((f) =>
+        const shelf = (await fields.views(orgId)).find((f) =>
             f.name.startsWith("Opened"),
         );
-        await fields.remove(storeId, shelf?.id ?? "", ownerId);
+        await fields.remove(orgId, shelf?.id ?? "");
         expect(
             (await products.get(storeId, serumId, ownerId)).customFields,
         ).toEqual([]);
-        await fields.restore(storeId, shelf?.id ?? "", ownerId);
+        await fields.restore(orgId, shelf?.id ?? "");
         const back = await products.get(storeId, serumId, ownerId);
         expect(back.customFields[0]?.value).toBe("12");
     });

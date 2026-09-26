@@ -1,21 +1,31 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { Storefront } from "../fixtures/throwaway-products";
+import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 import { demoUser, urls } from "../playwright.config";
 
 /**
  * The product editor film (#472), as a test: make a product on one page,
- * part by part — basics, then variants, stock and photos once it exists —
- * publish it, and read it back on the product page.
+ * part by part — basics, then variants and photos once it exists — publish
+ * it, and read it back on the product page.
  *
  * It runs on Leela & Loom, the showcase boutique, and leaves it as it found
  * it: the product it makes is deleted afterwards, and one left by a failed
- * run is deleted before it starts. Photos go in by address, since a test
- * stack has no file storage.
+ * run goes the same way before it starts. It never counts stock there — a
+ * count is history that is never deleted (DEC-032), so the product could
+ * only be archived and would stay on the showcase. A new product starts
+ * untracked (#515), so it has no count to leave behind. The Stock section's
+ * save — Track stock on, then a count — is checked on Northwind Supply
+ * instead, below. Photos go in by address, since a test stack has no file
+ * storage.
  */
 
 const ORG = "seed_sc_ll_org";
 const STORE = "seed_sc_ll_store";
+const LEELA: Storefront = { organizationId: ORG, storeId: STORE };
+/** Writes that leave history go to the base seed, never a showcase. */
+const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 const PHOTOS = [
     "https://images.unsplash.com/photo-1671493235081-5842463637cd?w=1600&q=80&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1671493234884-b1611bcf3e69?w=1600&q=80&auto=format&fit=crop",
@@ -35,22 +45,6 @@ async function signIn(page: Page) {
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
 const orgHeader = { "x-organization-id": ORG };
 
-/** Deletes every product of that name — the one made here, or a leftover. */
-async function removeProducts(request: APIRequestContext, name: string) {
-    const res = await request.get(api(""), { headers: orgHeader });
-    expect(res.ok()).toBe(true);
-    const body = (await res.json()) as
-        | { id: string; name: string }[]
-        | { items: { id: string; name: string }[] };
-    const list = Array.isArray(body) ? body : body.items;
-    for (const p of list.filter((x) => x.name === name)) {
-        const del = await request.delete(api(`/${p.id}`), {
-            headers: orgHeader,
-        });
-        expect(del.ok()).toBe(true);
-    }
-}
-
 test.describe("product editor", () => {
     test("create, add variants, stock and photos, publish, then read it back", async ({
         page,
@@ -62,7 +56,7 @@ test.describe("product editor", () => {
 
         await signIn(page);
         await page.goto(`/open/${ORG}`);
-        await removeProducts(page.request, name);
+        await removeProducts(page.request, LEELA, name);
 
         try {
             // 1. A new product needs a name and a price.
@@ -134,27 +128,26 @@ test.describe("product editor", () => {
                 page.getByText("Variants saved.").first(),
             ).toBeVisible();
 
-            // 6–7. A count for each size; the smallest runs low.
+            // 6–7. Stock is left uncounted here (see the header). A new
+            //    product starts untracked (#515): the switch reads off and
+            //    the section says what that means, with no count to add.
             const stock = page.getByRole("region", { name: "Stock" });
-            await stock.getByRole("button", { name: "Add stock" }).click();
-            for (const [size, qty, low] of [
-                ["15 ml", "24", "5"],
-                ["30 ml", "12", "4"],
-                ["50 ml", "3", "4"],
-            ] as const) {
-                await stock.getByLabel(`${size} on hand`).fill(qty);
-                await stock
-                    .getByLabel(`${size} warn when on hand reaches`)
-                    .fill(low);
-            }
             await expect(
-                stock.getByText(/50 ml has 3 left/).first(),
+                stock.getByRole("switch", {
+                    name: "Track stock for this product",
+                }),
+            ).toHaveAttribute("aria-checked", "false");
+            await expect(
+                stock.getByText(/^Not tracked\. This product has no count/),
             ).toBeVisible();
-            await stock.getByRole("button", { name: "Save stock" }).click();
-            await expect(page.getByText("Stock saved.").first()).toBeVisible();
+            await expect(
+                stock.getByRole("button", { name: "Add stock" }),
+            ).toHaveCount(0);
 
             // 8. Three photos by address; the first is the cover.
-            const photos = page.getByRole("region", { name: "Photos" });
+            const photos = page.getByRole("region", {
+                name: "Photos and videos",
+            });
             for (const [i, url] of PHOTOS.entries()) {
                 await photos
                     .getByRole("button", { name: "Or add one by its address" })
@@ -174,8 +167,10 @@ test.describe("product editor", () => {
                     name: /^Make photo \d the cover$/,
                 }),
             ).toHaveCount(2);
-            await photos.getByRole("button", { name: "Save photos" }).click();
-            await expect(page.getByText("Photos saved.").first()).toBeVisible();
+            await photos.getByRole("button", { name: "Save media" }).click();
+            await expect(
+                page.getByText("Photos and videos saved.").first(),
+            ).toBeVisible();
 
             // 9. Publishing is its own step, named for what it does.
             const visibility = page.getByRole("region", { name: "Visibility" });
@@ -207,9 +202,83 @@ test.describe("product editor", () => {
             await expect(
                 page.getByText(/₹649\s*–\s*₹1,599/).first(),
             ).toBeVisible();
-            await expect(page.getByText("1 low").first()).toBeVisible();
         } finally {
-            await removeProducts(page.request, name);
+            await removeProducts(page.request, LEELA, name);
+        }
+    });
+
+    test("the Stock section counts the product and saves it", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        // On Northwind: a count is history, so the product is set aside
+        // afterwards under one fixed name and brought back next run. A new
+        // product starts untracked (#515), so Track stock goes on first.
+        const name = `E2E Stock Count ${testInfo.project.name}`;
+        const inventory = (id: string) =>
+            `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`;
+        const nwHeader = { "x-organization-id": NW.organizationId };
+
+        await signIn(page);
+        await page.goto(`/open/${NW.organizationId}`);
+
+        try {
+            const id = await takeProduct(page.request, NW, name, {
+                price: "120.00",
+                status: "DRAFT",
+            });
+
+            await page.goto(
+                `/commerce/products/${id}/edit?storefront=${NW.storeId}#sec-stock`,
+            );
+            const stock = page.getByRole("region", { name: "Stock" });
+
+            // Track stock on, as the owner would: a new product starts off;
+            // one brought back may be on already, and stays so.
+            const track = stock.getByRole("switch", {
+                name: "Track stock for this product",
+            });
+            await expect(track).toBeEnabled();
+            if ((await track.getAttribute("aria-checked")) === "false") {
+                await track.click();
+                await expect(
+                    page
+                        .getByText("Stock is tracked for this product again.")
+                        .first(),
+                ).toBeVisible();
+            }
+            await expect(track).toHaveAttribute("aria-checked", "true");
+
+            // Read after the switch, which starts every shelf at 0. A product
+            // brought back may have a count already: aim for another number,
+            // so the save has something to change.
+            const before = await page.request.get(inventory(id), {
+                headers: nwHeader,
+            });
+            expect(before.ok()).toBe(true);
+            const { quantity } = (await before.json()) as {
+                quantity: number | null;
+            };
+            const target = quantity === 3 ? 2 : 3;
+
+            const add = stock.getByRole("button", { name: "Add stock" });
+            const onHand = page.locator("#pe-qty");
+            await expect(add.or(onHand)).toBeVisible();
+            if (await add.isVisible()) await add.click();
+            await onHand.fill(String(target));
+            await stock.getByLabel("Warn when on hand reaches").fill("4");
+            await stock.getByRole("button", { name: "Save stock" }).click();
+            await expect(page.getByText("Stock saved.").first()).toBeVisible();
+
+            const after = await page.request.get(inventory(id), {
+                headers: nwHeader,
+            });
+            expect(await after.json()).toMatchObject({
+                quantity: target,
+                lowStockAlert: 4,
+            });
+        } finally {
+            await removeProducts(page.request, NW, name);
         }
     });
 
@@ -222,8 +291,8 @@ test.describe("product editor", () => {
 
         await signIn(page);
         await page.goto(`/open/${ORG}`);
-        await removeProducts(page.request, taken);
-        await removeProducts(page.request, name);
+        await removeProducts(page.request, LEELA, taken);
+        await removeProducts(page.request, LEELA, name);
 
         try {
             // A product whose address the new one will try to take.
@@ -281,8 +350,8 @@ test.describe("product editor", () => {
             ).toBeVisible();
             await expect(page.getByText("Something went wrong")).toHaveCount(0);
         } finally {
-            await removeProducts(page.request, name);
-            await removeProducts(page.request, taken);
+            await removeProducts(page.request, LEELA, name);
+            await removeProducts(page.request, LEELA, taken);
         }
     });
 });

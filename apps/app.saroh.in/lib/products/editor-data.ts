@@ -1,7 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { canWriteProducts } from "@/lib/products/access";
+import { canStockProducts, canWriteProducts } from "@/lib/products/access";
 import { listCategories, listOptions } from "@/lib/products/service";
 import {
     getEffectiveDefaults,
@@ -9,8 +9,8 @@ import {
     listAllergens,
 } from "@/lib/products/settings";
 import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
+import { getStockTracking } from "@/lib/stock/service";
 import { productCategoriesHref } from "@/lib/stores/links";
-import type { Store } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
 /**
@@ -23,7 +23,7 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * starting values.
  */
 export async function loadEditorContext(
-    store: Store,
+    store: { id: string; name: string },
     product?: { id: string; categoryId: string | null },
 ) {
     const [
@@ -34,14 +34,15 @@ export async function loadEditorContext(
         sku,
         allergens,
         defaults,
+        business,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
-        listCategories(store.id),
-        listOptions(store.id).catch(() => []),
+        listCategories(),
+        listOptions().catch(() => []),
         resolveActiveOrganization(),
-        getSkuSettings(store.id, product?.id).catch(() => null),
-        listAllergens(store.id).catch(() => null),
-        getEffectiveDefaults(store.id, product?.categoryId ?? null).catch(
+        getSkuSettings(product?.id).catch(() => null),
+        listAllergens().catch(() => null),
+        getEffectiveDefaults(product?.categoryId ?? null).catch(
             (error: unknown) => {
                 // A forbidden() or redirect from the read is the page's to
                 // handle, not a failure to fall back from.
@@ -49,15 +50,20 @@ export async function loadEditorContext(
                 return null;
             },
         ),
+        // The business's Track stock switch (#515); unknown reads as on, and
+        // the product's own switch decides.
+        getStockTracking().catch(() => null),
     ]);
     return {
         storeId: store.id,
         storeName: store.name,
         currency: settings?.currency ?? "INR",
         categories: categories.map((c) => ({ id: c.id, name: c.name })),
-        categoriesHref: productCategoriesHref(store.id),
+        categoriesHref: productCategoriesHref(),
         options,
         canWrite: canWriteProducts(organization),
+        canStock: canStockProducts(organization),
+        businessTracks: business?.tracked ?? true,
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
         defaults,

@@ -23,6 +23,7 @@ jest.mock("@saroh/database", () => {
 });
 
 import {
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     NotFoundException,
@@ -63,6 +64,7 @@ function fakeStorage(over: Partial<ObjectStorage> = {}): ObjectStorage {
         getPublicUrl: jest.fn(),
         deleteObject: jest.fn().mockResolvedValue(undefined),
         headObject: jest.fn().mockResolvedValue(null),
+        readObjectStart: jest.fn().mockResolvedValue(null),
         ...over,
     };
 }
@@ -198,6 +200,192 @@ describe("MediaService.completeUpload", () => {
             service.completeUpload(ctx(), "media_1"),
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(update).not.toHaveBeenCalled();
+    });
+});
+
+describe("MediaService — videos (#517)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const MB = 1024 * 1024;
+    const ftyp = new Uint8Array([
+        0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d,
+    ]);
+    const html = new TextEncoder().encode("<!doctype html><script>");
+
+    it("signs an MP4 or MOV up to 50 MB under the video purpose", async () => {
+        const createSignedUploadUrl = jest.fn().mockResolvedValue(SIGNED);
+        const service = new MediaService(
+            fakeStorage({ createSignedUploadUrl }),
+        );
+        create.mockResolvedValue({ id: "media_v", key: SIGNED.key });
+        for (const contentType of ["video/mp4", "video/quicktime"]) {
+            await service.createUpload(ctx(), {
+                contentType,
+                contentLength: 50 * MB,
+                filename: "pour.mp4",
+                purpose: "product-video",
+            });
+        }
+        expect(createSignedUploadUrl).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses a 60 MB video in the merchant's words, before signing", async () => {
+        const createSignedUploadUrl = jest.fn();
+        const service = new MediaService(
+            fakeStorage({ createSignedUploadUrl }),
+        );
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "video/mp4",
+                contentLength: 60 * MB,
+                filename: "long.mp4",
+                purpose: "product-video",
+            }),
+        ).rejects.toThrow(
+            "That video is over 50 MB. Keep it under a minute, or export it smaller.",
+        );
+        expect(createSignedUploadUrl).not.toHaveBeenCalled();
+    });
+
+    it("refuses a PDF sent as product media", async () => {
+        const service = new MediaService(fakeStorage());
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "application/pdf",
+                contentLength: MB,
+                filename: "menu.pdf",
+                purpose: "product-video",
+            }),
+        ).rejects.toThrow(
+            "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.",
+        );
+    });
+
+    it("refuses a video outside the video purpose", async () => {
+        const service = new MediaService(fakeStorage());
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "video/mp4",
+                contentLength: MB,
+                filename: "pour.mp4",
+                purpose: "site-image",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("completes a video whose first bytes are an ftyp box", async () => {
+        const readObjectStart = jest.fn().mockResolvedValue(ftyp);
+        const service = new MediaService(fakeStorage({ readObjectStart }));
+        findUnique.mockResolvedValue({
+            id: "media_v",
+            organizationId: "org_1",
+            key: "org/org_1/product-video/pour.mp4",
+            contentType: "video/mp4",
+            sizeBytes: 5 * MB,
+            status: "PENDING",
+        });
+        update.mockResolvedValue({
+            id: "media_v",
+            status: "READY",
+            sizeBytes: 5 * MB,
+            key: "org/org_1/product-video/pour.mp4",
+        });
+        const out = await service.completeUpload(ctx(), "media_v");
+        expect(readObjectStart).toHaveBeenCalledWith(
+            "org/org_1/product-video/pour.mp4",
+            12,
+        );
+        expect(out.status).toBe("READY");
+    });
+
+    it("marks a file labelled video/mp4 without an ftyp box FAILED and deletes it", async () => {
+        const readObjectStart = jest.fn().mockResolvedValue(html);
+        const deleteObject = jest.fn().mockResolvedValue(undefined);
+        const service = new MediaService(
+            fakeStorage({ readObjectStart, deleteObject }),
+        );
+        findUnique.mockResolvedValue({
+            id: "media_x",
+            organizationId: "org_1",
+            key: "org/org_1/product-video/evil.mp4",
+            contentType: "video/mp4",
+            sizeBytes: 100,
+            status: "PENDING",
+        });
+        await expect(service.completeUpload(ctx(), "media_x")).rejects.toThrow(
+            "That file is not a video we can show. Choose an MP4 or MOV.",
+        );
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "media_x" },
+            data: { status: "FAILED" },
+        });
+        expect(update).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "READY" }),
+            }),
+        );
+        expect(deleteObject).toHaveBeenCalledWith(
+            "org/org_1/product-video/evil.mp4",
+        );
+    });
+
+    it("fails a video whose bytes can't be read at all", async () => {
+        const service = new MediaService(fakeStorage());
+        findUnique.mockResolvedValue({
+            id: "media_y",
+            organizationId: "org_1",
+            key: "k.mp4",
+            contentType: "video/quicktime",
+            sizeBytes: 100,
+            status: "PENDING",
+        });
+        await expect(
+            service.completeUpload(ctx(), "media_y"),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "media_y" },
+            data: { status: "FAILED" },
+        });
+    });
+
+    it("won't complete a FAILED upload a second time", async () => {
+        const readObjectStart = jest.fn();
+        const service = new MediaService(fakeStorage({ readObjectStart }));
+        findUnique.mockResolvedValue({
+            id: "media_x",
+            organizationId: "org_1",
+            key: "k.mp4",
+            contentType: "video/mp4",
+            sizeBytes: 100,
+            status: "FAILED",
+        });
+        await expect(
+            service.completeUpload(ctx(), "media_x"),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(readObjectStart).not.toHaveBeenCalled();
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("never sniffs a photo", async () => {
+        const readObjectStart = jest.fn();
+        const service = new MediaService(fakeStorage({ readObjectStart }));
+        findUnique.mockResolvedValue({
+            id: "m1",
+            organizationId: "org_1",
+            key: "a.png",
+            contentType: "image/png",
+            sizeBytes: 10,
+            status: "PENDING",
+        });
+        update.mockResolvedValue({
+            id: "m1",
+            status: "READY",
+            sizeBytes: 10,
+            key: "a.png",
+        });
+        await service.completeUpload(ctx(), "m1");
+        expect(readObjectStart).not.toHaveBeenCalled();
     });
 });
 

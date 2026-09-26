@@ -15,6 +15,7 @@ import {
     customFieldText,
     onTheShop,
 } from "@/lib/products/overview-rules";
+import { untrackedShort } from "@/lib/products/tracking";
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
@@ -26,16 +27,22 @@ export function CustomerView({
     overview,
     storeId,
     canWrite,
+    counts,
+    businessTracks,
 }: {
     overview: ProductOverview;
     storeId: string;
     canWrite: boolean;
+    /** The product counts stock (Track stock, #515). */
+    counts: boolean;
+    /** The business's Track stock switch: off, the editor has no Stock. */
+    businessTracks: boolean;
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
     const money = (a: string) => formatMoneyMajor(a, product.currency) ?? a;
     const edit = (s: EditorSection) => productEditHref(storeId, product.id, s);
-    const data = toShopData(overview);
+    const data = toShopData(overview, counts);
     const live = product.status === "PUBLISHED";
 
     const variantLine = product.variants
@@ -75,15 +82,23 @@ export function CustomerView({
         {
             n: 3,
             title: product.variants.length > 0 ? "Variants and stock" : "Stock",
-            body:
-                variantLine ||
-                (stock.product
-                    ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
-                    : "No stock count — the shop doesn't say how many are left."),
-            action: {
-                label: "Edit",
-                href: edit(product.variants.length > 0 ? "variants" : "stock"),
-            },
+            body: !counts
+                ? untrackedShort(product.storefronts ?? [])
+                : variantLine ||
+                  (stock.product
+                      ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
+                      : "No stock count — the shop doesn't say how many are left."),
+            // The editor's Stock section counts a product that counts
+            // stock; untracked, its Sold out is marked on the Overview.
+            action:
+                product.variants.length > 0
+                    ? { label: "Edit", href: edit("variants") }
+                    : businessTracks && counts
+                      ? { label: "Edit", href: edit("stock") }
+                      : {
+                            label: "Open",
+                            href: productHref(storeId, product.id, "overview"),
+                        },
         },
         {
             n: 4,
@@ -208,8 +223,17 @@ export function CustomerView({
 }
 
 /** The product page's read, as the shop page component takes it. */
-export function toShopData(overview: ProductOverview): ProductPageData {
-    const { product, stock, reviews } = overview;
+export function toShopData(
+    overview: ProductOverview,
+    counts = true,
+): ProductPageData {
+    const { product, reviews } = overview;
+    // Untracked (#515): no count, so the shop says "Sold out" only where
+    // it was marked sold out by hand — at this storefront, every variant.
+    const markedSoldOut = !counts && product.soldOut === true;
+    const stock = counts
+        ? overview.stock
+        : { ...overview.stock, variants: [], product: null };
     const shown = (k: Parameters<typeof onTheShop>[1]) =>
         onTheShop(product.shopFields, k);
     const word = (canSell: number, w: string): StockWord =>
@@ -274,6 +298,9 @@ export function toShopData(overview: ProductOverview): ProductPageData {
             alt: i.alt,
             width: i.width,
             height: i.height,
+            kind: i.kind,
+            durationSec: i.durationSec,
+            posterUrl: i.posterUrl,
         })),
         optionName: product.option?.name ?? null,
         variants: product.variants.map((v) => {
@@ -288,16 +315,22 @@ export function toShopData(overview: ProductOverview): ProductPageData {
                 price: v.price,
                 mrp: v.mrp ?? null,
                 imageId: v.imageId ?? null,
-                stock: line ? word(line.canSell, line.word) : "UNTRACKED",
-                left: line?.canSell ?? null,
+                stock: markedSoldOut
+                    ? "SOLD_OUT"
+                    : line
+                      ? word(line.canSell, line.word)
+                      : "UNTRACKED",
+                left: markedSoldOut ? null : (line?.canSell ?? null),
             };
         }),
-        stock: stock.product
-            ? {
-                  word: word(stock.product.canSell, stock.product.word),
-                  left: stock.product.canSell,
-              }
-            : null,
+        stock: markedSoldOut
+            ? { word: "SOLD_OUT", left: null }
+            : stock.product
+              ? {
+                    word: word(stock.product.canSell, stock.product.word),
+                    left: stock.product.canSell,
+                }
+              : null,
         rating:
             summary && summary.average !== null && summary.count > 0
                 ? { average: summary.average, count: summary.count }

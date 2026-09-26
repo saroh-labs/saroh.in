@@ -61,6 +61,13 @@ export interface OrderLineDto {
     quantity: number;
     /** Units refunded so far (pending or settled). */
     refundedQuantity: number;
+    /**
+     * Units a refund can still put back on the shelf ("Put N back in
+     * stock", #511): what the line sold less what refunds, pending or
+     * settled, put back. 0 before it is handed over, and for a product that
+     * counts no stock.
+     */
+    returnable: number;
     /** Unit price — only with a money read. */
     price?: string;
 }
@@ -227,7 +234,14 @@ export interface RawOrderRead {
             image?: string | null;
             photo?: { url: string } | null;
         } | null;
-        refundLines: { quantity: number; amountCents: number }[];
+        refundLines: {
+            quantity: number;
+            amountCents: number;
+            putBackQuantity?: number;
+        }[];
+        /** What the line took off its shelf when fulfilled (#511). */
+        soldQuantity?: number;
+        stockLevelId?: string | null;
     }[];
     events: {
         id: string;
@@ -275,6 +289,12 @@ export interface ReadOptions {
     now: Date;
     /** Payments on superseded edit charges not yet handed back. */
     owedBack?: { id: string; amountCents: number }[];
+    /**
+     * What each line can put back on the shelf (`returnableUnits`, #511):
+     * counts returns recorded by hand and products that stopped counting.
+     * Without it, sold less what refunds put back.
+     */
+    returnable?: ReadonlyMap<string, number>;
 }
 
 const cents = (v: DecimalLike) => Math.round(Number(v.toString()) * 100);
@@ -393,6 +413,18 @@ export function serializeOrderRead(
             allergens: allergensOf(i.product?.allergens ?? []),
             quantity: i.quantity,
             refundedQuantity: i.refundLines.reduce((s, r) => s + r.quantity, 0),
+            returnable:
+                opts.returnable?.get(i.id) ??
+                (i.stockLevelId
+                    ? Math.max(
+                          0,
+                          (i.soldQuantity ?? 0) -
+                              i.refundLines.reduce(
+                                  (s, r) => s + (r.putBackQuantity ?? 0),
+                                  0,
+                              ),
+                      )
+                    : 0),
             ...(opts.money ? { price: toMoneyString(i.price) } : {}),
         })),
         events: order.events.map((e) => ({

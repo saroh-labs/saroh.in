@@ -2,12 +2,21 @@ import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import Link from "next/link";
 
+import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { onTheShop, ratingLabel } from "@/lib/products/overview-rules";
+import type { ProductTracking, SoldOutPlace } from "@/lib/products/tracking";
+import {
+    BUSINESS_NOT_TRACKING,
+    canMarkSoldOut,
+    TRACKING_LOCKED,
+    untrackedLine,
+} from "@/lib/products/tracking";
 
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
@@ -18,6 +27,8 @@ import {
     SectionTitle,
 } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
+import { SoldOutActions } from "./sold-out-actions";
+import { StartTrackingButton } from "./tracking-actions";
 
 /**
  * The product at a glance. Four numbers a merchant checks first, what is
@@ -29,18 +40,21 @@ export function ProductOverviewTab({
     storeId,
     href,
     categories,
+    tracking,
 }: {
     overview: ProductOverview;
     storeId: string;
     href: (tab: ProductTab) => string;
     categories: { id: string; name: string }[];
+    tracking: ProductTracking;
 }) {
     const { product, stock, orders, reviews, discounts } = overview;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency) ?? amount;
     const edit = (section?: EditorSection) =>
         productEditHref(storeId, product.id, section);
-    const tracked = stock.mode === "variant" || stock.product !== null;
+    const tracked =
+        tracking.counts && (stock.mode === "variant" || stock.product !== null);
 
     return (
         <div className="flex flex-col gap-8">
@@ -49,19 +63,30 @@ export function ProductOverviewTab({
                     overview={overview}
                     edit={edit}
                     canWrite={overview.canWrite}
+                    counts={tracking.counts}
                 />
             ) : null}
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
-                <ProductStat
-                    label="Can be sold now"
-                    value={tracked ? stock.totals.canSell : "—"}
-                    hint={
-                        tracked
-                            ? `${stock.totals.onHand} on hand, ${stock.totals.promised} promised`
-                            : "No stock count yet"
-                    }
-                />
+                {tracking.counts ? (
+                    <ProductStat
+                        label="Can be sold now"
+                        value={tracked ? stock.totals.canSell : "—"}
+                        hint={
+                            tracked
+                                ? `${stock.totals.onHand} on hand, ${stock.totals.promised} promised`
+                                : "No stock count yet"
+                        }
+                    />
+                ) : (
+                    <UntrackedStat
+                        tracking={tracking}
+                        productId={product.id}
+                        storeId={storeId}
+                        places={product.storefronts ?? []}
+                        canMark={canMarkSoldOut(overview)}
+                    />
+                )}
                 <ProductStat
                     label="Variants"
                     value={product.variants.length || "—"}
@@ -257,20 +282,18 @@ export function ProductOverviewTab({
                                     className={
                                         i === 0
                                             ? "relative row-span-2 overflow-hidden rounded-[8px]"
-                                            : "overflow-hidden rounded-[6px]"
+                                            : "relative aspect-[4/3] overflow-hidden rounded-[6px]"
                                     }
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                                    <img
-                                        src={img.url}
+                                    <MediaThumb
+                                        item={img}
                                         alt={img.alt}
+                                        small={i > 0}
                                         className={
-                                            i === 0
-                                                ? "aspect-[4/3] size-full object-cover"
-                                                : "aspect-[4/3] w-full object-cover"
+                                            i === 0 ? "aspect-[4/3]" : undefined
                                         }
                                     />
-                                    {i === 0 ? (
+                                    {i === 0 && img.kind !== "video" ? (
                                         <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
                                             Cover
                                         </span>
@@ -280,11 +303,12 @@ export function ProductOverviewTab({
                         </div>
                     ) : (
                         <div className="grid place-items-center rounded-[8px] border border-dashed border-border px-4 py-10 text-center text-[12.5px] text-muted-foreground">
-                            No photos yet — up to 5, the first is the cover.
+                            No photos yet — up to 15 photos and 3 videos; the
+                            first photo is the cover.
                         </div>
                     )}
                     <p className="pb-3 pt-2 text-[11.5px] text-muted-foreground">
-                        {product.images.length} of 5 photos
+                        {mediaCounter(product.images)}
                     </p>
                 </Card>
             </div>
@@ -363,6 +387,80 @@ export function ProductOverviewTab({
                 </Card>
             </section>
         </div>
+    );
+}
+
+/**
+ * The design's untracked card: "Stock / Not tracked / Available on the
+ * shop." — or "Sold out — marked by hand" (#515), naming the storefronts
+ * when only some are. Track stock is Owner/Admin's, and only while the
+ * business tracks stock; a stock-only role is told why it can't. Marking it
+ * sold out is for anyone who may count stock: one button beside Track stock
+ * with one storefront, a row per storefront with several. Everyone else
+ * sees the state only.
+ */
+function UntrackedStat({
+    tracking,
+    productId,
+    storeId,
+    places,
+    canMark,
+}: {
+    tracking: ProductTracking;
+    productId: string;
+    storeId: string;
+    places: readonly SoldOutPlace[];
+    canMark: boolean;
+}) {
+    const line = untrackedLine(places);
+    const soldOut = line !== "Available on the shop.";
+    const startTracking = tracking.business && tracking.control === "change";
+    const oneButton = canMark && places.length === 1;
+    return (
+        <Card className="rounded-[12px] px-[15px] py-[13px]">
+            <p className="text-[11.5px] text-muted-foreground">Stock</p>
+            <p className="mt-1 font-display text-[18px] font-semibold leading-tight">
+                Not tracked
+            </p>
+            <p
+                className={
+                    soldOut
+                        ? "mt-0.5 text-pretty text-[11.5px] font-medium text-destructive-subtle-foreground"
+                        : "mt-0.5 text-[11.5px] text-muted-foreground"
+                }
+            >
+                {line}
+            </p>
+            {!tracking.business ? (
+                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
+                    {BUSINESS_NOT_TRACKING}
+                </p>
+            ) : tracking.control === "locked" ? (
+                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
+                    {TRACKING_LOCKED}
+                </p>
+            ) : null}
+            {startTracking || oneButton ? (
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {startTracking ? (
+                        <StartTrackingButton
+                            productId={productId}
+                            storeId={storeId}
+                        />
+                    ) : null}
+                    {oneButton ? (
+                        <SoldOutActions productId={productId} places={places} />
+                    ) : null}
+                </div>
+            ) : null}
+            {canMark && places.length > 1 ? (
+                <SoldOutActions
+                    productId={productId}
+                    places={places}
+                    className="mt-2.5 border-t border-border pt-2"
+                />
+            ) : null}
+        </Card>
     );
 }
 

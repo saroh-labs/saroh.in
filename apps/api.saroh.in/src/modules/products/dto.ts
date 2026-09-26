@@ -52,7 +52,15 @@ export const SHOP_FIELDS = [
 ] as const;
 export type ShopField = (typeof SHOP_FIELDS)[number];
 
-export const PRODUCT_IMAGE_LIMIT = 5;
+/** Photos and videos a product can carry (#517). */
+export const PRODUCT_IMAGE_LIMIT = 15;
+export const PRODUCT_VIDEO_LIMIT = 3;
+export const PRODUCT_MEDIA_KINDS = ["photo", "video"] as const;
+export type ProductMediaKind = (typeof PRODUCT_MEDIA_KINDS)[number];
+
+/** What the merchant reads when a limit is reached. */
+export const PHOTO_LIMIT_MESSAGE = `Already ${PRODUCT_IMAGE_LIMIT} photos — take one off first.`;
+export const VIDEO_LIMIT_MESSAGE = `Already ${PRODUCT_VIDEO_LIMIT} videos — take one off first.`;
 
 /** Limits the editor shows as counters; the API is the authority. */
 export const DETAIL_LIMITS = {
@@ -424,13 +432,41 @@ export class ProductImageInput {
     @ValidateIf((_o, v) => v !== null)
     @IsUrl({ protocols: ["https"], require_protocol: true })
     creditUrl?: string | null;
+
+    /**
+     * "photo" (the default) or "video". A new video comes from an uploaded
+     * MP4 or MOV (mediaId); a kept item keeps the kind it has.
+     */
+    @IsOptional()
+    @IsIn(PRODUCT_MEDIA_KINDS, {
+        message: "A media item is a photo or a video",
+    })
+    kind?: ProductMediaKind;
+
+    /** A video's length in whole seconds, read on the device. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsInt()
+    @Min(0)
+    @Max(24 * 60 * 60)
+    durationSec?: number | null;
+
+    /**
+     * A video's poster: a READY image from the library. Never an address —
+     * a poster is shown on the shop, so it comes from storage like the video.
+     * Null takes the poster off a kept video.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsString()
+    posterMediaId?: string | null;
 }
 
-/** The whole ordered set; the first is the cover. */
+/** The whole ordered set; the first photo is the cover. */
 export class ReplaceProductImagesDto {
     @IsArray()
-    @ArrayMaxSize(PRODUCT_IMAGE_LIMIT, {
-        message: `A product can have ${PRODUCT_IMAGE_LIMIT} photos at most — take one off first.`,
+    @ArrayMaxSize(PRODUCT_IMAGE_LIMIT + PRODUCT_VIDEO_LIMIT, {
+        message: `A product can have ${PRODUCT_IMAGE_LIMIT} photos and ${PRODUCT_VIDEO_LIMIT} videos at most — take one off first.`,
     })
     @ValidateNested({ each: true })
     @Type(() => ProductImageInput)

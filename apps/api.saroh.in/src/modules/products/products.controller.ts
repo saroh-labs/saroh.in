@@ -29,9 +29,12 @@ import { ProductOverviewService } from "./product-overview.service";
 import { ProductsService } from "./products.service";
 
 /**
- * Product catalog endpoints, scoped to a store. The caller is the session user
- * (BetterAuthGuard → @CurrentUser); ProductsService delegates authorization to
- * the store membership rules (read = access, write = canWrite).
+ * The old per-storefront product addresses, kept for one release (#531):
+ * `OrganizationProductsController` (organizations/:organizationId/products)
+ * is the business's catalogue now, and these are its aliases. Each resolves
+ * the product through the storefront, under the storefront's own access
+ * rules (the session user via BetterAuthGuard → @CurrentUser; read =
+ * access, write = canWrite), and calls the same service.
  */
 @Controller("stores/:storeId/products")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
@@ -120,6 +123,17 @@ export class ProductsController {
         @Body() dto: UpdateProductDto,
     ) {
         return this.products.update(storeId, productId, user.id, dto);
+    }
+
+    /** A draft copy of the product (#518). */
+    @Post(":productId/duplicate")
+    @HttpCode(201)
+    duplicate(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.products.duplicate(storeId, productId, user.id);
     }
 
     @Delete(":productId")

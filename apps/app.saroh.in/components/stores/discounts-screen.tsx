@@ -48,7 +48,7 @@ const FILTERS: DataFilter<Discount>[] = [
  * ends, and its state.
  *
  * A code belongs to the business; what it applies to — everything, some
- * storefronts, collections or products — is part of the code, not a scope
+ * storefronts, categories or products — is part of the code, not a scope
  * the screen follows.
  */
 export function DiscountsScreen({
@@ -156,7 +156,7 @@ export function DiscountsScreen({
                 emptyState={{
                     icon: <TicketPercent />,
                     title: "No discount codes yet",
-                    note: "A code takes money off an order — from everything, or just the storefronts, collections or products you choose.",
+                    note: "A code takes money off an order — from everything, or just the storefronts, categories or products you choose.",
                     action: canWrite ? (
                         <Button asChild>
                             <Link href="/commerce/discounts/new">

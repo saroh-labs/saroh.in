@@ -57,17 +57,17 @@ each with why it stops there:
   rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
   hand behind one controller. Under 400 means one injectable per feature and
   a controller and DI change, not a move.
-- `bookings/public-bookings.service.ts` (464) and `bookings/reservation.ts`
+- `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
   (418) — one class sharing its rate limiters, and one serializable write
   with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (626) — its state, effects
+- `site-blocks/src/booking-flow/booking-flow.tsx` (643) — its state, effects
   and handlers (the hold poll, confirm, letting a hold go) share one
   component's state; the drawing is already in `steps/`. Less means a
   reducer or hook seam, which is new logic.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
-  `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
-- `organizations/organization-settings-form.tsx` (1,250) — one form holds
+  `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
+- `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
@@ -78,17 +78,64 @@ each with why it stops there:
   member drawer and the invite dialog share the screen's roster and role
   state. Each piece is its own function already; moving them is a file split
   with props threaded through, not yet done.
-- `shared/nav-items.tsx` (1,117) — the nav's data (`NAV_GROUPS`,
+- `shared/nav-items.tsx` (1,140) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
 - `modules/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
 
-Split rather than listed: `providers/provider-list.tsx` (435) along its rows,
-which went to `provider-row.tsx`; and `lib/settings/activity.ts` (451) along
-its own seam — what a save recorded and the words for it went to
-`activity-changes.ts`, leaving the line an event becomes.
+Added or grown past 400 by the Products and Stock release (#510–#531), each
+with why it stops there:
+
+- `stock/stock.service.ts` (1,106) — the stock module's one writer: every
+  shelf change (count, received, wasted, returned, move, undo, and the
+  order flows' sale and return) goes through `recordEntry` or the batched
+  count and undo, under one set of lock and below-zero rules. It also finds
+  and creates rows under the product's lock. Row resolution, the batch
+  writers and the order flows' writers are each a seam. Splitting them
+  means exporting the private `Row` and lock helpers across files, and it
+  hasn't been done yet.
+- `stock/reserve.ts` (901) — every hold, release, sale, kitchen undo and
+  refund put-back an order makes, plus `reserveOnPayment`. They share one
+  line loader, one lock order and the invariant (promised = sum of held).
+  Online payment (`reserveOnPayment`) is the natural cut once the online
+  checkout calls it.
+- `collections/collections.service.ts` (803) — hand-picked and automatic
+  collections, their products and a product's collections, around the one
+  category tree. The product page's reads (`forProduct`, `setForProduct`)
+  could move to their own service, as the controller's product routes
+  already are.
+- `stock/stock-reads.service.ts` (486) and `stock/stock-checks.service.ts`
+  (418) — the Stock screen's levels and log, and its four checks. Each is
+  one reader. A little over, and cutting one splits a query from the words
+  it builds.
+- `products/serialize.ts` (596), `products/inventory.service.ts` (545) and
+  `products/variants.service.ts` (474) — grew with listings, stock per
+  storefront, Track stock and the per-variant switch. `inventory.service`'s
+  first switch (`switchStore`) and `serialize`'s stock words are the seams.
+  Moving them is a file split with nothing to gain until they change again.
+- `products/products.service.ts` (904; 648 before this release) and
+  `stores/stores.service.ts` (411) — the catalogue's reads and section
+  saves, now business-wide with listings and the delete guard; and a
+  storefront's create with its caps and, now, the business's currency. The
+  catalogue list read and the storefront caps are the seams; a little over
+  for the second, and not yet cut for the first.
+- `backfill/catalogue-settings.ts` (624), `backfill/merge-same-products.ts`
+  (493), `backfill/merge-same-products.move.ts` (523),
+  `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
+  (481) — one-off backfills, each one exported unit that the integration
+  suite runs twice. The merge is already split, into deciding and moving.
+- `sites/media-picker.tsx` (509) — the media library dialog. Photos and
+  videos (#517) added the video rules and the poster frame to its one
+  upload state. Less means an upload hook, which is new logic.
+
+Split rather than listed: `providers/provider-list.tsx` (435 before; 120
+now) along its rows, which went to `provider-row.tsx` (331); and
+`lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
+along its own seam — what a save recorded, the counts a stock line says and
+the words for them went to `activity-changes.ts` (265), leaving the line an
+event becomes.
 
 ## 7. No `any`, no `@ts-ignore`
 

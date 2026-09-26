@@ -24,6 +24,7 @@ import {
 } from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto } from "./dto";
 import {
     adjustReservation,
@@ -32,6 +33,7 @@ import {
 } from "./order-inventory";
 import {
     fromCents,
+    notSold,
     priceOrderLines,
     toCents,
     withGstRates,
@@ -109,6 +111,10 @@ export class OrderKitchenService {
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
+            // The refund sheet's "Put N back in stock" (a money reader's).
+            ...(money
+                ? { returnable: await returnableUnits(prisma, order.id) }
+                : {}),
         });
     }
 
@@ -147,6 +153,7 @@ export class OrderKitchenService {
                 order.items,
                 phaseOf(move.fromStatus),
                 phaseOf(move.toStatus),
+                ctx.userId,
             );
             await tx.order.update({
                 where: { id: order.id },
@@ -224,6 +231,7 @@ export class OrderKitchenService {
                 order.items,
                 phaseOf(order.status),
                 phaseOf(back.status),
+                ctx.userId,
             );
             await tx.order.update({
                 where: { id: order.id },
@@ -376,6 +384,11 @@ export class OrderKitchenService {
                 }
                 const delta = change.quantity - item.quantity;
                 if (delta === 0) continue;
+                // Nobody orders more of a product set to Not sold, staff
+                // included (DEC-032); lowering or removing its line is fine.
+                if (delta > 0 && item.product.status === "ARCHIVED") {
+                    throw new ConflictException(notSold(item.product.name));
+                }
                 const unit = toCents(item.price.toString());
                 subtotalCents += delta * unit;
                 corrections.push({
@@ -756,7 +769,11 @@ const READ_INCLUDE = {
             },
             refundLines: {
                 where: { paymentRefund: { status: { not: "FAILED" } } },
-                select: { quantity: true, amountCents: true },
+                select: {
+                    quantity: true,
+                    amountCents: true,
+                    putBackQuantity: true,
+                },
             },
         },
     },
@@ -810,7 +827,7 @@ async function lockOrder(
             items: {
                 orderBy: { id: "asc" },
                 include: {
-                    product: { select: { name: true } },
+                    product: { select: { name: true, status: true } },
                     refundLines: {
                         where: {
                             paymentRefund: { status: { not: "FAILED" } },

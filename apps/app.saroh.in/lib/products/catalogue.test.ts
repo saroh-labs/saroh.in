@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogueRow } from "./catalogue";
-import { inStorefront, mergeCatalogue } from "./catalogue";
-import type { ProductListItem } from "./service";
+import { catalogueRows, inStorefront } from "./catalogue";
+import type { CatalogueProduct } from "./service";
 
 function product(
-    over: Partial<ProductListItem> & { id: string; storeId: string },
-): ProductListItem {
+    over: Partial<CatalogueProduct> & { id: string },
+): CatalogueProduct {
     return {
+        storeId: "market",
         name: "Sourdough loaf",
         slug: "sourdough",
         description: null,
@@ -20,7 +21,21 @@ function product(
         variantCount: 2,
         sku: "SD-800",
         variants: [],
-        inventory: { quantity: 42, lowStockAlert: 5 },
+        inventory: { quantity: 72, promised: 0, lowStockAlert: 5 },
+        listings: [
+            {
+                storeId: "market",
+                storeName: "Market Street",
+                inventory: { quantity: 42, promised: 0, lowStockAlert: 5 },
+                variants: [],
+            },
+            {
+                storeId: "online",
+                storeName: "Online",
+                inventory: { quantity: 30, promised: 0, lowStockAlert: 10 },
+                variants: [],
+            },
+        ],
         ...over,
     };
 }
@@ -34,98 +49,138 @@ function only(rows: CatalogueRow[]): CatalogueRow {
     return row;
 }
 
-const STORES = [
-    { id: "market", name: "Market Street" },
-    { id: "online", name: "Online" },
-];
-
-describe("mergeCatalogue", () => {
-    it("makes one row of a SKU sold in two storefronts", () => {
-        const rows = mergeCatalogue(STORES, {
-            market: [product({ id: "p1", storeId: "market" })],
-            online: [
-                product({
-                    id: "p9",
-                    storeId: "online",
-                    price: "5.20",
-                    inventory: { quantity: 30, lowStockAlert: 10 },
-                    updatedAt: "2026-09-18T08:02:00.000Z",
-                }),
-            ],
-        });
-        const row = only(rows);
+describe("catalogueRows (#531)", () => {
+    it("is one row per catalogue product, naming every storefront that sells it", () => {
+        const row = only(catalogueRows([product({ id: "p1" })]));
+        expect(row.key).toBe("p1");
         expect(row.places.map((p) => p.storeName)).toEqual([
             "Market Street",
             "Online",
         ]);
-        // Price differs by storefront: say "varies", never pick a winner.
-        expect(row.varies).toBe(true);
         expect(row.stock).toBe(72);
         expect(row.lowStockAlert).toBe(5);
-        expect(row.updatedAt).toBe("2026-09-18T08:02:00.000Z");
     });
 
-    it("keeps a product with no SKU as its own row", () => {
-        const rows = mergeCatalogue(STORES, {
-            market: [product({ id: "a", storeId: "market", sku: null })],
-            online: [product({ id: "b", storeId: "online", sku: null })],
-        });
-        expect(rows).toHaveLength(2);
+    it("never merges two products, even with the same SKU", () => {
+        const rows = catalogueRows([
+            product({ id: "a" }),
+            product({ id: "b" }),
+        ]);
+        expect(rows.map((r) => r.key)).toEqual(["a", "b"]);
     });
 
-    it("is live when live anywhere, archived only when archived everywhere", () => {
-        const mixed = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({ id: "p1", storeId: "market", status: "DRAFT" }),
-                ],
-                online: [product({ id: "p2", storeId: "online" })],
-            }),
-        );
-        expect(mixed.status).toBe("PUBLISHED");
-        const gone = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({
-                        id: "p1",
-                        storeId: "market",
-                        status: "ARCHIVED",
-                    }),
-                ],
-                online: [
-                    product({ id: "p2", storeId: "online", status: "DRAFT" }),
-                ],
-            }),
-        );
-        expect(gone.status).toBe("DRAFT");
-    });
-
-    it("reads stock as unknown when no place tracks it", () => {
+    it("reads stock as unknown when no storefront tracks it", () => {
         const row = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({ id: "p1", storeId: "market", inventory: null }),
-                ],
-            }),
+            catalogueRows([
+                product({
+                    id: "p1",
+                    listings: [
+                        {
+                            storeId: "market",
+                            storeName: "Market Street",
+                            inventory: null,
+                            variants: [],
+                        },
+                    ],
+                }),
+            ]),
         );
         expect(row.stock).toBeNull();
+        expect(row.lowStockAlert).toBeNull();
+    });
+
+    it("keeps a product no storefront sells just now", () => {
+        const row = only(catalogueRows([product({ id: "p1", listings: [] })]));
+        expect(row.places).toEqual([]);
+        expect(row.stock).toBeNull();
+    });
+
+    it("is in a collection when it has a category", () => {
+        expect(
+            only(catalogueRows([product({ id: "p1", categoryId: "c1" })]))
+                .inCollection,
+        ).toBe(true);
     });
 });
 
 describe("inStorefront", () => {
-    it("shows one storefront's price and stock, and keeps where it is sold", () => {
-        const row = only(
-            mergeCatalogue(STORES, {
-                market: [product({ id: "p1", storeId: "market" })],
-                online: [
-                    product({ id: "p2", storeId: "online", price: "5.20" }),
-                ],
-            }),
-        );
+    it("filters by listing: that storefront's stock, and still where it is sold", () => {
+        const row = only(catalogueRows([product({ id: "p1" })]));
         const online = inStorefront(row, "online");
-        expect(online?.price).toBe("5.20");
+        expect(online?.stock).toBe(30);
+        expect(online?.lowStockAlert).toBe(10);
         expect(online?.places).toHaveLength(2);
-        expect(online?.varies).toBe(true);
         expect(inStorefront(row, "elsewhere")).toBeNull();
+    });
+
+    it("is the whole row for a business with one storefront", () => {
+        const row = only(
+            catalogueRows([
+                product({
+                    id: "p1",
+                    listings: [
+                        {
+                            storeId: "market",
+                            storeName: "Market Street",
+                            inventory: {
+                                quantity: 42,
+                                promised: 0,
+                                lowStockAlert: 5,
+                            },
+                            variants: [],
+                        },
+                    ],
+                }),
+            ]),
+        );
+        expect(inStorefront(row, "market")).toEqual(row);
+    });
+});
+
+describe("sold out by hand (#515)", () => {
+    const untracked = (soldOut: [boolean, boolean]) =>
+        product({
+            id: "cake",
+            inventory: null,
+            listings: [
+                {
+                    storeId: "market",
+                    storeName: "Market Street",
+                    inventory: null,
+                    soldOut: soldOut[0],
+                    variants: [],
+                },
+                {
+                    storeId: "online",
+                    storeName: "Online",
+                    inventory: null,
+                    soldOut: soldOut[1],
+                    variants: [],
+                },
+            ],
+        });
+
+    it("reads Sold out only where every storefront marked it", () => {
+        expect(only(catalogueRows([untracked([true, true])])).soldOut).toBe(
+            true,
+        );
+        expect(only(catalogueRows([untracked([true, false])])).soldOut).toBe(
+            false,
+        );
+        expect(only(catalogueRows([untracked([false, false])])).stock).toBe(
+            null,
+        );
+    });
+
+    it("reads it per storefront under the storefront filter", () => {
+        const row = only(catalogueRows([untracked([true, false])]));
+        expect(inStorefront(row, "market")?.soldOut).toBe(true);
+        expect(inStorefront(row, "online")?.soldOut).toBe(false);
+    });
+
+    it("never calls a counted product sold out by hand", () => {
+        expect(only(catalogueRows([product({ id: "p1" })])).soldOut).toBe(
+            false,
+        );
     });
 });

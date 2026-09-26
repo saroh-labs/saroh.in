@@ -22,6 +22,13 @@ jest.mock("../invoices/order-invoicing", () => ({
     settleSupplementaryInvoices: jest.fn().mockResolvedValue(0),
 }));
 
+// The shelf a confirmed refund moves (#511) is specced against a real
+// database (stock/reserve.db.spec.ts); here each call is recorded.
+jest.mock("../stock/reserve", () => ({
+    lockOrderShelves: jest.fn().mockResolvedValue(undefined),
+    settleRefundStock: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -76,6 +83,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
+import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -386,11 +394,26 @@ describe("WebhooksService refund settlement", () => {
         });
 
         expect(result).toEqual({ status: "processed", changed: true });
-        expect(queryRaw).toHaveBeenCalledTimes(1); // the row's lock
+        // The order's lock, then the refund row's (#511: Order →
+        // StockLevel → PaymentRefund).
+        expect(queryRaw).toHaveBeenCalledTimes(2);
+        expect(lockOrderShelves).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+        );
         expect(refundUpdate).toHaveBeenCalledWith({
             where: { id: "rf_1" },
             data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
         });
+        // Moved into SUCCEEDED here, so the shelf follows — once.
+        expect(settleRefundStock).toHaveBeenCalledTimes(1);
+        expect(settleRefundStock).toHaveBeenCalledWith(
+            expect.anything(),
+            "rf_1",
+            {
+                orderFullyRefunded: true,
+            },
+        );
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
             data: { paymentStatus: "REFUNDED" },
@@ -453,6 +476,8 @@ describe("WebhooksService refund settlement", () => {
         expect(result).toEqual({ status: "ignored", changed: false });
         expect(refundUpdate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+        // A redelivery moves no stock: it settled the first time.
+        expect(settleRefundStock).not.toHaveBeenCalled();
     });
 
     it("arriving before the refund path stored the provider's id, it settles Saroh's row by its reference and writes the REFUND step once", async () => {

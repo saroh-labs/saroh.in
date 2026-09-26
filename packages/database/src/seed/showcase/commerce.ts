@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
+import { listProductAt, setStockLevel } from "../helpers";
 import type { CatalogProduct } from "./data";
 import { addMinutes, daysBetween, earliest, istAt, istWeekday } from "./people";
 import type { Rng } from "./random";
@@ -26,9 +27,9 @@ export interface SellableProduct {
 }
 
 /**
- * Upsert products with their variants and stock, keyed on `(storeId, slug)` as
- * the base seed keys them — so a product the base seed already wrote is never
- * duplicated.
+ * Upsert products with their variants, their listing at the storefront and
+ * their stock there, keyed on the business and slug as the base seed keys
+ * them — so a product the base seed already wrote is never duplicated.
  */
 export async function upsertCatalog(
     prisma: Db,
@@ -40,7 +41,9 @@ export async function upsertCatalog(
         products: readonly CatalogProduct[];
         productId: (i: number) => string;
         variantId: (i: number, v: number) => string;
-        inventoryId: (i: number) => string;
+        listingId: (i: number) => string;
+        listingVariantId: (i: number, v: number) => string;
+        stockLevelId: (i: number) => string;
         createdAt: (i: number) => Date;
     },
 ): Promise<SellableProduct[]> {
@@ -54,7 +57,12 @@ export async function upsertCatalog(
             batch.map(async (p, j) => {
                 const i = k + j;
                 const product = await prisma.product.upsert({
-                    where: { storeId_slug: { storeId, slug: p.slug } },
+                    where: {
+                        organizationId_slug: {
+                            organizationId: orgId,
+                            slug: p.slug,
+                        },
+                    },
                     update: {
                         name: p.name,
                         price: p.price,
@@ -75,9 +83,10 @@ export async function upsertCatalog(
                         createdAt: options.createdAt(i),
                     },
                 });
+                const variantIds: string[] = [];
                 for (let v = 0; v < p.variants.length; v++) {
                     const variant = p.variants[v];
-                    await prisma.productVariant.upsert({
+                    const row = await prisma.productVariant.upsert({
                         where: {
                             productId_sku: {
                                 productId: product.id,
@@ -93,17 +102,28 @@ export async function upsertCatalog(
                             price: variant.price,
                         },
                     });
+                    variantIds.push(row.id);
                 }
-                await prisma.inventory.upsert({
-                    where: { productId: product.id },
-                    update: { quantity: p.stock },
-                    create: {
-                        id: options.inventoryId(i),
-                        productId: product.id,
-                        storeId,
-                        organizationId: orgId,
-                        quantity: p.stock,
-                    },
+                await listProductAt(prisma, {
+                    id: options.listingId(i),
+                    orgId,
+                    storeId,
+                    productId: product.id,
+                    variants: variantIds.map((variantId, v) => ({
+                        id: options.listingVariantId(i, v),
+                        variantId,
+                    })),
+                });
+                // Counted as a whole, as the base seed counts its products.
+                // `stock` is what the storefront can sell; the caller's open
+                // orders hold on top of it (holdOpenLines).
+                await setStockLevel(prisma, {
+                    id: options.stockLevelId(i),
+                    orgId,
+                    storeId,
+                    productId: product.id,
+                    onHand: p.stock,
+                    promised: 0,
                 });
                 return {
                     id: product.id,

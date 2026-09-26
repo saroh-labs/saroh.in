@@ -1,8 +1,9 @@
 /**
  * What a settings save recorded, and how a sentence says it: every field's
  * phrase, label and Business tab, the values a save kept (#509), and the
- * words for one field changed or several. Pure; `activity.ts` builds the
- * Activity line from these, and `activity-detail.ts` the sheet.
+ * words for one field changed or several, and the counts a stock line
+ * says (#515). Pure; `activity.ts` builds the Activity line from these, and
+ * `activity-detail.ts` the sheet.
  */
 
 /** The Business settings tab a field is on. */
@@ -115,6 +116,16 @@ export const record = (value: unknown): Record<string, unknown> =>
 
 export const text = (value: unknown): string | null =>
     typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+
+/** A whole count the stream recorded, or `null` (#515's stock lines). */
+export const countOf = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value >= 0
+        ? value
+        : null;
+
+/** "1 storefront", "2 storefronts", with Indian digit grouping. */
+export const counted = (n: number, one: string, many = `${one}s`): string =>
+    `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
 
 /** A value as recorded: plain, or nothing. */
 export type ChangeValue = string | number | boolean | null;

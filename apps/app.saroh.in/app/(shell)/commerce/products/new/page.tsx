@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "New product" };
@@ -26,9 +27,7 @@ export default async function NewProductPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     if (store) {
         const context = await loadEditorContext(store);

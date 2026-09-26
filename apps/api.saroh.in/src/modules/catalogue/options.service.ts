@@ -1,12 +1,10 @@
 import {
-    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { StoresService } from "../stores/stores.service";
 import type {
     AddOptionValueDto,
     CreateOptionDto,
@@ -23,7 +21,7 @@ export interface OptionView {
 }
 
 /**
- * Store-wide variant options ("Size", "Shade") and their values. A product
+ * The business's variant options ("Size", "Shade") and their values (#529). A product
  * picks one option; its variants each pick a value. Names and values are
  * unique ignoring case. Anything in use says so rather than disappearing:
  * an option a product uses cannot be deleted, a value a variant uses cannot
@@ -31,16 +29,9 @@ export interface OptionView {
  */
 @Injectable()
 export class OptionsService {
-    constructor(private readonly stores: StoresService) {}
-
-    async list(storeId: string, userId: string): Promise<OptionView[]> {
-        await this.stores.getForUser(storeId, userId);
-        return this.views(storeId);
-    }
-
-    async views(storeId: string): Promise<OptionView[]> {
+    async views(organizationId: string): Promise<OptionView[]> {
         const options = await prisma.productOption.findMany({
-            where: { storeId },
+            where: { organizationId },
             orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             select: {
                 id: true,
@@ -70,18 +61,16 @@ export class OptionsService {
         }));
     }
 
-    async create(storeId: string, userId: string, dto: CreateOptionDto) {
-        const organizationId = await this.requireOrg(storeId, userId);
-        await this.assertNameFree(storeId, dto.name);
+    async create(organizationId: string, dto: CreateOptionDto) {
+        await this.assertNameFree(organizationId, dto.name);
         const values = uniqueValues(dto.values ?? []);
         const last = await prisma.productOption.findFirst({
-            where: { storeId },
+            where: { organizationId },
             orderBy: { position: "desc" },
             select: { position: true },
         });
         const option = await prisma.productOption.create({
             data: {
-                storeId,
                 organizationId,
                 name: dto.name,
                 position: (last?.position ?? -1) + 1,
@@ -99,14 +88,12 @@ export class OptionsService {
     }
 
     async rename(
-        storeId: string,
+        organizationId: string,
         optionId: string,
-        userId: string,
         dto: RenameOptionDto,
     ) {
-        await this.requireOrg(storeId, userId);
-        const option = await this.requireOption(storeId, optionId);
-        await this.assertNameFree(storeId, dto.name, optionId);
+        const option = await this.requireOption(organizationId, optionId);
+        await this.assertNameFree(organizationId, dto.name, optionId);
         await prisma.productOption.update({
             where: { id: optionId },
             data: { name: dto.name },
@@ -115,10 +102,9 @@ export class OptionsService {
     }
 
     /** Refused while a product chooses by it; returns what it was, for Undo. */
-    async remove(storeId: string, optionId: string, userId: string) {
-        await this.requireOrg(storeId, userId);
+    async remove(organizationId: string, optionId: string) {
         const option = await prisma.productOption.findFirst({
-            where: { id: optionId, storeId },
+            where: { id: optionId, organizationId },
             select: {
                 id: true,
                 name: true,
@@ -146,13 +132,11 @@ export class OptionsService {
     }
 
     async addValue(
-        storeId: string,
+        organizationId: string,
         optionId: string,
-        userId: string,
         dto: AddOptionValueDto,
     ) {
-        const organizationId = await this.requireOrg(storeId, userId);
-        await this.requireOption(storeId, optionId);
+        await this.requireOption(organizationId, optionId);
         const clash = await prisma.productOptionValue.findFirst({
             where: {
                 optionId,
@@ -185,13 +169,11 @@ export class OptionsService {
 
     /** Refused while a variant uses it; returns the value, for Undo. */
     async removeValue(
-        storeId: string,
+        organizationId: string,
         optionId: string,
         valueId: string,
-        userId: string,
     ) {
-        await this.requireOrg(storeId, userId);
-        await this.requireOption(storeId, optionId);
+        await this.requireOption(organizationId, optionId);
         const value = await prisma.productOptionValue.findFirst({
             where: { id: valueId, optionId },
             select: {
@@ -211,23 +193,9 @@ export class OptionsService {
         return { id: valueId, value: value.value };
     }
 
-    private async requireOrg(storeId: string, userId: string): Promise<string> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (writable === null) throw new NotFoundException("Store not found");
-        if (!writable.organizationId) {
-            throw new BadRequestException(
-                "This storefront is not attached to a business, so it can't have options.",
-            );
-        }
-        return writable.organizationId;
-    }
-
-    private async requireOption(storeId: string, optionId: string) {
+    private async requireOption(organizationId: string, optionId: string) {
         const option = await prisma.productOption.findFirst({
-            where: { id: optionId, storeId },
+            where: { id: optionId, organizationId },
             select: { id: true, name: true },
         });
         if (!option) throw new NotFoundException("Option not found");
@@ -235,13 +203,13 @@ export class OptionsService {
     }
 
     private async assertNameFree(
-        storeId: string,
+        organizationId: string,
         name: string,
         exceptId?: string,
     ): Promise<void> {
         const clash = await prisma.productOption.findFirst({
             where: {
-                storeId,
+                organizationId,
                 name: { equals: name, mode: "insensitive" },
                 ...(exceptId ? { id: { not: exceptId } } : {}),
             },

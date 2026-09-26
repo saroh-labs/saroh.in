@@ -32,7 +32,10 @@ export const LIMITS = {
     seoTitle: 70,
     seoDescription: 160,
     alt: 250,
-    photos: 5,
+    photos: 15,
+    videos: 3,
+    // 50 MB, as the API signs a video upload for.
+    videoBytes: 50 * 1024 * 1024,
     sku: 100,
     variantTitle: 150,
 } as const;
@@ -344,6 +347,7 @@ export type VisibilityValues = z.infer<typeof visibilitySchema>;
 
 // ---- Photos ----
 
+/** One photo or video in the set (#517); a draft without a kind is a photo. */
 export interface PhotoDraft {
     /** Set for a photo already on the product. */
     id?: string;
@@ -354,6 +358,16 @@ export interface PhotoDraft {
     height: number | null;
     creditName: string | null;
     creditUrl: string | null;
+    kind?: "photo" | "video";
+    /** A video's length in seconds. */
+    durationSec?: number | null;
+    /** A video's poster: a library image, and where it is shown from. */
+    posterMediaId?: string | null;
+    posterUrl?: string | null;
+}
+
+export function isVideo(p: Pick<PhotoDraft, "kind">): boolean {
+    return p.kind === "video";
 }
 
 export function photosFrom(images: ProductImage[]): PhotoDraft[] {
@@ -366,31 +380,100 @@ export function photosFrom(images: ProductImage[]): PhotoDraft[] {
         height: i.height,
         creditName: i.creditName,
         creditUrl: i.creditUrl,
+        kind: i.kind === "video" ? "video" : "photo",
+        durationSec: i.durationSec ?? null,
+        posterMediaId: i.posterMediaId ?? null,
+        posterUrl: i.posterUrl ?? null,
     }));
 }
 
-/** What the photo set's save sends: a kept photo by id, a new one by its source. */
+/** What the media set's save sends: a kept item by id, a new one by its source. */
 export function photosInput(photos: PhotoDraft[]) {
     return photos.map((p) =>
         p.id
             ? { id: p.id, alt: p.alt }
-            : {
-                  ...(p.mediaId ? { mediaId: p.mediaId } : { url: p.url }),
-                  alt: p.alt,
-                  ...(p.width ? { width: p.width } : {}),
-                  ...(p.height ? { height: p.height } : {}),
-                  creditName: p.creditName,
-                  creditUrl: p.creditUrl,
-              },
+            : isVideo(p)
+              ? {
+                    kind: "video" as const,
+                    mediaId: p.mediaId ?? "",
+                    alt: p.alt,
+                    ...(p.durationSec != null
+                        ? { durationSec: p.durationSec }
+                        : {}),
+                    ...(p.posterMediaId
+                        ? { posterMediaId: p.posterMediaId }
+                        : {}),
+                }
+              : {
+                    ...(p.mediaId ? { mediaId: p.mediaId } : { url: p.url }),
+                    alt: p.alt,
+                    ...(p.width ? { width: p.width } : {}),
+                    ...(p.height ? { height: p.height } : {}),
+                    creditName: p.creditName,
+                    creditUrl: p.creditUrl,
+                },
     );
 }
 
-/** The same photos, in the same order, with the same words? */
+/** The same photos and videos, in the same order, with the same words? */
 export function samePhotos(a: PhotoDraft[], b: PhotoDraft[]): boolean {
     return (
         a.length === b.length &&
         a.every((p, i) => p.url === b[i]?.url && p.alt === b[i]?.alt)
     );
+}
+
+/** How many of each the set holds. */
+export function mediaCounts(items: PhotoDraft[]): {
+    photos: number;
+    videos: number;
+} {
+    const videos = items.filter(isVideo).length;
+    return { photos: items.length - videos, videos };
+}
+
+/** "3 of 15 photos · 1 of 3 videos". */
+export function mediaCounter(items: PhotoDraft[]): string {
+    const { photos, videos } = mediaCounts(items);
+    return `${photos} of ${LIMITS.photos} photos · ${videos} of ${LIMITS.videos} videos`;
+}
+
+export const PHOTOS_FULL_MESSAGE = `Already ${LIMITS.photos} photos — take one off first.`;
+export const VIDEOS_FULL_MESSAGE = `Already ${LIMITS.videos} videos — take one off first.`;
+export const NOT_MEDIA_MESSAGE =
+    "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
+export const VIDEO_TOO_BIG_MESSAGE =
+    "That video is over 50 MB. Keep it under a minute, or export it smaller.";
+
+/** The two video types a product takes; the API checks the bytes too. */
+export const VIDEO_TYPES = ["video/mp4", "video/quicktime"] as const;
+/** For a file input: photos, MP4 and MOV. */
+export const MEDIA_ACCEPT = "image/*,video/mp4,video/quicktime,.mov";
+
+/**
+ * Why a picked file can't go on the product, in the words the editor shows —
+ * or "" when it can. Checked before anything is uploaded.
+ */
+export function mediaFileProblem(
+    file: { type: string; size: number },
+    items: PhotoDraft[],
+): string {
+    const video = (VIDEO_TYPES as readonly string[]).includes(file.type);
+    if (!video && !file.type.startsWith("image/")) return NOT_MEDIA_MESSAGE;
+    const { photos, videos } = mediaCounts(items);
+    if (video) {
+        if (videos >= LIMITS.videos) return VIDEOS_FULL_MESSAGE;
+        if (file.size > LIMITS.videoBytes) return VIDEO_TOO_BIG_MESSAGE;
+        return "";
+    }
+    return photos >= LIMITS.photos ? PHOTOS_FULL_MESSAGE : "";
+}
+
+/** A video's length as its badge shows it: "0:24", "1:05". */
+export function formatDuration(seconds: number | null | undefined): string {
+    if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "";
+    const whole = Math.round(seconds);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 // ---- Stock ----
@@ -538,7 +621,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
     description: "Description",
     details: "How to use and ingredients",
     madeby: "Made by and returns",
-    photos: "Photos",
+    photos: "Photos and videos",
     visibility: "Visibility",
     variants: "Variants",
     stock: "Stock",

@@ -27,6 +27,12 @@ export type OrgAction =
     | "store:read"
     | "store:write"
     | "store:delete"
+    // Count and move stock (#513): counts, received/baked/wasted entries,
+    // moves between storefronts, undoing them, warning levels. Narrower than
+    // `store:write` — prices, names, listings and tracking stay there — and
+    // implied by it (`resolveCapabilities`), so whoever changes storefronts
+    // can still count.
+    | "inventory:write"
     | "site:create"
     | "site:read"
     | "site:update"
@@ -119,6 +125,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "store:read",
     "store:write",
     "store:delete",
+    "inventory:write",
     "site:create",
     "site:read",
     "site:update",

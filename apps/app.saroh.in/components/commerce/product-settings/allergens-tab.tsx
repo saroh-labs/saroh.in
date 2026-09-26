@@ -35,11 +35,9 @@ const COMMON = [
  * the usual eight in one step. One a product lists can't be removed.
  */
 export function AllergensTab({
-    storeId,
     allergens,
     canWrite,
 }: {
-    storeId: string;
     allergens: AllergenView[];
     canWrite: boolean;
 }) {
@@ -64,13 +62,13 @@ export function AllergensTab({
     function add(names: string[], said: string) {
         run(async () => {
             const before = new Set(allergens.map((a) => a.id));
-            const res = await addAllergens(storeId, names);
+            const res = await addAllergens(names);
             if (!res.ok) return showError(res.error);
             setName("");
             const added = res.data.filter((a) => !before.has(a.id));
             showUndo(said, () =>
                 run(async () => {
-                    for (const a of added) await removeAllergen(storeId, a.id);
+                    for (const a of added) await removeAllergen(a.id);
                 }),
             );
         });
@@ -148,10 +146,7 @@ export function AllergensTab({
                                         onClick={() =>
                                             run(async () => {
                                                 const res =
-                                                    await removeAllergen(
-                                                        storeId,
-                                                        a.id,
-                                                    );
+                                                    await removeAllergen(a.id);
                                                 if (!res.ok)
                                                     return showError(res.error);
                                                 showUndo(
@@ -160,7 +155,6 @@ export function AllergensTab({
                                                         run(async () => {
                                                             const undo =
                                                                 await addAllergens(
-                                                                    storeId,
                                                                     [a.name],
                                                                 );
                                                             if (!undo.ok)

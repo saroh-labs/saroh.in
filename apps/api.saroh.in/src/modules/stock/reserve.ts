@@ -1,0 +1,901 @@
+import { ConflictException } from "@nestjs/common";
+import type { Prisma, StockRow } from "@saroh/database";
+
+import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import { lockStockLevels } from "../products/stock-levels";
+import { markedSoldOut, soldOutKey } from "./sold-out";
+import {
+    ORDER_CLOSED_WHILE_PAYING,
+    putBackRefusal,
+    putBackTogetherRefusal,
+    RETURNED_CANT_UNDO,
+    sellRefusal,
+    SOLD_OUT_WHILE_PAYING,
+} from "./stock-words";
+import {
+    orderReturnableOnRow,
+    recordReturned,
+    recordSold,
+    reverseSale,
+} from "./stock.service";
+import { untrackedAmong } from "./tracking";
+
+/**
+ * Orders and the shelf (#511): how an order's lines hold, sell and give back
+ * units at the order's storefront. Every function runs on the caller's
+ * transaction.
+ *
+ * A line records the row it holds on (`stockLevelId`, with `stockRow`) the
+ * first time it holds, and how many units it holds there right now
+ * (`heldQuantity`) and took off the shelf when fulfilled (`soldQuantity`).
+ * Every later move reads those under the row's lock:
+ *
+ * - hold      — promised += q; refused past on hand − promised ("Sold out",
+ *               "Only N left at Hill Road"). Writes no entry: a promise is
+ *               not a shelf change.
+ * - release   — promised −= min(n, held). A line released already (a line
+ *               refund, then a cancel) gives back only what it still holds.
+ * - commit    — a SOLD entry for what the line holds, not its quantity.
+ * - uncommit  — the kitchen taking a fulfilment back: a REVERSED entry, and
+ *               the units held again; refused once money or items came back.
+ * - return    — a RETURNED entry, at most sold less what went back already.
+ *
+ * A line whose product counted no stock when it was placed (`stockRow`
+ * NONE) never holds, so it stays untracked for life. A line with no
+ * `stockRow` has never held (an online order not yet paid). Whether a
+ * product counts stock (Track stock, #515 — `tracking.ts`) is read after the
+ * row locks are taken, so a hold never lands on a shelf whose product just
+ * stopped counting, and a kitchen undo or a return on a product that no
+ * longer counts moves no stock. An untracked product marked Sold out by hand
+ * at the order's storefront (`sold-out.ts`) is refused like a counted one
+ * with nothing left; lines that held before are never re-judged.
+ *
+ * Lock order, every flow (docs/patterns/backend-billing-and-classes.md):
+ * Order → StockLevel rows (by id) → PaymentRefund → payment intent →
+ * Invoice → Booking. The caller holds the order's lock; these take the row
+ * locks. `reserveOnPayment` is the one entry point that starts earlier: it
+ * takes the intent, then the order, then the rows — and never an intent
+ * while it holds a row.
+ */
+
+type Tx = Prisma.TransactionClient;
+
+/** An order that still holds stock (orders' RESERVING_STATUSES). */
+const OPEN_STATUSES: readonly string[] = ["PENDING", "PROCESSING"];
+
+interface Line {
+    id: string;
+    orderId: string;
+    storeId: string;
+    productId: string;
+    productName: string;
+    variantId: string | null;
+    quantity: number;
+    stockRow: StockRow | null;
+    stockLevelId: string | null;
+    heldQuantity: number;
+    soldQuantity: number;
+}
+
+const LINE_SELECT = {
+    id: true,
+    orderId: true,
+    productId: true,
+    variantId: true,
+    quantity: true,
+    stockRow: true,
+    stockLevelId: true,
+    heldQuantity: true,
+    soldQuantity: true,
+    product: { select: { name: true } },
+    order: { select: { storeId: true } },
+} satisfies Prisma.OrderItemSelect;
+
+async function loadLines(
+    tx: Tx,
+    where: Prisma.OrderItemWhereInput,
+): Promise<Line[]> {
+    const rows = await tx.orderItem.findMany({
+        where,
+        orderBy: { id: "asc" },
+        select: LINE_SELECT,
+    });
+    return rows.map(({ product, order, ...line }) => ({
+        ...line,
+        productName: product.name,
+        storeId: order.storeId,
+    }));
+}
+
+function heldRowIds(lines: readonly Line[]): string[] {
+    return lines.flatMap((l) => (l.stockLevelId ? [l.stockLevelId] : []));
+}
+
+/**
+ * Load lines, lock the rows they sit on (id order), and read the lines again
+ * under those locks — what they hold is acted on as it stands now. Every
+ * writer of a line's row and held units holds its Order's lock, as the
+ * caller does; reading twice is the backstop for anything that doesn't (a
+ * repair script). A line that moved to another row meanwhile gets that row
+ * locked too.
+ */
+async function loadLocked(
+    tx: Tx,
+    where: Prisma.OrderItemWhereInput,
+): Promise<Line[]> {
+    const first = await loadLines(tx, where);
+    const locked = new Set(heldRowIds(first));
+    await lockStockLevels(tx, Array.from(locked));
+    const again = await loadLines(tx, where);
+    const more = heldRowIds(again).filter((id) => !locked.has(id));
+    if (more.length > 0) await lockStockLevels(tx, more);
+    return again;
+}
+
+/**
+ * Lock every shelf an order's lines sit on, in id order. The caller holds
+ * the order's lock; a flow that may touch any of the order's lines (a refund
+ * settling, a cancel) takes them all here, before a PaymentRefund.
+ */
+export async function lockOrderShelves(tx: Tx, orderId: string): Promise<void> {
+    const rows = await tx.orderItem.findMany({
+        where: { orderId, stockLevelId: { not: null } },
+        select: { stockLevelId: true },
+    });
+    await lockStockLevels(
+        tx,
+        rows.flatMap((r) => (r.stockLevelId ? [r.stockLevelId] : [])),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Holding
+// ---------------------------------------------------------------------------
+
+/** Why a hold was refused, as the order form and the checkout say it. */
+export interface HoldRefusal {
+    productId: string;
+    variantId: string | null;
+    /** What the storefront can still sell of it (on hand − promised, ≥ 0). */
+    available: number;
+    storefront: string;
+    message: string;
+}
+
+/** The row a line would hold on at its storefront: variant's, product's, none. */
+async function candidateRow(
+    tx: Tx,
+    line: Line,
+): Promise<{ kind: StockRow; id: string | null }> {
+    if (line.variantId) {
+        const variantRow = await tx.stockLevel.findFirst({
+            where: { storeId: line.storeId, variantId: line.variantId },
+            select: { id: true },
+        });
+        if (variantRow) return { kind: "VARIANT", id: variantRow.id };
+    }
+    const productRow = await tx.stockLevel.findFirst({
+        where: {
+            storeId: line.storeId,
+            productId: line.productId,
+            variantId: null,
+        },
+        select: { id: true },
+    });
+    return productRow
+        ? { kind: "PRODUCT", id: productRow.id }
+        : { kind: "NONE", id: null };
+}
+
+async function storefrontName(tx: Tx, storeId: string): Promise<string> {
+    const store = await tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true },
+    });
+    return store?.name ?? "this storefront";
+}
+
+/**
+ * Hold what the lines that have never held need, or say why not. Chooses
+ * each line's row, locks the rows in id order (re-choosing under the lock,
+ * so a row counted into being meanwhile is seen), and checks each row can
+ * sell what all the lines on it ask for. Nothing is written on a refusal.
+ */
+async function tryHold(
+    tx: Tx,
+    lines: readonly Line[],
+): Promise<HoldRefusal | null> {
+    const fresh = lines.filter((l) => l.stockRow === null);
+    if (fresh.length === 0) return null;
+
+    const choose = () => Promise.all(fresh.map((l) => candidateRow(tx, l)));
+    const first = await choose();
+    await lockStockLevels(
+        tx,
+        first.flatMap((c) => (c.id ? [c.id] : [])),
+    );
+    const chosen = await choose();
+    await lockStockLevels(
+        tx,
+        chosen.flatMap((c) => (c.id ? [c.id] : [])),
+    );
+    // Under the locks: Track stock can't go off while we hold them, and a
+    // product it went off for meanwhile holds nothing — its line is NONE.
+    const untracked = await untrackedAmong(
+        tx,
+        fresh.map((l) => l.productId),
+    );
+    for (const [i, line] of fresh.entries()) {
+        if (untracked.has(line.productId)) {
+            chosen[i] = { kind: "NONE", id: null };
+        }
+    }
+    // An untracked product marked Sold out by hand at the line's storefront
+    // (#515) is refused as a counted one is: "Sourdough — Sold out".
+    const marked = await markedSoldOut(
+        tx,
+        fresh.filter((l) => untracked.has(l.productId)),
+    );
+    const soldOut = fresh.find(
+        (l) => untracked.has(l.productId) && marked.has(soldOutKey(l)),
+    );
+    if (soldOut) {
+        const storefront = await storefrontName(tx, soldOut.storeId);
+        return {
+            productId: soldOut.productId,
+            variantId: soldOut.variantId,
+            available: 0,
+            storefront,
+            message: sellRefusal(soldOut.productName, 0, storefront),
+        };
+    }
+
+    // What each row is asked for, over every line on it.
+    const need = new Map<string, { units: number; line: Line }>();
+    for (const [i, line] of fresh.entries()) {
+        const rowId = chosen[i].id;
+        if (!rowId) continue;
+        const was = need.get(rowId);
+        need.set(rowId, {
+            units: (was?.units ?? 0) + line.quantity,
+            line: was?.line ?? line,
+        });
+    }
+    const rows = await tx.stockLevel.findMany({
+        where: { id: { in: Array.from(need.keys()) } },
+        select: { id: true, onHand: true, promised: true },
+    });
+    for (const row of rows.sort((a, b) => (a.id < b.id ? -1 : 1))) {
+        const asked = need.get(row.id);
+        if (!asked) continue;
+        const available = Math.max(0, row.onHand - row.promised);
+        if (asked.units > available) {
+            const storefront = await storefrontName(tx, asked.line.storeId);
+            return {
+                productId: asked.line.productId,
+                variantId: asked.line.variantId,
+                available,
+                storefront,
+                message: sellRefusal(
+                    asked.line.productName,
+                    available,
+                    storefront,
+                ),
+            };
+        }
+    }
+
+    for (const [rowId, asked] of need) {
+        // Conditional as well as locked: the row sells only what it has.
+        const moved = await tx.$executeRaw`
+            UPDATE "StockLevel" SET "promised" = "promised" + ${asked.units}
+            WHERE id = ${rowId} AND "onHand" - "promised" >= ${asked.units}`;
+        if (moved !== 1) {
+            throw new ConflictException(
+                sellRefusal(asked.line.productName, 0, "this storefront"),
+            );
+        }
+    }
+    for (const [i, line] of fresh.entries()) {
+        const { kind, id } = chosen[i];
+        await tx.orderItem.update({
+            where: { id: line.id },
+            data: {
+                stockRow: kind,
+                stockLevelId: id,
+                heldQuantity: id ? line.quantity : 0,
+            },
+        });
+    }
+    return null;
+}
+
+function refusalException(refusal: HoldRefusal): ConflictException {
+    return new ConflictException({
+        message: refusal.message,
+        details: {
+            field: "items",
+            reason: refusal.available > 0 ? "ONLY_LEFT" : "SOLD_OUT",
+            productId: refusal.productId,
+            variantId: refusal.variantId,
+            available: refusal.available,
+            storefront: refusal.storefront,
+        },
+    });
+}
+
+/**
+ * Hold stock for lines placed by staff (an order made in the workspace, or a
+ * line added before preparing): each takes its units at the order's
+ * storefront, or the whole order is refused with the storefront's words.
+ * Lines that held before are left alone.
+ */
+export async function holdLines(
+    tx: Tx,
+    lineIds: readonly string[],
+): Promise<void> {
+    if (lineIds.length === 0) return;
+    const lines = await loadLines(tx, { id: { in: [...lineIds] } });
+    const refusal = await tryHold(tx, lines);
+    if (refusal) throw refusalException(refusal);
+}
+
+/**
+ * An edit before preparing changes a line's quantity by `delta`: its hold
+ * grows (refused past what the storefront can sell) or shrinks. A promise,
+ * not a shelf change, so no entry.
+ */
+export async function changeHold(
+    tx: Tx,
+    lineId: string,
+    delta: number,
+): Promise<void> {
+    if (delta === 0) return;
+    const line = (await loadLines(tx, { id: lineId })).find(
+        (l) => l.id === lineId,
+    );
+    if (!line?.stockLevelId) return; // untracked, or never held
+    await lockStockLevels(tx, [line.stockLevelId]);
+    // Its product stopped counting since (it held nothing then): no hold.
+    if ((await untrackedAmong(tx, [line.productId])).has(line.productId)) {
+        return;
+    }
+    if (delta < 0) {
+        await releaseOne(tx, line, -delta);
+        return;
+    }
+    const moved = await tx.$executeRaw`
+        UPDATE "StockLevel" SET "promised" = "promised" + ${delta}
+        WHERE id = ${line.stockLevelId} AND "onHand" - "promised" >= ${delta}`;
+    if (moved !== 1) {
+        const row = await tx.stockLevel.findUniqueOrThrow({
+            where: { id: line.stockLevelId },
+            select: { onHand: true, promised: true },
+        });
+        const available = Math.max(0, row.onHand - row.promised);
+        const storefront = await storefrontName(tx, line.storeId);
+        throw refusalException({
+            productId: line.productId,
+            variantId: line.variantId,
+            available,
+            storefront,
+            message: sellRefusal(line.productName, available, storefront),
+        });
+    }
+    await tx.orderItem.update({
+        where: { id: line.id },
+        data: { heldQuantity: { increment: delta } },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Releasing
+// ---------------------------------------------------------------------------
+
+/** Give back min(units, held) of one line; the caller holds its row lock. */
+async function releaseOne(tx: Tx, line: Line, units: number): Promise<number> {
+    const n = Math.min(Math.max(0, units), line.heldQuantity);
+    if (n === 0 || !line.stockLevelId) return 0;
+    await tx.stockLevel.update({
+        where: { id: line.stockLevelId },
+        data: { promised: { decrement: n } },
+    });
+    await tx.orderItem.update({
+        where: { id: line.id },
+        data: { heldQuantity: { decrement: n } },
+    });
+    line.heldQuantity -= n;
+    return n;
+}
+
+/**
+ * Give back what lines hold: all of it (a cancel, a line removed), or up to
+ * `units` of each (a line refund confirmed). Never more than a line holds,
+ * so releasing twice gives back once.
+ */
+export async function releaseLines(
+    tx: Tx,
+    lines: readonly { id: string; units?: number }[],
+): Promise<void> {
+    if (lines.length === 0) return;
+    const loaded = await loadLocked(tx, {
+        id: { in: lines.map((l) => l.id) },
+    });
+    const asked = new Map(lines.map((l) => [l.id, l.units]));
+    for (const line of loaded) {
+        await releaseOne(tx, line, asked.get(line.id) ?? line.heldQuantity);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Selling
+// ---------------------------------------------------------------------------
+
+/**
+ * Fulfilled: each line's held units leave the shelf, one SOLD entry per
+ * line, recorded as the person who handed it over. A line that holds
+ * nothing (refunded before it went) sells nothing.
+ */
+export async function commitLines(
+    tx: Tx,
+    lineIds: readonly string[],
+    actorUserId: string | null,
+): Promise<void> {
+    if (lineIds.length === 0) return;
+    const lines = await loadLocked(tx, { id: { in: [...lineIds] } });
+    for (const line of lines) {
+        if (!line.stockLevelId || line.heldQuantity <= 0) continue;
+        await recordSold(tx, {
+            stockLevelId: line.stockLevelId,
+            units: line.heldQuantity,
+            orderId: line.orderId,
+            actorUserId,
+            releasePromised: line.heldQuantity,
+        });
+        await tx.orderItem.update({
+            where: { id: line.id },
+            data: {
+                heldQuantity: 0,
+                soldQuantity: { increment: line.heldQuantity },
+            },
+        });
+    }
+}
+
+/**
+ * The kitchen takes a fulfilment back: each line's sale is reversed and its
+ * units held again. Refused once the order has a confirmed refund of a line
+ * or a Returned entry — the shelf and the money have moved on.
+ */
+export async function uncommitLines(
+    tx: Tx,
+    lineIds: readonly string[],
+    actorUserId: string | null,
+): Promise<void> {
+    if (lineIds.length === 0) return;
+    const lines = await loadLines(tx, { id: { in: [...lineIds] } });
+    const orderIds = Array.from(new Set(lines.map((l) => l.orderId)));
+    const [refunded, returned] = await Promise.all([
+        tx.paymentRefundLine.count({
+            where: {
+                orderItemId: { in: [...lineIds] },
+                paymentRefund: { status: "SUCCEEDED" },
+            },
+        }),
+        tx.stockEntry.count({
+            where: { orderId: { in: orderIds }, kind: "RETURNED" },
+        }),
+    ]);
+    if (refunded > 0 || returned > 0) {
+        throw new ConflictException({
+            message: RETURNED_CANT_UNDO,
+            field: "eventId",
+        });
+    }
+    await lockStockLevels(tx, heldRowIds(lines));
+    const untracked = await untrackedAmong(
+        tx,
+        lines.map((l) => l.productId),
+    );
+    for (const line of lines) {
+        if (!line.stockLevelId || line.soldQuantity <= 0) continue;
+        if (untracked.has(line.productId)) {
+            // Its product no longer counts stock: nothing goes back on a
+            // shelf and nothing is held — the line just isn't sold yet.
+            await tx.orderItem.update({
+                where: { id: line.id },
+                data: { soldQuantity: 0 },
+            });
+            continue;
+        }
+        await reverseSale(tx, {
+            stockLevelId: line.stockLevelId,
+            units: line.soldQuantity,
+            orderId: line.orderId,
+            actorUserId,
+            rehold: line.soldQuantity,
+        });
+        await tx.orderItem.update({
+            where: { id: line.id },
+            data: {
+                heldQuantity: { increment: line.soldQuantity },
+                soldQuantity: 0,
+            },
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+
+/**
+ * How many of each line a refund may put back on the shelf: what it sold
+ * less what refunds (pending or settled) already put back — and never more
+ * than its order can still bring back to that shelf, which also counts a
+ * return recorded by hand on the Stock screen (`orderReturnableOnRow`). Read
+ * under the order's lock, when the refund is asked for.
+ */
+export async function returnableUnits(
+    tx: ReturnableTx,
+    orderId: string,
+): Promise<Map<string, number>> {
+    return (await returnablePlan(tx, orderId)).lines;
+}
+
+type ReturnableTx = Pick<
+    Tx,
+    | "orderItem"
+    | "stockEntry"
+    | "paymentRefundLine"
+    | "product"
+    | "businessProfile"
+>;
+
+/**
+ * What an order can put back, by line and by shelf. Each line is capped by
+ * its shelf's remainder on its own; lines of one order sharing a shelf also
+ * share that remainder, so a put-back is checked against both
+ * (`assertPutBack`).
+ */
+export interface ReturnablePlan {
+    /** What each line can put back, alone. */
+    lines: Map<string, number>;
+    /** Each line's shelf, for the lines that have one. */
+    rowOf: Map<string, string>;
+    /** What the order can still bring back to each shelf, over all its lines. */
+    rowLeft: Map<string, number>;
+}
+
+export async function returnablePlan(
+    tx: ReturnableTx,
+    orderId: string,
+): Promise<ReturnablePlan> {
+    const items = await tx.orderItem.findMany({
+        where: { orderId },
+        select: {
+            id: true,
+            productId: true,
+            soldQuantity: true,
+            stockLevelId: true,
+            refundLines: {
+                where: { paymentRefund: { status: { not: "FAILED" } } },
+                select: { putBackQuantity: true },
+            },
+        },
+    });
+    // A product that no longer counts stock takes nothing back.
+    const untracked = await untrackedAmong(
+        tx,
+        items.map((i) => i.productId),
+    );
+    const rowLeft = new Map<string, number>();
+    for (const rowId of new Set(
+        items.flatMap((i) => (i.stockLevelId ? [i.stockLevelId] : [])),
+    )) {
+        rowLeft.set(rowId, await orderReturnableOnRow(tx, orderId, rowId));
+    }
+    const rowOf = new Map(
+        items.flatMap((i) =>
+            i.stockLevelId ? [[i.id, i.stockLevelId] as const] : [],
+        ),
+    );
+    const lines = new Map(
+        items.map((i) => [
+            i.id,
+            i.stockLevelId && !untracked.has(i.productId)
+                ? Math.max(
+                      0,
+                      Math.min(
+                          i.soldQuantity -
+                              i.refundLines.reduce(
+                                  (s, r) => s + r.putBackQuantity,
+                                  0,
+                              ),
+                          rowLeft.get(i.stockLevelId) ?? 0,
+                      ),
+                  )
+                : 0,
+        ]),
+    );
+    return { lines, rowOf, rowLeft };
+}
+
+/**
+ * Refuse a put-back of more than a line can take back, or more than the
+ * order can bring back to a shelf over all its lines on it.
+ */
+export function assertPutBack(
+    returnable: ReturnablePlan,
+    asked: readonly { itemId: string; quantity: number }[],
+): void {
+    const onRow = new Map<string, number>();
+    for (const a of asked) {
+        const can = returnable.lines.get(a.itemId) ?? 0;
+        if (!Number.isInteger(a.quantity) || a.quantity < 0) {
+            throw new ConflictException({
+                message: "Put back a whole number of items.",
+                field: "putBack",
+            });
+        }
+        if (a.quantity > can) {
+            throw new ConflictException({
+                message: putBackRefusal(can),
+                field: "putBack",
+            });
+        }
+        const rowId = returnable.rowOf.get(a.itemId);
+        if (rowId) onRow.set(rowId, (onRow.get(rowId) ?? 0) + a.quantity);
+    }
+    for (const [rowId, total] of onRow) {
+        const left = returnable.rowLeft.get(rowId) ?? 0;
+        if (total > left) {
+            throw new ConflictException({
+                message: putBackTogetherRefusal(left),
+                field: "putBack",
+            });
+        }
+    }
+}
+
+/**
+ * A refund has just moved into SUCCEEDED — the provider confirmed it
+ * (DEC-026) — and this is the one transaction that does (a redelivered
+ * webhook finds it SUCCEEDED already and never gets here). The caller holds
+ * the order's lock and its shelves' (`lockOrderShelves`), then the refund's.
+ *
+ * - By line: each line gives back min(refunded, held) — a line already
+ *   fulfilled holds nothing and releases nothing — and puts back what the
+ *   refund asked, at most what it sold less what went back before: a
+ *   RETURNED entry.
+ * - With no lines (made in the provider's dashboard): nothing, unless it
+ *   brought the order to fully refunded — then every line gives back what it
+ *   still holds. A partial one is left for Stock checks.
+ * - An edit's difference: nothing — the edit moved the holds itself.
+ */
+export async function settleRefundStock(
+    tx: Tx,
+    refundId: string,
+    opts: { orderFullyRefunded: boolean; actorUserId?: string | null },
+): Promise<void> {
+    const refund = await tx.paymentRefund.findUniqueOrThrow({
+        where: { id: refundId },
+        select: {
+            forEdit: true,
+            paymentIntent: { select: { orderId: true } },
+            lines: {
+                select: {
+                    orderItemId: true,
+                    quantity: true,
+                    putBackQuantity: true,
+                },
+            },
+        },
+    });
+    const orderId = refund.paymentIntent.orderId;
+    if (!orderId || refund.forEdit) return;
+
+    if (refund.lines.length === 0) {
+        if (!opts.orderFullyRefunded) return;
+        const lines = await loadLocked(tx, { orderId });
+        for (const line of lines) {
+            await releaseOne(tx, line, line.heldQuantity);
+        }
+        return;
+    }
+
+    const lines = await loadLocked(tx, {
+        id: { in: refund.lines.map((l) => l.orderItemId) },
+    });
+    const byId = new Map(lines.map((l) => [l.id, l]));
+    const untracked = await untrackedAmong(
+        tx,
+        lines.map((l) => l.productId),
+    );
+    for (const asked of refund.lines) {
+        const line = byId.get(asked.orderItemId);
+        if (!line) continue;
+        await releaseOne(tx, line, asked.quantity);
+        if (asked.putBackQuantity <= 0 || !line.stockLevelId) continue;
+        if (untracked.has(line.productId)) continue; // writes no entry
+        // What went back before this refund, settled only.
+        const before = await tx.paymentRefundLine.aggregate({
+            where: {
+                orderItemId: line.id,
+                paymentRefundId: { not: refundId },
+                paymentRefund: { status: "SUCCEEDED" },
+            },
+            _sum: { putBackQuantity: true },
+        });
+        // Nor more than the order can still bring back to that shelf: a
+        // return recorded by hand counts. (This refund is SUCCEEDED by now,
+        // so its own put-back isn't counted as still to come.)
+        const onRow = await orderReturnableOnRow(
+            tx,
+            line.orderId,
+            line.stockLevelId,
+        );
+        const units = Math.min(
+            asked.putBackQuantity,
+            line.soldQuantity - (before._sum.putBackQuantity ?? 0),
+            onRow,
+        );
+        if (units <= 0) continue;
+        await recordReturned(tx, {
+            stockLevelId: line.stockLevelId,
+            units,
+            orderId: line.orderId,
+            actorUserId: opts.actorUserId ?? null,
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Online orders: hold when paid
+// ---------------------------------------------------------------------------
+
+/**
+ * The PaymentAttempt status recording that a payment's order held its units
+ * (`reserveOnPayment`). A repeat of that payment's webhook reads it and
+ * reads HELD again; any other payment for the order decides afresh.
+ */
+export const STOCK_HELD = "STOCK_HELD";
+
+/** The idempotency key of the automatic refund for a lost last unit. */
+export function soldOutRefundKey(paymentIntentId: string): string {
+    return `sold-out:${paymentIntentId}`;
+}
+
+export type ReserveOnPaymentResult =
+    | { kind: "HELD" }
+    | {
+          kind: "REFUSED";
+          /** The automatic refund, PENDING until the provider takes it. */
+          refundId: string;
+          /** False when an earlier call recorded this refusal. */
+          created: boolean;
+          refusal: HoldRefusal | null;
+          /** What the customer is told. */
+          message: string;
+      };
+
+/**
+ * An online order is paid (R5): hold its units now, or — when another
+ * payment took the last of them, or the order was closed (cancelled,
+ * expired, fulfilled) before the payment arrived — record the refusal and
+ * the automatic refund of the whole payment (DEC-032). A closed order never
+ * holds: nothing would ever release it. Idempotent per payment intent: a
+ * payment that held records a `STOCK_HELD` attempt, and a second call for
+ * it reads HELD whatever the order became since; a refused one returns the
+ * same refusal and the same refund, never a second. Any other payment for a
+ * closed order is refused and refunded, even if the order's lines held at
+ * placement or on another payment.
+ *
+ * Locks the intent, then the order, then the rows. The caller (the success
+ * webhook, when the online checkout exists) must hold nothing below the
+ * intent. The refund row is PENDING with the idempotency key
+ * `sold-out:<intent>` (unique per intent), so its id — Saroh's reference to
+ * the provider (DEC-026) — is the same on every call; the caller sends it
+ * after this transaction commits (`PaymentsService.sendAutomaticRefund`),
+ * and the refund webhook confirms it.
+ */
+export async function reserveOnPayment(
+    tx: Tx,
+    input: { organizationId: string; orderId: string; paymentIntentId: string },
+): Promise<ReserveOnPaymentResult> {
+    const intents = await tx.$queryRaw<
+        { amountCents: number; currency: string; provider: string }[]
+    >`SELECT "amountCents", currency, provider FROM "PaymentIntent"
+      WHERE id = ${input.paymentIntentId}
+        AND "organizationId" = ${input.organizationId}
+        AND "orderId" = ${input.orderId}
+      FOR NO KEY UPDATE`;
+    if (intents.length === 0) {
+        throw new ConflictException("That payment is not this order's.");
+    }
+    const [intent] = intents;
+    const [order] = await tx.$queryRaw<({ status: string } | undefined)[]>`
+        SELECT status::text AS status FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
+    const key = soldOutRefundKey(input.paymentIntentId);
+    const refused = await tx.paymentRefund.findFirst({
+        where: { paymentIntentId: input.paymentIntentId, idempotencyKey: key },
+        select: { id: true, reason: true },
+    });
+    if (refused) {
+        return {
+            kind: "REFUSED",
+            refundId: refused.id,
+            created: false,
+            refusal: null,
+            message: refused.reason ?? SOLD_OUT_WHILE_PAYING,
+        };
+    }
+
+    // Decided per payment, never per order: lines held at placement (a
+    // staff order) or on another payment say nothing about this one.
+    const heldBefore = await tx.paymentAttempt.findFirst({
+        where: { paymentIntentId: input.paymentIntentId, status: STOCK_HELD },
+        select: { id: true },
+    });
+    // This payment held on an earlier call, and the order may have been
+    // fulfilled or cancelled since: its webhook repeating still reads HELD,
+    // and nothing is refunded — a fulfilled order keeps its money, and a
+    // cancel refunds through its own flow.
+    if (heldBefore) return { kind: "HELD" };
+
+    const lines = await loadLines(tx, { orderId: input.orderId });
+    // Only an open order holds: a cancelled or expired one would keep the
+    // units promised for good, since nothing releases a closed order.
+    const open = OPEN_STATUSES.includes(order?.status ?? "");
+    const refusal = open ? await tryHold(tx, lines) : null;
+    if (open && !refusal) {
+        await tx.paymentAttempt.create({
+            data: {
+                organizationId: input.organizationId,
+                paymentIntentId: input.paymentIntentId,
+                provider: intent.provider,
+                status: STOCK_HELD,
+                rawResponse: { reason: "STOCK_HELD" },
+            },
+        });
+        return { kind: "HELD" };
+    }
+    const message = open ? SOLD_OUT_WHILE_PAYING : ORDER_CLOSED_WHILE_PAYING;
+
+    await tx.paymentAttempt.create({
+        data: {
+            organizationId: input.organizationId,
+            paymentIntentId: input.paymentIntentId,
+            provider: intent.provider,
+            status: CAPTURED_NEEDS_REFUND,
+            rawResponse: refusal
+                ? {
+                      reason: "SOLD_OUT",
+                      productId: refusal.productId,
+                      variantId: refusal.variantId,
+                      available: refusal.available,
+                  }
+                : { reason: "ORDER_CLOSED", status: order?.status ?? null },
+        },
+    });
+    const refund = await tx.paymentRefund.create({
+        data: {
+            organizationId: input.organizationId,
+            paymentIntentId: input.paymentIntentId,
+            amountCents: intent.amountCents,
+            currency: intent.currency,
+            status: "PENDING",
+            reason: message,
+            idempotencyKey: key,
+        },
+        select: { id: true },
+    });
+    return {
+        kind: "REFUSED",
+        refundId: refund.id,
+        created: true,
+        refusal,
+        message,
+    };
+}

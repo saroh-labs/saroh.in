@@ -25,10 +25,10 @@ export function reachOf(d: Pick<Discount, "appliesTo" | "targets">): string {
                   : `at ${n} storefronts`;
         case "COLLECTION":
             return n === 0
-                ? "no collection"
+                ? "no category"
                 : n === 1 && one
                   ? `${one}`
-                  : `${n} collections`;
+                  : `${n} categories`;
         case "PRODUCT":
             return n === 0
                 ? "no product"

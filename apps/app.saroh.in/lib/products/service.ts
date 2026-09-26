@@ -1,11 +1,19 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getJson, getList } from "@/lib/api/http";
+import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
+
+import type { SoldOutPlace } from "./tracking";
 
 /**
  * Catalog data access for app.saroh.in — products, categories, variants, and
- * inventory. Forwards the session cookie to api.saroh.in, which enforces store
- * membership (read = access, write = owner/EDITOR+). Prices are decimal strings
- * end-to-end so money never round-trips through a float. Server-only.
+ * inventory. Forwards the session cookie to api.saroh.in, which enforces the
+ * business role (read = `store:read`, write = `store:write`). Prices are
+ * decimal strings end-to-end so money never round-trips through a float.
+ * Server-only.
+ *
+ * Products belong to the business (#531): every call goes to
+ * `organizations/:org/products`. A `storeId` argument names the storefront
+ * whose shelf and listing the call reads or writes — the one the screen is
+ * open at — and travels as `?storefront=`.
  */
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -51,12 +59,18 @@ export interface ProductImage {
     position: number;
     creditName: string | null;
     creditUrl: string | null;
+    /** "photo" or "video" (#517). */
+    kind: "photo" | "video";
+    /** A video's length in seconds. */
+    durationSec: number | null;
+    /** A video's poster, from the library. */
+    posterMediaId: string | null;
+    posterUrl: string | null;
 }
 
 /**
- * A catalogue row as the list endpoint returns it: the product, how many
- * variants it has, the SKU it is known by, and its stock against its own
- * low-stock threshold.
+ * A product as a list shows it: the product, how many variants it has, the
+ * SKU it is known by, and its stock against its own low-stock threshold.
  */
 export interface ProductListItem extends Product {
     storeId: string;
@@ -70,7 +84,51 @@ export interface ProductListItem extends Product {
         title: string;
         price: string | null;
     }[];
-    inventory: { quantity: number; lowStockAlert: number } | null;
+    inventory: ListStock | null;
+    /**
+     * Marked sold out by hand at this storefront (#515): an untracked
+     * product it refuses orders for. Absent from an older API.
+     */
+    soldOut?: boolean;
+}
+
+/**
+ * A list row's stock (#518): on hand (`quantity`), what open orders have
+ * promised from it, and the warning level. Can sell is on hand minus
+ * promised.
+ */
+export interface ListStock {
+    quantity: number;
+    promised: number;
+    lowStockAlert: number;
+}
+
+/** One storefront that sells a catalogue product, and its stock there. */
+export interface CatalogueListing {
+    storeId: string;
+    storeName: string;
+    inventory: ListStock | null;
+    /** Marked sold out by hand here (#515). Absent from an older API. */
+    soldOut?: boolean;
+    /**
+     * Each variant's shelf here (#518): whether this storefront sells it,
+     * and its stock — null while it is not counted per variant here.
+     */
+    variants: {
+        variantId: string;
+        soldHere: boolean;
+        inventory: ListStock | null;
+    }[];
+}
+
+/**
+ * A row of the business's catalogue (#531): one per product, with each
+ * storefront that sells it. Read with a storefront, `storeId`, `variants`
+ * and `inventory` are that storefront's; without, the stock is summed across
+ * the storefronts that count it.
+ */
+export interface CatalogueProduct extends ProductListItem {
+    listings: CatalogueListing[];
 }
 
 export interface Variant {
@@ -105,6 +163,8 @@ export interface ProductCustomField {
 }
 
 export interface ProductDetail extends Product {
+    /** The storefront whose shelf and listing it was read at (#531). */
+    storeId: string;
     variants: Variant[];
     /** The fields its category asks for, with its values. */
     customFields: ProductCustomField[];
@@ -133,6 +193,12 @@ export interface ProductDetail extends Product {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
+    stockTracked: boolean;
+    /** Marked sold out by hand at the storefront read from (#515). */
+    soldOut?: boolean;
+    /** Every open storefront that sells it, and whether it is marked there. */
+    storefronts?: SoldOutPlace[];
     images: ProductImage[];
     stockMode: "product" | "variant";
     /**
@@ -196,6 +262,34 @@ export function resultField(field?: string): ResultField | undefined {
 export type Result<T = { ok: true }> =
     { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
 
+const NO_BUSINESS = "Pick a business first, then try again.";
+
+/** `?storefront=` for a call about one storefront's shelf and listing. */
+function at(storeId?: string | null): string {
+    return storeId ? `?storefront=${encodeURIComponent(storeId)}` : "";
+}
+
+/** A product's address under the business, or null with none active. */
+async function productPath(productId?: string): Promise<string | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return productId
+        ? `${base}/products/${encodeURIComponent(productId)}`
+        : `${base}/products`;
+}
+
+/** `mutate` on a product path; no business active is said, not thrown. */
+async function mutateProduct<T = { id: string }>(
+    productId: string | undefined,
+    rest: string,
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
+    body?: unknown,
+): Promise<Result<T>> {
+    const path = await productPath(productId);
+    if (!path) return { ok: false, error: NO_BUSINESS };
+    return mutate<T>(`${path}${rest}`, method, body);
+}
+
 async function mutate<T = { id: string }>(
     path: string,
     method: "POST" | "PUT" | "PATCH" | "DELETE",
@@ -213,19 +307,33 @@ async function mutate<T = { id: string }>(
 
 // ---- Products ----
 
-export function listProducts(
-    storeId: string,
-    status?: ProductStatus,
-): Promise<ProductListItem[]> {
-    const q = status ? `?status=${status}` : "";
-    return getList<ProductListItem>(`/stores/${storeId}/products${q}`);
+/**
+ * The business's catalogue, one row per product. `storefront` narrows it to
+ * what that storefront sells, as that storefront sees it.
+ */
+export async function listProducts(
+    filter: { storefront?: string; status?: ProductStatus } = {},
+): Promise<CatalogueProduct[]> {
+    const path = await productPath();
+    if (!path) return [];
+    const q = new URLSearchParams();
+    if (filter.storefront) q.set("storefront", filter.storefront);
+    if (filter.status) q.set("status", filter.status);
+    const query = q.toString();
+    return getList<CatalogueProduct>(query ? `${path}?${query}` : path);
 }
 
-export function getProduct(
-    storeId: string,
+/**
+ * One product, as a storefront sees it: the one named, or else the first
+ * that sells it. Null when it is not this business's.
+ */
+export async function getProduct(
+    storeId: string | null | undefined,
     productId: string,
 ): Promise<ProductDetail | null> {
-    return getJson<ProductDetail>(`/stores/${storeId}/products/${productId}`);
+    const path = await productPath(productId);
+    if (!path) return null;
+    return getJson<ProductDetail>(`${path}${at(storeId)}`);
 }
 
 export interface ProductInput {
@@ -243,26 +351,38 @@ export interface ProductInput {
 export type NewProductInput = ProductInput &
     Omit<ProductPatch, "name" | "price">;
 
+/** A new product of the business, sold at `storeId`. */
 export function createProduct(storeId: string, input: NewProductInput) {
-    return mutate(`/stores/${storeId}/products`, "POST", input);
+    return mutateProduct(undefined, at(storeId), "POST", input);
 }
 
-export function updateProduct(
-    storeId: string,
-    productId: string,
-    input: ProductInput,
-) {
-    return mutate(`/stores/${storeId}/products/${productId}`, "PUT", input);
+export function updateProduct(productId: string, input: ProductInput) {
+    return mutateProduct(productId, "", "PUT", input);
 }
 
-export function deleteProduct(storeId: string, productId: string) {
-    return mutate(`/stores/${storeId}/products/${productId}`, "DELETE");
+/**
+ * A draft copy (#518): "… (copy)", sold where the original is, stock at 0.
+ * Returns the copy as `getProduct` reads it at `storeId`.
+ */
+export function duplicateProduct(productId: string, storeId?: string | null) {
+    return mutateProduct<ProductDetail>(
+        productId,
+        `/duplicate${at(storeId)}`,
+        "POST",
+    );
 }
 
-// ---- Categories ----
+/** Delete it from the catalogue — and so from every storefront. */
+export function deleteProduct(productId: string) {
+    return mutateProduct(productId, "", "DELETE");
+}
 
-export function listCategories(storeId: string): Promise<Category[]> {
-    return getList<Category>(`/stores/${storeId}/categories`);
+// ---- Categories: the business's (#529), whatever storefront sells ----
+
+export async function listCategories(): Promise<Category[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return getList<Category>(`${base}/catalogue/categories`);
 }
 
 export interface CategoryInput {
@@ -271,20 +391,36 @@ export interface CategoryInput {
     parentId?: string | null;
 }
 
-export function createCategory(storeId: string, input: CategoryInput) {
-    return mutate(`/stores/${storeId}/categories`, "POST", input);
+export async function createCategory(
+    input: CategoryInput,
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(`${base}/catalogue/categories`, "POST", input);
 }
 
-export function updateCategory(
-    storeId: string,
+export async function updateCategory(
     categoryId: string,
     input: CategoryInput,
-) {
-    return mutate(`/stores/${storeId}/categories/${categoryId}`, "PUT", input);
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(
+        `${base}/catalogue/categories/${encodeURIComponent(categoryId)}`,
+        "PUT",
+        input,
+    );
 }
 
-export function deleteCategory(storeId: string, categoryId: string) {
-    return mutate(`/stores/${storeId}/categories/${categoryId}`, "DELETE");
+export async function deleteCategory(
+    categoryId: string,
+): Promise<Result<{ id: string }>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: NO_BUSINESS };
+    return mutate(
+        `${base}/catalogue/categories/${encodeURIComponent(categoryId)}`,
+        "DELETE",
+    );
 }
 
 // ---- Options (Settings → Options) ----
@@ -297,8 +433,10 @@ export interface ProductOptionView {
     values: { id: string; value: string; variantCount: number }[];
 }
 
-export function listOptions(storeId: string): Promise<ProductOptionView[]> {
-    return getList<ProductOptionView>(`/stores/${storeId}/options`);
+export async function listOptions(): Promise<ProductOptionView[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return getList<ProductOptionView>(`${base}/catalogue/options`);
 }
 
 // ---- Variants ----
@@ -313,38 +451,27 @@ export interface VariantInput {
     imageId?: string | null;
 }
 
-export function createVariant(
-    storeId: string,
-    productId: string,
-    input: VariantInput,
-) {
-    return mutate(
-        `/stores/${storeId}/products/${productId}/variants`,
-        "POST",
-        input,
-    );
+export function createVariant(productId: string, input: VariantInput) {
+    return mutateProduct(productId, "/variants", "POST", input);
 }
 
 export function updateVariant(
-    storeId: string,
     productId: string,
     variantId: string,
     input: VariantInput,
 ) {
-    return mutate(
-        `/stores/${storeId}/products/${productId}/variants/${variantId}`,
+    return mutateProduct(
+        productId,
+        `/variants/${encodeURIComponent(variantId)}`,
         "PUT",
         input,
     );
 }
 
-export function deleteVariant(
-    storeId: string,
-    productId: string,
-    variantId: string,
-) {
-    return mutate(
-        `/stores/${storeId}/products/${productId}/variants/${variantId}`,
+export function deleteVariant(productId: string, variantId: string) {
+    return mutateProduct(
+        productId,
+        `/variants/${encodeURIComponent(variantId)}`,
         "DELETE",
     );
 }
@@ -356,15 +483,60 @@ export interface InventoryInput {
     lowStockAlert?: number;
 }
 
+/** Its count at `storeId`. */
 export function setInventory(
     storeId: string,
     productId: string,
     input: InventoryInput,
 ) {
-    return mutate<Inventory>(
-        `/stores/${storeId}/products/${productId}/inventory`,
+    return mutateProduct<Inventory>(
+        productId,
+        `/inventory${at(storeId)}`,
         "PUT",
         input,
+    );
+}
+
+/** What turning Track stock on or off did (#515). */
+export interface StockTrackingResult {
+    productId: string;
+    tracked: boolean;
+    /** The business's switch: off, and no product counts stock. */
+    businessTracks: boolean;
+    /** Shelves counted to 0 by turning it off. */
+    counted: number;
+}
+
+/**
+ * Track stock on or off for a product, everywhere it sells. Owner/Admin only
+ * (`store:write`). Off is refused while open orders hold its units ("N are
+ * promised to open orders — fulfil or cancel them first") and counts each
+ * shelf to 0; on starts each shelf at 0, Sold out until counted.
+ */
+export function setProductStockTracking(productId: string, tracked: boolean) {
+    return mutateProduct<StockTrackingResult>(
+        productId,
+        "/stock-tracking",
+        "PUT",
+        { tracked },
+    );
+}
+
+/**
+ * Mark an untracked product sold out at one storefront, or available again
+ * (#515). Whoever may count and move stock; a product that counts stock is
+ * refused ("This product counts its stock, …").
+ */
+export function setProductSoldOut(
+    productId: string,
+    storefrontId: string,
+    soldOut: boolean,
+) {
+    return mutateProduct<SoldOutPlace & { productId: string }>(
+        productId,
+        "/sold-out",
+        "PUT",
+        { storefrontId, soldOut },
     );
 }
 
@@ -403,16 +575,13 @@ export interface ProductPatch {
     mayContain?: string[];
 }
 
+/** One section's save; returns the product as `storeId` sees it. */
 export function patchProduct(
     storeId: string,
     productId: string,
     patch: ProductPatch,
 ) {
-    return mutate<ProductDetail>(
-        `/stores/${storeId}/products/${productId}`,
-        "PATCH",
-        patch,
-    );
+    return mutateProduct<ProductDetail>(productId, at(storeId), "PATCH", patch);
 }
 
 /** One photo of the ordered set: kept (id), from the library, or an address. */
@@ -425,22 +594,25 @@ export interface ProductImageInput {
     height?: number;
     creditName?: string | null;
     creditUrl?: string | null;
+    /** A new video: an uploaded MP4 or MOV (mediaId), with its poster. */
+    kind?: "photo" | "video";
+    durationSec?: number | null;
+    posterMediaId?: string | null;
 }
 
 export function replaceProductImages(
-    storeId: string,
     productId: string,
     images: ProductImageInput[],
 ) {
-    return mutate<ProductImage[]>(
-        `/stores/${storeId}/products/${productId}/images`,
-        "PUT",
-        { images },
-    );
+    return mutateProduct<ProductImage[]>(productId, "/images", "PUT", {
+        images,
+    });
 }
 
 export interface StockView {
     productId: string;
+    /** Track stock (#515): the product's switch and the business's. */
+    tracked: boolean;
     mode: "product" | "variant";
     quantity: number;
     reserved: number;
@@ -453,26 +625,29 @@ export interface StockView {
     }[];
 }
 
-/** Every variant's count at once; switches the product to per-variant. */
+/** Every variant's count at `storeId`; switches the product to per-variant. */
 export function setVariantStock(
     storeId: string,
     productId: string,
     variants: { variantId: string; quantity: number; lowStockAlert: number }[],
 ) {
-    return mutate<StockView>(
-        `/stores/${storeId}/products/${productId}/inventory/variants`,
+    return mutateProduct<StockView>(
+        productId,
+        `/inventory/variants${at(storeId)}`,
         "PUT",
         { variants },
     );
 }
 
+/** The variants in order; returns them as `storeId` sees them. */
 export function reorderVariants(
     storeId: string,
     productId: string,
     ids: string[],
 ) {
-    return mutate<Variant[]>(
-        `/stores/${storeId}/products/${productId}/variants/order`,
+    return mutateProduct<Variant[]>(
+        productId,
+        `/variants/order${at(storeId)}`,
         "PUT",
         { ids },
     );

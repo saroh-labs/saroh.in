@@ -2,6 +2,8 @@ import type { AuditEventRow, RoleLabels } from "./activity";
 import { personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
+    counted,
+    countOf,
     FIELD_PHRASES,
     fieldsOf,
     moduleName,
@@ -62,6 +64,66 @@ const row = (
     before: string | null,
     after: string | null,
 ): ActivityChangeRow => ({ label, before, after });
+
+/**
+ * Track stock turned on or off (#515): the switch, then what it did — the
+ * units counted to 0 and where, the products it touched, whether a first
+ * count started it, the Sold out marks it cleared.
+ */
+function trackingRows(
+    on: boolean,
+    meta: Record<string, unknown>,
+    business: boolean,
+): ActivityChangeRow[] {
+    const rows: ActivityChangeRow[] = [];
+    const product = text(meta.product);
+    if (!business && product) rows.push(row("Product", null, product));
+    rows.push(row("Track stock", on ? "Off" : "On", on ? "On" : "Off"));
+    const products = countOf(meta.products);
+    if (business && products !== null) {
+        rows.push(
+            row(
+                "Products",
+                null,
+                on
+                    ? `${counted(products, "product")} counting again, from 0`
+                    : `${counted(products, "product")} stopped counting`,
+            ),
+        );
+    }
+    if (on) {
+        if (meta.startedWithCount === true) {
+            rows.push(row("Started by", null, "Its first count"));
+        }
+        const cleared = countOf(meta.soldOutCleared) ?? 0;
+        if (cleared > 0) {
+            rows.push(
+                row(
+                    "Sold out by hand",
+                    null,
+                    business
+                        ? `Cleared ${counted(cleared, "mark")}`
+                        : `Cleared at ${counted(cleared, "storefront")}`,
+                ),
+            );
+        }
+        return rows;
+    }
+    const units = countOf(meta.unitsZeroed);
+    if (units !== null) {
+        const at = countOf(meta.storefronts) ?? 0;
+        rows.push(
+            row(
+                "Stock",
+                null,
+                units === 0
+                    ? "None on the shelves"
+                    : `${counted(units, "unit")} set to 0${at > 0 ? ` at ${counted(at, "storefront")}` : ""}`,
+            ),
+        );
+    }
+    return rows;
+}
 
 /** A settings save's fields: with values where kept, "changed" where not. */
 function profileRows(
@@ -167,6 +229,44 @@ function detailRows(
         case "membership.remove":
             return {
                 rows: [row("Role", role(meta.role), "Removed from the team")],
+                withoutValues: false,
+            };
+        case "product.sold-out.mark":
+        case "product.sold-out.clear": {
+            const marked = event.action === "product.sold-out.mark";
+            const where = text(meta.storefront);
+            return {
+                rows: [
+                    ...(text(meta.product)
+                        ? [row("Product", null, text(meta.product))]
+                        : []),
+                    row(
+                        where ? `On the shop, ${where}` : "On the shop",
+                        marked ? "Available" : "Sold out",
+                        marked ? "Sold out" : "Available",
+                    ),
+                ],
+                withoutValues: false,
+            };
+        }
+        case "product.stock-tracking.on":
+        case "product.stock-tracking.off":
+            return {
+                rows: trackingRows(
+                    event.action === "product.stock-tracking.on",
+                    meta,
+                    false,
+                ),
+                withoutValues: false,
+            };
+        case "business.stock-tracking.on":
+        case "business.stock-tracking.off":
+            return {
+                rows: trackingRows(
+                    event.action === "business.stock-tracking.on",
+                    meta,
+                    true,
+                ),
                 withoutValues: false,
             };
         default:

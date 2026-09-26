@@ -1,19 +1,58 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
+    NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { BUSINESS_UNTRACKED, CANT_CHANGE_TRACKING } from "../stock/stock-words";
+import type { StockActor } from "../stock/stock.service";
+import {
+    businessTracksLocked,
+    count,
+    recordEntry,
+} from "../stock/stock.service";
+import type { ProductTracking } from "../stock/tracking";
+import {
+    COUNTING_ROWS,
+    ensureShelves,
+    setProductTracking,
+    tracksStock,
+} from "../stock/tracking";
 import type {
     UpdateInventoryDto,
     UpdateVariantStockDto,
 } from "./inventory.dto";
 import { linesToMove, promisesToMove } from "./open-promises";
+import type { ProductScope } from "./product-access";
 import { ProductsService } from "./products.service";
+import type { StockLevelRow } from "./stock-levels";
+import {
+    countsPerVariant,
+    lockProduct,
+    lockProductStock,
+    lockStockLevels,
+} from "./stock-levels";
+
+/** The caller as the stock flows take it: who, where, and as what role. */
+function stockActor(scope: ProductScope): StockActor {
+    return {
+        organizationId: scope.organizationId,
+        userId: scope.userId,
+        roleKey: scope.roleKey,
+    };
+}
+
+/** Why a count was written when the product switched to per-variant stock. */
+const SWITCH_NOTE = "Now counted per variant";
 
 export interface StockView {
     productId: string;
+    /** Track stock (#515): the product's switch and the business's. */
+    tracked: boolean;
     mode: "product" | "variant";
     /** The product's own row: all its stock, or (per variant) old promises. */
     quantity: number;
@@ -28,19 +67,29 @@ export interface StockView {
 }
 
 /**
- * Stock. A product counts either as a whole (its one Inventory row) or per
- * variant (a VariantInventory row each) — never both for the same units.
- * `reserved` belongs to Orders and is read-only here; this service sets
- * on-hand counts and warning levels.
+ * Stock at one storefront (#510: StockLevel rows, one per storefront ×
+ * product × variant). A product counts either as a whole (its row with no
+ * variant) or per variant (a row each) — never both for the same units.
+ * `reserved` (StockLevel.promised) belongs to Orders and is read-only here;
+ * this service sets on-hand counts and warning levels.
  *
- * Switching to per-variant stock is one save of every variant's count, and
- * every unit is counted once. Open orders that name a variant take their
- * promise with them: it becomes that variant's `reserved`, inside the count
- * the merchant gives it. The product's row is kept for lines that name no
- * variant, holding exactly what they promise (quantity = reserved), so
- * releasing or fulfilling any open order lands on the row it now sits on.
- * The editor seeds the counts to match: each variant starts at what it
- * promises, the first also at what was free to sell.
+ * Every count goes through the stock module (#513), so it writes a COUNTED
+ * entry in the same transaction, and needs whoever sets it to be able to
+ * count and move stock (`canWriteStock`). A count may go below what is
+ * promised; the shelf then reads "N short".
+ *
+ * Switching to per-variant stock is one save of every variant's count at the
+ * storefront the editor is open at, and every unit is counted once. It
+ * switches the product everywhere: at every storefront that counts it, open
+ * orders that name a variant take their promise with them — it becomes that
+ * variant's `reserved` at the same storefront. Here, inside the count the
+ * merchant gives; elsewhere, inside a count of what was promised, the first
+ * variant also taking what was free to sell. The product's row at each
+ * storefront is kept for lines that name no variant, holding exactly what
+ * they promise (quantity = reserved), so releasing or fulfilling any open
+ * order lands on the row it now sits on. The editor seeds the counts to
+ * match: each variant starts at what it promises, the first also at what was
+ * free to sell.
  */
 @Injectable()
 export class InventoryService {
@@ -51,60 +100,77 @@ export class InventoryService {
         productId: string,
         userId: string,
     ): Promise<StockView> {
-        await this.products.assertProductReadable(storeId, productId, userId);
-        return this.view(productId);
+        return this.getIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
     }
 
-    /** Set the product's own count; refused once it counts per variant. */
+    async getIn(scope: ProductScope, productId: string): Promise<StockView> {
+        return this.view(scope.storeId, productId);
+    }
+
+    /** Store-route alias of `upsertIn`. */
     async upsert(
         storeId: string,
         productId: string,
         userId: string,
         dto: UpdateInventoryDto,
     ) {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.upsertIn(
+            await this.products.access.stockViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
-        if (
-            (await prisma.variantInventory.count({ where: { productId } })) > 0
-        ) {
+    }
+
+    /**
+     * Count the product's own shelf here (a COUNTED entry); refused once it
+     * counts per variant. A shelf that counted nothing starts counting.
+     */
+    async upsertIn(
+        scope: ProductScope,
+        productId: string,
+        dto: UpdateInventoryDto,
+    ) {
+        const { organizationId, storeId, userId } = scope;
+        if (await countsPerVariant(prisma, productId)) {
             throw new ConflictException({
                 message:
                     "This product counts stock for each variant. Set each variant's count instead.",
                 field: "quantity",
             });
         }
-        const inventory = await prisma.inventory.upsert({
-            where: { productId },
-            create: {
-                storeId,
-                organizationId,
-                productId,
-                quantity: dto.quantity,
-                lowStockAlert: dto.lowStockAlert ?? 10,
-            },
-            update: {
-                quantity: dto.quantity,
-                ...(dto.lowStockAlert != null
-                    ? { lowStockAlert: dto.lowStockAlert }
-                    : {}),
-            },
+        const { shelf } = await prisma.$transaction(async (tx) => {
+            await this.startTracking(tx, scope, productId);
+            return count(
+                tx,
+                { organizationId, userId, roleKey: scope.roleKey },
+                {
+                    target: { storeId, productId, variantId: null },
+                    counted: dto.quantity,
+                    lowStockAlert: dto.lowStockAlert,
+                },
+            );
         });
         return {
             productId,
-            quantity: inventory.quantity,
-            reserved: inventory.reserved,
-            lowStockAlert: inventory.lowStockAlert,
+            quantity: shelf.onHand,
+            reserved: shelf.promised,
+            lowStockAlert: shelf.lowStockAlert,
         };
     }
 
     /**
-     * Set every variant's on-hand count and warning level at once. The list
-     * must name each variant of the product exactly once, so no variant is
-     * left uncounted. A count below what that variant already promises to
-     * open orders is refused.
+     * Count every variant's shelf and set its warning level here at once. The
+     * list must name each variant of the product exactly once, so no variant
+     * is left uncounted. A count below what a variant promises is saved; the
+     * shelf reads "N short". Switching the product to per-variant stock the
+     * first time changes how it counts, so that needs `store:write`.
      */
     async setVariants(
         storeId: string,
@@ -112,18 +178,27 @@ export class InventoryService {
         userId: string,
         dto: UpdateVariantStockDto,
     ): Promise<StockView> {
-        const organizationId = await this.products.assertProductWritable(
-            storeId,
+        return this.setVariantsIn(
+            await this.products.access.stockViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
             productId,
-            userId,
+            dto,
         );
-        if (!organizationId) {
-            throw new BadRequestException(
-                "This storefront is not attached to a business, so it can't count stock per variant.",
-            );
-        }
+    }
+
+    /** See `setVariants`. Every shelf it changes gets a COUNTED entry. */
+    async setVariantsIn(
+        scope: ProductScope,
+        productId: string,
+        dto: UpdateVariantStockDto,
+    ): Promise<StockView> {
+        const { organizationId, storeId, userId } = scope;
         const variants = await prisma.productVariant.findMany({
             where: { productId },
+            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             select: { id: true, title: true },
         });
         if (variants.length === 0) {
@@ -146,93 +221,325 @@ export class InventoryService {
         }
 
         await prisma.$transaction(async (tx) => {
-            // Lock the product's row first: two first switches at once, or
-            // an order settling on this row, wait for each other.
-            await tx.$queryRaw`SELECT id FROM "Inventory" WHERE "productId" = ${productId} FOR UPDATE`;
-            const own = await tx.inventory.findUnique({
-                where: { productId },
-                select: { reserved: true },
+            // Lock order: the open Orders whose lines may move, then the
+            // product, then its StockLevel rows — so an order settling on
+            // the product's row and this switch wait for each other.
+            const orders = await tx.orderItem.findMany({
+                where: linesToMove(productId),
+                select: { orderId: true },
             });
-            const counted = await tx.variantInventory.findMany({
-                where: { productId },
-                select: { variantId: true, reserved: true },
+            const orderIds = Array.from(
+                new Set(orders.map((o) => o.orderId)),
+            ).sort();
+            if (orderIds.length > 0) {
+                await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ANY(${orderIds}::text[]) ORDER BY id FOR UPDATE`;
+            }
+            // Order → BusinessProfile (FOR SHARE) → Product: startTracking
+            // below reads the profile again, already held.
+            await businessTracksLocked(tx, organizationId);
+            await lockProduct(tx, productId);
+            // Starting to track here: its other storefronts get their
+            // shelves once it counts per variant, below.
+            const started = await this.startTracking(tx, scope, productId, {
+                makeShelves: false,
             });
-            const firstSwitch = counted.length === 0;
-            const promisedNow = Object.fromEntries(
-                counted.map((row) => [row.variantId, row.reserved]),
-            );
-            // On the switch, the open lines holding stock on the product's
-            // row for a variant move to that variant's row.
+            const shelvesElsewhere = () =>
+                started
+                    ? ensureShelves(tx, organizationId, productId)
+                    : Promise.resolve();
+            const rows = await lockProductStock(tx, productId);
+            const firstSwitch = !rows.some((r) => r.variantId !== null);
+            if (firstSwitch && !scope.canWrite) {
+                throw new ForbiddenException(
+                    "Counting each variant changes how this product counts stock. Ask someone who can change products.",
+                );
+            }
+
+            const here = rows.filter((r) => r.storeId === storeId);
             const moving = firstSwitch
-                ? await promisesToMove(tx, productId, own != null)
+                ? await promisesToMove(tx, productId, storeId)
                 : {};
+            const counts = new Map<string, { onHand: number; warn: number }>();
             for (const input of dto.variants) {
-                const promised = firstSwitch
-                    ? (moving[input.variantId] ?? 0)
-                    : (promisedNow[input.variantId] ?? 0);
-                if (input.quantity < promised) {
-                    throw new BadRequestException({
-                        message: `${byId.get(input.variantId)?.title ?? "A variant"} has ${promised} promised to open orders — on hand can't go below that.`,
-                        field: "variants",
-                    });
+                counts.set(input.variantId, {
+                    onHand: input.quantity,
+                    warn: input.lowStockAlert,
+                });
+            }
+
+            if (!firstSwitch) {
+                for (const [variantId, next] of Array.from(counts)) {
+                    let rowId = here.find((r) => r.variantId === variantId)?.id;
+                    if (rowId) {
+                        await tx.stockLevel.update({
+                            where: { id: rowId },
+                            data: { lowStockAlert: next.warn },
+                        });
+                    } else {
+                        const made = await tx.stockLevel.create({
+                            data: {
+                                organizationId,
+                                storeId,
+                                productId,
+                                variantId,
+                                lowStockAlert: next.warn,
+                            },
+                            select: { id: true },
+                        });
+                        rowId = made.id;
+                    }
+                    await this.countTo(tx, rowId, next.onHand, userId);
                 }
-                await tx.variantInventory.upsert({
-                    where: { variantId: input.variantId },
-                    create: {
-                        variantId: input.variantId,
-                        productId,
-                        organizationId,
-                        quantity: input.quantity,
-                        reserved: promised,
-                        lowStockAlert: input.lowStockAlert,
-                    },
-                    update: {
-                        quantity: input.quantity,
-                        lowStockAlert: input.lowStockAlert,
-                    },
-                });
+                await shelvesElsewhere();
+                return;
             }
-            if (!firstSwitch) return;
-            await tx.orderItem.updateMany({
-                where: linesToMove(productId, own != null),
-                data: { stockRow: "VARIANT" },
-            });
-            // The product's own row now holds only what the lines left on it
-            // promise.
-            if (own) {
-                const moved = Object.values(moving).reduce((n, q) => n + q, 0);
-                // Never below zero, even if a line from before rows were
-                // recorded was guessed wrong.
-                const left = Math.max(0, own.reserved - moved);
-                await tx.inventory.update({
-                    where: { productId },
-                    data: { quantity: left, reserved: left },
+
+            // The first switch: here with the merchant's counts, and at every
+            // other storefront that counts the product, with what its open
+            // orders promise (the first variant also taking what was free).
+            const stores = new Set([
+                storeId,
+                ...rows
+                    .filter((r) => r.variantId === null)
+                    .map((r) => r.storeId),
+            ]);
+            for (const store of Array.from(stores)) {
+                const own = rows.find(
+                    (r) => r.storeId === store && r.variantId === null,
+                );
+                const promises =
+                    store === storeId
+                        ? moving
+                        : await promisesToMove(tx, productId, store);
+                const free = own ? Math.max(0, own.onHand - own.promised) : 0;
+                const created = await this.switchStore(tx, {
+                    organizationId,
+                    userId,
+                    storeId: store,
+                    productId,
+                    own,
+                    promises,
+                    counts:
+                        store === storeId
+                            ? counts
+                            : new Map(
+                                  variants.map((v, i) => [
+                                      v.id,
+                                      {
+                                          onHand:
+                                              (promises[v.id] ?? 0) +
+                                              (i === 0 ? free : 0),
+                                          warn: own?.lowStockAlert ?? 10,
+                                      },
+                                  ]),
+                              ),
                 });
+                await lockStockLevels(tx, created);
             }
+            await shelvesElsewhere();
         });
-        return this.view(productId);
+        return this.view(storeId, productId);
     }
 
-    private async view(productId: string): Promise<StockView> {
-        const [own, perVariant] = await Promise.all([
-            prisma.inventory.findUnique({ where: { productId } }),
-            prisma.variantInventory.findMany({
-                where: { productId },
+    /** Store-route alias of `setTrackingIn`. */
+    async setTracking(
+        storeId: string,
+        productId: string,
+        userId: string,
+        tracked: boolean,
+    ): Promise<ProductTracking> {
+        return this.setTrackingIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            tracked,
+        );
+    }
+
+    /**
+     * Track stock on or off for this product (#515), everywhere it sells.
+     * Changes how it sells, so it needs `store:write` — never
+     * `inventory:write` alone. Off is refused while open orders hold its
+     * units, and counts each shelf with stock to 0; on starts every shelf at
+     * 0 (`stock/tracking.ts`).
+     */
+    async setTrackingIn(
+        scope: ProductScope,
+        productId: string,
+        tracked: boolean,
+    ): Promise<ProductTracking> {
+        if (!scope.canWrite) {
+            throw new ForbiddenException(CANT_CHANGE_TRACKING);
+        }
+        return prisma.$transaction((tx) =>
+            setProductTracking(tx, stockActor(scope), productId, tracked),
+        );
+    }
+
+    /**
+     * Before a count from the product's own stock editor: the product must
+     * count stock. One that doesn't starts to — Track stock on, at 0 — for
+     * someone who can change products; a stock-only role is refused, as is
+     * any count while the business has Track stock off. Reads Track stock
+     * with the business's profile FOR SHARE, then takes the product's lock
+     * (Profile → Product, as `resolveRowId` does), so neither switch can
+     * go off under the count.
+     * Returns whether it started tracking.
+     */
+    private async startTracking(
+        tx: Prisma.TransactionClient,
+        scope: ProductScope,
+        productId: string,
+        opts: { makeShelves?: boolean } = {},
+    ): Promise<boolean> {
+        const businessOn = await businessTracksLocked(tx, scope.organizationId);
+        await lockProduct(tx, productId);
+        if (!businessOn) {
+            throw new ConflictException({
+                message: BUSINESS_UNTRACKED,
+                field: "quantity",
+            });
+        }
+        const product = await tx.product.findFirst({
+            where: { id: productId, organizationId: scope.organizationId },
+            select: { stockTracked: true },
+        });
+        if (!product) throw new NotFoundException("Product not found");
+        if (product.stockTracked) return false;
+        if (!scope.canWrite) {
+            throw new ForbiddenException(CANT_CHANGE_TRACKING);
+        }
+        // A first count turned it on: the Activity row says so.
+        await setProductTracking(tx, stockActor(scope), productId, true, {
+            ...opts,
+            startedWithCount: true,
+        });
+        return true;
+    }
+
+    /**
+     * Count a locked row to `onHand`: one COUNTED entry, even when nothing
+     * changed (a count that agrees is still a count).
+     */
+    private async countTo(
+        tx: Prisma.TransactionClient,
+        stockLevelId: string,
+        onHand: number,
+        userId: string,
+        switched = false,
+    ): Promise<void> {
+        const row = await tx.stockLevel.findUniqueOrThrow({
+            where: { id: stockLevelId },
+            select: { onHand: true },
+        });
+        await recordEntry(tx, {
+            stockLevelId,
+            kind: "COUNTED",
+            quantity: onHand - row.onHand,
+            counted: onHand,
+            actorUserId: userId,
+            // The switch to counting each variant is Saroh's count, never
+            // undone: undoing it would count the same units twice.
+            ...(switched ? { note: SWITCH_NOTE, system: "PER_VARIANT" } : {}),
+        });
+    }
+
+    /**
+     * One storefront's side of the first switch: a row per variant holding
+     * what its open lines here promise, those lines moved onto it, and the
+     * product's own row left holding only what lines without a variant
+     * promise. Each shelf that changes gets a COUNTED entry. Returns the
+     * rows it made.
+     */
+    private async switchStore(
+        tx: Prisma.TransactionClient,
+        input: {
+            organizationId: string;
+            userId: string;
+            storeId: string;
+            productId: string;
+            own: StockLevelRow | undefined;
+            promises: Record<string, number>;
+            counts: Map<string, { onHand: number; warn: number }>;
+        },
+    ): Promise<string[]> {
+        const { organizationId, userId, storeId, productId, own, promises } =
+            input;
+        const made: string[] = [];
+        for (const [variantId, next] of Array.from(input.counts)) {
+            const row = await tx.stockLevel.create({
+                data: {
+                    organizationId,
+                    storeId,
+                    productId,
+                    variantId,
+                    promised: promises[variantId] ?? 0,
+                    lowStockAlert: next.warn,
+                },
+                select: { id: true },
+            });
+            made.push(row.id);
+            await this.countTo(tx, row.id, next.onHand, userId, true);
+            await tx.orderItem.updateMany({
+                where: { ...linesToMove(productId, storeId), variantId },
+                data: { stockRow: "VARIANT", stockLevelId: row.id },
+            });
+        }
+        if (own) {
+            const moved = Object.values(promises).reduce((n, q) => n + q, 0);
+            // Never below zero, even if a line from before rows were
+            // recorded was guessed wrong.
+            const left = Math.max(0, own.promised - moved);
+            await tx.stockLevel.update({
+                where: { id: own.id },
+                data: { promised: left },
+            });
+            if (own.onHand !== left) {
+                await this.countTo(tx, own.id, left, userId, true);
+            }
+        }
+        return made;
+    }
+
+    private async view(storeId: string, productId: string): Promise<StockView> {
+        const [rows, perVariant, tracked] = await Promise.all([
+            prisma.stockLevel.findMany({
+                // An untracked product's shelves (kept at 0) read as none.
+                where: { storeId, productId, ...COUNTING_ROWS },
+                orderBy: { id: "asc" },
                 select: {
                     variantId: true,
-                    quantity: true,
-                    reserved: true,
+                    onHand: true,
+                    promised: true,
                     lowStockAlert: true,
                 },
             }),
+            countsPerVariant(prisma, productId),
+            tracksStock(prisma, productId),
         ]);
+        const own = rows.find((r) => r.variantId === null);
         return {
             productId,
-            mode: perVariant.length > 0 ? "variant" : "product",
-            quantity: own?.quantity ?? 0,
-            reserved: own?.reserved ?? 0,
+            tracked,
+            mode: perVariant ? "variant" : "product",
+            quantity: own?.onHand ?? 0,
+            reserved: own?.promised ?? 0,
             lowStockAlert: own?.lowStockAlert ?? 10,
-            variants: perVariant,
+            variants: rows.flatMap((r) =>
+                r.variantId
+                    ? [
+                          {
+                              variantId: r.variantId,
+                              quantity: r.onHand,
+                              reserved: r.promised,
+                              lowStockAlert: r.lowStockAlert,
+                          },
+                      ]
+                    : [],
+            ),
         };
     }
 }

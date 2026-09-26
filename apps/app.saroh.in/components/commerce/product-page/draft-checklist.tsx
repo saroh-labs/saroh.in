@@ -5,8 +5,10 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
+import { untrackedShort } from "@/lib/products/tracking";
 
 /**
  * "Before it goes on the shop" — a draft's checklist. Nothing here is
@@ -17,10 +19,13 @@ export function DraftChecklist({
     overview,
     edit,
     canWrite,
+    counts,
 }: {
     overview: ProductOverview;
     edit: (section?: EditorSection) => string;
     canWrite: boolean;
+    /** The product counts stock (Track stock, #515). */
+    counts: boolean;
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
@@ -42,8 +47,8 @@ export function DraftChecklist({
             title: "Photos",
             sub:
                 product.images.length > 0
-                    ? `${product.images.length} of 5 — the first is the cover.`
-                    : "No photos yet — up to 5.",
+                    ? `${mediaCounter(product.images)} — the first photo is the cover.`
+                    : "No photos yet — up to 15 photos and 3 videos.",
             cta: { label: "Add photos", section: "photos" },
         },
         {
@@ -61,14 +66,20 @@ export function DraftChecklist({
                     : "Not set. The shop says nothing rather than guessing.",
             cta: { label: "Add", section: "details" },
         },
-        {
-            done: tracked,
-            title: "Stock",
-            sub: tracked
-                ? `${stock.totals.onHand} on hand.`
-                : "No stock count yet.",
-            cta: { label: "Add stock", section: "stock" },
-        },
+        counts
+            ? {
+                  done: tracked,
+                  title: "Stock",
+                  sub: tracked
+                      ? `${stock.totals.onHand} on hand.`
+                      : "No stock count yet.",
+                  cta: { label: "Add stock", section: "stock" },
+              }
+            : {
+                  done: true,
+                  title: "Stock",
+                  sub: untrackedShort(overview.product.storefronts ?? []),
+              },
         {
             done: product.variants.length > 0,
             title: "Variants",

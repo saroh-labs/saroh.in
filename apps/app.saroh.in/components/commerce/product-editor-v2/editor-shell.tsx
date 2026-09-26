@@ -33,6 +33,7 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
+import { trackingControl } from "@/lib/products/tracking";
 
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
@@ -54,6 +55,10 @@ export interface ProductEditorProps {
     categoriesHref: string;
     options: ProductOptionView[];
     canWrite: boolean;
+    /** May count and move stock (`inventory:write`): sees Track stock, locked. */
+    canStock: boolean;
+    /** The business's Track stock switch (#515); off, no Stock section. */
+    businessTracks: boolean;
     /** Settings → SKUs, and this product's number for {N}. */
     sku: { pattern: string; suggest: boolean; n: number };
     /** Settings → Allergens; empty for a shop that sells no food. */
@@ -98,6 +103,8 @@ function EditorBody({
     categoriesHref,
     options,
     canWrite,
+    canStock,
+    businessTracks,
     sku,
     allergens,
     defaults: initialDefaults,
@@ -118,7 +125,7 @@ function EditorBody({
     async function categoryChanged(categoryId: string) {
         if (!creating) return;
         categoryAsked.current = categoryId;
-        const next = await effectiveDefaults(storeId, categoryId || null).catch(
+        const next = await effectiveDefaults(categoryId || null).catch(
             () => null,
         );
         // Only the latest pick counts; a slower earlier answer is dropped.
@@ -192,7 +199,10 @@ function EditorBody({
 
     const statusPill = product?.status;
     const jumps = SECTION_ORDER.filter(
-        (k) => !(creating && (k === "variants" || k === "stock")),
+        (k) =>
+            !(creating && (k === "variants" || k === "stock")) &&
+            // The business doesn't track stock: nothing to count (#515).
+            !(k === "stock" && !businessTracks),
     );
 
     return (
@@ -360,7 +370,7 @@ function EditorBody({
                         storeName={storeName}
                         defaults={defaults}
                     />
-                    <PhotosSection product={product} storeId={storeId} />
+                    <PhotosSection product={product} />
                 </div>
                 <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-[760px]:min-w-0 max-[760px]:border-l-0 max-[760px]:border-t max-[480px]:px-4">
                     <VisibilitySection
@@ -378,11 +388,19 @@ function EditorBody({
                                 options={options}
                                 sku={sku}
                             />
-                            <StockSection
-                                product={product}
-                                storeId={storeId}
-                                defaultWarn={defaults?.lowStockAlert ?? null}
-                            />
+                            {businessTracks ? (
+                                <StockSection
+                                    product={product}
+                                    storeId={storeId}
+                                    defaultWarn={
+                                        defaults?.lowStockAlert ?? null
+                                    }
+                                    control={trackingControl({
+                                        canWrite,
+                                        canStock,
+                                    })}
+                                />
+                            ) : null}
                         </>
                     ) : (
                         <NextSteps />

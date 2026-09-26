@@ -147,11 +147,26 @@ module.exports = {
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
+        // #517 photos and videos: limits, kind/type match, posters from the
+        // library, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/products/product-images.service.spec.ts",
+        // #530 the merge report: Owner/Admin only, with a mocked Prisma.
+        "<rootDir>/src/modules/products/merge-report.service.spec.ts",
+        // #513 the stock log's words and arithmetic — pure.
+        "<rootDir>/src/modules/stock/stock-words.spec.ts",
+        // #514 the Stock API: sign-in, organization and COMMERCE gates.
+        "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue.controller.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
+        // #516 collections: the gate and who may change them, and the
+        // website-pages scanner — no database.
+        "<rootDir>/src/modules/collections/collections.gate.spec.ts",
+        "<rootDir>/src/modules/collections/website-pages.spec.ts",
+        // #529 the business's categories, with a mocked Prisma.
+        "<rootDir>/src/modules/categories/categories.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
         // #173 — organization stamping on create; DB-free so CI catches a
         // regression without a provisioned Postgres.

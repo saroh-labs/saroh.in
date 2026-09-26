@@ -15,8 +15,10 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { SetStockTrackingDto, SetStoreSoldOutDto } from "../stock/dto";
 import { UpdateInventoryDto, UpdateVariantStockDto } from "./inventory.dto";
 import { InventoryService } from "./inventory.service";
+import { SoldOutService } from "./sold-out.service";
 import {
     CreateVariantDto,
     ReorderVariantsDto,
@@ -25,8 +27,12 @@ import {
 import { VariantsService } from "./variants.service";
 
 /**
- * Variants + inventory for a product. Both are scoped to a product within a
- * store; the services delegate authorization (read/write) to ProductsService.
+ * The old per-storefront addresses of a product's variants and stock, kept
+ * for one release (#531): `OrganizationProductsController` serves the same
+ * under organizations/:organizationId/products/:productId. Each resolves the
+ * product through the storefront, under the storefront's own access rules
+ * (counts under Count and move stock, `stockViaStore`), and calls the same
+ * service.
  */
 @Controller("stores/:storeId/products/:productId")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
@@ -35,6 +41,7 @@ export class ProductDetailsController {
     constructor(
         private readonly variants: VariantsService,
         private readonly inventory: InventoryService,
+        private readonly soldOut: SoldOutService,
     ) {}
 
     @Get("variants")
@@ -123,5 +130,37 @@ export class ProductDetailsController {
         @Body() dto: UpdateInventoryDto,
     ) {
         return this.inventory.upsert(storeId, productId, user.id, dto);
+    }
+
+    /** Track stock on or off for the product (#515), by whoever can change it. */
+    @Put("stock-tracking")
+    setStockTracking(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: SetStockTrackingDto,
+    ) {
+        return this.inventory.setTracking(
+            storeId,
+            productId,
+            user.id,
+            dto.tracked,
+        );
+    }
+
+    /** Sold out by hand at this storefront, or available again (#515). */
+    @Put("sold-out")
+    setSoldOut(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: SetStoreSoldOutDto,
+    ) {
+        return this.soldOut.setViaStore(
+            storeId,
+            productId,
+            user.id,
+            dto.soldOut,
+        );
     }
 }

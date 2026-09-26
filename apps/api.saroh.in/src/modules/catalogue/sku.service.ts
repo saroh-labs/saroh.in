@@ -1,11 +1,6 @@
-import {
-    BadRequestException,
-    ForbiddenException,
-    Injectable,
-} from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { StoresService } from "../stores/stores.service";
 import {
     clashProblem,
     DEFAULT_SKU_PATTERN,
@@ -37,25 +32,23 @@ export interface SkuPreviewView {
 /**
  * The SKU pattern (#484): read with the product's number for the editor,
  * a preview of every variant's suggestion with its clashes, and the save —
- * which never rewrites a SKU a variant already has.
+ * which never rewrites a SKU a variant already has. The pattern is the
+ * business's (#529, kept on its BusinessProfile), and {N} counts every
+ * storefront's products.
  */
 @Injectable()
 export class SkuService {
-    constructor(private readonly stores: StoresService) {}
-
     async get(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         productId?: string,
     ): Promise<SkuSettingsView> {
-        await this.stores.getForUser(storeId, userId);
         const [settings, ids] = await Promise.all([
-            prisma.storeSettings.findUnique({
-                where: { storeId },
+            prisma.businessProfile.findUnique({
+                where: { organizationId },
                 select: { skuPattern: true, skuSuggest: true },
             }),
             prisma.product.findMany({
-                where: { storeId },
+                where: { organizationId },
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                 select: { id: true },
             }),
@@ -69,12 +62,10 @@ export class SkuService {
     }
 
     async preview(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         pattern: string,
     ): Promise<SkuPreviewView> {
-        await this.stores.getForUser(storeId, userId);
-        const rows = await this.rows(storeId, pattern);
+        const rows = await this.rows(organizationId, pattern);
         return {
             rows,
             total: rows.length,
@@ -88,21 +79,11 @@ export class SkuService {
     }
 
     async save(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         input: { pattern: string; suggest: boolean },
     ): Promise<SkuSettingsView> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (!writable) {
-            throw new ForbiddenException(
-                "Your role can't change product settings.",
-            );
-        }
         const pattern = input.pattern.trim();
-        const rows = await this.rows(storeId, pattern);
+        const rows = await this.rows(organizationId, pattern);
         const problem =
             patternProblem(pattern) ||
             clashProblem(
@@ -115,21 +96,25 @@ export class SkuService {
                 field: "skuPattern",
             });
         }
-        await prisma.storeSettings.upsert({
-            where: { storeId },
-            create: { storeId, skuPattern: pattern, skuSuggest: input.suggest },
+        await prisma.businessProfile.upsert({
+            where: { organizationId },
+            create: {
+                organizationId,
+                skuPattern: pattern,
+                skuSuggest: input.suggest,
+            },
             update: { skuPattern: pattern, skuSuggest: input.suggest },
         });
-        return this.get(storeId, userId);
+        return this.get(organizationId);
     }
 
     /** Every variant (or product, when it has none), as the pattern names it. */
     private async rows(
-        storeId: string,
+        organizationId: string,
         pattern: string,
     ): Promise<SkuPreviewRow[]> {
         const products = await prisma.product.findMany({
-            where: { storeId },
+            where: { organizationId },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             select: {
                 id: true,

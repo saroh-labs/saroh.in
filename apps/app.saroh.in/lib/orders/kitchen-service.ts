@@ -123,12 +123,14 @@ export interface RefundOutcome {
 /**
  * Refund chosen lines — or, with none, everything still refundable. The API
  * works out the amount; `idempotencyKey` makes a retry return the first
- * refund instead of a second one.
+ * refund instead of a second one. `putBack` ("Put N back in stock") puts
+ * units back on the shelf once the provider confirms the refund.
  */
 export function refundOrderLines(
     orderId: string,
     input: {
         lines: { itemId: string; quantity: number }[] | null;
+        putBack?: { itemId: string; quantity: number }[];
         idempotencyKey: string;
     },
 ): Promise<CrmResult<RefundOutcome>> {
@@ -137,6 +139,7 @@ export function refundOrderLines(
         "POST",
         {
             ...(input.lines ? { lines: input.lines } : {}),
+            ...(input.putBack?.length ? { putBack: input.putBack } : {}),
             idempotencyKey: input.idempotencyKey,
         },
         "The refund didn't go through. Nothing was sent back.",

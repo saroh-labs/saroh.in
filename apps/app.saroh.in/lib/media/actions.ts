@@ -17,7 +17,7 @@ export async function createUpload(input: {
     contentLength: number;
     filename: string;
     /** The library bucket; site images unless said. */
-    purpose?: "site-image" | "business-logo";
+    purpose?: "site-image" | "business-logo" | "product-video";
 }) {
     return createUploadApi(input);
 }

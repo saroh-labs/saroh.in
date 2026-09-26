@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { hashPassword as hashPasswordUntyped } from "better-auth/crypto";
 
 import { parseSectionContentOrThrow } from "@saroh/block-contract";
+import {
+    describeHeldStockMismatches,
+    heldStockMismatches,
+} from "../backfill/held-stock";
 import type { SeedSection, SeedSite } from "./data";
 import { SEED_PREFIX, SEEDED_STYLE_VARIABLES } from "./data";
 
@@ -568,4 +572,153 @@ export async function publishSeedPost(
         where: { id: post.id },
         data: { currentPublicationId: publication.id, publishedAt },
     });
+}
+
+/**
+ * Sell a product at a storefront (#510): its `ProductListing` there and, for
+ * a product with variants, a `ProductListingVariant` for each — a product's
+ * variants are all sold where it is. Keyed on the listing's own uniques, so a
+ * re-run finds what the last one wrote. Returns the listing's id.
+ */
+export async function listProductAt(
+    prisma: Db,
+    a: {
+        id: string;
+        orgId: string;
+        storeId: string;
+        productId: string;
+        variants?: readonly { id: string; variantId: string }[];
+    },
+): Promise<string> {
+    const listing = await prisma.productListing.upsert({
+        where: {
+            storeId_productId: { storeId: a.storeId, productId: a.productId },
+        },
+        update: {},
+        create: {
+            id: a.id,
+            organizationId: a.orgId,
+            storeId: a.storeId,
+            productId: a.productId,
+        },
+    });
+    for (const v of a.variants ?? []) {
+        await prisma.productListingVariant.upsert({
+            where: {
+                listingId_variantId: {
+                    listingId: listing.id,
+                    variantId: v.variantId,
+                },
+            },
+            update: {},
+            create: {
+                id: v.id,
+                organizationId: a.orgId,
+                listingId: listing.id,
+                productId: a.productId,
+                variantId: v.variantId,
+            },
+        });
+    }
+    return listing.id;
+}
+
+/**
+ * A storefront's shelf of a product (`variantId` null: counted as a whole) or
+ * of one variant (#510). Its uniques are partial, so it is found and then
+ * written rather than upserted. `promised` and `lowStockAlert` change only
+ * when given. Returns the row's id.
+ */
+export async function setStockLevel(
+    prisma: Db,
+    a: {
+        id: string;
+        orgId: string;
+        storeId: string;
+        productId: string;
+        variantId?: string | null;
+        onHand: number;
+        promised?: number;
+        lowStockAlert?: number;
+    },
+): Promise<string> {
+    const variantId = a.variantId ?? null;
+    const data = {
+        onHand: a.onHand,
+        ...(a.promised === undefined ? {} : { promised: a.promised }),
+        ...(a.lowStockAlert === undefined
+            ? {}
+            : { lowStockAlert: a.lowStockAlert }),
+    };
+    // A product with a shelf tracks stock (#515).
+    await prisma.product.updateMany({
+        where: { id: a.productId, stockTracked: false },
+        data: { stockTracked: true, stockTrackedAt: new Date() },
+    });
+    const found = await prisma.stockLevel.findFirst({
+        where: { storeId: a.storeId, productId: a.productId, variantId },
+        select: { id: true },
+    });
+    if (found) {
+        await prisma.stockLevel.update({ where: { id: found.id }, data });
+        return found.id;
+    }
+    await prisma.stockLevel.create({
+        data: {
+            id: a.id,
+            organizationId: a.orgId,
+            storeId: a.storeId,
+            productId: a.productId,
+            variantId,
+            ...data,
+        },
+    });
+    return a.id;
+}
+
+/**
+ * Stop the seed when a shelf row's promised is not what its open lines hold,
+ * or a closed order's line still holds units (#511) — the state that made a
+ * cancel release, or a fulfilment sell, units nobody promised.
+ */
+export async function assertHeldStock(
+    prisma: Db,
+    organizationId: string,
+): Promise<void> {
+    const found = await heldStockMismatches(prisma, [organizationId]);
+    const said = describeHeldStockMismatches(found);
+    if (said.length > 0) {
+        throw new Error(
+            `${said.length} shelf row(s) or line(s) in ${organizationId} don't match what open orders hold:\n  - ${said.slice(0, 10).join("\n  - ")}`,
+        );
+    }
+}
+
+/**
+ * Make each shelf's stock log add up to what it holds (#513). The seeds set
+ * StockLevel.onHand directly; this writes one COUNTED entry wherever a row's
+ * entries don't sum to its on hand — the opening count on a new row (from 0),
+ * a re-count on a re-seeded one — so before + quantity = after holds and the
+ * entries add up, exactly as the migration left real data. Idempotent: a
+ * re-run over unchanged rows writes nothing. Returns the entries written.
+ */
+export async function balanceStockLog(
+    prisma: Db,
+    organizationId?: string,
+): Promise<number> {
+    const scope = organizationId ?? null;
+    return prisma.$executeRaw`
+        INSERT INTO "StockEntry" ("id", "organizationId", "stockLevelId", "storeId", "productId", "variantId",
+                                  "kind", "quantity", "before", "after", "counted", "note", "createdAt")
+        SELECT 'se' || replace(gen_random_uuid()::text, '-', ''), s."organizationId", s."id", s."storeId",
+               s."productId", s."variantId", 'COUNTED', s."onHand" - COALESCE(e."total", 0),
+               COALESCE(e."total", 0), s."onHand", s."onHand",
+               CASE WHEN e."total" IS NULL THEN 'Opening count' ELSE NULL END, CURRENT_TIMESTAMP
+        FROM "StockLevel" s
+        LEFT JOIN (
+            SELECT "stockLevelId", SUM("quantity")::int AS "total"
+            FROM "StockEntry" GROUP BY "stockLevelId"
+        ) e ON e."stockLevelId" = s."id"
+        WHERE (e."total" IS NULL OR e."total" <> s."onHand")
+          AND (${scope}::text IS NULL OR s."organizationId" = ${scope}::text)`;
 }

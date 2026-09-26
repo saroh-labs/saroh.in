@@ -31,6 +31,19 @@ export const AuditAction = {
     ModuleDisable: "organization.module.disabled",
     PlanChange: "organization.plan.changed",
     StorefrontHoursUpdate: "storefront.hours.update",
+    // An untracked product marked Sold out by hand at a storefront, or
+    // available again (#515); metadata names the product and storefront.
+    ProductSoldOutMark: "product.sold-out.mark",
+    ProductSoldOutClear: "product.sold-out.clear",
+    // Track stock turned on or off (#515), for one product or the whole
+    // business, written in the same transaction as the switch
+    // (`stock/tracking.ts`). A product's names it; off says how many units
+    // were counted to 0 and at how many storefronts; on says whether a
+    // first count started it and how many Sold out marks it cleared.
+    ProductStockTrackingOn: "product.stock-tracking.on",
+    ProductStockTrackingOff: "product.stock-tracking.off",
+    BusinessStockTrackingOn: "business.stock-tracking.on",
+    BusinessStockTrackingOff: "business.stock-tracking.off",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

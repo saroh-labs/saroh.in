@@ -233,6 +233,146 @@ describe("activityLine — values a save recorded (#509)", () => {
             }),
         ).toBe("Sanjay moved the plan from Free to Pro → Plan and billing");
     });
+
+    it("says a product marked sold out by hand, or available again (#515)", () => {
+        expect(
+            said({
+                action: "product.sold-out.mark",
+                targetType: "product",
+                targetId: "p1",
+                metadata: {
+                    product: "Rye loaf",
+                    storefront: "Hill Road",
+                    storefrontId: "s1",
+                },
+            }),
+        ).toBe("Sanjay marked Rye loaf sold out at Hill Road → Rye loaf");
+        expect(
+            said({
+                action: "product.sold-out.clear",
+                targetType: "product",
+                targetId: "p1",
+                metadata: { product: "Rye loaf", storefront: "Hill Road" },
+            }),
+        ).toBe(
+            "Sanjay marked Rye loaf available again at Hill Road → Rye loaf",
+        );
+        // It opens the product at the storefront it was marked at.
+        expect(
+            activityLine(
+                event({
+                    action: "product.sold-out.mark",
+                    targetId: "p1",
+                    metadata: { product: "Rye loaf", storefrontId: "s1" },
+                }),
+            )?.where.href,
+        ).toBe("/commerce/products/p1?storefront=s1");
+    });
+
+    it("says Track stock turned on or off, for a product or the business (#515)", () => {
+        const film = "Stretch Film Hand Dispenser";
+        expect(
+            said({
+                action: "product.stock-tracking.off",
+                targetType: "product",
+                targetId: "p1",
+                metadata: { product: film, unitsZeroed: 38, storefronts: 2 },
+            }),
+        ).toBe(
+            `Sanjay turned Track stock off for ${film} — 38 set to 0 → ${film}`,
+        );
+        // Nothing on the shelves: nothing to say about units.
+        expect(
+            said({
+                action: "product.stock-tracking.off",
+                targetId: "p1",
+                metadata: { product: film, unitsZeroed: 0, storefronts: 0 },
+            }),
+        ).toBe(`Sanjay turned Track stock off for ${film} → ${film}`);
+        expect(
+            said({
+                action: "product.stock-tracking.on",
+                targetId: "p1",
+                metadata: { product: film, soldOutCleared: 0 },
+            }),
+        ).toBe(`Sanjay turned Track stock on for ${film} → ${film}`);
+        // Clearing the hand-marked Sold out is part of the one line.
+        expect(
+            said({
+                action: "product.stock-tracking.on",
+                targetId: "p1",
+                metadata: { product: "Rye loaf", soldOutCleared: 2 },
+            }),
+        ).toBe(
+            "Sanjay turned Track stock on for Rye loaf — cleared Sold out at 2 storefronts → Rye loaf",
+        );
+        // A first count started it.
+        expect(
+            said({
+                action: "product.stock-tracking.on",
+                targetId: "p1",
+                metadata: {
+                    product: "Rye loaf",
+                    startedWithCount: true,
+                    soldOutCleared: 1,
+                },
+            }),
+        ).toBe(
+            "Sanjay turned Track stock on for Rye loaf with its first count — cleared Sold out at 1 storefront → Rye loaf",
+        );
+        // It opens the product.
+        expect(
+            activityLine(
+                event({
+                    action: "product.stock-tracking.off",
+                    targetId: "p1",
+                    metadata: { product: film },
+                }),
+            )?.where,
+        ).toEqual({ label: film, href: "/commerce/products/p1" });
+        expect(
+            said({
+                action: "business.stock-tracking.off",
+                targetType: "organization",
+                metadata: { products: 12, unitsZeroed: 140, storefronts: 2 },
+            }),
+        ).toBe("Sanjay turned Track stock off for the business → Products");
+        expect(
+            said({
+                action: "business.stock-tracking.on",
+                metadata: { products: 12, soldOutCleared: 0 },
+            }),
+        ).toBe("Sanjay turned Track stock on for the business → Products");
+    });
+
+    it("says Saroh support for an operator's stock change, as the API names it", () => {
+        const support = {
+            name: "Saroh support",
+            email: null,
+            role: null,
+            operator: true as const,
+        };
+        expect(
+            said({
+                action: "product.stock-tracking.off",
+                actorUserId: null,
+                actor: support,
+                metadata: { product: "Rye loaf", byOperator: true },
+            }),
+        ).toBe("Saroh support turned Track stock off for Rye loaf → Rye loaf");
+        expect(
+            said({
+                action: "product.sold-out.mark",
+                actorUserId: null,
+                actor: support,
+                metadata: {
+                    product: "Rye loaf",
+                    storefront: "Bandra",
+                    byOperator: true,
+                },
+            }),
+        ).toBe("Saroh support marked Rye loaf sold out at Bandra → Rye loaf");
+    });
 });
 
 describe("activityLine — the team", () => {

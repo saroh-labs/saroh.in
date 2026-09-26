@@ -213,9 +213,30 @@ export function resolveCapabilities(
 ): ReadonlySet<OrgAction> {
     if (stored) {
         const known = new Set<string>(ORG_ACTIONS);
-        return new Set(stored.filter((a): a is OrgAction => known.has(a)));
+        return withImplied(
+            new Set(stored.filter((a): a is OrgAction => known.has(a))),
+        );
     }
     return isBuiltInRole(roleKey) ? CAPABILITIES[roleKey] : CAPABILITIES.MEMBER;
+}
+
+/**
+ * Powers a role holds because it holds a wider one. `store:write` has always
+ * covered setting stock, so a role saved before `inventory:write` existed
+ * (#513) — or saved without it since — keeps counting.
+ */
+function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
+    if (set.has("store:write")) set.add("inventory:write");
+    return set;
+}
+
+/**
+ * Whether this actor may count and move stock (#513): `inventory:write`, or
+ * `store:write`, which implies it. Every stock write and the `canStock` read
+ * flag ask this, never either action on its own.
+ */
+export function canWriteStock(ctx: OrganizationContext): boolean {
+    return allows(ctx, "inventory:write") || allows(ctx, "store:write");
 }
 
 /** Whether a stored key names one of the four roles every business has. */

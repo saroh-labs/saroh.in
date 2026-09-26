@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { holdOpenLines } from "../../backfill/held-stock";
 import { assertDatabaseTarget } from "../../database-target";
 import {
     ANALYTICS_DAYS,
@@ -7,10 +8,12 @@ import {
     CONTACTS as BASE_CONTACTS,
     OWNER_EMAIL,
     PLAN,
+    SEED_PREFIX,
 } from "../data";
 import type { Db } from "../helpers";
 import {
     at,
+    balanceStockLog,
     buildAnalyticsRows,
     emailFor,
     hashPassword,
@@ -186,6 +189,8 @@ export async function seedShowcase(): Promise<void> {
         });
     }
 
+    // Every shelf the showcase set opens its stock log (#513).
+    await balanceStockLog(prisma);
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
@@ -455,11 +460,12 @@ async function seedNorthwind(
     // Categories: the base three plus labels, tools and shipping.
     for (const c of NORTHWIND_NEW_CATEGORIES) {
         await prisma.category.upsert({
-            where: { storeId_slug: { storeId, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.slug },
+            },
+            update: { name: c.name },
             create: {
                 id: sid(key, "category", c.slug),
-                storeId,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.slug,
@@ -467,7 +473,10 @@ async function seedNorthwind(
         });
     }
     const categories = await prisma.category.findMany({
-        where: { storeId, slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) } },
+        where: {
+            organizationId: orgId,
+            slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) },
+        },
         select: { id: true, slug: true },
     });
     const categoryId = (slug: string) => {
@@ -484,12 +493,14 @@ async function seedNorthwind(
         products: NORTHWIND_NEW_PRODUCTS,
         productId: (i) => sid(key, "product", i),
         variantId: (i, v) => sid(key, "variant", i, v),
-        inventoryId: (i) => sid(key, "inventory", i),
+        listingId: (i) => sid(key, "listing", i),
+        listingVariantId: (i, v) => sid(key, "listingvariant", i, v),
+        stockLevelId: (i) => sid(key, "stocklevel", i),
         createdAt: (i) => at(now, -(200 - i * 3), 11),
     });
     const baseProducts = await prisma.product.findMany({
         where: {
-            storeId,
+            organizationId: orgId,
             slug: { in: Object.keys(NORTHWIND_BASE_PRODUCT_DEMAND) },
         },
         select: { id: true, slug: true },
@@ -572,6 +583,12 @@ async function seedNorthwind(
         customerCreatedAt,
     );
     await writeOrders(ctx, key, planned);
+    // The open ones hold their units, as the order form's reserve does
+    // (#511); what each product can sell stays its catalogue `stock`.
+    await holdOpenLines(prisma, {
+        organizationId: orgId,
+        orderIdPrefix: SEED_PREFIX,
+    });
 
     // CRM: the best customers are contacts too, plus prospects not yet buying.
     const prospects = makePeople(

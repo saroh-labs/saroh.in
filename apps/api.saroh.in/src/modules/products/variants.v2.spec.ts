@@ -5,6 +5,8 @@ import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { OrderStatus } from "../orders/dto";
 import { OrdersService } from "../orders/orders.service";
+import { variantHasHistory } from "../stock/stock-words";
+import { reverse } from "../stock/stock.service";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ProductsService } from "./products.service";
@@ -97,11 +99,22 @@ describe("Variants and stock per variant (DB)", () => {
         await prisma.user.deleteMany({ where: { id: ownerId } });
     });
 
-    const stockOf = async (variantId: string) =>
-        prisma.variantInventory.findUniqueOrThrow({
-            where: { variantId },
-            select: { quantity: true, reserved: true },
+    // A variant's shelf at the storefront (#510: StockLevel).
+    const stockOf = async (variantId: string) => {
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, variantId },
+            select: { onHand: true, promised: true },
         });
+        return { quantity: row.onHand, reserved: row.promised };
+    };
+    // The product's own shelf at the storefront.
+    const ownRow = async (productId: string) => {
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, productId, variantId: null },
+            select: { onHand: true, promised: true },
+        });
+        return { quantity: row.onHand, reserved: row.promised };
+    };
 
     it("adds variants with a value of the product's option, in order", async () => {
         for (const size of ["S", "M", "L"]) {
@@ -231,7 +244,7 @@ describe("Variants and stock per variant (DB)", () => {
                 customerId,
                 items: [{ productId: dressId, variantId: v.L, quantity: 4 }],
             }),
-        ).rejects.toThrow(/Not enough stock/);
+        ).rejects.toThrow(/Only 3 left at Variants Store/);
     });
 
     it("won't remove a variant with stock promised to an open order", async () => {
@@ -267,30 +280,138 @@ describe("Variants and stock per variant (DB)", () => {
         expect(list.map((x) => x.title)).toEqual(["XL", "L", "M", "S"]);
     });
 
-    it("the last counted variant hands its stock back to the product", async () => {
-        const shirt = (
+    async function kurta(name: string, skus: string[]) {
+        const id = (
             await products.create(storeId, ownerId, {
-                name: "Cotton Kurta",
+                name,
                 price: "999",
                 currency: "INR",
             })
         ).id;
-        const only = (
-            await variants.create(storeId, shirt, ownerId, {
-                sku: "CK-ONE",
-                title: "Free size",
-            })
-        ).id;
-        await inventory.setVariants(storeId, shirt, ownerId, {
+        const ids: string[] = [];
+        for (const sku of skus) {
+            ids.push(
+                (
+                    await variants.create(storeId, id, ownerId, {
+                        sku,
+                        title: sku,
+                    })
+                ).id,
+            );
+        }
+        return { id, variants: ids };
+    }
+
+    it("the last counted variant hands its stock back to the product (Saroh's switch is not history)", async () => {
+        const shirt = await kurta("Cotton Kurta", ["CK-ONE", "CK-SPARE"]);
+        const [only, spare] = shirt.variants;
+        // Nothing counted it, nothing sold it: it goes.
+        await variants.remove(storeId, shirt.id, spare, ownerId);
+        // The switch to per-variant stock gives it 7: Saroh's count.
+        await inventory.setVariants(storeId, shirt.id, ownerId, {
             variants: [{ variantId: only, quantity: 7, lowStockAlert: 3 }],
         });
-        await variants.remove(storeId, shirt, only, ownerId);
-        const view = await inventory.get(storeId, shirt, ownerId);
+        await variants.remove(storeId, shirt.id, only, ownerId);
+        const view = await inventory.get(storeId, shirt.id, ownerId);
         expect(view).toMatchObject({
             mode: "product",
             quantity: 7,
             lowStockAlert: 3,
         });
+        const whole = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, productId: shirt.id, variantId: null },
+            select: { id: true, onHand: true },
+        });
+        const log = await prisma.stockEntry.findMany({
+            where: { stockLevelId: whole.id },
+            select: { quantity: true, system: true },
+        });
+        expect(log.reduce((n, e) => n + e.quantity, 0)).toBe(whole.onHand);
+        expect(log.at(-1)).toEqual({ quantity: 7, system: "VARIANT_REMOVED" });
+    });
+
+    it("a variant counted only at 0 since the switch can still be removed", async () => {
+        const shirt = await kurta("Silk Kurta", ["SK-S", "SK-M"]);
+        const [s, m] = shirt.variants;
+        const zeros = {
+            variants: [
+                { variantId: s, quantity: 0, lowStockAlert: 1 },
+                { variantId: m, quantity: 0, lowStockAlert: 1 },
+            ],
+        };
+        await inventory.setVariants(storeId, shirt.id, ownerId, zeros);
+        // Saved again: a person's counts, each at 0 — nothing moved.
+        await inventory.setVariants(storeId, shirt.id, ownerId, zeros);
+        await variants.remove(storeId, shirt.id, m, ownerId);
+        expect(await prisma.productVariant.count({ where: { id: m } })).toBe(0);
+    });
+
+    it("a variant with a real count, or a sale, can't be removed", async () => {
+        const shirt = await kurta("Khadi Kurta", ["KK-S", "KK-M"]);
+        const [s, m] = shirt.variants;
+        await inventory.setVariants(storeId, shirt.id, ownerId, {
+            variants: [
+                { variantId: s, quantity: 0, lowStockAlert: 1 },
+                { variantId: m, quantity: 0, lowStockAlert: 1 },
+            ],
+        });
+        // A person counts 4 of S: real history.
+        await inventory.setVariants(storeId, shirt.id, ownerId, {
+            variants: [
+                { variantId: s, quantity: 4, lowStockAlert: 1 },
+                { variantId: m, quantity: 3, lowStockAlert: 1 },
+            ],
+        });
+        await expect(
+            variants.remove(storeId, shirt.id, s, ownerId),
+        ).rejects.toThrow(new ConflictException(variantHasHistory("KK-S")));
+
+        // M's count is undone: netted out by its Reversed entry, so M goes.
+        const counted = await prisma.stockEntry.findFirstOrThrow({
+            where: { variantId: m, system: null, quantity: { not: 0 } },
+            select: { id: true },
+        });
+        await prisma.$transaction((tx) =>
+            reverse(
+                tx,
+                { organizationId: orgId, userId: ownerId },
+                { entryIds: [counted.id] },
+            ),
+        );
+        await variants.remove(storeId, shirt.id, m, ownerId);
+
+        // S sells one: an order line that sold it is history too.
+        const sold = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: shirt.id, variantId: s, quantity: 1 }],
+        });
+        for (const status of ["PROCESSING", "DELIVERED"] as const) {
+            await orders.updateStatus(storeId, sold.id, ownerId, { status });
+        }
+        await expect(
+            variants.remove(storeId, shirt.id, s, ownerId),
+        ).rejects.toThrow(new ConflictException(variantHasHistory("KK-S")));
+    });
+
+    it("a variant that only sold (its count Saroh's) can't be removed", async () => {
+        const shirt = await kurta("Chanderi Kurta", ["CH-S", "CH-M"]);
+        const [s, m] = shirt.variants;
+        await inventory.setVariants(storeId, shirt.id, ownerId, {
+            variants: [
+                { variantId: s, quantity: 2, lowStockAlert: 1 },
+                { variantId: m, quantity: 0, lowStockAlert: 1 },
+            ],
+        });
+        const sold = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId: shirt.id, variantId: s, quantity: 1 }],
+        });
+        for (const status of ["PROCESSING", "DELIVERED"] as const) {
+            await orders.updateStatus(storeId, sold.id, ownerId, { status });
+        }
+        await expect(
+            variants.remove(storeId, shirt.id, s, ownerId),
+        ).rejects.toThrow(new ConflictException(variantHasHistory("CH-S")));
     });
 
     it("a product still counting as a whole moves its own stock, as before", async () => {
@@ -306,21 +427,13 @@ describe("Variants and stock per variant (DB)", () => {
             customerId,
             items: [{ productId: serum, quantity: 3 }],
         });
-        const own = await prisma.inventory.findUniqueOrThrow({
-            where: { productId: serum },
-            select: { quantity: true, reserved: true },
-        });
-        expect(own).toEqual({ quantity: 10, reserved: 3 });
+        expect(await ownRow(serum)).toEqual({ quantity: 10, reserved: 3 });
     });
 
     describe("switching to a count per variant with orders open", () => {
         let tonerId = "";
         const t: Record<string, string> = {};
-        const own = (productId: string) =>
-            prisma.inventory.findUniqueOrThrow({
-                where: { productId },
-                select: { quantity: true, reserved: true },
-            });
+        const own = ownRow;
 
         beforeAll(async () => {
             tonerId = (
@@ -355,15 +468,6 @@ describe("Variants and stock per variant (DB)", () => {
             const detail = await products.get(storeId, tonerId, ownerId);
             expect(detail.variantPromises).toEqual({ [t.S]: 2 });
 
-            await expect(
-                inventory.setVariants(storeId, tonerId, ownerId, {
-                    variants: [
-                        { variantId: t.S, quantity: 1, lowStockAlert: 2 },
-                        { variantId: t.M, quantity: 0, lowStockAlert: 2 },
-                    ],
-                }),
-            ).rejects.toThrow("S has 2 promised to open orders");
-
             // S starts at what was free (8) plus its own promise (2).
             await inventory.setVariants(storeId, tonerId, ownerId, {
                 variants: [
@@ -385,30 +489,24 @@ describe("Variants and stock per variant (DB)", () => {
             expect(await own(tonerId)).toEqual({ quantity: 0, reserved: 0 });
         });
 
-        it("refuses a count below what a variant has promised since", async () => {
+        it("saves a count below what a variant has promised since (#513)", async () => {
             await orders.create(storeId, ownerId, {
                 customerId,
                 items: [{ productId: tonerId, variantId: t.S, quantity: 3 }],
             });
-            const refused = inventory.setVariants(storeId, tonerId, ownerId, {
+            // The shelf holds what was counted; the gap reads "1 short".
+            await inventory.setVariants(storeId, tonerId, ownerId, {
                 variants: [
                     { variantId: t.S, quantity: 2, lowStockAlert: 2 },
                     { variantId: t.M, quantity: 0, lowStockAlert: 2 },
                 ],
             });
-            await expect(refused).rejects.toThrow(BadRequestException);
-            await expect(refused).rejects.toThrow(
-                "S has 3 promised to open orders — on hand can't go below that.",
-            );
+            expect(await stockOf(t.S)).toEqual({ quantity: 2, reserved: 3 });
         });
     });
 
     describe("each line settles on the row it reserved from", () => {
-        const own = (productId: string) =>
-            prisma.inventory.findUniqueOrThrow({
-                where: { productId },
-                select: { quantity: true, reserved: true },
-            });
+        const own = ownRow;
         const stockRowOf = async (orderId: string) =>
             (
                 await prisma.orderItem.findFirstOrThrow({

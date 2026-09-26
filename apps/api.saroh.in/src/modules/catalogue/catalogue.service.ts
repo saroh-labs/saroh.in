@@ -1,11 +1,6 @@
-import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { StoresService } from "../stores/stores.service";
 import type {
     DefaultField,
     DefaultsEntry,
@@ -75,36 +70,36 @@ export interface DefaultsSaveResult {
  * The settings page's read, and the Defaults tab's save. One read carries
  * categories with their product counts, options with what uses them, and the
  * defaults with how many saved products still hold each one — so the page
- * never adds up anything itself.
+ * never adds up anything itself. The settings are the business's (#529):
+ * the counts are over every storefront's products.
  */
 @Injectable()
 export class CatalogueService {
-    constructor(
-        private readonly stores: StoresService,
-        private readonly options: OptionsService,
-    ) {}
+    constructor(private readonly options: OptionsService) {}
 
-    async get(storeId: string, userId: string): Promise<CatalogueView> {
-        await this.stores.getForUser(storeId, userId);
-        const [categories, uncategorizedCount, options, canWrite] =
-            await Promise.all([
-                prisma.category.findMany({
-                    where: { storeId },
-                    orderBy: { name: "asc" },
-                    select: {
-                        id: true,
-                        name: true,
-                        slug: true,
-                        parentId: true,
-                        _count: { select: { products: true } },
-                    },
-                }),
-                prisma.product.count({ where: { storeId, categoryId: null } }),
-                this.options.views(storeId),
-                this.stores.canWrite(storeId, userId),
-            ]);
-        const entries = await this.entries(storeId);
-        const products = await this.productDefaults(storeId);
+    async get(
+        organizationId: string,
+        canWrite: boolean,
+    ): Promise<CatalogueView> {
+        const [categories, uncategorizedCount, options] = await Promise.all([
+            prisma.category.findMany({
+                where: { organizationId },
+                orderBy: { name: "asc" },
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    parentId: true,
+                    _count: { select: { products: true } },
+                },
+            }),
+            prisma.product.count({
+                where: { organizationId, categoryId: null },
+            }),
+            this.options.views(organizationId),
+        ]);
+        const entries = await this.entries(organizationId);
+        const products = await this.productDefaults(organizationId);
 
         const keys = [ALL_KEY, ...categories.map((c) => c.id)];
         const still: Record<string, Record<DefaultField, number>> = {};
@@ -173,12 +168,10 @@ export class CatalogueService {
      * rows and exactly what changed, so Undo restores both.
      */
     async saveDefaults(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         dto: SaveDefaultsDto,
     ): Promise<DefaultsSaveResult> {
-        const organizationId = await this.requireOrg(storeId, userId);
-        await this.assertKeys(storeId, dto.entries);
+        await this.assertKeys(organizationId, dto.entries);
         const all = dto.entries.find((e) => e.key === ALL_KEY);
         if (
             all &&
@@ -198,21 +191,22 @@ export class CatalogueService {
             }
         }
 
-        const before = await this.entries(storeId);
+        const before = await this.entries(organizationId);
         const after: Record<string, DefaultsEntry> = { ...before };
         for (const e of dto.entries) after[e.key] = toEntry(e);
 
         const updated = dto.updateExisting
-            ? await this.productsToUpdate(storeId, before, after)
+            ? await this.productsToUpdate(organizationId, before, after)
             : { products: [], stock: [], next: [] as NextUpdate[] };
 
         await prisma.$transaction(async (tx) => {
             for (const e of dto.entries) {
                 const data = toEntry(e);
                 await tx.catalogueDefaults.upsert({
-                    where: { storeId_key: { storeId, key: e.key } },
+                    where: {
+                        organizationId_key: { organizationId, key: e.key },
+                    },
                     create: {
-                        storeId,
                         organizationId,
                         key: e.key,
                         categoryId: e.key === ALL_KEY ? null : e.key,
@@ -227,13 +221,9 @@ export class CatalogueService {
                         where: { id: u.id },
                         data: u.data,
                     });
-                } else if (u.kind === "productStock") {
-                    await tx.inventory.update({
-                        where: { id: u.id },
-                        data: { lowStockAlert: u.lowStockAlert },
-                    });
                 } else {
-                    await tx.variantInventory.update({
+                    // Either kind is a StockLevel row (#510).
+                    await tx.stockLevel.update({
                         where: { id: u.id },
                         data: { lowStockAlert: u.lowStockAlert },
                     });
@@ -257,16 +247,16 @@ export class CatalogueService {
     }
 
     /** Undo of a save: the rows as they were, and the products as they were. */
-    async undoDefaults(storeId: string, userId: string, dto: UndoDefaultsDto) {
-        const organizationId = await this.requireOrg(storeId, userId);
-        await this.assertKeys(storeId, dto.entries);
+    async undoDefaults(organizationId: string, dto: UndoDefaultsDto) {
+        await this.assertKeys(organizationId, dto.entries);
         await prisma.$transaction(async (tx) => {
             for (const e of dto.entries) {
                 const data = toEntry(e);
                 await tx.catalogueDefaults.upsert({
-                    where: { storeId_key: { storeId, key: e.key } },
+                    where: {
+                        organizationId_key: { organizationId, key: e.key },
+                    },
                     create: {
-                        storeId,
                         organizationId,
                         key: e.key,
                         categoryId: e.key === ALL_KEY ? null : e.key,
@@ -277,7 +267,7 @@ export class CatalogueService {
             }
             for (const p of dto.products) {
                 await tx.product.updateMany({
-                    where: { id: p.id, storeId },
+                    where: { id: p.id, organizationId },
                     data: {
                         howToUse: p.howToUse ?? null,
                         returnsMode: p.returnsMode,
@@ -285,46 +275,30 @@ export class CatalogueService {
                     },
                 });
             }
+            // Either kind is a StockLevel row (#510).
             for (const s of dto.stock) {
-                if (s.kind === "product") {
-                    await tx.inventory.updateMany({
-                        where: { id: s.id, storeId },
-                        data: { lowStockAlert: s.lowStockAlert },
-                    });
-                } else {
-                    await tx.variantInventory.updateMany({
-                        where: { id: s.id, organizationId },
-                        data: { lowStockAlert: s.lowStockAlert },
-                    });
-                }
+                await tx.stockLevel.updateMany({
+                    where: { id: s.id, organizationId },
+                    data: { lowStockAlert: s.lowStockAlert },
+                });
             }
         });
-        return { entries: await this.entries(storeId) };
-    }
-
-    /** The editor's prefill, for someone who can read the store. */
-    async effectiveForUser(
-        storeId: string,
-        userId: string,
-        categoryId: string | null,
-    ): Promise<Effective> {
-        await this.stores.getForUser(storeId, userId);
-        return this.effective(storeId, categoryId);
+        return { entries: await this.entries(organizationId) };
     }
 
     /** What a new product in `categoryId` starts with (the editor's prefill). */
     async effective(
-        storeId: string,
+        organizationId: string,
         categoryId: string | null,
     ): Promise<Effective> {
-        return effectiveFor(await this.entries(storeId), categoryId);
+        return effectiveFor(await this.entries(organizationId), categoryId);
     }
 
     private async entries(
-        storeId: string,
+        organizationId: string,
     ): Promise<Record<string, DefaultsEntry>> {
         const rows = await prisma.catalogueDefaults.findMany({
-            where: { storeId },
+            where: { organizationId },
             select: {
                 key: true,
                 howToUse: true,
@@ -345,7 +319,7 @@ export class CatalogueService {
         return out;
     }
 
-    private async productDefaults(storeId: string): Promise<
+    private async productDefaults(organizationId: string): Promise<
         (ProductDefaults & {
             stockRows: {
                 kind: "productStock" | "variantStock";
@@ -357,27 +331,30 @@ export class CatalogueService {
         })[]
     > {
         const rows = await prisma.product.findMany({
-            where: { storeId, status: { not: "ARCHIVED" } },
+            where: { organizationId, status: { not: "ARCHIVED" } },
             select: {
                 id: true,
                 categoryId: true,
                 howToUse: true,
                 returnsMode: true,
                 returnsText: true,
-                inventory: { select: { id: true, lowStockAlert: true } },
-                variants: {
-                    select: {
-                        inventory: {
-                            select: { id: true, lowStockAlert: true },
-                        },
-                    },
+                // Every storefront's shelf (#510).
+                stockLevels: {
+                    select: { id: true, lowStockAlert: true, variantId: true },
+                    orderBy: { id: "asc" },
                 },
             },
         });
         return rows.map((p) => {
-            const variantRows = p.variants.flatMap((v) =>
-                v.inventory
-                    ? [{ kind: "variantStock" as const, ...v.inventory }]
+            const variantRows = p.stockLevels.flatMap((r) =>
+                r.variantId
+                    ? [
+                          {
+                              kind: "variantStock" as const,
+                              id: r.id,
+                              lowStockAlert: r.lowStockAlert,
+                          },
+                      ]
                     : [],
             );
             // Per-variant products warn per variant; their product row holds
@@ -385,9 +362,11 @@ export class CatalogueService {
             const stockRows =
                 variantRows.length > 0
                     ? variantRows
-                    : p.inventory
-                      ? [{ kind: "productStock" as const, ...p.inventory }]
-                      : [];
+                    : p.stockLevels.map((r) => ({
+                          kind: "productStock" as const,
+                          id: r.id,
+                          lowStockAlert: r.lowStockAlert,
+                      }));
             return {
                 id: p.id,
                 categoryId: p.categoryId,
@@ -402,7 +381,7 @@ export class CatalogueService {
     }
 
     private async productsToUpdate(
-        storeId: string,
+        organizationId: string,
         before: Record<string, DefaultsEntry>,
         after: Record<string, DefaultsEntry>,
     ): Promise<{
@@ -410,7 +389,7 @@ export class CatalogueService {
         stock: StockSnapshot[];
         next: NextUpdate[];
     }> {
-        const products = await this.productDefaults(storeId);
+        const products = await this.productDefaults(organizationId);
         const snapshots: ProductSnapshot[] = [];
         const stock: StockSnapshot[] = [];
         const next: NextUpdate[] = [];
@@ -463,15 +442,15 @@ export class CatalogueService {
         return { products: snapshots, stock, next };
     }
 
-    /** Every key is "all" or one of this store's categories. */
+    /** Every key is "all" or one of the business's categories. */
     private async assertKeys(
-        storeId: string,
+        organizationId: string,
         entries: DefaultsEntryInput[],
     ): Promise<void> {
         const ids = entries.map((e) => e.key).filter((k) => k !== ALL_KEY);
         if (ids.length === 0) return;
         const found = await prisma.category.count({
-            where: { storeId, id: { in: ids } },
+            where: { organizationId, id: { in: ids } },
         });
         if (found !== new Set(ids).size) {
             throw new BadRequestException({
@@ -479,20 +458,6 @@ export class CatalogueService {
                 field: "entries",
             });
         }
-    }
-
-    private async requireOrg(storeId: string, userId: string): Promise<string> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (writable === null) throw new NotFoundException("Store not found");
-        if (!writable.organizationId) {
-            throw new BadRequestException(
-                "This storefront is not attached to a business, so it can't have defaults.",
-            );
-        }
-        return writable.organizationId;
     }
 }
 

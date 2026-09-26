@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/shared/page-container";
 /** The product page's shape — header, tabs, four numbers — while it loads. */
 export default function Loading() {
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <div className="flex flex-col gap-5" aria-hidden>
                 <div className="flex items-start gap-4">
                     <Skeleton className="size-14 rounded-[10px]" />

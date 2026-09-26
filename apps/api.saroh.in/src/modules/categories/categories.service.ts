@@ -7,7 +7,6 @@ import {
 import { prisma } from "@saroh/database";
 
 import { slugify } from "../stores/slug";
-import { StoresService } from "../stores/stores.service";
 import type {
     CreateCategoryDto,
     MergeCategoryDto,
@@ -42,18 +41,16 @@ export interface CategoryDefaultsSnapshot {
 }
 
 /**
- * Product categories with a parent/child hierarchy. Authorization delegates to
- * StoresService (read = store access, write = canWrite). Cycles are rejected on
- * update; a category with children can't be deleted.
+ * The business's product categories (#529), with a parent/child hierarchy:
+ * one list, whatever storefront sells the product. Every method is scoped to
+ * the organization; who may call it is settled by CatalogueAccess first.
+ * Cycles are rejected on update; a category with children can't be deleted.
  */
 @Injectable()
 export class CategoriesService {
-    constructor(private readonly stores: StoresService) {}
-
-    async list(storeId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+    async list(organizationId: string) {
         return prisma.category.findMany({
-            where: { storeId },
+            where: { organizationId },
             orderBy: { name: "asc" },
             select: {
                 id: true,
@@ -65,8 +62,7 @@ export class CategoriesService {
         });
     }
 
-    async create(storeId: string, userId: string, dto: CreateCategoryDto) {
-        const organizationId = await this.requireWrite(storeId, userId);
+    async create(organizationId: string, dto: CreateCategoryDto) {
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
@@ -76,14 +72,13 @@ export class CategoriesService {
         }
         // The name first: "already a category called Serums" is the answer a
         // merchant can act on; a clashing address follows from it.
-        await this.assertNameFree(storeId, dto.name);
-        await this.assertSlugFree(storeId, slug);
-        if (dto.parentId) await this.assertParentInStore(storeId, dto.parentId);
+        await this.assertNameFree(organizationId, dto.name);
+        await this.assertSlugFree(organizationId, slug);
+        if (dto.parentId) await this.assertParent(organizationId, dto.parentId);
 
         try {
             const category = await prisma.category.create({
                 data: {
-                    storeId,
                     organizationId,
                     name: dto.name,
                     slug,
@@ -100,21 +95,20 @@ export class CategoriesService {
     }
 
     async update(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
-        userId: string,
         dto: UpdateCategoryDto,
     ) {
-        await this.requireWrite(storeId, userId);
         const current = await prisma.category.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, organizationId },
             select: { slug: true },
         });
         if (!current) {
             throw new NotFoundException("Category not found");
         }
         const slug = slugify(dto.slug);
-        if (current.slug !== slug) await this.assertSlugFree(storeId, slug);
+        if (current.slug !== slug)
+            await this.assertSlugFree(organizationId, slug);
 
         const parentId = dto.parentId ?? null;
         if (parentId) {
@@ -124,8 +118,8 @@ export class CategoriesService {
                     field: "parentId",
                 });
             }
-            await this.assertParentInStore(storeId, parentId);
-            await this.assertNoCycle(storeId, categoryId, parentId);
+            await this.assertParent(organizationId, parentId);
+            await this.assertNoCycle(organizationId, categoryId, parentId);
         }
 
         try {
@@ -148,14 +142,12 @@ export class CategoriesService {
      * already has (in any case) is refused — that is what Merge is for.
      */
     async rename(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
-        userId: string,
         dto: RenameCategoryDto,
     ): Promise<{ id: string; name: string; previousName: string }> {
-        await this.requireWrite(storeId, userId);
-        const current = await this.requireCategory(storeId, categoryId);
-        await this.assertNameFree(storeId, dto.name, categoryId);
+        const current = await this.requireCategory(organizationId, categoryId);
+        await this.assertNameFree(organizationId, dto.name, categoryId);
         await prisma.category.update({
             where: { id: categoryId },
             data: { name: dto.name },
@@ -168,12 +160,10 @@ export class CategoriesService {
      * this one. Returns what moved, for Undo.
      */
     async merge(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
-        userId: string,
         dto: MergeCategoryDto,
     ): Promise<CategoryRemoval> {
-        await this.requireWrite(storeId, userId);
         const intoId = dto.intoId ?? null;
         if (intoId === categoryId) {
             throw new BadRequestException({
@@ -181,18 +171,16 @@ export class CategoriesService {
                 field: "intoId",
             });
         }
-        if (intoId) await this.requireCategory(storeId, intoId);
-        return this.removeInto(storeId, categoryId, intoId);
+        if (intoId) await this.requireCategory(organizationId, intoId);
+        return this.removeInto(organizationId, categoryId, intoId);
     }
 
     /** Delete a category; its products move to Uncategorized, untouched. */
     async remove(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
-        userId: string,
     ): Promise<CategoryRemoval> {
-        await this.requireWrite(storeId, userId);
-        return this.removeInto(storeId, categoryId, null);
+        return this.removeInto(organizationId, categoryId, null);
     }
 
     /**
@@ -201,18 +189,15 @@ export class CategoriesService {
      * the place the change put them, so a later edit is never overwritten.
      */
     async restore(
-        storeId: string,
-        userId: string,
+        organizationId: string,
         dto: RestoreCategoryDto,
     ): Promise<{ id: string; moved: number }> {
-        const organizationId = await this.requireWrite(storeId, userId);
-        await this.assertNameFree(storeId, dto.name);
-        await this.assertSlugFree(storeId, dto.slug);
-        if (dto.parentId) await this.assertParentInStore(storeId, dto.parentId);
+        await this.assertNameFree(organizationId, dto.name);
+        await this.assertSlugFree(organizationId, dto.slug);
+        if (dto.parentId) await this.assertParent(organizationId, dto.parentId);
         return prisma.$transaction(async (tx) => {
             const category = await tx.category.create({
                 data: {
-                    storeId,
                     organizationId,
                     name: dto.name,
                     slug: dto.slug,
@@ -223,7 +208,7 @@ export class CategoriesService {
             if (dto.fieldIds && dto.fieldIds.length > 0) {
                 const fields = await tx.productField.findMany({
                     where: {
-                        storeId,
+                        organizationId,
                         deletedAt: null,
                         id: { in: dto.fieldIds },
                     },
@@ -237,10 +222,9 @@ export class CategoriesService {
                     skipDuplicates: true,
                 });
             }
-            if (dto.defaults && organizationId) {
+            if (dto.defaults) {
                 await tx.catalogueDefaults.create({
                     data: {
-                        storeId,
                         organizationId,
                         key: category.id,
                         categoryId: category.id,
@@ -253,7 +237,7 @@ export class CategoriesService {
             }
             const moved = await tx.product.updateMany({
                 where: {
-                    storeId,
+                    organizationId,
                     id: { in: dto.productIds },
                     categoryId: dto.movedTo ?? null,
                 },
@@ -264,18 +248,23 @@ export class CategoriesService {
     }
 
     private async removeInto(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
         intoId: string | null,
     ): Promise<CategoryRemoval> {
         const category = await prisma.category.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, organizationId },
             select: {
                 id: true,
                 name: true,
                 slug: true,
                 parentId: true,
                 _count: { select: { children: true, discountReach: true } },
+                // Automatic collections that fill themselves from it (#516).
+                collections: {
+                    select: { name: true },
+                    orderBy: { name: "asc" },
+                },
                 fields: { select: { fieldId: true } },
                 defaults: {
                     select: {
@@ -304,14 +293,25 @@ export class CategoriesService {
                 `${n === 1 ? "A discount code applies" : `${n} discount codes apply`} to ${category.name}. Change ${n === 1 ? "it" : "them"} in Discounts first.`,
             );
         }
+        // An automatic collection would have nothing to fill itself from;
+        // name it, so the merchant knows what to change first.
+        if (category.collections.length > 0) {
+            throw new ConflictException(
+                collectionsUsing(
+                    category.name,
+                    category.collections.map((c) => c.name),
+                ),
+            );
+        }
+        // Every storefront's products in it: the category is the business's.
         const products = await prisma.product.findMany({
-            where: { storeId, categoryId },
+            where: { categoryId },
             select: { id: true },
         });
         const productIds = products.map((p) => p.id);
         await prisma.$transaction([
             prisma.product.updateMany({
-                where: { storeId, categoryId },
+                where: { categoryId },
                 data: { categoryId: intoId },
             }),
             prisma.category.delete({ where: { id: categoryId } }),
@@ -328,9 +328,9 @@ export class CategoriesService {
         };
     }
 
-    private async requireCategory(storeId: string, categoryId: string) {
+    private async requireCategory(organizationId: string, categoryId: string) {
         const category = await prisma.category.findFirst({
-            where: { id: categoryId, storeId },
+            where: { id: categoryId, organizationId },
             select: { id: true, name: true },
         });
         if (!category) {
@@ -339,15 +339,15 @@ export class CategoriesService {
         return category;
     }
 
-    /** Names are unique per store, ignoring case ("Serums" = "serums"). */
+    /** Names are unique per business, ignoring case ("Serums" = "serums"). */
     private async assertNameFree(
-        storeId: string,
+        organizationId: string,
         name: string,
         exceptId?: string,
     ): Promise<void> {
         const clash = await prisma.category.findFirst({
             where: {
-                storeId,
+                organizationId,
                 name: { equals: name, mode: "insensitive" },
                 ...(exceptId ? { id: { not: exceptId } } : {}),
             },
@@ -363,29 +363,13 @@ export class CategoriesService {
         }
     }
 
-    /**
-     * Assert write access AND return the owning Organization id, so every
-     * create in this service can stamp `organizationId` (#173). Returning it
-     * here rather than looking it up at each call site makes the stamp hard to
-     * forget: the guard you must call already hands you the value.
-     */
-    private async requireWrite(
-        storeId: string,
-        userId: string,
-    ): Promise<string | null> {
-        const writable = await this.stores.writableOrganization(
-            storeId,
-            userId,
-        );
-        if (writable === null) {
-            throw new NotFoundException("Store not found");
-        }
-        return writable.organizationId;
-    }
-
-    private async assertSlugFree(storeId: string, slug: string): Promise<void> {
+    /** Slugs are unique per business. */
+    private async assertSlugFree(
+        organizationId: string,
+        slug: string,
+    ): Promise<void> {
         const existing = await prisma.category.findUnique({
-            where: { storeId_slug: { storeId, slug } },
+            where: { organizationId_slug: { organizationId, slug } },
         });
         if (existing) {
             throw new ConflictException({
@@ -395,12 +379,12 @@ export class CategoriesService {
         }
     }
 
-    private async assertParentInStore(
-        storeId: string,
+    private async assertParent(
+        organizationId: string,
         parentId: string,
     ): Promise<void> {
         const parent = await prisma.category.findFirst({
-            where: { id: parentId, storeId },
+            where: { id: parentId, organizationId },
             select: { id: true },
         });
         if (!parent) {
@@ -413,7 +397,7 @@ export class CategoriesService {
 
     /** Walk up from the proposed parent; if we reach `categoryId`, it's a cycle. */
     private async assertNoCycle(
-        storeId: string,
+        organizationId: string,
         categoryId: string,
         parentId: string,
     ): Promise<void> {
@@ -430,10 +414,23 @@ export class CategoriesService {
             seen.add(cursor);
             const node: { parentId: string | null } | null =
                 await prisma.category.findFirst({
-                    where: { id: cursor, storeId },
+                    where: { id: cursor, organizationId },
                     select: { parentId: true },
                 });
             cursor = node?.parentId ?? null;
         }
     }
+}
+
+/**
+ * "The Fresh bread collection fills itself from Breads. Change it or delete
+ * it in Collections first." — naming every collection that uses it.
+ */
+export function collectionsUsing(category: string, names: string[]): string {
+    if (names.length === 1) {
+        return `The ${names[0]} collection fills itself from ${category}. Change it or delete it in Collections first.`;
+    }
+    const last = names[names.length - 1];
+    const listed = `${names.slice(0, -1).join(", ")} and ${last}`;
+    return `The ${listed} collections fill themselves from ${category}. Change them or delete them in Collections first.`;
 }

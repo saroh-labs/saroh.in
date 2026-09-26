@@ -372,57 +372,54 @@ export class OrdersService {
         dto: UpdateOrderDto,
     ) {
         await this.requireWrite(storeId, userId);
-        const order = await prisma.order.findFirst({
-            where: { id: orderId, storeId },
-            select: {
-                id: true,
-                status: true,
-                paymentStatus: true,
-                stage: true,
-                fulfilment: true,
-                organizationId: true,
-                items: {
-                    select: {
-                        id: true,
-                        productId: true,
-                        variantId: true,
-                        quantity: true,
-                        stockRow: true,
-                    },
-                },
-            },
-        });
-        if (!order) {
-            throw new NotFoundException("Order not found");
-        }
-
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
-        const statusChanging =
-            nextStatus != null && nextStatus !== order.status;
-
-        // Guard the lifecycle BEFORE any write: an illegal status/payment move
-        // throws 400 (naming the from→to) and nothing is persisted. Same→same
-        // is a no-op (not "changing"), so it is never asserted — re-PATCHing an
-        // unchanged status stays idempotent. The inline null-checks narrow the
-        // dto fields so no non-null assertion is needed.
-        if (nextStatus != null && nextStatus !== order.status) {
-            assertStatusTransition(order.status as OrderStatus, nextStatus);
-        }
-        if (nextPayment != null && nextPayment !== order.paymentStatus) {
-            assertPaymentTransition(
-                order.paymentStatus as PaymentStatus,
-                nextPayment,
-            );
-        }
 
         await prisma.$transaction(async (tx) => {
+            // Lock order (#511): the Order, then its StockLevel rows — the
+            // order a refund settling and a cancel both take. The order is
+            // read under its lock, so two status changes take turns and each
+            // moves stock from where the other left it.
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} AND "storeId" = ${storeId} FOR UPDATE`;
+            const order = await tx.order.findFirst({
+                where: { id: orderId, storeId },
+                select: {
+                    id: true,
+                    status: true,
+                    paymentStatus: true,
+                    stage: true,
+                    fulfilment: true,
+                    organizationId: true,
+                    items: { select: { id: true } },
+                },
+            });
+            if (!order) {
+                throw new NotFoundException("Order not found");
+            }
+            const statusChanging =
+                nextStatus != null && nextStatus !== order.status;
+
+            // Guard the lifecycle BEFORE any write: an illegal status/payment
+            // move throws 400 (naming the from→to) and nothing is persisted.
+            // Same→same is a no-op (not "changing"), so it is never asserted
+            // — re-PATCHing an unchanged status stays idempotent.
+            if (nextStatus != null && nextStatus !== order.status) {
+                assertStatusTransition(order.status as OrderStatus, nextStatus);
+            }
+            if (nextPayment != null && nextPayment !== order.paymentStatus) {
+                assertPaymentTransition(
+                    order.paymentStatus as PaymentStatus,
+                    nextPayment,
+                );
+            }
+
             if (statusChanging) {
                 await applyInventoryTransition(
                     tx,
                     order.items,
                     phaseOf(order.status),
-                    phaseOf(dto.status as string),
+                    phaseOf(nextStatus),
+                    userId,
                 );
             }
             // The kitchen stage follows a status set here, so the next

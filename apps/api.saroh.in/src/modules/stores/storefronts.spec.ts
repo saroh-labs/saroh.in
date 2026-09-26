@@ -13,6 +13,8 @@ jest.mock("@saroh/database", () => {
     const tx = {
         store: { update: jest.fn() },
         storeSettings: { upsert: jest.fn() },
+        stockLevel: { findMany: jest.fn(), count: jest.fn() },
+        $queryRaw: jest.fn(),
     };
     return {
         prisma: {
@@ -20,8 +22,12 @@ jest.mock("@saroh/database", () => {
                 findMany: jest.fn(),
                 findFirst: jest.fn(),
                 update: jest.fn(),
+                count: jest.fn(),
             },
             storeSettings: { findUnique: jest.fn() },
+            stockLevel: { aggregate: jest.fn() },
+            subscription: { findUnique: jest.fn() },
+            entitlementOverride: { findMany: jest.fn() },
             order: { count: jest.fn(), findFirst: jest.fn() },
             merchantPaymentProvider: {
                 findMany: jest.fn(),
@@ -50,12 +56,17 @@ import { StorefrontsService } from "./storefronts.service";
 const db = prisma as unknown as {
     store: Record<string, jest.Mock>;
     storeSettings: Record<string, jest.Mock>;
+    stockLevel: Record<string, jest.Mock>;
+    subscription: Record<string, jest.Mock>;
+    entitlementOverride: Record<string, jest.Mock>;
     order: Record<string, jest.Mock>;
     merchantPaymentProvider: Record<string, jest.Mock>;
     $transaction: jest.Mock;
     __tx: {
         store: Record<string, jest.Mock>;
         storeSettings: Record<string, jest.Mock>;
+        stockLevel: Record<string, jest.Mock>;
+        $queryRaw: jest.Mock;
     };
 };
 
@@ -78,6 +89,11 @@ beforeEach(() => {
     db.storeSettings.findUnique!.mockResolvedValue(null);
     db.order.count!.mockResolvedValue(0);
     db.order.findFirst!.mockResolvedValue(null);
+    db.stockLevel.aggregate!.mockResolvedValue({ _sum: {} });
+    db.subscription.findUnique!.mockResolvedValue(null);
+    db.entitlementOverride.findMany!.mockResolvedValue([]);
+    db.__tx.stockLevel.findMany!.mockResolvedValue([]);
+    db.__tx.stockLevel.count!.mockResolvedValue(0);
     db.merchantPaymentProvider.findMany!.mockResolvedValue([]);
     db.merchantPaymentProvider.findUnique!.mockResolvedValue(null);
 });
@@ -248,13 +264,64 @@ describe("StorefrontsService", () => {
             /2 orders here/,
         );
         expect(db.store.update).not.toHaveBeenCalled();
+        expect(db.__tx.store.update).not.toHaveBeenCalled();
     });
 
     it("closes by setting it aside, not by erasing it", async () => {
         await service.close("org_1", "st_1");
-        expect(db.store.update).toHaveBeenCalledWith({
+        expect(db.__tx.store.update).toHaveBeenCalledWith({
             where: { id: "st_1" },
             data: { deletedAt: expect.any(Date) },
+        });
+    });
+
+    it("will not close while stock is on hand or promised there", async () => {
+        db.__tx.stockLevel.findMany!.mockResolvedValue([
+            { id: "sl_b" },
+            { id: "sl_a" },
+        ]);
+        db.__tx.stockLevel.count!.mockResolvedValue(1);
+        await expect(service.close("org_1", "st_1")).rejects.toThrow(
+            ConflictException,
+        );
+        await expect(service.close("org_1", "st_1")).rejects.toThrow(
+            "Move or count out its stock first",
+        );
+        expect(db.__tx.stockLevel.count).toHaveBeenCalledWith({
+            where: {
+                storeId: "st_1",
+                OR: [{ onHand: { gt: 0 } }, { promised: { gt: 0 } }],
+            },
+        });
+        expect(db.__tx.store.update).not.toHaveBeenCalled();
+    });
+
+    it("checks the stock under the storefront's row locks, in id order", async () => {
+        db.__tx.stockLevel.findMany!.mockResolvedValue([
+            { id: "sl_b" },
+            { id: "sl_a" },
+        ]);
+        await service.close("org_1", "st_1");
+        const [, ids] = db.__tx.$queryRaw.mock.calls[0] as [unknown, string[]];
+        expect(ids).toEqual(["sl_a", "sl_b"]);
+        expect(db.__tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            db.__tx.stockLevel.count!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("says how much stock a storefront holds", async () => {
+        db.stockLevel
+            .aggregate!.mockResolvedValueOnce({ _sum: { onHand: 3 } })
+            .mockResolvedValueOnce({ _sum: { promised: 1 } });
+        const s = await service.get("org_1", "st_1");
+        expect(s.stock).toEqual({ onHand: 3, promised: 1 });
+    });
+
+    it("reads how many storefronts the plan allows", async () => {
+        db.store.count!.mockResolvedValue(2);
+        await expect(service.allowance("org_1")).resolves.toEqual({
+            used: 2,
+            limit: 5,
         });
     });
 });

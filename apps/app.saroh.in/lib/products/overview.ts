@@ -1,6 +1,6 @@
-import { getJson } from "@/lib/api/http";
+import { getJson, orgBase } from "@/lib/api/http";
+import type { ProductDetail } from "@/lib/products/service";
 import { getProduct } from "@/lib/products/service";
-import type { Store } from "@/lib/stores/service";
 
 import type { ProductOverview } from "./overview-rules";
 
@@ -11,33 +11,42 @@ import type { ProductOverview } from "./overview-rules";
 
 export type * from "./overview-rules";
 
-export function getProductOverview(
-    storeId: string,
+/**
+ * The product page as a storefront sees it (#531): the one named in the
+ * address, or the first that sells it. Null when it is not this business's.
+ */
+export async function getProductOverview(
+    storeId: string | null | undefined,
     productId: string,
 ): Promise<ProductOverview | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const q = storeId ? `?storefront=${encodeURIComponent(storeId)}` : "";
     return getJson<ProductOverview>(
-        `/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/overview`,
+        `${base}/products/${encodeURIComponent(productId)}/overview${q}`,
     );
 }
 
 /**
- * Which storefront a product lives in. The address names it (`?storefront=`);
- * a link without it — typed, or shared from an older screen — is still
- * honoured by asking each storefront until one has the product.
+ * A read that names a storefront no longer the business's — a link from an
+ * older screen, or a storefront since closed — still opens the product, at
+ * the first storefront that sells it.
  */
-export async function findProductStore(
-    stores: Store[],
-    productId: string,
+export async function withStorefrontFallback<T>(
     storefront: string | undefined,
-): Promise<Store | null> {
-    const named = stores.find((s) => s.id === storefront);
-    if (named && (await getProduct(named.id, productId).catch(() => null))) {
-        return named;
-    }
-    const others = stores.filter((s) => s !== named);
-    const hits = await Promise.all(
-        others.map((s) => getProduct(s.id, productId).catch(() => null)),
+    read: (storeId: string | undefined) => Promise<T | null>,
+): Promise<T | null> {
+    const named = await read(storefront);
+    if (named !== null || !storefront) return named;
+    return read(undefined);
+}
+
+/** The product for the editor, with the same fallback. */
+export function getProductAt(
+    storefront: string | undefined,
+    productId: string,
+): Promise<ProductDetail | null> {
+    return withStorefrontFallback(storefront, (storeId) =>
+        getProduct(storeId, productId),
     );
-    const i = hits.findIndex(Boolean);
-    return i >= 0 ? (others[i] ?? null) : null;
 }

@@ -14,7 +14,7 @@ const SAVES: Record<SectionKey, string> = {
     description: "Saves the description and key points.",
     details: "Saves how to use it and what it is made of.",
     madeby: "Saves who makes it, the warranty and the returns rule.",
-    photos: "Saves the photos and their order.",
+    photos: "Saves the photos, the videos and their order.",
     visibility: "",
     variants: "Saves every change in this list.",
     stock: "Saves on hand and the warning level.",
@@ -25,7 +25,7 @@ const SAVE_LABEL: Record<SectionKey, string> = {
     description: "Save description",
     details: "Save",
     madeby: "Save",
-    photos: "Save photos",
+    photos: "Save media",
     visibility: "Save",
     variants: "Save variants",
     stock: "Save stock",
@@ -42,11 +42,16 @@ export function SectionCard({
     title,
     children,
     className,
+    aside,
+    bodyClassName,
 }: {
     k: SectionKey;
     title: string;
     children: ReactNode;
     className?: string;
+    /** At the heading's far end: the Stock section's Track stock switch. */
+    aside?: ReactNode;
+    bodyClassName?: string;
 }) {
     const { mode, canWrite, states, saving, saveSections, discard } =
         useEditor();
@@ -89,8 +94,16 @@ export function SectionCard({
                     {title}
                 </h2>
                 {chip ? <SectionChip kind={chip} /> : null}
+                {aside ? (
+                    <>
+                        <span className="flex-1" />
+                        {aside}
+                    </>
+                ) : null}
             </div>
-            <div className="px-[18px] pb-[18px] pt-[13px]">{children}</div>
+            <div className={cn("px-[18px] pb-[18px] pt-[13px]", bodyClassName)}>
+                {children}
+            </div>
             {dirty && canWrite ? (
                 <div className="flex flex-wrap items-center gap-[9px] rounded-b-[12px] border-t border-border/70 bg-muted/50 py-2.5 pl-[18px] pr-3.5">
                     <span

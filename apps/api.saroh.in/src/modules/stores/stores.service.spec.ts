@@ -80,21 +80,38 @@ describe("StoresService (dev DB)", () => {
         expect(await service.isOwner(res.id, userB)).toBe(false);
     });
 
-    it("refuses a second storefront in the same business (ADR-006)", async () => {
+    it("adds a second storefront to the same business (ADR-010)", async () => {
+        const res = await service.createForUser(userA, orgId, {
+            name: "Second shop",
+            slug: `${slugPrefix}-second`,
+        });
+        createdStoreIds.push(res.id);
+        expect(
+            await prisma.store.count({ where: { organizationId: orgId } }),
+        ).toBe(2);
+    });
+
+    it("stops at the plan's storefronts, with a 403", async () => {
+        // Five on the free floor: three more fill it, the sixth is refused.
+        for (const n of [3, 4, 5]) {
+            const res = await service.createForUser(userA, orgId, {
+                name: `Shop ${n}`,
+                slug: `${slugPrefix}-shop-${n}`,
+            });
+            createdStoreIds.push(res.id);
+        }
         await expect(
             service.createForUser(userA, orgId, {
-                name: "Second shop",
-                slug: `${slugPrefix}-second`,
+                name: "Shop 6",
+                slug: `${slugPrefix}-shop-6`,
             }),
         ).rejects.toMatchObject({
-            status: 409,
-            response: {
-                message: expect.stringMatching(/already has its storefront/),
-            },
+            status: 403,
+            response: { message: expect.stringMatching(/5 storefronts/) },
         });
         expect(
             await prisma.store.count({ where: { organizationId: orgId } }),
-        ).toBe(1);
+        ).toBe(5);
     });
 
     it("rejects a taken slug and creates nothing", async () => {

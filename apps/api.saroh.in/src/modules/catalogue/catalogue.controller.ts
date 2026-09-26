@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -13,12 +12,15 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
-import type { AuthUser } from "../../common/types/store-context";
+import { OrganizationGuard } from "../../common/guards/organization.guard";
+import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { MergeReportService } from "../products/merge-report.service";
 import { AllergensService } from "./allergens.service";
+import { blankToNull, CatalogueAccess } from "./catalogue-access";
 import { CatalogueService } from "./catalogue.service";
 import {
     AddAllergensDto,
@@ -33,245 +35,226 @@ import {
 } from "./dto";
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
+import { single } from "./single-query";
 import { SkuService } from "./sku.service";
 
 /**
- * A query value given once. `?pattern=a&pattern=b` arrives as an array.
- * Typed `string`, the global ValidationPipe (`transform: true`) would turn
- * it into "a,b" — no 500, but two values silently read as one. Typed
- * `unknown`, the array reaches here and is refused in words; that is also
- * what satisfies CodeQL's type-confusion rule (js/type-confusion-through-
- * parameter-tampering), which cannot see the pipe. `what` names the value
- * as the message says it.
+ * The business's catalogue settings (#529): the settings page's one read,
+ * the options variants choose by, custom fields, allergens, the SKU pattern
+ * and the defaults new products start with. Org-nested, so the business
+ * comes from the path the guard proved; reading needs `store:read`,
+ * changing needs `store:write`.
  */
-function single(what: string, value: unknown): string | undefined {
-    if (value === undefined || typeof value === "string") return value;
-    throw new BadRequestException(`Send one ${what} at a time.`);
-}
-
-/**
- * Store-wide catalogue settings: the settings page's one read, the options
- * its variants choose by, and the defaults new products start with. Read =
- * store access, write = store write, like products and categories.
- */
-@Controller("stores/:storeId")
-@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@Controller("organizations/:organizationId/catalogue")
+@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 @RequireModule("COMMERCE")
-export class CatalogueController {
+export class OrganizationCatalogueController {
     constructor(
+        private readonly access: CatalogueAccess,
         private readonly catalogue: CatalogueService,
         private readonly options: OptionsService,
         private readonly sku: SkuService,
         private readonly fields: FieldsService,
         private readonly allergens: AllergensService,
+        private readonly mergeReports: MergeReportService,
     ) {}
 
-    // ---- Allergens (#483) ----
-
-    @Get("allergens")
-    listAllergens(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-    ) {
-        return this.allergens.list(storeId, user.id);
+    @Get()
+    get(@OrgContext() ctx: OrganizationContext) {
+        const scope = this.access.read(ctx);
+        return this.catalogue.get(scope.organizationId, scope.canWrite);
     }
 
-    @Post("allergens")
-    @HttpCode(201)
-    addAllergens(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Body() dto: AddAllergensDto,
-    ) {
-        return this.allergens.add(storeId, user.id, dto.names);
-    }
-
-    /** Refused while any product lists it. */
-    @Delete("allergens/:allergenId")
-    removeAllergen(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Param("allergenId") allergenId: string,
-    ) {
-        return this.allergens.remove(storeId, allergenId, user.id);
-    }
-
-    // ---- Custom fields (#482) ----
-
-    @Get("fields")
-    listFields(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-    ) {
-        return this.fields.list(storeId, user.id);
-    }
-
-    @Post("fields")
-    @HttpCode(201)
-    createField(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Body() dto: CreateFieldDto,
-    ) {
-        return this.fields.create(storeId, user.id, dto);
-    }
-
-    @Patch("fields/:fieldId")
-    updateField(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Param("fieldId") fieldId: string,
-        @Body() dto: UpdateFieldDto,
-    ) {
-        return this.fields.update(storeId, fieldId, user.id, dto);
-    }
-
-    /** Soft: its values are kept, and restore brings it back. */
-    @Delete("fields/:fieldId")
-    removeField(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Param("fieldId") fieldId: string,
-    ) {
-        return this.fields.remove(storeId, fieldId, user.id);
-    }
-
-    @Post("fields/:fieldId/restore")
-    @HttpCode(200)
-    restoreField(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Param("fieldId") fieldId: string,
-    ) {
-        return this.fields.restore(storeId, fieldId, user.id);
-    }
-
-    /** The pattern, whether to suggest, and a product's number for {N}. */
-    @Get("sku-pattern")
-    skuPattern(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Query("productId") productId?: unknown,
-    ) {
-        return this.sku.get(storeId, user.id, single("product", productId));
-    }
-
-    /** Every variant's SKU today and under this pattern, with any clash. */
-    @Get("sku-pattern/preview")
-    skuPreview(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Query("pattern") pattern?: unknown,
-    ) {
-        return this.sku.preview(
-            storeId,
-            user.id,
-            single("pattern", pattern) ?? "",
-        );
-    }
-
-    @Put("sku-pattern")
-    saveSkuPattern(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-        @Body() dto: SaveSkuPatternDto,
-    ) {
-        return this.sku.save(storeId, user.id, dto);
-    }
-
-    @Get("catalogue")
-    get(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {
-        return this.catalogue.get(storeId, user.id);
-    }
+    // ---- Defaults ----
 
     /** What a new product in this category starts with. */
-    @Get("catalogue/defaults/effective")
+    @Get("defaults/effective")
     effectiveDefaults(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Query("categoryId") categoryId?: string,
     ) {
-        return this.catalogue.effectiveForUser(
-            storeId,
-            user.id,
-            categoryId?.trim() ? categoryId : null,
+        return this.catalogue.effective(
+            this.access.read(ctx).organizationId,
+            blankToNull(categoryId),
         );
     }
 
-    @Put("catalogue/defaults")
+    @Put("defaults")
     saveDefaults(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Body() dto: SaveDefaultsDto,
     ) {
-        return this.catalogue.saveDefaults(storeId, user.id, dto);
+        return this.catalogue.saveDefaults(this.access.write(ctx), dto);
     }
 
-    @Post("catalogue/defaults/undo")
+    @Post("defaults/undo")
     @HttpCode(200)
     undoDefaults(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Body() dto: UndoDefaultsDto,
     ) {
-        return this.catalogue.undoDefaults(storeId, user.id, dto);
+        return this.catalogue.undoDefaults(this.access.write(ctx), dto);
     }
 
+    // ---- Options ----
+
     @Get("options")
-    listOptions(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
-    ) {
-        return this.options.list(storeId, user.id);
+    listOptions(@OrgContext() ctx: OrganizationContext) {
+        return this.options.views(this.access.read(ctx).organizationId);
     }
 
     @Post("options")
     @HttpCode(201)
     createOption(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Body() dto: CreateOptionDto,
     ) {
-        return this.options.create(storeId, user.id, dto);
+        return this.options.create(this.access.write(ctx), dto);
     }
 
     @Patch("options/:optionId")
     renameOption(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Param("optionId") optionId: string,
         @Body() dto: RenameOptionDto,
     ) {
-        return this.options.rename(storeId, optionId, user.id, dto);
+        return this.options.rename(this.access.write(ctx), optionId, dto);
     }
 
     @Delete("options/:optionId")
     removeOption(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Param("optionId") optionId: string,
     ) {
-        return this.options.remove(storeId, optionId, user.id);
+        return this.options.remove(this.access.write(ctx), optionId);
     }
 
     @Post("options/:optionId/values")
     @HttpCode(201)
     addValue(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Param("optionId") optionId: string,
         @Body() dto: AddOptionValueDto,
     ) {
-        return this.options.addValue(storeId, optionId, user.id, dto);
+        return this.options.addValue(this.access.write(ctx), optionId, dto);
     }
 
     @Delete("options/:optionId/values/:valueId")
     removeValue(
-        @CurrentUser() user: AuthUser,
-        @Param("storeId") storeId: string,
+        @OrgContext() ctx: OrganizationContext,
         @Param("optionId") optionId: string,
         @Param("valueId") valueId: string,
     ) {
-        return this.options.removeValue(storeId, optionId, valueId, user.id);
+        return this.options.removeValue(
+            this.access.write(ctx),
+            optionId,
+            valueId,
+        );
+    }
+
+    // ---- Custom fields (#482) ----
+
+    @Get("fields")
+    listFields(@OrgContext() ctx: OrganizationContext) {
+        return this.fields.views(this.access.read(ctx).organizationId);
+    }
+
+    @Post("fields")
+    @HttpCode(201)
+    createField(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateFieldDto,
+    ) {
+        return this.fields.create(this.access.write(ctx), dto);
+    }
+
+    @Patch("fields/:fieldId")
+    updateField(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("fieldId") fieldId: string,
+        @Body() dto: UpdateFieldDto,
+    ) {
+        return this.fields.update(this.access.write(ctx), fieldId, dto);
+    }
+
+    /** Soft: its values are kept, and restore brings it back. */
+    @Delete("fields/:fieldId")
+    removeField(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("fieldId") fieldId: string,
+    ) {
+        return this.fields.remove(this.access.write(ctx), fieldId);
+    }
+
+    @Post("fields/:fieldId/restore")
+    @HttpCode(200)
+    restoreField(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("fieldId") fieldId: string,
+    ) {
+        return this.fields.restore(this.access.write(ctx), fieldId);
+    }
+
+    // ---- Allergens (#483) ----
+
+    @Get("allergens")
+    listAllergens(@OrgContext() ctx: OrganizationContext) {
+        return this.allergens.views(this.access.read(ctx).organizationId);
+    }
+
+    @Post("allergens")
+    @HttpCode(201)
+    addAllergens(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: AddAllergensDto,
+    ) {
+        return this.allergens.add(this.access.write(ctx), dto.names);
+    }
+
+    /** Refused while any product lists it. */
+    @Delete("allergens/:allergenId")
+    removeAllergen(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("allergenId") allergenId: string,
+    ) {
+        return this.allergens.remove(this.access.write(ctx), allergenId);
+    }
+
+    // ---- SKU pattern (#484) ----
+
+    /** The pattern, whether to suggest, and a product's number for {N}. */
+    @Get("sku-pattern")
+    skuPattern(
+        @OrgContext() ctx: OrganizationContext,
+        @Query("productId") productId?: unknown,
+    ) {
+        const one = single("product", productId);
+        return this.sku.get(this.access.read(ctx).organizationId, one);
+    }
+
+    /** Every variant's SKU today and under this pattern, with any clash. */
+    @Get("sku-pattern/preview")
+    skuPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Query("pattern") pattern?: unknown,
+    ) {
+        const one = single("pattern", pattern) ?? "";
+        return this.sku.preview(this.access.read(ctx).organizationId, one);
+    }
+
+    @Put("sku-pattern")
+    saveSkuPattern(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SaveSkuPatternDto,
+    ) {
+        return this.sku.save(this.access.write(ctx), dto);
+    }
+
+    // ---- Same-product merge (#530) ----
+
+    /** What the merge joined, kept apart and dropped. Owner and Admin. */
+    @Get("merge-report")
+    mergeReport(@OrgContext() ctx: OrganizationContext) {
+        return this.mergeReports.list(ctx);
     }
 }

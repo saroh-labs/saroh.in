@@ -35,7 +35,8 @@ export function ProductHeader({
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency) ?? amount;
     const status = STATUS_BADGE[product.status];
-    const cover = product.images.at(0);
+    // The cover is the first photo; a video never stands in for it.
+    const cover = product.images.find((i) => i.kind !== "video");
     const tracked = stock.mode === "variant" || stock.product !== null;
 
     const meta = [

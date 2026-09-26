@@ -1,113 +1,98 @@
-import type { ProductListItem, ProductStatus } from "./service";
+import type { CatalogueProduct, ProductStatus } from "./service";
 
-/** One place a catalogue row is sold, and what it looks like there. */
+/** One storefront that sells a catalogue row, and its stock there. */
 export interface CataloguePlace {
     storeId: string;
     storeName: string;
-    product: ProductListItem;
+    inventory: { quantity: number; lowStockAlert: number } | null;
+    /** Marked sold out by hand here (#515); absent from an older API. */
+    soldOut?: boolean;
 }
 
 /**
  * One row of the business's catalogue.
  *
- * Products are stored per storefront today, but the catalogue belongs to the
- * business (the "Saroh Products Screen" design, after Square's single item
- * library): the same SKU sold in two storefronts is ONE product, carrying the
- * places that sell it. Where the price differs between them the row says
- * "varies" rather than picking a winner. A product with no SKU cannot be
- * matched to anything, so it stays its own row.
+ * The catalogue belongs to the business (#531, the "Saroh Products Screen"
+ * design, after Square's single item library): the API returns one product
+ * per row, with each storefront that sells it — its listings — and the
+ * stock on each shelf. Nothing is matched or merged here.
  */
 export interface CatalogueRow {
+    /** The product's id: one row per catalogue product. */
     key: string;
+    id: string;
     name: string;
     sku: string | null;
     variantCount: number;
     status: ProductStatus;
     price: string;
     currency: string;
-    /** The price differs between the places that sell it. */
-    varies: boolean;
     /** Summed across places that track stock; `null` when none do. */
     stock: number | null;
     /** The tightest low-stock threshold among those places. */
     lowStockAlert: number | null;
+    /**
+     * Untracked and marked sold out by hand at every place counted (#515):
+     * the stock column says "Sold out", not "Not tracked".
+     */
+    soldOut: boolean;
     updatedAt: string;
-    /** In a collection (a category) in at least one place. */
+    /** In a collection (a category). */
     inCollection: boolean;
+    /** Where it is sold; empty when no storefront sells it just now. */
     places: CataloguePlace[];
 }
 
-/** A row always has at least one place. */
-type Places = [CataloguePlace, ...CataloguePlace[]];
-
-export function mergeCatalogue(
-    stores: { id: string; name: string }[],
-    productsByStore: Record<string, ProductListItem[]>,
+export function catalogueRows(
+    products: readonly CatalogueProduct[],
 ): CatalogueRow[] {
-    const groups = new Map<string, Places>();
-    for (const store of stores) {
-        for (const product of productsByStore[store.id] ?? []) {
-            const key = product.sku ?? `${store.id}:${product.id}`;
-            const place = { storeId: store.id, storeName: store.name, product };
-            const seen = groups.get(key);
-            if (seen) seen.push(place);
-            else groups.set(key, [place]);
-        }
-    }
-    return Array.from(groups.entries(), ([key, places]) => toRow(key, places));
+    return products.map((p) => ({
+        key: p.id,
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        variantCount: p.variantCount,
+        status: p.status,
+        price: p.price,
+        currency: p.currency,
+        ...stockOf(p.listings),
+        updatedAt: p.updatedAt,
+        inCollection: p.categoryId !== null,
+        places: p.listings,
+    }));
 }
 
-/** The same row seen from one storefront: its own price, stock and status. */
+/**
+ * The same row as one storefront sees it: its stock there. `null` when that
+ * storefront does not sell it — the storefront filter filters by listing.
+ */
 export function inStorefront(
     row: CatalogueRow,
     storeId: string,
 ): CatalogueRow | null {
     const here = row.places.filter((p) => p.storeId === storeId);
-    const first = here.at(0);
-    if (!first) return null;
-    const rest = here.slice(1);
-    // "Sold at" and "varies" stay facts about the product, not the filter.
-    return {
-        ...toRow(row.key, [first, ...rest]),
-        places: row.places,
-        varies: row.varies,
-    };
+    if (here.length === 0) return null;
+    // "Sold at" stays a fact about the product, not the filter.
+    return { ...row, ...stockOf(here) };
 }
 
-function toRow(key: string, places: Places): CatalogueRow {
-    const first = places[0].product;
-    const tracked = places.filter((p) => p.product.inventory);
-    const published = places.some((p) => p.product.status === "PUBLISHED");
-    const allArchived = places.every((p) => p.product.status === "ARCHIVED");
+function stockOf(places: readonly CataloguePlace[]): {
+    stock: number | null;
+    lowStockAlert: number | null;
+    soldOut: boolean;
+} {
+    const tracked = places.flatMap((p) => (p.inventory ? [p.inventory] : []));
+    if (tracked.length === 0) {
+        return {
+            stock: null,
+            lowStockAlert: null,
+            soldOut:
+                places.length > 0 && places.every((p) => p.soldOut === true),
+        };
+    }
     return {
-        key,
-        name: first.name,
-        sku: first.sku,
-        variantCount: Math.max(...places.map((p) => p.product.variantCount)),
-        // Live anywhere is live; archived only when archived everywhere.
-        status: published ? "PUBLISHED" : allArchived ? "ARCHIVED" : "DRAFT",
-        price: first.price,
-        currency: first.currency,
-        varies: places.some((p) => p.product.price !== first.price),
-        stock: tracked.length
-            ? tracked.reduce(
-                  (n, p) => n + (p.product.inventory?.quantity ?? 0),
-                  0,
-              )
-            : null,
-        lowStockAlert: tracked.length
-            ? Math.min(
-                  ...tracked.map(
-                      (p) => p.product.inventory?.lowStockAlert ?? 0,
-                  ),
-              )
-            : null,
-        updatedAt: places.reduce(
-            (latest, p) =>
-                p.product.updatedAt > latest ? p.product.updatedAt : latest,
-            first.updatedAt,
-        ),
-        inCollection: places.some((p) => p.product.categoryId !== null),
-        places,
+        stock: tracked.reduce((n, i) => n + i.quantity, 0),
+        lowStockAlert: Math.min(...tracked.map((i) => i.lowStockAlert)),
+        soldOut: false,
     };
 }

@@ -58,6 +58,9 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        "<rootDir>/src/modules/products/merge-report.service.spec.ts",
+        "<rootDir>/src/modules/stock/stock-words.spec.ts",
+        "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
@@ -65,6 +68,9 @@ module.exports = {
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue.controller.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
+        "<rootDir>/src/modules/collections/collections.gate.spec.ts",
+        "<rootDir>/src/modules/collections/website-pages.spec.ts",
+        "<rootDir>/src/modules/categories/categories.service.spec.ts",
         "<rootDir>/src/modules/product-reviews/",
         // ADR-007 invoices: DB-free specs run in the unit project; only
         // invoices.db.spec.ts runs here.

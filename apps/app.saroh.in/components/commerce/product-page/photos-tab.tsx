@@ -1,6 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Image as ImageIcon } from "lucide-react";
 
+import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
+import { mediaCounter } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 
@@ -26,7 +28,7 @@ export function ProductPhotosTab({
             <TabState
                 icon={ImageIcon}
                 title="No photos yet"
-                description="Add up to 5. The first becomes the cover on the shop and in lists."
+                description="Add up to 15 photos and 3 videos. The first photo becomes the cover on the shop and in lists."
             >
                 {overview.canWrite ? (
                     <StateLink href={edit}>Add photos</StateLink>
@@ -44,10 +46,11 @@ export function ProductPhotosTab({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
                 <p className="text-[13px] font-semibold">
-                    {product.images.length} of 5 photos
+                    {mediaCounter(product.images)}
                 </p>
                 <p className="text-[12.5px] text-muted-foreground">
-                    In the order customers see them. The first is the cover.
+                    In the order customers see them. The first photo is the
+                    cover.
                 </p>
                 {overview.canWrite ? (
                     <div className="ml-auto">
@@ -64,16 +67,14 @@ export function ProductPhotosTab({
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
                 {product.images.map((img, i) => {
                     const variants = usedBy(img.id);
+                    const cover =
+                        i ===
+                        product.images.findIndex((m) => m.kind !== "video");
                     return (
                         <li key={img.id} className="min-w-0">
-                            <div className="relative overflow-hidden rounded-[10px] border border-border">
-                                {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                                <img
-                                    src={img.url}
-                                    alt={img.alt}
-                                    className="aspect-[4/3] w-full object-cover"
-                                />
-                                {i === 0 ? (
+                            <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-border">
+                                <MediaThumb item={img} alt={img.alt} />
+                                {cover ? (
                                     <Badge
                                         variant="neutral"
                                         className="absolute left-2 top-2"

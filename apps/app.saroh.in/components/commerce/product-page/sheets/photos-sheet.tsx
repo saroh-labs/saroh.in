@@ -49,11 +49,7 @@ export function PhotosSheet({
 
     async function save() {
         setSaving(true);
-        const res = await replaceProductImages(
-            storeId,
-            product.id,
-            photosInput(draft),
-        );
+        const res = await replaceProductImages(product.id, photosInput(draft));
         setSaving(false);
         if (!res.ok) {
             showError(res.error);
@@ -67,16 +63,14 @@ export function PhotosSheet({
         const previous = baseline.map((p) =>
             p.id && survivors.has(p.id) ? p : { ...p, id: undefined },
         );
-        showUndo("Photos saved.", () => {
-            void replaceProductImages(
-                storeId,
-                product.id,
-                photosInput(previous),
-            ).then((undo) => {
-                if (!undo.ok)
-                    showError("Couldn't undo. The saved photos stay.");
-                router.refresh();
-            });
+        showUndo("Photos and videos saved.", () => {
+            void replaceProductImages(product.id, photosInput(previous)).then(
+                (undo) => {
+                    if (!undo.ok)
+                        showError("Couldn't undo. The saved photos stay.");
+                    router.refresh();
+                },
+            );
         });
     }
 
@@ -88,7 +82,7 @@ export function PhotosSheet({
                 onOpenChange(o);
             }}
             productName={product.name}
-            title="Edit photos"
+            title="Edit photos and videos"
             fullEditorHref={productEditHref(storeId, product.id, "photos")}
             dirty={dirty}
             saving={saving}

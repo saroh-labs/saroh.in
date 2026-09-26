@@ -31,11 +31,12 @@ describe("Orders & inventory (dev DB)", () => {
     let customerId = "";
 
     async function stock() {
-        const inv = await prisma.inventory.findUnique({
-            where: { productId },
-            select: { quantity: true, reserved: true },
+        // The product's shelf at the storefront (#510: StockLevel).
+        const row = await prisma.stockLevel.findFirstOrThrow({
+            where: { storeId, productId, variantId: null },
+            select: { onHand: true, promised: true },
         });
-        return inv!;
+        return { quantity: row.onHand, reserved: row.promised };
     }
 
     beforeAll(async () => {
@@ -76,7 +77,7 @@ describe("Orders & inventory (dev DB)", () => {
     afterAll(async () => {
         await prisma.orderItem.deleteMany({ where: { order: { storeId } } });
         await prisma.order.deleteMany({ where: { storeId } });
-        await prisma.inventory.deleteMany({ where: { storeId } });
+        await prisma.stockLevel.deleteMany({ where: { storeId } });
         await prisma.product.deleteMany({ where: { storeId } });
         await prisma.customer.deleteMany({ where: { storeId } });
         await prisma.storeOwner.deleteMany({ where: { storeId } });

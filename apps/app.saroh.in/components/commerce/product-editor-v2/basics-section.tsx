@@ -314,7 +314,6 @@ export function BasicsSection({
                 <FieldLabel htmlFor="pe-category">Category</FieldLabel>
                 <CategoryPicker
                     id="pe-category"
-                    storeId={storeId}
                     value={v.categoryId}
                     onChange={(id) => {
                         form.setValue("categoryId", id, {

@@ -1,8 +1,14 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { rateToBps } from "../invoices/gst";
+import { currencyMismatch, storefrontCurrency } from "../stores/currency";
 import type { OrderItemInput } from "./dto";
+
+/** Why a product set to Not sold (archived) can't be ordered. */
+export function notSold(product: string): string {
+    return `${product} is set to Not sold, so it can't be ordered. Sell it again to take orders for it.`;
+}
 
 /** Money helpers — integer-cents math so totals never drift on floats. */
 export const toCents = (s: string) => Math.round(Number(s) * 100);
@@ -51,20 +57,59 @@ export async function priceOrderLines(
     items: readonly OrderItemInput[],
 ): Promise<PricedLine[]> {
     const lines: PricedLine[] = [];
+    // A business sells in one currency (DEC-030): a backstop for a listing
+    // made before listAt refused another currency.
+    const currency = await storefrontCurrency(prisma, storeId);
     for (const item of items) {
+        // Sold here (#510): the product is listed at the order's
+        // storefront, and a variant only if that storefront sells it.
         const product = await prisma.product.findFirst({
-            where: { id: item.productId, storeId },
+            where: { id: item.productId, listings: { some: { storeId } } },
             // The category too: a collection code matches on it.
             select: {
                 name: true,
                 price: true,
+                currency: true,
+                status: true,
                 categoryId: true,
-                variants: { select: { id: true, price: true } },
+                variants: {
+                    select: {
+                        id: true,
+                        price: true,
+                        listings: {
+                            where: { listing: { storeId } },
+                            select: { id: true },
+                        },
+                    },
+                },
             },
         });
         if (!product) {
             throw new BadRequestException({
                 message: "Unknown product in order",
+                field: "items",
+            });
+        }
+        // "Stop selling" archives a product (DEC-032): nobody orders it,
+        // staff included, until it's sold again.
+        if (product.status === "ARCHIVED") {
+            throw new ConflictException({
+                message: notSold(product.name),
+                field: "items",
+            });
+        }
+        if (currency !== null && product.currency !== currency) {
+            const store = await prisma.store.findUnique({
+                where: { id: storeId },
+                select: { name: true },
+            });
+            throw new ConflictException({
+                message: currencyMismatch({
+                    product: product.name,
+                    productCurrency: product.currency,
+                    storefront: store?.name ?? "this storefront",
+                    storefrontCurrency: currency,
+                }),
                 field: "items",
             });
         }
@@ -79,6 +124,12 @@ export async function priceOrderLines(
                     message: item.variantId
                         ? `That option of ${product.name} no longer exists.`
                         : `Choose which one of ${product.name} is being bought.`,
+                    field: "items",
+                });
+            }
+            if (variant.listings.length === 0) {
+                throw new BadRequestException({
+                    message: `That option of ${product.name} isn't sold at this storefront.`,
                     field: "items",
                 });
             }

@@ -14,10 +14,14 @@ import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { isProductTab, productHref } from "@/lib/products/links";
-import { findProductStore, getProductOverview } from "@/lib/products/overview";
+import {
+    getProductOverview,
+    withStorefrontFallback,
+} from "@/lib/products/overview";
 import { listCategories } from "@/lib/products/service";
+import { countsStock, trackingControl } from "@/lib/products/tracking";
 import { requireSession } from "@/lib/session";
-import { listBusinessStores } from "@/lib/stores/service";
+import { getStockTracking } from "@/lib/stock/service";
 
 export const metadata = { title: "Product" };
 
@@ -46,10 +50,9 @@ export default async function ProductPage({
     }>;
 }) {
     await requireSession();
-    const [{ productId }, query, stores, organization] = await Promise.all([
+    const [{ productId }, query, organization] = await Promise.all([
         params,
         searchParams,
-        listBusinessStores(),
         resolveActiveOrganization(),
     ]);
 
@@ -64,17 +67,32 @@ export default async function ProductPage({
         );
     }
 
-    const store = await findProductStore(stores, productId, query.storefront);
-    const overview = store
-        ? await getProductOverview(store.id, productId)
-        : null;
-    if (!store || !overview) notFound();
+    // The business's product (#531), as the storefront in the address sees
+    // it — or the first that sells it.
+    const [overview, business] = await Promise.all([
+        withStorefrontFallback(query.storefront, (at) =>
+            getProductOverview(at, productId),
+        ),
+        // The business's Track stock switch (#515). Optional: unknown, the
+        // product's own switch decides.
+        getStockTracking().catch(() => null),
+    ]);
+    if (!overview) notFound();
+    const tracking = {
+        counts: countsStock(
+            overview.product.stockTracked,
+            business?.tracked ?? null,
+        ),
+        business: business?.tracked ?? true,
+        control: trackingControl(overview),
+    };
+    const store = overview.storefront;
 
     const tab = isProductTab(query.tab) ? query.tab : "overview";
     const view = query.view === "customer" ? "customer" : "team";
     // The details sheet picks a category; only a writer opens it.
     const categories = overview.canWrite
-        ? await listCategories(store.id).catch(() => [])
+        ? await listCategories().catch(() => [])
         : [];
     // A hint for which controls to draw; the API decides regardless.
     const may = (action: string) =>
@@ -85,7 +103,7 @@ export default async function ProductPage({
         productHref(store.id, productId, t);
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <div className="flex flex-col gap-5">
                 <ProductHeader
                     overview={overview}
@@ -105,6 +123,8 @@ export default async function ProductPage({
                         overview={overview}
                         storeId={store.id}
                         canWrite={overview.canWrite}
+                        counts={tracking.counts}
+                        businessTracks={tracking.business}
                     />
                 ) : (
                     <>
@@ -112,6 +132,7 @@ export default async function ProductPage({
                             overview={overview}
                             active={tab}
                             href={href}
+                            counts={tracking.counts}
                         />
                         <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
                             {tab === "overview" ? (
@@ -120,12 +141,14 @@ export default async function ProductPage({
                                     storeId={store.id}
                                     href={href}
                                     categories={categories}
+                                    tracking={tracking}
                                 />
                             ) : null}
                             {tab === "variants" ? (
                                 <ProductVariantsTab
                                     overview={overview}
                                     storeId={store.id}
+                                    tracking={tracking}
                                 />
                             ) : null}
                             {tab === "photos" ? (
