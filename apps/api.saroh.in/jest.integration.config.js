@@ -66,6 +66,7 @@ module.exports = {
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
+        "<rootDir>/src/modules/catalogue/catalogue.controller.spec.ts",
         "<rootDir>/src/modules/products/products.gate.spec.ts",
         "<rootDir>/src/modules/collections/collections.gate.spec.ts",
         "<rootDir>/src/modules/collections/website-pages.spec.ts",

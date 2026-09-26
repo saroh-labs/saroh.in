@@ -44,7 +44,6 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { InviteValues } from "@/lib/organizations/invitations";
 import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
-import { lastActive } from "@/lib/organizations/last-active";
 import {
     inviteMember,
     removeMember,
@@ -59,6 +58,7 @@ import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { OrganizationRole } from "@/lib/organizations/service";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { LastActiveLine } from "./last-active-line";
 import { RolesTab } from "./roles-tab";
 
 const ROLES: OrganizationRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
@@ -404,7 +404,6 @@ function PeopleTab({
                 <ul>
                     {members.map((m) => {
                         const role = m.roleKey ?? m.role;
-                        const seen = lastActive(m.lastActiveAt);
                         // An owner is moved to another role first (Edit), and
                         // no one is removed by someone they outrank. Leaving
                         // is not removing yourself from a row.
@@ -456,18 +455,7 @@ function PeopleTab({
                                                 {book.labelOf(role)}
                                             </span>
                                         </p>
-                                        {seen ? (
-                                            <p
-                                                className={cn(
-                                                    "mt-px text-[11.5px]",
-                                                    seen.stale
-                                                        ? "text-brand-subtle-foreground"
-                                                        : "text-muted-foreground",
-                                                )}
-                                            >
-                                                {seen.text}
-                                            </p>
-                                        ) : null}
+                                        <LastActiveLine at={m.lastActiveAt} />
                                     </div>
                                 </div>
                                 <div className="hidden min-w-0 items-center gap-2 xl:flex">
@@ -882,7 +870,13 @@ function MemberDrawer({
                             (current === "OWNER" || member.isSelf) ? (
                                 <button
                                     type="button"
-                                    onClick={() => onRemove(member)}
+                                    onClick={() => {
+                                        // A role picked and not saved must
+                                        // not follow the drawer to the next
+                                        // person it opens for.
+                                        setDraft(null);
+                                        onRemove(member);
+                                    }}
                                     className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                     Remove from {organizationName}

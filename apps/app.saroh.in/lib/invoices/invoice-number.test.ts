@@ -15,6 +15,7 @@ import {
     moveRow,
     nextInvoiceNumber,
     numberFormatProblem,
+    numberFormatProblemOnSave,
     PART_LABEL,
     partRows,
     partValue,
@@ -340,5 +341,64 @@ describe("the parts list", () => {
             numberDigits: "4",
             numberRestart: "NEVER",
         });
+    });
+});
+
+describe("numberFormatProblemOnSave", () => {
+    // Saved under older rules: a registered business whose numbers never
+    // restart, which today's rules refuse.
+    const older = {
+        ...formatFields({
+            parts: ["PREFIX", "YEAR"],
+            separator: "/",
+            digits: 4,
+            restart: "NEVER",
+        }),
+        invoicePrefix: "RC",
+        gstRegistered: true,
+    };
+
+    it("leaves a stored format alone when the save does not change it", () => {
+        expect(numberFormatProblemOnSave(older, {})).toBeNull();
+        // A GSTIN, address or name save.
+        expect(
+            numberFormatProblemOnSave(older, {
+                taxId: true,
+                addressLine1: true,
+                name: true,
+            }),
+        ).toBeNull();
+    });
+
+    it.each([
+        "numberParts",
+        "numberSeparator",
+        "numberDigits",
+        "numberRestart",
+        "invoicePrefix",
+        "gstRegistered",
+    ])("re-checks it when %s changes", (field) => {
+        expect(numberFormatProblemOnSave(older, { [field]: true })).toEqual(
+            numberFormatProblem(formatOf(older), {
+                registered: true,
+                prefix: "RC",
+            }),
+        );
+        expect(numberFormatProblemOnSave(older, { [field]: true })?.field).toBe(
+            "numberRestart",
+        );
+    });
+
+    it("passes a good format that changed", () => {
+        expect(
+            numberFormatProblemOnSave(
+                {
+                    ...formatFields(defaultNumberFormat(true)),
+                    invoicePrefix: "RC",
+                    gstRegistered: true,
+                },
+                { numberDigits: true },
+            ),
+        ).toBeNull();
     });
 });

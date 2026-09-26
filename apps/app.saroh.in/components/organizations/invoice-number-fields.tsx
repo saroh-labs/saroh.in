@@ -80,6 +80,7 @@ export function InvoiceNumberFields({
     registered,
     next,
     problem,
+    timezone,
     at,
 }: {
     /** The format the four fields describe now. */
@@ -91,6 +92,8 @@ export function InvoiceNumberFields({
     /** Whether the format is refused (the message is on its field). */
     /** Why the format is refused, worked out from what is on screen; null when it is fine. */
     problem: string | null;
+    /** The business's time zone on screen: the dated parts are today there. */
+    timezone: string | null;
     at: (
         basis: string,
         grow?: boolean,
@@ -114,6 +117,7 @@ export function InvoiceNumberFields({
         prefix,
         counter: 1,
         credit: true,
+        timezone,
     });
 
     return (
@@ -181,7 +185,12 @@ export function InvoiceNumberFields({
                                         >
                                             {PART_LABEL[row.part]}
                                             <span className="ml-2 font-mono text-[12px] text-muted-foreground">
-                                                {partValue(row.part, prefix)}
+                                                {partValue(
+                                                    row.part,
+                                                    prefix,
+                                                    new Date(),
+                                                    timezone,
+                                                )}
                                             </span>
                                         </label>
                                         <Button

@@ -61,7 +61,8 @@
   business's orders ignore the storefront's old add-on tax.
 - **Numbering:** `InvoiceSequence` per business **and series**; never renumber
   an existing invoice. The financial year is April–March for everyone (GST
-  sets it; not a setting). A business builds its format
+  sets it; not a setting), and a number's financial year and month are dated
+  in the business's time zone — India's until one is saved (DEC-033). A business builds its format
   (`BusinessProfile.invoiceNumberFormat`, `NumberFormat` in `numbering.ts`):
   parts in its order (prefix, financial year "26-27", financial year short
   "26" — by the year it starts in, `FY_SHORT` — year, month), "/", "-" or no
@@ -76,8 +77,11 @@
   year in the number, long or short — not the calendar year alone, which
   January–March share with the next financial year's restart — and a monthly
   one the month and a year of any kind (the database holds each number once).
-  The rules are checked on save only: a stored format that breaks them (an old
-  year-only yearly format) still reads and numbers. The series key is prefix +
+  The rules are checked on save only, and only when the save changes the
+  format, the prefix or the registration (DEC-028): a stored format that
+  breaks them (an old year-only yearly format) still reads and numbers, and
+  never blocks a GSTIN, country or address save — in the API
+  (`business-tax-settings.ts`) or the app (`numberFormatProblemOnSave`). The series key is prefix +
   restart period (`RC/26-27`, `RC/2026-09`, `RC`), not the rest of the format
   (long and short financial year count in the same series), so a mid-year
   change keeps counting; `nextInvoiceNumber` checks the number is free and

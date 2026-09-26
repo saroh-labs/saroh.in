@@ -33,6 +33,7 @@ import {
 } from "./dto";
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
+import { single } from "./single-query";
 import { SkuService } from "./sku.service";
 
 /**
@@ -157,9 +158,10 @@ export class CatalogueController {
     async skuPattern(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("productId") productId?: string,
+        @Query("productId") productId?: unknown,
     ) {
-        return this.sku.get(await this.readOrg(storeId, user), productId);
+        const one = single("product", productId);
+        return this.sku.get(await this.readOrg(storeId, user), one);
     }
 
     /** Every variant's SKU today and under this pattern, with any clash. */
@@ -167,9 +169,10 @@ export class CatalogueController {
     async skuPreview(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("pattern") pattern = "",
+        @Query("pattern") pattern?: unknown,
     ) {
-        return this.sku.preview(await this.readOrg(storeId, user), pattern);
+        const one = single("pattern", pattern) ?? "";
+        return this.sku.preview(await this.readOrg(storeId, user), one);
     }
 
     @Put("sku-pattern")

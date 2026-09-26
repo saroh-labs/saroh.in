@@ -842,6 +842,33 @@ describe("OrganizationSettingsService", () => {
                 );
             });
 
+            it("a format saved under older rules does not block a tax ID, country or address save", async () => {
+                // RC-2026-09-00001: 16, with no room for the count to grow
+                // — allowed once, refused now.
+                const older = {
+                    parts: ["PREFIX", "YEAR", "MONTH"],
+                    separator: "-",
+                    digits: 5,
+                    restart: "MONTH",
+                };
+                profileFindUnique.mockResolvedValue({
+                    ...REGISTERED,
+                    invoiceNumberFormat: older,
+                });
+                // Touching the numbering itself is still checked.
+                await refused(
+                    { tax: { invoicePrefix: "RC" } },
+                    "invoicePrefix",
+                    /characters/,
+                );
+                await service.update(ctx(), {
+                    registeredAddress: { line1: "12 Church Street" },
+                });
+                expect(profileUpsert).toHaveBeenCalledTimes(1);
+                await service.update(ctx(), { taxId: "29AAGCR4375J1ZU" });
+                await service.update(ctx(), { country: "IN" });
+            });
+
             it("refuses CN as the prefix where CN takes the prefix's place on credit notes", async () => {
                 profileFindUnique.mockResolvedValue({
                     ...REGISTERED,

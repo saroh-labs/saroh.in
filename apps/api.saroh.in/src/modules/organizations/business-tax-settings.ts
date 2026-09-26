@@ -215,7 +215,7 @@ export function touchesTax(sent: TaxSent): boolean {
  * registered business cannot clear its GSTIN. The number format — the one
  * sent, else the one stored, else the default — must suit the business as
  * it will be ({@link numberFormatProblem}): changing the prefix or the
- * registration re-checks it.
+ * registration re-checks it, and nothing else does.
  *
  * The registered address goes with them: a registered business needs a
  * first line, a city and a PIN (CGST rule 46), and an Indian business's
@@ -309,20 +309,31 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
             restart: format.restart,
         };
     }
-    const problem = numberFormatProblem(
-        // The stored format as it is, not as numbering would bend it: a
-        // business registering with a counter that never restarts is told.
-        format ??
-            readNumberFormat(current?.invoiceNumberFormat) ??
-            defaultNumberFormat(registered),
-        {
-            registered,
-            prefix:
-                data.invoicePrefix !== undefined
-                    ? data.invoicePrefix
-                    : (current?.invoicePrefix ?? null),
-        },
-    );
+    // Only what can make the number wrong re-checks it: the format, the
+    // prefix or the registration. A format saved under older, looser rules
+    // keeps numbering as it is and never blocks a GSTIN, country or address
+    // save; it is told when it is next changed.
+    const recheck =
+        sentFormat !== undefined ||
+        tax?.invoicePrefix !== undefined ||
+        tax?.registered !== undefined;
+    const problem = recheck
+        ? numberFormatProblem(
+              // The stored format as it is, not as numbering would bend it:
+              // a business registering with a counter that never restarts
+              // is told.
+              format ??
+                  readNumberFormat(current?.invoiceNumberFormat) ??
+                  defaultNumberFormat(registered),
+              {
+                  registered,
+                  prefix:
+                      data.invoicePrefix !== undefined
+                          ? data.invoicePrefix
+                          : (current?.invoicePrefix ?? null),
+              },
+          )
+        : null;
     if (problem) {
         // A prefix that alone makes the number too long is the prefix's.
         const prefixOnly =

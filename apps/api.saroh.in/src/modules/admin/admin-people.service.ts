@@ -7,6 +7,7 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
@@ -338,9 +339,11 @@ interface PersonRecord {
 /**
  * The context an operator's people change runs under: every action, so the
  * business's "you cannot change a role that can do more than you" check does
- * not stop an operator; the operator's own user id, so the business's audit
- * stream names them. The business's own invariants — it always keeps an
- * owner — still apply in full.
+ * not stop an operator; the operator's own user id, so the change is never
+ * put down to one of the business's members; and the operator role key,
+ * which marks the business's audit row `byOperator` so Activity shows Saroh
+ * support, never the operator (DEC-035). The business's own invariants — it
+ * always keeps an owner — still apply in full.
  */
 function operatorContext(
     staff: PlatformAdminInfo,
@@ -350,7 +353,7 @@ function operatorContext(
         organizationId,
         userId: staff.userId,
         role: "MEMBER",
-        roleKey: "platform-operator",
+        roleKey: PLATFORM_OPERATOR_ROLE_KEY,
         actions: new Set(ORG_ACTIONS),
     };
 }

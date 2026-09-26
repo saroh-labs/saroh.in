@@ -22,6 +22,7 @@ import { prisma } from "@saroh/database";
 
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditAction, AuditService } from "../audit/audit.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
 import { resolveCapabilities } from "../organizations/organization-policy";
@@ -1231,6 +1232,30 @@ describe("Track stock in Settings → Activity", () => {
         ]);
         for (const row of rows) {
             expect(row.metadata).toMatchObject({ byOperator: true });
+        }
+        // And Settings › Activity reads each as Saroh support: never the
+        // operator's name, email or user id (DEC-035).
+        const { events } = await new AuditService().listForOrganization(orgId, {
+            actions: [
+                AuditAction.ProductStockTrackingOff,
+                AuditAction.BusinessStockTrackingOff,
+                AuditAction.BusinessStockTrackingOn,
+            ],
+        });
+        const byOperator = events.filter(
+            (e) =>
+                (e.metadata as Record<string, unknown> | null)?.byOperator ===
+                true,
+        );
+        expect(byOperator.length).toBeGreaterThanOrEqual(3);
+        for (const event of byOperator) {
+            expect(event.actorUserId).toBeNull();
+            expect(event.actor).toEqual({
+                name: "Saroh support",
+                email: null,
+                role: null,
+                operator: true,
+            });
         }
         // A merchant's own change carries no mark.
         await setTracking(owner(), kite, true);

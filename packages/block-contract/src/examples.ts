@@ -136,10 +136,18 @@ export function blockExample(
  * The pieces of text in a string: the whole of plain text, or each run of
  * words between tags in HTML, so one example paragraph is found inside a
  * merchant's longer rich text.
+ *
+ * `<[^<>]*>`, not `<[^>]*>`: from every "<" the old form scanned on to the
+ * end for a ">", quadratic on a run of "<" (CodeQL js/polynomial-redos);
+ * this one stops at the next "<", so it is linear. The old form was
+ * reachable, if only by a signed-in merchant: the flag engine runs this on
+ * the API over a block's content, and a few strings (a hero's subheading)
+ * are capped only by the 100 KB request body — 32 KB of "<" took ~350 ms,
+ * 100 KB some 3 s. A site visitor never reaches it.
  */
 function piecesOf(value: string): string[] {
     return value
-        .split(/<[^>]*>/)
+        .split(/<[^<>]*>/)
         .map((piece) => piece.replace(/\s+/g, " ").trim())
         .filter((piece) => piece !== "");
 }

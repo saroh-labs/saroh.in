@@ -35,6 +35,7 @@ import {
 } from "./dto";
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
+import { single } from "./single-query";
 import { SkuService } from "./sku.service";
 
 /**
@@ -225,18 +226,20 @@ export class OrganizationCatalogueController {
     @Get("sku-pattern")
     skuPattern(
         @OrgContext() ctx: OrganizationContext,
-        @Query("productId") productId?: string,
+        @Query("productId") productId?: unknown,
     ) {
-        return this.sku.get(this.access.read(ctx).organizationId, productId);
+        const one = single("product", productId);
+        return this.sku.get(this.access.read(ctx).organizationId, one);
     }
 
     /** Every variant's SKU today and under this pattern, with any clash. */
     @Get("sku-pattern/preview")
     skuPreview(
         @OrgContext() ctx: OrganizationContext,
-        @Query("pattern") pattern = "",
+        @Query("pattern") pattern?: unknown,
     ) {
-        return this.sku.preview(this.access.read(ctx).organizationId, pattern);
+        const one = single("pattern", pattern) ?? "";
+        return this.sku.preview(this.access.read(ctx).organizationId, one);
     }
 
     @Put("sku-pattern")

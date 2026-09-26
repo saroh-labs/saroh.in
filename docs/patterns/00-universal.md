@@ -57,28 +57,28 @@ each with why it stops there:
   rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
   hand behind one controller. Under 400 means one injectable per feature and
   a controller and DI change, not a move.
-- `bookings/public-bookings.service.ts` (464) and `bookings/reservation.ts`
+- `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
   (418) — one class sharing its rate limiters, and one serializable write
   with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (626) — its state, effects
+- `site-blocks/src/booking-flow/booking-flow.tsx` (643) — its state, effects
   and handlers (the hold poll, confirm, letting a hold go) share one
   component's state; the drawing is already in `steps/`. Less means a
   reducer or hook seam, which is new logic.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
   `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
-- `organizations/organization-settings-form.tsx` (1,249) — one form holds
+- `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
   to `time-zone-select.tsx`, and the Hours card, which saves to the
   storefronts, to `business-hours-section.tsx`. Less
   means a card per file sharing one form context.
-- `organizations/team-screen.tsx` (1,106) — the Roles and People tabs, the
+- `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
   member drawer and the invite dialog share the screen's roster and role
   state. Each piece is its own function already; moving them is a file split
   with props threaded through, not yet done.
-- `shared/nav-items.tsx` (1,102) — the nav's data (`NAV_GROUPS`,
+- `shared/nav-items.tsx` (1,140) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
@@ -129,6 +129,13 @@ with why it stops there:
 - `sites/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
+
+Split rather than listed: `providers/provider-list.tsx` (435 before; 120
+now) along its rows, which went to `provider-row.tsx` (331); and
+`lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
+along its own seam — what a save recorded, the counts a stock line says and
+the words for them went to `activity-changes.ts` (265), leaving the line an
+event becomes.
 
 ## 7. No `any`, no `@ts-ignore`
 

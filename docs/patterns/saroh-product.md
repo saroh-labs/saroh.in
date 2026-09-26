@@ -71,6 +71,9 @@ pattern files refer back here.
   only once no order waits and no stock is on hand or promised there — "Move
   or count out its stock first" — and closing never removes a catalogue
   product. Storefront and website stay separate — mapping them is future work.
+- **Current** — **Opening hours are edited once, for every storefront**
+  (DEC-034): Business → Hours reads the first storefront's week and Save
+  writes it to all of them, saying so first when their weeks differ.
 - **Current** — **One customer record behind an order and a booking is not true
   yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
   linking it to a `Contact` is manual

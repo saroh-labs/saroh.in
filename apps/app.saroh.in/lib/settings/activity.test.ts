@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { formatRecent } from "@/lib/format/datetime";
 
 import type { AuditEventRow } from "./activity";
-import { FIELD_PHRASES, activityLine, activityLines } from "./activity";
+import { activityLine, activityLines } from "./activity";
+import { FIELD_PHRASES } from "./activity-changes";
 
 const sanjay = { name: "Sanjay", email: "sanjay@ryeandco.in" };
 const priya = { name: "Priya", email: "priya@ryeandco.in" };
@@ -342,6 +343,35 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { products: 12, soldOutCleared: 0 },
             }),
         ).toBe("Sanjay turned Track stock on for the business → Products");
+    });
+
+    it("says Saroh support for an operator's stock change, as the API names it", () => {
+        const support = {
+            name: "Saroh support",
+            email: null,
+            role: null,
+            operator: true as const,
+        };
+        expect(
+            said({
+                action: "product.stock-tracking.off",
+                actorUserId: null,
+                actor: support,
+                metadata: { product: "Rye loaf", byOperator: true },
+            }),
+        ).toBe("Saroh support turned Track stock off for Rye loaf → Rye loaf");
+        expect(
+            said({
+                action: "product.sold-out.mark",
+                actorUserId: null,
+                actor: support,
+                metadata: {
+                    product: "Rye loaf",
+                    storefront: "Bandra",
+                    byOperator: true,
+                },
+            }),
+        ).toBe("Saroh support marked Rye loaf sold out at Bandra → Rye loaf");
     });
 });
 
