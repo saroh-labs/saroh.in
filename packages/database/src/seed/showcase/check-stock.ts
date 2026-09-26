@@ -97,42 +97,56 @@ export async function checkRyeStock(
     expect(`two shelves out (found ${out.length})`, out.length === 2);
     expect(`one shelf low (found ${low.length})`, low.length === 1);
 
-    // The Products list's "Needs you" (catalogue-needs.ts): each published
-    // product that counts stock, its listed shelves added up.
+    // The Products list's "Needs you" (catalogue-needs.ts): each product
+    // that counts stock and isn't archived, judged shelf by shelf where it
+    // is sold, as the Stock screen judges it (`shelfNeed`), by its worst.
+    // A per-variant product's own shelf sells nothing: only short counts.
     const onSale = await prisma.$queryRaw<Row[]>`
-        SELECT p.name,
-               SUM(GREATEST(0, s."onHand" - s.promised)) AS "canSell",
-               SUM(GREATEST(0, s.promised - s."onHand")) AS short,
-               MIN(s."lowStockAlert") AS "warnAt"
+        SELECT p.id, p.name,
+               GREATEST(0, s."onHand" - s.promised) AS "canSell",
+               GREATEST(0, s.promised - s."onHand") AS short,
+               s."lowStockAlert" AS "warnAt",
+               (s."variantId" IS NULL AND EXISTS (
+                   SELECT 1 FROM "StockLevel" o
+                   WHERE o."productId" = s."productId" AND o."variantId" IS NOT NULL
+               )) AS "holdsOnly"
         FROM "StockLevel" s
         JOIN "Product" p ON p.id = s."productId"
         WHERE s."organizationId" = ${orgId} AND p."stockTracked"
-          AND p.status = 'PUBLISHED'
+          AND p.status <> 'ARCHIVED'
           AND CASE WHEN s."variantId" IS NULL
                    THEN EXISTS (SELECT 1 FROM "ProductListing" l
                                 WHERE l."storeId" = s."storeId" AND l."productId" = s."productId")
                    ELSE EXISTS (SELECT 1 FROM "ProductListingVariant" lv
                                 JOIN "ProductListing" l ON l.id = lv."listingId"
                                 WHERE l."storeId" = s."storeId" AND lv."variantId" = s."variantId")
-              END
-        GROUP BY p.id, p.name`;
-    const need = (p: Row) =>
-        n(p.short) > 0
+              END`;
+    const RANK = { short: 0, out: 1, low: 2 } as const;
+    type Need = keyof typeof RANK;
+    const shelfNeed = (s: Row): Need | null =>
+        n(s.short) > 0
             ? "short"
-            : n(p.canSell) <= 0
-              ? "out"
-              : n(p.warnAt) > 0 && n(p.canSell) <= n(p.warnAt)
-                ? "low"
-                : null;
+            : s.holdsOnly
+              ? null
+              : n(s.canSell) <= 0
+                ? "out"
+                : n(s.warnAt) > 0 && n(s.canSell) <= n(s.warnAt)
+                  ? "low"
+                  : null;
+    const worst = new Map<string, { name: string; kind: Need }>();
+    for (const s of onSale) {
+        const kind = shelfNeed(s);
+        const had = worst.get(String(s.id));
+        if (kind && (!had || RANK[kind] < RANK[had.kind])) {
+            worst.set(String(s.id), { name: String(s.name), kind });
+        }
+    }
     const needs = {
         short: [] as string[],
         out: [] as string[],
         low: [] as string[],
     };
-    for (const p of onSale) {
-        const kind = need(p);
-        if (kind) needs[kind].push(String(p.name));
-    }
+    worst.forEach((p) => needs[p.kind].push(p.name));
     const needsYou = [
         needs.short.length ? `${needs.short.length} short for orders` : "",
         needs.out.length ? `${needs.out.length} out of stock` : "",

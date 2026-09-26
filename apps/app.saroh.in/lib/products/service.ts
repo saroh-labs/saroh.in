@@ -347,7 +347,13 @@ export interface CatalogueNeed {
     name: string;
     kind: "short" | "out" | "low";
     short: number;
+    /** What can be sold from the shelves that are `kind`. */
     canSell: number;
+    /**
+     * Which shelves are `kind` — "Small at Online", "Online", "Small" —
+     * when not all of them are; null when every shelf where it sells is.
+     */
+    where?: string[] | null;
 }
 
 /**

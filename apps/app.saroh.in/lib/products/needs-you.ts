@@ -17,18 +17,25 @@ export interface NeedLine {
     tone: NeedTone;
 }
 
-/** What a need says after the product's name. */
+/**
+ * What a need says after the product's name. The API judges each shelf
+ * where it sells, as the Stock screen does; when only some shelves need
+ * someone, it names them: "out of stock (Small at Online)".
+ */
 export function needWords(need: CatalogueNeed): NeedLine {
+    const where = need.where?.length ? need.where.join(", ") : null;
     const what =
         need.kind === "short"
             ? `${need.short} short for orders already placed`
             : need.kind === "out"
-              ? "out of stock, customers can't buy it"
+              ? where
+                  ? "out of stock"
+                  : "out of stock, customers can't buy it"
               : `only ${need.canSell} left`;
     return {
         productId: need.productId,
         name: need.name,
-        what,
+        what: where ? `${what} (${where})` : what,
         tone: need.kind === "low" ? "warn" : "danger",
     };
 }

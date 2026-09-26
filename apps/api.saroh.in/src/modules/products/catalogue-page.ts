@@ -14,7 +14,7 @@ import {
 
 import { categoryTree } from "../collections/collections.service";
 import { businessTracksStock, COUNTING_ROWS } from "../stock/tracking";
-import type { CatalogueNeed, NeedShelf } from "./catalogue-needs";
+import type { CatalogueNeed } from "./catalogue-needs";
 import { needsFrom } from "./catalogue-needs";
 import type { ProductStatus } from "./dto";
 import { PRODUCT_STATUSES } from "./dto";
@@ -102,7 +102,10 @@ export interface CataloguePageDto {
         everywhere: number;
         byStorefront: { id: string; name: string; count: number }[];
     };
-    /** Published products that need restocking, most urgent first. */
+    /**
+     * Products (published or draft) that need restocking, most urgent
+     * first — judged shelf by shelf, as the Stock screen judges them.
+     */
     needs: CatalogueNeed[];
 }
 
@@ -114,6 +117,23 @@ const ARCHIVED = "ARCHIVED";
  */
 export function wantsPage(query: CatalogueQueryDto): boolean {
     return query.limit !== undefined;
+}
+
+/**
+ * Products after `at` in the list's order (newest first, then by id): an
+ * explicit keyset, so a page never loses a product when the one before it
+ * has left the filters since.
+ */
+export function afterInList(at: {
+    id: string;
+    createdAt: Date;
+}): Prisma.ProductWhereInput {
+    return {
+        OR: [
+            { createdAt: { lt: at.createdAt } },
+            { createdAt: at.createdAt, id: { gt: at.id } },
+        ],
+    };
 }
 
 /** Name or SKU contains `q`, any case. */
@@ -173,7 +193,7 @@ export async function cataloguePage(
 
     const needs = await catalogueNeeds(
         organizationId,
-        storefront ? [storefront] : stores.map((s) => s.id),
+        storefront ? stores.filter((s) => s.id === storefront) : stores,
         base,
     );
 
@@ -206,11 +226,17 @@ export async function cataloguePage(
                   }),
         });
     }
+    // The page starts after the cursor's place in the list's order, read
+    // from the product itself — whether or not the filters still keep it
+    // (restocked out of Needs you, archived out of a collection).
+    let after: Prisma.ProductWhereInput | null = null;
     if (query.cursor) {
-        const found = await prisma.product.count({
+        const at = await prisma.product.findFirst({
             where: { id: query.cursor, organizationId },
+            select: { id: true, createdAt: true },
         });
-        if (found === 0) throw new NotFoundException("Product not found");
+        if (!at) throw new NotFoundException("Product not found");
+        after = afterInList(at);
     }
     const where: Prisma.ProductWhereInput = { AND: narrow };
 
@@ -220,7 +246,10 @@ export async function cataloguePage(
             products.catalogue(
                 organizationId,
                 { status, storefront },
-                { where, take: take + 1, cursor: query.cursor },
+                {
+                    where: after ? { AND: [where, after] } : where,
+                    take: take + 1,
+                },
             ),
             prisma.product.count({ where: { AND: [base, where] } }),
             prisma.product.count({ where: base }),
@@ -260,70 +289,58 @@ export async function cataloguePage(
 }
 
 /**
- * What needs restocking, from every shelf the products in `base` have at
- * `storeIds` — only published products that count stock, only where the
- * storefront sells them (and, for a variant's shelf, sells that variant).
+ * What needs restocking at `storefronts`, among the products in `base` that
+ * count stock and are listed there — published or draft, never archived,
+ * the same scope as the Stock screen's "Needs you". Every shelf is judged
+ * where the storefront sells it (and, for a variant, sells that variant);
+ * a storefront that sells it with no shelf yet reads 0, as on Stock.
  */
 export async function catalogueNeeds(
     organizationId: string,
-    storeIds: readonly string[],
+    storefronts: readonly { id: string; name: string }[],
     base: Prisma.ProductWhereInput,
 ): Promise<CatalogueNeed[]> {
-    if (storeIds.length === 0) return [];
-    const rows = await prisma.stockLevel.findMany({
+    if (storefronts.length === 0) return [];
+    const storeIds = storefronts.map((s) => s.id);
+    const products = await prisma.product.findMany({
         where: {
-            organizationId,
-            storeId: { in: [...storeIds] },
-            product: {
-                AND: [COUNTING_ROWS.product, base, { status: "PUBLISHED" }],
-            },
+            AND: [
+                base,
+                { organizationId },
+                COUNTING_ROWS.product,
+                { status: { not: ARCHIVED } },
+                { listings: { some: { storeId: { in: storeIds } } } },
+            ],
         },
         select: {
-            productId: true,
-            storeId: true,
-            variantId: true,
-            onHand: true,
-            promised: true,
-            lowStockAlert: true,
-            product: { select: { name: true } },
+            id: true,
+            name: true,
+            variants: {
+                orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                select: { id: true, title: true },
+            },
+            listings: {
+                where: { storeId: { in: storeIds } },
+                select: {
+                    storeId: true,
+                    variants: { select: { variantId: true } },
+                },
+            },
+            // Every shelf: counting per variant or as a whole is the
+            // product's, not one storefront's.
+            stockLevels: {
+                select: {
+                    storeId: true,
+                    variantId: true,
+                    onHand: true,
+                    promised: true,
+                    lowStockAlert: true,
+                },
+            },
         },
     });
-    if (rows.length === 0) return [];
-    const productIds = [...new Set(rows.map((r) => r.productId))];
-    const [listings, listedVariants] = await Promise.all([
-        prisma.productListing.findMany({
-            where: {
-                organizationId,
-                storeId: { in: [...storeIds] },
-                productId: { in: productIds },
-            },
-            select: { storeId: true, productId: true },
-        }),
-        prisma.productListingVariant.findMany({
-            where: {
-                organizationId,
-                productId: { in: productIds },
-                listing: { storeId: { in: [...storeIds] } },
-            },
-            select: { variantId: true, listing: { select: { storeId: true } } },
-        }),
-    ]);
-    const listed = new Set(listings.map((l) => `${l.productId}:${l.storeId}`));
-    const variantListed = new Set(
-        listedVariants.map((v) => `${v.variantId}:${v.listing.storeId}`),
+    return needsFrom(
+        products.map((p) => ({ ...p, shelves: p.stockLevels })),
+        storefronts,
     );
-    const shelves: NeedShelf[] = rows
-        .filter((r) =>
-            r.variantId
-                ? variantListed.has(`${r.variantId}:${r.storeId}`)
-                : listed.has(`${r.productId}:${r.storeId}`),
-        )
-        .map((r) => ({
-            productId: r.productId,
-            name: r.product.name,
-            onHand: r.onHand,
-            promised: r.promised,
-            lowStockAlert: r.lowStockAlert,
-        }));
-    return needsFrom(shelves);
 }

@@ -367,6 +367,38 @@ describe("Stock API (DB)", () => {
             });
             expect(found.timezone).toBe("Asia/Kolkata");
         });
+
+        it("an archived product never needs you, and the storefront shown doesn't narrow Needs you", async () => {
+            const gone = await product(`Stollen ${tag}`, 0);
+            const before = await api.levels(owner(), {});
+            expect(
+                (await api.levels(owner(), { needs: true })).rows.some(
+                    (r) => r.productId === gone,
+                ),
+            ).toBe(true);
+
+            await prisma.product.update({
+                where: { id: gone },
+                data: { status: "ARCHIVED" },
+            });
+            const after = await api.levels(owner(), {});
+            expect(after.needsYou).toBe(before.needsYou - 1);
+            // Still shown, as it is: only not counted as needing anyone.
+            const row = after.rows.find((r) => r.productId === gone);
+            expect(row?.cells[0]).toMatchObject({
+                word: "SOLD_OUT",
+                need: null,
+            });
+            expect(
+                (await api.levels(owner(), { needs: true })).rows.some(
+                    (r) => r.productId === gone,
+                ),
+            ).toBe(false);
+
+            // Online sells none of these: the count is still the business's.
+            const atOnline = await api.levels(owner(), { storefront: online });
+            expect(atOnline.needsYou).toBe(after.needsYou);
+        });
     });
 
     /** A fulfilled order that sold `units` of a product from Hill Road. */
@@ -401,6 +433,53 @@ describe("Stock API (DB)", () => {
     }
 
     describe("writes", () => {
+        it("warnings change when a shelf warns, and nothing else", async () => {
+            const id = await product("Brioche", 6);
+            const entries = await prisma.stockEntry.count({
+                where: { productId: id },
+            });
+            // A sale since the sheet was read: 6 → 4.
+            await prisma.stockLevel.update({
+                where: { id: (await shelf(hill, id)).id },
+                data: { onHand: 4 },
+            });
+            const saved = await api.warnings(ctx("OWNER"), {
+                warnings: [{ storeId: hill, productId: id, lowStockAlert: 5 }],
+            });
+            expect(saved.shelves[0]).toMatchObject({
+                onHand: 4,
+                lowStockAlert: 5,
+                canSell: 4,
+            });
+            expect(await shelf(hill, id)).toMatchObject({
+                onHand: 4,
+                lowStockAlert: 5,
+            });
+            // No count: the log is as it was.
+            expect(
+                await prisma.stockEntry.count({ where: { productId: id } }),
+            ).toBe(entries);
+
+            await expect(
+                api.warnings(ctx("MEMBER"), {
+                    warnings: [
+                        { storeId: hill, productId: id, lowStockAlert: 1 },
+                    ],
+                }),
+            ).rejects.toThrow(ForbiddenException);
+            await expect(
+                api.warnings(owner(), {
+                    warnings: [
+                        {
+                            storeId: hill,
+                            productId: otherProduct,
+                            lowStockAlert: 1,
+                        },
+                    ],
+                }),
+            ).rejects.toThrow(NotFoundException);
+        });
+
         it("adjust +5 writes a received entry and the levels read reflects it", async () => {
             const id = await product("Baguette", 2);
             const result = await api.adjust(owner(), {

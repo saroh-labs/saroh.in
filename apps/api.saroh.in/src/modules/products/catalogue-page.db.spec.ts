@@ -3,6 +3,8 @@ import { prisma } from "@saroh/database";
 
 import { CollectionsService } from "../collections/collections.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { readLevels } from "../stock/levels-read";
+import type { StockReader } from "../stock/stock-access";
 import { StoresService } from "../stores/stores.service";
 import { cataloguePage } from "./catalogue-page";
 import { InventoryService } from "./inventory.service";
@@ -194,13 +196,15 @@ describe("Catalogue page (DB)", () => {
         ).toEqual([rye, sourdough]);
     });
 
-    it("says what needs restocking across the catalogue, published only", async () => {
+    it("says what needs restocking across the catalogue, shelf by shelf, as Stock does", async () => {
         const { needs } = await page({ limit: 1 });
-        // Rye: nothing on the shelf. Bun: 4 at Hill Road, 0 Online — low.
-        // The draft focaccia is out too, but nobody can buy it yet.
-        expect(needs.map((n) => [n.productId, n.kind])).toEqual([
-            [rye, "out"],
-            [bun, "low"],
+        // Bun: 4 at Hill Road (low) but 0 Online — sold out there. The
+        // draft focaccia counts, as it does on Stock; an archived product
+        // never would. Rye: nothing on its one shelf.
+        expect(needs.map((n) => [n.productId, n.kind, n.where])).toEqual([
+            [bun, "out", ["Online"]],
+            [draft, "out", null],
+            [rye, "out", null],
         ]);
 
         await prisma.stockLevel.updateMany({
@@ -213,12 +217,100 @@ describe("Catalogue page (DB)", () => {
             kind: "short",
             short: 2,
             canSell: 0,
+            where: ["Hill Road"],
         });
-        expect(short.items.map((i) => i.id)).toEqual([rye, bun]);
+        expect(short.items.map((i) => i.id)).toEqual([draft, rye, bun]);
         await prisma.stockLevel.updateMany({
             where: { productId: bun, storeId: hill },
             data: { promised: 0 },
         });
+    });
+
+    it("agrees with the Stock screen's Needs you, and leaves archived products out", async () => {
+        const reader: StockReader = {
+            organizationId: orgId,
+            canWrite: true,
+            seesPeople: true,
+            seesOrders: true,
+        };
+        const stockNeeds = async () =>
+            new Set(
+                (await readLevels(reader, { needs: true })).rows.map(
+                    (r) => r.productId,
+                ),
+            );
+        const listNeeds = async () =>
+            new Set((await page({ limit: 1 })).needs.map((n) => n.productId));
+        expect(await listNeeds()).toEqual(await stockNeeds());
+
+        await prisma.product.update({
+            where: { id: rye },
+            data: { status: "ARCHIVED" },
+        });
+        try {
+            expect(await listNeeds()).not.toContain(rye);
+            expect(await stockNeeds()).not.toContain(rye);
+            expect((await readLevels(reader, {})).needsYou).toBe(2);
+        } finally {
+            await prisma.product.update({
+                where: { id: rye },
+                data: { status: "PUBLISHED" },
+            });
+        }
+    });
+
+    it("never drops a product when the one a page ended on has left the view", async () => {
+        const first = await page({ view: "needs", limit: 1 });
+        expect(first.items.map((i) => i.id)).toEqual([draft]);
+        // Restocked from the list: the focaccia no longer needs anyone.
+        await prisma.stockLevel.updateMany({
+            where: { productId: draft },
+            data: { onHand: 40 },
+        });
+        try {
+            const next = await page({
+                view: "needs",
+                limit: 1,
+                cursor: first.nextCursor ?? "",
+            });
+            expect(next.items.map((i) => i.id)).toEqual([rye]);
+        } finally {
+            await prisma.stockLevel.updateMany({
+                where: { productId: draft },
+                data: { onHand: 0 },
+            });
+        }
+    });
+
+    it("pages products made at the same moment by id, none twice and none lost", async () => {
+        const same = new Date("2026-01-01T00:00:00Z");
+        const was = await prisma.product.findMany({
+            where: { id: { in: [rye, bun, sourdough] } },
+            select: { id: true, createdAt: true },
+        });
+        await prisma.product.updateMany({
+            where: { id: { in: [rye, bun, sourdough] } },
+            data: { createdAt: same },
+        });
+        try {
+            const seen: string[] = [];
+            let cursor: string | undefined;
+            do {
+                const p = await page({ view: "all", limit: 1, cursor });
+                seen.push(...p.items.map((i) => i.id));
+                cursor = p.nextCursor ?? undefined;
+            } while (cursor);
+            expect(seen).toHaveLength(5);
+            expect(new Set(seen).size).toBe(5);
+            expect(seen.slice(2)).toEqual([rye, bun, sourdough].sort());
+        } finally {
+            for (const p of was) {
+                await prisma.product.update({
+                    where: { id: p.id },
+                    data: { createdAt: p.createdAt },
+                });
+            }
+        }
     });
 
     it("reads one storefront's shelf when narrowed to it", async () => {

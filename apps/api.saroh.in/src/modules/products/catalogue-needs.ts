@@ -1,8 +1,13 @@
-import { shortBy } from "../stock/stock-words";
+import type { LineShelf } from "../stock/product-lines";
+import { productLines } from "../stock/product-lines";
+import type { ShelfNeed } from "../stock/stock-words";
+import { movable, NEED_RANK, shortBy } from "../stock/stock-words";
 
 /**
- * The Products list's "Needs you" (#519), pure: a product's shelves added
- * up the way its list row adds them, and why it needs someone.
+ * The Products list's "Needs you" (#519), pure. It judges each shelf the
+ * way the Stock screen's "Needs you" does (`shelfNeed`, #527), so the two
+ * agree on every product: a product needs someone when any shelf where it
+ * is sold does, and why is its worst shelf's reason.
  */
 
 /** A product someone should restock, and why. */
@@ -10,64 +15,85 @@ export interface CatalogueNeed {
     productId: string;
     name: string;
     /** Short for orders placed; nothing left to sell; at its warning level. */
-    kind: "short" | "out" | "low";
-    /** Promised units that aren't on the shelf. */
+    kind: ShelfNeed;
+    /** Promised units that aren't on its shelves, wherever it is sold. */
     short: number;
+    /** What can be sold from the shelves that are `kind`. */
     canSell: number;
+    /**
+     * Which shelves are `kind` — "Small at Online", "Online", "Small" —
+     * when not every shelf where it is sold is; null when they all are.
+     */
+    where: string[] | null;
 }
 
-export interface NeedShelf {
-    productId: string;
+export interface NeedProduct {
+    id: string;
     name: string;
-    onHand: number;
-    promised: number;
-    lowStockAlert: number;
+    variants: readonly { id: string; title: string }[];
+    listings: readonly {
+        storeId: string;
+        variants: readonly { variantId: string }[];
+    }[];
+    shelves: readonly LineShelf[];
 }
+
+const EMPTY = { onHand: 0, promised: 0 };
 
 /**
- * Pure: a product's shelves added up, as the list row adds them. Short
- * first (someone was promised it), then nothing left, then at or under its
- * warning level (a level of 0 never warns); by name within each.
+ * Pure: every product that needs someone at `storefronts`, most urgent
+ * first (short, then out, then low), by name within each.
  */
-export function needsFrom(shelves: readonly NeedShelf[]): CatalogueNeed[] {
-    const byProduct = new Map<
-        string,
-        { name: string; canSell: number; short: number; warnAt: number }
-    >();
-    for (const s of shelves) {
-        const had = byProduct.get(s.productId) ?? {
-            name: s.name,
-            canSell: 0,
-            short: 0,
-            warnAt: Number.POSITIVE_INFINITY,
-        };
-        had.canSell += Math.max(0, s.onHand - s.promised);
-        had.short += shortBy(s);
-        had.warnAt = Math.min(had.warnAt, s.lowStockAlert);
-        byProduct.set(s.productId, had);
-    }
+export function needsFrom(
+    products: readonly NeedProduct[],
+    storefronts: readonly { id: string; name: string }[],
+): CatalogueNeed[] {
+    const storeName = new Map(storefronts.map((s) => [s.id, s.name]));
     const out: CatalogueNeed[] = [];
-    for (const [productId, p] of byProduct) {
-        const kind: CatalogueNeed["kind"] | null =
-            p.short > 0
-                ? "short"
-                : p.canSell <= 0
-                  ? "out"
-                  : p.warnAt > 0 && p.canSell <= p.warnAt
-                    ? "low"
-                    : null;
-        if (kind) {
-            out.push({
-                productId,
-                name: p.name,
-                kind,
-                short: p.short,
-                canSell: p.canSell,
-            });
+    for (const p of products) {
+        const lines = productLines(
+            p,
+            p.shelves,
+            storefronts.map((s) => s.id),
+        );
+        const sold = lines.flatMap((l) =>
+            l.cells
+                .filter((c) => c.soldHere)
+                .map((c) => ({ ...c, variantId: l.variantId })),
+        );
+        let kind: ShelfNeed | null = null;
+        for (const c of sold) {
+            if (c.need && (!kind || NEED_RANK[c.need] < NEED_RANK[kind])) {
+                kind = c.need;
+            }
         }
+        if (!kind) continue;
+        const worst = sold.filter((c) => c.need === kind);
+        const title = new Map(p.variants.map((v) => [v.id, v.title]));
+        const several = storefronts.length > 1;
+        const label = (c: (typeof worst)[number]) =>
+            [
+                c.variantId ? title.get(c.variantId) : null,
+                several ? storeName.get(c.storeId) : null,
+            ]
+                .filter(Boolean)
+                .join(" at ");
+        const where =
+            worst.length < sold.length
+                ? Array.from(new Set(worst.map(label))).filter(Boolean)
+                : [];
+        out.push({
+            productId: p.id,
+            name: p.name,
+            kind,
+            short: sold.reduce((n, c) => n + shortBy(c.shelf ?? EMPTY), 0),
+            canSell: worst.reduce((n, c) => n + movable(c.shelf ?? EMPTY), 0),
+            where: where.length > 0 ? where : null,
+        });
     }
-    const rank = { short: 0, out: 1, low: 2 } as const;
     return out.sort(
-        (a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name),
+        (a, b) =>
+            NEED_RANK[a.kind] - NEED_RANK[b.kind] ||
+            a.name.localeCompare(b.name),
     );
 }

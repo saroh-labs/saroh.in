@@ -6,7 +6,9 @@ import { businessTimezone } from "../bookings/staff-availability";
 import type { StockWord } from "../products/product-overview";
 import { stockLine } from "../products/product-overview";
 import type { StockLevelsQueryDto } from "./dto";
+import { productLines } from "./product-lines";
 import type { StockReader } from "./stock-access";
+import type { ShelfNeed } from "./stock-words";
 import { shortBy } from "./stock-words";
 import { businessTracksStock } from "./tracking";
 
@@ -46,6 +48,8 @@ export interface StockCell {
     short: number;
     warnAt: number;
     word: StockWord | "NOT_SOLD_HERE";
+    /** Why it needs someone here (`shelfNeed`); null where it isn't sold. */
+    need: ShelfNeed | null;
     lastChange: LastChange | null;
 }
 
@@ -84,8 +88,10 @@ export interface StockLevelsView {
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
     /**
-     * Rows that need someone, across every page (not the search): short,
-     * sold out or at their warning level where they are sold.
+     * Rows that need someone, across every page and every open storefront
+     * (not the search, nor the storefront shown): short, sold out or at
+     * their warning level where they are sold (`shelfNeed`). An archived
+     * product never counts: nobody can buy it, so nothing needs restocking.
      */
     needsYou: number;
     /** The business's zone, for the screen's "today at 07:12". */
@@ -178,13 +184,13 @@ function latest(changes: (LastChange | null)[]): LastChange | null {
 }
 
 /** A row that needs someone: short, sold out or low where it is sold. */
-export function rowNeedsYou(cells: readonly StockCell[]): boolean {
-    return cells.some(
-        (c) =>
-            c.word !== "NOT_SOLD_HERE" &&
-            (c.short > 0 || c.word === "SOLD_OUT" || c.word === "LOW"),
-    );
+export function rowNeedsYou(
+    cells: readonly Pick<StockCell, "need">[],
+): boolean {
+    return cells.some((c) => c.need !== null);
 }
+
+const ARCHIVED = "ARCHIVED";
 
 /** Where a search looks: the product's name and its variants' SKUs. */
 function searchWhere(q: string | undefined): Prisma.ProductWhereInput {
@@ -207,10 +213,15 @@ export async function readLevels(
     query: StockLevelsQueryDto,
 ): Promise<StockLevelsView> {
     const { organizationId } = reader;
-    const storefronts = await openStorefronts(organizationId, query.storefront);
+    // Every open storefront judges "Needs you"; the view shows the one asked.
+    const everyStorefront = await openStorefronts(organizationId);
+    const storefronts = query.storefront
+        ? everyStorefront.filter((s) => s.id === query.storefront)
+        : everyStorefront;
     if (query.storefront && storefronts.length === 0) {
         throw new NotFoundException("Store not found");
     }
+    const shown = new Set(storefronts.map((s) => s.id));
     if (query.product) {
         const found = await prisma.product.count({
             where: { id: query.product, organizationId },
@@ -306,84 +317,59 @@ export async function readLevels(
             });
             continue;
         }
-        const listings = new Map(
-            product.listings.map((l) => [
-                l.storeId,
-                new Set(l.variants.map((v) => v.variantId)),
-            ]),
+        const variants = new Map(product.variants.map((v) => [v.id, v]));
+        const lines = productLines(
+            product,
+            shelves,
+            everyStorefront.map((s) => s.id),
         );
-        const perVariant = shelves.some((s) => s.variantId !== null);
-        const lines: {
-            variantId: string | null;
-            title: string | null;
-            sku: string | null;
-        }[] = perVariant
-            ? product.variants.map((v) => ({
-                  variantId: v.id,
-                  title: v.title,
-                  sku: v.sku,
-              }))
-            : [
-                  {
-                      variantId: null,
-                      title: null,
-                      sku: product.variants[0]?.sku ?? null,
-                  },
-              ];
-        // In per-variant mode the product's own shelf only carries promises
-        // of lines without a variant; shown while it holds any.
-        if (
-            perVariant &&
-            shelves.some(
-                (s) =>
-                    s.variantId === null &&
-                    (s.onHand !== 0 || s.promised !== 0),
-            )
-        ) {
-            lines.push({ variantId: null, title: null, sku: null });
-        }
         const rows: StockLevelRow[] = [];
         for (const line of lines) {
-            const cells = storefronts.map((store): StockCell => {
-                const shelf = shelves.find(
-                    (s) =>
-                        s.storeId === store.id &&
-                        s.variantId === line.variantId,
-                );
-                const sold = listings.get(store.id);
-                const soldHere =
-                    sold !== undefined &&
-                    (line.variantId === null || sold.has(line.variantId));
-                const counts = stockLine({
-                    quantity: shelf?.onHand ?? 0,
-                    reserved: shelf?.promised ?? 0,
-                    lowStockAlert: shelf?.lowStockAlert ?? 0,
-                });
-                return {
-                    storeId: store.id,
-                    stockLevelId: shelf?.id ?? null,
-                    soldHere,
-                    onHand: counts.onHand,
-                    promised: counts.promised,
-                    canSell: counts.canSell,
-                    short: shortBy({
+            const variant = line.variantId
+                ? variants.get(line.variantId)
+                : undefined;
+            // An archived product sells nowhere: nothing about it needs you.
+            if (product.status !== ARCHIVED && rowNeedsYou(line.cells)) {
+                needsYou += 1;
+            }
+            const cells = line.cells
+                .filter((c) => shown.has(c.storeId))
+                .map(({ storeId, shelf, soldHere, need }): StockCell => {
+                    const counts = stockLine({
+                        quantity: shelf?.onHand ?? 0,
+                        reserved: shelf?.promised ?? 0,
+                        lowStockAlert: shelf?.lowStockAlert ?? 0,
+                    });
+                    return {
+                        storeId,
+                        stockLevelId: shelf?.id ?? null,
+                        soldHere,
                         onHand: counts.onHand,
                         promised: counts.promised,
-                    }),
-                    warnAt: counts.warnAt,
-                    word: soldHere ? counts.word : "NOT_SOLD_HERE",
-                    lastChange: null,
-                };
-            });
-            if (rowNeedsYou(cells)) needsYou += 1;
+                        canSell: counts.canSell,
+                        short: shortBy({
+                            onHand: counts.onHand,
+                            promised: counts.promised,
+                        }),
+                        warnAt: counts.warnAt,
+                        word: soldHere ? counts.word : "NOT_SOLD_HERE",
+                        need: product.status === ARCHIVED ? null : need,
+                        lastChange: null,
+                    };
+                });
             rows.push({
                 productId: product.id,
                 productName: product.name,
                 productStatus: product.status,
                 image: product.image,
                 variantId: line.variantId,
-                variantTitle: line.title,
-                sku: line.sku,
+                variantTitle: variant?.title ?? null,
+                // Counted as a whole, the row carries the first variant's SKU.
+                sku: variant
+                    ? variant.sku
+                    : lines.length === 1
+                      ? (product.variants[0]?.sku ?? null)
+                      : null,
                 cells,
                 lastChange: null,
             });

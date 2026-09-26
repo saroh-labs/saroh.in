@@ -28,6 +28,18 @@ describe("Needs you (#519)", () => {
         });
     });
 
+    it("names the shelves when only some need someone", () => {
+        expect(
+            needWords(need("Loaf", "out", { where: ["Small at Online"] })),
+        ).toMatchObject({ what: "out of stock (Small at Online)" });
+        expect(
+            needWords(need("Jam", "low", { canSell: 2, where: ["Online"] })),
+        ).toMatchObject({ what: "only 2 left (Online)", tone: "warn" });
+        expect(needWords(need("Rye", "out", { where: null }))).toMatchObject({
+            what: "out of stock, customers can't buy it",
+        });
+    });
+
     it("says a short product is short for orders already placed, in danger", () => {
         expect(needWords(need("Bun", "short", { short: 2 }))).toMatchObject({
             what: "2 short for orders already placed",

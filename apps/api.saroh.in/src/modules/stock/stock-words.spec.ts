@@ -8,6 +8,7 @@ import {
     movable,
     moveRefusal,
     promisedRefusal,
+    shelfNeed,
     shortBy,
     shortWords,
     STOCK_ENTRY_WORDS,
@@ -15,6 +16,24 @@ import {
 
 /** The stock log's words and arithmetic, with no database (#513). */
 describe("stock words", () => {
+    it("judges a shelf the one way both Needs you lists do", () => {
+        const at = (onHand: number, promised = 0, lowStockAlert = 5) => ({
+            onHand,
+            promised,
+            lowStockAlert,
+        });
+        expect(shelfNeed(at(1, 3))).toBe("short");
+        expect(shelfNeed(at(6, 6))).toBe("out");
+        expect(shelfNeed(at(0))).toBe("out");
+        expect(shelfNeed(at(5))).toBe("low");
+        expect(shelfNeed(at(6))).toBeNull();
+        // A level of 0 never warns.
+        expect(shelfNeed(at(1, 0, 0))).toBeNull();
+        // A shelf that sells nothing needs you only when short.
+        expect(shelfNeed(at(2, 2), false)).toBeNull();
+        expect(shelfNeed(at(0, 2), false)).toBe("short");
+    });
+
     it("names every kind of entry", () => {
         expect(Object.keys(STOCK_ENTRY_WORDS).sort()).toEqual(
             [
