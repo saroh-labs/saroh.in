@@ -26,7 +26,9 @@ export interface OrganizationMember {
     isSelf: boolean;
     /**
      * Their newest session, anywhere in Saroh — sessions belong to a person,
-     * not a business. `null` when they hold none; absent from an older API.
+     * not a business. `null` when they hold none, and for a viewer who may
+     * not remove people (the API keeps it to Owner and Admin by default);
+     * absent from an older API. The Team row says nothing when it is null.
      */
     lastActiveAt?: string | null;
 }

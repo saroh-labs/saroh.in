@@ -176,7 +176,7 @@ const CREDIT_MARK = "CN";
 /**
  * Where a credit note's "CN" goes, as the API decides it: after the prefix
  * where that fits in 16 characters with the counter's headroom
- * (RCCN/26-27/0001), else in its place (CN/26-27/09/001), or first when the
+ * (RCCN/26-27/0001), else in its place (CN/26-27/09/0001), or first when the
  * number has no prefix.
  */
 export type CreditMark = "after" | "instead" | "first";
@@ -437,6 +437,44 @@ export function formatOf(values: {
             ? (values.numberRestart as NumberRestart)
             : "FY",
     };
+}
+
+/**
+ * The form fields whose change re-checks the number format: the format's
+ * own, the prefix and the registration — what can make a number wrong.
+ */
+export const NUMBER_RECHECK_FIELDS = [
+    "numberParts",
+    "numberSeparator",
+    "numberDigits",
+    "numberRestart",
+    "invoicePrefix",
+    "gstRegistered",
+] as const;
+
+/**
+ * Why a save would be refused for its number format, or null. As the API
+ * does (DEC-028), the stored format is re-checked only when the save
+ * changes the format, the prefix or the registration: one saved under
+ * older, looser rules keeps numbering and never blocks a GSTIN, address or
+ * name save. `dirty` is the form's `dirtyFields`.
+ */
+export function numberFormatProblemOnSave(
+    values: {
+        numberParts: string;
+        numberSeparator: string;
+        numberDigits: string;
+        numberRestart: string;
+        invoicePrefix: string;
+        gstRegistered: boolean;
+    },
+    dirty: Readonly<Partial<Record<string, unknown>>>,
+): ReturnType<typeof numberFormatProblem> {
+    if (!NUMBER_RECHECK_FIELDS.some((key) => dirty[key])) return null;
+    return numberFormatProblem(formatOf(values), {
+        registered: values.gstRegistered,
+        prefix: prefixOf(values.invoicePrefix),
+    });
 }
 
 /** The editor's four fields for a format. */

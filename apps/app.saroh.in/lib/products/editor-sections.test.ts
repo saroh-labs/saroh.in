@@ -25,6 +25,7 @@ import {
     seoPatch,
     slugify,
     splitLines,
+    stripHtml,
     trimMoney,
 } from "./editor-sections";
 import type { ProductDetail } from "./service";
@@ -430,5 +431,22 @@ describe("stock under a fresh load", () => {
         expect(
             mergeDraft(reloaded, whole, { ...whole, lowStockAlert: "3" }),
         ).toEqual({ quantity: "11", lowStockAlert: "3", lines: [] });
+    });
+});
+
+describe("a description's plain text", () => {
+    it("decodes each entity once", () => {
+        expect(stripHtml("<p>Salt &amp;lt;3 &amp; pepper</p>")).toBe(
+            "Salt &lt;3 & pepper",
+        );
+    });
+
+    it("stays linear on a run of unclosed tags", () => {
+        // The old /<[^>]*>/ took ~350 ms on 32,000 of these.
+        const started = performance.now();
+        expect(stripHtml(`${"<".repeat(100_000)}ok`)).toBe(
+            `${"<".repeat(100_000)}ok`,
+        );
+        expect(performance.now() - started).toBeLessThan(100);
     });
 });

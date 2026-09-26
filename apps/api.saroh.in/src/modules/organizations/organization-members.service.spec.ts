@@ -165,6 +165,32 @@ describe("when someone was last active", () => {
             ["user_2", null],
         ]);
     });
+
+    it("is for those who may remove people: a Member sees no one's", async () => {
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "user_owner",
+                role: "OWNER",
+                user: { name: "Priya", email: "priya@example.test" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.session.groupBy.mockResolvedValue([
+            {
+                userId: "user_owner",
+                _max: { updatedAt: new Date("2026-09-24T10:00:00Z") },
+            },
+        ]);
+
+        const roster = await service.list(ctx("MEMBER"));
+
+        expect(db.session.groupBy).not.toHaveBeenCalled();
+        expect(roster.map((m) => m.lastActiveAt)).toEqual([null]);
+
+        // An Admin may remove people, so is shown it.
+        await service.list(ctx("ADMIN"));
+        expect(db.session.groupBy).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("inviting", () => {

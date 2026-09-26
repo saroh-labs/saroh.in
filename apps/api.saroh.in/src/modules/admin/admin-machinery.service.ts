@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { DomainsService } from "../domains/domains.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
@@ -263,7 +264,7 @@ export class AdminMachineryService {
             organizationId: domain.organizationId,
             userId: staff.userId,
             role: "MEMBER",
-            roleKey: "platform-operator",
+            roleKey: PLATFORM_OPERATOR_ROLE_KEY,
             actions: new Set(["domain:manage"]),
         };
         const result = await this.domains.verify(ctx, domain.id);

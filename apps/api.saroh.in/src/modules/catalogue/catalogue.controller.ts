@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -33,6 +34,20 @@ import {
 import { FieldsService } from "./fields.service";
 import { OptionsService } from "./options.service";
 import { SkuService } from "./sku.service";
+
+/**
+ * A query value given once. `?pattern=a&pattern=b` arrives as an array.
+ * Typed `string`, the global ValidationPipe (`transform: true`) would turn
+ * it into "a,b" — no 500, but two values silently read as one. Typed
+ * `unknown`, the array reaches here and is refused in words; that is also
+ * what satisfies CodeQL's type-confusion rule (js/type-confusion-through-
+ * parameter-tampering), which cannot see the pipe. `what` names the value
+ * as the message says it.
+ */
+function single(what: string, value: unknown): string | undefined {
+    if (value === undefined || typeof value === "string") return value;
+    throw new BadRequestException(`Send one ${what} at a time.`);
+}
 
 /**
  * Store-wide catalogue settings: the settings page's one read, the options
@@ -136,9 +151,9 @@ export class CatalogueController {
     skuPattern(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("productId") productId?: string,
+        @Query("productId") productId?: unknown,
     ) {
-        return this.sku.get(storeId, user.id, productId);
+        return this.sku.get(storeId, user.id, single("product", productId));
     }
 
     /** Every variant's SKU today and under this pattern, with any clash. */
@@ -146,9 +161,13 @@ export class CatalogueController {
     skuPreview(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
-        @Query("pattern") pattern = "",
+        @Query("pattern") pattern?: unknown,
     ) {
-        return this.sku.preview(storeId, user.id, pattern);
+        return this.sku.preview(
+            storeId,
+            user.id,
+            single("pattern", pattern) ?? "",
+        );
     }
 
     @Put("sku-pattern")

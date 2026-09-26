@@ -1,19 +1,14 @@
-import type {
-    AuditEventRow,
-    ChangeValue,
-    RecordedChange,
-    RoleLabels,
-} from "./activity";
+import type { AuditEventRow, RoleLabels } from "./activity";
+import { personName, roleName } from "./activity";
+import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
     FIELD_PHRASES,
     fieldsOf,
     moduleName,
-    personName,
     record,
     recordedChanges,
-    roleName,
     text,
-} from "./activity";
+} from "./activity-changes";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -198,8 +193,9 @@ export function activityDetail(
             name: name ?? "Someone no longer here",
             email: actor && actor.email !== name ? actor.email : null,
             role: roleName(actor?.role, roleLabels),
-            // An older API sends no role at all: that is not having left.
-            gone: !actor || actor.role === null,
+            // An older API sends no role at all: that is not having left;
+            // nor is Saroh support, which was never on the team.
+            gone: !actor || (actor.role === null && !actor.operator),
         },
         changes: rows,
         withoutValues,

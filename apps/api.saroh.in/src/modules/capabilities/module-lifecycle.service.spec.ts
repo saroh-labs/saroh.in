@@ -86,6 +86,31 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("a Saroh operator's switch is marked byOperator for Activity (DEC-035)", async () => {
+        const OPERATOR: OrganizationContext = {
+            organizationId: "org_1",
+            userId: "u_staff",
+            role: "MEMBER",
+            roleKey: "platform-operator",
+            actions: new Set(["module:manage"]),
+        };
+        const db = makeDb();
+        const svc = new ModuleLifecycleService(makeReadiness(), db as never);
+        await svc.enable(OPERATOR, "CRM");
+        expect(db.auditEvent.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    action: "organization.module.enabled",
+                    metadata: {
+                        module: "CRM",
+                        enabled: true,
+                        byOperator: true,
+                    },
+                }),
+            }),
+        );
+    });
+
     it("enabling an already-enabled module is a no-op (no second audit)", async () => {
         const db = makeDb();
         db.organizationModule.findUnique.mockResolvedValue({

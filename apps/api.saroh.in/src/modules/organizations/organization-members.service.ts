@@ -56,6 +56,11 @@ export interface MemberView {
      * business activity record to answer it more narrowly. Better Auth moves
      * `updatedAt` at sign-in and when it refreshes a session (at most daily),
      * so it is a floor — they were here at least this recently.
+     *
+     * Only for a viewer who may remove people (`member:remove`, Owner and
+     * Admin by default): whether someone still needs access is theirs to
+     * ask. Everyone else gets `null` — a colleague's Saroh-wide activity is
+     * not the whole team's to watch.
      */
     lastActiveAt: Date | null;
 }
@@ -102,6 +107,7 @@ export class OrganizationMembersService {
     /** Everyone in the org, with a reviewer's granted sites. */
     async list(ctx: OrganizationContext): Promise<MemberView[]> {
         authorize(ctx, "member:read");
+        const seesActivity = allows(ctx, "member:remove");
 
         const [memberships, grants, sessions] = await Promise.all([
             prisma.membership.findMany({
@@ -116,18 +122,21 @@ export class OrganizationMembersService {
                 where: { organizationId: ctx.organizationId },
                 select: { userId: true, siteId: true },
             }),
-            // One grouped read for the whole roster, not one per person.
-            prisma.session.groupBy({
-                by: ["userId"],
-                where: {
-                    user: {
-                        memberships: {
-                            some: { organizationId: ctx.organizationId },
-                        },
-                    },
-                },
-                _max: { updatedAt: true },
-            }),
+            // One grouped read for the whole roster, not one per person —
+            // and none for a viewer who is not shown it.
+            seesActivity
+                ? prisma.session.groupBy({
+                      by: ["userId"],
+                      where: {
+                          user: {
+                              memberships: {
+                                  some: { organizationId: ctx.organizationId },
+                              },
+                          },
+                      },
+                      _max: { updatedAt: true },
+                  })
+                : Promise.resolve([]),
         ]);
 
         const lastActive = new Map(
@@ -253,6 +262,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipInvite,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "invitation",
             targetId: invitation.id,
@@ -546,6 +556,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipRoleUpdate,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "membership",
             targetId: userId,
@@ -610,6 +621,7 @@ export class OrganizationMembersService {
         await this.audit.record({
             action: AuditAction.MembershipRemove,
             actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
             organizationId: ctx.organizationId,
             targetType: "membership",
             targetId: userId,

@@ -65,6 +65,9 @@ pattern files refer back here.
   for one: no picker unless a business already has more than one, no "New
   storefront" / "New site" once it has one, singular copy. Storefront and
   website stay separate — mapping them is future work.
+- **Current** — **Opening hours are edited once, for every storefront**
+  (DEC-034): Business → Hours reads the first storefront's week and Save
+  writes it to all of them, saying so first when their weeks differ.
 - **Current** — **One customer record behind an order and a booking is not true
   yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
   linking it to a `Contact` is manual
