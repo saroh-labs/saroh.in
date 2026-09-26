@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
+import { demoReviewer, demoUser, urls } from "../playwright.config";
 
 /**
  * Sell › Stock (#527, #521): count a shelf and undo the count, record
@@ -22,10 +22,19 @@ const STORE = "seed_store";
 const NW: Storefront = { organizationId: ORG, storeId: STORE };
 const COUNT = 7;
 
-async function signIn(page: Page) {
+/** Rye & Co. (the showcase) and Nisha, its counter — a Member. */
+const rye = {
+    org: "seed_sc_rc_org",
+    member: { email: "nisha.kulkarni@saroh.dev", password: demoUser.password },
+};
+
+async function signIn(
+    page: Page,
+    who: { email: string; password: string } = demoUser,
+) {
     await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
+    await page.getByLabel("Email").fill(who.email);
+    await page.getByLabel("Password", { exact: true }).fill(who.password);
     await page.getByRole("button", { name: "Log in" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
@@ -112,7 +121,10 @@ test.describe("Stock screen", () => {
             await page.getByRole("button", { name: "Record stock" }).click();
             const sheet = page.getByRole("dialog", { name: "Record stock" });
             await sheet.getByRole("radio", { name: "Wasted" }).click();
-            await sheet.getByLabel("What").click();
+            // The product picker — not the "What happened" kinds above it.
+            await sheet
+                .getByRole("combobox", { name: "What", exact: true })
+                .click();
             await page.getByRole("option", { name, exact: true }).click();
             await sheet.getByLabel("How many").fill("2");
             await sheet.getByRole("button", { name: "Record" }).click();
@@ -132,7 +144,9 @@ test.describe("Stock screen", () => {
             if (await move.isVisible()) {
                 await move.click();
                 const dialog = page.getByRole("dialog", { name: "Move stock" });
-                await dialog.getByLabel("What").click();
+                await dialog
+                    .getByRole("combobox", { name: "What", exact: true })
+                    .click();
                 await page.getByRole("option", { name, exact: true }).click();
                 await dialog.getByLabel("How many").fill("50");
                 await expect(
@@ -150,23 +164,37 @@ test.describe("Stock screen", () => {
     });
 
     test("a role that can't count sees no Count stock", async ({ page }) => {
-        // The Reviewer reads the catalogue but can't change stock.
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
-        await page.getByLabel("Email").fill("reviewer@saroh.dev");
-        await page
-            .getByLabel("Password", { exact: true })
-            .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
-        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-            timeout: 30_000,
-        });
+        // Rye's counter (a Member) reads the catalogue, so reads stock, but
+        // can't change it. Read-only: nothing is saved on the demo store.
+        await signIn(page, rye.member);
+        await page.goto(`/open/${rye.org}`);
+        await page.goto("/commerce/stock");
+        await expect(
+            page.getByRole("heading", { name: "Stock", level: 1 }),
+        ).toBeVisible();
+        // The shelves are there to read…
+        await expect(page.getByText("Sourdough loaf").first()).toBeVisible();
+        // …and nothing on the screen changes them.
+        for (const name of ["Count stock", "Record stock", "Move stock"]) {
+            await expect(page.getByRole("button", { name })).toHaveCount(0);
+        }
+    });
+
+    test("a role without Commerce is shown the door, not stock", async ({
+        page,
+    }) => {
+        // The Reviewer is website only: Commerce, stock with it, is locked.
+        await signIn(page, demoReviewer);
         await page.goto(`/open/${ORG}`);
         await page.goto("/commerce/stock");
         await expect(
-            page
-                .getByRole("heading", { name: "Stock", level: 1 })
-                .or(page.getByText("You can't open stock")),
+            page.getByRole("heading", {
+                name: "You do not have access to Commerce",
+            }),
         ).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Stock", level: 1 }),
+        ).toHaveCount(0);
         await expect(
             page.getByRole("button", { name: "Count stock" }),
         ).toHaveCount(0);
