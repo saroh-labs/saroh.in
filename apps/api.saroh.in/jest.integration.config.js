@@ -62,6 +62,7 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
+        "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",

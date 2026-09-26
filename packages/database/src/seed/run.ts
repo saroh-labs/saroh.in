@@ -12,6 +12,7 @@ import {
     LEADS,
     LIVE_PAYMENT_PROVIDER,
     MODULE_STATES,
+    ONLINE_STOCK,
     ORDERS,
     ORG_NAME,
     ORG_SLUG,
@@ -252,8 +253,13 @@ export async function seed(): Promise<void> {
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
-    // Every shelf the seed set opens its stock log (#513).
-    await balanceStockLog(prisma, org.id);
+    // Every shelf the seed set opens its stock log (#513), counted by the
+    // owner when the seed ran — never later than now.
+    await balanceStockLog(prisma, {
+        organizationId: org.id,
+        at: now,
+        actorUserId: user.id,
+    });
     await assertHeldStock(prisma, org.id);
     await report(prisma, org.id);
 }
@@ -533,6 +539,7 @@ async function seedCommerce(
     }
 
     const productIds: string[] = [];
+    const variantsOf: string[][] = [];
     for (let i = 0; i < PRODUCTS.length; i++) {
         const p = PRODUCTS[i];
         const product = await prisma.product.upsert({
@@ -599,7 +606,14 @@ async function seedCommerce(
             onHand: p.stock,
             promised: 0,
         });
+        variantsOf.push(variantIds);
     }
+    await seedOnlineStorefront(prisma, {
+        orgId,
+        userId,
+        productIds,
+        variantsOf,
+    });
 
     // Customers mirror the first contacts, so the same person exists on both
     // sides of the commerce/CRM divide. They are NOT auto-linked — that is
@@ -688,6 +702,88 @@ async function seedCommerce(
     });
 
     return store.id;
+}
+
+/**
+ * Northwind's second storefront, "Online" (#526): some of the catalogue,
+ * each counted as a whole on its own shelf, so Move stock and the
+ * several-storefront screens have somewhere to go. Nothing is ordered
+ * there, so nothing is promised; its log opens with `balanceStockLog`.
+ * Northwind is the write sandbox: re-seeding counts every shelf back.
+ */
+async function seedOnlineStorefront(
+    prisma: Db,
+    a: {
+        orgId: string;
+        userId: string;
+        productIds: readonly string[];
+        variantsOf: readonly string[][];
+    },
+) {
+    const storeId = id("store", "online");
+    await prisma.store.upsert({
+        where: { slug: `${STORE_SLUG}-online` },
+        update: { name: "Online", organizationId: a.orgId, deletedAt: null },
+        create: {
+            id: storeId,
+            organizationId: a.orgId,
+            name: "Online",
+            slug: `${STORE_SLUG}-online`,
+            description: "The website's shop: delivered anywhere in India.",
+        },
+    });
+    await prisma.storeOwner.upsert({
+        where: { storeId_userId: { storeId, userId: a.userId } },
+        update: { role: "OWNER" },
+        create: {
+            id: id("storeowner", "online"),
+            storeId,
+            userId: a.userId,
+            role: "OWNER",
+        },
+    });
+    await prisma.storeSettings.upsert({
+        where: { storeId },
+        update: { currency: CURRENCY, collectionEnabled: false },
+        create: {
+            id: id("storesettings", "online"),
+            storeId,
+            currency: CURRENCY,
+            collectionEnabled: false,
+        },
+    });
+    await prisma.storeFeatures.upsert({
+        where: { storeId },
+        update: { ecommerceEnabled: true },
+        create: {
+            id: id("storefeatures", "online"),
+            storeId,
+            ecommerceEnabled: true,
+        },
+    });
+    for (const [slug, onHand] of Object.entries(ONLINE_STOCK)) {
+        const i = PRODUCTS.findIndex((p) => p.slug === slug);
+        if (i < 0)
+            throw new Error(`Northwind sells no "${slug}" to list Online`);
+        await listProductAt(prisma, {
+            id: id("listing", i, "online"),
+            orgId: a.orgId,
+            storeId,
+            productId: a.productIds[i],
+            variants: a.variantsOf[i].map((variantId, v) => ({
+                id: id("listingvariant", i, v, "online"),
+                variantId,
+            })),
+        });
+        await setStockLevel(prisma, {
+            id: id("stocklevel", i, "online"),
+            orgId: a.orgId,
+            storeId,
+            productId: a.productIds[i],
+            onHand,
+            promised: 0,
+        });
+    }
 }
 
 // --- Content ------------------------------------------------------------

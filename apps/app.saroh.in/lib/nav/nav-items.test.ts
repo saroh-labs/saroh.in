@@ -189,6 +189,33 @@ describe("what each role is offered", () => {
         expect(offered).toContain("/sites/site_2");
     });
 
+    it("offers Sell › Stock only while the business tracks stock (#527)", () => {
+        const offered = (stockTracked: boolean | null) =>
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    stockTracked,
+                }),
+            );
+        expect(offered(true)).toContain("/commerce/stock");
+        // Unknown fails open, like the rest of the nav.
+        expect(offered(null)).toContain("/commerce/stock");
+        expect(offered(false)).not.toContain("/commerce/stock");
+        expect(offered(false)).toContain("/commerce/products");
+        // A role that can't read the catalogue can't read stock either.
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["order:stage"],
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    stockTracked: true,
+                }),
+            ),
+        ).not.toContain("/commerce/stock");
+    });
+
     it("offers a new site only to a business that has none (ADR-006)", () => {
         const offeredWith = (sites: typeof SITES) =>
             hrefs(

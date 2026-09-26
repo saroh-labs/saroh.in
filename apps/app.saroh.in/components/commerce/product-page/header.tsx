@@ -1,14 +1,15 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ArrowUpRight, Camera, ChevronLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 
-import { sellCrumbs } from "@/components/commerce/sell-crumbs";
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { priceLabel } from "@/lib/products/overview-rules";
+import { whereItSells } from "@/lib/products/overview-words";
 
 export const STATUS_BADGE = {
     PUBLISHED: { label: "Published", variant: "success" },
@@ -16,13 +17,15 @@ export const STATUS_BADGE = {
     ARCHIVED: { label: "Archived", variant: "neutral" },
 } as const;
 
+const FOCUS =
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 /**
- * Who this product is at a glance: its cover, name and saved status, then
- * one line — what it sells for, how many can be sold, where it sits and
- * where it is sold. "Edit product" opens the whole editor; each panel below
- * links to its own section.
+ * The bar above the product (#522): back to Products and the product's
+ * name; on the right, why the shop's page can't open yet, the Team /
+ * Customer switch and "View on the shop".
  */
-export function ProductHeader({
+export function ProductCrumbs({
     overview,
     storeId,
     view,
@@ -31,85 +34,75 @@ export function ProductHeader({
     storeId: string;
     view: "team" | "customer";
 }) {
-    const { product, stock, price, storefront } = overview;
-    const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
-    const status = STATUS_BADGE[product.status];
-    // The cover is the first photo; a video never stands in for it.
-    const cover = product.images.find((i) => i.kind !== "video");
-    const tracked = stock.mode === "variant" || stock.product !== null;
-
-    const meta = [
-        priceLabel(price, money),
-        tracked ? `${stock.totals.canSell} can be sold` : "no stock count",
-        product.category?.name ?? "no category",
-        product.status === "PUBLISHED"
-            ? storefront.name
-            : product.status === "ARCHIVED"
-              ? "not on the shop"
-              : "not on the shop yet",
-    ];
-
-    const crumbs = sellCrumbs(
-        { label: "Products", href: "/commerce/products" },
-        product.name,
-    );
-
+    const { product } = overview;
     const live = product.status === "PUBLISHED";
+    const note = live
+        ? "The shop's product page arrives with the website."
+        : product.status === "ARCHIVED"
+          ? "Archived — its page does not open for customers."
+          : "Publish it first — a draft has no public page.";
     return (
-        <div className="flex flex-col gap-3">
-            {/*
-             * On a phone the trail is one step back, as the design's phone
-             * bar draws it — the full crumbs, the shop's note and a button
-             * that cannot be pressed yet would take three lines above the
-             * product's own name (2026-09-25).
-             */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
             <Link
                 href="/commerce/products"
-                className="-ml-1 flex w-fit items-center gap-1 rounded-md px-1 py-1 text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11 sm:hidden"
+                className={cn(
+                    FOCUS,
+                    "flex items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[12.5px] text-neutral-700 hover:bg-muted hover:text-foreground coarse:min-h-11 dark:text-muted-foreground",
+                )}
             >
-                <ChevronLeft aria-hidden className="size-4" />
+                <ChevronLeft
+                    aria-hidden
+                    className="size-[15px]"
+                    strokeWidth={2}
+                />
                 Products
             </Link>
-            <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 sm:flex">
-                <nav
-                    aria-label="Breadcrumb"
-                    // A basis, so on a phone the crumbs take their own row rather
-                    // than squeezing under the note beside them.
-                    className="flex min-w-0 flex-[1_1_240px] flex-wrap items-center gap-2 text-[12px] text-muted-foreground"
-                >
-                    {crumbs.map((crumb, i) => (
-                        <span key={i} className="flex items-center gap-2">
-                            {i > 0 ? (
-                                <ChevronRight aria-hidden className="size-3" />
-                            ) : null}
-                            <span
-                                className={cn(
-                                    i === crumbs.length - 1 &&
-                                        "text-foreground",
-                                )}
-                            >
-                                {crumb}
-                            </span>
-                        </span>
-                    ))}
-                </nav>
+            <span aria-hidden className="text-[15px] text-muted-foreground">
+                /
+            </span>
+            <span
+                aria-current="page"
+                className="min-w-0 truncate text-[13.5px] font-semibold"
+            >
+                {product.name}
+            </span>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                 <span
                     id="shop-link-why"
-                    className="min-w-0 max-w-[300px] text-pretty text-[12px] text-muted-foreground"
+                    role="status"
+                    className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
                 >
-                    {live
-                        ? "The shop's product page arrives with the website."
-                        : product.status === "ARCHIVED"
-                          ? "Archived — its page does not open for customers."
-                          : "Publish it first — a draft has no public page."}
+                    {note}
                 </span>
+                <div
+                    role="group"
+                    aria-label="View as"
+                    className="flex rounded-lg bg-muted p-0.5"
+                >
+                    {(["team", "customer"] as const).map((v) => (
+                        <Link
+                            key={v}
+                            href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
+                            scroll={false}
+                            aria-current={view === v ? "page" : undefined}
+                            className={cn(
+                                FOCUS,
+                                "flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold coarse:min-h-11",
+                                view === v
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
+                        >
+                            {v === "team" ? "Team" : "Customer"} view
+                        </Link>
+                    ))}
+                </div>
                 <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     disabled
                     aria-describedby="shop-link-why"
-                    className="h-8 gap-[7px] rounded-[9px] px-3 text-[12.5px] coarse:h-11"
+                    className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
                 >
                     {live
                         ? "View on the shop"
@@ -117,86 +110,128 @@ export function ProductHeader({
                           ? "Not on the shop"
                           : "Not on the shop yet"}
                     <ArrowUpRight
-                        className="size-[13px]"
-                        strokeWidth={2}
                         aria-hidden
+                        className="size-3"
+                        strokeWidth={2}
                     />
                 </Button>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border pb-4">
-                <div className="size-12 shrink-0 overflow-hidden rounded-[10px] bg-muted sm:size-14">
-                    {cover ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist
-                        <img
-                            src={cover.url}
-                            alt=""
-                            className="size-full object-cover"
-                        />
-                    ) : product.status === "DRAFT" ? (
-                        <div
-                            aria-hidden
-                            className="size-full rounded-[10px] border-[1.5px] border-dashed border-border-strong"
-                        />
-                    ) : null}
-                </div>
-                <div className="min-w-0 flex-[1_1_200px]">
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                        <h1 className="min-w-0 break-words font-display text-[20px] font-semibold leading-[1.1] tracking-[-0.025em] sm:text-[24px]">
-                            {product.name}
-                        </h1>
-                        <Badge
-                            variant={status.variant}
-                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                        >
-                            {status.label}
-                        </Badge>
-                    </div>
-                    <p className="mt-1 text-[13px] tabular-nums text-muted-foreground">
-                        {meta.join(" · ")}
-                    </p>
-                </div>
-                <div className="flex w-full flex-wrap items-center justify-between gap-2.5 sm:w-auto sm:justify-start">
-                    <nav
-                        aria-label="View as"
-                        className="inline-flex rounded-[10px] bg-muted p-[3px]"
-                    >
-                        {(["team", "customer"] as const).map((v) => (
-                            <Link
-                                key={v}
-                                href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
-                                scroll={false}
-                                aria-current={view === v ? "page" : undefined}
-                                className={cn(
-                                    "rounded-[8px] px-3.5 py-1.5 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11 coarse:py-2.5",
-                                    view === v
-                                        ? "bg-card text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {v === "team" ? "Team" : "Customer"}
-                                <span className="max-sm:sr-only"> view</span>
-                            </Link>
-                        ))}
-                    </nav>
-                    {overview.canWrite ? (
-                        <Button
-                            asChild
-                            className="h-[34px] gap-[7px] rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
-                        >
-                            <Link href={productEditHref(storeId, product.id)}>
-                                <Pencil
-                                    className="size-3.5"
-                                    strokeWidth={1.9}
-                                    aria-hidden
-                                />
-                                Edit
-                                {/* The button spaces its parts itself. */}
-                                <span className="max-sm:sr-only">product</span>
-                            </Link>
-                        </Button>
-                    ) : null}
-                </div>
-            </div>
         </div>
+    );
+}
+
+/**
+ * Who this product is at a glance (#522): its cover — which opens Photos —
+ * its name and saved status, then one line: what it sells for, its
+ * category, where it sells and when it last changed. "Edit product" opens
+ * the whole editor; each panel below has its own Edit.
+ */
+export function ProductHeader({
+    overview,
+    storeId,
+    photosHref,
+}: {
+    overview: ProductOverview;
+    storeId: string;
+    photosHref: string;
+}) {
+    const { product, price } = overview;
+    const money = (amount: string) =>
+        formatMoneyMajor(amount, product.currency) ?? amount;
+    const status = STATUS_BADGE[product.status];
+    // The cover is the first photo; a video never stands in for it.
+    const cover = product.images.find((i) => i.kind !== "video");
+    const where = whereItSells(
+        product.status,
+        (product.storefronts ?? []).map((s) => s.name),
+    );
+    const meta = [
+        priceLabel(price, money),
+        product.category?.name ?? "no category",
+        where,
+    ].join(" · ");
+
+    return (
+        <div className="flex flex-wrap items-center gap-3.5 border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
+            {cover ? (
+                <Link
+                    href={photosHref}
+                    scroll={false}
+                    aria-label="Cover photo — open Photos"
+                    className={cn(
+                        FOCUS,
+                        "size-14 shrink-0 overflow-hidden rounded-xl bg-muted",
+                    )}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
+                    <img
+                        src={cover.url}
+                        alt=""
+                        className="size-full object-cover"
+                    />
+                </Link>
+            ) : (
+                <Link
+                    href={photosHref}
+                    scroll={false}
+                    aria-label="Add a photo"
+                    className={cn(
+                        FOCUS,
+                        "flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border-strong bg-muted/60 text-[10.5px] font-semibold text-muted-foreground hover:bg-muted",
+                    )}
+                >
+                    <Camera
+                        aria-hidden
+                        className="size-[18px]"
+                        strokeWidth={1.8}
+                    />
+                    Add
+                </Link>
+            )}
+            <div className="min-w-0 flex-[1_1_260px]">
+                <div className="flex flex-wrap items-center gap-[9px]">
+                    <h1 className="min-w-0 break-words font-display text-[24px] font-semibold leading-[1.15] tracking-[-0.025em]">
+                        {product.name}
+                    </h1>
+                    <Badge
+                        variant={status.variant}
+                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                    >
+                        {status.label}
+                    </Badge>
+                </div>
+                <p className="mt-1 text-pretty text-[13px] tabular-nums text-muted-foreground">
+                    {meta} · Changed{" "}
+                    <ViewerDate iso={overview.lastChanged} variant="dayMonth" />
+                </p>
+            </div>
+            {overview.canWrite ? (
+                <Button
+                    asChild
+                    className="gap-[7px] rounded-[9px] px-4 text-[12.5px]"
+                >
+                    <Link href={productEditHref(storeId, product.id)}>
+                        <Pencil
+                            aria-hidden
+                            className="size-3.5"
+                            strokeWidth={1.9}
+                        />
+                        Edit product
+                    </Link>
+                </Button>
+            ) : null}
+        </div>
+    );
+}
+
+/** For anyone who can't change the product: what they can do, and who can. */
+export function AccessLine({ line }: { line: string }) {
+    return (
+        <p
+            role="note"
+            className="text-pretty border-b border-border bg-muted px-4 py-2.5 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground sm:px-[22px]"
+        >
+            {line}
+        </p>
     );
 }

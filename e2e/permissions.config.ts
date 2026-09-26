@@ -72,6 +72,9 @@ export default defineConfig({
                 NEXT_PUBLIC_BETTER_AUTH_URL: apiURL,
                 NEXT_PUBLIC_API_URL: apiURL,
                 NEXT_PUBLIC_ACCOUNTS_URL: appURL,
+                // A Server Action from the page under test is a same-origin
+                // POST; the app's CSRF check refuses any origin not listed.
+                BETTER_AUTH_TRUSTED_ORIGINS: appURL,
             },
         },
     ],

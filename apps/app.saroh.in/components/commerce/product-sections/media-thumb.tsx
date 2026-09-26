@@ -14,6 +14,7 @@ export function MediaThumb({
     alt,
     className,
     small = false,
+    badgeAt = "right",
 }: {
     item: {
         url: string;
@@ -26,6 +27,8 @@ export function MediaThumb({
     className?: string;
     /** A tighter badge for a small thumbnail. */
     small?: boolean;
+    /** Where the length sits: the Editor's grid puts it bottom left (#525). */
+    badgeAt?: "left" | "right";
 }) {
     const fill = cn("size-full object-cover", className);
     if (item.kind !== "video") {
@@ -56,7 +59,11 @@ export function MediaThumb({
                     "absolute inline-flex items-center gap-1 rounded-full bg-foreground/85 font-semibold tabular-nums text-background",
                     small
                         ? "bottom-1 right-1 px-1.5 text-[10.5px]"
-                        : "bottom-1.5 right-1.5 px-[7px] py-px text-[11px]",
+                        : "bottom-1.5 px-[7px] text-[11px]",
+                    !small &&
+                        (badgeAt === "left"
+                            ? "left-1.5 py-0.5"
+                            : "right-1.5 py-px"),
                 )}
             >
                 <Play

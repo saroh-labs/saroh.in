@@ -97,6 +97,36 @@ export function movable(row: { onHand: number; promised: number }): number {
     return Math.max(0, row.onHand - Math.max(0, row.promised));
 }
 
+/** Why a shelf needs someone: short for orders, nothing to sell, or low. */
+export type ShelfNeed = "short" | "out" | "low";
+
+/** Most urgent first: someone was promised it, then nothing left, then low. */
+export const NEED_RANK: Record<ShelfNeed, number> = {
+    short: 0,
+    out: 1,
+    low: 2,
+};
+
+/**
+ * Whether one shelf, where it is sold, needs someone — the one rule behind
+ * the Stock screen's "Needs you" and the Products list's (#527, #519):
+ * short for orders already placed; else nothing left to sell; else at or
+ * under its own warning level (a level of 0 never warns). `sells` false is
+ * a per-variant product's own shelf, which only holds what order lines
+ * without a variant promise: it sells nothing, so only short counts.
+ */
+export function shelfNeed(
+    shelf: { onHand: number; promised: number; lowStockAlert: number },
+    sells = true,
+): ShelfNeed | null {
+    if (shortBy(shelf) > 0) return "short";
+    if (!sells) return null;
+    const canSell = movable(shelf);
+    if (canSell <= 0) return "out";
+    if (shelf.lowStockAlert > 0 && canSell <= shelf.lowStockAlert) return "low";
+    return null;
+}
+
 export const COUNT_DIDNT_MATCH = "Count didn't match";
 
 /**

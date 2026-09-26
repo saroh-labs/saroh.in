@@ -6,6 +6,10 @@ import {
     RYE_ADDRESS_PRINTED,
     RYE_GSTIN,
 } from "./bakery";
+import type { RyeProductPageCounts } from "./check-product-page";
+import { checkRyeProductPage } from "./check-product-page";
+import type { RyeStockCounts } from "./check-stock";
+import { checkRyeStock } from "./check-stock";
 import { TIMEZONE } from "./data";
 import { istAt } from "./people";
 import type { Interval } from "./periods";
@@ -459,6 +463,17 @@ export async function checkShowcase(
             WHERE s."organizationId" = ANY(${orgs})
               AND COALESCE(e.total, 0) <> s."onHand"`,
     );
+    // The Stock screen's "Last change" reads the newest entry and who made
+    // it: an entry is never later than now, and only one Saroh wrote itself
+    // (Track stock turned off, …) is by nobody.
+    fail(
+        "stock entries dated in the future, or made by nobody",
+        await prisma.$queryRaw<Row[]>`
+            SELECT id, "organizationId", "createdAt", "actorUserId" FROM "StockEntry"
+            WHERE "organizationId" = ANY(${orgs})
+              AND ("createdAt" > ${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC'
+                   OR ("actorUserId" IS NULL AND "system" IS NULL))`,
+    );
 
     if (failures.length > 0) {
         throw new Error(
@@ -545,7 +560,7 @@ export async function checkShowcase(
 
 // --- Rye & Co. ------------------------------------------------------------------
 
-export interface RyeCounts {
+export interface RyeCounts extends RyeStockCounts, RyeProductPageCounts {
     gstin: string;
     products: number;
     orders: number;
@@ -700,7 +715,10 @@ export async function checkRye(
     const stageCount = (s: string) =>
         n(stages.find((r) => r.stage === s)?.n ?? 0);
 
-    const counts: RyeCounts = {
+    const counts: Omit<
+        RyeCounts,
+        keyof RyeStockCounts | keyof RyeProductPageCounts
+    > = {
         gstin,
         products: await prisma.product.count({
             where: { organizationId: orgId, gstRate: { not: null } },
@@ -867,11 +885,17 @@ export async function checkRye(
             counts.allergyOrders >= 1,
     }).flatMap(([what, ok]) => (ok ? [] : [what]));
     if (missing.length > 0) failures.push(`missing: ${missing.join("; ")}`);
+    // The stock films' shelves, log, checks and collections (#526).
+    const stock = await checkRyeStock(prisma, orgId);
+    failures.push(...stock.failures);
+    // The Product Detail and Editor films' details, reviews and codes (#522).
+    const page = await checkRyeProductPage(prisma, orgId);
+    failures.push(...page.failures);
 
     if (failures.length > 0) {
         throw new Error(
             `Rye & Co. failed its checks:\n  - ${failures.join("\n  - ")}`,
         );
     }
-    return counts;
+    return { ...counts, ...stock.counts, ...page.counts };
 }

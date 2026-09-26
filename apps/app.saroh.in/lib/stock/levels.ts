@@ -20,7 +20,18 @@ export interface StockCell {
     short: number;
     warnAt: number;
     word: LevelWord;
-    lastChange: { at: string; kind: StockEntryKind; quantity: number } | null;
+    lastChange: LastChange | null;
+}
+
+/** The latest entry on a shelf. */
+export interface LastChange {
+    at: string;
+    kind: StockEntryKind;
+    quantity: number;
+    /** Who made it — null for a role that doesn't read the audit trail. */
+    by?: string | null;
+    /** The order behind it — null for a role that doesn't read orders. */
+    order?: { id: string; number: string } | null;
 }
 
 export type StockEntryKind =

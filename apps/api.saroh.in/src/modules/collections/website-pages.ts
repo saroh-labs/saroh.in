@@ -39,9 +39,12 @@ export interface WebsitePlacement {
     pages: WebsitePage[];
 }
 
-/** The product, and the collections it appears in. */
+/**
+ * The product, and the collections it appears in — or, for a collection's
+ * own card on the Products list (#524), no product and just that collection.
+ */
 export interface ShownTarget {
-    productId: string;
+    productId: string | null;
     collectionIds: readonly string[];
 }
 
@@ -78,7 +81,8 @@ export function pagesShowing(
             if (!read) return false;
             const reach = read(content);
             return (
-                reach.productIds.includes(target.productId) ||
+                (target.productId !== null &&
+                    reach.productIds.includes(target.productId)) ||
                 reach.collectionIds.some((id) => collections.has(id))
             );
         });
@@ -104,7 +108,57 @@ export async function websitePagesFor(
     if (Object.keys(blocks).length === 0) {
         return { showsProducts: false, pages: [] };
     }
-    const sites = await prisma.site.findMany({
+    const sites = await liveSites(organizationId);
+    const pages = sites.flatMap((site) =>
+        pagesShowing(site.currentPublication?.snapshot, target, blocks).map(
+            (page) => ({ siteId: site.id, siteName: site.name, ...page }),
+        ),
+    );
+    return { showsProducts: true, pages };
+}
+
+/**
+ * The live pages that show each collection — the Products list's
+ * collection cards (#524). One read of the sites for all of them, and none
+ * while no block can show a product.
+ */
+export async function websitePagesForCollections(
+    organizationId: string,
+    collectionIds: readonly string[],
+    blocks: Readonly<Record<string, ProductBlockReader>> = PRODUCT_BLOCKS,
+): Promise<Map<string, WebsitePlacement>> {
+    const out = new Map<string, WebsitePlacement>();
+    if (collectionIds.length === 0) return out;
+    if (Object.keys(blocks).length === 0) {
+        for (const id of collectionIds) {
+            out.set(id, { showsProducts: false, pages: [] });
+        }
+        return out;
+    }
+    const sites = await liveSites(organizationId);
+    for (const id of collectionIds) {
+        const target = { productId: null, collectionIds: [id] };
+        out.set(id, {
+            showsProducts: true,
+            pages: sites.flatMap((site) =>
+                pagesShowing(
+                    site.currentPublication?.snapshot,
+                    target,
+                    blocks,
+                ).map((page) => ({
+                    siteId: site.id,
+                    siteName: site.name,
+                    ...page,
+                })),
+            ),
+        });
+    }
+    return out;
+}
+
+/** The business's sites that have published, oldest first. */
+function liveSites(organizationId: string) {
+    return prisma.site.findMany({
         where: {
             organizationId,
             deletedAt: null,
@@ -117,10 +171,4 @@ export async function websitePagesFor(
             currentPublication: { select: { snapshot: true } },
         },
     });
-    const pages = sites.flatMap((site) =>
-        pagesShowing(site.currentPublication?.snapshot, target, blocks).map(
-            (page) => ({ siteId: site.id, siteName: site.name, ...page }),
-        ),
-    );
-    return { showsProducts: true, pages };
 }

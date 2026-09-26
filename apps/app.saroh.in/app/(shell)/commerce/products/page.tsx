@@ -1,26 +1,51 @@
+import { PartialNotice } from "@saroh/ui/data-state";
+
+import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { PageContainer } from "@/components/shared/page-container";
 import { CatalogueScreen } from "@/components/stores/catalogue-screen";
+import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
+import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import {
     invitableOrders,
     listReviews,
     reviewSummary,
 } from "@/lib/product-reviews/service";
-import { listProducts } from "@/lib/products/service";
+import { canStockProducts, canWriteProducts } from "@/lib/products/access";
+import { choicesFrom } from "@/lib/products/filter-choices";
+import {
+    catalogueFilter,
+    listHref,
+    readListQuery,
+} from "@/lib/products/list-query";
+import type { CataloguePage } from "@/lib/products/service";
+import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
+import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
-import { viewParam } from "@/lib/views/search-params";
 
 /**
- * Sell → Products: the business's catalogue, across every storefront.
+ * Sell → Products: the business's catalogue, across every storefront
+ * (#519, #520).
  *
- * The catalogue belongs to the business (#531): one read returns one row per
- * product with the storefronts that sell it. A failed read fails the page
- * (its error boundary), never an empty catalogue.
+ * The address says what the list shows (`?view=`, `?q=`, `?storefront=`,
+ * `?status=`, `?category=`, `?collection=`, or `?tab=reviews`); this reads
+ * the first page for it. The catalogue read failing fails the page (its
+ * error boundary) — never an empty catalogue. Reviews failing leaves the
+ * list and says their count is unknown.
  */
 export const metadata = { title: "Products" };
+
+const NO_PAGE: CataloguePage = {
+    items: [],
+    nextCursor: null,
+    total: 0,
+    counts: { all: 0, collections: 0, inventory: 0 },
+    storefronts: { everywhere: 0, byStorefront: [] },
+    needs: [],
+};
 
 export default async function CataloguePage({
     searchParams,
@@ -28,7 +53,7 @@ export default async function CataloguePage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [stores, query, organization] = await Promise.all([
+    const [stores, params, organization] = await Promise.all([
         listBusinessStores(),
         searchParams,
         resolveActiveOrganization(),
@@ -43,32 +68,76 @@ export default async function CataloguePage({
         ? may("product-review:read")
         : organization?.role !== "REVIEWER";
     const canWriteReviews = may("product-review:write") && may("order:read");
-    const tab =
-        query.tab === "reviews" && canReadReviews ? "reviews" : "products";
-    const products = stores.length > 0 ? await listProducts() : [];
+    const onReviews = params.tab === "reviews" && canReadReviews;
 
-    // Reviews are read for the tab's count on both tabs; a failure is an empty
-    // list here rather than the whole Products page failing.
-    const reviews = canReadReviews ? await listReviews().catch(() => []) : [];
-    const productCount = products.length;
-    const tabs = canReadReviews ? (
+    const query = readListQuery(params);
+    // A storefront that isn't this business's (or closed) is no filter.
+    if (query.storefront && !stores.some((s) => s.id === query.storefront)) {
+        query.storefront = null;
+    }
+
+    const [page, reviews, tracking, categories, collections] =
+        await Promise.all([
+            stores.length > 0
+                ? listCataloguePage(
+                      // The Reviews view still counts the chips: one row will do.
+                      onReviews ? { limit: 1 } : catalogueFilter(query),
+                  ).then((p) => p ?? NO_PAGE)
+                : NO_PAGE,
+            canReadReviews
+                ? listReviews().catch(() => null)
+                : Promise.resolve([]),
+            getStockTracking().catch(() => null),
+            // The Filter's choices and the Collections chip's cards (#524).
+            // Either failing leaves its part out, said, never the list.
+            listCategories().catch(() => null),
+            listCollections().catch(() => null),
+        ]);
+    const choices = choicesFrom(categories, collections);
+
+    const active: ProductsTab = onReviews
+        ? "reviews"
+        : query.view === "collections" || query.view === "inventory"
+          ? query.view
+          : "all";
+    const tabs = (
         <ProductsTabs
-            active={tab}
-            productCount={productCount}
-            reviewCount={reviews.length}
+            active={active}
+            counts={{
+                all: page.counts.all,
+                collections: page.counts.collections,
+                inventory: page.counts.inventory,
+                reviews: reviews ? reviews.length : null,
+            }}
+            hrefs={{
+                all: listHref(query, { view: "all" }),
+                collections: listHref(query, { view: "collections" }),
+                inventory: listHref(query, { view: "inventory" }),
+                reviews: "/commerce/products?tab=reviews",
+            }}
+            showInventory={tracking?.tracked !== false}
+            showReviews={canReadReviews}
         />
-    ) : undefined;
+    );
+    const notice =
+        reviews === null ? (
+            <PartialNotice>
+                Reviews couldn&apos;t be read just now, so their count shows as
+                “—”. It is not zero. Everything else on this page arrived
+                normally.
+            </PartialNotice>
+        ) : null;
 
-    if (tab === "reviews") {
+    if (onReviews) {
         const invitable = canWriteReviews
             ? await invitableOrders().catch(() => [])
             : [];
         const review =
-            typeof query.review === "string" ? query.review : undefined;
+            typeof params.review === "string" ? params.review : undefined;
         return (
             <PageContainer width="full">
                 <ReviewsView
-                    reviews={reviews}
+                    reviews={reviews ?? []}
                     invitable={invitable}
                     canWrite={canWriteReviews}
                     tabs={tabs}
@@ -79,15 +148,40 @@ export default async function CataloguePage({
     }
 
     const ratings = canReadReviews ? await reviewSummary().catch(() => []) : [];
+    const canWrite = canWriteProducts(organization);
 
     return (
         <PageContainer width="full">
             <CatalogueScreen
-                tabs={tabs}
-                ratings={ratings}
+                query={query}
+                page={page}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                products={products}
-                initialView={viewParam(query)}
+                tabs={tabs}
+                notice={notice}
+                ratings={ratings}
+                choices={choices}
+                canWrite={canWrite}
+                canStock={canStockProducts(organization)}
+                collectionCount={collections ? collections.length : null}
+                collectionsPanel={
+                    active === "collections" ? (
+                        <CollectionsPanel
+                            collections={collections}
+                            categories={categories ?? []}
+                            canWrite={canWrite}
+                            activeId={query.collection}
+                            hrefs={Object.fromEntries(
+                                (collections ?? []).map((c) => [
+                                    c.id,
+                                    listHref(query, { collection: c.id }),
+                                ]),
+                            )}
+                            clearHref={listHref(query, { collection: null })}
+                            openNew={params.new === "collection"}
+                            closeNewHref={listHref(query)}
+                        />
+                    ) : null
+                }
             />
         </PageContainer>
     );

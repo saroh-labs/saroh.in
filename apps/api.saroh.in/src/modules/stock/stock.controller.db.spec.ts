@@ -305,6 +305,100 @@ describe("Stock API (DB)", () => {
             const view = await api.levels(ctx("MEMBER"), {});
             expect(view.canWrite).toBe(false);
         });
+
+        it("pages by product, and every page lists the untracked", async () => {
+            const all = await api.levels(owner(), {});
+            expect(all.nextCursor).toBeNull();
+            const products = Array.from(
+                new Set(all.rows.map((r) => r.productId)),
+            );
+            expect(products.length).toBeGreaterThan(2);
+
+            const first = await api.levels(owner(), { limit: 2 });
+            expect(
+                Array.from(new Set(first.rows.map((r) => r.productId))),
+            ).toEqual(products.slice(0, 2));
+            expect(first.nextCursor).toBe(products[1]);
+            expect(first.untracked).toEqual(all.untracked);
+            expect(first.needsYou).toBe(all.needsYou);
+
+            const seen = [...products.slice(0, 2)];
+            let cursor: string | null = first.nextCursor;
+            while (cursor) {
+                const page = await api.levels(owner(), { limit: 2, cursor });
+                seen.push(
+                    ...Array.from(new Set(page.rows.map((r) => r.productId))),
+                );
+                cursor = page.nextCursor;
+            }
+            expect(seen).toEqual(products);
+            await expect(
+                api.levels(owner(), { limit: 2, cursor: otherProduct }),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it("searches names and SKUs, and keeps only what needs someone", async () => {
+            const low = await product(`Rye ${tag}`, 1);
+            await prisma.stockLevel.update({
+                where: { id: (await shelf(hill, low)).id },
+                data: { lowStockAlert: 4 },
+            });
+            const found = await api.levels(owner(), { q: `rye ${tag}` });
+            expect(found.rows.map((r) => r.productId)).toEqual([low]);
+
+            const needs = await api.levels(owner(), { needs: true });
+            expect(needs.rows.some((r) => r.productId === low)).toBe(true);
+            expect(
+                needs.rows.every((r) =>
+                    r.cells.some(
+                        (c) =>
+                            c.word === "LOW" ||
+                            c.word === "SOLD_OUT" ||
+                            c.short > 0,
+                    ),
+                ),
+            ).toBe(true);
+            expect(needs.needsYou).toBe(needs.rows.length);
+            // The last change says who, for a role that reads the audit trail.
+            const [row] = found.rows;
+            expect(row.lastChange).toMatchObject({
+                kind: "COUNTED",
+                by: "Asha Rao",
+            });
+            expect(found.timezone).toBe("Asia/Kolkata");
+        });
+
+        it("an archived product never needs you, and the storefront shown doesn't narrow Needs you", async () => {
+            const gone = await product(`Stollen ${tag}`, 0);
+            const before = await api.levels(owner(), {});
+            expect(
+                (await api.levels(owner(), { needs: true })).rows.some(
+                    (r) => r.productId === gone,
+                ),
+            ).toBe(true);
+
+            await prisma.product.update({
+                where: { id: gone },
+                data: { status: "ARCHIVED" },
+            });
+            const after = await api.levels(owner(), {});
+            expect(after.needsYou).toBe(before.needsYou - 1);
+            // Still shown, as it is: only not counted as needing anyone.
+            const row = after.rows.find((r) => r.productId === gone);
+            expect(row?.cells[0]).toMatchObject({
+                word: "SOLD_OUT",
+                need: null,
+            });
+            expect(
+                (await api.levels(owner(), { needs: true })).rows.some(
+                    (r) => r.productId === gone,
+                ),
+            ).toBe(false);
+
+            // Online sells none of these: the count is still the business's.
+            const atOnline = await api.levels(owner(), { storefront: online });
+            expect(atOnline.needsYou).toBe(after.needsYou);
+        });
     });
 
     /** A fulfilled order that sold `units` of a product from Hill Road. */
@@ -339,6 +433,53 @@ describe("Stock API (DB)", () => {
     }
 
     describe("writes", () => {
+        it("warnings change when a shelf warns, and nothing else", async () => {
+            const id = await product("Brioche", 6);
+            const entries = await prisma.stockEntry.count({
+                where: { productId: id },
+            });
+            // A sale since the sheet was read: 6 → 4.
+            await prisma.stockLevel.update({
+                where: { id: (await shelf(hill, id)).id },
+                data: { onHand: 4 },
+            });
+            const saved = await api.warnings(ctx("OWNER"), {
+                warnings: [{ storeId: hill, productId: id, lowStockAlert: 5 }],
+            });
+            expect(saved.shelves[0]).toMatchObject({
+                onHand: 4,
+                lowStockAlert: 5,
+                canSell: 4,
+            });
+            expect(await shelf(hill, id)).toMatchObject({
+                onHand: 4,
+                lowStockAlert: 5,
+            });
+            // No count: the log is as it was.
+            expect(
+                await prisma.stockEntry.count({ where: { productId: id } }),
+            ).toBe(entries);
+
+            await expect(
+                api.warnings(ctx("MEMBER"), {
+                    warnings: [
+                        { storeId: hill, productId: id, lowStockAlert: 1 },
+                    ],
+                }),
+            ).rejects.toThrow(ForbiddenException);
+            await expect(
+                api.warnings(owner(), {
+                    warnings: [
+                        {
+                            storeId: hill,
+                            productId: otherProduct,
+                            lowStockAlert: 1,
+                        },
+                    ],
+                }),
+            ).rejects.toThrow(NotFoundException);
+        });
+
         it("adjust +5 writes a received entry and the levels read reflects it", async () => {
             const id = await product("Baguette", 2);
             const result = await api.adjust(owner(), {

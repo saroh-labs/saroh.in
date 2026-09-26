@@ -701,19 +701,31 @@ export async function assertHeldStock(
  * a re-count on a re-seeded one — so before + quantity = after holds and the
  * entries add up, exactly as the migration left real data. Idempotent: a
  * re-run over unchanged rows writes nothing. Returns the entries written.
+ *
+ * `at` dates the count: always a moment the seed passed, never the database's
+ * clock, which a timestamp-without-zone column would read in the server's
+ * zone and could put hours in the future. The count is by `actorUserId`, or
+ * else by the business's first owner, so no seeded entry reads as the system.
  */
 export async function balanceStockLog(
     prisma: Db,
-    organizationId?: string,
+    a: { organizationId?: string; at: Date; actorUserId?: string },
 ): Promise<number> {
-    const scope = organizationId ?? null;
+    const scope = a.organizationId ?? null;
+    const actor = a.actorUserId ?? null;
+    // Prisma keeps DateTime as UTC in a column without a zone.
     return prisma.$executeRaw`
         INSERT INTO "StockEntry" ("id", "organizationId", "stockLevelId", "storeId", "productId", "variantId",
-                                  "kind", "quantity", "before", "after", "counted", "note", "createdAt")
+                                  "kind", "quantity", "before", "after", "counted", "note", "actorUserId", "createdAt")
         SELECT 'se' || replace(gen_random_uuid()::text, '-', ''), s."organizationId", s."id", s."storeId",
                s."productId", s."variantId", 'COUNTED', s."onHand" - COALESCE(e."total", 0),
                COALESCE(e."total", 0), s."onHand", s."onHand",
-               CASE WHEN e."total" IS NULL THEN 'Opening count' ELSE NULL END, CURRENT_TIMESTAMP
+               CASE WHEN e."total" IS NULL THEN 'Opening count' ELSE NULL END,
+               COALESCE(${actor}::text, (
+                   SELECT m."userId" FROM "Membership" m
+                   WHERE m."organizationId" = s."organizationId" AND m."role" = 'OWNER'
+                   ORDER BY m."id" LIMIT 1)),
+               (${a.at.toISOString()}::timestamptz AT TIME ZONE 'UTC')
         FROM "StockLevel" s
         LEFT JOIN (
             SELECT "stockLevelId", SUM("quantity")::int AS "total"

@@ -40,7 +40,10 @@ test.describe("new order at a GST-registered business", () => {
         ).toBeVisible();
 
         await page.getByRole("combobox", { name: "Product" }).click();
-        await page.getByRole("option", { name: /^Sourdough loaf —/ }).click();
+        // Sourdough has sizes since the showcase grew (#526); 800g is ₹480.
+        await page
+            .getByRole("option", { name: /^Sourdough loaf · 800g —/ })
+            .click();
         await page.getByLabel("Quantity").fill("2");
 
         await expect(page.getByLabel(/^Tax/)).toHaveCount(0);

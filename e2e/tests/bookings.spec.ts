@@ -173,20 +173,23 @@ test.describe("bookings calendar", () => {
             const gaps = page.getByRole("button", {
                 name: new RegExp(`^Book ${person.name} at`),
             });
-            await expect(gaps.first()).toBeVisible();
-            const labels = await gaps.evaluateAll((els) =>
-                els.map((e) => e.getAttribute("aria-label") ?? ""),
-            );
-            const index = labels.findIndex((l) => {
-                const [, a = "", b = ""] =
-                    /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ?? [];
-                return (
-                    at !== undefined &&
-                    mins(a) <= mins(at) &&
-                    mins(at) < mins(b)
-                );
-            });
-            expect(index).toBeGreaterThanOrEqual(0);
+            // The toast can land before the diary redraws, so wait for the gap.
+            const holding = async () =>
+                (
+                    await gaps.evaluateAll((els) =>
+                        els.map((e) => e.getAttribute("aria-label") ?? ""),
+                    )
+                ).findIndex((l) => {
+                    const [, a = "", b = ""] =
+                        /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ?? [];
+                    return (
+                        at !== undefined &&
+                        mins(a) <= mins(at) &&
+                        mins(at) < mins(b)
+                    );
+                });
+            await expect.poll(holding).toBeGreaterThanOrEqual(0);
+            const index = await holding();
             const gap = gaps.nth(index);
             await gap.click();
             const book = page.getByRole("dialog");

@@ -349,4 +349,40 @@ describe("Stock checks (DB)", () => {
             NotFoundException,
         );
     });
+    it("pages the open checks, with the counts across every page", async () => {
+        const all = await checks.list(owner());
+        expect(all.nextCursor).toBeNull();
+        expect(all.checks.length).toBeGreaterThan(1);
+        const first = await checks.list(owner(), { limit: 1 });
+        expect(first.checks.map((c) => c.key)).toEqual([all.checks[0].key]);
+        expect(first.counts).toEqual(all.counts);
+        expect(first.nextCursor).toBe(all.checks[0].key);
+        const keys = [...first.checks.map((c) => c.key)];
+        let cursor = first.nextCursor;
+        while (cursor) {
+            const page = await checks.list(owner(), { limit: 1, cursor });
+            keys.push(...page.checks.map((c) => c.key));
+            cursor = page.nextCursor;
+        }
+        expect(keys).toEqual(all.checks.map((c) => c.key));
+        expect(first.restarted).toBe(false);
+    });
+
+    it("says it started again when the check a page ended on has closed", async () => {
+        const first = await checks.list(owner(), { limit: 1 });
+        const ended = first.nextCursor;
+        expect(ended).not.toBeNull();
+        // Someone looks at it before Show more is pressed.
+        await checks.resolve(owner(), ended ?? "", {});
+        const next = await checks.list(owner(), {
+            limit: 1,
+            cursor: ended ?? "",
+        });
+        expect(next.restarted).toBe(true);
+        const fresh = await checks.list(owner(), { limit: 1 });
+        expect(next.checks.map((c) => c.key)).toEqual(
+            fresh.checks.map((c) => c.key),
+        );
+        expect(next.checks.map((c) => c.key)).not.toContain(ended);
+    });
 });

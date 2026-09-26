@@ -1,14 +1,8 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ChevronLeft, Lock } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -16,16 +10,15 @@ import { useRef, useState } from "react";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { currencySymbol } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
+import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
 import {
-    joinAnd,
     partitionSections,
     saveHint,
-    SECTION_JUMPS,
-    SECTION_NAMES,
     SECTION_ORDER,
 } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
+import type { ProductListingView } from "@/lib/products/listing-changes";
 import type {
     ProductDetail,
     ProductOptionView,
@@ -39,6 +32,12 @@ import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
 import { DetailsSection } from "./details-section";
+import {
+    LeaveDialog,
+    NextSteps,
+    ReadOnlyNote,
+    StatusPill,
+} from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
@@ -55,8 +54,18 @@ export interface ProductEditorProps {
     categoriesHref: string;
     options: ProductOptionView[];
     canWrite: boolean;
-    /** May count and move stock (`inventory:write`): sees Track stock, locked. */
+    /**
+     * May count and move stock (`inventory:write`): without `canWrite`, a
+     * stock-only role changes the Stock section alone and sees Track stock
+     * locked (#525).
+     */
     canStock: boolean;
+    /** The viewer's role as the business names it, for the read-only note. */
+    viewerRole: string;
+    /** The business's open storefronts; "Sell it at" shows with more than one. */
+    stores: { id: string; name: string }[];
+    /** Where the product is sold, per storefront; null when not read. */
+    listings: ProductListingView[] | null;
     /** The business's Track stock switch (#515); off, no Stock section. */
     businessTracks: boolean;
     /** Settings → SKUs, and this product's number for {N}. */
@@ -88,6 +97,8 @@ export function ProductEditorV2(props: ProductEditorProps) {
         <ProductEditorProvider
             mode={props.product ? "edit" : "create"}
             canWrite={props.canWrite}
+            canStock={props.canStock}
+            sellsFood={props.allergens.length > 0}
         >
             <EditorBody {...props} />
         </ProductEditorProvider>
@@ -104,14 +115,27 @@ function EditorBody({
     options,
     canWrite,
     canStock,
+    viewerRole,
+    stores,
+    listings,
     businessTracks,
     sku,
     allergens,
     defaults: initialDefaults,
 }: ProductEditorProps) {
     const router = useRouter();
-    const { mode, states, saving, saveSections, collectAll, afterCreateAll } =
-        useEditor();
+    const {
+        mode,
+        names,
+        states,
+        saving,
+        saveSections,
+        collectAll,
+        afterCreateAll,
+    } = useEditor();
+    // A stock-only role changes the Stock section and nothing else.
+    const canEdit = canWrite || canStock;
+    const jumpNames = sectionJumps(allergens.length > 0);
     const creating = mode === "create";
     const symbol = currencySymbol(currency);
     const [createStatus, setCreateStatus] = useState<ProductStatus>("DRAFT");
@@ -143,7 +167,7 @@ function EditorBody({
     const createBad = SECTION_ORDER.some((k) => problems[k]);
     const firstBad = SECTION_ORDER.map((k) => problems[k]).find(Boolean) ?? "";
 
-    useLeaveGuard(canWrite && dirty.length > 0 && !creatingNow);
+    useLeaveGuard(canEdit && dirty.length > 0 && !creatingNow);
 
     async function create() {
         if (!canWrite || createBad || creatingNow) return;
@@ -191,13 +215,12 @@ function EditorBody({
             : createStatus === "PUBLISHED"
               ? "Goes live as soon as it is created."
               : "It will be created as a draft — only the team will see it."
-        : saveHint(dirty, stuck);
+        : saveHint(dirty, stuck, names);
     const showHeaderSave = canWrite && (creating || dirty.length > 1);
     const headerOff = creating
         ? createBad || creatingNow
         : savable.length === 0 || saving.length > 0;
 
-    const statusPill = product?.status;
     const jumps = SECTION_ORDER.filter(
         (k) =>
             !(creating && (k === "variants" || k === "stock")) &&
@@ -214,7 +237,7 @@ function EditorBody({
                     <Link
                         href={PRODUCTS_HREF}
                         onClick={(e) => {
-                            if (canWrite && dirty.length > 0) {
+                            if (canEdit && dirty.length > 0) {
                                 e.preventDefault();
                                 setLeaving(true);
                             }
@@ -241,28 +264,7 @@ function EditorBody({
                               ? product.name
                               : "Untitled product"}
                     </span>
-                    {statusPill ? (
-                        <span
-                            className={cn(
-                                "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                statusPill === "PUBLISHED"
-                                    ? "bg-success-subtle text-success-subtle-foreground"
-                                    : statusPill === "DRAFT"
-                                      ? "bg-brand-subtle text-brand-subtle-foreground"
-                                      : "bg-muted text-foreground/75",
-                            )}
-                        >
-                            {statusPill === "PUBLISHED"
-                                ? "Published"
-                                : statusPill === "DRAFT"
-                                  ? "Draft"
-                                  : "Archived"}
-                        </span>
-                    ) : (
-                        <span className="shrink-0 rounded-full border border-dashed border-border-strong px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                            Not created yet
-                        </span>
-                    )}
+                    <StatusPill status={product?.status ?? null} />
                     <div className="ml-auto flex flex-wrap items-center gap-2.5 max-[480px]:ml-0">
                         <span
                             role="status"
@@ -301,20 +303,9 @@ function EditorBody({
                 </div>
 
                 {!canWrite ? (
-                    <div
-                        role="note"
-                        className="flex items-start gap-[9px] border-b border-border bg-brand-subtle px-[18px] py-2.5"
-                    >
-                        <Lock
-                            aria-hidden
-                            className="mt-px size-[15px] shrink-0 text-brand"
-                            strokeWidth={1.9}
-                        />
-                        <span className="text-pretty text-[12.5px] leading-[1.5] text-brand-subtle-foreground">
-                            You can read this product but not change it — an
-                            owner or admin can change your role in Team.
-                        </span>
-                    </div>
+                    <ReadOnlyNote>
+                        {readOnlyBanner(viewerRole, canStock)}
+                    </ReadOnlyNote>
                 ) : null}
 
                 <nav
@@ -327,7 +318,7 @@ function EditorBody({
                             href={`#sec-${k}`}
                             className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[12px] text-foreground/75 hover:bg-muted hover:text-foreground coarse:h-11"
                         >
-                            {SECTION_JUMPS[k]}
+                            {jumpNames[k]}
                             {!creating && dirty.includes(k) ? (
                                 <span
                                     aria-label={
@@ -387,11 +378,16 @@ function EditorBody({
                                 symbol={symbol}
                                 options={options}
                                 sku={sku}
+                                stores={stores}
+                                listings={listings}
                             />
                             {businessTracks ? (
                                 <StockSection
                                     product={product}
                                     storeId={storeId}
+                                    countedAt={
+                                        stores.length > 1 ? storeName : null
+                                    }
                                     defaultWarn={
                                         defaults?.lowStockAlert ?? null
                                     }
@@ -408,82 +404,13 @@ function EditorBody({
                 </div>
             </div>
 
-            <AlertDialog open={leaving} onOpenChange={setLeaving}>
-                <AlertDialogContent className="max-w-[380px] rounded-[14px] px-[22px] py-5">
-                    <AlertDialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        {creating
-                            ? "Leave without creating it?"
-                            : "Leave with unsaved changes?"}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="mt-[7px] text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                        {creating
-                            ? "Nothing you have entered is kept."
-                            : `Unsaved changes in ${joinAnd(
-                                  dirty.map((k) => SECTION_NAMES[k]),
-                              )} will be lost.`}
-                    </AlertDialogDescription>
-                    <div className="mt-[18px] flex flex-wrap justify-end gap-2">
-                        <Link
-                            href={PRODUCTS_HREF}
-                            className="inline-flex h-[34px] items-center rounded-[9px] border border-border px-[13px] text-[12.5px] font-semibold text-destructive hover:bg-destructive-subtle"
-                        >
-                            Leave without saving
-                        </Link>
-                        <button
-                            type="button"
-                            autoFocus
-                            onClick={() => setLeaving(false)}
-                            className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90"
-                        >
-                            Stay
-                        </button>
-                    </div>
-                </AlertDialogContent>
-            </AlertDialog>
+            <LeaveDialog
+                open={leaving}
+                onOpenChange={setLeaving}
+                href={PRODUCTS_HREF}
+                creating={creating}
+                sections={dirty.map((k) => names[k])}
+            />
         </main>
-    );
-}
-
-/** While creating: what opens once the product exists, and that it stays here. */
-function NextSteps() {
-    return (
-        <section
-            aria-label="After you create it"
-            className="rounded-[12px] border border-dashed border-border-strong px-[18px] py-[15px]"
-        >
-            <h2 className="font-display text-[15px] font-semibold tracking-[-0.015em]">
-                Next: variants and stock
-            </h2>
-            <p className="mt-1.5 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
-                Both are saved against the product, so they open here the moment
-                it is created. You stay on this page.
-            </p>
-            <ol className="mt-[13px] flex flex-col gap-[9px]">
-                <li className="flex items-start gap-2.5">
-                    <span className="mt-px shrink-0 font-mono text-[11px] text-muted-foreground/80">
-                        1
-                    </span>
-                    <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        <strong className="font-semibold text-foreground/75">
-                            Variants
-                        </strong>{" "}
-                        — one per size, shade or colour. Each starts at the
-                        product&apos;s price, and can have its own.
-                    </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                    <span className="mt-px shrink-0 font-mono text-[11px] text-muted-foreground/80">
-                        2
-                    </span>
-                    <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        <strong className="font-semibold text-foreground/75">
-                            Stock
-                        </strong>{" "}
-                        — how many you have, and when to warn you. With
-                        variants, each keeps its own count.
-                    </span>
-                </li>
-            </ol>
-        </section>
     );
 }

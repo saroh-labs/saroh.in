@@ -16,6 +16,7 @@ import {
     madeBySchema,
     mediaCounter,
     mediaFileProblem,
+    mediaLimitNote,
     mergeDraft,
     partitionSections,
     photosFrom,
@@ -446,6 +447,34 @@ describe("15 photos and 3 videos (#517)", () => {
         expect(mediaFileProblem({ type: "video/webm", size: MB }, [])).toBe(
             "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.",
         );
+        // Photos up to 8 MB, as the editor says (#525).
+        expect(mediaFileProblem({ type: "image/jpeg", size: 9 * MB }, [])).toBe(
+            "That photo is over 8 MB. Most phones can export a smaller copy.",
+        );
+        expect(mediaFileProblem({ type: "image/jpeg", size: 8 * MB }, [])).toBe(
+            "",
+        );
+    });
+
+    it("says what can still be added once one kind is full (#525)", () => {
+        const fifteen = Array.from({ length: 15 }, (_, i) => photo(i));
+        expect(mediaLimitNote([])).toEqual({
+            text: "Photos up to 8 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
+            full: false,
+        });
+        expect(mediaLimitNote([...fifteen, video(1)]).text).toBe(
+            "15 photos is the most. You can still add 2 more videos.",
+        );
+        expect(mediaLimitNote([...fifteen, video(1), video(2)]).text).toBe(
+            "15 photos is the most. You can still add 1 more video.",
+        );
+        expect(mediaLimitNote([video(1), video(2), video(3)])).toEqual({
+            text: "3 videos is the most. Photos can still be added.",
+            full: true,
+        });
+        expect(
+            mediaLimitNote([...fifteen, video(1), video(2), video(3)]).text,
+        ).toBe("Full: 15 photos and 3 videos. Take one off to add another.");
     });
 
     it("sends a new video by its upload, with its length and poster", () => {

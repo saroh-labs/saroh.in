@@ -5,7 +5,7 @@ import { prisma } from "@saroh/database";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { RESERVING_STATUSES } from "../orders/order-inventory";
-import type { ResolveCheckDto } from "./dto";
+import type { ResolveCheckDto, StockChecksQueryDto } from "./dto";
 import type { StockReader } from "./stock-access";
 import { stockReader, stockWriter } from "./stock-access";
 import { COUNT_DIDNT_MATCH, shortBy } from "./stock-words";
@@ -59,7 +59,15 @@ export interface StockCheck {
 
 export interface StockChecksView {
     checks: StockCheck[];
+    /** Every open check by kind, across every page. */
     counts: Record<StockCheckKind, number>;
+    /** Pass as `cursor` for the next page; null on the last. */
+    nextCursor: string | null;
+    /**
+     * The cursor's check had closed, so this is the first page again: the
+     * caller replaces the list it holds instead of adding to it.
+     */
+    restarted: boolean;
     /** May resolve them (count and move stock). */
     canResolve: boolean;
 }
@@ -75,7 +83,14 @@ const plural = (n: number, one: string, many = `${one}s`) =>
 export class StockChecksService {
     constructor(private readonly idempotency: IdempotencyService) {}
 
-    async list(ctx: OrganizationContext): Promise<StockChecksView> {
+    /**
+     * The open checks, a page at a time when `limit` is given (`cursor` is
+     * the last key of the page before). Without it, every one, as before.
+     */
+    async list(
+        ctx: OrganizationContext,
+        query: StockChecksQueryDto = {},
+    ): Promise<StockChecksView> {
         const reader = stockReader(ctx);
         const open = await this.open(reader);
         const counts: Record<StockCheckKind, number> = {
@@ -85,10 +100,25 @@ export class StockChecksService {
             PROMISED_MISMATCH: 0,
         };
         for (const c of open) counts[c.kind] += 1;
+        let rest = open;
+        let restarted = false;
+        if (query.cursor) {
+            const at = open.findIndex((c) => c.key === query.cursor);
+            // The check the page before ended on is no longer open (someone
+            // resolved it, or its numbers came right): send the first page
+            // again, and say so — the screen replaces what it holds rather
+            // than adding the first page twice, and nothing is skipped.
+            restarted = at < 0;
+            rest = restarted ? open : open.slice(at + 1);
+        }
+        const more = query.limit !== undefined && rest.length > query.limit;
+        const page = more ? rest.slice(0, query.limit) : rest;
         return {
-            checks: open.map(({ fingerprint: _f, ...check }) => check),
+            checks: page.map(({ fingerprint: _f, ...check }) => check),
             counts,
             canResolve: reader.canWrite,
+            nextCursor: more ? page[page.length - 1].key : null,
+            restarted,
         };
     }
 

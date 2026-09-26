@@ -25,6 +25,11 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import {
+    descriptionFootnote,
+    markupCount,
+    readCount,
+} from "@/lib/products/editor-labels";
 import { LIMITS, stripHtml } from "@/lib/products/editor-sections";
 
 /**
@@ -81,7 +86,13 @@ export function DescriptionEditor({
                 role: "textbox",
             },
         },
-        onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+        // Only a change to the text itself. `setEditable` emits an update
+        // too, with Tiptap's own spelling of the saved HTML — taken as an
+        // edit, it marked the description Unsaved on open (#525).
+        onUpdate: ({ editor: e, transaction }) => {
+            if (!transaction.docChanged) return;
+            onChange(e.getHTML());
+        },
     });
 
     // A Discard or a new baseline changes `value` under a mounted editor.
@@ -95,7 +106,7 @@ export function DescriptionEditor({
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
-        editor?.setEditable(!disabled);
+        editor?.setEditable(!disabled, false);
     }, [editor, disabled]);
 
     /* eslint-disable @typescript-eslint/no-unnecessary-condition --
@@ -336,18 +347,11 @@ export function DescriptionEditor({
                         over && "text-destructive",
                     )}
                 >
-                    {over
-                        ? "Over the limit. The count that matters is the markup, not the words."
-                        : "Formatting the shop can't show is dropped on save, so the toolbar only offers what survives."}
+                    {descriptionFootnote(over)}
                 </span>
-                <span className="font-mono">{plain} characters</span>
-                <span
-                    className={cn(
-                        "font-mono",
-                        over && "font-semibold text-destructive",
-                    )}
-                >
-                    {value.length} / 5000 markup
+                <span className="font-mono">{readCount(plain)}</span>
+                <span className={cn("font-mono", over && "text-destructive")}>
+                    {markupCount(value.length)}
                 </span>
             </div>
         </div>

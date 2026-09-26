@@ -2,6 +2,8 @@ import { unstable_rethrow } from "next/navigation";
 
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
+import { roleName } from "@/lib/products/editor-labels";
+import { getProductListings } from "@/lib/products/listings";
 import { listCategories, listOptions } from "@/lib/products/service";
 import {
     getEffectiveDefaults,
@@ -21,11 +23,17 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * that cannot be read leave Variants with none to offer, which it says.
  * Defaults (Settings → Defaults) that cannot be read leave the built-in
  * starting values.
+ *
+ * `stores` is the business's storefronts: with more than one, the Variants
+ * section says where each variant is sold ("Sell it at", #525), read from
+ * the product's listings; unreadable, it is left out rather than guessed.
  */
 export async function loadEditorContext(
     store: { id: string; name: string },
     product?: { id: string; categoryId: string | null },
+    stores: readonly { id: string; name: string }[] = [store],
 ) {
+    const several = stores.length > 1;
     const [
         settings,
         categories,
@@ -35,6 +43,7 @@ export async function loadEditorContext(
         allergens,
         defaults,
         business,
+        listings,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
         listCategories(),
@@ -53,6 +62,12 @@ export async function loadEditorContext(
         // The business's Track stock switch (#515); unknown reads as on, and
         // the product's own switch decides.
         getStockTracking().catch(() => null),
+        product && several
+            ? getProductListings(product.id).catch((error: unknown) => {
+                  unstable_rethrow(error);
+                  return null;
+              })
+            : null,
     ]);
     return {
         storeId: store.id,
@@ -63,6 +78,9 @@ export async function loadEditorContext(
         options,
         canWrite: canWriteProducts(organization),
         canStock: canStockProducts(organization),
+        viewerRole: organization ? roleName(organization) : "Member",
+        stores: stores.map((s) => ({ id: s.id, name: s.name })),
+        listings,
         businessTracks: business?.tracked ?? true,
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),

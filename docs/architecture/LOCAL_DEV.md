@@ -65,7 +65,11 @@ Sign in as the owner `demo@saroh.dev` / `demo-password-123`, or as
 `reviewer@saroh.dev` (same password) to see the Reviewer role — fixture values
 for a throwaway database, from `packages/database/src/seed/data.ts`. The seed lays down 24
 contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
-— enough for every operational surface to have something on it.
+— enough for every operational surface to have something on it. Northwind has
+two storefronts: "Northwind Supply Store" (`seed_store`) and "Online"
+(`seed_store_online`), which sells six of the products from its own shelves
+(one low, one out) so Move stock has somewhere to go (#526). Northwind is the
+write sandbox; re-seeding counts every shelf back.
 
 ### Showcase (the product film's world)
 
@@ -120,7 +124,7 @@ businesses — the first four each with one published site at
   breads nil-rated (HSN 1905 90 10), pastry 18% (1905 90 20), coffee 5% (SAC
   996331), delivery ₹60 at 18% (SAC 996813), prices GST-inclusive; eight
   allergens on the storefront and each product's "contains" / "may contain".
-  About 65 orders over five weeks, each paid one with its tax invoice
+  About 75 orders over five weeks, each paid one with its tax invoice
   (RC/26-27/0001…; CGST + SGST, IGST for deliveries to Goa, Telangana, West
   Bengal and Maharashtra), and today's board in every kitchen stage — new,
   preparing (one edited before preparing, with a supplementary invoice),
@@ -134,7 +138,23 @@ businesses — the first four each with one published site at
   Subscribers' contacts are linked to their store customers; Rohan Das is a
   contact and a customer with the same email, left unlinked (a possible
   match). Priya Raman's note names sesame and today's order holds a loaf that
-  may contain it (the allergy banner). `checkRye` stops the run if any of these
+  may contain it (the allergy banner). The products screens' sample data
+  (#526, `bakery-catalogue.ts`, `bakery-stock.ts`): two storefronts, Hill
+  Road and Online (`seed_sc_rc_store`, `seed_sc_rc_store_online`), and one
+  website; fifteen products, seven counting stock per storefront — Sourdough
+  loaf 800g/400g, Cinnamon bun Single/Six-pack, Almond croissant Single/Box of
+  4, Rye & caraway, Focaccia, House blend beans 250g by grind and 1kg. The
+  Products list reads "Needs you: 1 short for orders · 2 out of stock · 1
+  running low" — the Cinnamon bun (its six-pack 2 short at Hill Road), the
+  Rye & caraway loaf and the 1kg beans, the Focaccia; the rest are healthy.
+  Open orders hold what they promise. A five-day stock log —
+  counted, baked, received, sold, wasted and a move from Hill Road to Online —
+  adds up to every shelf, and three checks are open: that short, a count that
+  didn't match, and yesterday's loaf sold without leaving stock. The
+  multigrain loaf (untracked) is marked Sold out by hand at Hill Road. Four
+  collections: Bread (automatic, from Breads), Weekend bakes, Gifts and New
+  this week. The stock log and resolved checks are rewritten whole each run,
+  so a take is undone by re-seeding. `checkRye` stops the run if any of these
   states is missing.
 
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The

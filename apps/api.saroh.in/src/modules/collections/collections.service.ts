@@ -19,7 +19,7 @@ import type {
 } from "./dto";
 import { COLLECTION_PRODUCTS_MAX } from "./dto";
 import type { WebsitePlacement } from "./website-pages";
-import { websitePagesFor } from "./website-pages";
+import { websitePagesFor, websitePagesForCollections } from "./website-pages";
 
 export type CollectionKind = "HAND_PICKED" | "AUTOMATIC";
 
@@ -33,6 +33,11 @@ export interface CollectionSummary {
     category: { id: string; name: string } | null;
     /** Products it shows now — archived ones never count. */
     productCount: number;
+    /**
+     * The live website pages that show it (#524): until the website has a
+     * block that shows products (#473), `showsProducts` is false.
+     */
+    website: WebsitePlacement;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -190,6 +195,10 @@ export class CollectionsService {
         const byCategory = new Map(
             counts.map((c) => [c.categoryId, c._count._all]),
         );
+        const website = await websitePagesForCollections(
+            organizationId,
+            rows.map((r) => r.id),
+        );
         return rows.map((r) =>
             summary(
                 r,
@@ -198,6 +207,7 @@ export class CollectionsService {
                           .within(r.categoryId)
                           .reduce((n, id) => n + (byCategory.get(id) ?? 0), 0)
                     : r._count.products,
+                website.get(r.id),
             ),
         );
     }
@@ -207,6 +217,9 @@ export class CollectionsService {
         collectionId: string,
     ): Promise<CollectionDetail> {
         const row = await this.require(organizationId, collectionId);
+        const website = (
+            await websitePagesForCollections(organizationId, [collectionId])
+        ).get(collectionId);
         if (row.categoryId) {
             const tree = await categoryTree(organizationId);
             const products = await prisma.product.findMany({
@@ -219,7 +232,7 @@ export class CollectionsService {
                 select: PRODUCT_ROW,
             });
             return {
-                ...summary(row, products.length),
+                ...summary(row, products.length, website),
                 products: products.map(productRow),
                 hiddenCount: 0,
             };
@@ -233,7 +246,7 @@ export class CollectionsService {
             .map((m) => m.product)
             .filter((p) => p.status !== ARCHIVED);
         return {
-            ...summary(row, shown.length),
+            ...summary(row, shown.length, website),
             products: shown.map(productRow),
             hiddenCount: members.length - shown.length,
         };
@@ -718,7 +731,7 @@ async function requireProducts(
  * (what an automatic collection fills itself from — the same reach a
  * category discount has), and a category with the ones above it.
  */
-async function categoryTree(organizationId: string) {
+export async function categoryTree(organizationId: string) {
     const rows = await prisma.category.findMany({
         where: { organizationId },
         select: { id: true, parentId: true },
@@ -768,6 +781,7 @@ function summary(
         updatedAt: Date;
     },
     productCount: number,
+    website: WebsitePlacement = { showsProducts: false, pages: [] },
 ): CollectionSummary {
     return {
         id: row.id,
@@ -777,6 +791,7 @@ function summary(
         kind: row.category ? "AUTOMATIC" : "HAND_PICKED",
         category: row.category,
         productCount,
+        website,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };

@@ -1,6 +1,8 @@
 import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
+import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-access";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
 import { requireSession } from "@/lib/session";
@@ -23,14 +25,18 @@ export default async function NewProductPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores] = await Promise.all([
+    const [{ storefront }, stores, organization] = await Promise.all([
         searchParams,
         listBusinessStores(),
+        resolveActiveOrganization(),
     ]);
+    if (organization?.actions && !organization.actions.includes("store:read")) {
+        return <NoProductAccess organization={organization} />;
+    }
     const store = pickStorefront(stores, storefront);
 
     if (store) {
-        const context = await loadEditorContext(store);
+        const context = await loadEditorContext(store, undefined, stores);
         return <ProductEditorV2 {...context} product={null} />;
     }
 

@@ -53,7 +53,7 @@ export function SectionCard({
     aside?: ReactNode;
     bodyClassName?: string;
 }) {
-    const { mode, canWrite, states, saving, saveSections, discard } =
+    const { mode, mayEdit, states, saving, saveSections, discard } =
         useEditor();
     const state = states[k];
     const creating = mode === "create";
@@ -104,7 +104,7 @@ export function SectionCard({
             <div className={cn("px-[18px] pb-[18px] pt-[13px]", bodyClassName)}>
                 {children}
             </div>
-            {dirty && canWrite ? (
+            {dirty && mayEdit(k) ? (
                 <div className="flex flex-wrap items-center gap-[9px] rounded-b-[12px] border-t border-border/70 bg-muted/50 py-2.5 pl-[18px] pr-3.5">
                     <span
                         role="status"

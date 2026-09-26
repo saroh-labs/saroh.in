@@ -23,6 +23,8 @@ import {
     ResolveCheckDto,
     ReverseStockDto,
     SetStockTrackingDto,
+    SetWarningsDto,
+    StockChecksQueryDto,
     StockEntryDto,
     StockLevelsQueryDto,
     StockLogQueryDto,
@@ -76,6 +78,15 @@ export class StockController {
         return this.writes.counts(ctx, dto);
     }
 
+    /** When shelves warn — no count, no entry in the log. */
+    @Put("warnings")
+    warnings(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetWarningsDto,
+    ) {
+        return this.writes.warnings(ctx, dto);
+    }
+
     /** Received, baked, wasted, or returned by a customer. */
     @Post("entries")
     @HttpCode(201)
@@ -115,8 +126,11 @@ export class StockController {
 
     /** What needs looking at: short, counts, sales, promises. */
     @Get("checks")
-    listChecks(@OrgContext() ctx: OrganizationContext) {
-        return this.checks.list(ctx);
+    listChecks(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: StockChecksQueryDto,
+    ) {
+        return this.checks.list(ctx, query);
     }
 
     /** The business's Track stock switch (#515). */

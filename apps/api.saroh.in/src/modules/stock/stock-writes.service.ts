@@ -13,12 +13,20 @@ import type {
     CountStockDto,
     MoveStockDto,
     ReverseStockDto,
+    SetWarningsDto,
     StockEntryDto,
 } from "./dto";
 import { stockWriter } from "./stock-access";
 import { BUSINESS_UNTRACKED, movable, UNTRACKED } from "./stock-words";
 import type { ShelfView, StockActor, StockEntryView } from "./stock.service";
-import { adjust, countAll, move, returnByHand, reverse } from "./stock.service";
+import {
+    adjust,
+    countAll,
+    move,
+    returnByHand,
+    reverse,
+    setWarnings,
+} from "./stock.service";
 import { businessTracksStock } from "./tracking";
 
 /**
@@ -159,6 +167,38 @@ export class StockWritesService {
                     mismatch: r.mismatch,
                 })),
             };
+        });
+    }
+
+    /**
+     * When shelves warn, and nothing else: what is on them is left as it
+     * is, and the log gets no entry — a warning level isn't stock.
+     */
+    async warnings(
+        ctx: OrganizationContext,
+        dto: SetWarningsDto,
+    ): Promise<{ shelves: ShelfAfter[] }> {
+        const actor = stockWriter(ctx);
+        return this.once("warnings", actor, dto, async (tx) => {
+            const shelves = await whileTracked(
+                tx,
+                actor.organizationId,
+                dto.warnings.map((w) => w.productId),
+                () =>
+                    setWarnings(
+                        tx,
+                        actor,
+                        dto.warnings.map((w) => ({
+                            target: {
+                                storeId: w.storeId,
+                                productId: w.productId,
+                                variantId: w.variantId ?? null,
+                            },
+                            lowStockAlert: w.lowStockAlert,
+                        })),
+                    ),
+            );
+            return { shelves: shelves.map(after) };
         });
     }
 

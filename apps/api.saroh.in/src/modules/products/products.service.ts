@@ -58,6 +58,25 @@ const STOCK_ROW = {
     select: { onHand: true, promised: true, lowStockAlert: true },
 } as const;
 
+/**
+ * The business's open storefronts, first made first; a `storefront` that
+ * isn't one of them is not found.
+ */
+export async function openStores(
+    organizationId: string,
+    storefront?: string,
+): Promise<{ id: string; name: string }[]> {
+    const stores = await prisma.store.findMany({
+        where: { organizationId, deletedAt: null },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, name: true },
+    });
+    if (storefront && !stores.some((s) => s.id === storefront)) {
+        throw new NotFoundException("Store not found");
+    }
+    return stores;
+}
+
 /** Sold at `storeId` (#510): the product has a listing there. */
 export function listedAt(storeId: string) {
     return {
@@ -208,24 +227,28 @@ export class ProductsService {
     async catalogue(
         organizationId: string,
         filter: { status?: ProductStatus; storefront?: string } = {},
+        /**
+         * A page of it (#519): narrowed further by `where` (which carries
+         * the keyset after the page before, `afterInList`), `take` rows in
+         * the same order. Left out, all of it.
+         */
+        page: {
+            where?: Prisma.ProductWhereInput;
+            take?: number;
+        } = {},
     ): Promise<CatalogueItemDto[]> {
         const { status, storefront } = filter;
-        const stores = await prisma.store.findMany({
-            where: { organizationId, deletedAt: null },
-            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-            select: { id: true, name: true },
-        });
-        if (storefront && !stores.some((s) => s.id === storefront)) {
-            throw new NotFoundException("Store not found");
-        }
+        const stores = await openStores(organizationId, storefront);
         const open = stores.map((s) => s.id);
         const products = await prisma.product.findMany({
             where: {
                 organizationId,
                 ...(storefront ? listedAt(storefront) : {}),
                 ...(status ? { status } : {}),
+                ...(page.where ? { AND: [page.where] } : {}),
             },
             orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+            ...(page.take !== undefined ? { take: page.take } : {}),
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { variants: true } },

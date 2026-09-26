@@ -51,7 +51,7 @@ export function ArchivedBanner({
     return (
         <div
             role="note"
-            className="flex flex-wrap items-center gap-2.5 rounded-[10px] bg-muted px-[18px] py-[11px]"
+            className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted px-4 py-[11px] sm:px-[22px]"
         >
             <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
                 <strong className="font-semibold text-foreground">

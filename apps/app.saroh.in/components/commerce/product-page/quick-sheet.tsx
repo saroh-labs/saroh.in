@@ -27,6 +27,7 @@ export function QuickSheet({
     productName,
     title,
     fullEditorHref,
+    moreLink,
     dirty,
     saving,
     note,
@@ -38,7 +39,10 @@ export function QuickSheet({
     onOpenChange: (open: boolean) => void;
     productName: string;
     title: string;
-    fullEditorHref: string;
+    /** "More in the full editor"; left out where the editor has no more. */
+    fullEditorHref?: string;
+    /** In its place, a link on to where the rest is managed. */
+    moreLink?: { href: string; label: string };
     dirty: boolean;
     saving: boolean;
     /** Why Save is off, or what saving will do — written, never a tooltip. */
@@ -129,12 +133,18 @@ export function QuickSheet({
                         </div>
                     ) : null}
                     <SheetFooter className="flex flex-row flex-wrap items-center gap-2 border-t border-border px-[18px] py-3 sm:justify-start sm:space-x-0">
-                        <Link
-                            href={fullEditorHref}
-                            className="flex-[1_1_150px] text-[12.5px] text-brand hover:text-foreground"
-                        >
-                            More in the full editor
-                        </Link>
+                        {fullEditorHref || moreLink ? (
+                            <Link
+                                href={fullEditorHref ?? moreLink?.href ?? ""}
+                                className="flex-[1_1_150px] text-[12.5px] text-brand hover:text-foreground"
+                            >
+                                {fullEditorHref
+                                    ? "More in the full editor"
+                                    : moreLink?.label}
+                            </Link>
+                        ) : (
+                            <span className="flex-[1_1_150px]" />
+                        )}
                         {note ? (
                             <span
                                 role="status"

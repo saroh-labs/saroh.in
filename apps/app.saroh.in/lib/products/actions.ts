@@ -1,12 +1,16 @@
 "use server";
 
+import {
+    listProductAt as listProductAtApi,
+    unlistProductAt as unlistProductAtApi,
+} from "./listings";
 import type {
     CategoryInput,
     InventoryInput,
     NewProductInput,
     ProductImageInput,
-    ProductInput,
     ProductPatch,
+    ProductStatus,
     Result,
     VariantInput,
 } from "./service";
@@ -25,7 +29,6 @@ import {
     setProductStockTracking as setProductStockTrackingApi,
     setVariantStock as setVariantStockApi,
     updateCategory as updateCategoryApi,
-    updateProduct as updateProductApi,
     updateVariant as updateVariantApi,
 } from "./service";
 
@@ -40,10 +43,6 @@ import {
 /** A new product, sold at `storeId`. */
 export async function createProduct(storeId: string, input: NewProductInput) {
     return createProductApi(storeId, input);
-}
-
-export async function updateProduct(productId: string, input: ProductInput) {
-    return updateProductApi(productId, input);
 }
 
 /** Delete it from the catalogue, and so from every storefront. */
@@ -107,6 +106,18 @@ export async function setProductSoldOut(
     return setProductSoldOutApi(productId, storefrontId, soldOut);
 }
 
+/**
+ * On sale, a draft, or archived — the list's Stop selling and Sell again.
+ * Only the status is sent: the whole-product PUT also wants the slug, which
+ * a list row doesn't carry, so it refused every one of these.
+ */
+export async function setProductStatus(
+    productId: string,
+    status: ProductStatus,
+) {
+    return patchProductApi(null, productId, { status });
+}
+
 /** One section of a product; the API judges the whole product after it. */
 export async function patchProduct(
     storeId: string,
@@ -137,4 +148,18 @@ export async function reorderVariants(
     ids: string[],
 ) {
     return reorderVariantsApi(storeId, productId, ids);
+}
+
+/** Sell it at a storefront, those variants there (#525); `store:write`. */
+export async function listProductAt(
+    productId: string,
+    storeId: string,
+    variantIds: string[],
+) {
+    return listProductAtApi(productId, storeId, variantIds);
+}
+
+/** Stop selling it at a storefront; its shelf keeps the stock. */
+export async function unlistProductAt(productId: string, storeId: string) {
+    return unlistProductAtApi(productId, storeId);
 }

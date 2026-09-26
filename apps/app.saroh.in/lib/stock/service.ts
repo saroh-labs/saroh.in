@@ -48,6 +48,12 @@ export interface StockLevels {
     tracking: boolean;
     /** The caller may count and move stock. */
     canWrite: boolean;
+    /** Pass as `cursor` for the next page; null on the last. */
+    nextCursor?: string | null;
+    /** Rows that need someone across the business (short, sold out, low). */
+    needsYou?: number;
+    /** The business's time zone. */
+    timezone?: string;
 }
 
 export interface StockLogEntry {
@@ -84,6 +90,8 @@ export interface StockLog {
     nextCursor: string | null;
     seesPeople: boolean;
     seesOrders: boolean;
+    /** The business's time zone, for the log's days. */
+    timezone?: string;
 }
 
 export type StockCheckKind =
@@ -111,6 +119,13 @@ export interface StockChecks {
     checks: StockCheck[];
     counts: Record<StockCheckKind, number>;
     canResolve: boolean;
+    /** Pass as `cursor` for the next page; null on the last. */
+    nextCursor?: string | null;
+    /**
+     * The check the page before ended on had closed, so this is the first
+     * page again: replace the list rather than add to it.
+     */
+    restarted?: boolean;
 }
 
 /** A shelf after a change. */
@@ -152,11 +167,15 @@ function query(params: Record<string, string | number | undefined>): string {
     return s ? `?${s}` : "";
 }
 
-async function write<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+async function write<T>(
+    path: string,
+    body: unknown,
+    method: "POST" | "PUT" = "POST",
+): Promise<ApiResult<T>> {
     const base = await orgBase();
     if (!base) return { ok: false, error: NO_BUSINESS };
     const res = await apiFetch(`${base}/stock${path}`, {
-        method: "POST",
+        method,
         body: JSON.stringify(body),
     });
     const data: unknown = await res.json().catch(() => null);
@@ -171,11 +190,24 @@ async function write<T>(path: string, body: unknown): Promise<ApiResult<T>> {
  * per variant, a cell per storefront. Null when there is no business.
  */
 export async function getStockLevels(
-    filter: { storefront?: string; product?: string } = {},
+    filter: {
+        storefront?: string;
+        product?: string;
+        /** Name or SKU. */
+        q?: string;
+        /** Only rows that need someone. */
+        needs?: boolean;
+        /** Products a page; left out, every row. */
+        limit?: number;
+        cursor?: string;
+    } = {},
 ): Promise<StockLevels | null> {
     const base = await orgBase();
     if (!base) return null;
-    return getJson<StockLevels>(`${base}/stock${query(filter)}`);
+    const { needs, ...rest } = filter;
+    return getJson<StockLevels>(
+        `${base}/stock${query({ ...rest, needs: needs ? "true" : undefined })}`,
+    );
 }
 
 /** The log, newest first, by kind, storefront, product or variant. */
@@ -198,10 +230,12 @@ export async function getStockLog(
 }
 
 /** What needs looking at. */
-export async function getStockChecks(): Promise<StockChecks | null> {
+export async function getStockChecks(
+    page: { limit?: number; cursor?: string } = {},
+): Promise<StockChecks | null> {
     const base = await orgBase();
     if (!base) return null;
-    return getJson<StockChecks>(`${base}/stock/checks`);
+    return getJson<StockChecks>(`${base}/stock/checks${query(page)}`);
 }
 
 // ---- Writes ----
@@ -226,6 +260,17 @@ export function countStock(input: {
             mismatch: boolean;
         }[];
     }>("/counts", input);
+}
+
+/**
+ * When shelves warn, and nothing else: no count and no entry in the log, so
+ * what is on each shelf stays whatever it is now.
+ */
+export function setStockWarnings(input: {
+    warnings: (Shelf & { lowStockAlert: number })[];
+    idempotencyKey: string;
+}) {
+    return write<{ shelves: ShelfAfter[] }>("/warnings", input, "PUT");
 }
 
 /** Received, baked, wasted, or returned by a customer. */
