@@ -44,7 +44,7 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -113,6 +113,8 @@ describe("PaymentsService.createIntentForOrderPublic (S5-004)", () => {
             organizationId: "org_1",
             total: "42.50",
             currency: "INR",
+            status: "PENDING",
+            paymentStatus: "UNPAID",
         });
         intentFindUnique.mockResolvedValue(null);
         providerFindMany.mockResolvedValue([connectedRow()]);
@@ -153,6 +155,8 @@ describe("PaymentsService.createIntentForOrderPublic (S5-004)", () => {
             organizationId: "org_1",
             total: "10.00",
             currency: "INR",
+            status: "PENDING",
+            paymentStatus: "FAILED",
         });
         // An intent already exists for (orderId, idempotencyKey).
         intentFindUnique.mockResolvedValue({
@@ -197,6 +201,32 @@ describe("PaymentsService.createIntentForOrderPublic (S5-004)", () => {
             service.createIntentForOrderPublic("order_x", {}),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it.each([
+        ["already paid", "PROCESSING", "PAID"],
+        ["refunded", "CANCELLED", "REFUNDED"],
+        ["cancelled before payment", "CANCELLED", "UNPAID"],
+    ])(
+        "refuses an order that is %s, and never calls the provider (PAY-03)",
+        async (_label, status, paymentStatus) => {
+            const { service, fake } = makeService();
+            orderFindUnique.mockResolvedValue({
+                id: "order_1",
+                storeId: "store_1",
+                store: { name: "High Street", settings: null },
+                organizationId: "org_1",
+                total: "10.00",
+                currency: "INR",
+                status,
+                paymentStatus,
+            });
+            await expect(
+                service.createIntentForOrderPublic("order_1", {}),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(fake.calls).toHaveLength(0);
+            expect(intentCreate).not.toHaveBeenCalled();
+        },
+    );
 });
 
 describe("PaymentsService.getReceipt (S5-004)", () => {
@@ -383,6 +413,8 @@ describe("Storefront settings on the buyer's path", () => {
         organizationId: "org_1",
         total: "10.00",
         currency: "INR",
+        status: "PENDING",
+        paymentStatus: "UNPAID",
         store: { name: "High Street", settings },
     });
 

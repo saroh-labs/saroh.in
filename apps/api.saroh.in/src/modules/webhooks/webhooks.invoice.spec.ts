@@ -22,7 +22,11 @@ jest.mock("@saroh/database", () => {
     const client = {
         merchantPaymentProvider: { findUnique: jest.fn() },
         webhookEvent: { create: jest.fn(), update: jest.fn() },
-        paymentIntent: { findFirst: jest.fn(), update: jest.fn() },
+        paymentIntent: {
+            findFirst: jest.fn(),
+            update: jest.fn(),
+            updateMany: jest.fn(),
+        },
         paymentAttempt: { create: jest.fn() },
         paymentRefund: {
             findFirst: jest.fn(),
@@ -32,7 +36,8 @@ jest.mock("@saroh/database", () => {
         },
         order: { findUnique: jest.fn(), update: jest.fn() },
         invoice: { findFirst: jest.fn(), update: jest.fn() },
-        $queryRaw: jest.fn(),
+        // The intent's row lock, then the invoice's; [] keeps the status read.
+        $queryRaw: jest.fn().mockResolvedValue([]),
     };
     return {
         ...actual,
@@ -74,6 +79,7 @@ const whCreate = prisma.webhookEvent.create as jest.Mock;
 const whUpdate = prisma.webhookEvent.update as jest.Mock;
 const intentFindFirst = prisma.paymentIntent.findFirst as jest.Mock;
 const intentUpdate = prisma.paymentIntent.update as jest.Mock;
+const intentUpdateMany = prisma.paymentIntent.updateMany as jest.Mock;
 const attemptCreate = prisma.paymentAttempt.create as jest.Mock;
 const refundFindFirst = prisma.paymentRefund.findFirst as jest.Mock;
 const refundFindUnique = prisma.paymentRefund.findUniqueOrThrow as jest.Mock;
@@ -163,9 +169,10 @@ describe("webhook success on an invoice intent", () => {
         const result = await deliver(bodyOf());
 
         expect(result).toEqual({ status: "processed", changed: true });
-        // The lock is taken before the invoice is read or written.
-        expect(queryRaw).toHaveBeenCalledTimes(1);
-        const [lockCall] = queryRaw.mock.invocationCallOrder;
+        // The intent's lock, then the invoice's (the lock order), both
+        // before the invoice is read or written.
+        expect(queryRaw).toHaveBeenCalledTimes(2);
+        const [, lockCall] = queryRaw.mock.invocationCallOrder;
         const [readCall] = invoiceFindFirst.mock.invocationCallOrder;
         expect(lockCall).toBeLessThan(readCall ?? 0);
         expect(invoiceFindFirst).toHaveBeenCalledWith({
@@ -210,6 +217,23 @@ describe("webhook success on an invoice intent", () => {
         expect(intentUpdate).not.toHaveBeenCalled();
         // Above all, not recorded as a payment needing a refund.
         expect(attemptCreate).not.toHaveBeenCalled();
+    });
+
+    it("reads the intent under its lock: paid a moment ago by the other event is paid, not owed back (PAY-01)", async () => {
+        // payment.captured and order.paid for one payment, at once: this one
+        // read the intent unpaid, the other committed first.
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        queryRaw.mockResolvedValueOnce([{ status: "SUCCEEDED" }]);
+        invoiceFindFirst.mockResolvedValue({ status: "PAID" });
+
+        const result = await deliver(
+            bodyOf({ providerEventId: "evt_2", eventType: "order.paid" }),
+        );
+
+        expect(result).toEqual({ status: "ignored", changed: false });
+        expect(attemptCreate).not.toHaveBeenCalled();
+        expect(intentUpdate).not.toHaveBeenCalled();
+        expect(invoiceUpdate).not.toHaveBeenCalled();
     });
 
     it("a duplicate delivery (same event id) writes nothing", async () => {
@@ -279,14 +303,20 @@ describe("webhook success on an invoice intent", () => {
 describe("webhook failure on an invoice intent", () => {
     it("fails the intent and touches nothing else", async () => {
         intentFindFirst.mockResolvedValue({ ...INTENT });
+        intentUpdateMany.mockResolvedValue({ count: 1 });
 
         const result = await deliver(
             bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
         );
 
         expect(result).toEqual({ status: "processed", changed: true });
-        expect(intentUpdate).toHaveBeenCalledWith({
-            where: { id: "pi_inv_1" },
+        expect(intentUpdateMany).toHaveBeenCalledWith({
+            where: {
+                id: "pi_inv_1",
+                status: {
+                    in: ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"],
+                },
+            },
             data: { status: "FAILED" },
         });
         expect(queryRaw).not.toHaveBeenCalled();
@@ -295,16 +325,31 @@ describe("webhook failure on an invoice intent", () => {
         expect(orderFindUnique).not.toHaveBeenCalled();
     });
 
-    it("never overrides a succeeded intent with a late failure", async () => {
-        intentFindFirst.mockResolvedValue({ ...INTENT, status: "SUCCEEDED" });
+    it.each([
+        ["succeeded", "SUCCEEDED"],
+        ["superseded by an edit", "SUPERSEDED"],
+    ])(
+        "never overrides an intent that %s with a late failure (PAY-02)",
+        async (_label, status) => {
+            // Read open without a lock, but no longer open in the database:
+            // the condition in the UPDATE matches nothing.
+            intentFindFirst.mockResolvedValue({ ...INTENT });
+            intentUpdateMany.mockResolvedValue({ count: 0 });
 
-        const result = await deliver(
-            bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
-        );
+            const result = await deliver(
+                bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
+            );
 
-        expect(result).toEqual({ status: "ignored", changed: false });
-        expect(intentUpdate).not.toHaveBeenCalled();
-    });
+            expect(result).toEqual({ status: "ignored", changed: false });
+            expect(intentUpdate).not.toHaveBeenCalled();
+            const where = (
+                intentUpdateMany.mock.calls[0] as [
+                    { where: { status: { in: string[] } } },
+                ]
+            )[0].where;
+            expect(where.status.in).not.toContain(status);
+        },
+    );
 });
 
 describe("webhook refund on an invoice intent", () => {
