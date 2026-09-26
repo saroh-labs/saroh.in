@@ -19,7 +19,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { SetSoldOutDto, SetStockTrackingDto } from "../stock/dto";
-import type { ProductStatus } from "./dto";
+import { CatalogueQueryDto, cataloguePage, wantsPage } from "./catalogue-page";
 import {
     CreateProductDto,
     PatchProductDto,
@@ -65,17 +65,24 @@ export class OrganizationProductsController {
         private readonly soldOut: SoldOutService,
     ) {}
 
-    /** One row per catalogue product, with where it is sold. */
+    /**
+     * One row per catalogue product, with where it is sold. With `limit`, a
+     * page of it (#519): searched, narrowed to a chip, a category or a
+     * collection, with the chips' counts and what needs restocking.
+     */
     @Get()
     list(
         @OrgContext() ctx: OrganizationContext,
-        @Query("status") status?: ProductStatus,
-        @Query("storefront") storefront?: string,
+        @Query() query: CatalogueQueryDto,
     ) {
-        return this.products.catalogue(
-            this.access.business(ctx).organizationId,
-            { status, storefront },
-        );
+        const { organizationId } = this.access.business(ctx);
+        if (wantsPage(query)) {
+            return cataloguePage(this.products, organizationId, query);
+        }
+        return this.products.catalogue(organizationId, {
+            status: query.status,
+            storefront: query.storefront,
+        });
     }
 
     /** A new product, sold at the storefront named (or the only one). */

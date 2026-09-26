@@ -146,6 +146,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
+        // #519 the Products list's "Needs you": pure.
+        "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         // #517 photos and videos: limits, kind/type match, posters from the
         // library, with a jest-mocked Prisma.

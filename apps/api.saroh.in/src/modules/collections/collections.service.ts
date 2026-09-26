@@ -718,7 +718,7 @@ async function requireProducts(
  * (what an automatic collection fills itself from — the same reach a
  * category discount has), and a category with the ones above it.
  */
-async function categoryTree(organizationId: string) {
+export async function categoryTree(organizationId: string) {
     const rows = await prisma.category.findMany({
         where: { organizationId },
         select: { id: true, parentId: true },
