@@ -478,6 +478,29 @@ describe("editing an order before preparing", () => {
             promised: 0,
         });
     });
+
+    it("a line for a product set to Not sold since can go down, but not up", async () => {
+        const tart = await product("Tart", { hill: 5 });
+        const order = await place(hill, [{ productId: tart, quantity: 2 }]);
+        await prisma.product.update({
+            where: { id: tart },
+            data: { status: "ARCHIVED", archivedAt: new Date() },
+        });
+        const itemId = await line(order, tart);
+
+        await expect(
+            kitchen.edit(owner, order, {
+                lines: [{ itemId, quantity: 3 }],
+            }),
+        ).rejects.toThrow(new ConflictException(notSold("Tart")));
+        expect(await shelf(hill, tart)).toMatchObject({ promised: 2 });
+
+        await kitchen.edit(owner, order, { lines: [{ itemId, quantity: 1 }] });
+        expect(await shelf(hill, tart)).toMatchObject({
+            onHand: 5,
+            promised: 1,
+        });
+    });
 });
 
 describe("refunds and the shelf", () => {

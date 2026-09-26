@@ -33,6 +33,7 @@ import {
 } from "./order-inventory";
 import {
     fromCents,
+    notSold,
     priceOrderLines,
     toCents,
     withGstRates,
@@ -383,6 +384,11 @@ export class OrderKitchenService {
                 }
                 const delta = change.quantity - item.quantity;
                 if (delta === 0) continue;
+                // Nobody orders more of a product set to Not sold, staff
+                // included (DEC-032); lowering or removing its line is fine.
+                if (delta > 0 && item.product.status === "ARCHIVED") {
+                    throw new ConflictException(notSold(item.product.name));
+                }
                 const unit = toCents(item.price.toString());
                 subtotalCents += delta * unit;
                 corrections.push({
@@ -821,7 +827,7 @@ async function lockOrder(
             items: {
                 orderBy: { id: "asc" },
                 include: {
-                    product: { select: { name: true } },
+                    product: { select: { name: true, status: true } },
                     refundLines: {
                         where: {
                             paymentRefund: { status: { not: "FAILED" } },
