@@ -10,10 +10,13 @@ import { prisma } from "@saroh/database";
 
 import { BUSINESS_UNTRACKED, CANT_CHANGE_TRACKING } from "../stock/stock-words";
 import type { StockActor } from "../stock/stock.service";
-import { count, recordEntry } from "../stock/stock.service";
+import {
+    businessTracksLocked,
+    count,
+    recordEntry,
+} from "../stock/stock.service";
 import type { ProductTracking } from "../stock/tracking";
 import {
-    businessTracksStock,
     COUNTING_ROWS,
     ensureShelves,
     setProductTracking,
@@ -231,6 +234,9 @@ export class InventoryService {
             if (orderIds.length > 0) {
                 await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ANY(${orderIds}::text[]) ORDER BY id FOR UPDATE`;
             }
+            // Order → BusinessProfile (FOR SHARE) → Product: startTracking
+            // below reads the profile again, already held.
+            await businessTracksLocked(tx, organizationId);
             await lockProduct(tx, productId);
             // Starting to track here: its other storefronts get their
             // shelves once it counts per variant, below.
@@ -377,8 +383,10 @@ export class InventoryService {
      * Before a count from the product's own stock editor: the product must
      * count stock. One that doesn't starts to — Track stock on, at 0 — for
      * someone who can change products; a stock-only role is refused, as is
-     * any count while the business has Track stock off. Takes the product's
-     * lock, so Track stock can't go off under the count.
+     * any count while the business has Track stock off. Reads Track stock
+     * with the business's profile FOR SHARE, then takes the product's lock
+     * (Profile → Product, as `resolveRowId` does), so neither switch can
+     * go off under the count.
      * Returns whether it started tracking.
      */
     private async startTracking(
@@ -387,8 +395,9 @@ export class InventoryService {
         productId: string,
         opts: { makeShelves?: boolean } = {},
     ): Promise<boolean> {
+        const businessOn = await businessTracksLocked(tx, scope.organizationId);
         await lockProduct(tx, productId);
-        if (!(await businessTracksStock(tx, scope.organizationId))) {
+        if (!businessOn) {
             throw new ConflictException({
                 message: BUSINESS_UNTRACKED,
                 field: "quantity",

@@ -170,7 +170,7 @@ function shelf(row: Row): ShelfView {
  * it. Taken before any product lock: Profile → Product → StockLevel. No
  * profile yet reads as on, as `businessTracksStock` does.
  */
-async function businessTracksLocked(
+export async function businessTracksLocked(
     tx: Tx,
     organizationId: string,
 ): Promise<boolean> {
