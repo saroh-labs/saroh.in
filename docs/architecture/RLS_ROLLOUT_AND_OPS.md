@@ -1,167 +1,217 @@
 # RLS enforcement rollout + remaining ops follow-ups
 
-Row-level security now covers **every** org-owned table (48 org-direct via
-`B1`, 17 join-based children via `B2`), all as a **dark rollout**: the policies
-exist and are `FORCE`d, but the application connects to Postgres as a role with
-the `BYPASSRLS` attribute (`neondb_owner` on Neon), so **RLS does not yet gate
-real traffic**. This document is the operator runbook to turn it on, plus the
-other infra-side follow-ups that only a repo/DB admin can complete.
+**State on 2026-09-26 (#53):** row-level security covers **every**
+business-owned table: each one is `ENABLE`d and `FORCE`d with the
+`org_isolation` policy, either on its own `organizationId` or, for a child
+table, through its parent (the B2 shape). The last 16 went in with
+`20261008100000_rls_remaining_tables`. A structural test fails CI if a new
+table arrives without a policy or an allow-list entry with a reason
+(`packages/database/src/rls-coverage.test.ts`).
+
+It is still a **dark rollout** in every environment: the API connects as the
+database owner, which bypasses RLS, and `RLS_ENFORCEMENT` is off. Switching it
+on is the operator runbook in §1 below. The whole API integration suite now
+runs in CI the way production will run once it's switched on (§0.2), and it
+passes.
 
 > **Why dark by default:** the policies are permissive when the transaction-local
 > GUC `app.current_organization_id` is unset/empty (`NULLIF(...) IS NULL`), and
 > the current owner role bypasses RLS entirely. So nothing changes for the
-> running app until you (a) deploy a non-`BYPASSRLS` role **and** (b) ensure every
-> org-scoped query runs inside `withOrgContext()`.
+> running app until you (a) connect as a non-`BYPASSRLS` role **and** (b) set
+> `RLS_ENFORCEMENT=on`, which makes the `prisma` proxy set the GUC for every
+> query an org-scoped request makes.
 
 ---
 
-## 0. AUDIT (2026-07-19): the role flip is NECESSARY BUT NOT SUFFICIENT
+## 0. What is built, and what has been proven
 
-Before flipping, a `withOrgContext` coverage audit was run. **Result: the GUC is
-never set anywhere in the running app.**
+### 0.1 Coverage
 
-- `withOrgContext()` (packages/database/src/org-context.ts) is defined and
-  exported but has **0 callers** in application code. `withoutOrgContext()` also
-  has 0 callers.
-- All **278** org-scoped `prisma.<model>.<op>()` call sites across the 56
-  org-touching service files use the **ambient `prisma` singleton** — none run
-  through the `tx` that `withOrgContext` yields. `OrganizationGuard` resolves the
-  org and attaches `request.organizationContext`, but sets no GUC and opens no
-  transaction.
+| Kind                                               | How it is isolated                                  | Where                                                                                                  |
+| -------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Tables with `organizationId`                       | `"organizationId" = GUC`                            | B1, later feature migrations, `…_rls_remaining_tables`                                                 |
+| Child tables (no `organizationId`)                 | `EXISTS (parent WHERE parent.organizationId = GUC)` | B2, `…_product_field_category_rls`, `…_rls_remaining_tables` (`ApiKey`, `TeamMember`, `ProjectAccess`) |
+| Not business-owned (allow-listed, with the reason) | none                                                | `NOT_TENANT_OWNED` in `rls-coverage.test.ts`                                                           |
 
-**Consequence:** even after deploying the `saroh_app` (NOBYPASSRLS) role, every
-query runs with the GUC unset → the permissive branch → **all rows returned →
-RLS still enforces nothing.** The role flip is safe (nothing breaks) but adds no
-isolation on its own. RLS (B1/B2) is defense-in-depth that is currently dormant.
+The allow-list is: `Organization` (the tenant root), `User`, `Session`,
+`Account`, `Verification` (identity, across organizations), `FeatureFlag`,
+`Plan` (platform catalogues), `PlatformAdmin`, `PlatformAdminRoleAssignment`,
+`AdminOperation`, `AdminOperationItem` (staff), `WaitlistSignup` (before any
+organization exists).
 
-**What IS protecting tenants today:** the app-layer `where organizationId = …`
-filters. The audit spot-checked the 12 queries that don't obviously scope by org
-and found **no leaks** — each is scoped by an owning FK whose parent was
-org-verified (`paymentIntentId`, `serviceId`, `projectId`), a deliberately
-global catalog (`Plan`, `FeatureFlag` — no org column), or an intentional
-public/webhook path (public site render by hostname; webhook subscription lookup
-by `(provider, providerSubscriptionId)`). App-layer isolation is sound.
+The admin console's tables (`AdminAccessSession`, `AdminAuditEvent`,
+`AdminOrganizationNote`) and `IdempotencyRecord` are isolated too. The console
+reads them across organizations, but its routes never carry an organization
+context (`AdminRoutes` has no `OrganizationGuard`), so they take the permissive
+branch. A row with a NULL `organizationId` (a platform-wide audit event, an
+admin idempotency record) can be seen or written **only** outside an org
+context. That is the only place such rows are written today.
 
-### The enforcement layer (now BUILT — `RLS_ENFORCEMENT` flag)
+### 0.2 The enforcement layer, and the suite that exercises it
 
-The "enforcement half" of S1-011 is now implemented (packages/database
-`rls-proxy.ts` + api `OrgRlsInterceptor`), **flag-gated and off by default**:
+- `OrgRlsInterceptor` runs each request that `OrganizationGuard` resolved inside
+  `runInOrgContext(orgId)`. The exported `prisma` is a proxy that, with
+  `RLS_ENFORCEMENT` on and a context active, runs each operation in a short
+  transaction whose first statement sets the GUC. A service's own
+  `$transaction` becomes that one transaction. Jobs, public routes, webhooks
+  and the admin console run with no context, and take the permissive branch.
+- **RLS mode of the integration suite** (`TEST_RLS=on`,
+  `apps/api.saroh.in/test/rls-mode.ts`) builds the schema from the
+  **migrations**, connects as a fresh `NOSUPERUSER NOBYPASSRLS` role that has
+  only DML rights, sets `RLS_ENFORCEMENT=on`, and runs every `@Injectable()`
+  method called with an `OrganizationContext` (or a first parameter named
+  `organizationId`) inside that organization's context, as the interceptor
+  does for a real request. CI runs it after the normal integration step.
+- `src/modules/rls/rls-isolation.db.spec.ts` runs the §1 probe for all 16
+  newly covered tables: the org's own rows in context, 0 for a bogus org, all
+  rows with no context. It also checks that a write for another organization
+  is refused, and that the harness really wraps services.
 
-1. `OrgRlsInterceptor` (global, outermost) reads the org resolved by
-   `OrganizationGuard` and runs the rest of the request inside an org-context
-   `AsyncLocalStorage` — subscribing to the handler stream INSIDE the ALS scope
-   so async continuations inherit it.
-2. The exported `prisma` is an **RLS-aware proxy** over the base client. When an
-   org context is active AND `RLS_ENFORCEMENT` is on, every model op / raw query
-   runs in a **short per-operation transaction** whose first statement is
-   `set_config('app.current_organization_id', <org>, true)`. A service's own
-   `prisma.$transaction(...)` becomes that one transaction (GUC set first, its
-   callback participates; ambient calls inside it reuse the same tx — never a
-   nested one). Per-op micro-transactions (not one request-tx) mean a handler
-   that makes an external call mid-request never holds a tx open across I/O.
-3. Background jobs / public routes have no org context → the proxy falls through
-   to the base client → GUC unset → permissive branch (cross-org), as required.
+**What the first enforced run found (#53, 2026-09-26):**
 
-**Off by default:** with `RLS_ENFORCEMENT` unset the proxy is a transparent
-pass-through and the interceptor a no-op — merging the code changed nothing
-(full api suite stayed green).
+1. **Array-form `$transaction([...])` failed under enforcement.** The proxy ran
+   each operation eagerly in its own transaction and handed Prisma plain
+   promises, which it rejects. Four paths use it inside an org context: the
+   category merge, deleting a post category, reordering variants, and saving
+   product field values. With enforcement on, each would have returned a 500.
+   Fixed in `rls-proxy.ts`: an org-scoped operation is now lazy, like a
+   PrismaPromise, and the array form runs its operations in order inside one
+   transaction that sets the GUC first. Unit tests are in `rls-proxy.test.ts`.
+2. Two backfill specs rebuild an old schema with DDL. The DML-only role can't
+   do that, and in production neither the backfills nor their DDL run as the
+   runtime role. RLS mode skips them, and the normal run still covers them.
 
-**Verified:** proxy unit tests (5, DB-free) + a live dev-DB proof: through the
-proxy over a `NOBYPASSRLS` connection, `runInOrgContext(realOrg)` returned only
-that org's rows, a bogus org returned 0, and no-context returned all — RLS
-enforced end-to-end.
+Nothing else failed. Result: **169 suites, 2159 tests, green under enforcement**.
+The normal run has 170 suites and 2163 tests (the 20 RLS-mode tests skip there).
 
-### Enablement order
+### 0.3 What the suite cannot see
 
-1. Ship the code (done — off by default).
-2. In dev/staging: set `RLS_ENFORCEMENT=on` **and** point runtime `DATABASE_URL`
-   at the `saroh_app` (NOBYPASSRLS) role (§1). Both are required together — the
-   flag alone (still on the BYPASSRLS owner) or the role alone (flag off, GUC
-   never set) each enforce nothing.
-3. Smoke-test the app, then roll the same pair to production. To roll back
-   instantly, unset `RLS_ENFORCEMENT` (no redeploy of code needed).
-
-### ⚠️ Final validation gate — operator sign-off (NOT yet done)
-
-The enforcement layer was proven in development against a **throwaway**
-`NOBYPASSRLS` login role that was created and dropped in place (real org → own
-rows, bogus org → 0, no-context → all). That confirms the code path; it is **not**
-a production sign-off. Before enabling in production, the operator must:
-
-- [ ] Create the persistent `saroh_app` role (§1) in dev → staging → prod.
-- [ ] Point the **runtime** `DATABASE_URL` at `saroh_app` (keep migrations on the
-      owner role) and set `RLS_ENFORCEMENT=on`, per environment.
-- [ ] Run the §1 verify probe against each environment's real data.
-- [ ] Smoke-test the app end-to-end under the flag+role in **staging** — exercise
-      the cross-org, job-worker (context-free), and public/webhook paths — and
-      confirm no handler regressed (watch for tx-timeout / pool errors).
-- [ ] Only then roll the same flag+role pair to production; keep the flag as the
-      instant rollback.
-
-Until this gate is signed off, treat RLS as installed-but-inert defense-in-depth
-and keep relying on the app-layer `where organizationId` filters (verified sound
-in §0).
+- **Data.** A row whose `organizationId` is NULL is invisible inside an org
+  context. `Customer`, `Cart`, `Order` and `Inventory` still allow NULL
+  (SEC-005). Test data never has such rows, and real data might. The
+  pre-flight in §1 counts them.
+- **Paths no test calls with an organization context.** The harness wraps
+  what the specs call. A handler with no spec, or a spec that calls a helper
+  function directly, is covered only by the staging smoke test.
+- **Load.** Each org-scoped query becomes a short transaction (BEGIN,
+  set_config, the query, COMMIT). Watch p95 latency and pool use in the smoke
+  test.
 
 ---
 
-## 1. Deploy a non-`BYPASSRLS` application role (one of two prerequisites)
+## 1. Runbook: switching enforcement on, per environment
 
-This is **necessary but not sufficient** — see §0: it must be paired with
-`RLS_ENFORCEMENT=on` (the enforcement layer is built and shipped, off by
-default), or RLS stays permissive.
+Run it in development first, then production. Each step says who does it. None
+of it is done yet.
 
-The app must connect as a role **without** `BYPASSRLS` (and not a superuser) for
-`FORCE ROW LEVEL SECURITY` to bite. Create a dedicated login role, grant it only
-DML (no ownership), and point `DATABASE_URL` at it.
+**Prerequisites (once).**
+
+- The deploy's **migrate** and **backup** steps must connect as the owner
+  role, **not** through the API's runtime `DATABASE_URL`. The rollout script
+  on the host runs migrations with the new image. If it reads the same env
+  file as the API, give it a separate owner URL first (for example a
+  `MIGRATION_DATABASE_URL` that the migrate step maps to `DATABASE_URL`).
+  Otherwise the first deploy after step 3 fails at `prisma migrate deploy`,
+  because the runtime role can't run DDL. The script lives on the host, not in
+  this repo.
+- Any one-off backfill (`packages/database/src/backfill/*`) runs as the owner
+  too.
+
+**Step 1: create the runtime role** (database admin, as the owner).
 
 ```sql
--- Run as the DB owner/admin, once per environment.
-CREATE ROLE saroh_app LOGIN PASSWORD '<strong-secret>' NOBYPASSRLS;
+CREATE ROLE saroh_app LOGIN PASSWORD '<strong-secret>' NOSUPERUSER NOBYPASSRLS;
 
 -- DML on all current + future tables in the app schema (no DDL, no ownership).
+GRANT CONNECT ON DATABASE "<database>" TO saroh_app;
 GRANT USAGE ON SCHEMA public TO saroh_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO saroh_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO saroh_app;
+-- Tables the owner creates in later migrations. Run as the role that runs
+-- migrations; default privileges belong to the role that creates the objects.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO saroh_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO saroh_app;
 ```
 
-Keep **migrations** running as the owner/admin role (they need DDL); only the
-**runtime** `DATABASE_URL` switches to `saroh_app`. So typically:
+Keep the password in the environment's secret store only (see
+`docs/patterns/devops-secrets.md`).
 
-- `DATABASE_URL` (runtime app) → `saroh_app`
-- `DIRECT_DATABASE_URL` / migration step → the owner role (unchanged)
-
-### Verify enforcement (the same probe used to validate B1/B2)
-
-Under a `NOBYPASSRLS` role, with the GUC set to a bogus org, a protected table
-must return **0 rows**; unset must return **all** rows (dark-rollout safe). This
-was confirmed for `Order`, `AnalyticsEvent`, `Subscription`, `Message`,
-`Booking`, `OrderItem`, `ProductVariant`, `Post`, `Comment`, `Transaction`:
+**Step 2: pre-flight** (database admin, read-only).
 
 ```sql
-SET ROLE saroh_app;               -- or connect as it
-BEGIN;
-  SELECT set_config('app.current_organization_id', 'org_does_not_exist', true);
-  SELECT count(*) FROM "Order";    -- expect 0  (isolated)
-COMMIT;
-BEGIN;
-  -- no set_config here
-  SELECT count(*) FROM "Order";    -- expect ALL  (permissive when unset)
-COMMIT;
+-- a) The role is subject to RLS.
+SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'saroh_app';
+--    expect: f, f
+
+-- b) Every table is ENABLEd and FORCEd, except the allow-list in §0.1.
+SELECT c.relname
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relkind = 'r'
+  AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+ORDER BY 1;
+--    expect: Account, AdminOperation, AdminOperationItem, FeatureFlag,
+--    Organization, Plan, PlatformAdmin, PlatformAdminRoleAssignment, Session,
+--    User, Verification, WaitlistSignup, _prisma_migrations
+
+-- c) Rows an org context could never see again. Each must be 0, or be fixed
+--    (backfilled to their organization) before step 3.
+SELECT 'Customer' AS t, count(*) FROM "Customer" WHERE "organizationId" IS NULL
+UNION ALL SELECT 'Cart', count(*) FROM "Cart" WHERE "organizationId" IS NULL
+UNION ALL SELECT 'Order', count(*) FROM "Order" WHERE "organizationId" IS NULL
+UNION ALL SELECT 'Inventory', count(*) FROM "Inventory" WHERE "organizationId" IS NULL;
 ```
 
-### App precondition before flipping
+**Step 3: probe as the role** (database admin). Pick a real organization id.
 
-Every org-scoped read/write must execute inside `withOrgContext(orgId, …)` so the
-GUC is set for that transaction. Requests carry the org via `OrganizationGuard`;
-**background jobs run with no context on purpose** and rely on the permissive
-"unset → all rows" branch (that is why the empty-string fix in B1 matters — a
-pooled backend that once ran `withOrgContext` returns `''`, not `NULL`). Audit
-that no org-scoped query path bypasses `withOrgContext` before switching the
-runtime role, then roll out per-environment (dev → staging → prod).
+```sql
+SET ROLE saroh_app;
+BEGIN;
+  SELECT set_config('app.current_organization_id', '<real org id>', true);
+  SELECT count(*) FROM "Order";               -- that org's orders only
+  SELECT count(*) FROM "OrganizationModule";  -- that org's modules only
+COMMIT;
+BEGIN;
+  SELECT set_config('app.current_organization_id', 'org_does_not_exist', true);
+  SELECT count(*) FROM "Order";               -- expect 0
+  SELECT count(*) FROM "SavedView";           -- expect 0
+  SELECT count(*) FROM "ApiKey";              -- expect 0 (join-based)
+COMMIT;
+BEGIN;
+  SELECT count(*) FROM "Order";               -- expect ALL (no context)
+COMMIT;
+RESET ROLE;
+```
+
+**Step 4: switch the API** (operator, in the environment's settings; both
+together).
+
+- Runtime `DATABASE_URL` → the `saroh_app` connection string.
+- `RLS_ENFORCEMENT=on`.
+- Redeploy or restart the API. Readiness (`/health/ready`) must go green.
+
+**Step 5: smoke test** (operator, 15 minutes). Use a business that isn't a
+demo store.
+
+- Sign in, open Home, Orders, Products, Bookings, Contacts, Website, and
+  Settings → Team.
+- Write one of each: a product edit, a category merge (the array-form path
+  above), an enquiry from the public site, a public booking, a checkout up to
+  the payment page, and an invitation.
+- Admin console: open a business, its notes and audit, and flags.
+- Background jobs: the queue drains (`/health/ready` stays green, and the job
+  list in the console shows no new failures).
+- Logs: no `row-level security` errors, no `P2028` transaction timeouts, and no
+  pool exhaustion. Compare p95 latency with the day before.
+
+**Step 6: record it** here, in §4, with the date, environment and results of
+steps 2c, 3 and 5.
+
+**Rollback (instant):** unset `RLS_ENFORCEMENT` and restart. Every query goes
+back to no context and the permissive branch, even on the `saroh_app` role.
+To undo fully, point `DATABASE_URL` back at the owner. No code change or
+migration is needed either way.
 
 ---
 
@@ -170,13 +220,13 @@ runtime role, then roll out per-environment (dev → staging → prod).
 These cannot be done from application code; they are listed here so they are not
 lost.
 
-| Item                                  | What                                                                                                                                                                                                                              | Where                                     |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **CI required check** (S0-002)        | Mark `ci` a **required status check** in GitHub branch protection for `main` (and `development`), so a red gate blocks merge.                                                                                                     | GitHub → Settings → Branches              |
-| **Wire `db:migrate:deploy`** (S0-004) | Add `pnpm --filter @saroh/database db:migrate:deploy` to the deploy pipeline (runs as the owner role, before the app starts on the new build). Confirm the set of environments (dev confirmed; staging/prod?).                    | CD config + `S0-004_MIGRATION_RUNBOOK.md` |
-| **Non-`BYPASSRLS` role** (S1-011)     | Section 1 above — create `saroh_app`, point runtime `DATABASE_URL` at it.                                                                                                                                                         | DB admin                                  |
-| **Flip `ORG_AUTHORIZATION`** (S1-006) | The org-authorization dual-read is behind a default-off flag. After validating in staging, turn it on so store routes authorize via org membership. `Store.organizationId` is now NOT NULL (B5), so the data precondition is met. | Feature-flag admin (`admin.saroh.in`)     |
-| **Rotate shared credentials** (R-13)  | Rotate any credential ever shared in a non-secret channel; keep gitleaks in CI.                                                                                                                                                   | Ops                                       |
+| Item                                   | What                                                                                                                                                                                                                              | Where                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **CI required check** (S0-002, #104)   | Make the CI jobs **required status checks** on `main` and `development`. The exact job names and `gh api` calls are on #104.                                                                                                      | GitHub → Settings → Branches              |
+| **Wire `db:migrate:deploy`** (S0-004)  | Add `pnpm --filter @saroh/database db:migrate:deploy` to the deploy pipeline (runs as the owner role, before the app starts on the new build). Confirm the set of environments (dev confirmed; staging/prod?).                    | CD config + `S0-004_MIGRATION_RUNBOOK.md` |
+| **Non-`BYPASSRLS` role** (S1-011, #53) | Section 1 above: create `saroh_app`, give migrations their own owner URL, point the runtime `DATABASE_URL` at `saroh_app`, and set `RLS_ENFORCEMENT=on`.                                                                          | DB admin + operator                       |
+| **Flip `ORG_AUTHORIZATION`** (S1-006)  | The org-authorization dual-read is behind a default-off flag. After validating in staging, turn it on so store routes authorize via org membership. `Store.organizationId` is now NOT NULL (B5), so the data precondition is met. | Feature-flag admin (`admin.saroh.in`)     |
+| **Rotate shared credentials** (R-13)   | Rotate any credential ever shared in a non-secret channel; keep gitleaks in CI.                                                                                                                                                   | Ops                                       |
 
 ---
 
@@ -194,3 +244,12 @@ lost.
   from frontends" follow-up), and R-13 (credential rotation — table above).
 - **Environment variables:** see `ENVIRONMENT.md` — the stack boots locally with
   only `DATABASE_URL`; production additionally requires `BETTER_AUTH_SECRET`.
+
+---
+
+## 4. Enablement log
+
+| Date | Environment | Pre-flight 2c (NULL-org rows) | Probe (step 3) | Smoke (step 5) | By  |
+| ---- | ----------- | ----------------------------- | -------------- | -------------- | --- |
+| —    | development | not run                       | not run        | not run        |     |
+| —    | production  | not run                       | not run        | not run        |     |
