@@ -63,9 +63,11 @@ hour.
 0. **Stop the old API** before anything else: scale it to 0, or put the API
    and the storefronts into maintenance, so nothing writes orders or stock
    from here until step 6. Checkout and the workspace are down for the
-   length of steps 1–6; on the dataset above that is under a minute plus
-   the time you spend reading step 4. The new image starts only after
-   step 4 (and step 5, if you run it) passes.
+   length of steps 1–6. On the dataset above the migrations and backfills
+   take under a minute; add the time you spend reading step 4, and step
+   6's own time to pull the new image, start it and pass `/health/ready`,
+   which is not measured here and can itself take a minute or more. The
+   new image starts only after step 4 (and step 5, if you run it) passes.
 1. **Back up.** Take a fresh snapshot now that nothing writes (the host's
    rollout takes one before it migrates; run that part alone). Confirm it
    exists and note its name: **rollback is restoring it** (below).
