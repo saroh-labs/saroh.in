@@ -228,3 +228,18 @@ export function checkWords(c: CheckLike): { title: string; body: string } {
             };
     }
 }
+
+/**
+ * The checks list after "Show more": the next page added to what is shown —
+ * or, when the API started again because the check the last page ended on
+ * has closed (`restarted`), the first page in its place. A check already
+ * shown is never shown twice.
+ */
+export function moreChecks<T extends { key: string }>(
+    shown: readonly T[],
+    next: { checks: readonly T[]; restarted?: boolean },
+): T[] {
+    if (next.restarted) return [...next.checks];
+    const have = new Set(shown.map((c) => c.key));
+    return [...shown, ...next.checks.filter((c) => !have.has(c.key))];
+}

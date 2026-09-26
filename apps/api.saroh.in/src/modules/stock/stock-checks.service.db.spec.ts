@@ -365,5 +365,24 @@ describe("Stock checks (DB)", () => {
             cursor = page.nextCursor;
         }
         expect(keys).toEqual(all.checks.map((c) => c.key));
+        expect(first.restarted).toBe(false);
+    });
+
+    it("says it started again when the check a page ended on has closed", async () => {
+        const first = await checks.list(owner(), { limit: 1 });
+        const ended = first.nextCursor;
+        expect(ended).not.toBeNull();
+        // Someone looks at it before Show more is pressed.
+        await checks.resolve(owner(), ended ?? "", {});
+        const next = await checks.list(owner(), {
+            limit: 1,
+            cursor: ended ?? "",
+        });
+        expect(next.restarted).toBe(true);
+        const fresh = await checks.list(owner(), { limit: 1 });
+        expect(next.checks.map((c) => c.key)).toEqual(
+            fresh.checks.map((c) => c.key),
+        );
+        expect(next.checks.map((c) => c.key)).not.toContain(ended);
     });
 });

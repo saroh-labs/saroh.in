@@ -63,6 +63,11 @@ export interface StockChecksView {
     counts: Record<StockCheckKind, number>;
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
+    /**
+     * The cursor's check had closed, so this is the first page again: the
+     * caller replaces the list it holds instead of adding to it.
+     */
+    restarted: boolean;
     /** May resolve them (count and move stock). */
     canResolve: boolean;
 }
@@ -96,11 +101,15 @@ export class StockChecksService {
         };
         for (const c of open) counts[c.kind] += 1;
         let rest = open;
+        let restarted = false;
         if (query.cursor) {
             const at = open.findIndex((c) => c.key === query.cursor);
-            // A check resolved since the page before: start again rather
-            // than skip what the screen hasn't shown.
-            rest = at >= 0 ? open.slice(at + 1) : open;
+            // The check the page before ended on is no longer open (someone
+            // resolved it, or its numbers came right): send the first page
+            // again, and say so — the screen replaces what it holds rather
+            // than adding the first page twice, and nothing is skipped.
+            restarted = at < 0;
+            rest = restarted ? open : open.slice(at + 1);
         }
         const more = query.limit !== undefined && rest.length > query.limit;
         const page = more ? rest.slice(0, query.limit) : rest;
@@ -109,6 +118,7 @@ export class StockChecksService {
             counts,
             canResolve: reader.canWrite,
             nextCursor: more ? page[page.length - 1].key : null,
+            restarted,
         };
     }
 

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { productHref } from "@/lib/products/links";
-import { CHECK_LABELS, checkWords } from "@/lib/stock/log";
+import { CHECK_LABELS, checkWords, moreChecks } from "@/lib/stock/log";
 import {
     loadChecksPage,
     resolveStockCheck,
@@ -127,7 +127,7 @@ export function ChecksList({
             }
             setLoaded((l) => ({
                 ...l,
-                list: [...l.list, ...res.data.checks],
+                list: moreChecks(l.list, res.data),
                 next: res.data.nextCursor ?? null,
             }));
         });

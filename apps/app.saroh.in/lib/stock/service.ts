@@ -121,6 +121,11 @@ export interface StockChecks {
     canResolve: boolean;
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor?: string | null;
+    /**
+     * The check the page before ended on had closed, so this is the first
+     * page again: replace the list rather than add to it.
+     */
+    restarted?: boolean;
 }
 
 /** A shelf after a change. */
