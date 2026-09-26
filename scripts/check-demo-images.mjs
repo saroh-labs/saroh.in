@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom showcase seeds must load (#471).
+ * Every photo the Leela & Loom and Rye & Co. showcases seed must load (#471, #522).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -14,11 +14,19 @@
  */
 import { readFileSync } from "node:fs";
 
-const source = readFileSync(
-    new URL("../packages/database/src/seed/showcase/boutique-catalog.ts", import.meta.url),
-    "utf8",
-);
-const urls = [...new Set([...source.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]))];
+const read = (file) =>
+    readFileSync(new URL(`../packages/database/src/seed/showcase/${file}`, import.meta.url), "utf8");
+const boutique = read("boutique-catalog.ts");
+// Rye & Co.'s photos (#522) are written as unsplash("photo-…").
+const bakery = read("bakery-product-page.ts");
+const urls = [
+    ...new Set([
+        ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]),
+        ...[...bakery.matchAll(/unsplash\("([^"]+)"\)/g)].map(
+            (m) => `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+        ),
+    ]),
+];
 
 let failed = 0;
 const queue = [...urls];

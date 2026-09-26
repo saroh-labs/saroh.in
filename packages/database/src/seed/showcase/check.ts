@@ -6,6 +6,8 @@ import {
     RYE_ADDRESS_PRINTED,
     RYE_GSTIN,
 } from "./bakery";
+import type { RyeProductPageCounts } from "./check-product-page";
+import { checkRyeProductPage } from "./check-product-page";
 import type { RyeStockCounts } from "./check-stock";
 import { checkRyeStock } from "./check-stock";
 import { TIMEZONE } from "./data";
@@ -558,7 +560,7 @@ export async function checkShowcase(
 
 // --- Rye & Co. ------------------------------------------------------------------
 
-export interface RyeCounts extends RyeStockCounts {
+export interface RyeCounts extends RyeStockCounts, RyeProductPageCounts {
     gstin: string;
     products: number;
     orders: number;
@@ -713,7 +715,10 @@ export async function checkRye(
     const stageCount = (s: string) =>
         n(stages.find((r) => r.stage === s)?.n ?? 0);
 
-    const counts: Omit<RyeCounts, keyof RyeStockCounts> = {
+    const counts: Omit<
+        RyeCounts,
+        keyof RyeStockCounts | keyof RyeProductPageCounts
+    > = {
         gstin,
         products: await prisma.product.count({
             where: { organizationId: orgId, gstRate: { not: null } },
@@ -883,11 +888,14 @@ export async function checkRye(
     // The stock films' shelves, log, checks and collections (#526).
     const stock = await checkRyeStock(prisma, orgId);
     failures.push(...stock.failures);
+    // The Product Detail and Editor films' details, reviews and codes (#522).
+    const page = await checkRyeProductPage(prisma, orgId);
+    failures.push(...page.failures);
 
     if (failures.length > 0) {
         throw new Error(
             `Rye & Co. failed its checks:\n  - ${failures.join("\n  - ")}`,
         );
     }
-    return { ...counts, ...stock.counts };
+    return { ...counts, ...stock.counts, ...page.counts };
 }

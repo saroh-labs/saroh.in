@@ -15,6 +15,11 @@ import {
     ryeId,
     unitPaise,
 } from "./bakery-catalogue";
+import {
+    writeRyeDiscounts,
+    writeRyePhotos,
+    writeRyeReviews,
+} from "./bakery-product-page-write";
 import { writeRyeSite } from "./bakery-site";
 import type { LineForStock, StockPlan } from "./bakery-stock";
 import {
@@ -729,6 +734,13 @@ export async function seedBakery(
         categoryId,
         createdAt: istAt(now, -30, 11 * 60),
     });
+    // The Product Detail and Editor films' photos (#522, #525).
+    await writeRyePhotos(prisma, {
+        orgId,
+        productIds,
+        variantIds,
+        createdAt: istAt(now, -30, 11 * 60),
+    });
     const shelfIds = await ensureShelves(prisma, {
         orgId,
         stores,
@@ -778,6 +790,17 @@ export async function seedBakery(
     await writeLevels(prisma, world.stock.levels);
     await writeWorld(prisma, orgId, world);
     await prisma.stockEntry.createMany({ data: world.stock.entries });
+    // Reviews from people who bought the product, and the codes that reach
+    // the loaf (#522): after the orders they hang off.
+    await writeRyeReviews(prisma, {
+        orgId,
+        now,
+        productIds,
+        variantIds,
+        demoUserId,
+        shopperKey: (email) => SHOPPERS.find((s) => emailOf(s) === email)?.key,
+    });
+    await writeRyeDiscounts(prisma, { orgId, now, productIds });
     // Sold out by hand this morning, on a loaf that counts no stock.
     await markSoldOut(prisma, {
         orgId,
@@ -871,6 +894,10 @@ function productData(
         description: p.description
             ? `<p>${p.description.replace(/&/g, "&amp;")}</p>`
             : null,
+        // The details the Product Detail and Editor designs show (#522, #525).
+        keyPoints: [...(p.keyPoints ?? [])],
+        materials: p.ingredients ?? null,
+        howToUse: p.ready ?? null,
         price: rupees(p.price * 100),
         currency: CURRENCY,
         status: p.status ?? "PUBLISHED",
@@ -903,6 +930,13 @@ async function clearVolume(prisma: Db) {
         where: { organizationId: RYE.orgId },
     });
     await prisma.stockEntry.deleteMany({
+        where: { organizationId: RYE.orgId },
+    });
+    // Every review and invitation, hand-made ones included.
+    await prisma.productReview.deleteMany({
+        where: { organizationId: RYE.orgId },
+    });
+    await prisma.reviewInvitation.deleteMany({
         where: { organizationId: RYE.orgId },
     });
     const where = { id: { startsWith: RYE.prefix } };

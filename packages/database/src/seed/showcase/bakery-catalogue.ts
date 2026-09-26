@@ -71,6 +71,12 @@ export interface BakeryProduct {
     /** GST-inclusive, whole rupees. */
     price: number;
     description: string;
+    /** The designs' key points, as the product page lists them. */
+    keyPoints?: readonly string[];
+    /** Ingredients (the product's materials). */
+    ingredients?: string;
+    /** When it is ready: the line under the price (its how-to-use). */
+    ready?: string;
     contains: readonly Allergen[];
     mayContain: readonly Allergen[];
     /** Default PUBLISHED. */
@@ -99,6 +105,9 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         price: 480,
         description:
             "A long-fermented loaf, milled and baked on Hill Road. Crust dark, crumb open, keeps three days in paper.",
+        keyPoints: ["48-hour cold ferment", "Stoneground wheat, milled here"],
+        ingredients: "Stoneground wheat flour, water, salt, sourdough starter.",
+        ready: "Baked each morning. Collect from 7am at Hill Road, or delivered next day.",
         contains: ["Gluten"],
         mayContain: ["Nuts", "Sesame"],
         tracked: true,
@@ -117,6 +126,7 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "breads",
         price: 540,
         description: "Dark rye with toasted caraway, dense and sour.",
+        ready: "Baked each morning. Collect from 7am at Hill Road.",
         contains: ["Gluten"],
         mayContain: [],
         tracked: true,
@@ -168,6 +178,9 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "pastry",
         price: 120,
         description: "Laminated dough, cinnamon sugar, a thin orange glaze.",
+        ingredients:
+            "Wheat flour, butter, milk, sugar, cinnamon, eggs, yeast, orange.",
+        ready: "Baked each morning.",
         contains: ["Gluten", "Milk", "Eggs"],
         mayContain: ["Nuts"],
         tracked: true,
@@ -183,6 +196,8 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "pastry",
         price: 360,
         description: "Twice-baked with frangipane and flaked almonds.",
+        ingredients: "Wheat flour, butter, almonds, sugar, eggs, milk.",
+        ready: "Baked each morning.",
         contains: ["Gluten", "Milk", "Eggs", "Nuts"],
         mayContain: [],
         tracked: true,
@@ -229,6 +244,8 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "breads",
         price: 600,
         description: "A full tray, olive oil and rosemary from the garden.",
+        ingredients: "Wheat flour, water, olive oil, rosemary, salt, yeast.",
+        ready: "Baked each morning. Collect from 7am at Hill Road.",
         contains: ["Gluten"],
         mayContain: [],
         tracked: true,
@@ -239,6 +256,7 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "coffee",
         price: 950,
         description: "Roasted on Tuesdays, sent out within the week.",
+        ingredients: "Arabica coffee beans.",
         contains: [],
         mayContain: [],
         gst: { bps: 500, code: "0901" },
@@ -273,6 +291,7 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         category: "coffee",
         price: 3100,
         description: "",
+        ingredients: "Arabica coffee beans.",
         contains: [],
         mayContain: [],
         // Published, not the designs' draft: "Needs you" counts only what
