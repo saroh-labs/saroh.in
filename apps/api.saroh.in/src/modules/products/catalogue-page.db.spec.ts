@@ -225,6 +225,14 @@ describe("Catalogue page (DB)", () => {
         const at = await page({ storefront: online });
         expect(at.items.map((i) => i.id)).toEqual([bun]);
         expect(at.counts.all).toBe(1);
+        // The storefront filter still counts the whole business.
+        expect(at.storefronts).toEqual({
+            everywhere: 5,
+            byStorefront: [
+                { id: hill, name: "Hill Road", count: 5 },
+                { id: online, name: "Online", count: 1 },
+            ],
+        });
         // Online has nothing of the bun on its shelf.
         expect(at.needs).toEqual([
             expect.objectContaining({ productId: bun, kind: "out" }),

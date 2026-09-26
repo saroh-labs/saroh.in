@@ -94,6 +94,14 @@ export interface CataloguePageDto {
     total: number;
     /** Each chip's count, within the storefront and status asked for. */
     counts: { all: number; collections: number; inventory: number };
+    /**
+     * The storefront filter's counts, within the status asked for: every
+     * product of the business, and how many each open storefront sells.
+     */
+    storefronts: {
+        everywhere: number;
+        byStorefront: { id: string; name: string; count: number }[];
+    };
     /** Published products that need restocking, most urgent first. */
     needs: CatalogueNeed[];
 }
@@ -207,17 +215,31 @@ export async function cataloguePage(
     const where: Prisma.ProductWhereInput = { AND: narrow };
 
     const take = query.limit ?? DEFAULT_PAGE;
-    const [page, total, all, inColl, inv] = await Promise.all([
-        products.catalogue(
-            organizationId,
-            { status, storefront },
-            { where, take: take + 1, cursor: query.cursor },
-        ),
-        prisma.product.count({ where: { AND: [base, where] } }),
-        prisma.product.count({ where: base }),
-        prisma.product.count({ where: { AND: [base, inCollections] } }),
-        prisma.product.count({ where: { AND: [base, tracked] } }),
-    ]);
+    const [page, total, all, inColl, inv, everywhere, listed] =
+        await Promise.all([
+            products.catalogue(
+                organizationId,
+                { status, storefront },
+                { where, take: take + 1, cursor: query.cursor },
+            ),
+            prisma.product.count({ where: { AND: [base, where] } }),
+            prisma.product.count({ where: base }),
+            prisma.product.count({ where: { AND: [base, inCollections] } }),
+            prisma.product.count({ where: { AND: [base, tracked] } }),
+            prisma.product.count({
+                where: { organizationId, ...(status ? { status } : {}) },
+            }),
+            prisma.productListing.groupBy({
+                by: ["storeId"],
+                where: {
+                    organizationId,
+                    storeId: { in: stores.map((s) => s.id) },
+                    ...(status ? { product: { status } } : {}),
+                },
+                _count: { _all: true },
+            }),
+        ]);
+    const perStore = new Map(listed.map((l) => [l.storeId, l._count._all]));
     const more = page.length > take;
     const items = more ? page.slice(0, take) : page;
     return {
@@ -225,6 +247,14 @@ export async function cataloguePage(
         nextCursor: more ? (items[items.length - 1]?.id ?? null) : null,
         total,
         counts: { all, collections: inColl, inventory: inv },
+        storefronts: {
+            everywhere,
+            byStorefront: stores.map((s) => ({
+                id: s.id,
+                name: s.name,
+                count: perStore.get(s.id) ?? 0,
+            })),
+        },
         needs,
     };
 }
