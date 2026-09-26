@@ -142,9 +142,13 @@ export class RazorpayBillingProvider implements BillingProvider {
         return safeEqualHex(provided, expected);
     }
 
-    parseWebhook(payload: unknown): ParsedBillingEvent {
+    parseWebhook(
+        payload: unknown,
+        headers: WebhookHeaders = {},
+    ): ParsedBillingEvent {
         const body = (payload ?? {}) as {
             event?: string;
+            created_at?: number;
             payload?: {
                 subscription?: { entity?: { id?: string; status?: string } };
             };
@@ -156,7 +160,12 @@ export class RazorpayBillingProvider implements BillingProvider {
 
         return {
             type,
-            providerEventId: `${type}:${providerSubscriptionId ?? "unknown"}`,
+            // Razorpay's own id for this delivery; without it, the event's
+            // time. `type:subscription` alone was the same for every month's
+            // `subscription.charged`, so the second was dropped (PAY-04).
+            providerEventId:
+                headerValue(headers, "x-razorpay-event-id") ??
+                `${type}:${providerSubscriptionId ?? "unknown"}:${body.created_at ?? "unknown"}`,
             providerSubscriptionId,
             status: outcomeFor(type),
         };
