@@ -22,7 +22,7 @@ import { useRef, useState } from "react";
 import { OptionSelect } from "@/components/shared/option-select";
 import { movedWords } from "@/lib/stock/levels";
 import type { MoveShelf } from "@/lib/stock/screen";
-import { moveNote, moveProblem } from "@/lib/stock/screen";
+import { moveNote, moveProblem, STOCK_UNREACHABLE } from "@/lib/stock/screen";
 import { moveStock, undoStock } from "@/lib/stock/screen-actions";
 
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
@@ -91,15 +91,24 @@ export function MoveDialog({
         const n = Number(units);
         attempt.current ??= crypto.randomUUID();
         setSaving(true);
-        const res = await moveStock({
-            fromStoreId: from,
-            toStoreId: to,
-            productId: row.productId,
-            variantId: row.variantId,
-            units: n,
-            idempotencyKey: attempt.current,
-        });
-        setSaving(false);
+        let res: Awaited<ReturnType<typeof moveStock>>;
+        try {
+            res = await moveStock({
+                fromStoreId: from,
+                toStoreId: to,
+                productId: row.productId,
+                variantId: row.variantId,
+                units: n,
+                idempotencyKey: attempt.current,
+            });
+        } catch {
+            // Saroh couldn't be reached. The same key goes with a retry, so
+            // a move that did land isn't made twice.
+            setRefusal(STOCK_UNREACHABLE);
+            return;
+        } finally {
+            setSaving(false);
+        }
         if (!res.ok) {
             setRefusal(res.error);
             attempt.current = null;

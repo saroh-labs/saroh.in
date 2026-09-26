@@ -14,7 +14,12 @@ import { useCallback, useRef, useState } from "react";
 
 import { countSaved } from "@/lib/stock/levels";
 import type { LogKindId } from "@/lib/stock/log";
-import { countDraft, parseCountKey, stockSubline } from "@/lib/stock/screen";
+import {
+    countDraft,
+    parseCountKey,
+    STOCK_UNREACHABLE,
+    stockSubline,
+} from "@/lib/stock/screen";
 import { countStock, undoStock } from "@/lib/stock/screen-actions";
 import type { StockChecks, StockLevels, StockLog } from "@/lib/stock/service";
 
@@ -113,15 +118,24 @@ export function StockScreen({
         if (!draft.entered.length || draft.bad) return;
         attempt.current ??= crypto.randomUUID();
         setSaving(true);
-        const res = await countStock({
-            counts: draft.entered.map((e) => ({
-                ...parseCountKey(e.key),
-                expected: e.expected,
-                counted: e.counted,
-            })),
-            idempotencyKey: attempt.current,
-        });
-        setSaving(false);
+        let res: Awaited<ReturnType<typeof countStock>>;
+        try {
+            res = await countStock({
+                counts: draft.entered.map((e) => ({
+                    ...parseCountKey(e.key),
+                    expected: e.expected,
+                    counted: e.counted,
+                })),
+                idempotencyKey: attempt.current,
+            });
+        } catch {
+            // The count stays on screen, and its key with it: a retry of
+            // one that landed isn't counted twice.
+            showError(STOCK_UNREACHABLE);
+            return;
+        } finally {
+            setSaving(false);
+        }
         if (!res.ok) {
             // The count stays on screen to fix and save again.
             showError(res.error);

@@ -22,7 +22,12 @@ import { useRef, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import type { EntryKind } from "@/lib/stock/screen";
-import { ENTRY_KINDS, entryProblem, entrySaved } from "@/lib/stock/screen";
+import {
+    ENTRY_KINDS,
+    entryProblem,
+    entrySaved,
+    STOCK_UNREACHABLE,
+} from "@/lib/stock/screen";
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 
 import { chipClass } from "./tones";
@@ -84,16 +89,24 @@ export function EntrySheet({
         const n = Number(units);
         attempt.current ??= crypto.randomUUID();
         setSaving(true);
-        const res = await recordStockEntry({
-            kind,
-            storeId: store,
-            productId: row.productId,
-            variantId: row.variantId,
-            units: n,
-            note: note.trim() || undefined,
-            idempotencyKey: attempt.current,
-        });
-        setSaving(false);
+        let res: Awaited<ReturnType<typeof recordStockEntry>>;
+        try {
+            res = await recordStockEntry({
+                kind,
+                storeId: store,
+                productId: row.productId,
+                variantId: row.variantId,
+                units: n,
+                note: note.trim() || undefined,
+                idempotencyKey: attempt.current,
+            });
+        } catch {
+            // Keep the key: a retry of one that landed isn't made twice.
+            setRefusal(STOCK_UNREACHABLE);
+            return;
+        } finally {
+            setSaving(false);
+        }
         if (!res.ok) {
             setRefusal(res.error);
             attempt.current = null;

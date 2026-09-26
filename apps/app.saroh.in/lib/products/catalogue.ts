@@ -124,8 +124,10 @@ export type StockTone = "plain" | "warn" | "danger" | "muted";
 /**
  * The Inventory column: "30 in stock", "Out of stock", "Not tracked",
  * "Sold out". Coloured by what can be sold: nothing to sell is danger, at or
- * under the product's own warning level is the accent, else plain. A read
- * that failed is "Not available", never a zero.
+ * under the product's own warning level is the accent, else plain. `null`
+ * stock means nothing here counts it, never a failed read: the stock comes
+ * in the catalogue read itself, and that read failing fails the page (its
+ * error boundary), so no row ever shows a guessed zero or "Not tracked".
  */
 export function stockWords(
     row: Pick<CatalogueRow, "stock" | "canSell" | "lowStockAlert" | "soldOut">,

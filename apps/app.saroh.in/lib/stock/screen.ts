@@ -12,6 +12,13 @@ import { readCount, signed } from "./levels";
 
 export type Tone = "plain" | "ok" | "warn" | "danger" | "muted";
 
+/**
+ * A stock write that never got an answer. It may have landed: the retry
+ * carries the same idempotency key, so it is never made twice.
+ */
+export const STOCK_UNREACHABLE =
+    "Saroh couldn't be reached. Try again — it won't be done twice.";
+
 // ---- Levels ----
 
 /**

@@ -17,6 +17,7 @@ import {
     getStockLog,
     getStockTracking,
 } from "@/lib/stock/service";
+import { listStorefronts } from "@/lib/stores/storefronts";
 
 export const metadata = { title: "Stock" };
 
@@ -100,9 +101,12 @@ export default async function StockPage({
     const logStore = one(query.store);
     const logProduct = one(query.product);
 
-    // The storefronts come with every levels read; the first names them.
-    const all = await getStockLevels({ limit: 1 });
-    const storefronts = all?.storefronts ?? [];
+    // The business's open storefronts, first made first — the same list the
+    // levels read names — so `show` is checked before the one levels read.
+    const storefronts = (await listStorefronts()).map((s) => ({
+        id: s.id,
+        name: s.name,
+    }));
     const storefront = storefronts.some((s) => s.id === show)
         ? show
         : undefined;
@@ -132,7 +136,7 @@ export default async function StockPage({
         // The log's product filter: the business's catalogue.
         tab === "log" ? listProducts().catch(() => []) : Promise.resolve([]),
     ]);
-    if (!levels || !all) {
+    if (!levels) {
         // No business to read (no active organization).
         return (
             <StockLocked
@@ -150,7 +154,7 @@ export default async function StockPage({
                 show={show}
                 q={q}
                 levels={levels}
-                needsYou={all.needsYou ?? 0}
+                needsYou={levels.needsYou ?? 0}
                 storefronts={storefronts}
                 checks={checks}
                 log={log}
