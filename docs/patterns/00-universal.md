@@ -129,13 +129,32 @@ with why it stops there:
 - `sites/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
+- `lib/products/editor-sections.ts` (762) — every editor section's schema,
+  how it reads a saved product and the patch it sends, plus the media rules
+  and the shell's hint and saved message. Each part is small and the
+  sections share its limits and helpers; the Editor and the product page's
+  sheets import it from one place. The media rules and the shell's part are
+  the seams. The Editor's newer words and rules (#525) went to their own
+  files instead: `editor-labels.ts`, `editor-stock.ts`, `variant-rows.ts`,
+  `listing-changes.ts`.
+- `product-editor-v2/photos-section.tsx` (458) and `editor-shell.tsx`
+  (416) — the media set's staged list with its upload, drop and address
+  paths; and the header, jumps, create flow and two columns. The library
+  panel went to `photo-library-panel.tsx`, and the status pill, read-only
+  note, next steps and leave dialog to `editor-parts.tsx`. A little over;
+  what is left shares one component's state.
 
 Split rather than listed: `providers/provider-list.tsx` (435 before; 120
 now) along its rows, which went to `provider-row.tsx` (331); and
 `lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
 along its own seam — what a save recorded, the counts a stock line says and
 the words for them went to `activity-changes.ts` (265), leaving the line an
-event becomes.
+event becomes. The Editor's `variants-section.tsx` (822 before; 390 now, #525)
+went along its row, its add row and its save — `variant-row.tsx`,
+`variant-add-row.tsx`, `variant-save.ts`, with the row rules in
+`lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 335
+now) along its two ways of counting, to `stock-fields.tsx` and
+`lib/products/editor-stock.ts`.
 
 ## 7. No `any`, no `@ts-ignore`
 
