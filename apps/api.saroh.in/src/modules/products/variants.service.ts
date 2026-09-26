@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { variantHasHistory } from "../stock/stock-words";
+import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
@@ -341,6 +341,30 @@ export class VariantsService {
             if (logged > 0 || sold > 0) {
                 throw new ConflictException({
                     message: variantHasHistory(variant.title),
+                    field: "variantId",
+                });
+            }
+            // Units on its shelf where other variants keep counting have
+            // nowhere to go back to: they'd vanish with the shelf.
+            for (const row of own) {
+                if (row.onHand === 0) continue;
+                const others = rows.some(
+                    (r) =>
+                        r.storeId === row.storeId &&
+                        r.variantId !== null &&
+                        r.variantId !== variantId,
+                );
+                if (!others) continue;
+                const store = await tx.store.findUnique({
+                    where: { id: row.storeId },
+                    select: { name: true },
+                });
+                throw new ConflictException({
+                    message: variantHasStock(
+                        variant.title,
+                        row.onHand,
+                        store?.name ?? "this storefront",
+                    ),
                     field: "variantId",
                 });
             }

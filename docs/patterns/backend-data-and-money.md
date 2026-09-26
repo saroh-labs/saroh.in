@@ -74,8 +74,15 @@
   variant. A product with no shelf yet may start with either kind. Switching
   to per-variant stock is `setVariantsIn` alone: it moves open lines'
   `heldQuantity` (never their quantity) and needs `store:write`. **The log
-  keeps its history:** a variant with any stock entry, or a line that sold
-  or holds it, can't be removed (archive the product instead). A COUNTED
+  keeps its history:** a variant with real history — a line that sold or
+  holds it, or an entry a person or an order wrote that moved stock and
+  wasn't undone — can't be removed (archive the product instead). Saroh's
+  own entries and counts that changed nothing aren't history, so such a
+  variant goes; the last variant counting at a storefront hands what it
+  held back to the product (`VARIANT_REMOVED`), and one with units where
+  other variants still count is refused, since they'd be lost. A product
+  with any stock entry, or stock on a
+  shelf, can't be deleted either (archive it). A COUNTED
   entry Saroh wrote (`StockEntry.system`: Track stock off, the per-variant
   switch, a removed variant) is never undone. A return recorded by hand
   that names an order counts against that order's refund put-backs

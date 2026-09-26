@@ -187,6 +187,22 @@ export function variantHasHistory(title: string): string {
     return `${title} has been sold or its stock counted, so it can't be removed — that would erase its stock history. Set the product to Not sold (archive it) instead.`;
 }
 
+/**
+ * Why a variant with units on a shelf, where other variants keep counting,
+ * can't be removed: the units would go with its shelf.
+ */
+export function variantHasStock(
+    title: string,
+    units: number,
+    storefront: string,
+): string {
+    return `${title} has ${units} in stock at ${storefront}, so it can't be removed — those units would be lost. Set the product to Not sold (archive it) instead.`;
+}
+
+/** Why a product whose stock was counted or moved can't be deleted. */
+export const PRODUCT_HAS_STOCK_HISTORY =
+    "This product has a stock history, so it can't be deleted — that would erase it. Set it to Not sold instead: it leaves the storefront and its stock log stays.";
+
 export const CLOSED_STOREFRONT =
     "This storefront is closed, so its stock can't change.";
 

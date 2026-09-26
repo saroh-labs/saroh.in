@@ -4,7 +4,7 @@ import { prisma } from "@saroh/database";
 import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
-import { variantHasHistory } from "../stock/stock-words";
+import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ProductsService } from "./products.service";
@@ -266,12 +266,14 @@ describe("Products at one storefront (characterization, DB)", () => {
             withMedium.variants.find((v) => v.variantId === medium.id),
         ).toMatchObject({ quantity: 0, reserved: 0 });
 
-        // A variant never counted or sold can be removed; one with a stock
-        // log can't — removing it would erase its history (DEC-032).
+        // A variant never counted or sold can be removed; one that sold
+        // can't — removing it would erase its history (DEC-032). Large's 6
+        // came from Saroh's switch, not a person, but Small still counts
+        // here, so they'd have nowhere to go.
         await variants.remove(storeId, id, medium.id, ownerId);
         await expect(
             variants.remove(storeId, id, large.id, ownerId),
-        ).rejects.toThrow(variantHasHistory("Large"));
+        ).rejects.toThrow(variantHasStock("Large", 6, "Char Store"));
         await expect(
             variants.remove(storeId, id, small.id, ownerId),
         ).rejects.toThrow(variantHasHistory("Small"));

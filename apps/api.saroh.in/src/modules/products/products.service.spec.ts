@@ -192,14 +192,27 @@ describe("Products catalog (dev DB)", () => {
         ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it("deletes a product (variants + inventory cascade)", async () => {
-        await products.remove(storeId, productId, ownerId);
+    it("won't delete a counted product; deletes one never counted (variants cascade)", async () => {
+        // Its stock was counted: the log stays, so it can't be deleted.
+        await expect(
+            products.remove(storeId, productId, ownerId),
+        ).rejects.toBeInstanceOf(ConflictException);
+
+        const fresh = await products.create(storeId, ownerId, {
+            name: "Plain Tee",
+            price: "9.99",
+        });
+        await variants.create(storeId, fresh.id, ownerId, {
+            sku: "PT-L",
+            title: "Large",
+        });
+        await products.remove(storeId, fresh.id, ownerId);
         const gone = await prisma.product.findUnique({
-            where: { id: productId },
+            where: { id: fresh.id },
         });
         expect(gone).toBeNull();
         const orphanVariants = await prisma.productVariant.count({
-            where: { productId },
+            where: { productId: fresh.id },
         });
         expect(orphanVariants).toBe(0);
     });

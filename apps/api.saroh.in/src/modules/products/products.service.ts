@@ -20,6 +20,7 @@ import {
     saveProductFieldValues,
 } from "../catalogue/fields.service";
 import { isGstRate } from "../invoices/gst";
+import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
 import { COUNTING_ROWS } from "../stock/tracking";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
@@ -743,13 +744,31 @@ export class ProductsService {
         // An order line keeps its product (the history of what was sold, and
         // now of what was reviewed), so the database refuses the delete — which
         // used to surface as a bare 500. Say it, and say what to do instead.
-        const sold = await prisma.orderItem.count({ where: { productId } });
-        if (sold > 0) {
-            throw new ConflictException(
-                "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
-            );
-        }
-        await prisma.product.delete({ where: { id: productId } });
+        await prisma.$transaction(async (tx) => {
+            // A delete locks the product FOR UPDATE, before any shelf, so a
+            // count or an order line being written for it waits, and is
+            // refused once it's gone (backend-data-and-money.md).
+            await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
+            const sold = await tx.orderItem.count({ where: { productId } });
+            if (sold > 0) {
+                throw new ConflictException(
+                    "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+                );
+            }
+            // The stock log is never edited (DEC-032): deleting the product
+            // would take its entries with it, and any units on a shelf
+            // would vanish with no entry saying so.
+            const [logged, stocked] = await Promise.all([
+                tx.stockEntry.count({ where: { productId } }),
+                tx.stockLevel.count({
+                    where: { productId, onHand: { not: 0 } },
+                }),
+            ]);
+            if (logged > 0 || stocked > 0) {
+                throw new ConflictException(PRODUCT_HAS_STOCK_HISTORY);
+            }
+            await tx.product.delete({ where: { id: productId } });
+        });
         return { id: productId };
     }
 

@@ -13,7 +13,11 @@ import { InventoryService } from "../products/inventory.service";
 import { ProductAccess } from "../products/product-access";
 import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
-import { COUNT_DIDNT_MATCH, shortWords } from "./stock-words";
+import {
+    COUNT_DIDNT_MATCH,
+    PRODUCT_HAS_STOCK_HISTORY,
+    shortWords,
+} from "./stock-words";
 import type { StockActor } from "./stock.service";
 import {
     adjust,
@@ -229,6 +233,24 @@ describe("Stock log and rules (DB)", () => {
                 sum: row.onHand,
             });
         }
+    });
+
+    it("a product whose stock was counted can't be deleted; one never counted can", async () => {
+        const { productId } = await product("Stollen", 0);
+        await expect(
+            products.remove(hill, productId, users.OWNER),
+        ).rejects.toThrow(new ConflictException(PRODUCT_HAS_STOCK_HISTORY));
+        expect(
+            await prisma.stockEntry.count({ where: { productId } }),
+        ).toBeGreaterThan(0);
+
+        const scope = await access.write(ctx("OWNER"), undefined, hill);
+        const { id: never } = await products.createIn(scope, {
+            name: "Never counted",
+            price: "10.00",
+        });
+        await products.remove(hill, never, users.OWNER);
+        expect(await prisma.product.count({ where: { id: never } })).toBe(0);
     });
 
     it("count 10 → 8 writes counted −2 (before 10, after 8)", async () => {
