@@ -13,8 +13,9 @@ import { demoUser, urls } from "../playwright.config";
  * stay camera-ready). The seed's own products hold stock for open orders,
  * and Track stock off is refused while anything is promised, so it makes a
  * product of its own, counted at 7. It leaves that product as it found it,
- * tracked with its count back at 7, then deletes it; one left by a failed
- * run is deleted before it starts.
+ * tracked with its count back at 7, then takes it away (set to Not sold under
+ * a name of its own: it has a stock history, so it can't be deleted); one
+ * left by a failed run goes the same way before it starts.
  */
 
 const ORG = "seed_org";
@@ -34,7 +35,11 @@ async function signIn(page: Page) {
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
 const orgHeader = { "x-organization-id": ORG };
 
-/** Deletes every product of that name: the one made here, or a leftover. */
+/**
+ * Takes away every product of that name: the one made here, or a leftover.
+ * One with a stock history can't be deleted (DEC-032), so it is set to Not
+ * sold under a name and an address of its own.
+ */
 async function removeProducts(request: APIRequestContext, name: string) {
     const res = await request.get(api(""), { headers: orgHeader });
     expect(res.ok()).toBe(true);
@@ -46,7 +51,18 @@ async function removeProducts(request: APIRequestContext, name: string) {
         const del = await request.delete(api(`/${p.id}`), {
             headers: orgHeader,
         });
-        expect(del.ok()).toBe(true);
+        if (del.ok()) continue;
+        expect(del.status()).toBe(409);
+        const stamp = Date.now().toString(36);
+        const retired = await request.patch(api(`/${p.id}`), {
+            headers: orgHeader,
+            data: {
+                name: `${name} (retired ${stamp})`,
+                slug: `e2e-retired-${stamp}-${p.id.slice(-6)}`,
+                status: "ARCHIVED",
+            },
+        });
+        expect(retired.ok()).toBe(true);
     }
 }
 
@@ -140,7 +156,7 @@ test.describe("Track stock and Sold out", () => {
                 }),
             ).toHaveAttribute("aria-checked", "true");
         } finally {
-            // As it was found: tracked, counted at 7. Then gone.
+            // As it was found: tracked, counted at 7. Then out of the way.
             await putBack(page.request, id);
             await removeProducts(page.request, name);
         }

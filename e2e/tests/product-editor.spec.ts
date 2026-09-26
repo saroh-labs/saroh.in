@@ -9,9 +9,10 @@ import { demoUser, urls } from "../playwright.config";
  * publish it, and read it back on the product page.
  *
  * It runs on Leela & Loom, the showcase boutique, and leaves it as it found
- * it: the product it makes is deleted afterwards, and one left by a failed
- * run is deleted before it starts. Photos go in by address, since a test
- * stack has no file storage.
+ * it: the product it makes is taken away afterwards (set to Not sold under a
+ * name of its own, since its counted stock is history that is never
+ * deleted), and one left by a failed run goes the same way before it
+ * starts. Photos go in by address, since a test stack has no file storage.
  */
 
 const ORG = "seed_sc_ll_org";
@@ -35,7 +36,11 @@ async function signIn(page: Page) {
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
 const orgHeader = { "x-organization-id": ORG };
 
-/** Deletes every product of that name — the one made here, or a leftover. */
+/**
+ * Takes away every product of that name — the one made here, or a leftover.
+ * One with a stock history can't be deleted (DEC-032), so it is set to Not
+ * sold under a name and an address of its own.
+ */
 async function removeProducts(request: APIRequestContext, name: string) {
     const res = await request.get(api(""), { headers: orgHeader });
     expect(res.ok()).toBe(true);
@@ -47,7 +52,18 @@ async function removeProducts(request: APIRequestContext, name: string) {
         const del = await request.delete(api(`/${p.id}`), {
             headers: orgHeader,
         });
-        expect(del.ok()).toBe(true);
+        if (del.ok()) continue;
+        expect(del.status()).toBe(409);
+        const stamp = Date.now().toString(36);
+        const retired = await request.patch(api(`/${p.id}`), {
+            headers: orgHeader,
+            data: {
+                name: `${name} (retired ${stamp})`,
+                slug: `e2e-retired-${stamp}-${p.id.slice(-6)}`,
+                status: "ARCHIVED",
+            },
+        });
+        expect(retired.ok()).toBe(true);
     }
 }
 
