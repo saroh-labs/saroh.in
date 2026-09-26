@@ -672,7 +672,7 @@ export const SECTION_JUMPS: Record<SectionKey, string> = {
     description: "Description",
     details: "How to use",
     madeby: "Made by",
-    photos: "Photos",
+    photos: "Photos and videos",
     visibility: "Visibility",
     variants: "Variants",
     stock: "Stock",
