@@ -275,7 +275,8 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         description: "",
         contains: [],
         mayContain: [],
-        status: "DRAFT",
+        // Published, not the designs' draft: "Needs you" counts only what
+        // is on sale, and this is the second of the two out of stock.
         gst: { bps: 500, code: "0901" },
         maker: "Kaapi Roasters, Chikmagalur",
         returns: "Returnable within 7 days, unused.",

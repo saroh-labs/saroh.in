@@ -18,6 +18,8 @@ export interface RyeStockCounts {
     storefronts: string;
     website: string;
     catalogue: string;
+    /** The Products list's "Needs you", as its summary reads. */
+    needsYou: string;
     shelves: string;
     entries: string;
     checks: string;
@@ -94,6 +96,55 @@ export async function checkRyeStock(
     );
     expect(`two shelves out (found ${out.length})`, out.length === 2);
     expect(`one shelf low (found ${low.length})`, low.length === 1);
+
+    // The Products list's "Needs you" (catalogue-needs.ts): each published
+    // product that counts stock, its listed shelves added up.
+    const onSale = await prisma.$queryRaw<Row[]>`
+        SELECT p.name,
+               SUM(GREATEST(0, s."onHand" - s.promised)) AS "canSell",
+               SUM(GREATEST(0, s.promised - s."onHand")) AS short,
+               MIN(s."lowStockAlert") AS "warnAt"
+        FROM "StockLevel" s
+        JOIN "Product" p ON p.id = s."productId"
+        WHERE s."organizationId" = ${orgId} AND p."stockTracked"
+          AND p.status = 'PUBLISHED'
+          AND CASE WHEN s."variantId" IS NULL
+                   THEN EXISTS (SELECT 1 FROM "ProductListing" l
+                                WHERE l."storeId" = s."storeId" AND l."productId" = s."productId")
+                   ELSE EXISTS (SELECT 1 FROM "ProductListingVariant" lv
+                                JOIN "ProductListing" l ON l.id = lv."listingId"
+                                WHERE l."storeId" = s."storeId" AND lv."variantId" = s."variantId")
+              END
+        GROUP BY p.id, p.name`;
+    const need = (p: Row) =>
+        n(p.short) > 0
+            ? "short"
+            : n(p.canSell) <= 0
+              ? "out"
+              : n(p.warnAt) > 0 && n(p.canSell) <= n(p.warnAt)
+                ? "low"
+                : null;
+    const needs = {
+        short: [] as string[],
+        out: [] as string[],
+        low: [] as string[],
+    };
+    for (const p of onSale) {
+        const kind = need(p);
+        if (kind) needs[kind].push(String(p.name));
+    }
+    const needsYou = [
+        needs.short.length ? `${needs.short.length} short for orders` : "",
+        needs.out.length ? `${needs.out.length} out of stock` : "",
+        needs.low.length ? `${needs.low.length} running low` : "",
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    expect(
+        `the Products list's Needs you: 1 short for orders · 2 out of stock · 1 running low (found ${needsYou}: ${JSON.stringify(needs)})`,
+        needsYou === "1 short for orders · 2 out of stock · 1 running low" &&
+            needs.short[0] === "Cinnamon bun",
+    );
 
     // The log: each entry's own sum, its place in its shelf's chain, and 0.
     fail(
@@ -254,6 +305,7 @@ export async function checkRyeStock(
             storefronts: stores.map((s) => s.name).join(", "),
             website: sites.map((s) => s.name).join(", "),
             catalogue: `${tracked + untracked} products, ${tracked} tracking stock`,
+            needsYou: `${needsYou} (${[...needs.short, ...needs.out, ...needs.low].join(", ")})`,
             shelves: `${shelves.length}: ${short.length} short, ${out.length} out, ${low.length} low`,
             entries: `${entries}: ${kinds.map((k) => `${k._count} ${k.kind.toLowerCase()}`).join(", ")}`,
             checks: `${short.length + countMismatch + saleNotTaken}: ${short.length} short, ${countMismatch} count didn't match, ${saleNotTaken} sale not taken`,

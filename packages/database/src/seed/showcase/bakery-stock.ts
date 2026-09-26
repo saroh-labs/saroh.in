@@ -19,9 +19,10 @@ import { istAt } from "./people";
  * then each day's bakes, deliveries, the orders' sales, a move between the
  * storefronts, day-old waste and this morning's counts, in time order, and
  * ends on the shelf's on hand — each entry's before + quantity = after.
- * The numbers are the designs': a Cinnamon bun six-pack 2 short at Hill
- * Road, the Rye & caraway loaf and the 1kg beans out, the 250g whole beans
- * low at Hill Road, the rest healthy. Three checks open: that short, a count
+ * The numbers are the designs', counted the way the Products list's
+ * "Needs you" counts them (a product's shelves added up): the Cinnamon bun
+ * 2 short for orders (its six-pack, at Hill Road), the Rye & caraway loaf
+ * and the 1kg beans out, the Focaccia running low, the rest healthy. Three checks open: that short, a count
  * made while a sale came in ("Count didn't match"), and yesterday's loaf
  * sold at the counter without leaving stock ("Sale not taken").
  */
@@ -150,18 +151,19 @@ export const SHELVES: readonly ShelfSpec[] = [
         waste: [[-3, 2]],
     },
     {
+        // Running low: three left from yesterday, none baked today.
         key: "foc-h",
         slug: "focaccia-rosemary",
         variant: null,
         store: "H",
         kind: "fresh",
-        onHand: 9,
+        onHand: 3,
         warnAt: 4,
         opening: 0,
         par: 9,
         waste: [
             [-3, 3],
-            [-1, 2],
+            [-1, 6],
         ],
     },
     {
@@ -170,7 +172,7 @@ export const SHELVES: readonly ShelfSpec[] = [
         variant: 0,
         store: "H",
         kind: "goods",
-        onHand: 1,
+        onHand: 4,
         warnAt: 3,
         opening: 0,
         count: { day: -1, minute: 18 * 60 + 5, diff: 0, by: "owner" },

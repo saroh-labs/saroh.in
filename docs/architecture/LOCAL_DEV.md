@@ -144,9 +144,10 @@ businesses — the first four each with one published site at
   website; fifteen products, seven counting stock per storefront — Sourdough
   loaf 800g/400g, Cinnamon bun Single/Six-pack, Almond croissant Single/Box of
   4, Rye & caraway, Focaccia, House blend beans 250g by grind and 1kg. The
-  Cinnamon bun six-pack is 2 short at Hill Road, the Rye & caraway loaf and
-  the 1kg beans are out, the 250g whole beans low at Hill Road; the rest are
-  healthy. Open orders hold what they promise. A five-day stock log —
+  Products list reads "Needs you: 1 short for orders · 2 out of stock · 1
+  running low" — the Cinnamon bun (its six-pack 2 short at Hill Road), the
+  Rye & caraway loaf and the 1kg beans, the Focaccia; the rest are healthy.
+  Open orders hold what they promise. A five-day stock log —
   counted, baked, received, sold, wasted and a move from Hill Road to Online —
   adds up to every shelf, and three checks are open: that short, a count that
   didn't match, and yesterday's loaf sold without leaving stock. The
