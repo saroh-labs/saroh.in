@@ -323,6 +323,67 @@ export async function listProducts(
     return getList<CatalogueProduct>(query ? `${path}?${query}` : path);
 }
 
+/** Rows a page of the Products list holds. */
+export const CATALOGUE_PAGE = 50;
+
+/** The Products list's chips (#519); `needs` is "Show only these". */
+export type CatalogueView = "all" | "collections" | "inventory" | "needs";
+
+/** What the Products list asks the catalogue for: one page of it. */
+export interface CatalogueFilter {
+    storefront?: string;
+    status?: ProductStatus;
+    q?: string;
+    view?: CatalogueView;
+    category?: string;
+    collection?: string;
+    cursor?: string;
+    limit?: number;
+}
+
+/** A product someone should restock, and why (#519). */
+export interface CatalogueNeed {
+    productId: string;
+    name: string;
+    kind: "short" | "out" | "low";
+    short: number;
+    canSell: number;
+}
+
+/**
+ * A page of the catalogue (#519): its rows, how many match everything
+ * asked, each chip's count, the storefront filter's counts, and what needs
+ * restocking — worked out by the API for the whole catalogue.
+ */
+export interface CataloguePage {
+    items: CatalogueProduct[];
+    nextCursor: string | null;
+    total: number;
+    counts: { all: number; collections: number; inventory: number };
+    storefronts: {
+        everywhere: number;
+        byStorefront: { id: string; name: string; count: number }[];
+    };
+    needs: CatalogueNeed[];
+}
+
+/** One page of the catalogue; null with no business active. */
+export async function listCataloguePage(
+    filter: CatalogueFilter,
+): Promise<CataloguePage | null> {
+    const path = await productPath();
+    if (!path) return null;
+    const q = new URLSearchParams();
+    const entries: [string, string | number | undefined][] = Object.entries({
+        limit: CATALOGUE_PAGE,
+        ...filter,
+    });
+    for (const [key, value] of entries) {
+        if (value !== undefined && value !== "") q.set(key, String(value));
+    }
+    return getJson<CataloguePage>(`${path}?${q.toString()}`);
+}
+
 /**
  * One product, as a storefront sees it: the one named, or else the first
  * that sells it. Null when it is not this business's.

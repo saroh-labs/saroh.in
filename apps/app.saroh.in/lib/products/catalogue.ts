@@ -1,13 +1,11 @@
-import type { CatalogueProduct, ProductStatus } from "./service";
+import type {
+    CatalogueListing,
+    CatalogueProduct,
+    ProductStatus,
+} from "./service";
 
 /** One storefront that sells a catalogue row, and its stock there. */
-export interface CataloguePlace {
-    storeId: string;
-    storeName: string;
-    inventory: { quantity: number; lowStockAlert: number } | null;
-    /** Marked sold out by hand here (#515); absent from an older API. */
-    soldOut?: boolean;
-}
+export type CataloguePlace = CatalogueListing;
 
 /**
  * One row of the business's catalogue.
@@ -15,30 +13,41 @@ export interface CataloguePlace {
  * The catalogue belongs to the business (#531, the "Saroh Products Screen"
  * design, after Square's single item library): the API returns one product
  * per row, with each storefront that sells it — its listings — and the
- * stock on each shelf. Nothing is matched or merged here.
+ * stock on each shelf. Read under the storefront filter (#519), the row's
+ * stock is that storefront's; otherwise the shelves added up. Nothing is
+ * matched or merged here.
  */
 export interface CatalogueRow {
     /** The product's id: one row per catalogue product. */
     key: string;
     id: string;
     name: string;
+    /** The cover photo; the tile falls back to initials without one. */
+    image: string | null;
     sku: string | null;
     variantCount: number;
+    /** Each variant it sells in this view, with its own price if any. */
+    variants: CatalogueProduct["variants"];
     status: ProductStatus;
     price: string;
+    /** Lowest and highest variant price when they differ, else null. */
+    priceRange: { low: string; high: string } | null;
     currency: string;
-    /** Summed across places that track stock; `null` when none do. */
+    /** On hand; `null` when nothing here counts stock. */
     stock: number | null;
-    /** The tightest low-stock threshold among those places. */
+    /** Promised to open orders. */
+    promised: number;
+    /** On hand minus promised, never below 0 — what the shop sells. */
+    canSell: number | null;
+    /** The product's own warning level (the lowest of its shelves). */
     lowStockAlert: number | null;
     /**
-     * Untracked and marked sold out by hand at every place counted (#515):
+     * Untracked and marked sold out by hand (#515) wherever it is counted:
      * the stock column says "Sold out", not "Not tracked".
      */
     soldOut: boolean;
     updatedAt: string;
-    /** In a collection (a category). */
-    inCollection: boolean;
+    categoryId: string | null;
     /** Where it is sold; empty when no storefront sells it just now. */
     places: CataloguePlace[];
 }
@@ -46,53 +55,80 @@ export interface CatalogueRow {
 export function catalogueRows(
     products: readonly CatalogueProduct[],
 ): CatalogueRow[] {
-    return products.map((p) => ({
-        key: p.id,
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        variantCount: p.variantCount,
-        status: p.status,
-        price: p.price,
-        currency: p.currency,
-        ...stockOf(p.listings),
-        updatedAt: p.updatedAt,
-        inCollection: p.categoryId !== null,
-        places: p.listings,
-    }));
+    return products.map((p) => {
+        const inv = p.inventory;
+        return {
+            key: p.id,
+            id: p.id,
+            name: p.name,
+            image: p.image,
+            sku: p.sku,
+            variantCount: p.variantCount,
+            variants: p.variants,
+            status: p.status,
+            price: p.price,
+            priceRange: priceRange(p.price, p.variants),
+            currency: p.currency,
+            stock: inv ? inv.quantity : null,
+            promised: inv ? inv.promised : 0,
+            canSell: inv ? Math.max(0, inv.quantity - inv.promised) : null,
+            lowStockAlert: inv ? inv.lowStockAlert : null,
+            soldOut: !inv && p.soldOut === true,
+            updatedAt: p.updatedAt,
+            categoryId: p.categoryId,
+            places: p.listings,
+        };
+    });
 }
 
 /**
- * The same row as one storefront sees it: its stock there. `null` when that
- * storefront does not sell it — the storefront filter filters by listing.
+ * A price range is the variants', never a storefront's (the design): a
+ * variant without its own price sells at the product's.
  */
-export function inStorefront(
-    row: CatalogueRow,
-    storeId: string,
-): CatalogueRow | null {
-    const here = row.places.filter((p) => p.storeId === storeId);
-    if (here.length === 0) return null;
-    // "Sold at" stays a fact about the product, not the filter.
-    return { ...row, ...stockOf(here) };
+export function priceRange(
+    price: string,
+    variants: readonly { price: string | null }[],
+): { low: string; high: string } | null {
+    if (variants.length < 2) return null;
+    const prices = variants.map((v) => v.price ?? price);
+    const sorted = [...prices].sort((a, b) => Number(a) - Number(b));
+    const low = sorted[0];
+    const high = sorted[sorted.length - 1];
+    return Number(low) === Number(high) ? null : { low, high };
 }
 
-function stockOf(places: readonly CataloguePlace[]): {
-    stock: number | null;
-    lowStockAlert: number | null;
-    soldOut: boolean;
-} {
-    const tracked = places.flatMap((p) => (p.inventory ? [p.inventory] : []));
-    if (tracked.length === 0) {
-        return {
-            stock: null,
-            lowStockAlert: null,
-            soldOut:
-                places.length > 0 && places.every((p) => p.soldOut === true),
-        };
+/** Stock as the row says it, and the colour role that reinforces it. */
+export type StockTone = "plain" | "warn" | "danger" | "muted";
+
+/**
+ * The Inventory column: "30 in stock", "Out of stock", "Not tracked",
+ * "Sold out". Coloured by what can be sold: nothing to sell is danger, at or
+ * under the product's own warning level is the accent, else plain. A read
+ * that failed is "Not available", never a zero.
+ */
+export function stockWords(
+    row: Pick<CatalogueRow, "stock" | "canSell" | "lowStockAlert" | "soldOut">,
+): { text: string; tone: StockTone } {
+    if (row.stock === null || row.canSell === null) {
+        return row.soldOut
+            ? { text: "Sold out", tone: "danger" }
+            : { text: "Not tracked", tone: "muted" };
     }
-    return {
-        stock: tracked.reduce((n, i) => n + i.quantity, 0),
-        lowStockAlert: Math.min(...tracked.map((i) => i.lowStockAlert)),
-        soldOut: false,
-    };
+    if (row.stock <= 0) return { text: "Out of stock", tone: "danger" };
+    const text = `${row.stock} in stock`;
+    if (row.canSell <= 0) return { text, tone: "danger" };
+    if (row.lowStockAlert !== null && row.lowStockAlert > 0) {
+        if (row.canSell <= row.lowStockAlert) return { text, tone: "warn" };
+    }
+    return { text, tone: "plain" };
+}
+
+/** Two letters from the product's words: "Rye & caraway loaf" → "RC". */
+export function initials(name: string): string {
+    return name
+        .split(/[\s&]+/)
+        .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w))
+        .slice(0, 2)
+        .map((w) => w.charAt(0).toUpperCase())
+        .join("");
 }
