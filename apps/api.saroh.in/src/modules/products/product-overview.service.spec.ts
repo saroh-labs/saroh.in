@@ -369,4 +369,49 @@ describe("Product overview (DB)", () => {
             allows.mockRestore();
         }
     });
+
+    it("counts the lines short and needing someone for the Stock tab's badge", async () => {
+        const toteId = (
+            await products.create(storeId, ownerId, {
+                name: "Canvas Tote",
+                price: "600",
+                currency: "INR",
+            })
+        ).id;
+        // Not tracked: nothing to say.
+        await prisma.product.update({
+            where: { id: toteId },
+            data: { stockTracked: false },
+        });
+        expect(
+            (await overview.get(storeId, toteId, ownerId)).stock.needs,
+        ).toEqual({ short: 0, low: 0 });
+
+        await prisma.product.update({
+            where: { id: toteId },
+            data: { stockTracked: true },
+        });
+        const shelf = async (onHand: number, promised: number) => {
+            await prisma.stockLevel.deleteMany({
+                where: { productId: toteId },
+            });
+            await prisma.stockLevel.create({
+                data: {
+                    organizationId: orgId,
+                    storeId,
+                    productId: toteId,
+                    onHand,
+                    promised,
+                    lowStockAlert: 5,
+                },
+            });
+            return (await overview.get(storeId, toteId, ownerId)).stock.needs;
+        };
+        // Three promised, one on the shelf: short, and so needing someone.
+        expect(await shelf(1, 3)).toEqual({ short: 1, low: 1 });
+        // At its warning level.
+        expect(await shelf(4, 0)).toEqual({ short: 0, low: 1 });
+        // Plenty.
+        expect(await shelf(20, 0)).toEqual({ short: 0, low: 0 });
+    });
 });

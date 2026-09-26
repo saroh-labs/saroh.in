@@ -35,7 +35,10 @@ export function TrackStockSwitch({
     productName: string;
     tracked: boolean;
     control: Exclude<TrackingControl, "hidden">;
-    /** Drops the section's unsaved counts: there is nothing left to count. */
+    /**
+     * Closes an Add stock the section had open: there is nothing left to
+     * count. Its counts reset from the refreshed product, not from here.
+     */
     onTurnedOff: () => void;
 }) {
     const router = useRouter();

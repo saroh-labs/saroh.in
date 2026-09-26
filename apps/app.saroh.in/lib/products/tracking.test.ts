@@ -8,6 +8,7 @@ import {
     soldOutSaid,
     stopTrackingConfirm,
     trackingControl,
+    untrackedDetail,
     untrackedLine,
     untrackedShort,
 } from "./tracking";
@@ -92,6 +93,17 @@ describe("Sold out by hand (#515)", () => {
         ).toBe("Sold out — marked by hand");
         expect(untrackedShort([{ ...hill, soldOut: true }])).toBe(
             "Not tracked — sold out, marked by hand.",
+        );
+    });
+
+    it("the Details row agrees with the Stock card", () => {
+        expect(untrackedDetail([hill])).toBe("Not tracked · always available");
+        // The seeded multigrain: sold out by hand at Hill Road.
+        expect(untrackedDetail([{ ...hill, soldOut: true }])).toBe(
+            "Not tracked · sold out, marked by hand",
+        );
+        expect(untrackedDetail([{ ...hill, soldOut: true }, online])).toBe(
+            "Not tracked · sold out at Hill Road, marked by hand",
         );
     });
 

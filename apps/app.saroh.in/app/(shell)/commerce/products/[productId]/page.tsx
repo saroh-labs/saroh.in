@@ -28,6 +28,7 @@ import {
     getProductOverview,
     withStorefrontFallback,
 } from "@/lib/products/overview";
+import { stockBadge } from "@/lib/products/overview-rules";
 import { accessLine } from "@/lib/products/overview-words";
 import { listCategories } from "@/lib/products/service";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
@@ -167,13 +168,6 @@ export default async function ProductPage({
         canStock: overview.canStock,
         canReply: overview.canReply,
     });
-    const shortSizes = stock?.sizes.filter((s) => s.short > 0).length ?? 0;
-    const lowSizes =
-        stock?.sizes.filter((s) =>
-            (stock.split ? s.shelves.map((x) => x.word) : [s.word]).some(
-                (w) => w.tone === "low" || w.tone === "bad",
-            ),
-        ).length ?? overview.stock.totals.lowCount;
 
     return (
         <main className="w-full">
@@ -209,15 +203,10 @@ export default async function ProductPage({
                         active={tab}
                         href={href}
                         counts={tracking.counts}
-                        stockBadge={
-                            !tracking.counts
-                                ? null
-                                : shortSizes > 0
-                                  ? `${shortSizes} short`
-                                  : lowSizes > 0
-                                    ? `${lowSizes} low`
-                                    : null
-                        }
+                        // From the one read every tab makes: the levels
+                        // load only on Overview and Stock, and a badge
+                        // built from them changed with the tab.
+                        stockBadge={stockBadge(overview.stock, tracking.counts)}
                     />
                     <div
                         role="tabpanel"

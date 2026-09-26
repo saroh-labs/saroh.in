@@ -71,6 +71,13 @@ export interface ProductOverview {
             canSell: number;
             lowCount: number;
         };
+        /**
+         * The Stock tab's badge, across every open storefront: lines short
+         * for orders, and lines needing someone at all (short, sold out or
+         * low) — as Stock's "Needs you" judges them. Missing from an API
+         * older than the app (they ship apart); `stockBadge` falls back.
+         */
+        needs?: { short: number; low: number };
     };
     price: {
         min: string;
@@ -145,6 +152,26 @@ export function customersSee(line: StockLine): string {
     if (line.word === "SOLD_OUT") return "Sold out";
     if (line.word === "LOW") return `Only ${line.canSell} left`;
     return "In stock";
+}
+
+/**
+ * The Stock tab's badge: "1 short" before "2 low", nothing when all is
+ * well or the product doesn't count stock. From the page's one read, so it
+ * says the same on every tab.
+ */
+export function stockBadge(
+    stock: Pick<ProductOverview["stock"], "needs" | "totals">,
+    counts: boolean,
+): string | null {
+    if (!counts) return null;
+    // An older API: this storefront's low count, as the badge once read.
+    const { short, low } = stock.needs ?? {
+        short: 0,
+        low: stock.totals.lowCount,
+    };
+    if (short > 0) return `${short} short`;
+    if (low > 0) return `${low} low`;
+    return null;
 }
 
 /** "1 product", "2 products". */

@@ -7,9 +7,20 @@ import type { ProductPlacement } from "../collections/collections.service";
 import { productPlacement } from "../collections/collections.service";
 import { discountState } from "../discounts/discount-state";
 import type { OrgAction } from "../organizations/organization-policy";
+import { productLines } from "../stock/product-lines";
 import type { ProductScope } from "./product-access";
-import type { RatingSummary, StockLine, StockTotals } from "./product-overview";
-import { ratingSummary, stockLine, stockTotals } from "./product-overview";
+import type {
+    RatingSummary,
+    StockLine,
+    StockNeeds,
+    StockTotals,
+} from "./product-overview";
+import {
+    ratingSummary,
+    stockLine,
+    stockNeeds,
+    stockTotals,
+} from "./product-overview";
 import { savingPercent } from "./product-rules";
 import { ProductsService } from "./products.service";
 import type { ProductDetailDto } from "./serialize";
@@ -84,6 +95,8 @@ export interface ProductOverview {
         variants: (StockLine & { variantId: string })[];
         product: StockLine | null;
         totals: StockTotals;
+        /** Every open storefront's shelves, for the Stock tab's badge. */
+        needs: StockNeeds;
     };
     price: {
         min: string;
@@ -176,23 +189,33 @@ export class ProductOverviewService {
                 ? stockTotals(variantLines, product.inventory)
                 : stockTotals(productLine ? [productLine] : [], null);
 
-        const [orders, reviews, discounts, placement, canStock, canReply] =
-            await Promise.all([
-                this.panel(scope, "order:read", "orders", () =>
-                    this.orders(productId, now),
-                ),
-                this.panel(scope, "product-review:read", "reviews", () =>
-                    this.reviews(productId, product),
-                ),
-                this.panel(scope, "discount:read", "discounts", () =>
-                    this.discounts(organizationId, storeId, product, now),
-                ),
-                this.panel(scope, "store:read", "collections", () =>
-                    productPlacement(organizationId, productId),
-                ),
-                scope.canStock(),
-                scope.may("product-review:write"),
-            ]);
+        const [
+            orders,
+            reviews,
+            discounts,
+            placement,
+            canStock,
+            canReply,
+            needs,
+        ] = await Promise.all([
+            this.panel(scope, "order:read", "orders", () =>
+                this.orders(productId, now),
+            ),
+            this.panel(scope, "product-review:read", "reviews", () =>
+                this.reviews(productId, product),
+            ),
+            this.panel(scope, "discount:read", "discounts", () =>
+                this.discounts(organizationId, storeId, product, now),
+            ),
+            this.panel(scope, "store:read", "collections", () =>
+                productPlacement(organizationId, productId),
+            ),
+            scope.canStock(),
+            scope.may("product-review:write"),
+            product.stockTracked
+                ? this.needs(organizationId, productId)
+                : Promise.resolve({ short: 0, low: 0 }),
+        ]);
 
         return {
             product,
@@ -201,6 +224,7 @@ export class ProductOverviewService {
                 variants: variantLines,
                 product: productLine,
                 totals,
+                needs,
             },
             price: priceRange(product),
             lastChanged: lastChanged(product),
@@ -213,6 +237,54 @@ export class ProductOverviewService {
             discounts,
             placement,
         };
+    }
+
+    /**
+     * Its lines at every open storefront, judged as Stock's "Needs you"
+     * judges them (`productLines`) — one small read, so the badge needn't
+     * wait for the levels the Overview and Stock tabs load.
+     */
+    private async needs(
+        organizationId: string,
+        productId: string,
+    ): Promise<StockNeeds> {
+        const [stores, product] = await Promise.all([
+            prisma.store.findMany({
+                where: { organizationId, deletedAt: null },
+                select: { id: true },
+            }),
+            prisma.product.findUniqueOrThrow({
+                where: { id: productId },
+                select: {
+                    variants: {
+                        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                        select: { id: true },
+                    },
+                    listings: {
+                        select: {
+                            storeId: true,
+                            variants: { select: { variantId: true } },
+                        },
+                    },
+                    stockLevels: {
+                        select: {
+                            storeId: true,
+                            variantId: true,
+                            onHand: true,
+                            promised: true,
+                            lowStockAlert: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+        return stockNeeds(
+            productLines(
+                product,
+                product.stockLevels,
+                stores.map((s) => s.id),
+            ),
+        );
     }
 
     private async panel<T>(
