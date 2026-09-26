@@ -489,6 +489,20 @@ export const PRODUCTS: readonly {
 ];
 
 /**
+ * What Northwind's second storefront, "Online", sells and holds (#526), by
+ * slug: a healthy few, one low (the first-aid kit, under its 10) and one
+ * out (the hi-vis vest), so Move stock has something to move either way.
+ */
+export const ONLINE_STOCK: Readonly<Record<string, number>> = {
+    "kraft-mailer-box": 60,
+    "bubble-wrap-roll": 24,
+    "safety-gloves": 80,
+    "shipping-labels": 150,
+    "first-aid-kit": 4,
+    "hi-vis-vest": 0,
+};
+
+/**
  * Orders across every status the UI renders. The PENDING and PROCESSING ones
  * are what Home counts as open work — without them the OVERDUE branch of the
  * ranking is unreachable and cannot be reviewed.
