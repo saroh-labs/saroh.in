@@ -91,7 +91,7 @@
   never both** (#516, DEC-031). `Collection` carries a required
   `organizationId`. A hand-picked one lists its products in
   `CollectionProduct` rows ordered by `position`, 500 at most
-  (`COLLECTION_PRODUCTS_MAX`, checked on every add). An automatic one sets
+  (`COLLECTION_PRODUCTS_MAX`, checked on every add and save, under the collection's lock). An automatic one sets
   `categoryId`, and its products are read from that category and the ones
   below it when asked, never stored, so it can't be edited by hand. A
   category an automatic collection uses can't be deleted: the service
