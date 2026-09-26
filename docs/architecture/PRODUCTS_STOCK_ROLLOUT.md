@@ -156,6 +156,64 @@ hour.
    `curl -sI <R2_PUBLIC_BASE_URL>/<any object key> | grep -i x-content-type-options`
    shows `nosniff`. Once per environment; it isn't in this repo.
 
+## Releasing to production: the order
+
+A merge to `main` does two things at once:
+
+- The API workflow builds an image and runs the host's rollout in one go: backup, migrate, deploy.
+- Vercel ships the frontends from `main`.
+
+Both are wrong for this release. The rollout skips steps 0, 3 and 4. The
+new frontends against the old API is the breaking direction (the old API
+refuses the new fields). So the production API goes first, by hand, and the
+merge comes last:
+
+1. Merge the release's last PR into `development` and let CI build it. The
+   push to `development` builds the image `sha-<commit>` and deploys it to the
+   development environment.
+2. Take that exact image to production by hand: checklist steps 0–4 with
+   `sha-<commit>`, then step 6 through the host's rollout for production and
+   the same tag. Its backup and migrate run again and find nothing to do. The
+   production API now runs the new code with the old frontends, which is the
+   safe direction.
+3. Only then merge `development` into `main` (the release PR). The push
+   builds the merge commit and runs the host's rollout again. That redeploys
+   the same code, and the migrations are already applied, so it is harmless.
+   Vercel then ships the new frontends against the new API.
+4. Step 7 (the media `nosniff` rule), once per environment.
+
+If the host can't be reached from CI, the automatic run for step 3 fails at
+its SSH step and changes nothing on the host. The API is already right from
+step 2. That happened once, on 2026-09-26: a three-minute network drop on
+the host's side, with no connection reaching its SSH at all.
+
+## Rehearsals
+
+- **Development environment, 2026-09-26.** Steps 0–4 and 6 were done by hand
+  with the image of #533 (`sha-342d5b96…`):
+    - the 11 new migrations applied in about 4 s;
+    - the backfill copied and repaired nothing (the development database had
+      no products and no open orders);
+    - both queries in step 4 returned no rows;
+    - the new image was ready 2½ minutes after the old one stopped.
+
+    This proved the commands and their order, not the copy.
+
+- **Production, as it stands on 2026-09-26.** Its database had the schema
+  and no data: no users, businesses or products. It was 30 migrations behind
+  `development`: everything from `20260923120000_admin_console` on, not only
+  this release's.
+
+    A copy of it, restored locally, took all 30 in under a second. `prisma
+migrate diff` then found no drift from `schema.prisma`, and the backfill
+    ran clean. So for this first production release the locks and times in the
+    table above are moot. The order above still applies, because the
+    frontends must not reach the old API.
+
+    Count again before each later release. Once production has real data, time
+    the migrations on a restored copy of it the same way before choosing the
+    window.
+
 ## A database that ran this branch before the migrations changed
 
 The branch's migrations were edited in place twice before release, which is
