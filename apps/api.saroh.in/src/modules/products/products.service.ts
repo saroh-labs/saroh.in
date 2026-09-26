@@ -52,6 +52,7 @@ import {
     serializeProductDetail,
     serializeProductListItem,
 } from "./serialize";
+import { lockProduct, lockProductStock } from "./stock-levels";
 
 const STOCK_ROW = {
     select: { onHand: true, promised: true, lowStockAlert: true },
@@ -142,6 +143,23 @@ function isSlugClash(error: unknown): boolean {
     // Driver adapters don't always name the target; when it is named, it
     // must be the slug.
     return meta === undefined || JSON.stringify(meta).includes("slug");
+}
+
+/**
+ * Postgres gave up on the transaction over a lock: a deadlock (40P01) or a
+ * write conflict, which Prisma reports as P2034, or as a raw query's P2010
+ * naming the Postgres code.
+ */
+function isLockConflict(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+    const { code, meta, message } = error as {
+        code?: unknown;
+        meta?: unknown;
+        message?: unknown;
+    };
+    if (code === "P2034") return true;
+    const text = `${JSON.stringify(meta ?? null)} ${typeof message === "string" ? message : ""}`;
+    return text.includes("40P01") || text.includes("deadlock detected");
 }
 
 /** Never null over the wire in a patch: a null there means "not sent". */
@@ -766,31 +784,49 @@ export class ProductsService {
         // An order line keeps its product (the history of what was sold, and
         // now of what was reviewed), so the database refuses the delete — which
         // used to surface as a bare 500. Say it, and say what to do instead.
-        await prisma.$transaction(async (tx) => {
-            // A delete locks the product FOR UPDATE, before any shelf, so a
-            // count or an order line being written for it waits, and is
-            // refused once it's gone (backend-data-and-money.md).
-            await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
-            const sold = await tx.orderItem.count({ where: { productId } });
-            if (sold > 0) {
-                throw new ConflictException(
-                    "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
-                );
-            }
-            // The stock log is never edited (DEC-032): deleting the product
-            // would take its entries with it, and any units on a shelf
-            // would vanish with no entry saying so.
-            const [logged, stocked] = await Promise.all([
-                tx.stockEntry.count({ where: { productId } }),
-                tx.stockLevel.count({
-                    where: { productId, onHand: { not: 0 } },
-                }),
-            ]);
-            if (logged > 0 || stocked > 0) {
-                throw new ConflictException(PRODUCT_HAS_STOCK_HISTORY);
-            }
-            await tx.product.delete({ where: { id: productId } });
-        });
+        try {
+            await prisma.$transaction(async (tx) => {
+                // The lock order every stock writer keeps (backend-data-and-
+                // money.md): the product FOR NO KEY UPDATE, then its shelves.
+                // A count or receive already holding a shelf finishes first —
+                // its entry's key check doesn't wait on NO KEY UPDATE — and
+                // the checks below then see what it wrote.
+                await lockProduct(tx, productId);
+                await lockProductStock(tx, productId);
+                const sold = await tx.orderItem.count({ where: { productId } });
+                if (sold > 0) {
+                    throw new ConflictException(
+                        "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the storefront and its order history stays.",
+                    );
+                }
+                // The stock log is never edited (DEC-032): deleting the
+                // product would take its entries with it, and any units on
+                // a shelf would vanish with no entry saying so.
+                const [logged, stocked] = await Promise.all([
+                    tx.stockEntry.count({ where: { productId } }),
+                    tx.stockLevel.count({
+                        where: { productId, onHand: { not: 0 } },
+                    }),
+                ]);
+                if (logged > 0 || stocked > 0) {
+                    throw new ConflictException(PRODUCT_HAS_STOCK_HISTORY);
+                }
+                // Its rows go first, under the locks held, and the product
+                // last: only that delete takes it FOR UPDATE, once nothing
+                // below it is left to wait on.
+                await tx.collectionProduct.deleteMany({ where: { productId } });
+                await tx.productListing.deleteMany({ where: { productId } });
+                await tx.stockLevel.deleteMany({ where: { productId } });
+                await tx.product.delete({ where: { id: productId } });
+            });
+        } catch (error) {
+            // An order line written for it right now can still meet the
+            // final delete; nothing was changed, so asking again is safe.
+            if (!isLockConflict(error)) throw error;
+            throw new ConflictException(
+                "Someone is changing this product right now. Try deleting it again.",
+            );
+        }
         return { id: productId };
     }
 

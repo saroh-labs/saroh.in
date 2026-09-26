@@ -53,8 +53,11 @@
   (a StockEntry, an OrderItem) takes FOR KEY SHARE on it for the foreign
   key, after the StockLevel locks it already holds. FOR UPDATE conflicts
   with that, so a count opening a new shelf deadlocked with a sale on the
-  product's other shelf (PR #533 review). Only a delete (the merge's loser)
-  takes FOR UPDATE, before any shelf.
+  product's other shelf (PR #533 review). Deleting a product keeps the same
+  order: NO KEY UPDATE, then its shelves, its checks under those locks, its
+  collection memberships, listings and shelves deleted explicitly, and the
+  product last (a lock conflict left over is a 409 to try again). Only the
+  merge's loser, deleted with the API stopped, takes FOR UPDATE first.
   Whether a product counts stock is `Product.stockTracked` and the
   business's `BusinessProfile.stockTracking` (#515), not whether it has a
   row: an untracked product keeps its rows at 0 for the log, so every

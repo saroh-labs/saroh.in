@@ -6,9 +6,15 @@ jest.mock("@saroh/database", () => {
         product: { findFirst: jest.fn(), delete: jest.fn() },
         orderItem: { count: jest.fn() },
         stockEntry: { count: jest.fn() },
-        stockLevel: { count: jest.fn() },
+        stockLevel: {
+            count: jest.fn(),
+            findMany: jest.fn().mockResolvedValue([]),
+            deleteMany: jest.fn(),
+        },
+        collectionProduct: { deleteMany: jest.fn() },
         productListing: {
             findUnique: jest.fn().mockResolvedValue({ id: "l_1" }),
+            deleteMany: jest.fn(),
         },
         $queryRaw: jest.fn().mockResolvedValue([]),
         $transaction: jest.fn(),
@@ -80,4 +86,21 @@ describe("ProductsService.remove", () => {
             where: { id: "p_1" },
         });
     });
+
+    it.each([
+        { code: "P2034", message: "write conflict or a deadlock" },
+        { code: "P2010", meta: { code: "40P01" }, message: "raw query" },
+    ])(
+        "a lock conflict with a write in flight is a 409 to try again, not a 500 ($code)",
+        async (failure) => {
+            db.product!.delete!.mockRejectedValueOnce(
+                Object.assign(new Error(failure.message), failure),
+            );
+            await expect(service.remove("st_1", "p_1", "u_1")).rejects.toThrow(
+                new ConflictException(
+                    "Someone is changing this product right now. Try deleting it again.",
+                ),
+            );
+        },
+    );
 });
