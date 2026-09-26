@@ -66,7 +66,7 @@ each with why it stops there:
   reducer or hook seam, which is new logic.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
-  `orders/order-kitchen.service.ts` (831), `staff/staff.service.ts` (744).
+  `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
 - `organizations/organization-settings-form.tsx` (1,249) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
@@ -96,7 +96,7 @@ with why it stops there:
   writers and the order flows' writers are each a seam. Splitting them
   means exporting the private `Row` and lock helpers across files, and it
   hasn't been done yet.
-- `stock/reserve.ts` (876) — every hold, release, sale, kitchen undo and
+- `stock/reserve.ts` (901) — every hold, release, sale, kitchen undo and
   refund put-back an order makes, plus `reserveOnPayment`. They share one
   line loader, one lock order and the invariant (promised = sum of held).
   Online payment (`reserveOnPayment`) is the natural cut once the online
@@ -110,12 +110,12 @@ with why it stops there:
   (418) — the Stock screen's levels and log, and its four checks. Each is
   one reader. A little over, and cutting one splits a query from the words
   it builds.
-- `products/serialize.ts` (596), `products/inventory.service.ts` (536) and
-  `products/variants.service.ts` (479) — grew with listings, stock per
+- `products/serialize.ts` (596), `products/inventory.service.ts` (545) and
+  `products/variants.service.ts` (474) — grew with listings, stock per
   storefront, Track stock and the per-variant switch. `inventory.service`'s
   first switch (`switchStore`) and `serialize`'s stock words are the seams.
   Moving them is a file split with nothing to gain until they change again.
-- `products/products.service.ts` (846; 648 before this release) and
+- `products/products.service.ts` (904; 648 before this release) and
   `stores/stores.service.ts` (411) — the catalogue's reads and section
   saves, now business-wide with listings and the delete guard; and a
   storefront's create with its caps and, now, the business's currency. The
