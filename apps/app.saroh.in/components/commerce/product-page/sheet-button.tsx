@@ -9,9 +9,9 @@ import type { ProductDetail } from "@/lib/products/service";
 import { DescriptionSheet } from "./sheets/description-sheet";
 import { DetailsSheet } from "./sheets/details-sheet";
 import { PhotosSheet } from "./sheets/photos-sheet";
-import { StockSheet } from "./sheets/stock-sheet";
 
-export type SheetKind = "details" | "description" | "stock" | "photos";
+/** The stock sheet has its own button (`StockSheetButton`, #523). */
+export type SheetKind = "details" | "description" | "photos";
 
 /**
  * An "Edit" beside a panel of the product page. It opens that panel's quick
@@ -25,7 +25,6 @@ export function SheetButton({
     product,
     storeId,
     categories = [],
-    counts,
 }: {
     kind: SheetKind;
     label: string;
@@ -34,8 +33,6 @@ export function SheetButton({
     product: ProductDetail;
     storeId: string;
     categories?: { id: string; name: string }[];
-    /** The product counts stock (Track stock, #515); the stock sheet only. */
-    counts?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const common = { open, onOpenChange: setOpen, product, storeId };
@@ -55,9 +52,6 @@ export function SheetButton({
                 <DetailsSheet {...common} categories={categories} />
             ) : null}
             {kind === "description" ? <DescriptionSheet {...common} /> : null}
-            {kind === "stock" ? (
-                <StockSheet {...common} counts={counts} />
-            ) : null}
             {kind === "photos" ? <PhotosSheet {...common} /> : null}
         </>
     );

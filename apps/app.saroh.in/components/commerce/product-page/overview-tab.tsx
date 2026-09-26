@@ -1,39 +1,39 @@
-import { Badge } from "@saroh/ui/badge";
-import { Card } from "@saroh/ui/card";
-import Link from "next/link";
+import { cn } from "@saroh/ui/lib/utils";
 
-import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
-import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { mediaCounter } from "@/lib/products/editor-sections";
 import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
-import { onTheShop, ratingLabel } from "@/lib/products/overview-rules";
-import type { ProductTracking, SoldOutPlace } from "@/lib/products/tracking";
+import { discountAmount, ratingLabel } from "@/lib/products/overview-rules";
 import {
-    BUSINESS_NOT_TRACKING,
-    canMarkSoldOut,
-    TRACKING_LOCKED,
-    untrackedLine,
-} from "@/lib/products/tracking";
+    collectionsSummary,
+    openOrderLine,
+    ordersSummary,
+    websiteSummary,
+} from "@/lib/products/overview-words";
+import type { ProductTracking } from "@/lib/products/tracking";
+import { canMarkSoldOut } from "@/lib/products/tracking";
+import type { ProductStock } from "@/lib/stock/product-stock";
 
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
+import { OverviewDescription, OverviewPhotos } from "./overview-media";
 import {
     LinkedCard,
+    LinkedCardLink,
+    LinkedHeadline,
+    LinkedLines,
     PanelLine,
     ProductStat,
-    SectionTitle,
 } from "./overview-parts";
-import { SheetButton } from "./sheet-button";
-import { SoldOutActions } from "./sold-out-actions";
-import { StartTrackingButton } from "./tracking-actions";
+import { AvailabilityCard, VariantsStat } from "./overview-stats";
+import { UntrackedStat } from "./untracked-stat";
 
 /**
- * The product at a glance. Four numbers a merchant checks first, what is
- * linked to it (each read-only here, with its own tab), everything about it
- * with a tag saying whether customers see it, its photos and its words.
+ * The product at a glance (#522): two cards a merchant checks first — what
+ * can be sold (or how short it is) and its variants — then what is linked
+ * to it, each opening its own tab, its details in two groups, its photos
+ * and its words.
  */
 export function ProductOverviewTab({
     overview,
@@ -41,43 +41,56 @@ export function ProductOverviewTab({
     href,
     categories,
     tracking,
+    stock,
+    now,
 }: {
     overview: ProductOverview;
     storeId: string;
     href: (tab: ProductTab) => string;
     categories: { id: string; name: string }[];
     tracking: ProductTracking;
+    /** Its shelves at every storefront; null when that read failed. */
+    stock: ProductStock | null;
+    now: Date;
 }) {
-    const { product, stock, orders, reviews, discounts } = overview;
+    const { product, orders, reviews, discounts, placement } = overview;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency) ?? amount;
     const edit = (section?: EditorSection) =>
         productEditHref(storeId, product.id, section);
-    const tracked =
-        tracking.counts && (stock.mode === "variant" || stock.product !== null);
+    const counted =
+        overview.stock.mode === "variant" || overview.stock.product !== null;
+    const multi = (product.storefronts ?? []).length > 1;
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col">
             {product.status === "DRAFT" ? (
-                <DraftChecklist
-                    overview={overview}
-                    edit={edit}
-                    canWrite={overview.canWrite}
-                    counts={tracking.counts}
-                />
+                <div className="mb-4">
+                    <DraftChecklist
+                        overview={overview}
+                        edit={edit}
+                        canWrite={overview.canWrite}
+                        counts={tracking.counts}
+                    />
+                </div>
             ) : null}
 
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
+            <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
                 {tracking.counts ? (
-                    <ProductStat
-                        label="Can be sold now"
-                        value={tracked ? stock.totals.canSell : "—"}
-                        hint={
-                            tracked
-                                ? `${stock.totals.onHand} on hand, ${stock.totals.promised} promised`
-                                : "No stock count yet"
-                        }
-                    />
+                    counted ? (
+                        <AvailabilityCard
+                            overview={overview}
+                            stock={stock}
+                            multi={multi}
+                            href={href}
+                        />
+                    ) : (
+                        <ProductStat
+                            label="Can be sold now"
+                            value="—"
+                            hint="No stock count yet"
+                        />
+                    )
                 ) : (
                     <UntrackedStat
                         tracking={tracking}
@@ -87,405 +100,158 @@ export function ProductOverviewTab({
                         canMark={canMarkSoldOut(overview)}
                     />
                 )}
-                <ProductStat
-                    label="Variants"
-                    value={product.variants.length || "—"}
-                    hint={
-                        product.variants.length
-                            ? product.variants
-                                  .slice(0, 3)
-                                  .map(
-                                      (v) =>
-                                          `${v.title} ${money(v.price ?? product.price)}`,
-                                  )
-                                  .join(" · ")
-                            : "Sold as itself"
-                    }
+                <VariantsStat
+                    overview={overview}
+                    money={money}
+                    // Untracked, the Stock tab is left out of the row: this
+                    // card is the way to the sizes and their prices.
+                    href={tracking.counts ? null : href("stock")}
                 />
-                <ProductStat
-                    label="Last changed"
-                    value={
-                        <ViewerDate
-                            iso={overview.lastChanged}
-                            variant="dayMonth"
-                        />
-                    }
-                    hint={
-                        <ViewerDate iso={overview.lastChanged} variant="time" />
-                    }
-                />
-                <Link
-                    href={href("reviews")}
-                    className="rounded-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    <ProductStat
-                        className="h-full transition-colors hover:border-border-strong"
-                        label="Reviews"
-                        value={
-                            reviews.status === "ok"
-                                ? (ratingLabel(reviews.data.summary) ?? "—")
-                                : "—"
-                        }
-                        hint={
-                            reviews.status === "ok" ? (
-                                reviews.data.summary.count === 0 ? (
-                                    "None yet"
-                                ) : reviews.data.toAnswer > 0 ? (
-                                    <span className="text-brand">
-                                        {reviews.data.toAnswer} waiting for a
-                                        reply
-                                    </span>
-                                ) : (
-                                    "All answered"
-                                )
-                            ) : reviews.status === "failed" ? (
-                                "Couldn't load reviews"
-                            ) : (
-                                "Your role can't see reviews"
-                            )
-                        }
-                    />
-                </Link>
             </div>
 
-            <section className="flex flex-col gap-3">
-                <SectionTitle
-                    title="Linked to this product"
-                    aside="Read-only here. Each has its own tab, and links on to where it is managed."
-                />
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-2.5">
-                    <LinkedCard title="Orders" href={href("orders")}>
-                        {orders.status === "ok" ? (
-                            <>
-                                <p className="text-[14px] font-semibold">
-                                    {orders.data.openCount} open ·{" "}
-                                    {orders.data.thisMonthCount} this month
-                                </p>
-                                {orders.data.recent
+            <h2 className="mb-2.5 mt-1 font-display text-[15px] font-semibold tracking-[-0.015em]">
+                Linked to this product
+            </h2>
+            <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-2.5">
+                <LinkedCard title="Orders" href={href("orders")}>
+                    {orders.status === "ok" ? (
+                        <>
+                            <LinkedHeadline>
+                                {ordersSummary(
+                                    orders.data.openCount,
+                                    orders.data.thisMonthCount,
+                                    now,
+                                )}
+                            </LinkedHeadline>
+                            <LinkedLines
+                                lines={orders.data.recent
                                     .filter((o) => o.open)
                                     .slice(0, 3)
-                                    .map((o) => (
-                                        <p
-                                            key={o.id}
-                                            className="text-[12px] text-muted-foreground"
-                                        >
-                                            {o.orderNumber} {o.customer} —{" "}
-                                            {o.lines
-                                                .map(
-                                                    (l) =>
-                                                        `${l.title || product.name} × ${l.quantity}`,
-                                                )
-                                                .join(", ")}
-                                        </p>
-                                    ))}
-                            </>
-                        ) : (
-                            <PanelLine status={orders.status} what="orders" />
-                        )}
-                    </LinkedCard>
-                    <LinkedCard title="Reviews" href={href("reviews")}>
-                        {reviews.status === "ok" ? (
-                            <>
-                                <p className="text-[14px] font-semibold">
-                                    {ratingLabel(reviews.data.summary) ??
-                                        "No reviews yet"}
-                                </p>
-                                <p
-                                    className={
-                                        reviews.data.toAnswer > 0
-                                            ? "text-[12px] text-brand"
-                                            : "text-[12px] text-muted-foreground"
-                                    }
-                                >
-                                    {reviews.data.toAnswer > 0
-                                        ? `${reviews.data.toAnswer} waiting for a reply`
-                                        : reviews.data.summary.count > 0
-                                          ? "Every review has a reply or is answered"
-                                          : "Only people who bought it can review it"}
-                                </p>
-                            </>
-                        ) : (
-                            <PanelLine status={reviews.status} what="reviews" />
-                        )}
-                    </LinkedCard>
-                    <LinkedCard title="Discounts" href={href("discounts")}>
-                        {discounts.status === "ok" ? (
-                            <>
-                                <p className="text-[14px] font-semibold">
-                                    {
-                                        discounts.data.filter(
-                                            (d) => d.state === "ACTIVE",
-                                        ).length
-                                    }{" "}
-                                    apply now
-                                </p>
-                                {discounts.data
-                                    .filter((d) => d.state === "ACTIVE")
-                                    .slice(0, 2)
-                                    .map((d) => (
-                                        <p
-                                            key={d.id}
-                                            className="font-mono text-[12px] text-muted-foreground"
-                                        >
-                                            {d.code}
-                                        </p>
-                                    ))}
-                            </>
-                        ) : (
-                            <PanelLine
-                                status={discounts.status}
-                                what="discounts"
+                                    .map((o) => openOrderLine(o, product.name))}
                             />
-                        )}
-                    </LinkedCard>
-                </div>
-                {tracked ? (
-                    <p className="text-pretty text-[11.5px] text-muted-foreground">
-                        {promisedLine(stock.totals.promised, orders)}
-                    </p>
-                ) : null}
-            </section>
+                        </>
+                    ) : (
+                        <PanelLine
+                            status={orders.status}
+                            what="orders"
+                            retryHref={href("overview")}
+                        />
+                    )}
+                </LinkedCard>
+                <LinkedCard title="Discounts" href={href("discounts")}>
+                    {discounts.status === "ok" ? (
+                        (() => {
+                            const live = discounts.data.filter(
+                                (d) => d.state === "ACTIVE",
+                            );
+                            return (
+                                <>
+                                    <LinkedHeadline>
+                                        {live.length}{" "}
+                                        {live.length === 1
+                                            ? "applies"
+                                            : "apply"}{" "}
+                                        now
+                                    </LinkedHeadline>
+                                    <LinkedLines
+                                        lines={live.map(
+                                            (d) =>
+                                                `${d.code} — ${d.description ?? discountAmount(d, money)}`,
+                                        )}
+                                    />
+                                </>
+                            );
+                        })()
+                    ) : (
+                        <PanelLine status={discounts.status} what="discounts" />
+                    )}
+                </LinkedCard>
+                <LinkedCard title="Collections" href={href("collections")}>
+                    {placement?.status === "ok" ? (
+                        <>
+                            <LinkedHeadline>
+                                {collectionsSummary(placement.data).count}
+                            </LinkedHeadline>
+                            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                                {collectionsSummary(placement.data).names}
+                            </p>
+                        </>
+                    ) : (
+                        <PanelLine
+                            status={placement?.status ?? "failed"}
+                            what="collections"
+                        />
+                    )}
+                </LinkedCard>
+                <LinkedCard title="Website" href={href("collections")}>
+                    {placement?.status === "ok" ? (
+                        <>
+                            <LinkedHeadline>
+                                {websiteSummary(placement.data).headline}
+                            </LinkedHeadline>
+                            <LinkedLines
+                                lines={websiteSummary(placement.data).lines}
+                            />
+                        </>
+                    ) : (
+                        <PanelLine
+                            status={placement?.status ?? "failed"}
+                            what="the website's pages"
+                        />
+                    )}
+                </LinkedCard>
+                <LinkedCardLink title="Reviews" href={href("reviews")}>
+                    {reviews.status === "ok" ? (
+                        <>
+                            <span className="text-[14px] font-semibold">
+                                {ratingLabel(reviews.data.summary) ??
+                                    "No reviews yet"}
+                            </span>
+                            <span
+                                className={cn(
+                                    "text-[12px] leading-[1.45]",
+                                    reviews.data.toAnswer > 0
+                                        ? "text-brand"
+                                        : "text-muted-foreground",
+                                )}
+                            >
+                                {reviews.data.toAnswer > 0
+                                    ? `${reviews.data.toAnswer} waiting for a reply`
+                                    : reviews.data.summary.count > 0
+                                      ? "All answered"
+                                      : "Only people who bought it can review it"}
+                            </span>
+                        </>
+                    ) : (
+                        <PanelLine status={reviews.status} what="reviews" />
+                    )}
+                </LinkedCardLink>
+            </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] items-start gap-4">
                 <ProductDetailsCard
                     overview={overview}
                     storeId={storeId}
                     categories={categories}
-                />
-
-                <Card className="flex min-w-0 flex-col self-start rounded-[12px] px-4 pb-1 pt-3.5">
-                    <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-                        <h2 className="flex-1 text-[12.5px] text-muted-foreground">
-                            Photos
-                        </h2>
-                        {overview.canWrite ? (
-                            <SheetButton
-                                kind="photos"
-                                label="Edit"
-                                ariaLabel="Edit photos"
-                                product={product}
-                                storeId={storeId}
-                            />
-                        ) : null}
-                        <Link
-                            href={href("photos")}
-                            className="text-[12px] text-brand hover:text-foreground"
-                        >
-                            See all
-                        </Link>
-                    </div>
-                    {product.images.length > 0 ? (
-                        <div className="grid grid-cols-[2fr_1fr_1fr] gap-1.5">
-                            {product.images.slice(0, 5).map((img, i) => (
-                                <div
-                                    key={img.id}
-                                    className={
-                                        i === 0
-                                            ? "relative row-span-2 overflow-hidden rounded-[8px]"
-                                            : "relative aspect-[4/3] overflow-hidden rounded-[6px]"
-                                    }
-                                >
-                                    <MediaThumb
-                                        item={img}
-                                        alt={img.alt}
-                                        small={i > 0}
-                                        className={
-                                            i === 0 ? "aspect-[4/3]" : undefined
-                                        }
-                                    />
-                                    {i === 0 && img.kind !== "video" ? (
-                                        <span className="absolute left-1.5 top-1.5 rounded-full bg-foreground px-[7px] py-px text-[11px] font-semibold text-background">
-                                            Cover
-                                        </span>
-                                    ) : null}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="grid place-items-center rounded-[8px] border border-dashed border-border px-4 py-10 text-center text-[12.5px] text-muted-foreground">
-                            No photos yet — up to 15 photos and 3 videos; the
-                            first photo is the cover.
-                        </div>
-                    )}
-                    <p className="pb-3 pt-2 text-[11.5px] text-muted-foreground">
-                        {mediaCounter(product.images)}
-                    </p>
-                </Card>
-            </div>
-
-            <section className="flex flex-col gap-3">
-                <SectionTitle
-                    title="Description and ingredients"
-                    action={
-                        overview.canWrite ? (
-                            <SheetButton
-                                kind="description"
-                                label="Edit"
-                                ariaLabel="Edit description"
-                                product={product}
-                                storeId={storeId}
-                            />
-                        ) : null
+                    stock={
+                        !tracking.business
+                            ? null
+                            : !tracking.counts
+                              ? "untracked"
+                              : multi
+                                ? "tracked-per-storefront"
+                                : "tracked"
                     }
                 />
-                <Card className="max-w-[70ch] rounded-[12px] px-5 py-4">
-                    {product.description ? (
-                        <div
-                            className="prose prose-sm max-w-none text-foreground dark:prose-invert"
-                            // Sanitised by the API on every save (#461).
-                            dangerouslySetInnerHTML={{
-                                __html: product.description,
-                            }}
-                        />
-                    ) : (
-                        <p className="text-[13.5px] text-muted-foreground">
-                            No description yet.
-                        </p>
-                    )}
-                    {product.keyPoints.length > 0 ? (
-                        <ul className="mt-3 list-disc space-y-1 pl-5 text-[13.5px]">
-                            {product.keyPoints.map((p) => (
-                                <li key={p}>{p}</li>
-                            ))}
-                        </ul>
-                    ) : null}
-                </Card>
-                <Card className="max-w-[calc(70ch+40px)] rounded-[12px] px-[18px] py-1">
-                    <dl className="text-[13.5px]">
-                        <div className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-baseline gap-3 py-[11px]">
-                            <dt className="text-[12.5px] text-muted-foreground">
-                                Ingredients or material
-                            </dt>
-                            <dd className="min-w-0 break-words">
-                                {product.materials ?? (
-                                    <span className="text-muted-foreground">
-                                        Not given.
-                                    </span>
-                                )}
-                            </dd>
-                            {product.materials ? (
-                                onTheShop(product.shopFields, "materials") ? (
-                                    <Badge
-                                        variant="success"
-                                        className="rounded-full px-[7px] py-px text-[11px] font-semibold"
-                                    >
-                                        On the shop
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        variant="neutral"
-                                        className="rounded-full px-[7px] py-px text-[11px] font-semibold"
-                                    >
-                                        Team only
-                                    </Badge>
-                                )
-                            ) : (
-                                <span />
-                            )}
-                        </div>
-                    </dl>
-                </Card>
-            </section>
+                <OverviewPhotos
+                    overview={overview}
+                    storeId={storeId}
+                    photosHref={href("photos")}
+                />
+            </div>
+            <div className="mt-4">
+                <OverviewDescription overview={overview} storeId={storeId} />
+            </div>
         </div>
     );
-}
-
-/**
- * The design's untracked card: "Stock / Not tracked / Available on the
- * shop." — or "Sold out — marked by hand" (#515), naming the storefronts
- * when only some are. Track stock is Owner/Admin's, and only while the
- * business tracks stock; a stock-only role is told why it can't. Marking it
- * sold out is for anyone who may count stock: one button beside Track stock
- * with one storefront, a row per storefront with several. Everyone else
- * sees the state only.
- */
-function UntrackedStat({
-    tracking,
-    productId,
-    storeId,
-    places,
-    canMark,
-}: {
-    tracking: ProductTracking;
-    productId: string;
-    storeId: string;
-    places: readonly SoldOutPlace[];
-    canMark: boolean;
-}) {
-    const line = untrackedLine(places);
-    const soldOut = line !== "Available on the shop.";
-    const startTracking = tracking.business && tracking.control === "change";
-    const oneButton = canMark && places.length === 1;
-    return (
-        <Card className="rounded-[12px] px-[15px] py-[13px]">
-            <p className="text-[11.5px] text-muted-foreground">Stock</p>
-            <p className="mt-1 font-display text-[18px] font-semibold leading-tight">
-                Not tracked
-            </p>
-            <p
-                className={
-                    soldOut
-                        ? "mt-0.5 text-pretty text-[11.5px] font-medium text-destructive-subtle-foreground"
-                        : "mt-0.5 text-[11.5px] text-muted-foreground"
-                }
-            >
-                {line}
-            </p>
-            {!tracking.business ? (
-                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
-                    {BUSINESS_NOT_TRACKING}
-                </p>
-            ) : tracking.control === "locked" ? (
-                <p className="mt-2 text-pretty text-[11.5px] text-muted-foreground">
-                    {TRACKING_LOCKED}
-                </p>
-            ) : null}
-            {startTracking || oneButton ? (
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {startTracking ? (
-                        <StartTrackingButton
-                            productId={productId}
-                            storeId={storeId}
-                        />
-                    ) : null}
-                    {oneButton ? (
-                        <SoldOutActions productId={productId} places={places} />
-                    ) : null}
-                </div>
-            ) : null}
-            {canMark && places.length > 1 ? (
-                <SoldOutActions
-                    productId={productId}
-                    places={places}
-                    className="mt-2.5 border-t border-border pt-2"
-                />
-            ) : null}
-        </Card>
-    );
-}
-
-/** What the promised stock is, and which open orders hold it. */
-function promisedLine(
-    promised: number,
-    orders: ProductOverview["orders"],
-): string {
-    if (orders.status !== "ok") {
-        return `Promised stock (${promised}) comes from the product itself, so it is still right while orders are down.`;
-    }
-    if (promised === 0) return "Nothing is promised to an open order.";
-    const open = orders.data.recent.filter((o) => o.open);
-    // Older open orders than the recent ones read here can hold stock too.
-    if (open.length === 0)
-        return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders.`;
-    const held = open
-        .map(
-            (o) =>
-                `${o.orderNumber} (${o.lines.reduce((n, l) => n + l.quantity, 0)})`,
-        )
-        .join(", ");
-    return `The ${promised} promised in stock ${promised === 1 ? "is" : "are"} ${
-        open.length === 1
-            ? "this open order"
-            : `these ${open.length} open orders`
-    }: ${held}.`;
 }
