@@ -14,9 +14,11 @@ import { demoUser, urls } from "../playwright.config";
  * it: the product it makes is deleted afterwards, and one left by a failed
  * run goes the same way before it starts. It never counts stock there — a
  * count is history that is never deleted (DEC-032), so the product could
- * only be archived and would stay on the showcase. The Stock section's save
- * is checked on Northwind Supply instead, below. Photos go in by address,
- * since a test stack has no file storage.
+ * only be archived and would stay on the showcase. A new product starts
+ * untracked (#515), so it has no count to leave behind. The Stock section's
+ * save — Track stock on, then a count — is checked on Northwind Supply
+ * instead, below. Photos go in by address, since a test stack has no file
+ * storage.
  */
 
 const ORG = "seed_sc_ll_org";
@@ -126,12 +128,21 @@ test.describe("product editor", () => {
                 page.getByText("Variants saved.").first(),
             ).toBeVisible();
 
-            // 6–7. Stock is left uncounted here (see the header); each size
-            //    offers its own count.
+            // 6–7. Stock is left uncounted here (see the header). A new
+            //    product starts untracked (#515): the switch reads off and
+            //    the section says what that means, with no count to add.
             const stock = page.getByRole("region", { name: "Stock" });
             await expect(
-                stock.getByRole("button", { name: "Add stock" }),
+                stock.getByRole("switch", {
+                    name: "Track stock for this product",
+                }),
+            ).toHaveAttribute("aria-checked", "false");
+            await expect(
+                stock.getByText(/^Not tracked\. This product has no count/),
             ).toBeVisible();
+            await expect(
+                stock.getByRole("button", { name: "Add stock" }),
+            ).toHaveCount(0);
 
             // 8. Three photos by address; the first is the cover.
             const photos = page.getByRole("region", {
@@ -201,7 +212,8 @@ test.describe("product editor", () => {
     }, testInfo) => {
         test.setTimeout(120_000);
         // On Northwind: a count is history, so the product is set aside
-        // afterwards under one fixed name and brought back next run.
+        // afterwards under one fixed name and brought back next run. A new
+        // product starts untracked (#515), so Track stock goes on first.
         const name = `E2E Stock Count ${testInfo.project.name}`;
         const inventory = (id: string) =>
             `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`;
@@ -215,8 +227,31 @@ test.describe("product editor", () => {
                 price: "120.00",
                 status: "DRAFT",
             });
-            // A product brought back has a count already: aim for another
-            // number, so the save has something to change.
+
+            await page.goto(
+                `/commerce/products/${id}/edit?storefront=${NW.storeId}#sec-stock`,
+            );
+            const stock = page.getByRole("region", { name: "Stock" });
+
+            // Track stock on, as the owner would: a new product starts off;
+            // one brought back may be on already, and stays so.
+            const track = stock.getByRole("switch", {
+                name: "Track stock for this product",
+            });
+            await expect(track).toBeEnabled();
+            if ((await track.getAttribute("aria-checked")) === "false") {
+                await track.click();
+                await expect(
+                    page
+                        .getByText("Stock is tracked for this product again.")
+                        .first(),
+                ).toBeVisible();
+            }
+            await expect(track).toHaveAttribute("aria-checked", "true");
+
+            // Read after the switch, which starts every shelf at 0. A product
+            // brought back may have a count already: aim for another number,
+            // so the save has something to change.
             const before = await page.request.get(inventory(id), {
                 headers: nwHeader,
             });
@@ -226,10 +261,6 @@ test.describe("product editor", () => {
             };
             const target = quantity === 3 ? 2 : 3;
 
-            await page.goto(
-                `/commerce/products/${id}/edit?storefront=${NW.storeId}#sec-stock`,
-            );
-            const stock = page.getByRole("region", { name: "Stock" });
             const add = stock.getByRole("button", { name: "Add stock" });
             const onHand = page.locator("#pe-qty");
             await expect(add.or(onHand)).toBeVisible();
