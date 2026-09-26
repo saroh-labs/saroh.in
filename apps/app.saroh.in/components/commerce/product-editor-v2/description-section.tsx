@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 
 import { ShopSwitch } from "@/components/commerce/product-sections/shop-switch";
 import { patchProduct } from "@/lib/products/actions";
+import { descriptionNote } from "@/lib/products/editor-labels";
 import type { DescriptionValues } from "@/lib/products/editor-sections";
 import {
     descriptionFrom,
@@ -114,7 +115,9 @@ export function DescriptionSection({
                 className="mt-1.5"
                 tone={errors.description ? "bad" : "quiet"}
             >
-                {errors.description?.message ?? "Shown on the product page."}
+                {v.description.length > LIMITS.description
+                    ? descriptionNote(true)
+                    : (errors.description?.message ?? descriptionNote(false))}
             </FieldHelp>
 
             <div className="mt-4">

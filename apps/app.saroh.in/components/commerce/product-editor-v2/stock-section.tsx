@@ -1,14 +1,19 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import { Plus, TriangleAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { SoldOutActions } from "@/components/commerce/product-page/sold-out-actions";
 import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";
+import {
+    stockCounting,
+    stockDraftFrom,
+    stockLayout,
+    switchesToVariants,
+} from "@/lib/products/editor-stock";
 import type { ProductDetail } from "@/lib/products/service";
 import type { TrackingControl } from "@/lib/products/tracking";
 import {
@@ -18,81 +23,68 @@ import {
 } from "@/lib/products/tracking";
 
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp } from "./fields";
+import { FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
+import {
+    lowLines,
+    LowNote,
+    VariantStockTable,
+    WholeStock,
+} from "./stock-fields";
 import { TrackStockSwitch } from "./track-stock-switch";
 
 const DEFAULT_WARN = "10";
 
-function draftFrom(p: ProductDetail, defaultWarn: string): StockDraft {
-    const own = p.inventory;
-    const perVariant = p.stockMode === "variant";
-    // Moving to a count per variant counts every unit once: the API moves
-    // each open order's promise onto the variant it names, so each variant
-    // starts at what it promises, and the first also takes what was free to
-    // sell. Lines naming no variant stay promised on the product.
-    const free = Math.max(0, (own?.quantity ?? 0) - (own?.reserved ?? 0));
-    return {
-        quantity: String(own?.quantity ?? 0),
-        lowStockAlert: String(own?.lowStockAlert ?? defaultWarn),
-        lines: [...p.variants]
-            .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-            .map((v, i) => {
-                const promised = perVariant
-                    ? (v.inventory?.reserved ?? 0)
-                    : (p.variantPromises[v.id] ?? 0);
-                return {
-                    variantId: v.id,
-                    title: v.title || v.sku,
-                    quantity: String(
-                        perVariant
-                            ? (v.inventory?.quantity ?? 0)
-                            : promised + (i === 0 ? free : 0),
-                    ),
-                    lowStockAlert: String(
-                        v.inventory?.lowStockAlert ??
-                            own?.lowStockAlert ??
-                            defaultWarn,
-                    ),
-                    promised,
-                };
-            }),
-    };
-}
-
 const same = (a: StockDraft, b: StockDraft) =>
     JSON.stringify(a) === JSON.stringify(b);
 
+/** Only an owner or admin can make a product count per variant (#515). */
+const SPLIT_NEEDS_WRITE =
+    "Counting each variant changes how this product counts stock, so an owner or admin sets it up.";
+
 /**
- * Stock: how many there are and when to warn. Once a product has variants,
- * each keeps its own count — a small bottle runs out before a large one —
- * and the product's total is the sum. Promised stock is what open orders
- * hold; Orders sets it, so it is shown and never typed.
+ * Stock: how many there are and when to warn. Once a product counts per
+ * variant, each keeps its own count — a small bottle runs out before a large
+ * one — and the product's total is the sum. An older product with variants
+ * may still count as a whole; it is shown and counted that way until an
+ * owner or admin splits it (#525). Promised stock is what open orders hold;
+ * Orders sets it, so it is shown and never typed.
+ *
+ * A stock-only role (`inventory:write`) changes this section and nothing
+ * else; the Track stock switch stays locked for them, and the save sends
+ * counts only — the API refuses tracking and listing changes from them.
  */
 export function StockSection({
     product,
     storeId,
+    countedAt,
     defaultWarn,
     control,
 }: {
     product: ProductDetail;
     storeId: string;
+    /** The storefront whose shelf this counts, named when there are several. */
+    countedAt: string | null;
     /** Settings → Defaults: where a first count starts warning. */
     defaultWarn: number | null;
     /** Who may flip Track stock (#515): Owner/Admin, locked, or no switch. */
     control: TrackingControl;
 }) {
-    const { canWrite, states } = useEditor();
-    const ro = !canWrite;
-    const fromProduct = draftFrom(
+    const { canWrite, mayEdit, states } = useEditor();
+    const ro = !mayEdit("stock");
+    const fromProduct = stockDraftFrom(
         product,
         defaultWarn === null ? DEFAULT_WARN : String(defaultWarn),
     );
-    const loadedKey = JSON.stringify(fromProduct);
+    const counting = stockCounting(product);
+    const loadedKey = JSON.stringify([fromProduct, counting]);
     const [base, setBase] = useState(fromProduct);
     const [draft, setDraft] = useState(fromProduct);
     const [seen, setSeen] = useState(loadedKey);
-    const [adding, setAdding] = useState(false);
+    // Add stock, or Count each variant; kept through its save until the
+    // product comes back counted the new way, so the layout doesn't flicker.
+    const [opened, setOpened] = useState(false);
+    const [openedSaved, setOpenedSaved] = useState(false);
     if (seen !== loadedKey) {
         setSeen(loadedKey);
         setBase(fromProduct);
@@ -101,21 +93,22 @@ export function StockSection({
                 ? fromProduct
                 : mergeDraft(fromProduct, base, draft),
         );
+        setOpened(false);
+        setOpenedSaved(false);
     }
 
-    const perVariant = product.variants.length > 0;
-    const counted = perVariant
-        ? product.stockMode === "variant"
-        : product.inventory !== null;
+    const hasVariants = product.variants.length > 0;
+    const layout = stockLayout(counting, hasVariants, opened);
     // Track stock (#515): the business tracks stock, or this section isn't
     // drawn, so the product's own switch decides.
     const tracked = product.stockTracked;
-    const collapsed = !counted && !adding;
-    const dirty = tracked && (!same(draft, base) || (adding && !counted));
+    const dirty = tracked && (!same(draft, base) || (opened && !openedSaved));
+    const splitting = switchesToVariants(counting, layout);
 
     const qtyBad = !isCount(draft.quantity) || !isCount(draft.lowStockAlert);
     const reserved = product.inventory?.reserved ?? 0;
-    const belowPromised = perVariant
+    const lines = layout === "lines";
+    const belowPromised = lines
         ? draft.lines.find(
               (l) => isCount(l.quantity) && Number(l.quantity) < l.promised,
           )
@@ -133,20 +126,22 @@ export function StockSection({
         ? ""
         : variantsPending
           ? "Save variants first."
-          : (perVariant ? lineBad : qtyBad)
-            ? "Whole numbers, zero or more."
-            : belowPromised
-              ? `${belowPromised.promised} promised to open orders${
-                    belowPromised.title ? ` for ${belowPromised.title}` : ""
-                } — on hand can't go below that.`
-              : "";
+          : splitting && !canWrite
+            ? SPLIT_NEEDS_WRITE
+            : (lines ? lineBad : qtyBad)
+              ? "Whole numbers, zero or more."
+              : belowPromised
+                ? `${belowPromised.promised} promised to open orders${
+                      belowPromised.title ? ` for ${belowPromised.title}` : ""
+                  } — on hand can't go below that.`
+                : "";
 
     useSection(
         "stock",
         { dirty, problem },
         {
             save: async () => {
-                const res = perVariant
+                const res = lines
                     ? await setVariantStock(
                           storeId,
                           product.id,
@@ -165,12 +160,13 @@ export function StockSection({
                     return false;
                 }
                 setBase(draft);
-                setAdding(false);
+                if (opened) setOpenedSaved(true);
                 return true;
             },
             discard: () => {
                 setDraft(base);
-                setAdding(false);
+                setOpened(false);
+                setOpenedSaved(false);
             },
         },
     );
@@ -192,16 +188,24 @@ export function StockSection({
                 control={control}
                 onTurnedOff={() => {
                     setDraft(base);
-                    setAdding(false);
+                    setOpened(false);
                 }}
             />
         );
-    const lockedNote =
-        control === "locked" ? (
-            <p className="mb-2.5 text-[12px] text-muted-foreground">
-                {TRACKING_LOCKED}
-            </p>
-        ) : null;
+    const head = (
+        <>
+            {control === "locked" ? (
+                <p className="mb-2.5 text-[12px] text-muted-foreground">
+                    {TRACKING_LOCKED}
+                </p>
+            ) : null}
+            {countedAt && tracked ? (
+                <p className="mb-2.5 text-[12px] text-muted-foreground">
+                    Counted at {countedAt}.
+                </p>
+            ) : null}
+        </>
+    );
 
     if (!tracked) {
         // Sold out by hand (#515): anyone who may count stock marks it, per
@@ -215,7 +219,7 @@ export function StockSection({
                 aside={aside}
                 bodyClassName="pb-4 pt-2.5"
             >
-                {lockedNote}
+                {head}
                 <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                     {UNTRACKED_NOTE}
                 </p>
@@ -235,103 +239,64 @@ export function StockSection({
         );
     }
 
-    if (collapsed) {
+    if (layout === "collapsed") {
+        // A first count per variant changes how the product counts: an
+        // owner or admin's to start (#515).
+        const blocked = ro || (hasVariants && !canWrite);
         return (
             <SectionCard k="stock" title="Stock" aside={aside}>
-                {lockedNote}
+                {head}
                 <p className="mb-3 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
-                    {perVariant
+                    {hasVariants
                         ? `No stock count yet. Each of the ${product.variants.length} variants gets its own, so a small one can run out before a large one.`
                         : "No stock count yet. Add one to see how many you have and get a warning when it runs low."}
                 </p>
                 <button
                     type="button"
-                    disabled={ro}
-                    onClick={() => setAdding(true)}
-                    className="inline-flex h-[34px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-[13px] text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
+                    disabled={blocked}
+                    onClick={() => setOpened(true)}
+                    className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
                 >
                     <Plus aria-hidden className="size-3.5" strokeWidth={2.2} />
                     Add stock
                 </button>
+                {hasVariants && !canWrite && !ro ? (
+                    <FieldHelp className="mt-2">{SPLIT_NEEDS_WRITE}</FieldHelp>
+                ) : null}
             </SectionCard>
         );
     }
 
-    if (!perVariant) {
+    if (layout === "whole") {
         const qty = Number(draft.quantity);
         const low = Number(draft.lowStockAlert);
         const lowNow = !qtyBad && qty <= low;
         return (
             <SectionCard k="stock" title="Stock" aside={aside}>
-                {lockedNote}
-                <div className="flex flex-wrap items-start gap-3">
-                    <div className="min-w-[92px] flex-[0_1_112px]">
-                        <label
-                            htmlFor="pe-qty"
-                            className="mb-[5px] block text-[12px] font-medium"
-                        >
-                            On hand
-                        </label>
-                        <input
-                            id="pe-qty"
-                            type="number"
-                            min={0}
-                            inputMode="numeric"
-                            value={draft.quantity}
-                            disabled={ro}
-                            onChange={(e) =>
-                                setDraft({ ...draft, quantity: e.target.value })
-                            }
-                            className={boxClass({
-                                small: true,
-                                bad:
-                                    !isCount(draft.quantity) || !!belowPromised,
-                            })}
-                        />
-                    </div>
-                    <div className="min-w-[92px] flex-[0_1_112px]">
-                        <label
-                            htmlFor="pe-low"
-                            className="mb-[5px] block text-[12px] font-medium"
-                        >
-                            Warn at
-                        </label>
-                        <input
-                            id="pe-low"
-                            type="number"
-                            min={0}
-                            inputMode="numeric"
-                            value={draft.lowStockAlert}
-                            disabled={ro}
-                            onChange={(e) =>
-                                setDraft({
-                                    ...draft,
-                                    lowStockAlert: e.target.value,
-                                })
-                            }
-                            aria-label="Warn when on hand reaches"
-                            className={boxClass({
-                                small: true,
-                                bad: !isCount(draft.lowStockAlert),
-                            })}
-                        />
-                    </div>
-                    <div className="min-w-0 flex-[1_1_96px]">
-                        <p className="mb-[5px] text-[12px] font-medium">
-                            Promised to orders
-                        </p>
-                        <p className="flex h-8 items-center font-display text-[15px] font-semibold tabular-nums">
-                            {reserved}
-                        </p>
-                    </div>
-                </div>
-                <FieldHelp
-                    className="mt-[9px]"
-                    tone={problem ? "bad" : "quiet"}
-                >
-                    {problem ||
-                        "Promised to orders is set by Orders, so it cannot be changed here."}
-                </FieldHelp>
+                {head}
+                <WholeStock
+                    draft={draft}
+                    promised={reserved}
+                    ro={ro}
+                    qtyBad={!!belowPromised}
+                    noteBad={!!problem}
+                    note={
+                        problem ||
+                        (hasVariants
+                            ? "Counted for the whole product, not per variant: an order for any variant takes from this count. Promised updates itself as orders come in and are collected."
+                            : "Promised updates itself as orders come in and are collected.")
+                    }
+                    onChange={(patch) => setDraft({ ...draft, ...patch })}
+                />
+                {hasVariants && canWrite ? (
+                    <button
+                        type="button"
+                        onClick={() => setOpened(true)}
+                        className="mt-2 text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                    >
+                        Count each variant instead
+                    </button>
+                ) : null}
                 {lowNow ? (
                     <LowNote>
                         {qty === 0
@@ -345,147 +310,26 @@ export function StockSection({
         );
     }
 
-    const lowLines = draft.lines.filter(
-        (l) =>
-            isCount(l.quantity) &&
-            isCount(l.lowStockAlert) &&
-            Number(l.lowStockAlert) > 0 &&
-            Number(l.quantity) <= Number(l.lowStockAlert),
-    );
-    const total = draft.lines.reduce(
-        (n, l) => n + (isCount(l.quantity) ? Number(l.quantity) : 0),
-        0,
-    );
-    const promised = draft.lines.reduce((n, l) => n + l.promised, 0);
-    const grid =
-        "grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-1.5";
-
+    const low = lowLines(draft.lines);
     return (
         <SectionCard k="stock" title="Stock" aside={aside}>
-            {lockedNote}
-            <div
-                className={cn(
-                    grid,
-                    "pb-[5px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
-                )}
-            >
-                <span>Variant</span>
-                <span>On hand</span>
-                <span>Warn at</span>
-                <span className="text-right">Promised</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-                {draft.lines.map((l) => {
-                    const low = lowLines.includes(l);
-                    return (
-                        <div
-                            key={l.variantId}
-                            className={cn(grid, "items-center")}
-                        >
-                            <span className="flex min-w-0 items-center gap-1.5">
-                                {low ? (
-                                    <span
-                                        aria-hidden
-                                        className="size-[7px] shrink-0 rounded-full bg-highlight"
-                                    />
-                                ) : null}
-                                <span className="truncate text-[12.5px] font-medium">
-                                    {l.title}
-                                </span>
-                            </span>
-                            <input
-                                type="number"
-                                min={0}
-                                inputMode="numeric"
-                                value={l.quantity}
-                                disabled={ro}
-                                aria-label={`${l.title} on hand`}
-                                onChange={(e) =>
-                                    setLine(l.variantId, {
-                                        quantity: e.target.value,
-                                    })
-                                }
-                                className={boxClass({
-                                    small: true,
-                                    bad:
-                                        !isCount(l.quantity) ||
-                                        Number(l.quantity) < l.promised,
-                                })}
-                            />
-                            <input
-                                type="number"
-                                min={0}
-                                inputMode="numeric"
-                                value={l.lowStockAlert}
-                                disabled={ro}
-                                aria-label={`${l.title} warn when on hand reaches`}
-                                onChange={(e) =>
-                                    setLine(l.variantId, {
-                                        lowStockAlert: e.target.value,
-                                    })
-                                }
-                                className={boxClass({
-                                    small: true,
-                                    bad: !isCount(l.lowStockAlert),
-                                })}
-                            />
-                            <span className="text-right font-display text-[14px] font-semibold tabular-nums">
-                                {l.promised}
-                            </span>
-                        </div>
-                    );
-                })}
-                <div
-                    className={cn(
-                        grid,
-                        "mt-0.5 items-center border-t border-border/70 pt-2",
-                    )}
-                >
-                    <span className="text-[12.5px] text-foreground/75">
-                        Whole product
-                    </span>
-                    <span className="pl-2.5 font-display text-[14px] font-semibold tabular-nums">
-                        {total}
-                    </span>
-                    <span />
-                    <span className="text-right font-display text-[14px] font-semibold tabular-nums">
-                        {promised}
-                    </span>
-                </div>
-            </div>
+            {head}
+            <VariantStockTable lines={draft.lines} ro={ro} onLine={setLine} />
             <FieldHelp className="mt-[9px]" tone={problem ? "bad" : "quiet"}>
                 {problem ||
-                    (product.stockMode === "variant" || !product.inventory
-                        ? "Each variant counts on its own; the product's total is the sum. Promised to orders is set by Orders."
-                        : "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — nothing on the shelf is lost or counted twice.")}
+                    (splitting && counting === "whole"
+                        ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — nothing on the shelf is lost or counted twice."
+                        : "Each variant has its own count, and the product's total is the sum. Promised updates itself as orders come in and are collected.")}
             </FieldHelp>
-            {lowLines.length > 0 && !problem ? (
+            {low.length > 0 && !problem ? (
                 <LowNote>
-                    {lowLines
+                    {low
                         .map((l) => `${l.title} has ${l.quantity} left`)
                         .join(", ")}{" "}
-                    — at or under {lowLines.length === 1 ? "its" : "their"}{" "}
-                    warning level.
+                    — at or under {low.length === 1 ? "its" : "their"} warning
+                    level.
                 </LowNote>
             ) : null}
         </SectionCard>
-    );
-}
-
-function LowNote({ children }: { children: React.ReactNode }) {
-    return (
-        <div
-            role="status"
-            className="mt-2.5 flex items-start gap-[9px] rounded-[9px] bg-brand-subtle px-3 py-2.5"
-        >
-            <TriangleAlert
-                aria-hidden
-                className="mt-px size-[15px] shrink-0 text-brand"
-                strokeWidth={1.9}
-            />
-            <span className="text-pretty text-[12px] leading-[1.5] text-brand-subtle-foreground">
-                {children}
-            </span>
-        </div>
     );
 }

@@ -1,5 +1,9 @@
 "use server";
 
+import {
+    listProductAt as listProductAtApi,
+    unlistProductAt as unlistProductAtApi,
+} from "./listings";
 import type {
     CategoryInput,
     InventoryInput,
@@ -137,4 +141,18 @@ export async function reorderVariants(
     ids: string[],
 ) {
     return reorderVariantsApi(storeId, productId, ids);
+}
+
+/** Sell it at a storefront, those variants there (#525); `store:write`. */
+export async function listProductAt(
+    productId: string,
+    storeId: string,
+    variantIds: string[],
+) {
+    return listProductAtApi(productId, storeId, variantIds);
+}
+
+/** Stop selling it at a storefront; its shelf keeps the stock. */
+export async function unlistProductAt(productId: string, storeId: string) {
+    return unlistProductAtApi(productId, storeId);
 }

@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 
 import { ShopSwitch } from "@/components/commerce/product-sections/shop-switch";
 import { patchProduct } from "@/lib/products/actions";
+import { detailsCopy } from "@/lib/products/editor-labels";
 import type { DetailsValues } from "@/lib/products/editor-sections";
 import {
     detailsFrom,
@@ -78,12 +79,18 @@ export function DetailsSection({
     const { isDirty, errors } = form.formState;
     const v = form.watch();
     const ro = !canWrite;
+    const copy = detailsCopy(allergens.length > 0);
+    // Creating: the allergens go with the create call, like every other
+    // field here (#525).
+    const allergenPatch = () =>
+        contains.length || may.length ? { contains, mayContain: may } : {};
     const howLong = v.howToUse.length > LIMITS.howToUse;
 
     useSection(
         "details",
         {
             dirty: isDirty || allergensDirty,
+            note: copy.saves,
             problem: howLong
                 ? `Keep the line under ${LIMITS.howToUse} characters.`
                 : firstProblem(detailsSchema, v),
@@ -110,17 +117,20 @@ export function DetailsSection({
                 setContains(baseContains);
                 setMay(baseMay);
             },
-            collect: () => detailsPatch(form.getValues()),
+            collect: () => ({
+                ...detailsPatch(form.getValues()),
+                ...allergenPatch(),
+            }),
         },
     );
 
     return (
-        <SectionCard k="details" title="How to use and ingredients">
+        <SectionCard k="details" title={copy.title}>
             <FieldLabel
                 htmlFor="pe-how"
                 aside={
                     <ShopSwitch
-                        field="How to use"
+                        field={copy.how.field}
                         checked={v.showHowToUse}
                         disabled={ro}
                         onCheckedChange={(on) =>
@@ -131,13 +141,13 @@ export function DetailsSection({
                     />
                 }
             >
-                How to use or care for it
+                {copy.how.label}
             </FieldLabel>
             <input
                 id="pe-how"
                 {...form.register("howToUse")}
                 disabled={ro}
-                placeholder="Two drops, morning and night, on clean skin."
+                placeholder={copy.how.placeholder}
                 aria-invalid={howLong || !!errors.howToUse}
                 className={boxClass({ bad: howLong || !!errors.howToUse })}
             />
@@ -147,15 +157,14 @@ export function DetailsSection({
             >
                 {howLong
                     ? `Keep the line under ${LIMITS.howToUse} characters.`
-                    : (errors.howToUse?.message ??
-                      "One line under the price. Every variant shares it.")}
+                    : (errors.howToUse?.message ?? copy.how.help)}
             </FieldHelp>
 
             <FieldLabel
                 htmlFor="pe-materials"
                 aside={
                     <ShopSwitch
-                        field="Ingredients or material"
+                        field={copy.materials.field}
                         checked={v.showMaterials}
                         disabled={ro}
                         onCheckedChange={(on) =>
@@ -166,14 +175,14 @@ export function DetailsSection({
                     />
                 }
             >
-                Ingredients or material
+                {copy.materials.label}
             </FieldLabel>
             <textarea
                 id="pe-materials"
                 {...form.register("materials")}
                 rows={2}
                 disabled={ro}
-                placeholder="Aqua, Ethyl ascorbic acid, Glycerin… — or 100% linen"
+                placeholder={copy.materials.placeholder}
                 aria-invalid={!!errors.materials}
                 className={cn(
                     boxClass({ bad: !!errors.materials }),
@@ -190,7 +199,7 @@ export function DetailsSection({
                     list={allergens}
                     contains={contains}
                     may={may}
-                    disabled={ro || !product}
+                    disabled={ro}
                     onContains={(ids) => {
                         setContains(ids);
                         // One allergen is either in it or may be: not both.
@@ -244,7 +253,7 @@ function Allergens({
                         disabled={disabled}
                         onClick={() => onChange(toggle(ids, a.id))}
                         className={cn(
-                            "inline-flex h-8 items-center rounded-full border px-[13px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
+                            "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
                             on
                                 ? "border-foreground bg-foreground font-semibold text-background"
                                 : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",

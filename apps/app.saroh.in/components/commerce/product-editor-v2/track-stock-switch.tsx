@@ -80,14 +80,13 @@ export function TrackStockSwitch({
                 className={cn(
                     "relative h-[22px] w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed coarse:after:absolute coarse:after:-inset-[11px] coarse:after:content-['']",
                     tracked ? "bg-foreground" : "bg-border-strong",
-                    locked && "opacity-60",
                     pending && "cursor-wait opacity-70",
                 )}
             >
                 <span
                     aria-hidden
                     className={cn(
-                        "absolute top-[3px] size-4 rounded-full bg-background [transition:left_120ms_ease-out]",
+                        "absolute top-[3px] size-4 rounded-full bg-card [transition:left_120ms_ease-out]",
                         tracked ? "left-[17px]" : "left-[3px]",
                     )}
                 />
