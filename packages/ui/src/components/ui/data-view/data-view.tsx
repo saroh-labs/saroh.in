@@ -726,7 +726,20 @@ export function DataView<TRow>({
                             <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
                                 <div className="min-w-0 space-y-1">
                                     <div className="truncate font-medium">
-                                        {primary?.cell(row)}
+                                        {!href && onRowClick ? (
+                                            // A real button, as in the table:
+                                            // the row's name and its one
+                                            // keyboard stop.
+                                            <button
+                                                type="button"
+                                                onClick={() => onRowClick(row)}
+                                                className="block w-full min-w-0 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            >
+                                                {primary?.cell(row)}
+                                            </button>
+                                        ) : (
+                                            primary?.cell(row)
+                                        )}
                                     </div>
                                     {rest.length ? (
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -783,6 +796,19 @@ export function DataView<TRow>({
                                         aria-hidden
                                         tabIndex={-1}
                                         className="absolute inset-0"
+                                    />
+                                ) : onRowClick ? (
+                                    // The same overlay for a row that opens
+                                    // in place (a quick look) rather than at
+                                    // an address. Without it a list row did
+                                    // nothing when tapped, so a phone could
+                                    // never open one.
+                                    <button
+                                        type="button"
+                                        aria-hidden
+                                        tabIndex={-1}
+                                        onClick={() => onRowClick(row)}
+                                        className="absolute inset-0 cursor-pointer"
                                     />
                                 ) : null}
                                 {/* Clicks fall through to the overlay EXCEPT on
