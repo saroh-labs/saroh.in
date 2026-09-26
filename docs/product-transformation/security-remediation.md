@@ -1,8 +1,11 @@
 # Security remediation
 
-> Audit-only cycle — **nothing here is implemented**. Every finding is stated
-> with evidence, impact and acceptance criteria so remediation can be reviewed
-> before code changes.
+> Written as an audit (2026-07-31), before any fix. Every finding is stated
+> with evidence, impact and acceptance criteria. The **Status** column and the
+> status line under each finding are a later pass (#135, 2026-09-26), checked
+> against the code on `development`, not against earlier claims. Evidence below
+> each status line is the original audit and still describes the code as it
+> was then.
 >
 > Companion to [`current-state-audit.md`](./current-state-audit.md).
 
@@ -10,21 +13,36 @@
 
 ## Summary
 
-| ID      | Finding                                                | Confidence             | Priority | Effort |
-| ------- | ------------------------------------------------------ | ---------------------- | -------- | ------ |
-| SEC-001 | Idempotency replay silently discards a mutation        | CONFIRMED (reproduced) | **P0**   | L      |
-| SEC-002 | Admin authorization fails **open** on missing metadata | CONFIRMED (read)       | **P0**   | M      |
-| SEC-003 | Support-access enforcement is not wired                | CONFIRMED (grep)       | **P0**   | M      |
-| SEC-004 | RLS policies fail open; enforcement disabled           | CONFIRMED (read)       | **P1**   | XL     |
-| SEC-005 | `Customer.organizationId` nullable — RLS blocker       | CONFIRMED (schema)     | **P1**   | M      |
-| SEC-006 | No cross-tenant negative tests                         | CONFIRMED              | **P1**   | M      |
-| SEC-007 | Staff cannot revoke another staff member's session     | CONFIRMED              | **P2**   | S      |
-| SEC-008 | Access denials audit through a swallowing path         | CONFIRMED              | **P2**   | S      |
-| SEC-009 | Concurrent duplicate idempotency keys surface as 500   | CONFIRMED              | **P2**   | S      |
+| ID      | Finding                                                | Priority | Status (2026-09-26)                                                                               |
+| ------- | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------- |
+| SEC-001 | Idempotency replay silently discards a mutation        | **P0**   | **Fixed** — `2136ec13` (flags, 409 on a changed request); access-session replay `d44751c9` (#135) |
+| SEC-002 | Admin authorization fails **open** on missing metadata | **P0**   | **Fixed** — `acd624c6`                                                                            |
+| SEC-003 | Support-access enforcement is not wired                | **P0**   | **Fixed**, one criterion open — `a44fc2ee` (#139), `b6a08df2`; no job sweeps lapsed sessions yet  |
+| SEC-004 | RLS policies fail open; enforcement disabled           | **P1**   | **Open** — built and tested (`88022d72`, `a5115ef9`, #53), not switched on in any environment     |
+| SEC-005 | `Customer.organizationId` nullable — RLS blocker       | **P1**   | **Open** — rows backfilled and writes stamp it (`56e0be6e`); the column is still nullable         |
+| SEC-006 | No cross-tenant negative tests                         | **P1**   | **Fixed** for the HTTP path — app-layer specs in 49 files, RLS isolation spec (#53); see below    |
+| SEC-007 | Staff cannot revoke another staff member's session     | **P2**   | **Fixed** — `4c39646d`                                                                            |
+| SEC-008 | Access denials audit through a swallowing path         | **P2**   | **Fixed** — `4c39646d`, `b6a08df2`                                                                |
+| SEC-009 | Concurrent duplicate idempotency keys surface as 500   | **P2**   | **Fixed** — `2136ec13` (P2002 → 409)                                                              |
+
+No item is left reproduced and unfixed. The two **Open** rows aren't
+reproductions of a live defect. SEC-004 is a rollout still waiting on an
+operator step (`docs/architecture/RLS_ROLLOUT_AND_OPS.md` §1), and SEC-005 is
+a schema constraint still to add. Both are listed there as pre-flights.
 
 ---
 
 ## SEC-001 · Idempotency replay silently discards a mutation
+
+> **Status: Fixed.** The flag mutations go through `IdempotencyService`
+> (`common/idempotency/idempotency.service.ts`, `2136ec13`): the same key with
+> the same fingerprint replays, and a changed request gets `409`. Opening an
+> access session kept its own key and still short-circuited. Replaying a
+> revoked session answered `201`, which is the second reproduction above. The
+> #135 pass fixed it (`d44751c9`, `admin-access.service.ts`): a replay now re-checks the
+> organization, refuses a session that has been revoked or has lapsed, and
+> refuses the same key with a different reason (`409`). Tests are in
+> `admin-access.service.spec.ts`. Acceptance 1–6 hold.
 
 **P0 · CONFIRMED (reproduced live 2026-07-31) · Effort L**
 
@@ -124,6 +142,11 @@ None. Can start immediately.
 
 ## SEC-002 · Admin authorization fails open on missing route metadata
 
+> **Status: Fixed** (`acd624c6`). `PlatformPermissionGuard` refuses a route
+> with no permission metadata and names the fix. `@IdentityOnly()` is the
+> explicit marker (`/admin/me`). `admin.controller.permissions.spec.ts`
+> discovers every route from Nest's router, not from a list.
+
 **P0 · CONFIRMED (read) · Effort M**
 
 ### Evidence
@@ -193,6 +216,15 @@ None.
 
 ## SEC-003 · Support-access enforcement is not wired
 
+> **Status: Fixed, with one criterion open.** `OrganizationAccessSessionGuard`
+> and `@RequireOrganizationAccessSession()` gate the business page, and
+> `authorize()` has a production caller (`a44fc2ee`, #139). Denials fail
+> closed when they can't be audited (`b6a08df2`). **Still open: acceptance 2.**
+> No job sweeps lapsed sessions. A session is marked expired the first time
+> someone uses it after `expiresAt`, and `authorize()` refuses it either way,
+> so a lapsed session grants nothing. But the row keeps saying "open" until
+> it's touched.
+
 **P0 · CONFIRMED · Effort M**
 
 ### Evidence
@@ -250,6 +282,16 @@ Benefits from SEC-001 (the session replay bug is an idempotency bug).
 ---
 
 ## SEC-004 · RLS policies fail open; enforcement disabled
+
+> **Status: Open (rollout).** Every business-owned table now has an
+> empty-string-safe, FORCEd policy (`88022d72`, and #53 for the last 16).
+> `rls-coverage.test.ts` fails CI on a table without one (acceptance 4). The
+> enforcement proxy and interceptor are built (`a5115ef9`), and the whole
+> integration suite passes under a NOBYPASSRLS role with enforcement on (#53).
+> Acceptance 1 is **not** met in any environment: the runtime role still
+> bypasses RLS and `RLS_ENFORCEMENT` is off. The runbook is
+> `RLS_ROLLOUT_AND_OPS.md` §1. Acceptance 3 (an explicit system context for
+> jobs) isn't built. Jobs still rely on "no context means every row".
 
 **P1 · CONFIRMED · Effort XL**
 
@@ -324,6 +366,14 @@ remaining work is operational.
 
 ## SEC-005 · `Customer.organizationId` is nullable
 
+> **Status: Open.** Acceptance 1 holds in migrated environments: every
+> commerce row was backfilled from its store, and the write paths stamp
+> `organizationId` (`56e0be6e`, migration `20260830120000`). Acceptance 2 is
+> not met, because `Customer.organizationId` (and `Cart`, `Order`,
+> `Inventory`) is still `String?`. The RLS runbook counts NULL rows as a
+> pre-flight before enforcement. Acceptance 3 (auto-link to a contact) is not
+> built.
+
 **P1 · CONFIRMED · Effort M**
 
 ### Evidence
@@ -379,6 +429,14 @@ None. **Blocks SEC-004.**
 
 ## SEC-006 · No cross-tenant negative tests
 
+> **Status: Fixed for the org-scoped HTTP path.** 49 spec files assert that a
+> read or write from another organization is refused or finds nothing (e.g.
+> `orders.service.org-scope.spec.ts`, `catalogue.org-scope.db.spec.ts`). The
+> RLS isolation spec proves it at the database for the tables #53 covered.
+> The whole suite also runs under enforcement in CI. Jobs, webhooks and public
+> routes still run with no org context by design. Their tests prove scoping
+> in the application, not in the database; see SEC-004 acceptance 3.
+
 **P1 · CONFIRMED · Effort M**
 
 ### Evidence
@@ -421,6 +479,8 @@ Requires a provisioned test database (currently absent locally).
 
 ## SEC-007 · Staff cannot revoke another staff member's session
 
+> **Status: Fixed** (`4c39646d`). Revocation is scoped to the organization, not the opener: any staff member with `organization:view-as` can close a colleague's session, and the audit records who revoked whose.
+
 **P2 · CONFIRMED · Effort S**
 
 `admin-access.service.ts:233-240` requires `session.actorUserId ===
@@ -439,6 +499,8 @@ the audit records who revoked whose.
 
 ## SEC-008 · Access denials audit through a swallowing path
 
+> **Status: Fixed** (`4c39646d`, `b6a08df2`). `deny()` no longer goes through the swallowing `recordRead`: an unauditable denial fails the request.
+
 **P2 · CONFIRMED · Effort S**
 
 `admin-access.service.ts:303` routes denials through
@@ -456,6 +518,8 @@ the signal the ledger exists to capture.
 ---
 
 ## SEC-009 · Concurrent duplicate keys surface as 500
+
+> **Status: Fixed** (`2136ec13`). `IdempotencyService` maps the unique-key race (`P2002`) to `409`.
 
 **P2 · CONFIRMED · Effort S**
 
