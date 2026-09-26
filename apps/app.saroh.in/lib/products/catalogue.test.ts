@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogueRow } from "./catalogue";
-import { catalogueRows, initials, priceRange, stockWords } from "./catalogue";
+import {
+    catalogueRows,
+    initials,
+    priceRange,
+    rowFacts,
+    stockWords,
+} from "./catalogue";
 import { catalogueProduct } from "./catalogue.fixture";
 
 /** The single row a case expects; fails the test when there is not exactly one. */
@@ -12,6 +18,37 @@ function only(rows: CatalogueRow[]): CatalogueRow {
     }
     return row;
 }
+
+describe("the row's second line (#524)", () => {
+    const places = [
+        { storeName: "Hill Road" },
+        { storeName: "Online" },
+    ] as CatalogueRow["places"];
+
+    it("says its variants, SKU and storefronts, as the design does", () => {
+        expect(
+            rowFacts({ variantCount: 1, sku: "RYE-800", places }, true),
+        ).toEqual({
+            variants: "1 variant",
+            sku: "RYE-800",
+            places: "Hill Road · Online",
+        });
+        expect(rowFacts({ variantCount: 3, sku: null, places }, false)).toEqual(
+            { variants: "3 variants", sku: null, places: null },
+        );
+    });
+
+    it("never says 0 variants", () => {
+        expect(rowFacts({ variantCount: 0, sku: null, places }, true)).toEqual({
+            variants: null,
+            sku: null,
+            places: "Hill Road · Online",
+        });
+        expect(
+            rowFacts({ variantCount: 0, sku: null, places: [] }, true),
+        ).toEqual({ variants: null, sku: null, places: null });
+    });
+});
 
 describe("catalogueRows (#531, #519)", () => {
     it("is one row per catalogue product, naming every storefront that sells it", () => {
