@@ -88,10 +88,11 @@ each with why it stops there:
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:
 
-- `stock/stock.service.ts` (1,106) — the stock module's one writer: every
+- `stock/stock.service.ts` (1,147) — the stock module's one writer: every
   shelf change (count, received, wasted, returned, move, undo, and the
   order flows' sale and return) goes through `recordEntry` or the batched
-  count and undo, under one set of lock and below-zero rules. It also finds
+  count and undo, under one set of lock and below-zero rules — and, with
+  no entry, `setWarnings` (a warning level alone, #534). It also finds
   and creates rows under the product's lock. Row resolution, the batch
   writers and the order flows' writers are each a seam. Splitting them
   means exporting the private `Row` and lock helpers across files, and it
@@ -107,17 +108,19 @@ with why it stops there:
   category tree. The product page's reads (`forProduct`, `setForProduct`)
   could move to their own service, as the controller's product routes
   already are.
-- `stock/levels-read.ts` (442) and `stock/stock-checks.service.ts`
-  (438) — the Stock screen's levels, and its four checks. Each is one
+- `stock/levels-read.ts` (423) and `stock/stock-checks.service.ts`
+  (448) — the Stock screen's levels, and its four checks. Each is one
   reader, now paged (#527). The levels left `stock-reads.service.ts` (217
-  now, the log) when paging grew them; a little over, and cutting one
-  splits a query from the words it builds.
+  now, the log) when paging grew them, and how a product's lines and
+  cells are drawn and judged went to `stock/product-lines.ts` (#534), which
+  the Products list's Needs you shares; a little over, and cutting either
+  further splits a query from the words it builds.
 - `products/serialize.ts` (596), `products/inventory.service.ts` (545) and
   `products/variants.service.ts` (474) — grew with listings, stock per
   storefront, Track stock and the per-variant switch. `inventory.service`'s
   first switch (`switchStore`) and `serialize`'s stock words are the seams.
   Moving them is a file split with nothing to gain until they change again.
-- `products/products.service.ts` (904; 648 before this release) and
+- `products/products.service.ts` (927; 648 before this release) and
   `stores/stores.service.ts` (411) — the catalogue's reads and section
   saves, now business-wide with listings and the delete guard; and a
   storefront's create with its caps and, now, the business's currency. The
@@ -128,11 +131,18 @@ with why it stops there:
   `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
   (481) — one-off backfills, each one exported unit that the integration
   suite runs twice. The merge is already split, into deciding and moving.
-- `stores/catalogue-screen.tsx` (412; 401 before the Collections chip,
+- `stores/catalogue-screen.tsx` (425; 401 before the Collections chip,
   #524) — the Products list's rows, paging, bulk bar, quick look and
   delete confirm share its list state. The Collections chip's cards and
   sheet went to their own `commerce/collections/collections-panel.tsx`,
   passed in as a slot; the list's reload and paging are the next seam.
+- `commerce/collections/collection-sheet.tsx` (401; #524) — New and Edit
+  collection: reading the one to edit, its draft and field errors, the
+  save, the delete confirm and the leave-unsaved confirm share its state.
+  The fields and the products picker already went to
+  `collection-fields.tsx`, `kind-choice.tsx` and `products-picker.tsx`;
+  the load-save-delete flow, as a hook, is the next seam. One line over,
+  and not yet cut.
 - `sites/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
   upload state. Less means an upload hook, which is new logic.
@@ -159,7 +169,7 @@ the words for them went to `activity-changes.ts` (265), leaving the line an
 event becomes. The Editor's `variants-section.tsx` (822 before; 390 now, #525)
 went along its row, its add row and its save — `variant-row.tsx`,
 `variant-add-row.tsx`, `variant-save.ts`, with the row rules in
-`lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 335
+`lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 332
 now) along its two ways of counting, to `stock-fields.tsx` and
 `lib/products/editor-stock.ts`.
 

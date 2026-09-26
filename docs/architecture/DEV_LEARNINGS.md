@@ -539,6 +539,23 @@ transaction with `docChanged`. Anything that feeds a Tiptap editor's HTML
 into a dirty check should ignore updates that didn't change the document.
 **Category**: frontend · `apps/app.saroh.in/components/commerce/product-sections/description-editor.tsx` · `frontend-forms.md`
 
+## Database — Load more skipped a product in the Needs you view (#534)
+
+**Problem**: On the Products list's Needs you view, restocking the last row
+with its own "+N · Add" and then pressing Load more never showed the next
+product.
+**Root cause**: The page read used Prisma's `cursor: { id }, skip: 1`.
+Prisma finds the cursor row's place from the row itself, whether or not the
+`where` still keeps it, and `skip: 1` then throws away the first row after
+it — a real one, once the cursor row has left the filter (restocked out of
+Needs you, archived out of a collection, renamed out of a search).
+**Fix**: An explicit keyset: read the cursor product's `createdAt` (scoped
+to the organization) and add `createdAt < c OR (createdAt = c AND id > c.id)`
+to the where, matching the order `[createdAt desc, id asc]`; no `cursor`,
+no `skip` (`afterInList` in `products/catalogue-page.ts`). Any paged read
+whose filter can drop the cursor row needs the same.
+**Category**: database · Prisma · `apps/api.saroh.in/src/modules/products/catalogue-page.ts`
+
 ## Security — a CodeQL ReDoS alert: fixed without knowing whether it mattered
 
 **Problem**: CodeQL raised `js/polynomial-redos` (and, alongside it,
