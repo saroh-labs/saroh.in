@@ -26,7 +26,7 @@ import {
 } from "../orders/order-refunds";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
-import { assertPutBack, returnableUnits } from "../stock/reserve";
+import { assertPutBack, returnablePlan } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import type {
     MerchantProvider,
@@ -243,7 +243,7 @@ async function planPutBack(
     }
     if (asked.size > 0) {
         assertPutBack(
-            await returnableUnits(tx, orderId),
+            await returnablePlan(tx, orderId),
             Array.from(asked, ([itemId, quantity]) => ({ itemId, quantity })),
         );
     }

@@ -162,6 +162,16 @@ export function putBackRefusal(returnable: number): string {
         : "None of that line can go back in stock — it wasn't handed over, or it's back already.";
 }
 
+/**
+ * Why lines of one order that came off the same shelf can't all go back:
+ * together they ask for more than the order can bring back there.
+ */
+export function putBackTogetherRefusal(returnable: number): string {
+    return returnable > 0
+        ? `Only ${returnable} of these lines can go back in stock together — they came off the same shelf.`
+        : "None of these lines can go back in stock — they're back already.";
+}
+
 /** Why a return recorded by hand can't bring back that many of an order. */
 export function orderReturnRefusal(returnable: number): string {
     return returnable > 0

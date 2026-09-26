@@ -693,6 +693,61 @@ describe("refunds and the shelf", () => {
         expect(await returnable()).toBe(0);
     });
 
+    it("two lines off the same shelf share what the order can still put back there", async () => {
+        const cup = await product("Tea cup", { hill: 10 });
+        const order = await place(hill, [
+            { productId: cup, quantity: 2 },
+            { productId: cup, quantity: 3 },
+        ]);
+        await pay(order);
+        await fulfil(order);
+        const [first, second] = await prisma.orderItem.findMany({
+            where: { orderId: order },
+            orderBy: { quantity: "asc" },
+            select: { id: true, stockLevelId: true },
+        });
+        expect(first.stockLevelId).toBe(second.stockLevelId);
+        // 5 sold from the shelf; 3 came back by hand, so 2 can still go back.
+        await prisma.$transaction((tx) =>
+            returnByHand(
+                tx,
+                { organizationId: orgId, userId: ownerId },
+                {
+                    target: { storeId: hill, productId: cup },
+                    units: 3,
+                    orderId: order,
+                },
+            ),
+        );
+        // Each line alone could put back 2; together they can't put back 4.
+        await expect(
+            payments.initiateRefund(owner, order, {
+                lines: [
+                    { itemId: first.id, quantity: 2 },
+                    { itemId: second.id, quantity: 2 },
+                ],
+                putBack: [
+                    { itemId: first.id, quantity: 2 },
+                    { itemId: second.id, quantity: 2 },
+                ],
+            }),
+        ).rejects.toThrow(
+            "Only 2 of these lines can go back in stock together — they came off the same shelf.",
+        );
+        const refund = await payments.initiateRefund(owner, order, {
+            lines: [
+                { itemId: first.id, quantity: 1 },
+                { itemId: second.id, quantity: 1 },
+            ],
+            putBack: [
+                { itemId: first.id, quantity: 1 },
+                { itemId: second.id, quantity: 1 },
+            ],
+        });
+        await confirmRefund(order, refund.providerRefundId);
+        expect(await shelf(hill, cup)).toMatchObject({ onHand: 10 });
+    });
+
     it("a hand return between a refund's request and its confirmation: the refund puts back only what is left", async () => {
         const bowl = await product("Soup bowl", { hill: 10 });
         const order = await place(hill, [{ productId: bowl, quantity: 2 }]);

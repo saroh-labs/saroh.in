@@ -7,6 +7,7 @@ import { markedSoldOut, soldOutKey } from "./sold-out";
 import {
     ORDER_CLOSED_WHILE_PAYING,
     putBackRefusal,
+    putBackTogetherRefusal,
     RETURNED_CANT_UNDO,
     sellRefusal,
     SOLD_OUT_WHILE_PAYING,
@@ -536,16 +537,40 @@ export async function uncommitLines(
  * under the order's lock, when the refund is asked for.
  */
 export async function returnableUnits(
-    tx: Pick<
-        Tx,
-        | "orderItem"
-        | "stockEntry"
-        | "paymentRefundLine"
-        | "product"
-        | "businessProfile"
-    >,
+    tx: ReturnableTx,
     orderId: string,
 ): Promise<Map<string, number>> {
+    return (await returnablePlan(tx, orderId)).lines;
+}
+
+type ReturnableTx = Pick<
+    Tx,
+    | "orderItem"
+    | "stockEntry"
+    | "paymentRefundLine"
+    | "product"
+    | "businessProfile"
+>;
+
+/**
+ * What an order can put back, by line and by shelf. Each line is capped by
+ * its shelf's remainder on its own; lines of one order sharing a shelf also
+ * share that remainder, so a put-back is checked against both
+ * (`assertPutBack`).
+ */
+export interface ReturnablePlan {
+    /** What each line can put back, alone. */
+    lines: Map<string, number>;
+    /** Each line's shelf, for the lines that have one. */
+    rowOf: Map<string, string>;
+    /** What the order can still bring back to each shelf, over all its lines. */
+    rowLeft: Map<string, number>;
+}
+
+export async function returnablePlan(
+    tx: ReturnableTx,
+    orderId: string,
+): Promise<ReturnablePlan> {
     const items = await tx.orderItem.findMany({
         where: { orderId },
         select: {
@@ -570,7 +595,12 @@ export async function returnableUnits(
     )) {
         rowLeft.set(rowId, await orderReturnableOnRow(tx, orderId, rowId));
     }
-    return new Map(
+    const rowOf = new Map(
+        items.flatMap((i) =>
+            i.stockLevelId ? [[i.id, i.stockLevelId] as const] : [],
+        ),
+    );
+    const lines = new Map(
         items.map((i) => [
             i.id,
             i.stockLevelId && !untracked.has(i.productId)
@@ -588,15 +618,20 @@ export async function returnableUnits(
                 : 0,
         ]),
     );
+    return { lines, rowOf, rowLeft };
 }
 
-/** Refuse a put-back of more than a line can take back. */
+/**
+ * Refuse a put-back of more than a line can take back, or more than the
+ * order can bring back to a shelf over all its lines on it.
+ */
 export function assertPutBack(
-    returnable: ReadonlyMap<string, number>,
+    returnable: ReturnablePlan,
     asked: readonly { itemId: string; quantity: number }[],
 ): void {
+    const onRow = new Map<string, number>();
     for (const a of asked) {
-        const can = returnable.get(a.itemId) ?? 0;
+        const can = returnable.lines.get(a.itemId) ?? 0;
         if (!Number.isInteger(a.quantity) || a.quantity < 0) {
             throw new ConflictException({
                 message: "Put back a whole number of items.",
@@ -606,6 +641,17 @@ export function assertPutBack(
         if (a.quantity > can) {
             throw new ConflictException({
                 message: putBackRefusal(can),
+                field: "putBack",
+            });
+        }
+        const rowId = returnable.rowOf.get(a.itemId);
+        if (rowId) onRow.set(rowId, (onRow.get(rowId) ?? 0) + a.quantity);
+    }
+    for (const [rowId, total] of onRow) {
+        const left = returnable.rowLeft.get(rowId) ?? 0;
+        if (total > left) {
+            throw new ConflictException({
+                message: putBackTogetherRefusal(left),
                 field: "putBack",
             });
         }
