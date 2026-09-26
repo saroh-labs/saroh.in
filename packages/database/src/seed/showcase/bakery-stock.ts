@@ -317,7 +317,9 @@ const rupees = (whole: number) => `${whole}.00`;
 
 /**
  * Each product's variants and its listings: at each of its storefronts, with
- * the variants sold there. Returns the variant ids, [product][variant].
+ * the variants sold there. The film set is put back whole: a variant, a
+ * listing or a variant's place at a storefront that a take added to one of
+ * these products is removed. Returns the variant ids, [product][variant].
  */
 export async function writeVariantsAndListings(
     prisma: Db,
@@ -329,6 +331,8 @@ export async function writeVariantsAndListings(
     },
 ): Promise<string[][]> {
     const variantIds: string[][] = [];
+    const listingIds: string[] = [];
+    const listed: { listingId: string; variantId: string }[] = [];
     for (let i = 0; i < PRODUCTS.length; i++) {
         const p = PRODUCTS[i];
         const ids: string[] = [];
@@ -367,7 +371,7 @@ export async function writeVariantsAndListings(
         variantIds.push(ids);
         for (const store of p.stores ?? ["H"]) {
             const sold = p.variantsAt?.[store] ?? ids.map((_, v) => v);
-            await listProductAt(prisma, {
+            const listingId = await listProductAt(prisma, {
                 id:
                     store === "H"
                         ? ryeId("listing", i)
@@ -383,8 +387,28 @@ export async function writeVariantsAndListings(
                     variantId: ids[v],
                 })),
             });
+            listingIds.push(listingId);
+            listed.push(...sold.map((v) => ({ listingId, variantId: ids[v] })));
         }
     }
+    await prisma.productListingVariant.deleteMany({
+        where: {
+            productId: { in: [...a.productIds] },
+            NOT: { OR: listed },
+        },
+    });
+    await prisma.productListing.deleteMany({
+        where: {
+            productId: { in: [...a.productIds] },
+            id: { notIn: listingIds },
+        },
+    });
+    await prisma.productVariant.deleteMany({
+        where: {
+            productId: { in: [...a.productIds] },
+            id: { notIn: variantIds.flat() },
+        },
+    });
     return variantIds;
 }
 
