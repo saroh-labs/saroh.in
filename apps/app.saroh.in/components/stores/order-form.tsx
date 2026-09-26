@@ -173,6 +173,13 @@ export function OrderForm({
         name: "lines",
     });
     const { isSubmitting } = form.formState;
+    // The API's refusal of a line ("Sourdough — Sold out") is about the lines
+    // as they were sent: any change to them clears it, until the next save.
+    const linesChanged = () => {
+        if (form.formState.errors.lines?.type === "server") {
+            form.clearErrors("lines");
+        }
+    };
 
     // Watch the value-bearing fields so the totals recompute as the user types.
     const watchedLines = form.watch("lines");
@@ -358,7 +365,10 @@ export function OrderForm({
                                     <OptionSelect
                                         aria-label="Product"
                                         value={field.value}
-                                        onValueChange={field.onChange}
+                                        onValueChange={(v) => {
+                                            linesChanged();
+                                            field.onChange(v);
+                                        }}
                                         disabled={isSubmitting}
                                         className="flex-1"
                                         options={sellables.map((s) => ({
@@ -381,6 +391,7 @@ export function OrderForm({
                                 className="w-20"
                                 {...form.register(`lines.${i}.quantity`, {
                                     valueAsNumber: true,
+                                    onChange: linesChanged,
                                 })}
                             />
                             <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
@@ -394,7 +405,10 @@ export function OrderForm({
                                 variant="ghost"
                                 size="sm"
                                 disabled={isSubmitting || fields.length === 1}
-                                onClick={() => remove(i)}
+                                onClick={() => {
+                                    linesChanged();
+                                    remove(i);
+                                }}
                             >
                                 ✕
                             </Button>
@@ -410,12 +424,13 @@ export function OrderForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
+                        linesChanged();
                         append({
                             productId: firstSellable(products),
                             quantity: 1,
-                        })
-                    }
+                        });
+                    }}
                     disabled={isSubmitting}
                 >
                     Add item
