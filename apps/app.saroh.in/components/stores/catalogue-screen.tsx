@@ -291,9 +291,13 @@ export function CatalogueScreen({
                     view: query.view === "needs" ? "all" : "needs",
                 })}
             />
-            {tabs}
-            {notice}
-            {collectionsPanel}
+            {/* Each slot the page hands over in a fragment of its own: a
+                server element can arrive as a lazy chunk, and a lazy one
+                among siblings is keyed like a list item — React's "unique
+                key" warning. Alone in a fragment it is a single child. */}
+            <>{tabs}</>
+            <>{notice}</>
+            <>{collectionsPanel}</>
             <div aria-busy={navigating} className="pt-0.5">
                 <DataView
                     viewId="catalogue"
