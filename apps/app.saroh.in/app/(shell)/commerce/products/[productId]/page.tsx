@@ -124,6 +124,7 @@ export default async function ProductPage({
                         storeId={store.id}
                         canWrite={overview.canWrite}
                         counts={tracking.counts}
+                        businessTracks={tracking.business}
                     />
                 ) : (
                     <>

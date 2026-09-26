@@ -34,6 +34,7 @@ import {
 } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail } from "@/lib/products/service";
+import { untrackedShort } from "@/lib/products/tracking";
 
 import { QuickSheet } from "../quick-sheet";
 
@@ -454,10 +455,8 @@ export function StockSheet({
                     ) : null}
                     {!counts ? (
                         <p className="text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
-                            Stock isn&apos;t tracked, so it is always available
-                            on the shop — no count and no &ldquo;Sold
-                            out&rdquo;. Track stock is in the editor&apos;s
-                            Stock section.
+                            {untrackedShort(product.storefronts ?? [])} Track
+                            stock is in the editor&apos;s Stock section.
                         </p>
                     ) : !showStock ? (
                         <div className="flex flex-col items-start gap-2.5">

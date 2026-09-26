@@ -28,12 +28,15 @@ export function CustomerView({
     storeId,
     canWrite,
     counts,
+    businessTracks,
 }: {
     overview: ProductOverview;
     storeId: string;
     canWrite: boolean;
     /** The product counts stock (Track stock, #515). */
     counts: boolean;
+    /** The business's Track stock switch: off, the editor has no Stock. */
+    businessTracks: boolean;
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
@@ -85,10 +88,17 @@ export function CustomerView({
                   (stock.product
                       ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
                       : "No stock count — the shop doesn't say how many are left."),
-            action: {
-                label: "Edit",
-                href: edit(product.variants.length > 0 ? "variants" : "stock"),
-            },
+            // The editor's Stock section counts a product that counts
+            // stock; untracked, its Sold out is marked on the Overview.
+            action:
+                product.variants.length > 0
+                    ? { label: "Edit", href: edit("variants") }
+                    : businessTracks && counts
+                      ? { label: "Edit", href: edit("stock") }
+                      : {
+                            label: "Open",
+                            href: productHref(storeId, product.id, "overview"),
+                        },
         },
         {
             n: 4,

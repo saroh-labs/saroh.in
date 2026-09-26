@@ -11,7 +11,7 @@ import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview, StockLine } from "@/lib/products/overview-rules";
 import { customersSee } from "@/lib/products/overview-rules";
 import type { ProductTracking } from "@/lib/products/tracking";
-import { TRACKING_LOCKED } from "@/lib/products/tracking";
+import { TRACKING_LOCKED, untrackedShort } from "@/lib/products/tracking";
 
 import { StateLink, TabState } from "./panel-state";
 import { SheetButton } from "./sheet-button";
@@ -64,7 +64,7 @@ export function ProductVariantsTab({
                     title="Sold as itself"
                     description={`No sizes or shades, so every order is for "${product.name}" at ${money(product.price)}.${
                         !counts
-                            ? " Stock isn't tracked, so it is always available on the shop."
+                            ? ` ${untrackedShort(product.storefronts ?? [])}`
                             : stock.product
                               ? ""
                               : " There is no stock count yet either."
@@ -275,7 +275,7 @@ export function ProductVariantsTab({
                     ) : null}
                     <p className="min-w-0 flex-[1_1_240px] text-[11.5px] text-muted-foreground">
                         {!counts
-                            ? "Stock isn't tracked, so every variant is always available on the shop. Open a variant for its orders, reviews and photo."
+                            ? `${untrackedShort(product.storefronts ?? [])} Open a variant for its orders, reviews and photo.`
                             : stock.mode === "product"
                               ? "Stock is counted for the product as a whole. Count each variant on its own in the editor's Stock section."
                               : "Can sell is on hand minus what is promised to orders — the number the shop uses. Open a variant for its orders, reviews and photo."}
