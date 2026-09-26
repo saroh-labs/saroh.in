@@ -1,6 +1,8 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { Storefront } from "../fixtures/throwaway-products";
+import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 import { demoUser, urls } from "../playwright.config";
 
 /**
@@ -64,42 +66,12 @@ test.describe("new order at a GST-registered business", () => {
  * four is wired by hand, so each is checked.
  *
  * Runs on Northwind Supply (writes and error paths go there, never on the
- * film sets). It makes a product of its own counted at 1, never places an
- * order, and takes the product away afterwards: deleted if it can be, else
- * — it has a stock history (DEC-032) — set to Not sold under a name and an
- * address of its own.
+ * film sets). It uses a product of its own counted at 1 and never places an
+ * order. Counted, the product has a stock history (DEC-032), so afterwards
+ * it is set to Not sold under one fixed name, and the next run brings that
+ * same one back (`fixtures/throwaway-products.ts`).
  */
-const NW_ORG = "seed_org";
-const NW_STORE = "seed_store";
-const nwApi = (path: string) =>
-    `${urls.API_URL}/stores/${NW_STORE}/products${path}`;
-const nwHeader = { "x-organization-id": NW_ORG };
-
-async function retireProducts(request: APIRequestContext, name: string) {
-    const res = await request.get(nwApi(""), { headers: nwHeader });
-    expect(res.ok()).toBe(true);
-    const body = (await res.json()) as
-        | { id: string; name: string }[]
-        | { items: { id: string; name: string }[] };
-    const list = Array.isArray(body) ? body : body.items;
-    for (const p of list.filter((x) => x.name === name)) {
-        const del = await request.delete(nwApi(`/${p.id}`), {
-            headers: nwHeader,
-        });
-        if (del.ok()) continue;
-        expect(del.status()).toBe(409);
-        const stamp = Date.now().toString(36);
-        const retired = await request.patch(nwApi(`/${p.id}`), {
-            headers: nwHeader,
-            data: {
-                name: `${name} (retired ${stamp})`,
-                slug: `e2e-retired-${stamp}-${p.id.slice(-6)}`,
-                status: "ARCHIVED",
-            },
-        });
-        expect(retired.ok()).toBe(true);
-    }
-}
+const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 
 test.describe("a line the API refused", () => {
     test("its error clears when the lines change: quantity, add, remove, product", async ({
@@ -108,23 +80,23 @@ test.describe("a line the API refused", () => {
         test.setTimeout(120_000);
         const name = `E2E Last Jar ${testInfo.project.name}`;
         await signIn(page);
-        await page.goto(`/open/${NW_ORG}`);
-        await retireProducts(page.request, name);
-
-        const made = await page.request.post(nwApi(""), {
-            headers: nwHeader,
-            data: { name, price: "100.00", status: "PUBLISHED" },
-        });
-        expect(made.ok()).toBe(true);
-        const { id } = (await made.json()) as { id: string };
-        const counted = await page.request.put(nwApi(`/${id}/inventory`), {
-            headers: nwHeader,
-            data: { quantity: 1 },
-        });
-        expect(counted.ok()).toBe(true);
+        await page.goto(`/open/${NW.organizationId}`);
 
         try {
-            await page.goto(`/commerce/orders/new?storefront=${NW_STORE}`);
+            const id = await takeProduct(page.request, NW, name, {
+                price: "100.00",
+                status: "PUBLISHED",
+            });
+            const counted = await page.request.put(
+                `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`,
+                {
+                    headers: { "x-organization-id": NW.organizationId },
+                    data: { quantity: 1 },
+                },
+            );
+            expect(counted.ok()).toBe(true);
+
+            await page.goto(`/commerce/orders/new?storefront=${NW.storeId}`);
             await page.getByLabel("Customer").click();
             await page.getByRole("option").first().click();
 
@@ -169,7 +141,7 @@ test.describe("a line the API refused", () => {
                 .click();
             await expect(refused).toHaveCount(0);
         } finally {
-            await retireProducts(page.request, name);
+            await removeProducts(page.request, NW, name);
         }
     });
 });
