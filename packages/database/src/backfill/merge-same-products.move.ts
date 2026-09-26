@@ -74,9 +74,19 @@ export async function mergeProductInto(
             value: typeof value === "string" ? value : JSON.stringify(value),
         });
 
-    await tx.$queryRaw`
-        SELECT "id" FROM "Product" WHERE "id" IN (${survivorId}, ${loserId})
-        ORDER BY "id" FOR UPDATE`;
+    // Products in id order. The survivor is kept, so FOR NO KEY UPDATE, as
+    // the API's lockProduct takes it: a sale's entry insert (FOR KEY SHARE
+    // on its product, under a shelf lock) never waits on it. The loser is
+    // deleted, which needs FOR UPDATE; taking it first, before any shelf,
+    // waits out an order line being written for it rather than deadlocking
+    // at the delete.
+    for (const id of [survivorId, loserId].sort()) {
+        if (id === loserId) {
+            await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" = ${id} FOR UPDATE`;
+        } else {
+            await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" = ${id} FOR NO KEY UPDATE`;
+        }
+    }
     await tx.$queryRaw`
         SELECT "id" FROM "StockLevel" WHERE "productId" IN (${survivorId}, ${loserId})
         ORDER BY "id" FOR UPDATE`;

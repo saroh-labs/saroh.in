@@ -45,8 +45,16 @@
   (`heldQuantity`) and what it took off the shelf when fulfilled
   (`soldQuantity`); every hold, sale, release and return reads those under
   the row's lock (`stock/reserve.ts`, #511 — see
-  `backend-billing-and-classes.md`). Lock order: Order → Product (a change
-  to how it counts) → StockLevel rows by id (`products/stock-levels.ts`).
+  `backend-billing-and-classes.md`). Lock order: Order → BusinessProfile
+  (FOR SHARE, when Track stock is read under a lock) → Product (a change to
+  how it counts; several at once in id order, in one statement) →
+  StockLevel rows by id (`products/stock-levels.ts`). **A product is locked
+  FOR NO KEY UPDATE, never FOR UPDATE:** every insert that names a product
+  (a StockEntry, an OrderItem) takes FOR KEY SHARE on it for the foreign
+  key, after the StockLevel locks it already holds. FOR UPDATE conflicts
+  with that, so a count opening a new shelf deadlocked with a sale on the
+  product's other shelf (PR #533 review). Only a delete (the merge's loser)
+  takes FOR UPDATE, before any shelf.
   Whether a product counts stock is `Product.stockTracked` and the
   business's `BusinessProfile.stockTracking` (#515), not whether it has a
   row: an untracked product keeps its rows at 0 for the log, so every

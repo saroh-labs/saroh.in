@@ -4,6 +4,7 @@ import type { Prisma } from "@saroh/database";
 import {
     firstRow,
     lockProduct,
+    lockProducts,
     lockProductStock,
     lockStockLevels,
 } from "../products/stock-levels";
@@ -324,7 +325,17 @@ export async function setBusinessTracking(
             data: { stockTracking: true },
         });
         // Counting starts again now: a sale made while it was off isn't a
-        // sale the shelf missed.
+        // sale the shelf missed. The products are locked first, in id order
+        // (Profile → Product), so this never meets a stock take's product
+        // locks in another order.
+        const counting = await tx.product.findMany({
+            where: { organizationId, stockTracked: true },
+            select: { id: true },
+        });
+        await lockProducts(
+            tx,
+            counting.map((p) => p.id),
+        );
         const restarted = await tx.product.updateMany({
             where: { organizationId, stockTracked: true },
             data: { stockTrackedAt: new Date() },

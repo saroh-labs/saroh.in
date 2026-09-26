@@ -6,11 +6,19 @@ import type { Prisma } from "@saroh/database";
  * a storefront while it has a row there, and counts per variant once any of
  * its rows names a variant.
  *
- * Lock order, every flow that changes stock (plan KTD): Order → Product (a
- * change to how the product counts: listing it, switching to variants,
- * removing a variant) → StockLevel rows, sorted by id. Rows are found under
- * that lock and created when missing; the uniques are partial, so they are
- * never upserted.
+ * Lock order, every flow that changes stock (plan KTD): Order →
+ * BusinessProfile (FOR SHARE, when Track stock is read under the lock) →
+ * Product (a change to how the product counts: listing it, switching to
+ * variants, removing a variant; several at once sorted by id) → StockLevel
+ * rows, sorted by id. Rows are found under that lock and created when
+ * missing; the uniques are partial, so they are never upserted.
+ *
+ * A product is locked FOR NO KEY UPDATE, never FOR UPDATE: every insert
+ * that names a product (a StockEntry, an OrderItem) takes FOR KEY SHARE on
+ * it for its foreign key, often while it holds a StockLevel lock. FOR
+ * UPDATE conflicts with that, so a count opening a new shelf and a sale on
+ * the product's other shelf would wait on each other (PR #533 review). NO
+ * KEY UPDATE still serialises every lockProduct caller.
  */
 
 /** What the API has always called a stock row: on hand, promised, warning. */
@@ -84,7 +92,17 @@ export async function lockProduct(
     tx: Prisma.TransactionClient,
     productId: string,
 ): Promise<void> {
-    await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR NO KEY UPDATE`;
+}
+
+/** Lock several products at once, in id order, in one statement. */
+export async function lockProducts(
+    tx: Prisma.TransactionClient,
+    productIds: readonly string[],
+): Promise<void> {
+    const sorted = Array.from(new Set(productIds)).sort();
+    if (sorted.length === 0) return;
+    await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ANY(${sorted}::text[]) ORDER BY id FOR NO KEY UPDATE`;
 }
 
 /** Whether the product counts stock per variant (anywhere). */

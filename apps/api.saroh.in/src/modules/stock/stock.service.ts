@@ -8,7 +8,11 @@ import {
 } from "@nestjs/common";
 import type { Prisma, StockEntryKind } from "@saroh/database";
 
-import { lockProduct, lockStockLevels } from "../products/stock-levels";
+import {
+    lockProduct,
+    lockProducts,
+    lockStockLevels,
+} from "../products/stock-levels";
 import { clearSoldOut } from "./sold-out";
 import type { AdjustKind, StockSystemReason } from "./stock-words";
 import {
@@ -41,7 +45,8 @@ import { recordProductTracking } from "./tracking-audit";
  *
  * Every function runs on the caller's transaction and takes the StockLevel
  * row locks itself, in id order, after whatever the caller already holds —
- * the lock order is Order → Product → StockLevel (sorted by id). A function
+ * the lock order is Order → BusinessProfile (FOR SHARE) → Product (FOR NO
+ * KEY UPDATE, sorted by id) → StockLevel (sorted by id). A function
  * that is handed a row id rather than a target (`recordEntry`, `recordSold`,
  * `recordReturned`, `reverseSale`) expects the caller to hold that lock.
  *
@@ -160,30 +165,42 @@ function shelf(row: Row): ShelfView {
 // ---------------------------------------------------------------------------
 
 /**
+ * Whether the business counts stock, read FOR SHARE so its switch (which
+ * locks the profile FOR UPDATE, then its products) waits for us, or we for
+ * it. Taken before any product lock: Profile → Product → StockLevel. No
+ * profile yet reads as on, as `businessTracksStock` does.
+ */
+async function businessTracksLocked(
+    tx: Tx,
+    organizationId: string,
+): Promise<boolean> {
+    const [profile] = await tx.$queryRaw<
+        ({ stockTracking: boolean } | undefined)[]
+    >`
+        SELECT "stockTracking" FROM "BusinessProfile"
+        WHERE "organizationId" = ${organizationId} FOR SHARE`;
+    return profile?.stockTracking ?? true;
+}
+
+/**
  * Refuse a new shelf for a product that stopped counting stock. Called under
  * the product's lock, so Track stock going off for the product (which takes
- * it first) has committed or not started; the business's profile is read
- * FOR SHARE, so its switch going off (which locks the profile) is waited
- * for too.
+ * it first) has committed or not started; `businessOn` was read with the
+ * profile's lock (`businessTracksLocked`), so the business's switch is
+ * settled too.
  */
 async function assertStillTracked(
     tx: Tx,
     organizationId: string,
     productId: string,
+    businessOn: boolean,
 ): Promise<void> {
     const product = await tx.product.findFirst({
         where: { id: productId, organizationId },
         select: { stockTracked: true },
     });
     if (!product) throw new NotFoundException("Product not found");
-    const [profile] = await tx.$queryRaw<
-        ({ stockTracking: boolean } | undefined)[]
-    >`
-        SELECT "stockTracking" FROM "BusinessProfile"
-        WHERE "organizationId" = ${organizationId} FOR SHARE`;
-    if (profile && !profile.stockTracking) {
-        throw new ConflictException(BUSINESS_UNTRACKED);
-    }
+    if (!businessOn) throw new ConflictException(BUSINESS_UNTRACKED);
     if (!product.stockTracked) throw new ConflictException(UNTRACKED);
 }
 
@@ -243,9 +260,11 @@ async function resolveRowId(
     const found = await findRow();
     if (found) return found.id;
     if (!create) throw new NotFoundException("Stock not found");
-    // A new row changes where the product counts: take the product's lock
-    // (Order → Product → StockLevel), so it waits for Track stock going off
-    // or a switch to per-variant stock, and look again under it.
+    // A new row changes where the product counts: read the business's
+    // switch under its lock, then take the product's (Order → Profile →
+    // Product → StockLevel), so it waits for Track stock going off or a
+    // switch to per-variant stock, and look again under it.
+    const businessOn = await businessTracksLocked(tx, organizationId);
     await lockProduct(tx, productId);
     const raced = await findRow();
     if (raced) return raced.id;
@@ -255,7 +274,7 @@ async function resolveRowId(
     });
     if (shelves.length > 0) {
         // Read under the lock: Track stock that went off meanwhile is seen.
-        await assertStillTracked(tx, organizationId, productId);
+        await assertStillTracked(tx, organizationId, productId, businessOn);
         // A product counts as a whole or per variant, never both; switching
         // is the product's own Stock section (`store:write`).
         const perVariant = shelves.some((s) => s.variantId !== null);
@@ -301,6 +320,63 @@ async function resolveRowId(
         select: { id: true },
     });
     return made.id;
+}
+
+/**
+ * Before resolving many targets (a stock take), take the locks a new shelf
+ * needs for all of them at once: the profile FOR SHARE, then every product
+ * with a target that has no shelf yet, sorted by id in one statement. Taken
+ * one target at a time, in the order a request lists them, two stock takes
+ * naming the same products in opposite orders would wait on each other.
+ * `resolveRowId` then takes the same locks again, which it already holds.
+ */
+async function lockProductsToOpen(
+    tx: Tx,
+    organizationId: string,
+    targets: readonly StockTarget[],
+): Promise<void> {
+    const named = targets.flatMap((t) =>
+        "stockLevelId" in t
+            ? []
+            : [
+                  {
+                      storeId: t.storeId,
+                      productId: t.productId,
+                      variantId: t.variantId ?? null,
+                  },
+              ],
+    );
+    if (named.length < 2) return;
+    const existing = await tx.stockLevel.findMany({
+        where: {
+            organizationId,
+            productId: {
+                in: Array.from(new Set(named.map((t) => t.productId))),
+            },
+        },
+        select: { storeId: true, productId: true, variantId: true },
+    });
+    const key = (t: {
+        storeId: string;
+        productId: string;
+        variantId: string | null;
+    }) => `${t.storeId}:${t.productId}:${t.variantId ?? ""}`;
+    const have = new Set(existing.map(key));
+    const opening = named.filter((t) => !have.has(key(t)));
+    if (opening.length === 0) return;
+    // Only this business's products; anything else is refused later.
+    const ours = await tx.product.findMany({
+        where: {
+            organizationId,
+            id: { in: Array.from(new Set(opening.map((t) => t.productId))) },
+        },
+        select: { id: true },
+    });
+    await businessTracksLocked(tx, organizationId);
+    await lockProducts(
+        tx,
+        ours.map((p) => p.id),
+    );
 }
 
 /**
@@ -541,6 +617,11 @@ export async function countAll(
             });
         }
     }
+    await lockProductsToOpen(
+        tx,
+        actor.organizationId,
+        counts.map((c) => c.target),
+    );
     const ids: string[] = [];
     for (const c of counts) {
         ids.push(await resolveRowId(tx, actor, c.target, true));

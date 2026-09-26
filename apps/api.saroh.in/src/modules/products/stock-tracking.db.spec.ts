@@ -37,8 +37,8 @@ import {
     TRACKING_OFF_NOTE,
 } from "../stock/stock-words";
 import { StockWritesService, UNTRACKED } from "../stock/stock-writes.service";
-import { count } from "../stock/stock.service";
-import { setProductTracking } from "../stock/tracking";
+import { count, countAll } from "../stock/stock.service";
+import { setBusinessTracking, setProductTracking } from "../stock/tracking";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { OrganizationProductsController } from "./organization-products.controller";
@@ -423,7 +423,7 @@ describe("toggling while an order is being made", () => {
         // Track stock going off, holding its locks for a moment.
         const toggle = prisma.$transaction(
             async (tx) => {
-                await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${cake} FOR UPDATE`;
+                await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${cake} FOR NO KEY UPDATE`;
                 await tx.$queryRaw`SELECT id FROM "StockLevel" WHERE id = ${row.id} FOR UPDATE`;
                 locked();
                 await sleep(400);
@@ -1237,5 +1237,86 @@ describe("Track stock in Settings → Activity", () => {
         expect((await trackingRows(kite)).at(-1)?.metadata).not.toHaveProperty(
             "byOperator",
         );
+    });
+});
+
+describe("lock order: profile, then products by id, then shelves", () => {
+    it("Track stock turning back on for the business doesn't deadlock a count opening a new shelf", async () => {
+        const jam = await product("Jam", { hill: 4 });
+        await prisma.businessProfile.upsert({
+            where: { organizationId: orgId },
+            create: { organizationId: orgId, stockTracking: false },
+            update: { stockTracking: false },
+        });
+        let locked!: () => void;
+        const gotProfile = new Promise<void>((r) => (locked = r));
+        // Turning the business back on: the profile first, then (after a
+        // moment) every tracked product.
+        const on = prisma.$transaction(
+            async (tx) => {
+                await tx.$queryRaw`SELECT id FROM "BusinessProfile" WHERE "organizationId" = ${orgId} FOR UPDATE`;
+                locked();
+                await sleep(400);
+                return setBusinessTracking(
+                    tx,
+                    { organizationId: orgId, userId: ownerId },
+                    true,
+                );
+            },
+            { timeout: 10_000 },
+        );
+        await gotProfile;
+        // A count opening Online's shelf reads Track stock under the
+        // profile's lock before it takes the product's.
+        const counted = prisma.$transaction(
+            (tx) =>
+                count(
+                    tx,
+                    { organizationId: orgId, userId: ownerId },
+                    { target: { storeId: online, productId: jam }, counted: 2 },
+                ),
+            { timeout: 10_000 },
+        );
+        const [switched, took] = await Promise.allSettled([on, counted]);
+        expect(switched).toMatchObject({ status: "fulfilled" });
+        expect(took).toMatchObject({ status: "fulfilled" });
+        expect(await shelf(online, jam)).toMatchObject({ onHand: 2 });
+    });
+
+    it("two stock takes opening shelves of the same products in opposite orders both finish", async () => {
+        const market = (
+            await prisma.store.create({
+                data: {
+                    name: "Market",
+                    slug: `st-market-${tag}`,
+                    organizationId: orgId,
+                },
+            })
+        ).id;
+        for (let i = 0; i < 6; i += 1) {
+            const a = await product(`Bun ${i}`, { hill: 1 });
+            const b = await product(`Bap ${i}`, { hill: 1 });
+            const take = (storeId: string, ids: string[]) =>
+                prisma.$transaction(
+                    (tx) =>
+                        countAll(
+                            tx,
+                            { organizationId: orgId, userId: ownerId },
+                            ids.map((productId) => ({
+                                target: { storeId, productId },
+                                counted: 1,
+                            })),
+                        ),
+                    { timeout: 10_000 },
+                );
+            const results = await Promise.allSettled([
+                take(online, [a, b]),
+                take(market, [b, a]),
+            ]);
+            expect(results).toMatchObject([
+                { status: "fulfilled" },
+                { status: "fulfilled" },
+            ]);
+        }
     });
 });

@@ -1195,4 +1195,51 @@ describe("lock order", () => {
             });
         }
     });
+
+    it("a count opening a new shelf doesn't deadlock a fulfilment on the product's other shelf", async () => {
+        // The count takes the product's lock to open the Online shelf, then
+        // asks for the Hill Road shelf. The fulfilment holds the Hill Road
+        // shelf and writes its Sold entry, whose key check reads the
+        // product (FOR KEY SHARE). A product lock taken FOR UPDATE blocks
+        // that read, and the two wait on each other.
+        const loaf = await product("Rye loaf", { hill: 6 });
+        const order = await place(hill, [{ productId: loaf, quantity: 2 }]);
+        await orders.updateStatus(hill, order, ownerId, {
+            status: "PROCESSING",
+        });
+        const actor = { organizationId: orgId, userId: ownerId };
+        let opened!: () => void;
+        const shelfOpened = new Promise<void>((r) => (opened = r));
+        const stockTake = prisma.$transaction(
+            async (tx) => {
+                await count(tx, actor, {
+                    target: { storeId: online, productId: loaf },
+                    counted: 3,
+                });
+                opened();
+                // Let the fulfilment take the Hill Road shelf first.
+                await new Promise((r) => setTimeout(r, 400));
+                return count(tx, actor, {
+                    target: { storeId: hill, productId: loaf },
+                    counted: 6,
+                });
+            },
+            { timeout: 15_000 },
+        );
+        await shelfOpened;
+        const [take, fulfilled] = await Promise.allSettled([
+            stockTake,
+            orders.updateStatus(hill, order, ownerId, { status: "DELIVERED" }),
+        ]);
+        expect(fulfilled).toMatchObject({ status: "fulfilled" });
+        expect(take).toMatchObject({ status: "fulfilled" });
+        expect(await shelf(hill, loaf)).toMatchObject({
+            onHand: 6,
+            promised: 0,
+        });
+        expect(await shelf(online, loaf)).toMatchObject({
+            onHand: 3,
+            promised: 0,
+        });
+    });
 });
