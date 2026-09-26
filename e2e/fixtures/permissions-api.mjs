@@ -34,6 +34,115 @@ const siteFor = (scenario) => ({
         { id: "page_1", title: "Home", path: "/", isHome: true, hidden: false },
     ],
 });
+/**
+ * The product editor's roles (#525): a stock-only custom role ("Packer",
+ * `inventory:write` without `store:write`) and one that can't see products.
+ */
+const PRODUCT_ROLES = {
+    OWNER: {
+        role: "OWNER",
+        roleLabel: null,
+        actions: ["store:read", "store:write", "inventory:write", "order:read"],
+    },
+    STOCK: {
+        role: "MEMBER",
+        roleLabel: "Packer",
+        actions: ["store:read", "inventory:write", "order:read"],
+    },
+    NOREAD: {
+        role: "MEMBER",
+        roleLabel: "Front desk",
+        actions: ["order:read", "booking:read"],
+    },
+};
+const STORE = {
+    id: "store_1",
+    name: "Hill Road",
+    slug: "hill-road",
+    description: null,
+    logo: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+};
+/** A product counted as a whole, as `GET …/products/:id` returns it. */
+const PRODUCT = {
+    id: "prod_1",
+    storeId: "store_1",
+    name: "Sourdough loaf",
+    slug: "sourdough-loaf",
+    description: "<p>Baked each morning.</p><ul><li>Long ferment</li></ul>",
+    image: null,
+    categoryId: null,
+    category: null,
+    price: "480.00",
+    mrp: null,
+    currency: "INR",
+    status: "PUBLISHED",
+    archivedAt: null,
+    variants: [],
+    customFields: [],
+    allergens: { contains: [], mayContain: [] },
+    inventory: { quantity: 12, reserved: 2, lowStockAlert: 4 },
+    howToUse: null,
+    materials: null,
+    keyPoints: [],
+    madeHere: true,
+    maker: null,
+    madeIn: null,
+    supplierCode: null,
+    gstRate: null,
+    hsnCode: null,
+    warranty: null,
+    returnsMode: "STOREFRONT",
+    returnsText: null,
+    shopFields: {},
+    seoTitle: null,
+    seoDescription: null,
+    seoImageId: null,
+    optionId: null,
+    stockTracked: true,
+    storefronts: [],
+    images: [],
+    stockMode: "product",
+    variantPromises: {},
+    option: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+};
+/**
+ * An older product (#525): a variant with no option value, counted as a
+ * whole — Northwind's Platform Trolley and Stretch Film Hand Dispenser —
+ * sold at two storefronts.
+ */
+const OLDER = {
+    ...PRODUCT,
+    id: "prod_2",
+    name: "Stretch Film Hand Dispenser",
+    slug: "stretch-film-hand-dispenser",
+    description: null,
+    status: "PUBLISHED",
+    variants: [
+        {
+            id: "var_1",
+            productId: "prod_2",
+            sku: "SFD-500",
+            title: "500mm",
+            price: null,
+            image: null,
+            optionValueId: null,
+            imageId: null,
+            position: 0,
+            inventory: null,
+        },
+    ],
+    inventory: { quantity: 16, reserved: 14, lowStockAlert: 5 },
+    stockMode: "product",
+    variantPromises: { var_1: 14 },
+};
+const STORES = [
+    STORE,
+    { ...STORE, id: "store_2", name: "Online", slug: "online" },
+];
 createServer((req, res) => {
     const path = new URL(req.url, "http://fixture").pathname;
     const cookies = req.headers.cookie ?? "";
@@ -64,8 +173,46 @@ createServer((req, res) => {
                 name: "Permission tests",
                 slug: "permissions",
                 role: scenario === "REVIEWER" ? "REVIEWER" : "MEMBER",
+                ...(PRODUCT_ROLES[scenario] ?? {}),
             },
         ]);
+    // The product editor (#525). An owner's business has two storefronts.
+    const stores = scenario === "OWNER" ? STORES : [STORE];
+    if (path === "/stores") return reply(200, stores);
+    if (path.endsWith("/storefronts"))
+        return reply(
+            200,
+            stores.map((s) => ({
+                id: s.id,
+                name: s.name,
+                orderCount: 0,
+                kind: "SHOP",
+                paused: false,
+            })),
+        );
+    if (path.endsWith("/products/prod_2")) return reply(200, OLDER);
+    if (path.endsWith("/products/prod_2/listings"))
+        return reply(
+            200,
+            STORES.map((s) => ({
+                storeId: s.id,
+                storeName: s.name,
+                listed: true,
+                stock: null,
+                variants: [{ variantId: "var_1", soldHere: true, stock: null }],
+            })),
+        );
+    if (path.endsWith("/products/prod_1"))
+        return scenario === "NOREAD"
+            ? reply(403, { error: "fixture" })
+            : reply(200, PRODUCT);
+    if (path.endsWith("/products/prod_1/inventory") && req.method === "PUT")
+        return reply(200, {
+            productId: "prod_1",
+            quantity: 12,
+            reserved: 2,
+            lowStockAlert: 4,
+        });
     if (path.endsWith("/modules"))
         return reply(200, {
             data: [

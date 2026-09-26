@@ -36,6 +36,8 @@ export const LIMITS = {
     videos: 3,
     // 50 MB, as the API signs a video upload for.
     videoBytes: 50 * 1024 * 1024,
+    // 8 MB, as the editor promises: a shop photo off a phone is well under.
+    photoBytes: 8 * 1024 * 1024,
     sku: 100,
     variantTitle: 150,
 } as const;
@@ -444,6 +446,42 @@ export const NOT_MEDIA_MESSAGE =
     "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
 export const VIDEO_TOO_BIG_MESSAGE =
     "That video is over 50 MB. Keep it under a minute, or export it smaller.";
+export const PHOTO_TOO_BIG_MESSAGE =
+    "That photo is over 8 MB. Most phones can export a smaller copy.";
+
+/**
+ * The line under the grid (#525): what can still be added once one kind is
+ * full, else the sizes it takes. `full` colours it as a warning.
+ */
+export function mediaLimitNote(items: PhotoDraft[]): {
+    text: string;
+    full: boolean;
+} {
+    const { photos, videos } = mediaCounts(items);
+    const photosFull = photos >= LIMITS.photos;
+    const videosFull = videos >= LIMITS.videos;
+    if (photosFull && videosFull)
+        return {
+            text: `Full: ${LIMITS.photos} photos and ${LIMITS.videos} videos. Take one off to add another.`,
+            full: true,
+        };
+    if (photosFull) {
+        const left = LIMITS.videos - videos;
+        return {
+            text: `${LIMITS.photos} photos is the most. You can still add ${left} more video${left === 1 ? "" : "s"}.`,
+            full: true,
+        };
+    }
+    if (videosFull)
+        return {
+            text: `${LIMITS.videos} videos is the most. Photos can still be added.`,
+            full: true,
+        };
+    return {
+        text: "Photos up to 8 MB, videos up to 50 MB. Drop files onto the grid, or use the tiles.",
+        full: false,
+    };
+}
 
 /** The two video types a product takes; the API checks the bytes too. */
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime"] as const;
@@ -466,7 +504,8 @@ export function mediaFileProblem(
         if (file.size > LIMITS.videoBytes) return VIDEO_TOO_BIG_MESSAGE;
         return "";
     }
-    return photos >= LIMITS.photos ? PHOTOS_FULL_MESSAGE : "";
+    if (photos >= LIMITS.photos) return PHOTOS_FULL_MESSAGE;
+    return file.size > LIMITS.photoBytes ? PHOTO_TOO_BIG_MESSAGE : "";
 }
 
 /** A video's length as its badge shows it: "0:24", "1:05". */
@@ -671,14 +710,18 @@ export function firstProblem<T>(schema: z.ZodType<T>, values: T): string {
  * The line in the editor's header: what is saved, what is not, and what
  * needs a fix before Save all can take it.
  */
-export function saveHint(dirty: SectionKey[], stuck: SectionKey[]): string {
+export function saveHint(
+    dirty: SectionKey[],
+    stuck: SectionKey[],
+    names: Record<SectionKey, string> = SECTION_NAMES,
+): string {
     if (dirty.length === 0) return "All changes saved";
     const head =
         dirty.length === 1
-            ? `${SECTION_NAMES[dirty[0]]} is unsaved`
+            ? `${names[dirty[0]]} is unsaved`
             : `${dirty.length} sections unsaved`;
     if (stuck.length === 0) return head;
-    return `${head} · ${joinAnd(stuck.map((k) => SECTION_NAMES[k]))} ${
+    return `${head} · ${joinAnd(stuck.map((k) => names[k]))} ${
         stuck.length === 1 ? "needs" : "need"
     } a fix`;
 }
@@ -700,13 +743,14 @@ export function savedMessage(
     saved: SectionKey[],
     stuck: SectionKey[],
     single?: string,
+    names: Record<SectionKey, string> = SECTION_NAMES,
 ): string {
     const head =
         saved.length === 1
-            ? (single ?? `${SECTION_NAMES[saved[0]]} saved.`)
-            : `Saved ${saved.map((k) => SECTION_NAMES[k].toLowerCase()).join(", ")}.`;
+            ? (single ?? `${names[saved[0]]} saved.`)
+            : `Saved ${saved.map((k) => names[k].toLowerCase()).join(", ")}.`;
     if (stuck.length === 0) return head;
-    return `${head} ${joinAnd(stuck.map((k) => SECTION_NAMES[k]))} ${
+    return `${head} ${joinAnd(stuck.map((k) => names[k]))} ${
         stuck.length === 1 ? "needs" : "need"
     } a fix first.`;
 }

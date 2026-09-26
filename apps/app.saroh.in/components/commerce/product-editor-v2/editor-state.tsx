@@ -13,11 +13,11 @@ import {
     useState,
 } from "react";
 
+import { maySection, sectionNames } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
 import {
     partitionSections,
     savedMessage,
-    SECTION_NAMES,
     SECTION_ORDER,
 } from "@/lib/products/editor-sections";
 import type { ProductPatch } from "@/lib/products/service";
@@ -57,6 +57,12 @@ export interface SectionHandle {
 interface EditorApi {
     mode: "create" | "edit";
     canWrite: boolean;
+    /** May count stock (`inventory:write`): a stock-only role edits Stock. */
+    canStock: boolean;
+    /** Whether this person can change a section (#525). */
+    mayEdit: (key: SectionKey) => boolean;
+    /** The sections' names, Details named for what the business sells. */
+    names: Record<SectionKey, string>;
     states: Partial<Record<SectionKey, SectionState>>;
     saving: SectionKey[];
     report: (key: SectionKey, state: SectionState) => void;
@@ -86,13 +92,22 @@ export function useEditor(): EditorApi {
 export function ProductEditorProvider({
     mode,
     canWrite,
+    canStock,
+    sellsFood,
     children,
 }: {
     mode: "create" | "edit";
     canWrite: boolean;
+    canStock: boolean;
+    sellsFood: boolean;
     children: ReactNode;
 }) {
     const router = useRouter();
+    const names = useMemo(() => sectionNames(sellsFood), [sellsFood]);
+    const mayEdit = useCallback(
+        (key: SectionKey) => maySection(key, { canWrite, canStock }),
+        [canWrite, canStock],
+    );
     const [states, setStates] = useState<
         Partial<Record<SectionKey, SectionState>>
     >({});
@@ -154,7 +169,7 @@ export function ProductEditorProvider({
                     } catch {
                         // A save that threw never reached the API's answer.
                         showError(
-                            `Couldn't save ${SECTION_NAMES[k].toLowerCase()} — the connection dropped. Your changes are still here.`,
+                            `Couldn't save ${names[k].toLowerCase()} — the connection dropped. Your changes are still here.`,
                         );
                     }
                 }
@@ -169,10 +184,11 @@ export function ProductEditorProvider({
                     saved,
                     stuck,
                     only ? current[only]?.savedMessage : undefined,
+                    names,
                 ),
             );
         },
-        [router],
+        [router, names],
     );
 
     const discard = useCallback((key: SectionKey) => {
@@ -205,6 +221,9 @@ export function ProductEditorProvider({
         () => ({
             mode,
             canWrite,
+            canStock,
+            mayEdit,
+            names,
             states,
             saving,
             report,
@@ -217,6 +236,9 @@ export function ProductEditorProvider({
         [
             mode,
             canWrite,
+            canStock,
+            mayEdit,
+            names,
             states,
             saving,
             report,
