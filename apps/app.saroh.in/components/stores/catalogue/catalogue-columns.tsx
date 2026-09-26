@@ -20,13 +20,14 @@ import {
     Trash2,
 } from "lucide-react";
 import Link from "next/link";
+import { Fragment } from "react";
 
 import type { DataColumn } from "@/components/shared/data-view/types";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { ratingLabel, rowRating } from "@/lib/product-reviews/describe";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
-import { stockWords } from "@/lib/products/catalogue";
+import { rowFacts, stockWords } from "@/lib/products/catalogue";
 
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
@@ -67,35 +68,39 @@ export function catalogueColumns({
                         <span className="block truncate text-[13.5px] font-medium">
                             {r.name}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                            {r.variantCount === 1
-                                ? "1 variant"
-                                : `${r.variantCount} variants`}
-                            {r.sku ? (
-                                <>
-                                    {" · "}
-                                    <span className="font-mono">{r.sku}</span>
-                                </>
-                            ) : null}
-                            {/* An aggregate view must say which places a row
-                                belongs to. */}
-                            {!filtered && many && r.places.length > 0
-                                ? ` · ${r.places.map((p) => p.storeName).join(" · ")}`
-                                : null}
-                            {(() => {
-                                const rating = rowRating([r.id], ratingById);
-                                return rating ? (
-                                    <>
-                                        {" · "}
-                                        <span
-                                            aria-label={`Rated ${rating.average} from ${rating.count} ${rating.count === 1 ? "review" : "reviews"}`}
-                                        >
-                                            ★ {ratingLabel(rating)}
-                                        </span>
-                                    </>
-                                ) : null;
-                            })()}
-                        </span>
+                        {(() => {
+                            // An aggregate view must say which places a row
+                            // belongs to; no variants, no "0 variants".
+                            const facts = rowFacts(r, !filtered && many);
+                            const rating = rowRating([r.id], ratingById);
+                            const parts = [
+                                facts.variants,
+                                facts.sku ? (
+                                    <span key="sku" className="font-mono">
+                                        {facts.sku}
+                                    </span>
+                                ) : null,
+                                facts.places,
+                                rating ? (
+                                    <span
+                                        key="rating"
+                                        aria-label={`Rated ${rating.average} from ${rating.count} ${rating.count === 1 ? "review" : "reviews"}`}
+                                    >
+                                        ★ {ratingLabel(rating)}
+                                    </span>
+                                ) : null,
+                            ].filter((p) => p !== null);
+                            return parts.length > 0 ? (
+                                <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                                    {parts.map((p, i) => (
+                                        <Fragment key={i}>
+                                            {i > 0 ? " · " : null}
+                                            {p}
+                                        </Fragment>
+                                    ))}
+                                </span>
+                            ) : null;
+                        })()}
                     </span>
                 </span>
             ),

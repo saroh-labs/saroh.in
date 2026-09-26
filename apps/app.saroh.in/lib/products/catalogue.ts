@@ -97,6 +97,27 @@ export function priceRange(
     return Number(low) === Number(high) ? null : { low, high };
 }
 
+/**
+ * The row's second line, as the design writes it: "2 variants · SKU ·
+ * where it sells". A product without variants says nothing about them —
+ * never "0 variants" — so it reads as its SKU (if any) and its
+ * storefronts. `places` is left out when the view needn't say where.
+ */
+export function rowFacts(
+    row: Pick<CatalogueRow, "variantCount" | "sku" | "places">,
+    showPlaces: boolean,
+): { variants: string | null; sku: string | null; places: string | null } {
+    const n = row.variantCount;
+    return {
+        variants: n > 0 ? `${n} ${n === 1 ? "variant" : "variants"}` : null,
+        sku: row.sku?.trim() ? row.sku : null,
+        places:
+            showPlaces && row.places.length > 0
+                ? row.places.map((p) => p.storeName).join(" · ")
+                : null,
+    };
+}
+
 /** Stock as the row says it, and the colour role that reinforces it. */
 export type StockTone = "plain" | "warn" | "danger" | "muted";
 

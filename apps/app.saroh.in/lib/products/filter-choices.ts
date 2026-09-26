@@ -1,15 +1,10 @@
-import { getList, orgBase } from "@/lib/api/http";
-
-import { listCategories } from "./service";
-
 /**
  * What the Products list's Filter can narrow to (#519): the business's
- * categories and collections, by name. Server-only. A read that fails
- * leaves that section out of the menu rather than failing the list — the
- * list itself still loads, and the chips still work.
- *
- * TODO(#524): the collections screens bring `lib/collections/service.ts`;
- * this read moves there then.
+ * categories and collections, by name. The page reads them — categories
+ * through `lib/products/service.ts`, collections through
+ * `lib/collections/service.ts` (#524) — and a read that failed arrives as
+ * null, which leaves that section out of the menu rather than failing the
+ * list: the list itself still loads, and the chips still work. Pure.
  */
 export interface FilterChoice {
     id: string;
@@ -21,17 +16,11 @@ export interface FilterChoices {
     collections: FilterChoice[] | null;
 }
 
-export async function filterChoices(): Promise<FilterChoices> {
-    const base = await orgBase();
-    const [categories, collections] = await Promise.all([
-        listCategories()
-            .then((rows) => rows.map((c) => ({ id: c.id, name: c.name })))
-            .catch(() => null),
-        base
-            ? getList<FilterChoice>(`${base}/collections`)
-                  .then((rows) => rows.map((c) => ({ id: c.id, name: c.name })))
-                  .catch(() => null)
-            : Promise.resolve([]),
-    ]);
-    return { categories, collections };
+export function choicesFrom(
+    categories: readonly FilterChoice[] | null,
+    collections: readonly FilterChoice[] | null,
+): FilterChoices {
+    const names = (rows: readonly FilterChoice[] | null) =>
+        rows?.map((r) => ({ id: r.id, name: r.name })) ?? null;
+    return { categories: names(categories), collections: names(collections) };
 }

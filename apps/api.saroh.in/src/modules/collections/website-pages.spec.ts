@@ -5,7 +5,12 @@ jest.mock("@saroh/database", () => ({
 import { prisma } from "@saroh/database";
 
 import type { ProductBlockReader } from "./website-pages";
-import { PRODUCT_BLOCKS, pagesShowing, websitePagesFor } from "./website-pages";
+import {
+    PRODUCT_BLOCKS,
+    pagesShowing,
+    websitePagesFor,
+    websitePagesForCollections,
+} from "./website-pages";
 
 /**
  * "Shown on the website" (#516) reads the live snapshot's sections. No block
@@ -102,5 +107,50 @@ describe("website pages that show a product", () => {
                 ),
             ).toEqual([]);
         }
+    });
+
+    it("a collection's card says the website doesn't show products, without reading a site", async () => {
+        const got = await websitePagesForCollections("org_rye", [
+            "col_breads",
+            "col_gifts",
+        ]);
+        expect(Object.fromEntries(got)).toEqual({
+            col_breads: { showsProducts: false, pages: [] },
+            col_gifts: { showsProducts: false, pages: [] },
+        });
+        expect(prisma.site.findMany).not.toHaveBeenCalled();
+    });
+
+    it("finds the pages that show one collection, reading the sites once", async () => {
+        const findMany = prisma.site.findMany as jest.Mock;
+        findMany.mockResolvedValueOnce([
+            {
+                id: "site_1",
+                name: "Rye & Co.",
+                currentPublication: { snapshot },
+            },
+        ]);
+        const got = await websitePagesForCollections(
+            "org_rye",
+            ["col_breads", "col_gifts"],
+            blocks,
+        );
+        expect(findMany).toHaveBeenCalledTimes(1);
+        expect(got.get("col_breads")).toEqual({
+            showsProducts: true,
+            pages: [
+                {
+                    siteId: "site_1",
+                    siteName: "Rye & Co.",
+                    path: "/breads",
+                    title: "Breads",
+                },
+            ],
+        });
+        // A page naming a product is not a page showing a collection.
+        expect(got.get("col_gifts")).toEqual({
+            showsProducts: true,
+            pages: [],
+        });
     });
 });

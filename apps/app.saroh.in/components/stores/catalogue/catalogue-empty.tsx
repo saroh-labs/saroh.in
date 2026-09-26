@@ -1,11 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Layers, Package, Search, Store } from "lucide-react";
+import { Layers, Package, Plus, Search, Store } from "lucide-react";
 import Link from "next/link";
 
 import { newProductHref } from "@/lib/products/links";
 import type { EmptyCopy, ListQuery } from "@/lib/products/list-query";
+import { newCollectionHref } from "@/lib/products/list-query";
 import { newStorefrontHref } from "@/lib/stores/links";
 
 /** A business with no storefront: nothing to sell from yet. */
@@ -35,17 +36,17 @@ export function NoStorefront({ canWrite }: { canWrite: boolean }) {
 /**
  * An empty list's state for DataView (#519): its icon, words and the one
  * action that fills it — Clear search, Clear filters, Show all, or Add
- * product for a role that can.
+ * product and New collection (#524) for a role that can.
  */
 export function emptyState(
     empty: EmptyCopy,
     {
-        view,
+        query,
         go,
         canWrite,
         storeId,
     }: {
-        view: ListQuery["view"];
+        query: ListQuery;
         go: (patch: Partial<ListQuery>) => void;
         canWrite: boolean;
         /** Where Add product makes it. */
@@ -74,12 +75,19 @@ export function emptyState(
             <Button asChild>
                 <Link href={newProductHref(storeId)}>Add product</Link>
             </Button>
+        ) : empty.action === "new-collection" && canWrite ? (
+            <Button asChild>
+                <Link href={newCollectionHref(query)} scroll={false}>
+                    <Plus aria-hidden />
+                    New collection
+                </Link>
+            </Button>
         ) : undefined;
     return {
         icon:
             empty.kind === "search" ? (
                 <Search />
-            ) : view === "collections" ? (
+            ) : query.view === "collections" ? (
                 <Layers />
             ) : (
                 <Package />

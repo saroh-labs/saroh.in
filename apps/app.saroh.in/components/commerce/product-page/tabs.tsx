@@ -1,5 +1,6 @@
 import type { ProductTab } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
+import { shownCollections } from "@/lib/products/overview-words";
 
 import type { TabItem } from "./tab-row";
 import { TabRow } from "./tab-row";
@@ -101,11 +102,7 @@ export function ProductTabs({
             badge:
                 placement?.status === "ok"
                     ? {
-                          text: String(
-                              placement.data.collections.filter(
-                                  (c) => c.showing,
-                              ).length,
-                          ),
+                          text: String(shownCollections(placement.data).length),
                           tone: "plain",
                       }
                     : placement?.status === "failed"

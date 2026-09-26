@@ -172,7 +172,10 @@ describe("Collections (DB)", () => {
             name: "Weekend",
             kind: "HAND_PICKED",
             productCount: 2,
+            // No website block shows products yet (#473): the card says so.
+            website: { showsProducts: false, pages: [] },
         });
+        expect(removed.website).toEqual({ showsProducts: false, pages: [] });
     });
 
     it("an automatic Breads collection follows products moving into and out of Breads", async () => {

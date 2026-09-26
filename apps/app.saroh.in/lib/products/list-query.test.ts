@@ -5,6 +5,7 @@ import {
     emptyCopy,
     isNarrowed,
     listHref,
+    newCollectionHref,
     readListQuery,
 } from "./list-query";
 
@@ -66,6 +67,31 @@ describe("the Products list's address (#519)", () => {
         expect(emptyCopy(readListQuery({ view: "needs" }), null).title).toBe(
             "Nothing needs restocking",
         );
+    });
+
+    it("says No collections yet, with New collection, only when there are none", () => {
+        const onChip = readListQuery({ view: "collections" });
+        expect(emptyCopy(onChip, null, 0)).toMatchObject({
+            title: "No collections yet",
+            action: "new-collection",
+        });
+        expect(emptyCopy(onChip, null, 3)).toMatchObject({
+            title: "Nothing in a collection yet",
+            action: null,
+        });
+        // Couldn't be read: never "No collections yet".
+        expect(emptyCopy(onChip, null, null).title).toBe(
+            "Nothing in a collection yet",
+        );
+    });
+
+    it("links New collection to the Collections chip with the sheet open", () => {
+        expect(newCollectionHref(readListQuery({}))).toBe(
+            "/commerce/products?view=collections&new=collection",
+        );
+        expect(
+            newCollectionHref(readListQuery({ q: "rye", collection: "c1" })),
+        ).toBe("/commerce/products?view=collections&q=rye&new=collection");
     });
 
     it("asks the API only for what narrows", () => {

@@ -68,6 +68,15 @@ export function listHref(
     return s ? `/commerce/products?${s}` : "/commerce/products";
 }
 
+/**
+ * The Collections chip with the collection sheet open on a new one (#524):
+ * the empty state's New collection, as a link.
+ */
+export function newCollectionHref(query: ListQuery): string {
+    const href = listHref(query, { view: "collections", collection: null });
+    return `${href}${href.includes("?") ? "&" : "?"}new=collection`;
+}
+
 /** The API filter for `query`, leaving out what it doesn't narrow. */
 export function catalogueFilter(query: ListQuery) {
     return {
@@ -86,18 +95,26 @@ export interface EmptyCopy {
     title: string;
     note: string;
     action:
-        "clear-search" | "clear-filters" | "show-all" | "add-product" | null;
+        | "clear-search"
+        | "clear-filters"
+        | "show-all"
+        | "add-product"
+        | "new-collection"
+        | null;
 }
 
 /**
  * The design's empty states: a search that found nothing names the search
  * and offers Clear search; filters that found nothing offer to clear them;
  * an empty chip says what would fill it; and only an empty catalogue says
- * "No products yet".
+ * "No products yet". The Collections chip says "No collections yet" only
+ * when the business has none (`collections` is how many it has; null when
+ * they couldn't be read) — with some, it is their products that are missing.
  */
 export function emptyCopy(
     query: ListQuery,
     storeName: string | null,
+    collections: number | null = 0,
 ): EmptyCopy {
     if (query.q) {
         return {
@@ -116,10 +133,21 @@ export function emptyCopy(
         };
     }
     if (query.view === "collections") {
+        if (collections === 0) {
+            return {
+                kind: "chip",
+                title: "No collections yet",
+                note: "Collections group products into the sets people browse — Bread, Gifts, new arrivals.",
+                action: "new-collection",
+            };
+        }
         return {
             kind: "chip",
-            title: "No collections yet",
-            note: "Collections group products into the sets people browse — Bread, Gifts, new arrivals.",
+            title: "Nothing in a collection yet",
+            note:
+                collections === null
+                    ? "Products in a collection show here."
+                    : "Your collections have nothing on sale in them yet. Edit one to pick its products, or point it at a category.",
             action: null,
         };
     }

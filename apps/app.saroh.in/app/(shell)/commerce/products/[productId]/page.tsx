@@ -2,8 +2,8 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
 import { ArchivedBanner } from "@/components/commerce/product-page/archived-banner";
-import { ProductCollectionsTab } from "@/components/commerce/product-page/collections-tab";
 import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
 import {
@@ -21,6 +21,7 @@ import { ProductPhotosTab } from "@/components/commerce/product-page/photos-tab"
 import { ProductReviewsTab } from "@/components/commerce/product-page/reviews-tab";
 import { ProductStockTab } from "@/components/commerce/product-page/stock-tab";
 import { ProductTabs } from "@/components/commerce/product-page/tabs";
+import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { productHref, productTabOf } from "@/lib/products/links";
 import {
@@ -125,7 +126,8 @@ export default async function ProductPage({
     const store = overview.storefront;
     const onStock = view === "team" && tab === "stock" && tracking.counts;
 
-    const [levels, log, checks, categories] = await Promise.all([
+    const onCollections = view === "team" && tab === "collections";
+    const [levels, log, checks, categories, collections] = await Promise.all([
         // Its shelves at every storefront — optional: without them, the
         // Overview shows the address's storefront and the Stock tab says
         // it couldn't load.
@@ -138,10 +140,16 @@ export default async function ProductPage({
             ? getStockLog({ product: productId, limit: 100 }).catch(() => null)
             : Promise.resolve(null),
         onStock ? getStockChecks().catch(() => null) : Promise.resolve(null),
-        // The details sheet picks a category; only a writer opens it.
-        overview.canWrite
+        // The details sheet picks a category; only a writer opens it. The
+        // Collections tab says which category put it in an automatic one.
+        overview.canWrite || onCollections
             ? listCategories().catch(() => [])
             : Promise.resolve([]),
+        // The Collections tab's sizes and its Edit sheet (#524) — optional:
+        // without them the cards leave the count out and Edit waits.
+        onCollections
+            ? listCollections().catch(() => null)
+            : Promise.resolve(null),
     ]);
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
@@ -278,6 +286,8 @@ export default async function ProductPage({
                         {tab === "collections" ? (
                             <ProductCollectionsTab
                                 overview={overview}
+                                collections={collections}
+                                categories={categories}
                                 retryHref={href("collections")}
                             />
                         ) : null}
