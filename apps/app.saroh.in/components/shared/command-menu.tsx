@@ -225,6 +225,7 @@ export function CommandMenu({
     actions: permissions = null,
     sites = [],
     storefronts = null,
+    stockTracked = null,
 }: {
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
@@ -245,6 +246,8 @@ export function CommandMenu({
      * and "New storefront" is offered.
      */
     storefronts?: StorefrontAllowance | null;
+    /** The business tracks stock; off, Sell › Stock is not offered. */
+    stockTracked?: boolean | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -257,6 +260,7 @@ export function CommandMenu({
         moduleKeys,
         sites,
         storefronts: storefronts?.used ?? null,
+        stockTracked,
     });
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
