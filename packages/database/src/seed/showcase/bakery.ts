@@ -2,8 +2,32 @@ import type { Prisma } from "@prisma/client";
 
 import { PLAN } from "../data";
 import type { Db } from "../helpers";
-import { id, listProductAt } from "../helpers";
-import { SHOWCASE_KEY, SHOWCASE_SEED, TIMEZONE } from "./data";
+import type { BakeryProduct, CategoryKey, StoreKey } from "./bakery-catalogue";
+import {
+    ALLERGENS,
+    CATEGORIES,
+    HISTORY_PRODUCTS,
+    lineName,
+    P,
+    PRODUCTS,
+    rateOf,
+    RYE_KEY,
+    ryeId,
+    unitPaise,
+} from "./bakery-catalogue";
+import { writeRyeSite } from "./bakery-site";
+import type { LineForStock, StockPlan } from "./bakery-stock";
+import {
+    ensureShelves,
+    markSoldOut,
+    planStock,
+    trackedSince,
+    writeCollections,
+    writeLevels,
+    writeOptions,
+    writeVariantsAndListings,
+} from "./bakery-stock";
+import { SHOWCASE_SEED, TIMEZONE } from "./data";
 import { addMinutes, earliest, hashKey, istAt, istWeekday } from "./people";
 import type { Period } from "./periods";
 import { boundary, periodLabel } from "./periods";
@@ -17,13 +41,16 @@ import { createRng } from "./random";
  * RC/26-27/0001 and its credit notes RCCN/26-27/0001. Owned by
  * `demo@saroh.dev`; Nisha, who works the counter, is a Member.
  *
- * STRUCTURE — the business, its GST settings, the storefront, its allergen
- * list, categories, eleven products with their GST rate, HSN/SAC and
- * allergens, and two Sourdough plans — is upserted on seeded ids.
+ * STRUCTURE — the business, its GST settings, its two storefronts (Hill
+ * Road and Online) and website, its allergen list, categories, the designs'
+ * products (`bakery-catalogue.ts`) with their GST rate, HSN/SAC, allergens,
+ * variants and shelves (`bakery-stock.ts`), collections, and two Sourdough
+ * plans — is upserted on seeded ids.
  *
  * VOLUME — store customers and CRM contacts, orders with their kitchen steps,
- * payments, a line refund and an edit, subscriptions with their renewals and
- * skips, hand-written trade invoices, identity links and notes — is cleared
+ * payments, a line refund and an edit, what they hold and sold, the stock
+ * log, subscriptions with their renewals and skips, hand-written trade
+ * invoices, identity links and notes — is cleared
  * and written again each run, from a seeded PRNG and dates relative to `now`,
  * so a re-run inside the same half hour writes identical rows.
  *
@@ -52,8 +79,8 @@ import { createRng } from "./random";
  *   paper was issued, the financial year read in Asia/Kolkata.
  */
 
-const KEY = "rc";
-const sid = (...parts: (string | number)[]) => id(SHOWCASE_KEY, KEY, ...parts);
+const KEY = RYE_KEY;
+const sid = ryeId;
 const rngFor = (...parts: string[]) =>
     createRng((SHOWCASE_SEED ^ hashKey(KEY, ...parts)) >>> 0);
 
@@ -66,8 +93,12 @@ export const RYE = {
     key: KEY,
     name: NAME,
     orgId: sid("org"),
+    /** Hill Road: the shop, which also delivers. */
     storeId: sid("store"),
+    /** Online: the website's shop, delivery only (#526). */
+    onlineStoreId: sid("store", "online"),
     slug: "rye-and-co",
+    onlineSlug: "rye-and-co-online",
     prefix: sid(""),
 };
 
@@ -183,151 +214,6 @@ const gstInside = (lines: readonly DocLineInput[], inter: boolean) =>
         .reduce((s, l) => s + l.cgstPaise + l.sgstPaise + l.igstPaise, 0);
 
 // --- Fixtures ----------------------------------------------------------------
-
-const ALLERGENS = [
-    "Gluten",
-    "Milk",
-    "Eggs",
-    "Nuts",
-    "Peanuts",
-    "Sesame",
-    "Soy",
-    "Mustard",
-] as const;
-type Allergen = (typeof ALLERGENS)[number];
-
-const CATEGORIES = [
-    { key: "breads", name: "Breads" },
-    { key: "pastry", name: "Pastry" },
-    { key: "coffee", name: "Coffee" },
-] as const;
-type CategoryKey = (typeof CATEGORIES)[number]["key"];
-
-/** Bread nil-rated (HSN 1905 90 10), pastry 18% (1905 90 20), coffee 5% (SAC 996331). */
-const RATES: Record<CategoryKey, { bps: number; code: string }> = {
-    breads: { bps: 0, code: "19059010" },
-    pastry: { bps: 1800, code: "19059020" },
-    coffee: { bps: 500, code: "996331" },
-};
-
-interface BakeryProduct {
-    slug: string;
-    name: string;
-    category: CategoryKey;
-    /** GST-inclusive, whole rupees. */
-    price: number;
-    description: string;
-    contains: readonly Allergen[];
-    mayContain: readonly Allergen[];
-}
-
-const PRODUCTS: readonly BakeryProduct[] = [
-    {
-        slug: "sourdough-loaf",
-        name: "Sourdough loaf",
-        category: "breads",
-        price: 480,
-        description:
-            "A long-fermented loaf, milled and baked on Hill Road. Crust dark, crumb open, keeps three days in paper.",
-        contains: ["Gluten"],
-        mayContain: ["Nuts", "Sesame"],
-    },
-    {
-        slug: "rye-caraway-loaf",
-        name: "Rye & caraway loaf",
-        category: "breads",
-        price: 540,
-        description: "Dark rye with toasted caraway, dense and sour.",
-        contains: ["Gluten"],
-        mayContain: [],
-    },
-    {
-        slug: "seeded-multigrain-loaf",
-        name: "Seeded multigrain loaf",
-        category: "breads",
-        price: 420,
-        description:
-            "Sunflower, pumpkin, flax and sesame through a wholewheat crumb.",
-        contains: ["Gluten", "Sesame"],
-        mayContain: ["Nuts"],
-    },
-    {
-        slug: "baguette",
-        name: "Baguette",
-        category: "breads",
-        price: 160,
-        description: "Baked three times a day; best within the hour.",
-        contains: ["Gluten"],
-        mayContain: ["Sesame"],
-    },
-    {
-        slug: "butter-croissant",
-        name: "Butter croissant",
-        category: "pastry",
-        price: 180,
-        description: "Laminated over three days with cultured butter.",
-        contains: ["Gluten", "Milk", "Eggs"],
-        mayContain: [],
-    },
-    {
-        slug: "pain-au-chocolat",
-        name: "Pain au chocolat",
-        category: "pastry",
-        price: 220,
-        description: "Two batons of dark chocolate in croissant dough.",
-        contains: ["Gluten", "Milk", "Eggs", "Soy"],
-        mayContain: ["Nuts"],
-    },
-    {
-        slug: "cinnamon-bun",
-        name: "Cinnamon bun",
-        category: "pastry",
-        price: 120,
-        description: "Laminated dough, cinnamon sugar, a thin orange glaze.",
-        contains: ["Gluten", "Milk", "Eggs"],
-        mayContain: ["Nuts"],
-    },
-    {
-        slug: "almond-croissant",
-        name: "Almond croissant",
-        category: "pastry",
-        price: 360,
-        description: "Twice-baked with frangipane and flaked almonds.",
-        contains: ["Gluten", "Milk", "Eggs", "Nuts"],
-        mayContain: [],
-    },
-    {
-        slug: "flat-white",
-        name: "Flat white",
-        category: "coffee",
-        price: 220,
-        description: "A double ristretto and steamed milk.",
-        contains: ["Milk"],
-        mayContain: [],
-    },
-    {
-        slug: "cappuccino",
-        name: "Cappuccino",
-        category: "coffee",
-        price: 200,
-        description: "House blend, from Kaapi Roasters in Chikmagalur.",
-        contains: ["Milk"],
-        mayContain: [],
-    },
-    {
-        slug: "cold-brew",
-        name: "Cold brew",
-        category: "coffee",
-        price: 250,
-        description: "Steeped for eighteen hours; black, over ice.",
-        contains: [],
-        mayContain: [],
-    },
-];
-const P = Object.fromEntries(PRODUCTS.map((p, i) => [p.slug, i])) as Record<
-    string,
-    number
->;
 
 /** Delivery, charged per order and taxed at the delivery rate. */
 const DELIVERY_PAISE = 6000;
@@ -634,6 +520,8 @@ export async function seedBakery(
         gstState: GST.state,
         ...RYE_ADDRESS,
         invoicePrefix: GST.prefix,
+        // The business counts stock (#515); a take that turned it off is undone.
+        stockTracking: true,
         deliveryGstRate: bpsToRate(GST.deliveryRateBps),
         deliverySacCode: GST.deliverySac,
     };
@@ -721,52 +609,38 @@ export async function seedBakery(
         },
     });
 
-    // --- the storefront: a shop on Hill Road that also delivers
-    await prisma.store.upsert({
-        where: { slug: RYE.slug },
-        update: { name: NAME, organizationId: orgId },
-        create: {
-            id: storeId,
-            organizationId: orgId,
-            name: NAME,
-            slug: RYE.slug,
-            description: "Sourdough, pastry and coffee, baked on Hill Road.",
-            createdAt,
-        },
-    });
-    await prisma.storeOwner.upsert({
-        where: { storeId_userId: { storeId, userId: demoUserId } },
-        update: { role: "OWNER" },
-        create: {
-            id: sid("storeowner"),
-            storeId,
-            userId: demoUserId,
-            role: "OWNER",
-        },
-    });
-    const settings = {
-        currency: CURRENCY,
-        timezone: TIMEZONE,
-        kind: "SHOP",
+    // --- the storefronts: the shop on Hill Road, which also delivers, and
+    // the website's Online shop, which only delivers (#526)
+    const stores = { H: storeId, O: RYE.onlineStoreId };
+    await writeStorefront(prisma, {
+        id: storeId,
+        key: "",
+        orgId,
+        slug: RYE.slug,
+        name: "Hill Road",
+        description: "Sourdough, pastry and coffee, baked on Hill Road.",
         address: "3 Hill Road, Indiranagar, Bengaluru 560038",
-        collectionEnabled: true,
-        taxEnabled: false,
-    };
-    await prisma.storeSettings.upsert({
-        where: { storeId },
-        update: settings,
-        create: { id: sid("storesettings"), storeId, ...settings },
+        collect: true,
+        createdAt,
+        demoUserId,
     });
-    await prisma.storeFeatures.upsert({
-        where: { storeId },
-        update: { ecommerceEnabled: true },
-        create: { id: sid("storefeatures"), storeId, ecommerceEnabled: true },
+    await writeStorefront(prisma, {
+        id: RYE.onlineStoreId,
+        key: "online",
+        orgId,
+        slug: RYE.onlineSlug,
+        name: "Online",
+        description: "Loaves, beans and gift boxes, delivered.",
+        address: null,
+        collect: false,
+        createdAt: istAt(now, -120, 10 * 60),
+        demoUserId,
     });
 
     // Volume first, so nothing below trips over last run's rows.
     await clearVolume(prisma);
 
-    // --- allergens, categories, products
+    // --- allergens, categories, options, products
     const allergenId: Record<string, string> = {};
     for (let i = 0; i < ALLERGENS.length; i++) {
         const name = ALLERGENS[i];
@@ -784,7 +658,7 @@ export async function seedBakery(
         });
         allergenId[name] = rowId;
     }
-    const categoryId: Record<string, string> = {};
+    const categoryId = {} as Record<CategoryKey, string>;
     for (const c of CATEGORIES) {
         const row = await prisma.category.upsert({
             where: {
@@ -800,24 +674,16 @@ export async function seedBakery(
         });
         categoryId[c.key] = row.id;
     }
+    const options = await writeOptions(prisma, orgId);
     const productIds: string[] = [];
     for (let i = 0; i < PRODUCTS.length; i++) {
         const p = PRODUCTS[i];
         const productId = sid("product", i);
-        const rate = RATES[p.category];
-        const data = {
-            name: p.name,
-            description: `<p>${p.description.replace(/&/g, "&amp;")}</p>`,
-            price: rupees(p.price * 100),
-            currency: CURRENCY,
-            status: "PUBLISHED",
-            categoryId: categoryId[p.category],
-            madeHere: true,
-            returnsMode: "OWN",
-            returnsText: "Non-returnable — fresh food.",
-            gstRate: bpsToRate(rate.bps),
-            hsnCode: rate.code,
-        };
+        const data = productData(p, {
+            categoryId,
+            optionId: p.option ? options[p.option].id : null,
+            trackedAt: trackedSince(now),
+        });
         await prisma.product.upsert({
             where: { id: productId },
             update: data,
@@ -830,16 +696,15 @@ export async function seedBakery(
                 ...data,
             },
         });
-        // Sold at the counter's storefront (#510). Baked fresh, so it counts
-        // no stock: no StockLevel, and its lines hold nothing.
-        await listProductAt(prisma, {
-            id: sid("listing", i),
-            orgId,
-            storeId,
-            productId,
-        });
         productIds.push(productId);
     }
+    // Its variants, and where each is sold (#510).
+    const variantIds = await writeVariantsAndListings(prisma, {
+        orgId,
+        stores,
+        productIds,
+        options,
+    });
     // What each product contains or may contain: rewritten whole.
     await prisma.productAllergen.deleteMany({
         where: { productId: { in: productIds } },
@@ -857,6 +722,18 @@ export async function seedBakery(
                 kind,
             })),
         ),
+    });
+    await writeCollections(prisma, {
+        orgId,
+        productIds,
+        categoryId,
+        createdAt: istAt(now, -30, 11 * 60),
+    });
+    const shelfIds = await ensureShelves(prisma, {
+        orgId,
+        stores,
+        productIds,
+        variantIds,
     });
 
     // --- the Sourdough plans (Restrict from their subscribers: upserted)
@@ -885,24 +762,149 @@ export async function seedBakery(
         });
     }
 
-    // --- the volume
+    // --- the volume, and what it holds and sold from the shelves
     const world = planWorld({
         now,
         orgId,
-        storeId,
+        stores,
         demoUserId,
         counterUserId: ctx.counterUserId,
         productIds,
+        variantIds,
+        shelfIds,
         planIds,
         allergenId,
     });
+    await writeLevels(prisma, world.stock.levels);
     await writeWorld(prisma, orgId, world);
+    await prisma.stockEntry.createMany({ data: world.stock.entries });
+    // Sold out by hand this morning, on a loaf that counts no stock.
+    await markSoldOut(prisma, {
+        orgId,
+        stores,
+        productIds,
+        at: todayClock(now)(10 * 60 + 15),
+        by: ctx.counterUserId,
+    });
+    await writeRyeSite(prisma, { orgId, userId: demoUserId, now });
 
     return { id: orgId, name: NAME, prefix: RYE.prefix };
 }
 
-/** This business's volume, children first. Its catalogue and plans stay. */
+/** A storefront, its owner, settings and features. */
+async function writeStorefront(
+    prisma: Db,
+    a: {
+        id: string;
+        /** "" for the first storefront, whose rows predate the second. */
+        key: string;
+        orgId: string;
+        slug: string;
+        name: string;
+        description: string;
+        address: string | null;
+        /** Customers can collect here. */
+        collect: boolean;
+        createdAt: Date;
+        demoUserId: string;
+    },
+) {
+    const rowId = (what: string) => (a.key ? sid(what, a.key) : sid(what));
+    await prisma.store.upsert({
+        where: { slug: a.slug },
+        update: { name: a.name, organizationId: a.orgId, deletedAt: null },
+        create: {
+            id: a.id,
+            organizationId: a.orgId,
+            name: a.name,
+            slug: a.slug,
+            description: a.description,
+            createdAt: a.createdAt,
+        },
+    });
+    await prisma.storeOwner.upsert({
+        where: { storeId_userId: { storeId: a.id, userId: a.demoUserId } },
+        update: { role: "OWNER" },
+        create: {
+            id: rowId("storeowner"),
+            storeId: a.id,
+            userId: a.demoUserId,
+            role: "OWNER",
+        },
+    });
+    const settings = {
+        currency: CURRENCY,
+        timezone: TIMEZONE,
+        kind: "SHOP",
+        address: a.address,
+        collectionEnabled: a.collect,
+        taxEnabled: false,
+    };
+    await prisma.storeSettings.upsert({
+        where: { storeId: a.id },
+        update: settings,
+        create: { id: rowId("storesettings"), storeId: a.id, ...settings },
+    });
+    await prisma.storeFeatures.upsert({
+        where: { storeId: a.id },
+        update: { ecommerceEnabled: true },
+        create: {
+            id: rowId("storefeatures"),
+            storeId: a.id,
+            ecommerceEnabled: true,
+        },
+    });
+}
+
+/** A product row's fields, from its catalogue entry. */
+function productData(
+    p: BakeryProduct,
+    a: {
+        categoryId: Record<CategoryKey, string>;
+        optionId: string | null;
+        trackedAt: Date;
+    },
+) {
+    const rate = rateOf(p);
+    return {
+        name: p.name,
+        description: p.description
+            ? `<p>${p.description.replace(/&/g, "&amp;")}</p>`
+            : null,
+        price: rupees(p.price * 100),
+        currency: CURRENCY,
+        status: p.status ?? "PUBLISHED",
+        archivedAt: null,
+        categoryId: p.category ? a.categoryId[p.category] : null,
+        madeHere: !p.maker,
+        maker: p.maker ?? null,
+        returnsMode: p.returns === null ? "STOREFRONT" : "OWN",
+        returnsText:
+            p.returns === null
+                ? null
+                : (p.returns ?? "Non-returnable — fresh food."),
+        gstRate: bpsToRate(rate.bps),
+        hsnCode: rate.code,
+        optionId: a.optionId,
+        // Track stock (#515): on since the log opened, or off.
+        stockTracked: p.tracked,
+        stockTrackedAt: p.tracked ? a.trackedAt : null,
+    };
+}
+
+/**
+ * This business's volume, children first. Its catalogue and plans stay.
+ * Rye is a film set (#526): its whole stock log and every resolved stock
+ * check go too, hand-made ones included, so a take that counted, moved or
+ * resolved something is undone by the next run.
+ */
 async function clearVolume(prisma: Db) {
+    await prisma.stockCheckResolution.deleteMany({
+        where: { organizationId: RYE.orgId },
+    });
+    await prisma.stockEntry.deleteMany({
+        where: { organizationId: RYE.orgId },
+    });
     const where = { id: { startsWith: RYE.prefix } };
     // Corrections point at the invoice they correct: remove them first.
     await prisma.invoiceLine.deleteMany({ where });
@@ -947,12 +949,23 @@ const STATUS_OF: Record<Stage, string> = {
     DELIVERED: "DELIVERED",
 };
 
+interface OrderLine {
+    product: number;
+    qty: number;
+    /** Its variant; absent on a product with variants: the first. */
+    variant?: number;
+}
+
 interface OrderPlan {
     shopper: number;
     placedAt: Date;
+    /** The storefront it was placed at; default Hill Road. */
+    store?: StoreKey;
     fulfilment: "COLLECT" | "DELIVERY";
     /** Final quantities (after any edit). */
-    lines: { product: number; qty: number }[];
+    lines: OrderLine[];
+    /** Fulfilled without taking it off the shelf ("Sale not taken", #514). */
+    notTaken?: boolean;
     /** ONLINE: paid at checkout; RECORDED: paid at the counter; FAILED: not paid. */
     pay: "ONLINE" | "RECORDED" | "FAILED";
     moves: { to: Stage; at: Date; by: string }[];
@@ -973,13 +986,19 @@ interface OrderPlan {
 interface PlanInput {
     now: Date;
     orgId: string;
-    storeId: string;
+    stores: Record<StoreKey, string>;
     demoUserId: string;
     counterUserId: string;
     productIds: readonly string[];
+    variantIds: readonly string[][];
+    shelfIds: Map<string, string>;
     planIds: readonly string[];
     allergenId: Record<string, string>;
 }
+
+/** A line's variant index: its own, the first of a product with variants, or none. */
+const variantOf = (l: OrderLine): number | null =>
+    PRODUCTS[l.product].variants ? (l.variant ?? 0) : null;
 
 /** Local day offset of an instant from `now`'s day, in Kolkata. */
 const dayOf = (now: Date, at: Date) =>
@@ -1050,9 +1069,10 @@ function planOrders(input: PlanInput): OrderPlan[] {
     const regulars = SHOPPERS.map((s, i) => ({ i, w: s.weight })).filter(
         (x) => x.w > 0,
     );
-    const breadAndPastry = PRODUCTS.map((p, i) => ({ i, p })).filter(
-        (x) => x.p.category !== "coffee",
-    );
+    const history = PRODUCTS.slice(0, HISTORY_PRODUCTS);
+    const breadAndPastry = history
+        .map((p, i) => ({ i, p }))
+        .filter((x) => x.p.category !== "coffee");
     for (let d = -35; d <= -1; d++) {
         const weekday = istWeekday(now, d);
         const count =
@@ -1067,7 +1087,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             const fulfilment = far || rng.chance(0.3) ? "DELIVERY" : "COLLECT";
             const pool =
                 fulfilment === "COLLECT"
-                    ? PRODUCTS.map((_, i) => i)
+                    ? history.map((_, i) => i)
                     : breadAndPastry.map((x) => x.i);
             const n = rng.weighted([1, 2, 3], (x) =>
                 x === 1 ? 5 : x === 2 ? 3 : 1,
@@ -1150,6 +1170,67 @@ function planOrders(input: PlanInput): OrderPlan[] {
         },
     });
 
+    // The designs' stock story (#526). Buns for Kolkata, three six-packs,
+    // still being prepared: Hill Road has one, so it is 2 short.
+    const adityaAt = istAt(now, -3, 8 * 60 + 40);
+    orders.push({
+        shopper: SHOPPER.aditya,
+        placedAt: adityaAt,
+        fulfilment: "DELIVERY",
+        lines: [{ product: P["cinnamon-bun"], variant: 1, qty: 3 }],
+        pay: "ONLINE",
+        moves: [{ to: "PREPARING", at: addMinutes(adityaAt, 35), by: nisha }],
+        notes: "Blue Dart next day, please — they're for my mother.",
+    });
+    // Yesterday's loaf, collected at the counter without leaving stock.
+    const devAt = istAt(now, -1, 7 * 60 + 5);
+    orders.push({
+        shopper: SHOPPER.dev,
+        placedAt: devAt,
+        fulfilment: "COLLECT",
+        lines: [{ product: P["sourdough-loaf"], qty: 1 }],
+        pay: "RECORDED",
+        moves: collectPath(devAt, staff),
+        notTaken: true,
+    });
+    // Beans to Pune, sent from Hill Road's shelf.
+    const sanjayAt = istAt(now, -1, 13 * 60 + 10);
+    orders.push({
+        shopper: SHOPPER.sanjay,
+        placedAt: sanjayAt,
+        fulfilment: "DELIVERY",
+        lines: [{ product: P["house-blend-beans-250g"], qty: 2 }],
+        pay: "ONLINE",
+        moves: deliverPath(sanjayAt, staff),
+    });
+    // The website's shop: delivered orders from its own shelves.
+    const online = (
+        shopper: number,
+        daysAgo: number,
+        minute: number,
+        lines: OrderLine[],
+    ) => {
+        const at = istAt(now, -daysAgo, minute);
+        orders.push({
+            shopper,
+            placedAt: at,
+            store: "O",
+            fulfilment: "DELIVERY",
+            lines,
+            pay: "ONLINE",
+            moves: deliverPath(at, staff),
+        });
+    };
+    online(SHOPPER.vikram, 4, 10 * 60 + 5, [
+        { product: P["sourdough-loaf"], variant: 1, qty: 2 },
+    ]);
+    online(SHOPPER.anjali, 2, 11 * 60 + 30, [
+        { product: P["house-blend-beans-250g"], qty: 1 },
+    ]);
+    online(SHOPPER.ishaan, 1, 9 * 60 + 15, [
+        { product: P["bakers-gift-box"], qty: 1 },
+    ]);
+
     // Today, one board: every kitchen stage.
     const today = (
         placedMinute: number,
@@ -1220,7 +1301,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
                 shopper: SHOPPER.dev,
                 fulfilment: "COLLECT",
                 lines: [
-                    { product: P["rye-caraway-loaf"], qty: 1 },
+                    { product: P["seeded-multigrain-loaf"], qty: 1 },
                     { product: P.cappuccino, qty: 1 },
                 ],
                 pay: "RECORDED",
@@ -1318,6 +1399,35 @@ function planOrders(input: PlanInput): OrderPlan[] {
             },
             [],
         ),
+        // Online, today: a small loaf just in, and beans being packed.
+        today(
+            hhmm(9, 50),
+            {
+                shopper: SHOPPER.tara,
+                store: "O",
+                fulfilment: "DELIVERY",
+                lines: [{ product: P["sourdough-loaf"], variant: 1, qty: 1 }],
+                pay: "ONLINE",
+            },
+            [],
+        ),
+        today(
+            hhmm(8, 5),
+            {
+                shopper: SHOPPER.nikhil,
+                store: "O",
+                fulfilment: "DELIVERY",
+                lines: [
+                    {
+                        product: P["house-blend-beans-250g"],
+                        variant: 1,
+                        qty: 1,
+                    },
+                ],
+                pay: "ONLINE",
+            },
+            [["PREPARING", hhmm(9, 0), nisha]],
+        ),
     );
     return orders.sort(
         (a, b) =>
@@ -1374,6 +1484,8 @@ interface World {
     notes: Prisma.ContactNoteCreateManyInput[];
     noteAllergens: Prisma.ContactNoteAllergenCreateManyInput[];
     docs: DocSpec[];
+    /** What the lines hold and sold, the shelves' numbers and the stock log. */
+    stock: StockPlan;
 }
 
 const METHODS = [
@@ -1399,8 +1511,9 @@ function counterPayment(rng: Rng): {
 }
 
 function planWorld(input: PlanInput): World {
-    const { now, orgId, storeId, demoUserId: owner } = input;
-    const w: World = {
+    const { now, orgId, demoUserId: owner } = input;
+    const storeId = input.stores.H;
+    const w: Omit<World, "stock"> = {
         customers: [],
         contacts: [],
         orders: [],
@@ -1417,33 +1530,40 @@ function planWorld(input: PlanInput): World {
         noteAllergens: [],
         docs: [],
     };
-    const customerId = (i: number) => sid("customer", SHOPPERS[i].key);
+    // A customer belongs to a storefront: Online's are their own rows.
+    const customerId = (i: number, store: StoreKey = "H") =>
+        store === "H"
+            ? sid("customer", SHOPPERS[i].key)
+            : sid("customer", SHOPPERS[i].key, "online");
+    const stockLines: LineForStock[] = [];
     const contactId = (key: string) => sid("contact", key);
 
     // --- orders, their steps, their money and their paper
     const planned = planOrders(input);
     const payRng = rngFor("payments");
     const firstOrder = new Map<number, Date>();
+    const firstOnline = new Map<number, Date>();
     planned.forEach((o, n) => {
         const orderId = sid("order", n);
         const number = String(1001 + n);
         const shopper = SHOPPERS[o.shopper];
-        if (!firstOrder.has(o.shopper)) firstOrder.set(o.shopper, o.placedAt);
+        const store = o.store ?? "H";
+        const firsts = store === "H" ? firstOrder : firstOnline;
+        if (!firsts.has(o.shopper)) firsts.set(o.shopper, o.placedAt);
         const delivery = o.fulfilment === "DELIVERY";
         const shippingPaise = delivery ? DELIVERY_PAISE : 0;
         const inter = delivery && shopper.address.state !== "Karnataka";
         const pos = delivery ? STATE_CODES[shopper.address.state] : GST.state;
 
         const itemIds = o.lines.map((_, k) => sid("orderitem", n, k));
-        const priceOf = (l: { product: number }) =>
-            PRODUCTS[l.product].price * 100;
+        const priceOf = (l: OrderLine) => unitPaise(l.product, variantOf(l));
         const lineInputs = (qty: (k: number) => number): DocLineInput[] => [
             ...o.lines.map((l, k) => ({
-                description: PRODUCTS[l.product].name,
+                description: lineName(l.product, variantOf(l)),
                 quantity: qty(k),
                 unitPaise: priceOf(l),
-                rateBps: RATES[PRODUCTS[l.product].category].bps,
-                code: RATES[PRODUCTS[l.product].category].code,
+                rateBps: rateOf(PRODUCTS[l.product]).bps,
+                code: rateOf(PRODUCTS[l.product]).code,
                 orderItemId: itemIds[k],
             })),
             ...(shippingPaise > 0
@@ -1484,10 +1604,10 @@ function planWorld(input: PlanInput): World {
 
         w.orders.push({
             id: orderId,
-            storeId,
+            storeId: input.stores[store],
             organizationId: orgId,
             orderId: number,
-            customerId: customerId(o.shopper),
+            customerId: customerId(o.shopper, store),
             subtotal: rupees(subtotalPaise),
             tax: rupees(gstInside(finalLines, inter)),
             shipping: rupees(shippingPaise),
@@ -1510,15 +1630,38 @@ function planWorld(input: PlanInput): World {
             createdAt: o.placedAt,
             updatedAt: lastTouch,
         });
+        // Where it left the shelf: collected, or handed to the courier.
+        const out = o.moves.find(
+            (m) => m.to === "COLLECTED" || m.to === "HANDED_TO_COURIER",
+        );
+        const open =
+            STATUS_OF[stage] === "PENDING" || STATUS_OF[stage] === "PROCESSING";
         o.lines.forEach((l, k) => {
+            const variant = variantOf(l);
             w.items.push({
                 id: itemIds[k],
                 orderId,
                 productId: input.productIds[l.product],
+                variantId:
+                    variant === null
+                        ? null
+                        : input.variantIds[l.product][variant],
                 quantity: l.qty,
                 price: rupees(priceOf(l)),
-                // Bakes are not counted: nothing is held.
+                // What it holds or sold is set from the shelves below.
                 stockRow: "NONE",
+            });
+            stockLines.push({
+                itemId: itemIds[k],
+                orderId,
+                product: l.product,
+                variant,
+                qty: l.qty,
+                store,
+                open,
+                fulfilledAt: out?.at ?? null,
+                fulfilledBy: out?.by ?? null,
+                notTaken: o.notTaken,
             });
         });
 
@@ -1535,7 +1678,7 @@ function planWorld(input: PlanInput): World {
                 actorUserId: o.edit.by,
                 fromStage: "NEW",
                 toStage: "NEW",
-                note: `${PRODUCTS[line.product].name} ${o.edit.from} → ${line.qty}`,
+                note: `${lineName(line.product, variantOf(line))} ${o.edit.from} → ${line.qty}`,
                 amountCents: (line.qty - o.edit.from) * priceOf(line),
                 createdAt: o.edit.at,
             });
@@ -1678,11 +1821,11 @@ function planWorld(input: PlanInput): World {
                 placeOfSupply: pos,
                 lines: [
                     {
-                        description: PRODUCTS[line.product].name,
+                        description: lineName(line.product, variantOf(line)),
                         quantity: added,
                         unitPaise: priceOf(line),
-                        rateBps: RATES[PRODUCTS[line.product].category].bps,
-                        code: RATES[PRODUCTS[line.product].category].code,
+                        rateBps: rateOf(PRODUCTS[line.product]).bps,
+                        code: rateOf(PRODUCTS[line.product]).code,
                         orderItemId: itemIds[o.edit.line],
                     },
                 ],
@@ -1747,11 +1890,11 @@ function planWorld(input: PlanInput): World {
                 placeOfSupply: pos,
                 lines: [
                     {
-                        description: PRODUCTS[line.product].name,
+                        description: lineName(line.product, variantOf(line)),
                         quantity: o.refund.qty,
                         unitPaise: priceOf(line),
-                        rateBps: RATES[PRODUCTS[line.product].category].bps,
-                        code: RATES[PRODUCTS[line.product].category].code,
+                        rateBps: rateOf(PRODUCTS[line.product]).bps,
+                        code: rateOf(PRODUCTS[line.product]).code,
                         orderItemId: itemIds[o.refund.line],
                     },
                 ],
@@ -1771,6 +1914,27 @@ function planWorld(input: PlanInput): World {
         w.customers.push({
             id: customerId(i),
             storeId,
+            organizationId: orgId,
+            email: emailOf(s),
+            firstName: s.first,
+            lastName: s.last,
+            phone: s.phone,
+            country: "India",
+            state: s.address.state,
+            city: s.address.city,
+            zipCode: s.address.zip,
+            createdAt: at,
+            updatedAt: at,
+        });
+    });
+    // Online's customers: the people who have ordered there.
+    SHOPPERS.forEach((s, i) => {
+        const first = firstOnline.get(i);
+        if (!first) return;
+        const at = addMinutes(first, -peopleRng.int(5, 3 * 24 * 60));
+        w.customers.push({
+            id: customerId(i, "O"),
+            storeId: input.stores.O,
             organizationId: orgId,
             email: emailOf(s),
             firstName: s.first,
@@ -2018,8 +2182,8 @@ function planWorld(input: PlanInput): World {
             description: `${p.name} (trade)`,
             quantity: qty,
             unitPaise: unit * 100,
-            rateBps: RATES[p.category].bps,
-            code: RATES[p.category].code,
+            rateBps: rateOf(p).bps,
+            code: rateOf(p).code,
         };
     };
     const trade: {
@@ -2269,7 +2433,24 @@ function planWorld(input: PlanInput): World {
         organizationId: orgId,
     });
 
-    return w;
+    // --- what the lines hold and sold, and the stock log they write
+    const stock = planStock({
+        now,
+        today: todayClock(now),
+        orgId,
+        stores: input.stores,
+        productIds: input.productIds,
+        variantIds: input.variantIds,
+        shelfIds: input.shelfIds,
+        owner,
+        nisha: input.counterUserId,
+        lines: stockLines,
+    });
+    for (const item of w.items) {
+        const held = stock.items.get(item.id ?? "");
+        if (held) Object.assign(item, held);
+    }
+    return { ...w, stock };
 }
 
 // --- Writing ------------------------------------------------------------------------
