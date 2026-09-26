@@ -12,7 +12,7 @@ import { ProductAccess } from "../products/product-access";
 import { ProductOverviewService } from "../products/product-overview.service";
 import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
-import { CollectionsService } from "./collections.service";
+import { CollectionsService, tooManyKept } from "./collections.service";
 import type { ProductBlockReader } from "./website-pages";
 import { websitePagesFor } from "./website-pages";
 
@@ -488,6 +488,125 @@ describe("Collections (DB)", () => {
         ).rejects.toThrow(
             "Everything already holds 500 products, the most a collection can.",
         );
+    });
+
+    it("saving the whole list counts the Not sold members it keeps against the 500", async () => {
+        const many = Array.from({ length: 501 }, (_, i) => ({
+            id: `keep-${i}-${tag}`,
+            organizationId: orgId,
+            storeId,
+            name: `Keep ${i}`,
+            slug: `keep-${i}-${tag}`,
+            price: "10.00",
+            status: i === 0 ? "ARCHIVED" : "PUBLISHED",
+            archivedAt: i === 0 ? new Date() : null,
+        }));
+        await prisma.product.createMany({ data: many });
+        const made = await collections.create(orgId, { name: "Kept" });
+        // One member is set to Not sold: the screen doesn't show it, and
+        // saving keeps it.
+        await prisma.collectionProduct.create({
+            data: {
+                collectionId: made.id,
+                organizationId: orgId,
+                productId: many[0].id,
+                position: 0,
+            },
+        });
+        const shown = many.slice(1).map((p) => p.id);
+        const refused = await collections
+            .setProducts(orgId, made.id, shown)
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(BadRequestException);
+        expect((refused as BadRequestException).getResponse()).toMatchObject({
+            field: "productIds",
+            message: tooManyKept(1),
+        });
+        expect(
+            await prisma.collectionProduct.count({
+                where: { collectionId: made.id },
+            }),
+        ).toBe(1);
+        // 499 shown and the one kept: 500, saved.
+        await collections.setProducts(orgId, made.id, shown.slice(0, 499));
+        expect(
+            await prisma.collectionProduct.count({
+                where: { collectionId: made.id },
+            }),
+        ).toBe(500);
+    });
+
+    it("two adds racing for the last places never take a collection past 500", async () => {
+        const many = Array.from({ length: 502 }, (_, i) => ({
+            id: `race-${i}-${tag}`,
+            organizationId: orgId,
+            storeId,
+            name: `Race ${i}`,
+            slug: `race-${i}-${tag}`,
+            price: "10.00",
+            status: "PUBLISHED",
+        }));
+        await prisma.product.createMany({ data: many });
+        const made = await collections.create(orgId, { name: "Racing" });
+        await prisma.collectionProduct.createMany({
+            data: many.slice(0, 499).map((p, position) => ({
+                collectionId: made.id,
+                organizationId: orgId,
+                productId: p.id,
+                position,
+            })),
+        });
+        // Another add has locked the collection and put the 500th in, and
+        // hasn't committed yet. Each add below waits for it, then finds
+        // the collection full.
+        let took!: () => void;
+        const tookLast = new Promise<void>((r) => (took = r));
+        const first = prisma.$transaction(
+            async (tx) => {
+                await tx.$queryRaw`SELECT id FROM "Collection" WHERE id = ${made.id} FOR NO KEY UPDATE`;
+                await tx.collectionProduct.create({
+                    data: {
+                        collectionId: made.id,
+                        organizationId: orgId,
+                        productId: many[499].id,
+                        position: 499,
+                    },
+                });
+                took();
+                await new Promise((r) => setTimeout(r, 400));
+            },
+            { timeout: 10_000 },
+        );
+        await tookLast;
+        const results = await Promise.allSettled([
+            collections.addProducts(orgId, made.id, [many[500].id]),
+            collections.setForProduct(orgId, many[501].id, {
+                collectionIds: [made.id],
+            }),
+            first,
+        ]);
+        expect(results.map((r) => r.status)).toEqual([
+            "rejected",
+            "rejected",
+            "fulfilled",
+        ]);
+        expect(
+            await prisma.collectionProduct.count({
+                where: { collectionId: made.id },
+            }),
+        ).toBe(500);
+        // The same product added twice at once: added once, no error.
+        const again = await collections.create(orgId, { name: "Twice" });
+        const twice = await Promise.allSettled([
+            collections.addProducts(orgId, again.id, [many[0].id]),
+            collections.addProducts(orgId, again.id, [many[0].id]),
+        ]);
+        expect(twice.map((r) => r.status)).toEqual(["fulfilled", "fulfilled"]);
+        expect(
+            await prisma.collectionProduct.count({
+                where: { collectionId: again.id },
+            }),
+        ).toBe(1);
     });
 
     it("the product page puts a product at the end of each collection it joins", async () => {

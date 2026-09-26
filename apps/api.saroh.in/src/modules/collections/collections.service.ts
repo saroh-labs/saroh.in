@@ -5,6 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
@@ -126,6 +127,30 @@ export function tooManyProducts(has: number): string {
     return room > 0
         ? `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products; this one has room for ${room} more.`
         : `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products, and this one is full.`;
+}
+
+/**
+ * Why a hand-picked collection's whole list can't be saved: with the members
+ * set to Not sold it keeps (the screen doesn't show them), it would pass
+ * the cap.
+ */
+export function tooManyKept(kept: number): string {
+    const room = Math.max(0, COLLECTION_PRODUCTS_MAX - kept);
+    return `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products. It keeps ${kept} set to Not sold, so this list can have ${room} at most.`;
+}
+
+/**
+ * Lock collections, in id order, before reading how full they are: two adds
+ * racing for the last places then take them one after the other. FOR NO KEY
+ * UPDATE, so a membership insert's key check (FOR KEY SHARE) isn't blocked.
+ */
+async function lockCollections(
+    tx: Prisma.TransactionClient,
+    ids: readonly string[],
+): Promise<void> {
+    const sorted = Array.from(new Set(ids)).sort();
+    if (sorted.length === 0) return;
+    await tx.$queryRaw`SELECT id FROM "Collection" WHERE id = ANY(${sorted}::text[]) ORDER BY id FOR NO KEY UPDATE`;
 }
 
 @Injectable()
@@ -334,6 +359,7 @@ export class CollectionsService {
         await this.requireHandPicked(organizationId, collectionId);
         await requireProducts(organizationId, productIds);
         await prisma.$transaction(async (tx) => {
+            await lockCollections(tx, [collectionId]);
             const members = await tx.collectionProduct.findMany({
                 where: { collectionId },
                 select: { productId: true, position: true },
@@ -378,6 +404,7 @@ export class CollectionsService {
         await this.requireHandPicked(organizationId, collectionId);
         await requireProducts(organizationId, productIds);
         await prisma.$transaction(async (tx) => {
+            await lockCollections(tx, [collectionId]);
             const hidden = await tx.collectionProduct.findMany({
                 where: {
                     collectionId,
@@ -387,8 +414,15 @@ export class CollectionsService {
                 orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 select: { productId: true },
             });
-            await tx.collectionProduct.deleteMany({ where: { collectionId } });
             const order = [...productIds, ...hidden.map((h) => h.productId)];
+            // The members kept count too: the cap holds on every save.
+            if (order.length > COLLECTION_PRODUCTS_MAX) {
+                throw new BadRequestException({
+                    message: tooManyKept(hidden.length),
+                    field: "productIds",
+                });
+            }
+            await tx.collectionProduct.deleteMany({ where: { collectionId } });
             if (order.length > 0) {
                 await tx.collectionProduct.createMany({
                     data: order.map((productId, position) => ({
@@ -457,6 +491,8 @@ export class CollectionsService {
             );
         }
         await prisma.$transaction(async (tx) => {
+            // The collections it joins, locked before their sizes are read.
+            await lockCollections(tx, dto.collectionIds);
             await tx.collectionProduct.deleteMany({
                 where: {
                     organizationId,
