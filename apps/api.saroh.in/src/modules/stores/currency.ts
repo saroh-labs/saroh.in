@@ -97,3 +97,44 @@ export async function assertSameCurrency(
         field: input.field ?? "storeId",
     });
 }
+
+/**
+ * Refuse (409) moving a product to `currency` while a storefront that sells
+ * it uses another. A save that leaves currency out never reaches here: the
+ * product keeps the one it has.
+ */
+export async function assertCurrencyChangeAllowed(
+    db: Pick<
+        Prisma.TransactionClient,
+        "storeSettings" | "store" | "productListing"
+    >,
+    input: { productId: string; name: string; currency: string },
+): Promise<void> {
+    const listings = await db.productListing.findMany({
+        where: { productId: input.productId },
+        orderBy: { storeId: "asc" },
+        select: { storeId: true },
+    });
+    for (const { storeId } of listings) {
+        await assertSameCurrency(db, {
+            storeId,
+            product: { name: input.name, currency: input.currency },
+            field: "currency",
+        });
+    }
+}
+
+/**
+ * What a new product made at `storeId` is priced in when no currency is
+ * given: the storefront's, else the business's (DEC-030). Null when neither
+ * has one yet, and the column's default applies.
+ */
+export async function defaultProductCurrency(
+    db: Db,
+    input: { storeId: string; organizationId: string },
+): Promise<string | null> {
+    return (
+        (await storefrontCurrency(db, input.storeId)) ??
+        (await businessCurrency(db, input.organizationId))
+    );
+}

@@ -22,6 +22,10 @@ import {
 import { isGstRate } from "../invoices/gst";
 import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
 import { COUNTING_ROWS } from "../stock/tracking";
+import {
+    assertCurrencyChangeAllowed,
+    defaultProductCurrency,
+} from "../stores/currency";
 import { slugify } from "../stores/slug";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -370,6 +374,15 @@ export class ProductsService {
         try {
             // The business's product, sold at the storefront it is made at.
             createdId = await prisma.$transaction(async (tx) => {
+                // Left out: the storefront's currency, else the business's
+                // (DEC-030) — never a USD guess.
+                const currency =
+                    dto.currency ??
+                    (await defaultProductCurrency(tx, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    undefined;
                 const product = await tx.product.create({
                     data: {
                         storeId,
@@ -381,7 +394,7 @@ export class ProductsService {
                         categoryId: dto.categoryId ?? null,
                         price: dto.price,
                         mrp: dto.mrp ?? null,
-                        currency: dto.currency ?? "USD",
+                        currency,
                         status: dto.status ?? "DRAFT",
                         archivedAt:
                             dto.status === "ARCHIVED" ? new Date() : null,
@@ -457,12 +470,21 @@ export class ProductsService {
         const { organizationId } = scope;
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
-            select: { slug: true, status: true },
+            select: { slug: true, status: true, currency: true },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
         }
         const slug = slugify(dto.slug);
+        // Left out, the product keeps its currency. Changed, every
+        // storefront that sells it must sell in the new one (DEC-030).
+        if (dto.currency && dto.currency !== current.currency) {
+            await assertCurrencyChangeAllowed(prisma, {
+                productId,
+                name: dto.name,
+                currency: dto.currency,
+            });
+        }
         if (current.slug !== slug) {
             await this.assertSlugFree(organizationId, slug);
         }
@@ -481,7 +503,7 @@ export class ProductsService {
                     image: dto.image ?? null,
                     categoryId: dto.categoryId ?? null,
                     price: dto.price,
-                    currency: dto.currency ?? "USD",
+                    ...(dto.currency ? { currency: dto.currency } : {}),
                     ...(dto.status
                         ? {
                               status: dto.status,

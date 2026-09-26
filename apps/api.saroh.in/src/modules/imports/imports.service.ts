@@ -9,7 +9,10 @@ import { prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import { listAt } from "../products/listings.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
-import { storefrontCurrency } from "../stores/currency";
+import {
+    assertCurrencyChangeAllowed,
+    defaultProductCurrency,
+} from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -250,12 +253,6 @@ export class ImportsService {
                     : null,
                 image: v.image ?? null,
                 price: required(row, "price"),
-                // Left blank: the storefront's currency, which is the
-                // business's (DEC-030) — never a USD guess.
-                currency:
-                    v.currency ??
-                    (await storefrontCurrency(tx, storeId)) ??
-                    "USD",
                 status: v.status ?? "DRAFT",
             };
             // Every storefront belongs to a business; so does every product.
@@ -265,9 +262,18 @@ export class ImportsService {
                 );
             }
             if (row.outcome === "CREATE") {
+                // Left blank: the storefront's currency, else the
+                // business's (DEC-030) — never a USD guess.
+                const currency =
+                    v.currency ??
+                    (await defaultProductCurrency(tx, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    undefined;
                 // The business's product, sold at this storefront (#510).
                 const product = await tx.product.create({
-                    data: { storeId, organizationId, slug, ...data },
+                    data: { storeId, organizationId, slug, currency, ...data },
                     select: { id: true },
                 });
                 await listAt(tx, {
@@ -277,10 +283,26 @@ export class ImportsService {
                 });
             } else {
                 // The catalogue's product, now also sold here (a listing it
-                // already has is kept as it is).
-                const product = await tx.product.update({
+                // already has is kept as it is). A blank currency keeps the
+                // product's; another one must suit every storefront that
+                // sells it (DEC-030).
+                const current = await tx.product.findUniqueOrThrow({
                     where: { organizationId_slug: { organizationId, slug } },
-                    data,
+                    select: { id: true, currency: true },
+                });
+                if (v.currency && v.currency !== current.currency) {
+                    await assertCurrencyChangeAllowed(tx, {
+                        productId: current.id,
+                        name: data.name,
+                        currency: v.currency,
+                    });
+                }
+                const product = await tx.product.update({
+                    where: { id: current.id },
+                    data: {
+                        ...data,
+                        ...(v.currency ? { currency: v.currency } : {}),
+                    },
                     select: { id: true },
                 });
                 await listAt(tx, {

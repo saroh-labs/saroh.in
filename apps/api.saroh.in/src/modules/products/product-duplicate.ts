@@ -1,6 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { assertSameCurrency } from "../stores/currency";
 import { readShopFields } from "./serialize";
 
 /**
@@ -212,6 +213,12 @@ export async function duplicateProduct(
     // Sold where the original is sold, the same variants at each.
     const listedAt = new Set<string>();
     for (const listing of source.listings) {
+        // As listAt checks (DEC-030): a listing from before the one-currency
+        // rule isn't copied into another product at the wrong currency.
+        await assertSameCurrency(tx, {
+            storeId: listing.storeId,
+            product: { name: source.name, currency: source.currency },
+        });
         const made = await tx.productListing.create({
             data: {
                 organizationId,
