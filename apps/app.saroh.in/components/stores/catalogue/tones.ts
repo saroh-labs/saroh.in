@@ -1,5 +1,6 @@
 import type { BadgeProps } from "@saroh/ui/badge";
 
+import { STOCK_TEXT } from "@/components/commerce/stock-tones";
 import type { ProductStatus } from "@/lib/products/service";
 
 /**
@@ -26,11 +27,13 @@ export const STATUS_VARIANT: Record<
 
 /**
  * Stock words, coloured only to reinforce them: danger text for nothing to
- * sell or short, Saffron 700 text at the warning level, plain otherwise.
+ * sell or short, Saffron 700 text at the warning level — the same colours
+ * as the Stock screen (`STOCK_TEXT`) — and the list's secondary text
+ * (`--text-2`) otherwise.
  */
 export const TONE_TEXT = {
-    danger: "text-destructive-subtle-foreground",
-    warn: "text-brand-subtle-foreground",
+    danger: STOCK_TEXT.danger,
+    warn: STOCK_TEXT.warn,
     plain: "text-neutral-700 dark:text-foreground",
-    muted: "text-muted-foreground",
+    muted: STOCK_TEXT.muted,
 } as const;

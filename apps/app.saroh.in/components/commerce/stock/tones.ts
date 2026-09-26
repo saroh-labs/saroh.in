@@ -2,18 +2,16 @@ import { cn } from "@saroh/ui/lib/utils";
 
 import type { Tone } from "@/lib/stock/screen";
 
+import { STOCK_TEXT } from "../stock-tones";
+
 /**
- * The Stock design's colour roles on the app's tokens: its danger text is
- * `destructive`, its accent text (low, a count that differs) is Saffron text
- * (`brand`), its ok text is the success 700 cut. Here, not in `lib/`,
- * because Tailwind scans components.
+ * The Stock design's colour roles on the app's tokens: danger, accent (low,
+ * a count that differs) and ok text are the shared stock colours
+ * (`STOCK_TEXT`); plain is the page's own text (`--text`).
  */
 export const TEXT_TONE: Record<Tone, string> = {
     plain: "text-foreground",
-    ok: "text-success-subtle-foreground",
-    warn: "text-brand",
-    danger: "text-destructive",
-    muted: "text-muted-foreground",
+    ...STOCK_TEXT,
 };
 
 /** The design's 11px pill: the tint with its 700 text, words always. */

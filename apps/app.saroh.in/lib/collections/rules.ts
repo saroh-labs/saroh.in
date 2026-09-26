@@ -1,4 +1,5 @@
 import type { ProductPlacement } from "@/lib/products/overview-rules";
+import { plural } from "@/lib/products/overview-rules";
 
 import type {
     CollectionKind,
@@ -18,10 +19,6 @@ export const COLLECTION_PRODUCTS_MAX = 500;
 /** The longest name — a card title and a chip. */
 export const COLLECTION_NAME_MAX = 60;
 export const COLLECTION_DESCRIPTION_MAX = 600;
-
-function plural(n: number, one: string, many = `${one}s`): string {
-    return `${n} ${n === 1 ? one : many}`;
-}
 
 /** "4 products · picked by hand"; "12 products · fills itself: everything in Breads". */
 export function collectionNote(c: {
