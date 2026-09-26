@@ -23,6 +23,7 @@ import { createHmac } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
+import { notSold } from "../orders/order-pricing";
 import { OrdersService } from "../orders/orders.service";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -453,6 +454,29 @@ describe("editing an order before preparing", () => {
             await prisma.stockLevel.findUniqueOrThrow({ where: { id: sRow } }),
         ).toMatchObject({ onHand: 5, promised: 1 });
         expect((await entriesOf(sRow)).map((e) => e.kind)).toEqual(["COUNTED"]);
+    });
+
+    it("a product set to Not sold (archived) can't be ordered, nor added to an order", async () => {
+        const bread = await product("Bread", { hill: 5 });
+        const cake = await product("Cake", { hill: 5 });
+        await prisma.product.update({
+            where: { id: cake },
+            data: { status: "ARCHIVED", archivedAt: new Date() },
+        });
+        await expect(
+            place(hill, [{ productId: cake, quantity: 1 }]),
+        ).rejects.toThrow(new ConflictException(notSold("Cake")));
+
+        const order = await place(hill, [{ productId: bread, quantity: 1 }]);
+        await expect(
+            kitchen.edit(owner, order, {
+                add: [{ productId: cake, quantity: 1 }],
+            }),
+        ).rejects.toThrow(notSold("Cake"));
+        expect(await shelf(hill, cake)).toMatchObject({
+            onHand: 5,
+            promised: 0,
+        });
     });
 });
 

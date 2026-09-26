@@ -21,6 +21,7 @@ import {
     resolveCapabilities,
 } from "../organizations/organization-policy";
 
+import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
 
@@ -334,6 +335,10 @@ export class StoresService {
             });
         }
 
+        // A business sells in one currency (DEC-030): a new storefront takes
+        // the business's, rather than reading as the column default (USD)
+        // until someone saves its settings.
+        const currency = await businessCurrency(prisma, organizationId);
         try {
             const store = await prisma.store.create({
                 data: {
@@ -343,6 +348,7 @@ export class StoresService {
                     organization: { connect: { id: organizationId } },
                     // Nested create runs in one transaction → no orphan store.
                     owners: { create: { userId, role: "OWNER" } },
+                    ...(currency ? { settings: { create: { currency } } } : {}),
                 },
             });
             return { id: store.id };

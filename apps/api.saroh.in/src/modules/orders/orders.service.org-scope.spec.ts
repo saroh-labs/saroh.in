@@ -91,6 +91,7 @@ beforeEach(() => {
     productFindFirst.mockResolvedValue({
         name: "Widget",
         price: "20.00",
+        currency: "INR",
         categoryId: null,
         variants: [],
     });

@@ -9,8 +9,11 @@ jest.mock("@saroh/database", () => ({
         store: {
             count: jest.fn(),
             findUnique: jest.fn(),
+            findFirst: jest.fn().mockResolvedValue(null),
             create: jest.fn(),
         },
+        order: { findFirst: jest.fn().mockResolvedValue(null) },
+        product: { findFirst: jest.fn().mockResolvedValue(null) },
         subscription: { findUnique: jest.fn() },
         entitlementOverride: { findMany: jest.fn() },
     },

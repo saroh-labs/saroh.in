@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { COUNTING_ROWS } from "../stock/tracking";
+import { assertSameCurrency } from "../stores/currency";
 import type { StockCounts } from "./stock-levels";
 import {
     asCounts,
@@ -73,6 +74,15 @@ export async function listAt(
         select: { id: true },
     });
     const isNew = listing === null;
+    if (isNew) {
+        // A business sells in one currency (DEC-030): a product priced in
+        // another than the storefront's isn't listed there.
+        const product = await tx.product.findUniqueOrThrow({
+            where: { id: productId },
+            select: { name: true, currency: true },
+        });
+        await assertSameCurrency(tx, { storeId, product });
+    }
     listing ??= await tx.productListing.create({
         data: { organizationId, storeId, productId },
         select: { id: true },

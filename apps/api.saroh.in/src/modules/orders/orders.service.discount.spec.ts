@@ -98,6 +98,7 @@ beforeEach(() => {
     db.product!.findFirst!.mockResolvedValue({
         name: "Widget",
         price: "20.00",
+        currency: "INR",
         categoryId: "cat_1",
         variants: [],
     });

@@ -77,17 +77,20 @@ export default async function NewOrderPage({
             <OrderForm
                 storeId={store.id}
                 customers={customers}
-                products={products.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    price: p.price,
-                    variants: p.variants,
-                    // Counted here and nothing on the shelf (#511), or
-                    // untracked and marked sold out here by hand (#515).
-                    soldOut:
-                        p.soldOut === true ||
-                        (p.inventory !== null && p.inventory.quantity <= 0),
-                }))}
+                // Set to Not sold (archived): nobody orders it (DEC-032).
+                products={products
+                    .filter((p) => p.status !== "ARCHIVED")
+                    .map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        variants: p.variants,
+                        // Counted here and nothing on the shelf (#511), or
+                        // untracked and marked sold out here by hand (#515).
+                        soldOut:
+                            p.soldOut === true ||
+                            (p.inventory !== null && p.inventory.quantity <= 0),
+                    }))}
                 checkout={checkout}
                 gstRegistered={business?.registered ?? false}
             />

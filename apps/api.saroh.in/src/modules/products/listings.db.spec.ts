@@ -1,9 +1,14 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
+import { currencyMismatch } from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
 import { ListingsService } from "./listings.service";
@@ -431,5 +436,111 @@ describe("Listings and StockLevel per storefront (DB)", () => {
                 price: "150.00",
             }),
         ).rejects.toThrow("That slug is already taken");
+    });
+
+    describe("one currency for the business (DEC-030)", () => {
+        const mismatch = (product: string, store: string) =>
+            currencyMismatch({
+                product,
+                productCurrency: "USD",
+                storefront: store,
+                storefrontCurrency: "INR",
+            });
+
+        it("a new storefront takes the business's currency from its first storefront", async () => {
+            // Only this suite's organization: its first storefront, Hill
+            // Road, settles on INR.
+            const biz = (
+                await prisma.organization.create({
+                    data: { name: "Chai Co.", slug: `ls-chai-${tag}` },
+                })
+            ).id;
+            const first = await storefront(biz, "Chai Hill");
+            await prisma.storeSettings.create({
+                data: { storeId: first, currency: "INR" },
+            });
+            const made = await stores.createForUser(ownerId, biz, {
+                name: "Chai Online",
+                slug: `ls-chai-online-${tag}`,
+            });
+            expect(
+                await prisma.storeSettings.findUnique({
+                    where: { storeId: made.id },
+                    select: { currency: true },
+                }),
+            ).toEqual({ currency: "INR" });
+
+            // A business with nothing to go by yet leaves it to the
+            // storefront.
+            const fresh = (
+                await prisma.organization.create({
+                    data: { name: "New Co.", slug: `ls-new-${tag}` },
+                })
+            ).id;
+            const firstEver = await stores.createForUser(ownerId, fresh, {
+                name: "New Co. Shop",
+                slug: `ls-new-shop-${tag}`,
+            });
+            expect(
+                await prisma.storeSettings.count({
+                    where: { storeId: firstEver.id },
+                }),
+            ).toBe(0);
+        });
+
+        it("refuses listing a product at a storefront in another currency, and ordering one listed before", async () => {
+            const biz = (
+                await prisma.organization.create({
+                    data: { name: "Masala Co.", slug: `ls-masala-${tag}` },
+                })
+            ).id;
+            const rupees = await storefront(biz, "Masala Market");
+            await prisma.storeSettings.create({
+                data: { storeId: rupees, currency: "INR" },
+            });
+            const dollars = await prisma.product.create({
+                data: {
+                    storeId: rupees,
+                    organizationId: biz,
+                    name: "Dollar tin",
+                    slug: `ls-dollar-tin-${tag}`,
+                    price: "5.00",
+                    currency: "USD",
+                },
+            });
+            await expect(
+                listings.list(biz, dollars.id, rupees),
+            ).rejects.toThrow(
+                new ConflictException(mismatch("Dollar tin", "Masala Market")),
+            );
+            expect(
+                await prisma.productListing.count({
+                    where: { productId: dollars.id },
+                }),
+            ).toBe(0);
+
+            // Listed before the check (made by hand here): the order is
+            // refused rather than taken in the wrong currency.
+            await prisma.productListing.create({
+                data: {
+                    storeId: rupees,
+                    organizationId: biz,
+                    productId: dollars.id,
+                },
+            });
+            const customer = await prisma.customer.create({
+                data: {
+                    storeId: rupees,
+                    organizationId: biz,
+                    email: `ls-masala-buyer-${tag}@example.com`,
+                },
+            });
+            await expect(
+                orders.create(rupees, ownerId, {
+                    customerId: customer.id,
+                    items: [{ productId: dollars.id, quantity: 1 }],
+                }),
+            ).rejects.toThrow(mismatch("Dollar tin", "Masala Market"));
+        });
     });
 });

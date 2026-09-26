@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import { listAt } from "../products/listings.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
+import { storefrontCurrency } from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -249,7 +250,12 @@ export class ImportsService {
                     : null,
                 image: v.image ?? null,
                 price: required(row, "price"),
-                currency: v.currency ?? "USD",
+                // Left blank: the storefront's currency, which is the
+                // business's (DEC-030) — never a USD guess.
+                currency:
+                    v.currency ??
+                    (await storefrontCurrency(tx, storeId)) ??
+                    "USD",
                 status: v.status ?? "DRAFT",
             };
             // Every storefront belongs to a business; so does every product.
