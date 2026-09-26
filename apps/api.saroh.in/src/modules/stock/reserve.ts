@@ -776,10 +776,18 @@ export async function reserveOnPayment(
         };
     }
 
+    const lines = await loadLines(tx, { orderId: input.orderId });
     // Only an open order holds: a cancelled or expired one would keep the
-    // units promised for good, since nothing releases a closed order.
+    // units promised for good, since nothing releases a closed order. But an
+    // order that held on an earlier call (a line has its row, or was judged
+    // untracked) and was fulfilled or cancelled since is this payment's
+    // webhook repeating: it held then, so it still reads HELD, and nothing
+    // is refunded — a fulfilled order keeps its money, and a cancel refunds
+    // through its own flow.
     const open = OPEN_STATUSES.includes(order?.status ?? "");
-    const lines = open ? await loadLines(tx, { orderId: input.orderId }) : [];
+    if (!open && lines.some((l) => l.stockRow !== null)) {
+        return { kind: "HELD" };
+    }
     const refusal = open ? await tryHold(tx, lines) : null;
     if (open && !refusal) return { kind: "HELD" };
     const message = open ? SOLD_OUT_WHILE_PAYING : ORDER_CLOSED_WHILE_PAYING;

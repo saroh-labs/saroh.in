@@ -1113,6 +1113,47 @@ describe("online orders: reserveOnPayment", () => {
         ).toEqual({ stockRow: null, heldQuantity: 0 });
     });
 
+    it.each(["DELIVERED", "CANCELLED"] as const)(
+        "a payment webhook repeated after the held order was %s: still HELD, and no refund",
+        async (status) => {
+            const mug = await product(`Mug ${status}`, { online: 5 });
+            const x = await onlineOrder(mug, 2);
+            const reserve = () =>
+                prisma.$transaction((tx) =>
+                    reserveOnPayment(tx, { organizationId: orgId, ...x }),
+                );
+            expect(await reserve()).toEqual({ kind: "HELD" });
+            if (status === "DELIVERED") {
+                await orders.updateStatus(online, x.orderId, ownerId, {
+                    status: "PROCESSING",
+                });
+            }
+            await orders.updateStatus(online, x.orderId, ownerId, { status });
+
+            expect(await reserve()).toEqual({ kind: "HELD" });
+            expect(
+                await prisma.paymentRefund.count({
+                    where: {
+                        paymentIntentId: x.paymentIntentId,
+                        idempotencyKey: soldOutRefundKey(x.paymentIntentId),
+                    },
+                }),
+            ).toBe(0);
+            expect(
+                await prisma.paymentAttempt.count({
+                    where: {
+                        paymentIntentId: x.paymentIntentId,
+                        status: "CAPTURED_NEEDS_REFUND",
+                    },
+                }),
+            ).toBe(0);
+            expect(await shelf(online, mug)).toMatchObject({
+                onHand: status === "DELIVERED" ? 3 : 5,
+                promised: 0,
+            });
+        },
+    );
+
     it("the winner holds once; the loser's refusal is recorded once with one refund, sent once", async () => {
         const last = await product("Last candle", { online: 1 });
         const a = await onlineOrder(last, 1);
