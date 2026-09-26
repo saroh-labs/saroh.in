@@ -70,7 +70,11 @@ const PRODUCT = {
     storeId: "store_1",
     name: "Sourdough loaf",
     slug: "sourdough-loaf",
-    description: "<p>Baked each morning.</p><ul><li>Long ferment</li></ul>",
+    // Spelled as Tiptap writes it, so the Editor has nothing to rewrite on
+    // open and makes no transaction — the case that left the description an
+    // empty box, because only a transaction woke its toolbar.
+    description:
+        "<p>Baked each morning.</p><ul><li><p>Long ferment</p></li></ul>",
     image: null,
     categoryId: null,
     category: null,

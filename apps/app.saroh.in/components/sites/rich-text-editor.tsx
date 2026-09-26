@@ -147,7 +147,9 @@ export function RichTextEditor({
         // through `next/dynamic` with `ssr: false`, so there is no server pass
         // to mismatch against — and `immediatelyRender: false` moves editor
         // creation into an effect that, under React 19 in development, left
-        // the hook returning null and the field an empty box.
+        // the hook returning null and the field an empty box. Said outright:
+        // left unset, Tiptap 3.31 sees Next.js and picks false itself.
+        immediatelyRender: true,
         extensions: [
             StarterKit.configure({
                 heading: { levels: [1, 2, 3, 4] },

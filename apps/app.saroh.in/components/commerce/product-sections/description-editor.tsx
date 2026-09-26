@@ -6,6 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Textarea } from "@saroh/ui/textarea";
 import Placeholder from "@tiptap/extension-placeholder";
+import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -54,9 +55,12 @@ export function DescriptionEditor({
     id?: string;
     invalid?: boolean;
 }) {
-    const [source, setSource] = useState(false);
-    const [more, setMore] = useState(false);
     const editor = useEditor({
+        // Behind `next/dynamic` with `ssr: false` there is no server pass to
+        // mismatch, so the editor is made on the first render. Left unset,
+        // Tiptap 3.31 sees Next.js and defaults this to false: null first,
+        // the editor an effect later.
+        immediatelyRender: true,
         extensions: [
             StarterKit.configure({
                 heading: { levels: [2, 3] },
@@ -95,26 +99,92 @@ export function DescriptionEditor({
         },
     });
 
+    /*
+     * Two components, as the site editor's are (`rich-text-editor.tsx`).
+     * `useEditorState` builds its store around the editor it is FIRST given,
+     * and its snapshot only moves on to a newer one at that editor's next
+     * transaction. Beside `useEditor`, it was first given null; a description
+     * Tiptap had nothing to rewrite — Sourdough loaf's — made no transaction,
+     * so the toolbar's state stayed null and the field an empty box for good.
+     * The surface mounts once there is an editor, so its store starts with one.
+     */
+    /* eslint-disable @typescript-eslint/no-unnecessary-condition --
+       typed never-null with `immediatelyRender: true`; kept so a null editor
+       is an empty box rather than a crash if that ever changes. */
+    if (!editor) {
+        return (
+            <div className="min-h-[220px] rounded-[10px] border border-border bg-card" />
+        );
+    }
+    /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+    return (
+        <DescriptionSurface
+            // A new editor gets a new surface, and so a new store.
+            key={editorKey(editor)}
+            editor={editor}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            invalid={invalid}
+        />
+    );
+}
+
+const editorKeys = new WeakMap<Editor, number>();
+let lastEditorKey = 0;
+
+/** A key per editor instance, so a remade editor remounts the surface. */
+function editorKey(editor: Editor): number {
+    let key = editorKeys.get(editor);
+    if (key === undefined) {
+        key = ++lastEditorKey;
+        editorKeys.set(editor, key);
+    }
+    return key;
+}
+
+function DescriptionSurface({
+    editor,
+    value,
+    onChange,
+    disabled,
+    invalid,
+}: {
+    editor: Editor;
+    value: string;
+    onChange: (html: string) => void;
+    disabled: boolean;
+    invalid: boolean;
+}) {
+    const [source, setSource] = useState(false);
+    const [more, setMore] = useState(false);
+
+    /*
+     * The product page's sheet hides this while a lazy part of it loads,
+     * which disconnects the effects; `useEditor` then destroys its editor
+     * and makes a new one when they reconnect. These effects reconnect
+     * first, holding the destroyed one — its schema is gone, and
+     * `getHTML` threw. They wait for the new editor, and its new surface.
+     */
     // A Discard or a new baseline changes `value` under a mounted editor.
     useEffect(() => {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- null before Tiptap mounts under next/dynamic
-        if (!editor || source) return;
+        if (source || editor.isDestroyed) return;
         if (editor.getHTML() !== value) {
             editor.commands.setContent(value, { emitUpdate: false });
         }
     }, [editor, value, source]);
 
     useEffect(() => {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
-        editor?.setEditable(!disabled, false);
+        if (editor.isDestroyed) return;
+        editor.setEditable(!disabled, false);
     }, [editor, disabled]);
 
     /* eslint-disable @typescript-eslint/no-unnecessary-condition --
-       the editor is null on the first render behind next/dynamic. */
+       typed never-null; guarded as the site editor's is. */
     const state = useEditorState({
         editor,
         selector: ({ editor: e }) =>
-            e
+            e && !e.isDestroyed
                 ? {
                       bold: e.isActive("bold"),
                       italic: e.isActive("italic"),
@@ -142,8 +212,7 @@ export function DescriptionEditor({
     const plain = stripHtml(value).length;
     const over = value.length > LIMITS.description;
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
-    if (!editor || !state) {
+    if (!state) {
         return (
             <div className="min-h-[220px] rounded-[10px] border border-border bg-card" />
         );
