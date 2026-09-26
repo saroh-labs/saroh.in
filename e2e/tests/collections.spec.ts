@@ -166,9 +166,23 @@ test.describe("Collections", () => {
             // Untick the hand-picked one here; the page follows.
             await edit.getByRole("checkbox", { name: picked }).click();
             await edit.getByRole("button", { name: "Save" }).click();
+            await expect(page.getByText("Collections saved.")).toBeVisible();
             await expect(
-                page.getByText(`${first}'s collections saved.`),
+                page.getByRole("tabpanel").getByText(picked, { exact: true }),
+            ).toHaveCount(0);
+
+            // Undo puts it back in the hand-picked one.
+            await page.getByRole("button", { name: "Undo" }).last().click();
+            await expect(
+                page.getByRole("tabpanel").getByText(picked, { exact: true }),
             ).toBeVisible();
+
+            // Out of it again, for the rest of the run.
+            await page
+                .getByRole("button", { name: "Edit collections" })
+                .click();
+            await edit.getByRole("checkbox", { name: picked }).click();
+            await edit.getByRole("button", { name: "Save" }).click();
             await expect(
                 page.getByRole("tabpanel").getByText(picked, { exact: true }),
             ).toHaveCount(0);
