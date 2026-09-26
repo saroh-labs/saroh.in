@@ -524,6 +524,21 @@ dependent field (or the lot) when the field it reads changes. The invoice
 number fields do the same with `form.trigger(NUMBER_FIELDS)`.
 **Category**: frontend · `apps/app.saroh.in/components/organizations/organization-settings-form.tsx` · `frontend-forms.md`
 
+## Forms — the description read Unsaved the moment the editor opened (#525)
+
+**Problem**: Every product with a description opened with Description marked
+Unsaved, so Save all saved it too, though nobody had typed.
+**Root cause**: Tiptap's `editor.setEditable(editable)` emits an `update`
+event by default (its second argument, `emitUpdate`, is `true`). The editor
+called it in an effect on mount, `onUpdate` handed `editor.getHTML()` to the
+form, and Tiptap's spelling of the saved HTML (a list item wrapped in a
+`<p>`, say) differs from what the API stored — a change, as far as the form
+could tell.
+**Fix**: `setEditable(!disabled, false)`, and `onUpdate` passes on only a
+transaction with `docChanged`. Anything that feeds a Tiptap editor's HTML
+into a dirty check should ignore updates that didn't change the document.
+**Category**: frontend · `apps/app.saroh.in/components/commerce/product-sections/description-editor.tsx` · `frontend-forms.md`
+
 ## Security — a CodeQL ReDoS alert: fixed without knowing whether it mattered
 
 **Problem**: CodeQL raised `js/polynomial-redos` (and, alongside it,
