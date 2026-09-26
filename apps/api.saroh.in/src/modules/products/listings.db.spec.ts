@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 import { CustomersService } from "../customers/customers.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrdersService } from "../orders/orders.service";
+import { variantHasStock } from "../stock/stock-words";
 import { currencyMismatch } from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { InventoryService } from "./inventory.service";
@@ -423,6 +424,67 @@ describe("Listings and StockLevel per storefront (DB)", () => {
                 data: { organizationId: orgId, storeId: hill, productId: id },
             }),
         ).rejects.toThrow();
+    });
+
+    it("removing a variant a storefront sells alone never counts the product whole there while other variants count elsewhere", async () => {
+        // Counted per variant at Hill Road (Small and Large); Online then
+        // sells only Small, so its one shelf is Small's.
+        const { id } = await products.create(hill, ownerId, {
+            name: "Cap",
+            price: "250.00",
+        });
+        const small = await variants.create(hill, id, ownerId, {
+            sku: `LS-CAP-S-${tag}`,
+            title: "Small",
+        });
+        const large = await variants.create(hill, id, ownerId, {
+            sku: `LS-CAP-L-${tag}`,
+            title: "Large",
+        });
+        await inventory.setVariants(hill, id, ownerId, {
+            variants: [
+                { variantId: small.id, quantity: 0, lowStockAlert: 1 },
+                { variantId: large.id, quantity: 0, lowStockAlert: 1 },
+            ],
+        });
+        await listings.list(orgId, id, online, [small.id]);
+        const onlineRows = () =>
+            prisma.stockLevel.findMany({
+                where: { storeId: online, productId: id },
+                select: { variantId: true },
+            });
+        expect(await onlineRows()).toEqual([{ variantId: small.id }]);
+
+        // 2 on Small's shelf at Online, as a system count leaves them.
+        await prisma.stockLevel.updateMany({
+            where: { storeId: online, variantId: small.id },
+            data: { onHand: 2 },
+        });
+        // Large still counts at Hill Road: handing those 2 back to a
+        // whole-product shelf at Online would count the product whole
+        // there and per variant at Hill Road. Refused; nothing changes.
+        await expect(
+            variants.remove(hill, id, small.id, ownerId),
+        ).rejects.toThrow(
+            new ConflictException(variantHasStock("Small", 2, "Online")),
+        );
+        expect(
+            await prisma.productVariant.count({ where: { id: small.id } }),
+        ).toBe(1);
+        expect(await onlineRows()).toEqual([{ variantId: small.id }]);
+
+        // At 0 it goes, and Online gets no whole-product shelf either.
+        await prisma.stockLevel.updateMany({
+            where: { storeId: online, variantId: small.id },
+            data: { onHand: 0 },
+        });
+        await variants.remove(hill, id, small.id, ownerId);
+        expect(await onlineRows()).toEqual([]);
+        expect(
+            await prisma.stockLevel.count({
+                where: { productId: id, variantId: large.id },
+            }),
+        ).toBe(1);
     });
 
     it("gives a product an address unique in its business, whichever storefront made it", async () => {

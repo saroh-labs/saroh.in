@@ -188,8 +188,9 @@ export function variantHasHistory(title: string): string {
 }
 
 /**
- * Why a variant with units on a shelf, where other variants keep counting,
- * can't be removed: the units would go with its shelf.
+ * Why a variant with units on a shelf, while other variants keep counting
+ * (at that storefront or another), can't be removed: the units would go
+ * with its shelf.
  */
 export function variantHasStock(
     title: string,

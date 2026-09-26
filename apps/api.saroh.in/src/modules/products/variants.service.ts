@@ -344,17 +344,17 @@ export class VariantsService {
                     field: "variantId",
                 });
             }
-            // Units on its shelf where other variants keep counting have
-            // nowhere to go back to: they'd vanish with the shelf.
+            // A product counts as a whole or per variant, never both, and
+            // that is decided across the business: while another variant
+            // counts at any storefront, its units have no whole-product
+            // shelf to go back to — at a storefront where it counts alone
+            // as much as next to other variants — and would vanish with
+            // the shelf.
+            const othersAnywhere = rows.some(
+                (r) => r.variantId !== null && r.variantId !== variantId,
+            );
             for (const row of own) {
-                if (row.onHand === 0) continue;
-                const others = rows.some(
-                    (r) =>
-                        r.storeId === row.storeId &&
-                        r.variantId !== null &&
-                        r.variantId !== variantId,
-                );
-                if (!others) continue;
+                if (row.onHand === 0 || !othersAnywhere) continue;
                 const store = await tx.store.findUnique({
                     where: { id: row.storeId },
                     select: { name: true },
@@ -369,18 +369,13 @@ export class VariantsService {
                 });
             }
             await tx.productVariant.delete({ where: { id: variantId } });
-            // At each storefront, the last variant counting its own stock
-            // takes its count back to the product, so the product does not
-            // silently lose its stock. The product's shelf logs it as a
-            // count (#513); the variant's shelf goes with the variant.
-            for (const row of own) {
-                const others = rows.some(
-                    (r) =>
-                        r.storeId === row.storeId &&
-                        r.variantId !== null &&
-                        r.variantId !== variantId,
-                );
-                if (others) continue;
+            // The last variant counting anywhere takes its count back to the
+            // product at each storefront, so the product does not silently
+            // lose its stock. The product's shelf logs it as a count (#513);
+            // the variant's shelf goes with the variant. While another
+            // variant still counts, nothing comes back (its units were
+            // refused above) and no whole-product shelf is made.
+            for (const row of othersAnywhere ? [] : own) {
                 const whole = rows.find(
                     (r) => r.storeId === row.storeId && r.variantId === null,
                 );

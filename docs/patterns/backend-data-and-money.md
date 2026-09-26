@@ -81,9 +81,11 @@
   holds it, or an entry a person or an order wrote that moved stock and
   wasn't undone — can't be removed (archive the product instead). Saroh's
   own entries and counts that changed nothing aren't history, so such a
-  variant goes; the last variant counting at a storefront hands what it
-  held back to the product (`VARIANT_REMOVED`), and one with units where
-  other variants still count is refused, since they'd be lost. A product
+  variant goes; the last variant counting anywhere hands what it held
+  back to the product at each storefront (`VARIANT_REMOVED`), and one with
+  units anywhere while another variant still counts at any storefront is
+  refused, since they'd be lost (never a whole shelf beside variant ones:
+  a storefront can sell only some variants). A product
   with any stock entry, or stock on a
   shelf, can't be deleted either (archive it). A COUNTED
   entry Saroh wrote (`StockEntry.system`: Track stock off, the per-variant
