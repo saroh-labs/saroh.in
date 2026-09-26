@@ -88,7 +88,7 @@ each with why it stops there:
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:
 
-- `stock/stock.service.ts` (1,023) — the stock module's one writer: every
+- `stock/stock.service.ts` (1,106) — the stock module's one writer: every
   shelf change (count, received, wasted, returned, move, undo, and the
   order flows' sale and return) goes through `recordEntry` or the batched
   count and undo, under one set of lock and below-zero rules. It also finds
@@ -96,12 +96,12 @@ with why it stops there:
   writers and the order flows' writers are each a seam. Splitting them
   means exporting the private `Row` and lock helpers across files, and it
   hasn't been done yet.
-- `stock/reserve.ts` (822) — every hold, release, sale, kitchen undo and
+- `stock/reserve.ts` (876) — every hold, release, sale, kitchen undo and
   refund put-back an order makes, plus `reserveOnPayment`. They share one
   line loader, one lock order and the invariant (promised = sum of held).
   Online payment (`reserveOnPayment`) is the natural cut once the online
   checkout calls it.
-- `collections/collections.service.ts` (767) — hand-picked and automatic
+- `collections/collections.service.ts` (803) — hand-picked and automatic
   collections, their products and a product's collections, around the one
   category tree. The product page's reads (`forProduct`, `setForProduct`)
   could move to their own service, as the controller's product routes
@@ -111,14 +111,20 @@ with why it stops there:
   one reader. A little over, and cutting one splits a query from the words
   it builds.
 - `products/serialize.ts` (596), `products/inventory.service.ts` (536) and
-  `products/variants.service.ts` (442) — grew with listings, stock per
+  `products/variants.service.ts` (479) — grew with listings, stock per
   storefront, Track stock and the per-variant switch. `inventory.service`'s
   first switch (`switchStore`) and `serialize`'s stock words are the seams.
   Moving them is a file split with nothing to gain until they change again.
+- `products/products.service.ts` (846; 648 before this release) and
+  `stores/stores.service.ts` (411) — the catalogue's reads and section
+  saves, now business-wide with listings and the delete guard; and a
+  storefront's create with its caps and, now, the business's currency. The
+  catalogue list read and the storefront caps are the seams; a little over
+  for the second, and not yet cut for the first.
 - `backfill/catalogue-settings.ts` (624), `backfill/merge-same-products.ts`
-  (493), `backfill/merge-same-products.move.ts` (513),
+  (493), `backfill/merge-same-products.move.ts` (523),
   `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
-  (469) — one-off backfills, each one exported unit that the integration
+  (481) — one-off backfills, each one exported unit that the integration
   suite runs twice. The merge is already split, into deciding and moving.
 - `sites/media-picker.tsx` (509) — the media library dialog. Photos and
   videos (#517) added the video rules and the poster frame to its one
