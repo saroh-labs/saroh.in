@@ -253,8 +253,13 @@ export async function seed(): Promise<void> {
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
-    // Every shelf the seed set opens its stock log (#513).
-    await balanceStockLog(prisma, org.id);
+    // Every shelf the seed set opens its stock log (#513), counted by the
+    // owner when the seed ran — never later than now.
+    await balanceStockLog(prisma, {
+        organizationId: org.id,
+        at: now,
+        actorUserId: user.id,
+    });
     await assertHeldStock(prisma, org.id);
     await report(prisma, org.id);
 }

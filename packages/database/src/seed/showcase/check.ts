@@ -461,6 +461,17 @@ export async function checkShowcase(
             WHERE s."organizationId" = ANY(${orgs})
               AND COALESCE(e.total, 0) <> s."onHand"`,
     );
+    // The Stock screen's "Last change" reads the newest entry and who made
+    // it: an entry is never later than now, and only one Saroh wrote itself
+    // (Track stock turned off, …) is by nobody.
+    fail(
+        "stock entries dated in the future, or made by nobody",
+        await prisma.$queryRaw<Row[]>`
+            SELECT id, "organizationId", "createdAt", "actorUserId" FROM "StockEntry"
+            WHERE "organizationId" = ANY(${orgs})
+              AND ("createdAt" > ${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC'
+                   OR ("actorUserId" IS NULL AND "system" IS NULL))`,
+    );
 
     if (failures.length > 0) {
         throw new Error(
