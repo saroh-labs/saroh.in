@@ -2,8 +2,10 @@
  * The product page's stock sheet (#523) — what it edits and what a save
  * writes. Pure and client-safe, so the rules can be tested without the
  * sheet: who may change which field, and how one save becomes the fewest
- * writes (a count only of the shelves that changed; the per-storefront set
- * only when a warning level changed or counting starts).
+ * writes (a count only of the shelves that changed; a warning level on its
+ * own, with no count; the per-storefront set only when counting starts) —
+ * and, after a save that partly failed, what the sheet now starts from, so
+ * trying again sends only what didn't land.
  */
 
 import type { ProductStock } from "../stock/product-stock";
@@ -145,8 +147,8 @@ export interface SheetPlan {
     }[];
     remove: string[];
     /**
-     * Set every size at each storefront — when a warning level changed or
-     * counting starts. `perVariant` false: the product's own shelf.
+     * Set every size at each storefront — only when counting starts (the
+     * first count). `perVariant` false: the product's own shelf.
      */
     setAt: {
         storeId: string;
@@ -157,7 +159,17 @@ export interface SheetPlan {
             lowStockAlert: number;
         }[];
     }[];
-    /** Otherwise, count only the shelves whose number changed. */
+    /**
+     * Once it counts, a changed warning level alone: every shelf of that
+     * size, with no quantity — so a sale or a move since the sheet opened
+     * is never written over, and the log gets no count nobody made.
+     */
+    warn: {
+        storeId: string;
+        variantId: string | null;
+        lowStockAlert: number;
+    }[];
+    /** Once it counts, only the shelves whose number changed. */
     count: {
         storeId: string;
         variantId: string | null;
@@ -183,6 +195,7 @@ export function planSave(
         variants: [],
         remove: [],
         setAt: [],
+        warn: [],
         count: [],
     };
     if (may.canWrite) {
@@ -192,7 +205,7 @@ export function planSave(
         }
         now.sizes.forEach((s, i) => {
             const before = was.sizes.at(i);
-            if (!s.variantId || !before) return;
+            if (!s.variantId || !before || before.removed) return;
             if (s.removed) {
                 plan.remove.push(s.variantId);
                 return;
@@ -211,11 +224,8 @@ export function planSave(
     }
     if (!may.canStock) return plan;
     const kept = now.sizes.filter((s) => !s.removed);
-    const warnChanged = now.sizes.some(
-        (s, i) => !s.removed && s.warn.trim() !== was.sizes[i]?.warn,
-    );
     const perVariant = kept.some((s) => s.variantId !== null);
-    if (warnChanged || !counted) {
+    if (!counted) {
         const stores = Array.from(
             new Set(kept.flatMap((s) => s.shelves.map((x) => x.storeId))),
         );
@@ -233,6 +243,16 @@ export function planSave(
         }));
         return plan;
     }
+    now.sizes.forEach((s, i) => {
+        if (s.removed || s.warn.trim() === was.sizes[i]?.warn) return;
+        for (const shelf of s.shelves) {
+            plan.warn.push({
+                storeId: shelf.storeId,
+                variantId: s.variantId,
+                lowStockAlert: Number(s.warn),
+            });
+        }
+    });
     for (const s of kept) {
         for (const shelf of s.shelves) {
             const n = Number(shelf.onHand);
@@ -256,8 +276,93 @@ export function planIsEmpty(plan: SheetPlan): boolean {
         plan.variants.length === 0 &&
         plan.remove.length === 0 &&
         plan.setAt.length === 0 &&
+        plan.warn.length === 0 &&
         plan.count.length === 0
     );
+}
+
+/** Which of a plan's writes landed. */
+export interface SheetDone {
+    product: boolean;
+    /** Variants whose name or price saved. */
+    variants: string[];
+    /** Sizes removed. */
+    removed: string[];
+    /** Storefronts whose first count saved. */
+    setAt: string[];
+    warn: boolean;
+    count: boolean;
+}
+
+export function nothingDone(): SheetDone {
+    return {
+        product: false,
+        variants: [],
+        removed: [],
+        setAt: [],
+        warn: false,
+        count: false,
+    };
+}
+
+/**
+ * After a save that partly failed: the sheet's starting values with what
+ * landed folded in, and the draft's shelves told what they now hold — so
+ * trying again sends only what didn't land, never a write twice.
+ */
+export function foldSaved(
+    was: SheetValues,
+    now: SheetValues,
+    plan: SheetPlan,
+    done: SheetDone,
+): { was: SheetValues; now: SheetValues } {
+    const next: SheetValues = structuredClone(was);
+    const draft: SheetValues = structuredClone(now);
+    if (done.product && plan.product) {
+        next.price = plan.product.price;
+        next.mrp = plan.product.mrp ?? "";
+    }
+    for (const v of plan.variants) {
+        if (!done.variants.includes(v.variantId)) continue;
+        const size = next.sizes.find((s) => s.variantId === v.variantId);
+        if (size) {
+            size.title = v.title;
+            size.price = v.price ?? "";
+        }
+    }
+    for (const id of done.removed) {
+        const size = next.sizes.find((s) => s.variantId === id);
+        if (size) size.removed = true;
+    }
+    /** A shelf now holds `n`: in both, so it no longer reads as changed. */
+    const holds = (storeId: string, variantId: string | null, n: number) => {
+        for (const values of [next, draft]) {
+            const shelf = values.sizes
+                .find((s) => s.variantId === variantId)
+                ?.shelves.find((x) => x.storeId === storeId);
+            if (shelf) {
+                shelf.was = n;
+                if (values === next) shelf.onHand = String(n);
+            }
+        }
+    };
+    for (const at of plan.setAt) {
+        if (!done.setAt.includes(at.storeId)) continue;
+        for (const r of at.rows) holds(at.storeId, r.variantId, r.quantity);
+    }
+    const warned =
+        done.warn ||
+        (plan.setAt.length > 0 && done.setAt.length === plan.setAt.length);
+    if (warned) {
+        draft.sizes.forEach((s, i) => {
+            const size = next.sizes.at(i);
+            if (size && !s.removed) size.warn = s.warn.trim();
+        });
+    }
+    if (done.count) {
+        for (const c of plan.count) holds(c.storeId, c.variantId, c.counted);
+    }
+    return { was: next, now: draft };
 }
 
 /** "16 can sell" under a size, from the edited counts; "—" while one is wrong. */

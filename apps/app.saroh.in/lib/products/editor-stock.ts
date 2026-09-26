@@ -7,6 +7,27 @@ import type { ProductDetail } from "./service";
  */
 
 /**
+ * Only an owner or admin can make a product count per variant (#515): the
+ * first count of a product with variants is that switch, so a stock-only
+ * role reads this instead of Add stock — in the Editor and on the product
+ * page.
+ */
+export const SPLIT_NEEDS_WRITE =
+    "Counting each variant changes how this product counts stock, so an owner or admin sets it up.";
+
+/**
+ * Whether this person may give a product its first count: they count
+ * stock, and — with variants, where the first count is the switch to
+ * counting each variant — they may change the product too.
+ */
+export function canStartCounting(
+    may: { canStock: boolean; canWrite: boolean },
+    variantCount: number,
+): boolean {
+    return may.canStock && (may.canWrite || variantCount === 0);
+}
+
+/**
  * How the product is counted at this storefront:
  * - "variant" — each variant keeps its own count;
  * - "whole" — one count for the product, even when it has variants (an

@@ -167,11 +167,15 @@ function query(params: Record<string, string | number | undefined>): string {
     return s ? `?${s}` : "";
 }
 
-async function write<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+async function write<T>(
+    path: string,
+    body: unknown,
+    method: "POST" | "PUT" = "POST",
+): Promise<ApiResult<T>> {
     const base = await orgBase();
     if (!base) return { ok: false, error: NO_BUSINESS };
     const res = await apiFetch(`${base}/stock${path}`, {
-        method: "POST",
+        method,
         body: JSON.stringify(body),
     });
     const data: unknown = await res.json().catch(() => null);
@@ -256,6 +260,17 @@ export function countStock(input: {
             mismatch: boolean;
         }[];
     }>("/counts", input);
+}
+
+/**
+ * When shelves warn, and nothing else: no count and no entry in the log, so
+ * what is on each shelf stays whatever it is now.
+ */
+export function setStockWarnings(input: {
+    warnings: (Shelf & { lowStockAlert: number })[];
+    idempotencyKey: string;
+}) {
+    return write<{ shelves: ShelfAfter[] }>("/warnings", input, "PUT");
 }
 
 /** Received, baked, wasted, or returned by a customer. */

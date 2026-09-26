@@ -9,6 +9,7 @@ import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";
 import {
+    SPLIT_NEEDS_WRITE,
     stockCounting,
     stockDraftFrom,
     stockLayout,
@@ -37,10 +38,6 @@ const DEFAULT_WARN = "10";
 
 const same = (a: StockDraft, b: StockDraft) =>
     JSON.stringify(a) === JSON.stringify(b);
-
-/** Only an owner or admin can make a product count per variant (#515). */
-const SPLIT_NEEDS_WRITE =
-    "Counting each variant changes how this product counts stock, so an owner or admin sets it up.";
 
 /**
  * Stock: how many there are and when to warn. Once a product counts per

@@ -5,6 +5,10 @@ import { Box } from "lucide-react";
 import { useState } from "react";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import {
+    canStartCounting,
+    SPLIT_NEEDS_WRITE,
+} from "@/lib/products/editor-stock";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import type { ProductTracking } from "@/lib/products/tracking";
@@ -154,7 +158,7 @@ export function ProductStockTab({
                         : "Add a count to see how many you have and get a warning when it runs low."
                 }
             >
-                {overview.canStock ? (
+                {canStartCounting(overview, product.variants.length) ? (
                     <StockSheetButton
                         overview={overview}
                         storeId={storeId}
@@ -162,6 +166,12 @@ export function ProductStockTab({
                         counts
                         label="Add stock"
                     />
+                ) : overview.canStock ? (
+                    // With variants, the first count is the switch to
+                    // counting each one: the API asks store:write for it.
+                    <p className="max-w-[46ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                        {SPLIT_NEEDS_WRITE}
+                    </p>
                 ) : (
                     <StateLink
                         href={productEditHref(storeId, product.id, "stock")}

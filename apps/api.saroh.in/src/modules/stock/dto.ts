@@ -108,6 +108,36 @@ export class CountStockDto extends StockWriteDto {
     counts!: CountRowDto[];
 }
 
+export class WarnRowDto {
+    @IsString()
+    storeId!: string;
+
+    @IsString()
+    productId!: string;
+
+    @IsOptional()
+    @IsString()
+    variantId?: string | null;
+
+    @IsInt({ message: "Whole numbers only." })
+    @Min(0, { message: "Warn at 0 or more." })
+    @Max(1_000_000)
+    lowStockAlert!: number;
+}
+
+/**
+ * Change when shelves warn, and nothing else: no count, no entry in the
+ * log, so what is on the shelf stays whatever it is now.
+ */
+export class SetWarningsDto extends StockWriteDto {
+    @IsArray()
+    @ArrayMinSize(1, { message: "Name at least one shelf." })
+    @ArrayMaxSize(500)
+    @ValidateNested({ each: true })
+    @Type(() => WarnRowDto)
+    warnings!: WarnRowDto[];
+}
+
 /** Received, baked, wasted, or returned by a customer. */
 export class StockEntryDto extends ShelfDto {
     @IsIn(HAND_ENTRY_KINDS)

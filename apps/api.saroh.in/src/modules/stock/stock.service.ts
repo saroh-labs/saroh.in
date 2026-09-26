@@ -678,6 +678,47 @@ export async function count(
     return result;
 }
 
+/**
+ * Change when shelves warn, and nothing else: no count and no entry, so a
+ * sale, a return or a move since the screen was read stays as it is. A
+ * shelf not made yet is made at 0, as a count would make it. Rows are
+ * locked together in id order.
+ */
+export async function setWarnings(
+    tx: Tx,
+    actor: StockActor,
+    warnings: readonly { target: StockTarget; lowStockAlert: number }[],
+): Promise<ShelfView[]> {
+    for (const w of warnings) {
+        if (!Number.isInteger(w.lowStockAlert) || w.lowStockAlert < 0) {
+            throw new BadRequestException({
+                message: "Warn at a whole number, 0 or more.",
+                field: "lowStockAlert",
+            });
+        }
+    }
+    await lockProductsToOpen(
+        tx,
+        actor.organizationId,
+        warnings.map((w) => w.target),
+    );
+    const ids: string[] = [];
+    for (const w of warnings) {
+        ids.push(await resolveRowId(tx, actor, w.target, true));
+    }
+    if (new Set(ids).size !== ids.length) {
+        throw new BadRequestException("Name each shelf once.");
+    }
+    const rows = await lockRows(tx, ids);
+    const next = warnings.map((w, i) => {
+        const row = rows.get(ids[i]);
+        if (!row) throw new NotFoundException("Stock not found");
+        return { ...row, lowStockAlert: w.lowStockAlert };
+    });
+    await setShelves(tx, next);
+    return next.map(shelf);
+}
+
 // ---------------------------------------------------------------------------
 // Received, baked, wasted
 // ---------------------------------------------------------------------------

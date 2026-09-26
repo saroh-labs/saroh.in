@@ -10,18 +10,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { currencySymbol } from "@/lib/format/money";
-import {
-    deleteVariant,
-    patchProduct,
-    setInventory,
-    setVariantStock,
-    updateVariant,
-} from "@/lib/products/actions";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
-import { countProductStock } from "@/lib/products/stock-actions";
 import type { SheetSize, SheetValues } from "@/lib/products/stock-sheet";
 import {
+    foldSaved,
     planIsEmpty,
     planSave,
     sheetProblem,
@@ -32,6 +25,7 @@ import type { ProductStock } from "@/lib/stock/product-stock";
 import { QuickSheet } from "../quick-sheet";
 import { MoveStock } from "./move-stock";
 import { PRICE_ROW, ROW, SheetSizeRow } from "./stock-sheet-row";
+import { saveStockSheet } from "./stock-sheet-save";
 
 /**
  * "Change stock or prices" (#523): the design's sheet over the product
@@ -105,16 +99,33 @@ export function StockSheet({
         canWrite: overview.canWrite,
         canStock: counts && overview.canStock,
     };
-    const counted =
-        overview.stock.mode === "variant" || overview.stock.product !== null;
-    const [was] = useState(() => sheetValues(product, stock));
+    // What the sheet starts from, and the read it came from. A save that
+    // partly failed folds in what landed; a fresh read (after a move, or a
+    // sale elsewhere) replaces it while nothing is being edited — so a later
+    // save never writes the old numbers back.
+    const [base, setBase] = useState(() => ({
+        stock,
+        values: sheetValues(product, stock),
+    }));
+    const was = base.values;
     const [draft, setDraft] = useState<SheetValues>(was);
     const [saving, setSaving] = useState(false);
+    // A first count that landed at some storefronts: it counts now.
+    const [started, setStarted] = useState(false);
+    const counted =
+        started ||
+        overview.stock.mode === "variant" ||
+        overview.stock.product !== null;
     const symbol = currencySymbol(product.currency);
     const split = counts && (stock?.split ?? false);
     const problem = sheetProblem(draft);
     const dirty =
         JSON.stringify(draft) !== JSON.stringify(was) || (counts && !counted);
+    if (base.stock !== stock && !dirty && !saving) {
+        const values = sheetValues(product, stock);
+        setBase({ stock, values });
+        setDraft(values);
+    }
 
     const setSize = (i: number, patch: Partial<SheetSize>) =>
         setDraft((d) => ({
@@ -144,71 +155,23 @@ export function StockSheet({
             return;
         }
         setSaving(true);
-        const failed: string[] = [];
         try {
-            if (plan.product) {
-                const res = await patchProduct(
-                    storeId,
-                    product.id,
-                    plan.product,
-                );
-                if (!res.ok) {
-                    showError("Nothing was saved", res.error);
-                    return;
-                }
-            }
-            for (const v of plan.variants) {
-                const variant = product.variants.find(
-                    (x) => x.id === v.variantId,
-                );
-                if (!variant) continue;
-                const res = await updateVariant(product.id, variant.id, {
-                    sku: variant.sku,
-                    title: v.title,
-                    price: v.price,
-                    mrp: variant.mrp ?? null,
-                    // The API's PUT replaces the variant: an omitted image is cleared.
-                    image: variant.image ?? null,
-                    optionValueId: variant.optionValueId ?? null,
-                    imageId: variant.imageId ?? null,
-                });
-                if (!res.ok) failed.push(`${variant.title}'s price`);
-            }
-            for (const id of plan.remove) {
-                const res = await deleteVariant(product.id, id);
-                if (!res.ok) {
-                    failed.push(
-                        `removing ${product.variants.find((v) => v.id === id)?.title ?? "a size"}`,
-                    );
-                }
-            }
-            for (const at of plan.setAt) {
-                const res = at.perVariant
-                    ? await setVariantStock(
-                          at.storeId,
-                          product.id,
-                          at.rows.map((r) => ({
-                              variantId: r.variantId ?? "",
-                              quantity: r.quantity,
-                              lowStockAlert: r.lowStockAlert,
-                          })),
-                      )
-                    : await setInventory(at.storeId, product.id, {
-                          quantity: at.rows[0]?.quantity ?? 0,
-                          lowStockAlert: at.rows[0]?.lowStockAlert ?? 10,
-                      });
-                if (!res.ok) failed.push(`the stock (${res.error})`);
-            }
-            if (plan.count.length > 0) {
-                const res = await countProductStock({
-                    productId: product.id,
-                    counts: plan.count,
-                    idempotencyKey: crypto.randomUUID(),
-                });
-                if (!res.ok) failed.push(`the counts (${res.error})`);
+            const { stopped, failed, done } = await saveStockSheet(
+                product,
+                storeId,
+                plan,
+            );
+            if (stopped !== null) {
+                showError("Nothing was saved", stopped);
+                return;
             }
             router.refresh();
             if (failed.length > 0) {
+                // Keep what landed, so trying again sends only the rest.
+                const next = foldSaved(was, draft, plan, done);
+                setBase((b) => ({ ...b, values: next.was }));
+                setDraft(next.now);
+                if (done.setAt.length > 0) setStarted(true);
                 showError(
                     `Saved, except ${failed.join(" and ")}. Try those again.`,
                 );

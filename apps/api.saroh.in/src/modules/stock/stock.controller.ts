@@ -23,6 +23,7 @@ import {
     ResolveCheckDto,
     ReverseStockDto,
     SetStockTrackingDto,
+    SetWarningsDto,
     StockChecksQueryDto,
     StockEntryDto,
     StockLevelsQueryDto,
@@ -75,6 +76,15 @@ export class StockController {
     @HttpCode(201)
     counts(@OrgContext() ctx: OrganizationContext, @Body() dto: CountStockDto) {
         return this.writes.counts(ctx, dto);
+    }
+
+    /** When shelves warn — no count, no entry in the log. */
+    @Put("warnings")
+    warnings(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetWarningsDto,
+    ) {
+        return this.writes.warnings(ctx, dto);
     }
 
     /** Received, baked, wasted, or returned by a customer. */

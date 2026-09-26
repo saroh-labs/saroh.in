@@ -5,7 +5,9 @@ import type { ProductDetail } from "./service";
 import type { SheetValues } from "./stock-sheet";
 import {
     canSellNote,
+    foldSaved,
     movable,
+    nothingDone,
     planIsEmpty,
     planSave,
     sheetProblem,
@@ -97,15 +99,28 @@ describe("planSave", () => {
         expect(plan.count).toHaveLength(1);
     });
 
-    it("sets every storefront when a warning level changes", () => {
+    it("a warning level alone sends no quantity, at every shelf of that size", () => {
         const now = copy(base);
         now.sizes[0].warn = "8";
         const plan = planSave(base, now, owner, true);
         expect(plan.count).toEqual([]);
-        expect(plan.setAt.map((s) => s.storeId)).toEqual(["hill", "online"]);
-        expect(plan.setAt[0].rows).toEqual([
-            { variantId: "v800", quantity: 14, lowStockAlert: 8 },
-            { variantId: "v400", quantity: 0, lowStockAlert: 4 },
+        expect(plan.setAt).toEqual([]);
+        expect(plan.warn).toEqual([
+            { storeId: "hill", variantId: "v800", lowStockAlert: 8 },
+            { storeId: "online", variantId: "v800", lowStockAlert: 8 },
+        ]);
+    });
+
+    it("a warning level and a count go out apart", () => {
+        const now = copy(base);
+        now.sizes[1].warn = "2";
+        now.sizes[0].shelves[0].onHand = "12";
+        const plan = planSave(base, now, owner, true);
+        expect(plan.warn).toEqual([
+            { storeId: "online", variantId: "v400", lowStockAlert: 2 },
+        ]);
+        expect(plan.count).toEqual([
+            { storeId: "hill", variantId: "v800", expected: 14, counted: 12 },
         ]);
     });
 
@@ -129,6 +144,63 @@ describe("planSave", () => {
 
     it("an untouched sheet writes nothing", () => {
         expect(planIsEmpty(planSave(base, copy(base), owner, true))).toBe(true);
+    });
+});
+
+describe("foldSaved", () => {
+    it("a retry after a partial save sends only what didn't land", () => {
+        const now = copy(base);
+        now.price = "500";
+        now.sizes[1].price = "280";
+        now.sizes[0].removed = true;
+        now.sizes[1].warn = "3";
+        now.sizes[1].shelves[0].onHand = "7";
+        const plan = planSave(base, now, owner, true);
+        // The price and the count landed; the variant, the removal and the
+        // warning level didn't.
+        const done = { ...nothingDone(), product: true, count: true };
+        const next = foldSaved(base, now, plan, done);
+        const again = planSave(next.was, next.now, owner, true);
+        expect(again.product).toBeNull();
+        expect(again.count).toEqual([]);
+        expect(again.variants).toEqual([
+            { variantId: "v400", title: "400g", price: "280" },
+        ]);
+        expect(again.remove).toEqual(["v800"]);
+        expect(again.warn).toHaveLength(1);
+    });
+
+    it("never removes a size twice, and a clean retry writes nothing", () => {
+        const now = copy(base);
+        now.sizes[0].removed = true;
+        now.sizes[1].shelves[0].onHand = "9";
+        const plan = planSave(base, now, owner, true);
+        const done = {
+            ...nothingDone(),
+            removed: ["v800"],
+            count: true,
+        };
+        const next = foldSaved(base, now, plan, done);
+        expect(planIsEmpty(planSave(next.was, next.now, owner, true))).toBe(
+            true,
+        );
+    });
+
+    it("a first count that landed at one storefront counts, not sets, the other", () => {
+        // Nothing counted yet: every shelf was 0, and the sheet has numbers.
+        const never = copy(base);
+        for (const s of never.sizes) for (const x of s.shelves) x.was = 0;
+        const now = copy(never);
+        const plan = planSave(never, now, owner, false);
+        expect(plan.setAt.map((a) => a.storeId)).toEqual(["hill", "online"]);
+        const done = { ...nothingDone(), setAt: ["hill"] };
+        const next = foldSaved(never, now, plan, done);
+        const again = planSave(next.was, next.now, owner, true);
+        expect(again.setAt).toEqual([]);
+        expect(again.count).toEqual([
+            { storeId: "online", variantId: "v800", expected: 0, counted: 6 },
+            { storeId: "online", variantId: "v400", expected: 0, counted: 10 },
+        ]);
     });
 });
 
