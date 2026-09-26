@@ -758,7 +758,7 @@ export async function reserveOnPayment(
         throw new ConflictException("That payment is not this order's.");
     }
     const [intent] = intents;
-    const [order] = await tx.$queryRaw<{ status: string }[]>`
+    const [order] = await tx.$queryRaw<({ status: string } | undefined)[]>`
         SELECT status::text AS status FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
 
     const key = soldOutRefundKey(input.paymentIntentId);

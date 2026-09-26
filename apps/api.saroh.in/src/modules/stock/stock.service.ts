@@ -176,7 +176,9 @@ async function assertStillTracked(
         select: { stockTracked: true },
     });
     if (!product) throw new NotFoundException("Product not found");
-    const [profile] = await tx.$queryRaw<{ stockTracking: boolean }[]>`
+    const [profile] = await tx.$queryRaw<
+        ({ stockTracking: boolean } | undefined)[]
+    >`
         SELECT "stockTracking" FROM "BusinessProfile"
         WHERE "organizationId" = ${organizationId} FOR SHARE`;
     if (profile && !profile.stockTracking) {
