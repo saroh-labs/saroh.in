@@ -63,7 +63,14 @@ const SheetContent = React.forwardRef<
     SheetContentProps
 >(
     (
-        { side = "right", className, children, closeButton = true, ...props },
+        {
+            side = "right",
+            className,
+            children,
+            closeButton = true,
+            onInteractOutside,
+            ...props
+        },
         ref,
     ) => (
         <SheetPortal>
@@ -72,6 +79,16 @@ const SheetContent = React.forwardRef<
                 ref={ref}
                 className={cn(sheetVariants({ side }), className)}
                 {...props}
+                // A toast is not "outside": Undo on "Stopped selling" is
+                // pressed while the quick look that did it is still open, and
+                // pressing it must not close the sheet it is about.
+                onInteractOutside={(event) => {
+                    onInteractOutside?.(event);
+                    const target = event.target as Element | null;
+                    if (target?.closest("[data-sonner-toaster]")) {
+                        event.preventDefault();
+                    }
+                }}
             >
                 {children}
                 {closeButton ? (

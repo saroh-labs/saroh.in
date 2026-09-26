@@ -21,7 +21,10 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 export const brandToastOptions: ToasterProps["toastOptions"] = {
     unstyled: true,
     classNames: {
-        toast: "flex w-full min-w-[300px] items-center gap-3 rounded-[10px] bg-primary px-[15px] py-3 text-[13px] text-primary-foreground shadow-lg [&>[data-icon]]:shrink-0 [&_[data-icon]_svg]:size-4",
+        // `pointer-events-auto`: a modal sheet sets `pointer-events: none`
+        // on the body, which the toast would inherit — and its Undo, raised
+        // by an action in that sheet, could not be pressed.
+        toast: "pointer-events-auto flex w-full min-w-[300px] items-center gap-3 rounded-[10px] bg-primary px-[15px] py-3 text-[13px] text-primary-foreground shadow-lg [&>[data-icon]]:shrink-0 [&_[data-icon]_svg]:size-4",
         title: "font-medium",
         description: "mt-0.5 text-[12.5px] opacity-80",
         actionButton:
