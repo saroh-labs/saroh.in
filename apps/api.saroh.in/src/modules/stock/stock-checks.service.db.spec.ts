@@ -349,4 +349,21 @@ describe("Stock checks (DB)", () => {
             NotFoundException,
         );
     });
+    it("pages the open checks, with the counts across every page", async () => {
+        const all = await checks.list(owner());
+        expect(all.nextCursor).toBeNull();
+        expect(all.checks.length).toBeGreaterThan(1);
+        const first = await checks.list(owner(), { limit: 1 });
+        expect(first.checks.map((c) => c.key)).toEqual([all.checks[0].key]);
+        expect(first.counts).toEqual(all.counts);
+        expect(first.nextCursor).toBe(all.checks[0].key);
+        const keys = [...first.checks.map((c) => c.key)];
+        let cursor = first.nextCursor;
+        while (cursor) {
+            const page = await checks.list(owner(), { limit: 1, cursor });
+            keys.push(...page.checks.map((c) => c.key));
+            cursor = page.nextCursor;
+        }
+        expect(keys).toEqual(all.checks.map((c) => c.key));
+    });
 });
