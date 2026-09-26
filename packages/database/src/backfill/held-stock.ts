@@ -80,18 +80,30 @@ export async function heldStockMismatches(
 ): Promise<HeldStockMismatches> {
     const orgs = organizationIds ? [...organizationIds] : null;
     const open = [...OPEN_ORDER_STATUSES];
+    // Only what holds or promises anything is read: a row that promises 0
+    // and has no line holding on it adds up. Both sides are partial
+    // indexes (`OrderItem_holding_idx`, `StockLevel_promising_idx`), so a
+    // check across every business at the API's start reads the few rows
+    // and lines holding stock, not every order line ever sold.
     const rows = await db.$queryRaw<HeldStockRow[]>`
-        SELECT s.id AS "stockLevelId", s."organizationId", s."storeId", s."productId",
-               s."variantId", s.promised, COALESCE(h.held, 0)::int AS held
-        FROM "StockLevel" s
-        LEFT JOIN (
+        WITH h AS (
             SELECT i."stockLevelId", SUM(i."heldQuantity")::int AS held
             FROM "OrderItem" i
             JOIN "Order" o ON o.id = i."orderId"
-            WHERE o.status::text = ANY(${open}::text[]) AND i."stockLevelId" IS NOT NULL
+            WHERE i."heldQuantity" <> 0 AND i."stockLevelId" IS NOT NULL
+              AND o.status::text = ANY(${open}::text[])
               AND (${orgs}::text[] IS NULL OR o."organizationId" = ANY(${orgs}::text[]))
             GROUP BY i."stockLevelId"
-        ) h ON h."stockLevelId" = s.id
+        ), candidates AS (
+            SELECT id FROM "StockLevel" WHERE promised <> 0
+            UNION
+            SELECT "stockLevelId" FROM h
+        )
+        SELECT s.id AS "stockLevelId", s."organizationId", s."storeId", s."productId",
+               s."variantId", s.promised, COALESCE(h.held, 0)::int AS held
+        FROM candidates c
+        JOIN "StockLevel" s ON s.id = c.id
+        LEFT JOIN h ON h."stockLevelId" = s.id
         WHERE s.promised <> COALESCE(h.held, 0)
           AND (${orgs}::text[] IS NULL OR s."organizationId" = ANY(${orgs}::text[]))
         ORDER BY s."organizationId", s.id`;

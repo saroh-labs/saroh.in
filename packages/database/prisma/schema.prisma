@@ -1214,6 +1214,8 @@ model StockLevel {
   @@index([productId])
   @@index([variantId])
   @@index([organizationId])
+  // Rows promising anything, for the held-stock check (#511).
+  @@index([organizationId], map: "StockLevel_promising_idx", where: raw("promised <> 0"))
 }
 
 // The stock log (#513): one entry for every change to what is on a shelf —
@@ -1511,6 +1513,8 @@ model OrderItem {
   @@index([orderId])
   @@index([variantId])
   @@index([stockLevelId])
+  // Lines holding stock, for the held-stock check (#511): few of all lines.
+  @@index([stockLevelId], map: "OrderItem_holding_idx", where: raw("\"heldQuantity\" <> 0"))
 }
 
 enum StockRow {

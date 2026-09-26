@@ -11,6 +11,10 @@ import { env } from "../../env";
 /** How many broken rows and lines one warning names; the rest are counted. */
 const NAMED = 20;
 
+/** How long either of the check's two reads may take before it gives up. */
+const CHECK_TIMEOUT_MS = 30_000;
+const CHECK_TIMEOUT = `${CHECK_TIMEOUT_MS}ms`;
+
 /**
  * Held stock, checked when the API starts (#511): every row's promised
  * should be the sum of its open lines' `heldQuantity`, and closed lines hold
@@ -41,7 +45,17 @@ export class HeldStockWatch implements OnApplicationBootstrap {
 
     /** Log what doesn't add up; returns how many rows and lines. */
     async check(): Promise<number> {
-        const found = await heldStockMismatches(prisma);
+        // Read only what holds or promises stock (two partial indexes), and
+        // never for long: every instance runs this at its start, and a slow
+        // database is better left unread than loaded further.
+        const found = await prisma.$transaction(
+            async (tx) => {
+                // SET LOCAL, which takes no bound parameter.
+                await tx.$queryRaw`SELECT set_config('statement_timeout', ${CHECK_TIMEOUT}, true)`;
+                return heldStockMismatches(tx);
+            },
+            { timeout: 2 * CHECK_TIMEOUT_MS + 5_000 },
+        );
         const total = found.rows.length + found.lines.length;
         if (total === 0) return 0;
         const businesses = new Set([
