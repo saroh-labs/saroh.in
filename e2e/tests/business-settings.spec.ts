@@ -18,7 +18,8 @@ import { demoUser, urls } from "../playwright.config";
  */
 
 const ORG = "seed_org";
-const headers = { "x-organization-id": ORG };
+// The API refuses a write with no Origin (#50).
+const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const settingsUrl = `${urls.API_URL}/organizations/${ORG}/settings`;
 
 async function signIn(page: Page) {

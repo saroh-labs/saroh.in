@@ -15,7 +15,10 @@ import { demoUser, urls } from "../playwright.config";
  */
 
 const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
-const orgHeader = { "x-organization-id": NW.organizationId };
+const orgHeader = {
+    "x-organization-id": NW.organizationId,
+    origin: urls.APP_URL,
+};
 const org = (path: string) =>
     `${urls.API_URL}/organizations/${NW.organizationId}${path}`;
 const store = (path: string) =>

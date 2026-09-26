@@ -17,11 +17,14 @@ import { isTrustedOrigin } from "@saroh/auth";
  *  - A PRESENT `Origin` (or, absent that, `Referer`) that is NOT a trusted
  *    `*.saroh.in` origin is REJECTED (403). This is the actual browser-CSRF
  *    vector — a real browser always sends `Origin` on a cross-site POST.
- *  - A MISSING Origin AND Referer is ALLOWED. Server-to-server callers (the
- *    frontends' own server-side `fetch` to the API forward the session cookie
- *    but no Origin header) legitimately omit it; the SameSite cookie is the
- *    backstop for the browser case. Requiring an Origin here would break every
- *    server action, so it is intentionally permitted.
+ *  - A MISSING Origin AND Referer is REJECTED too (403, #50). It used to be
+ *    allowed because the frontends' server-side `fetch` forwarded the session
+ *    cookie without one; they now send the origin they serve
+ *    (`requestOrigin` from `@saroh/auth/origins`), so nothing first-party
+ *    needs the gap. A browser sends `Origin` on every state-changing request,
+ *    so a request with neither header either came from a tool or had its
+ *    headers stripped, and the SameSite cookie was the only thing left
+ *    standing between it and a write.
  *  - PUBLIC endpoints (`/public/*`, `/health`) and Better Auth's own
  *    `/api/auth/*` are EXEMPT: public intake (enquiry, analytics, provider
  *    webhooks) is deliberately cross-origin from customer sites / providers and
@@ -61,11 +64,13 @@ export class OriginGuard implements CanActivate {
             return true;
         }
 
-        // Prefer Origin; fall back to Referer. Missing both → server-to-server,
-        // allowed (SameSite cookie is the backstop for browsers).
+        // Prefer Origin; fall back to Referer. Missing both is refused (#50).
         const candidate =
             this.header(req.headers.origin) ?? this.header(req.headers.referer);
-        if (candidate !== undefined && !isTrustedOrigin(candidate)) {
+        if (candidate === undefined) {
+            throw new ForbiddenException("Missing request origin");
+        }
+        if (!isTrustedOrigin(candidate)) {
             throw new ForbiddenException("Untrusted request origin");
         }
         return true;

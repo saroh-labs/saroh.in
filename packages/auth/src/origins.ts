@@ -87,3 +87,33 @@ export function safeDestination(
 
     return isTrustedOrigin(candidate) ? candidate : null;
 }
+
+/**
+ * The origin to put on a frontend's server-side call to the API (#50).
+ *
+ * The API refuses a state-changing request that carries neither `Origin` nor
+ * `Referer` (`OriginGuard`). A browser always sends `Origin` on such a
+ * request. A Next server action or route handler that relays it with `fetch`
+ * does not, so it has to say where the request came from. That is the
+ * incoming request's own `Origin` when there is one: a server action's browser
+ * request always has it, and Next has already checked it against the host.
+ * Otherwise it is the origin of the host this app is serving.
+ *
+ * The API still checks the value against its trusted list. A forwarded foreign
+ * `Origin` is refused there. The host comes from the browser, which can't be
+ * made to name a first-party host it isn't visiting.
+ */
+export function requestOrigin(headers: {
+    get(name: string): string | null;
+}): string | undefined {
+    const origin = headers.get("origin")?.trim();
+    if (origin && origin !== "null") return origin;
+    const host = (headers.get("x-forwarded-host") ?? headers.get("host"))
+        ?.split(",")[0]
+        .trim();
+    if (!host) return undefined;
+    const forwarded = headers.get("x-forwarded-proto")?.split(",")[0].trim();
+    const proto =
+        forwarded === undefined || forwarded === "" ? "https" : forwarded;
+    return `${proto}://${host}`;
+}

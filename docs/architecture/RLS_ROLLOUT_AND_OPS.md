@@ -240,8 +240,8 @@ lost.
   0–7 landed. Read them as historical context, not current status; the live
   status is the per-stage progress tables in `IMPLEMENTATION_BACKLOG.md`. The
   still-open residual risks are R-05 (RLS enforcement — this doc), R-10 (CSRF
-  missing-origin — mitigated app-side in B3, with a documented "require Origin
-  from frontends" follow-up), and R-13 (credential rotation — table above).
+  missing-origin — closed by #50: the API now refuses a write with no Origin,
+  and the frontends send theirs), and R-13 (credential rotation — table above).
 - **Environment variables:** see `ENVIRONMENT.md` — the stack boots locally with
   only `DATABASE_URL`; production additionally requires `BETTER_AUTH_SECRET`.
 

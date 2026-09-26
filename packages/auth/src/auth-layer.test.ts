@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getTrustedOrigins, isTrustedOrigin, safeDestination } from "./origins";
+import {
+    getTrustedOrigins,
+    isTrustedOrigin,
+    requestOrigin,
+    safeDestination,
+} from "./origins";
 import { sessionCookieDomain } from "./server";
 
 describe("origins", () => {
@@ -72,6 +77,45 @@ function fakeRequest({
         },
     } as never;
 }
+
+describe("requestOrigin (#50)", () => {
+    const h = (entries: Record<string, string>) => new Headers(entries);
+
+    it("forwards the incoming request's Origin", () => {
+        expect(
+            requestOrigin(
+                h({ origin: "https://app.saroh.in", host: "internal:3000" }),
+            ),
+        ).toBe("https://app.saroh.in");
+    });
+
+    it("falls back to the forwarded host, first hop, then the Host header", () => {
+        expect(
+            requestOrigin(
+                h({
+                    "x-forwarded-host": "app.saroh.in, proxy.internal",
+                    "x-forwarded-proto": "https, http",
+                    host: "internal:3000",
+                }),
+            ),
+        ).toBe("https://app.saroh.in");
+        expect(requestOrigin(h({ host: "localhost:3003" }))).toBe(
+            "https://localhost:3003",
+        );
+        expect(
+            requestOrigin(
+                h({ host: "localhost:3003", "x-forwarded-proto": "http" }),
+            ),
+        ).toBe("http://localhost:3003");
+    });
+
+    it("ignores an opaque null Origin, and gives nothing with no host", () => {
+        expect(requestOrigin(h({ origin: "null", host: "app.saroh.in" }))).toBe(
+            "https://app.saroh.in",
+        );
+        expect(requestOrigin(h({}))).toBeUndefined();
+    });
+});
 
 describe("createAuthMiddleware", () => {
     const mw = createAuthMiddleware({
