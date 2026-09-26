@@ -81,6 +81,19 @@ pattern files refer back here.
   UI, marketing or docs until auto-linking ships (§14, `PRODUCT.md`).
 - **Adopted** — Never silently merge uncertain identities: normalise email and
   phone, and keep links reversible and auditable (§14).
+- **Adopted** (2026-09-26, DEC-041, DEC-042) — **Customers is everyone who
+  pays or signs in on the business's site**, and the list is keyed on the
+  Contact. Leads, Pipeline and Contacts (the CRM) stay as they are. A merchant
+  may **merge** two customers; Saroh suggests merges and never makes one. A
+  person's details can be **removed for privacy**; their orders and issued
+  invoices stay, with what was printed on them.
+- **Adopted** (2026-09-26, DEC-040) — **Needs attention is one list per
+  customer** (Allergy, Medical, Access, Other). A sensitive entry reaches only
+  a role with the sensitive permission, and the API leaves it out for everyone
+  else.
+- **Adopted** (2026-09-26, ADR-011, DEC-037) — **A business's customers sign
+  in on its own site** with a one-time code, with one account per business,
+  never a Saroh-wide identity.
 - **Current** — Merchant payments run on the Organization's own providers —
   Razorpay and Cashfree first — kept apart from Saroh's billing (DEC-010).
 - **Current** — **Deleting a contact, a lead or a customer is permanent, so it
@@ -112,6 +125,9 @@ pattern files refer back here.
 - **Current** — Saroh records and invoices; it does not charge a card on file
   and does not send the invoice. Copy says so: "Nothing is charged and nobody is
   contacted", "Saroh doesn't send this. Print it and hand it over."
+  **Adopted** (2026-09-26, DEC-038): autopay will run on the business's own
+  provider's mandates, with a pay link as the fallback. The copy above stays
+  true for every subscription without a mandate.
 - **Current** — **Mention an invoice only when Payments is on.** With Payments
   off, subscribing is refused, and a pack or course is recorded with the price
   paid and no invoice — so no copy may promise one. The API says which
@@ -150,6 +166,11 @@ pattern files refer back here.
   Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
+- **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,
+  booking or invoice always goes into their account on the business's site.
+  It goes out by email, SMS or WhatsApp only through the business's connected
+  provider. Saroh's own email sends a site's sign-in codes and nothing else.
+  Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
 
 ## Analytics
 

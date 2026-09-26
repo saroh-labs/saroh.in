@@ -4,6 +4,14 @@
 **Part of:** [#506](https://github.com/saroh-labs/saroh.in/issues/506) — billing, bookings, orders and customers to the design
 **Amends:** [ADR-007](./ADR-007-subscriptions-invoices-classes.md) (store orders are now invoiced; issued invoices are credited, not voided, by a GST-registered business) · DEC-020 (Members move kitchen stages)
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-003](./ADR-003-organization-modules.md) (modules) · DEC-010 (merchant payments on the business's own providers)
+**Superseded in part (2026-09-26):**
+
+- by [ADR-011](./ADR-011-customer-accounts-on-merchant-sites.md) (DEC-037): "The public booking page" and, in §3, "Not sending email or SMS";
+- by DEC-042: "One read of a customer" (records are now merged at the merchant's request);
+- by DEC-045: the kitchen's collect-or-delivery (six fulfilment types);
+- by DEC-038: in §3, "Not card-on-file, auto-debit" (autopay now runs on the business's own provider).
+
+Notes in each section say what changed.
 
 ---
 
@@ -200,6 +208,15 @@ Owner/Admin.
 
 **What it is not.** Not a courier integration — a tracking link is typed.
 
+> **Amended 2026-09-26 (DEC-045).** An order has one of six fulfilment types:
+> Pick-up, Local delivery, Shipping, Digital, Appointment (in person) and
+> Appointment (online). Each has its own steps and late rule. Collect becomes
+> Pick-up and Delivery becomes Local delivery. Shipping records the courier's
+> name and the tracking number; it is still not a courier integration. "Ready
+> does not text anyone" is replaced by ADR-011's rule: a message about an
+> order goes to the customer's account, and out only through the business's
+> own connected provider.
+
 ### One read of a customer, rooted on the contact
 
 **Context.** Every business has contacts; a gym has no store customers. A
@@ -220,6 +237,15 @@ where there is one. The page says where each block came from.
 
 **What it is not.** Not customer unification. Saroh does not claim two records
 are one person until the merchant links them.
+
+> **Superseded in part 2026-09-26 (DEC-041, DEC-042).** A merchant can now
+> **merge** two customers, and the surviving contact keeps every order, note
+> and booking. Orders keep the contact details they were placed with. Saroh
+> still never merges on its own; it suggests. A person's details can be
+> removed for privacy (anonymised, with orders and issued invoices kept). The
+> Customers list is keyed on the contact, and a paying store customer gets a
+> contact of their own. Linking a store customer to a known contact (#120)
+> stays.
 
 ### The public booking page
 
@@ -242,10 +268,25 @@ booking block. A client-sent amount is ignored.
 **What it is not.** Not customer recognition, not buying packs online, not a
 waitlist.
 
+> **Superseded in part 2026-09-26 by [ADR-011](./ADR-011-customer-accounts-on-merchant-sites.md)
+> (DEC-037).** A business's customers can now sign in on its site with a
+> one-time code, with one account per business. A **signed-in** customer may
+> spend a class credit online, buy a class pack online, join a class waitlist,
+> be recognised (with a double booking of the same slot refused) and message
+> the business. "Pay now" and "Pay at the desk" stay as decided above, and a
+> client-sent amount is still ignored. Whether a visitor must sign in to book
+> is plan A's default, to confirm.
+
 ## 3. What this is not
 
 - Not card-on-file, auto-debit or proration on a plan change.
+  _Amended 2026-09-26 (DEC-038): card-on-file and auto-debit now run on the
+  business's own provider's mandates. Proration is still out._
 - Not sending email or SMS. Copy never promises a message that is not sent.
+  _Superseded in part 2026-09-26 (ADR-011): sign-in codes are sent, and
+  messages about a customer's own orders, bookings and invoices go to their
+  account, and out through the business's own provider. The second sentence
+  stands._
 - Not retroactive: existing orders get no invoices, existing bookings no staff.
 
 ## 4. Build order
