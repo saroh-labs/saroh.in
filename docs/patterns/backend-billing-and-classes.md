@@ -130,7 +130,11 @@
   can-sell update; the refusal is the storefront's words from
   `stock/stock-words.ts` — "Sourdough — Sold out", "… — Only 2 left at Hill
   Road". An online order holds only when paid: `reserveOnPayment` is
-  idempotent per intent, and a payment that lost the last unit records one
+  idempotent per intent: a payment that held records a `STOCK_HELD`
+  attempt, so its webhook repeating reads HELD even after the order
+  closed, while any other payment reaching a closed order is refunded
+  (lines held at placement say nothing about it). A payment that lost the
+  last unit, or reached a closed order, records one
   refusal (`CAPTURED_NEEDS_REFUND`) and one PENDING refund of the whole
   payment keyed `sold-out:<intent>`, sent after commit
   (`PaymentsService.sendAutomaticRefund`) and confirmed by the refund

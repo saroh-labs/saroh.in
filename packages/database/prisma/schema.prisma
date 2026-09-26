@@ -3764,7 +3764,9 @@ model PaymentAttempt {
   provider    String
   providerRef String? // provider payment id
   // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
-  // taken on an invoice that was already paid or void when it arrived.
+  // taken on an invoice that was already paid or void when it arrived, or
+  // STOCK_HELD: Saroh's note that this payment's order held its units
+  // (stock/reserve.ts reserveOnPayment), not a provider interaction.
   status      String
   rawResponse Json? // provider response (sanitized), for audit
 

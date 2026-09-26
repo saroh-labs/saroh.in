@@ -26,7 +26,7 @@ import {
 } from "../orders/order-refunds";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
-import { assertPutBack, returnablePlan } from "../stock/reserve";
+import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import type {
     MerchantProvider,
@@ -1472,7 +1472,12 @@ export class PaymentsService {
             where: { orderId: order.id, organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
             include: {
-                attempts: { orderBy: { createdAt: "asc" } },
+                // The provider's attempts; Saroh's note that the payment
+                // held stock (reserveOnPayment) isn't one.
+                attempts: {
+                    where: { status: { not: STOCK_HELD } },
+                    orderBy: { createdAt: "asc" },
+                },
                 refunds: { orderBy: { createdAt: "asc" } },
             },
         });

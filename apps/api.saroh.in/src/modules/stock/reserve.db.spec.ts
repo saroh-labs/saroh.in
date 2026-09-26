@@ -1287,6 +1287,98 @@ describe("online orders: reserveOnPayment", () => {
             promised: 1,
         });
     });
+
+    /** Another payment for the order, succeeded at the provider. */
+    async function anotherIntent(orderId: string) {
+        return (
+            await prisma.paymentIntent.create({
+                data: {
+                    organizationId: orgId,
+                    orderId,
+                    provider: "RAZORPAY",
+                    amountCents: 10000,
+                    currency: "INR",
+                    status: "SUCCEEDED",
+                },
+                select: { id: true },
+            })
+        ).id;
+    }
+
+    it("a staff order held when placed, cancelled, then its payment link paid: refused and refunded", async () => {
+        const jar = await product("Honey jar", { online: 5 });
+        const orderId = await place(online, [{ productId: jar, quantity: 1 }]);
+        // Held at placement (DEC-032): the line has its row.
+        expect(
+            await prisma.orderItem.findFirstOrThrow({
+                where: { orderId },
+                select: { stockRow: true },
+            }),
+        ).toEqual({ stockRow: "PRODUCT" });
+        const paymentIntentId = await anotherIntent(orderId);
+        await orders.updateStatus(online, orderId, ownerId, {
+            status: "CANCELLED",
+        });
+
+        const result = await prisma.$transaction((tx) =>
+            reserveOnPayment(tx, {
+                organizationId: orgId,
+                orderId,
+                paymentIntentId,
+            }),
+        );
+        expect(result).toMatchObject({
+            kind: "REFUSED",
+            created: true,
+            message: ORDER_CLOSED_WHILE_PAYING,
+        });
+        expect(
+            await prisma.paymentRefund.findMany({
+                where: { paymentIntentId },
+                select: { amountCents: true, status: true },
+            }),
+        ).toEqual([{ amountCents: 10000, status: "PENDING" }]);
+        expect(await shelf(online, jar)).toMatchObject({
+            onHand: 5,
+            promised: 0,
+        });
+    });
+
+    it("a second payment for an order that held and was cancelled is refused; the first still reads HELD", async () => {
+        const bowl = await product("Clay bowl", { online: 5 });
+        const first = await onlineOrder(bowl, 1);
+        const reserve = (paymentIntentId: string) =>
+            prisma.$transaction((tx) =>
+                reserveOnPayment(tx, {
+                    organizationId: orgId,
+                    orderId: first.orderId,
+                    paymentIntentId,
+                }),
+            );
+        expect(await reserve(first.paymentIntentId)).toEqual({ kind: "HELD" });
+        await orders.updateStatus(online, first.orderId, ownerId, {
+            status: "CANCELLED",
+        });
+
+        const second = await anotherIntent(first.orderId);
+        expect(await reserve(second)).toMatchObject({
+            kind: "REFUSED",
+            created: true,
+            message: ORDER_CLOSED_WHILE_PAYING,
+        });
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntentId: second },
+            }),
+        ).toBe(1);
+        // The first payment's webhook repeating changes nothing.
+        expect(await reserve(first.paymentIntentId)).toEqual({ kind: "HELD" });
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntentId: first.paymentIntentId },
+            }),
+        ).toBe(0);
+    });
 });
 
 describe("lock order", () => {

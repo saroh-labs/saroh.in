@@ -754,6 +754,13 @@ export async function settleRefundStock(
 // Online orders: hold when paid
 // ---------------------------------------------------------------------------
 
+/**
+ * The PaymentAttempt status recording that a payment's order held its units
+ * (`reserveOnPayment`). A repeat of that payment's webhook reads it and
+ * reads HELD again; any other payment for the order decides afresh.
+ */
+export const STOCK_HELD = "STOCK_HELD";
+
 /** The idempotency key of the automatic refund for a lost last unit. */
 export function soldOutRefundKey(paymentIntentId: string): string {
     return `sold-out:${paymentIntentId}`;
@@ -778,8 +785,11 @@ export type ReserveOnPaymentResult =
  * expired, fulfilled) before the payment arrived — record the refusal and
  * the automatic refund of the whole payment (DEC-032). A closed order never
  * holds: nothing would ever release it. Idempotent per payment intent: a
- * second call for a held order changes nothing, and for a refused one
- * returns the same refusal and the same refund, never a second.
+ * payment that held records a `STOCK_HELD` attempt, and a second call for
+ * it reads HELD whatever the order became since; a refused one returns the
+ * same refusal and the same refund, never a second. Any other payment for a
+ * closed order is refused and refunded, even if the order's lines held at
+ * placement or on another payment.
  *
  * Locks the intent, then the order, then the rows. The caller (the success
  * webhook, when the online checkout exists) must hold nothing below the
@@ -822,20 +832,35 @@ export async function reserveOnPayment(
         };
     }
 
+    // Decided per payment, never per order: lines held at placement (a
+    // staff order) or on another payment say nothing about this one.
+    const heldBefore = await tx.paymentAttempt.findFirst({
+        where: { paymentIntentId: input.paymentIntentId, status: STOCK_HELD },
+        select: { id: true },
+    });
+    // This payment held on an earlier call, and the order may have been
+    // fulfilled or cancelled since: its webhook repeating still reads HELD,
+    // and nothing is refunded — a fulfilled order keeps its money, and a
+    // cancel refunds through its own flow.
+    if (heldBefore) return { kind: "HELD" };
+
     const lines = await loadLines(tx, { orderId: input.orderId });
     // Only an open order holds: a cancelled or expired one would keep the
-    // units promised for good, since nothing releases a closed order. But an
-    // order that held on an earlier call (a line has its row, or was judged
-    // untracked) and was fulfilled or cancelled since is this payment's
-    // webhook repeating: it held then, so it still reads HELD, and nothing
-    // is refunded — a fulfilled order keeps its money, and a cancel refunds
-    // through its own flow.
+    // units promised for good, since nothing releases a closed order.
     const open = OPEN_STATUSES.includes(order?.status ?? "");
-    if (!open && lines.some((l) => l.stockRow !== null)) {
+    const refusal = open ? await tryHold(tx, lines) : null;
+    if (open && !refusal) {
+        await tx.paymentAttempt.create({
+            data: {
+                organizationId: input.organizationId,
+                paymentIntentId: input.paymentIntentId,
+                provider: intent.provider,
+                status: STOCK_HELD,
+                rawResponse: { reason: "STOCK_HELD" },
+            },
+        });
         return { kind: "HELD" };
     }
-    const refusal = open ? await tryHold(tx, lines) : null;
-    if (open && !refusal) return { kind: "HELD" };
     const message = open ? SOLD_OUT_WHILE_PAYING : ORDER_CLOSED_WHILE_PAYING;
 
     await tx.paymentAttempt.create({
