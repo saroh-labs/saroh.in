@@ -1,6 +1,7 @@
 "use client";
 
 import { ctaClasses, SiteTheme } from "@saroh/site-blocks";
+import { reportError } from "@saroh/ui/lib/report-error";
 import { useEffect } from "react";
 
 /**
@@ -26,8 +27,7 @@ export default function Error({
     reset: () => void;
 }) {
     useEffect(() => {
-        // TODO(#103): forward to error tracking once observability lands.
-        console.error(error);
+        reportError(error, { boundary: "sites/root", digest: error.digest });
     }, [error]);
 
     return (
