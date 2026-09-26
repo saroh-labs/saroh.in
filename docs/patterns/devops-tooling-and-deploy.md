@@ -94,9 +94,11 @@ audit that blocks on critical advisories; plus integration tests,
 - **Current** — **A release with a step after its migrations writes an
   ordered checklist** in `docs/architecture/`, and this file points at it. The
   Products and Stock release (#510–#531) is
-  `docs/architecture/PRODUCTS_STOCK_ROLLOUT.md`: back up, migrate, run
-  `listings-stock-levels.cli.ts` (which repairs held stock), verify with its
-  two queries, optionally merge same products, then deploy. Rollback is
+  `docs/architecture/PRODUCTS_STOCK_ROLLOUT.md`: stop the old API first (it
+  must not write between the stock copy and the new image), back up, migrate,
+  run `listings-stock-levels.cli.ts` (which repairs held stock), verify with
+  its two queries, optionally merge same products, then start the new image.
+  It does not go through the automatic push-to-deploy. Rollback is
   restoring the snapshot. The same file records how long each migration takes
   and which table locks it holds.
 - **Adopted** — **Production writes need explicit approval at the time** —
