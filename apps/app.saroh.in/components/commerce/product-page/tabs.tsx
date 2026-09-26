@@ -1,57 +1,56 @@
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
-
 import type { ProductTab } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 
+import type { TabItem } from "./tab-row";
+import { TabRow } from "./tab-row";
+
 /**
- * The product page's views. Links, not client state, so each view is an
- * address: a review notification can open `?tab=reviews`, and Back works.
- * Drawn like the Products | Reviews switch. A count says what is waiting,
- * in words where it asks for attention ("2 low", "3 to answer").
+ * The product page's views (#522): Overview · Stock · Photos · Reviews ·
+ * Orders · Discounts · Collections. Links, not client state, so each view is
+ * an address: a review notification can open `?tab=reviews`, and Back
+ * works. A count says what is waiting, in words where it asks for attention
+ * ("2 short", "3 to answer").
+ *
+ * An untracked product has no Stock tab, as the design draws it; its sizes
+ * and prices are still one tap away, from the Overview's Variants card.
  */
 export function ProductTabs({
     overview,
     active,
     href,
     counts,
+    stockBadge,
 }: {
     overview: ProductOverview;
     active: ProductTab;
     href: (tab: ProductTab) => string;
-    /** The product counts stock (Track stock, #515); untracked, no stock. */
+    /** The product counts stock (Track stock, #515). */
     counts: boolean;
+    /** "2 short" or "1 low", from the storefronts' shelves; null when fine. */
+    stockBadge: string | null;
 }) {
-    const { product, stock, orders, reviews, discounts } = overview;
-    const tabs: {
-        id: ProductTab;
-        label: string;
-        badge?: { text: string; tone: "plain" | "attention" | "danger" };
-    }[] = [
-        { id: "overview", label: "Overview" },
+    const { product, orders, reviews, discounts, placement } = overview;
+    const failed = { text: "Couldn't load", tone: "danger" } as const;
+    const all: TabItem[] = [
+        { id: "overview", label: "Overview", href: href("overview") },
         {
-            id: "variants",
-            label: counts ? "Variants and stock" : "Variants",
-            badge:
-                counts && stock.totals.lowCount > 0
-                    ? {
-                          text: `${stock.totals.lowCount} low`,
-                          tone: "attention",
-                      }
-                    : product.variants.length > 0
-                      ? { text: String(product.variants.length), tone: "plain" }
-                      : undefined,
+            id: "stock",
+            label: "Stock",
+            href: href("stock"),
+            badge: stockBadge
+                ? { text: stockBadge, tone: "attention" }
+                : undefined,
         },
         {
             id: "photos",
             label: "Photos",
-            badge: product.images.length
-                ? { text: String(product.images.length), tone: "plain" }
-                : undefined,
+            href: href("photos"),
+            badge: { text: String(product.images.length), tone: "plain" },
         },
         {
             id: "reviews",
             label: "Reviews",
+            href: href("reviews"),
             badge:
                 reviews.status === "ok"
                     ? reviews.data.toAnswer > 0
@@ -59,89 +58,63 @@ export function ProductTabs({
                               text: `${reviews.data.toAnswer} to answer`,
                               tone: "attention",
                           }
-                        : reviews.data.summary.count > 0
-                          ? {
-                                text: String(reviews.data.summary.count),
-                                tone: "plain",
-                            }
-                          : undefined
+                        : {
+                              text: String(reviews.data.summary.count),
+                              tone: "plain",
+                          }
                     : reviews.status === "failed"
-                      ? { text: "Couldn't load", tone: "danger" }
+                      ? failed
                       : undefined,
         },
         {
             id: "orders",
             label: "Orders",
+            href: href("orders"),
             badge:
                 orders.status === "ok"
-                    ? orders.data.openCount > 0
-                        ? {
-                              text: `${orders.data.openCount} open`,
-                              tone: "plain",
-                          }
-                        : undefined
+                    ? { text: `${orders.data.openCount} open`, tone: "plain" }
                     : orders.status === "failed"
-                      ? { text: "Couldn't load", tone: "danger" }
+                      ? failed
                       : undefined,
         },
         {
             id: "discounts",
             label: "Discounts",
+            href: href("discounts"),
             badge:
-                discounts.status === "ok" && discounts.data.length > 0
+                discounts.status === "ok"
                     ? {
                           text: String(
                               discounts.data.filter((d) => d.state === "ACTIVE")
-                                  .length || discounts.data.length,
+                                  .length,
                           ),
                           tone: "plain",
                       }
                     : discounts.status === "failed"
-                      ? { text: "Couldn't load", tone: "danger" }
+                      ? failed
+                      : undefined,
+        },
+        {
+            id: "collections",
+            label: "Collections",
+            href: href("collections"),
+            badge:
+                placement?.status === "ok"
+                    ? {
+                          text: String(
+                              placement.data.collections.filter(
+                                  (c) => c.showing,
+                              ).length,
+                          ),
+                          tone: "plain",
+                      }
+                    : placement?.status === "failed"
+                      ? failed
                       : undefined,
         },
     ];
-
-    return (
-        <nav
-            aria-label="Product views"
-            className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1"
-        >
-            {tabs.map((t) => {
-                const on = t.id === active;
-                return (
-                    <Link
-                        key={t.id}
-                        id={`tab-${t.id}`}
-                        href={href(t.id)}
-                        scroll={false}
-                        aria-current={on ? "page" : undefined}
-                        className={cn(
-                            "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                            on
-                                ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                : "font-medium text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {t.label}
-                        {t.badge ? (
-                            <span
-                                className={cn(
-                                    "rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums",
-                                    t.badge.tone === "attention" &&
-                                        "bg-brand-subtle text-brand-subtle-foreground",
-                                    t.badge.tone === "danger" &&
-                                        "bg-destructive-subtle text-destructive-subtle-foreground",
-                                    t.badge.tone === "plain" &&
-                                        "bg-muted text-muted-foreground",
-                                )}
-                            >
-                                {t.badge.text}
-                            </span>
-                        ) : null}
-                    </Link>
-                );
-            })}
-        </nav>
+    const tabs = all.filter(
+        (t) => t.id !== "stock" || counts || active === "stock",
     );
+    return <TabRow tabs={tabs} active={active} />;
 }

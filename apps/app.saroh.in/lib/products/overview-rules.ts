@@ -103,6 +103,35 @@ export interface ProductOverview {
         latest: OverviewReview[];
     }>;
     discounts: Panel<OverviewDiscount[]>;
+    /**
+     * The collections it is in and the live website pages that show it
+     * (#516). Optional so an older API's answer still renders.
+     */
+    placement?: Panel<ProductPlacement>;
+}
+
+/** A collection the product is in (#516). */
+export interface ProductCollection {
+    id: string;
+    name: string;
+    kind: "HAND_PICKED" | "AUTOMATIC";
+    category: { id: string; name: string } | null;
+    /** False only for a hand-picked one while the product is archived. */
+    showing: boolean;
+}
+
+export interface ProductPlacement {
+    collections: ProductCollection[];
+    website: {
+        /** False until the website has a block that shows products (#473). */
+        showsProducts: boolean;
+        pages: {
+            siteId: string;
+            siteName: string;
+            path: string;
+            title: string;
+        }[];
+    };
 }
 
 export const STOCK_WORD_LABEL: Record<StockWord, string> = {

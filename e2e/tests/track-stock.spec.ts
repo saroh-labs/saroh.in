@@ -96,7 +96,7 @@ test.describe("Track stock and Sold out", () => {
             await page.goto(`/commerce/products/${id}?storefront=${STORE}`);
             await expect(page.getByText("Not tracked")).toBeVisible();
             await expect(
-                page.getByText("Available on the shop."),
+                page.getByText("Always available on the shop."),
             ).toBeVisible();
 
             // 3. Mark it sold out by hand, then available again.
@@ -108,7 +108,7 @@ test.describe("Track stock and Sold out", () => {
             await page.getByRole("button", { name: "Mark available" }).click();
             await expect(page.getByText(/^Available again at /)).toBeVisible();
             await expect(
-                page.getByText("Available on the shop."),
+                page.getByText("Always available on the shop."),
             ).toBeVisible();
 
             // 4. Track stock again: it starts at 0 and opens the count.

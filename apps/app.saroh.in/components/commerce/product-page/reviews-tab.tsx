@@ -97,8 +97,11 @@ export function ProductReviewsTab({
                 </p>
             </Card>
             <div className="flex min-w-0 flex-[2_1_400px] flex-col gap-2.5">
-                <p className="text-[12.5px] text-muted-foreground">
-                    The latest {latest.length} of {summary.count + hiddenCount}
+                <p className="text-pretty text-[12.5px] text-muted-foreground">
+                    {reviews.data.toAnswer > 0
+                        ? `${reviews.data.toAnswer} waiting for your reply, shown first. Then the newest. `
+                        : "Newest first. "}
+                    Showing {latest.length} of {summary.count + hiddenCount}.
                 </p>
                 <ReviewList
                     reviews={latest}
