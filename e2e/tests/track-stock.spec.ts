@@ -1,6 +1,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { Storefront } from "../fixtures/throwaway-products";
+import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 import { demoUser, urls } from "../playwright.config";
 
 /**
@@ -13,13 +15,15 @@ import { demoUser, urls } from "../playwright.config";
  * stay camera-ready). The seed's own products hold stock for open orders,
  * and Track stock off is refused while anything is promised, so it makes a
  * product of its own, counted at 7. It leaves that product as it found it,
- * tracked with its count back at 7, then takes it away (set to Not sold under
- * a name of its own: it has a stock history, so it can't be deleted); one
- * left by a failed run goes the same way before it starts.
+ * tracked with its count back at 7, then sets it to Not sold under one fixed
+ * name (it has a stock history, so it can't be deleted); the next run, or
+ * the one after a failed run, brings that same product back rather than
+ * making another (`fixtures/throwaway-products.ts`).
  */
 
 const ORG = "seed_org";
 const STORE = "seed_store";
+const NW: Storefront = { organizationId: ORG, storeId: STORE };
 const COUNT = 7;
 
 async function signIn(page: Page) {
@@ -34,37 +38,6 @@ async function signIn(page: Page) {
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
 const orgHeader = { "x-organization-id": ORG };
-
-/**
- * Takes away every product of that name: the one made here, or a leftover.
- * One with a stock history can't be deleted (DEC-032), so it is set to Not
- * sold under a name and an address of its own.
- */
-async function removeProducts(request: APIRequestContext, name: string) {
-    const res = await request.get(api(""), { headers: orgHeader });
-    expect(res.ok()).toBe(true);
-    const body = (await res.json()) as
-        | { id: string; name: string }[]
-        | { items: { id: string; name: string }[] };
-    const list = Array.isArray(body) ? body : body.items;
-    for (const p of list.filter((x) => x.name === name)) {
-        const del = await request.delete(api(`/${p.id}`), {
-            headers: orgHeader,
-        });
-        if (del.ok()) continue;
-        expect(del.status()).toBe(409);
-        const stamp = Date.now().toString(36);
-        const retired = await request.patch(api(`/${p.id}`), {
-            headers: orgHeader,
-            data: {
-                name: `${name} (retired ${stamp})`,
-                slug: `e2e-retired-${stamp}-${p.id.slice(-6)}`,
-                status: "ARCHIVED",
-            },
-        });
-        expect(retired.ok()).toBe(true);
-    }
-}
 
 /** Track stock on, and the shelf counted back to what it was. */
 async function putBack(request: APIRequestContext, productId: string) {
@@ -91,22 +64,16 @@ test.describe("Track stock and Sold out", () => {
 
         await signIn(page);
         await page.goto(`/open/${ORG}`);
-        await removeProducts(page.request, name);
 
-        // Made and counted through the API: a published product at 7.
-        const made = await page.request.post(api(""), {
-            headers: orgHeader,
-            data: { name, price: "240.00", status: "PUBLISHED" },
-        });
-        expect(made.ok()).toBe(true);
-        const { id } = (await made.json()) as { id: string };
-        const counted = await page.request.put(api(`/${id}/inventory`), {
-            headers: orgHeader,
-            data: { quantity: COUNT },
-        });
-        expect(counted.ok()).toBe(true);
-
+        let id: string | undefined;
         try {
+            // Taken and counted through the API: a published product at 7.
+            id = await takeProduct(page.request, NW, name, {
+                price: "240.00",
+                status: "PUBLISHED",
+            });
+            await putBack(page.request, id);
+
             // 1. The editor's Stock section: the switch is on; turning it
             //    off asks first, because the count goes to 0.
             await page.goto(
@@ -157,8 +124,8 @@ test.describe("Track stock and Sold out", () => {
             ).toHaveAttribute("aria-checked", "true");
         } finally {
             // As it was found: tracked, counted at 7. Then out of the way.
-            await putBack(page.request, id);
-            await removeProducts(page.request, name);
+            if (id) await putBack(page.request, id);
+            await removeProducts(page.request, NW, name);
         }
     });
 });
