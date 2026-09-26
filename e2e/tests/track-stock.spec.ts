@@ -94,7 +94,10 @@ test.describe("Track stock and Sold out", () => {
 
             // 2. The product page: not tracked, and available on the shop.
             await page.goto(`/commerce/products/${id}?storefront=${STORE}`);
-            await expect(page.getByText("Not tracked")).toBeVisible();
+            // The Stock card's title; its details row says the same after it.
+            await expect(
+                page.getByText("Not tracked", { exact: true }),
+            ).toBeVisible();
             await expect(
                 page.getByText("Always available on the shop."),
             ).toBeVisible();
