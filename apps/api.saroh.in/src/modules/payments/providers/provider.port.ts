@@ -50,6 +50,13 @@ export interface CreateOrderIntentResult {
 }
 
 export interface RefundInput {
+    /**
+     * Saroh's own reference for this refund — the PaymentRefund row's id. One
+     * row is one refund at the provider: it is the idempotency key (Razorpay)
+     * or the merchant `refund_id` (Cashfree), so a retry never makes a
+     * second refund and two equal partial refunds are still two.
+     */
+    reference: string;
     /** The provider's order/intent id the refund is booked against. */
     providerIntentId: string;
     /** The provider's payment id (from the capture webhook), when known. */
@@ -65,6 +72,44 @@ export interface RefundResult {
     providerRefundId: string;
     /** The provider's refund status (e.g. "PENDING" | "PROCESSED"). */
     status: string;
+    /** The provider says this refund failed or was cancelled — nothing went back. */
+    failed: boolean;
+}
+
+/** Look a refund up at the provider by Saroh's reference. */
+export type FindRefundInput = Omit<RefundInput, "amountCents" | "currency">;
+
+/**
+ * A refund call that did not come back with a refund. `REFUSED`: the
+ * provider definitely made none (a 4xx it would give again), so the money
+ * and lines are free. `UNKNOWN`: it may have made one — a network error, a
+ * timeout, a 5xx, a request still in flight — so nothing may be freed until
+ * the provider says (the webhook, or a try-again that looks first).
+ */
+export class RefundCallError extends Error {
+    constructor(
+        message: string,
+        readonly outcome: "REFUSED" | "UNKNOWN",
+    ) {
+        super(message);
+        this.name = "RefundCallError";
+    }
+}
+
+/**
+ * A refund call's 2xx body. One that cannot be read — cut short, or not
+ * JSON — came after the provider said yes, so the refund may be made:
+ * `UNKNOWN`, never a refusal.
+ */
+export async function readRefundAnswer<T>(
+    res: Response,
+    what: string,
+): Promise<T> {
+    try {
+        return (await res.json()) as T;
+    } catch {
+        throw new RefundCallError(`${what}: unreadable response`, "UNKNOWN");
+    }
 }
 
 export interface MerchantProvider {
@@ -75,9 +120,14 @@ export interface MerchantProvider {
     /**
      * Book a refund with the provider (S5-003). Returns the provider refund id;
      * the actual money-state settlement happens asynchronously when the
-     * provider's refund webhook is reconciled.
+     * provider's refund webhook is reconciled. Throws {@link RefundCallError}.
      */
     refund(input: RefundInput): Promise<RefundResult>;
+    /**
+     * The refund made under `reference`, or null when the provider has none.
+     * Throws {@link RefundCallError} (`UNKNOWN`) when it could not say.
+     */
+    findRefund(input: FindRefundInput): Promise<RefundResult | null>;
 }
 
 /** Factory over the concrete providers — injectable so tests swap in a fake. */

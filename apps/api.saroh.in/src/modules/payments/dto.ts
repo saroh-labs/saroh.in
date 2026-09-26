@@ -1,10 +1,15 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+    ArrayMinSize,
+    IsArray,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     MaxLength,
+    Min,
     MinLength,
+    ValidateNested,
 } from "class-validator";
 
 import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
@@ -84,12 +89,39 @@ export class CreateIntentDto {
     idempotencyKey?: string;
 }
 
+/** One line to refund, and how many of it (U6). */
+export class RefundLineInput {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    itemId!: string;
+
+    @IsInt({ message: "Quantity must be a whole number" })
+    @Min(1, { message: "Refund at least one" })
+    quantity!: number;
+}
+
+/** Units of a line a refund puts back on the shelf (#511). */
+export class RefundPutBackInput {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    itemId!: string;
+
+    @IsInt({ message: "Quantity must be a whole number" })
+    @Min(1, { message: "Put back at least one" })
+    quantity!: number;
+}
+
 /**
- * Initiate a refund against an Order's successful payment (S5-003).
+ * Initiate a refund against an Order's successful payment (S5-003), by line
+ * (ADR-008, U6).
  *
- * SECURITY: there is NO amount field — the refund amount is derived server-side
- * from the Order's SUCCEEDED PaymentIntent (`amountCents`), so a client can
- * never influence how much is refunded. `reason` is an optional free-text note.
+ * SECURITY: there is NO amount field — the amount is worked out server-side
+ * from the chosen lines (what each paid, less what was already refunded of
+ * it), or with no lines, everything still refundable on the order. A client
+ * can never influence how much is refunded. `idempotencyKey` makes a retry
+ * return the first refund instead of making a second.
  */
 export class RefundOrderDto {
     @IsOptional()
@@ -97,4 +129,29 @@ export class RefundOrderDto {
     @IsString()
     @MaxLength(500)
     reason?: string;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1, { message: "Choose at least one line to refund" })
+    @ValidateNested({ each: true })
+    @Type(() => RefundLineInput)
+    lines?: RefundLineInput[];
+
+    /**
+     * "Put N back in stock" (#511), off unless sent: units of refunded lines
+     * that go back on the shelf once the provider confirms the refund. Each
+     * is capped at what the line sold less what went back already.
+     */
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => RefundPutBackInput)
+    putBack?: RefundPutBackInput[];
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(255)
+    idempotencyKey?: string;
 }

@@ -1,34 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    allergenWords,
+    allergyCheck,
+    allergyNotesFrom,
     canCancel,
-    nextStep,
+    eventText,
+    flowOf,
+    isOpen,
+    kitchenStanding,
     PAYMENT_TRANSITIONS,
+    putBackOf,
+    refundableQuantity,
     standingOf,
-    STATUS_TRANSITIONS,
+    waiting,
 } from "@/lib/orders/lifecycle";
-
-describe("nextStep", () => {
-    it("walks an order forward one state at a time", () => {
-        expect(nextStep("PENDING")?.to).toBe("PROCESSING");
-        expect(nextStep("PROCESSING")?.to).toBe("SHIPPED");
-        expect(nextStep("SHIPPED")?.to).toBe("DELIVERED");
-    });
-
-    it("offers nothing once the goods are done with", () => {
-        expect(nextStep("DELIVERED")).toBeNull();
-        expect(nextStep("CANCELLED")).toBeNull();
-    });
-
-    it("only ever offers a move the server allows", () => {
-        for (const status of Object.keys(
-            STATUS_TRANSITIONS,
-        ) as (keyof typeof STATUS_TRANSITIONS)[]) {
-            const step = nextStep(status);
-            if (step) expect(STATUS_TRANSITIONS[status]).toContain(step.to);
-        }
-    });
-});
+import type { OrderReadEvent, OrderReadLine } from "@/lib/orders/read";
 
 describe("canCancel", () => {
     it("allows cancelling before the goods go out, and not after", () => {
@@ -55,5 +42,277 @@ describe("payment moves", () => {
         for (const next of Object.values(PAYMENT_TRANSITIONS)) {
             expect(next).not.toContain("UNPAID");
         }
+    });
+});
+
+const SESAME = { id: "al_sesame", name: "Sesame" };
+const GLUTEN = { id: "al_gluten", name: "Gluten" };
+const NUTS = { id: "al_nuts", name: "Nuts" };
+
+const line = (over: Partial<OrderReadLine> = {}): OrderReadLine => ({
+    id: "li_1",
+    productId: "p_1",
+    name: "Sourdough loaf",
+    variantTitle: null,
+    sku: null,
+    imageUrl: null,
+    allergens: { contains: [GLUTEN], mayContain: [NUTS, SESAME] },
+    quantity: 2,
+    refundedQuantity: 0,
+    ...over,
+});
+
+describe("the kitchen flow", () => {
+    it("collects at the counter, or goes out with a courier", () => {
+        expect(flowOf("COLLECT")).toEqual([
+            "NEW",
+            "PREPARING",
+            "READY",
+            "COLLECTED",
+        ]);
+        expect(flowOf("DELIVERY").at(-2)).toBe("HANDED_TO_COURIER");
+    });
+
+    it("is open until its last stage, a cancel or a refund in full", () => {
+        const o = {
+            status: "PROCESSING" as const,
+            stage: "READY" as const,
+            fulfilment: "COLLECT" as const,
+            refundStanding: "NONE" as const,
+        };
+        expect(isOpen(o)).toBe(true);
+        expect(isOpen({ ...o, stage: "COLLECTED" })).toBe(false);
+        expect(isOpen({ ...o, refundStanding: "REFUNDED" })).toBe(false);
+        expect(isOpen({ ...o, refundStanding: "PARTLY_REFUNDED" })).toBe(true);
+        expect(isOpen({ ...o, status: "CANCELLED" })).toBe(false);
+    });
+
+    it("reads a partial refund as the order it still is", () => {
+        const o = { status: "DELIVERED", paymentStatus: "PAID" } as const;
+        expect(
+            kitchenStanding({ ...o, refundStanding: "PARTLY_REFUNDED" }),
+        ).toBe("FULFILLED");
+        expect(kitchenStanding({ ...o, refundStanding: "REFUNDED" })).toBe(
+            "REFUNDED",
+        );
+    });
+});
+
+describe("waiting", () => {
+    const placed = "2026-09-23T09:14:00Z";
+    const at = (min: number) => Date.parse(placed) + min * 60_000;
+
+    it("counts minutes, and is late from the 20-minute target", () => {
+        expect(waiting(placed, at(16))).toEqual({
+            text: "Waiting 16 min",
+            minutes: 16,
+            late: false,
+        });
+        expect(waiting(placed, at(20)).late).toBe(true);
+    });
+
+    it("reads hours and days as hours and days", () => {
+        expect(waiting(placed, at(222)).text).toBe("Waiting 3 h 42 min");
+        expect(waiting(placed, at(60 * 50)).text).toBe("Waiting 2 days");
+    });
+});
+
+describe("allergyCheck", () => {
+    it("matches the note's allergens to a line's by id, not by spelling", () => {
+        const check = allergyCheck(
+            [
+                line(),
+                line({
+                    id: "li_2",
+                    name: "Butter croissant",
+                    allergens: { contains: [GLUTEN], mayContain: [] },
+                }),
+            ],
+            [{ body: "Sesame allergy", allergens: [SESAME] }],
+        );
+        expect(check.hits).toEqual([SESAME]);
+        expect(check.lines).toEqual({ li_1: "May contain sesame" });
+        expect(check.named).toEqual(["Sourdough loaf — may contain sesame"]);
+    });
+
+    it("says contains over may contain", () => {
+        const check = allergyCheck(
+            [line()],
+            [{ body: "Coeliac; nuts", allergens: [GLUTEN, NUTS] }],
+        );
+        expect(check.lines.li_1).toBe("Contains gluten");
+        expect(check.hits).toEqual([GLUTEN, NUTS]);
+    });
+
+    it("hits a second storefront's allergen once the note's ids are widened (#508 R6)", () => {
+        // The note was written against storefront A's Peanuts; the order is
+        // from storefront B, whose product lists B's own Peanuts.
+        const peanutsA = { id: "al_peanuts_a", name: "Peanuts" };
+        const peanutsB = { id: "al_peanuts_b", name: "PEANUTS" };
+        const satay = line({
+            id: "li_b",
+            name: "Satay bowl",
+            allergens: { contains: [peanutsB], mayContain: [] },
+        });
+
+        const asWritten = allergyCheck(
+            [satay],
+            [{ body: "Peanut allergy", allergens: [peanutsA] }],
+        );
+        expect(asWritten.hits).toEqual([]);
+
+        const notes = allergyNotesFrom([
+            {
+                body: "Peanut allergy",
+                allergens: [peanutsA],
+                matchAllergens: [peanutsA, peanutsB],
+            },
+            { body: "Prefers oat milk", allergens: [], matchAllergens: [] },
+        ]);
+        expect(notes).toEqual([
+            { body: "Peanut allergy", allergens: [peanutsA, peanutsB] },
+        ]);
+        const check = allergyCheck([satay], notes);
+        expect(check.hits).toEqual([peanutsB]);
+        expect(check.lines).toEqual({ li_b: "Contains peanuts" });
+        expect(allergenWords(check.hits)).toBe("peanuts");
+    });
+
+    it("keeps a note's own ids when the wider list is missing", () => {
+        expect(
+            allergyNotesFrom([{ body: "Sesame", allergens: [SESAME] }]),
+        ).toEqual([{ body: "Sesame", allergens: [SESAME] }]);
+    });
+
+    it("does not hit a different allergen on another storefront", () => {
+        const check = allergyCheck(
+            [
+                line({
+                    allergens: {
+                        contains: [{ id: "al_mustard_b", name: "Mustard" }],
+                        mayContain: [],
+                    },
+                }),
+            ],
+            allergyNotesFrom([
+                {
+                    body: "Peanuts",
+                    allergens: [{ id: "al_peanuts_a", name: "Peanuts" }],
+                    matchAllergens: [
+                        { id: "al_peanuts_a", name: "Peanuts" },
+                        { id: "al_peanuts_b", name: "Peanuts" },
+                    ],
+                },
+            ]),
+        );
+        expect(check.hits).toEqual([]);
+    });
+
+    it("finds nothing when the note names an allergen no line has", () => {
+        const check = allergyCheck(
+            [line()],
+            [{ body: "Peanuts", allergens: [{ id: "al_p", name: "Peanuts" }] }],
+        );
+        expect(check.hits).toEqual([]);
+        expect(check.named).toEqual([]);
+    });
+});
+
+describe("eventText", () => {
+    const ev = (over: Partial<OrderReadEvent>): OrderReadEvent => ({
+        id: "ev",
+        kind: "STAGE",
+        at: "2026-09-23T09:30:00Z",
+        actor: null,
+        fromStage: "NEW",
+        toStage: "PREPARING",
+        fromStatus: null,
+        toStatus: null,
+        note: null,
+        undoneAt: null,
+        undoesEventId: null,
+        ...over,
+    });
+    const money = (c: number) => `₹${c / 100}`;
+
+    it("names each step, and says when one was undone", () => {
+        expect(eventText(ev({}), money)).toBe("Preparing");
+        expect(eventText(ev({ undoneAt: "2026-09-23T09:31:00Z" }), money)).toBe(
+            "Preparing — undone",
+        );
+        expect(
+            eventText(
+                ev({ kind: "UNDO", fromStage: "READY", toStage: "PREPARING" }),
+                money,
+            ),
+        ).toBe("Undone — back to preparing");
+    });
+
+    it("names the courier it went with", () => {
+        expect(
+            eventText(
+                ev({ toStage: "HANDED_TO_COURIER", note: "Delhivery" }),
+                money,
+            ),
+        ).toBe("Handed to Delhivery");
+    });
+
+    it("shows a refund's amount only when the money was sent", () => {
+        expect(
+            eventText(ev({ kind: "REFUND", amountCents: 36000 }), money),
+        ).toBe("Refunded ₹360");
+        expect(eventText(ev({ kind: "REFUND" }), money)).toBe("Refunded");
+    });
+
+    it("never claims a message went to the customer", () => {
+        for (const to of ["READY", "COLLECTED", "HANDED_TO_COURIER"]) {
+            expect(eventText(ev({ toStage: to }), money)).not.toMatch(
+                /text|email|sms|sent|told/i,
+            );
+        }
+    });
+});
+
+describe("refundableQuantity", () => {
+    it("is what is left after earlier refunds", () => {
+        expect(
+            refundableQuantity(line({ quantity: 3, refundedQuantity: 1 })),
+        ).toBe(2);
+        expect(
+            refundableQuantity(line({ quantity: 1, refundedQuantity: 1 })),
+        ).toBe(0);
+    });
+});
+
+describe("putBackOf", () => {
+    it("offers what was handed over and not refunded or put back yet", () => {
+        expect(
+            putBackOf([
+                line({
+                    id: "a",
+                    quantity: 3,
+                    refundedQuantity: 1,
+                    returnable: 3,
+                }),
+                line({
+                    id: "b",
+                    quantity: 2,
+                    refundedQuantity: 0,
+                    returnable: 1,
+                }),
+            ]),
+        ).toEqual([
+            { itemId: "a", quantity: 2 },
+            { itemId: "b", quantity: 1 },
+        ]);
+    });
+
+    it("offers nothing for a line not handed over, or untracked", () => {
+        expect(
+            putBackOf([
+                line({ id: "a", quantity: 3, returnable: 0 }),
+                line({ id: "b", quantity: 3 }),
+            ]),
+        ).toEqual([]);
     });
 });

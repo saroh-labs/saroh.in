@@ -3,8 +3,8 @@
 > **Read when:** designing or changing anything a merchant sees, deciding what
 > to build, or writing copy, a claim or a status.
 > Sources: `PRODUCT.md` (the short brief), `docs/PRODUCT_STRATEGY.md` (§ numbers
-> below), ADR-001 to ADR-006 and DEC-010 to DEC-018. Where this file and those
-> disagree, they win — fix this file in the same change.
+> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030. Where
+> this file and those disagree, they win — fix this file in the same change.
 
 These are the product facts that change engineering rules. The technical
 pattern files refer back here.
@@ -60,11 +60,20 @@ pattern files refer back here.
 
 - **Current** — Commerce-led, not commerce-only (decided 2026-08-02). A `Store`
   is a commerce channel beneath an Organization (ADR-001), not the tenant.
-- **Current** — **One storefront and one website per business, for now**
-  (ADR-006). The API refuses a second; the schema stays multi. Design screens
-  for one: no picker unless a business already has more than one, no "New
-  storefront" / "New site" once it has one, singular copy. Storefront and
-  website stay separate — mapping them is future work.
+- **Current** — **Several storefronts, one website per business.** A business
+  may add storefronts up to its plan's `storefronts` entitlement (5 on the free
+  floor), under a product ceiling of 25 (ADR-010); the API refuses one more
+  (409 at the ceiling, 403 at the plan) and the app reads the allowance from
+  `GET …/storefronts/allowance` rather than copying the number. Websites stay
+  at one (ADR-006). Design screens so a one-storefront business sees no
+  change: a picker or "across N storefronts" only with more than one
+  (`lib/stores/pick.ts`), singular copy otherwise. A storefront closes (soft)
+  only once no order waits and no stock is on hand or promised there — "Move
+  or count out its stock first" — and closing never removes a catalogue
+  product. Storefront and website stay separate — mapping them is future work.
+- **Current** — **Opening hours are edited once, for every storefront**
+  (DEC-034): Business → Hours reads the first storefront's week and Save
+  writes it to all of them, saying so first when their weeks differ.
 - **Current** — **One customer record behind an order and a booking is not true
   yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
   linking it to a `Contact` is manual

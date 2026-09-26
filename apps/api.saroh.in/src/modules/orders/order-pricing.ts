@@ -1,0 +1,153 @@
+import { BadRequestException, ConflictException } from "@nestjs/common";
+import { prisma } from "@saroh/database";
+
+import { rateToBps } from "../invoices/gst";
+import { currencyMismatch, storefrontCurrency } from "../stores/currency";
+import type { OrderItemInput } from "./dto";
+
+/** Why a product set to Not sold (archived) can't be ordered. */
+export function notSold(product: string): string {
+    return `${product} is set to Not sold, so it can't be ordered. Sell it again to take orders for it.`;
+}
+
+/** Money helpers — integer-cents math so totals never drift on floats. */
+export const toCents = (s: string) => Math.round(Number(s) * 100);
+export const fromCents = (c: number) => (c / 100).toFixed(2);
+
+export interface PricedLine {
+    productId: string;
+    variantId: string | null;
+    quantity: number;
+    priceCents: number;
+    categoryId: string | null;
+}
+
+/**
+ * The lines with the GST rate each product's price includes (ADR-008), for
+ * the informational `Order.tax` of a GST-registered business.
+ */
+export async function withGstRates(
+    lines: readonly {
+        productId: string;
+        quantity: number;
+        priceCents: number;
+    }[],
+): Promise<{ quantity: number; unitCents: number; rateBps: number | null }[]> {
+    const products = await prisma.product.findMany({
+        where: { id: { in: [...new Set(lines.map((l) => l.productId))] } },
+        select: { id: true, gstRate: true },
+    });
+    const rate = new Map(products.map((p) => [p.id, rateToBps(p.gstRate)]));
+    return lines.map((l) => ({
+        quantity: l.quantity,
+        unitCents: l.priceCents,
+        rateBps: rate.get(l.productId) ?? null,
+    }));
+}
+
+/**
+ * Snapshot each line's price from what was bought: the variant's own price
+ * when it has one, else the product's. A product with variants is bought as
+ * one of them, so its line must say which. Shared by placing an order and
+ * adding a line to one before preparing (U6), so the two can never price the
+ * same thing differently.
+ */
+export async function priceOrderLines(
+    storeId: string,
+    items: readonly OrderItemInput[],
+): Promise<PricedLine[]> {
+    const lines: PricedLine[] = [];
+    // A business sells in one currency (DEC-030): a backstop for a listing
+    // made before listAt refused another currency.
+    const currency = await storefrontCurrency(prisma, storeId);
+    for (const item of items) {
+        // Sold here (#510): the product is listed at the order's
+        // storefront, and a variant only if that storefront sells it.
+        const product = await prisma.product.findFirst({
+            where: { id: item.productId, listings: { some: { storeId } } },
+            // The category too: a collection code matches on it.
+            select: {
+                name: true,
+                price: true,
+                currency: true,
+                status: true,
+                categoryId: true,
+                variants: {
+                    select: {
+                        id: true,
+                        price: true,
+                        listings: {
+                            where: { listing: { storeId } },
+                            select: { id: true },
+                        },
+                    },
+                },
+            },
+        });
+        if (!product) {
+            throw new BadRequestException({
+                message: "Unknown product in order",
+                field: "items",
+            });
+        }
+        // "Stop selling" archives a product (DEC-032): nobody orders it,
+        // staff included, until it's sold again.
+        if (product.status === "ARCHIVED") {
+            throw new ConflictException({
+                message: notSold(product.name),
+                field: "items",
+            });
+        }
+        if (currency !== null && product.currency !== currency) {
+            const store = await prisma.store.findUnique({
+                where: { id: storeId },
+                select: { name: true },
+            });
+            throw new ConflictException({
+                message: currencyMismatch({
+                    product: product.name,
+                    productCurrency: product.currency,
+                    storefront: store?.name ?? "this storefront",
+                    storefrontCurrency: currency,
+                }),
+                field: "items",
+            });
+        }
+        let unitPrice = product.price.toString();
+        let variantId: string | null = null;
+        if (product.variants.length > 0) {
+            const variant = product.variants.find(
+                (v) => v.id === item.variantId,
+            );
+            if (!variant) {
+                throw new BadRequestException({
+                    message: item.variantId
+                        ? `That option of ${product.name} no longer exists.`
+                        : `Choose which one of ${product.name} is being bought.`,
+                    field: "items",
+                });
+            }
+            if (variant.listings.length === 0) {
+                throw new BadRequestException({
+                    message: `That option of ${product.name} isn't sold at this storefront.`,
+                    field: "items",
+                });
+            }
+            variantId = variant.id;
+            if (variant.price) unitPrice = variant.price.toString();
+        } else if (item.variantId) {
+            throw new BadRequestException({
+                message: `${product.name} has no options to choose from.`,
+                field: "items",
+            });
+        }
+        lines.push({
+            productId: item.productId,
+            variantId,
+            quantity: item.quantity,
+            priceCents: toCents(unitPrice),
+            categoryId: product.categoryId,
+        });
+    }
+    return lines;
+}

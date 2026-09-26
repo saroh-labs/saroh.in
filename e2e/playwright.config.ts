@@ -67,6 +67,15 @@ export const ignoreHTTPSErrors = Boolean(process.env.E2E_IGNORE_HTTPS_ERRORS);
  * itself; they are not a secret and must never be pointed at a real one — the
  * S0-003 guard and `DATABASE_TARGET_CONFIRM` exist to make that impossible.
  */
+/**
+ * A provider-paid order with three lines, for Order Detail's refund journey
+ * (a dev stack takes no provider payments, so it is opt-in).
+ */
+export const refundOrder = {
+    id: process.env.E2E_REFUND_ORDER_ID,
+    org: process.env.E2E_REFUND_ORG,
+};
+
 export const demoUser = {
     email: "demo@saroh.dev",
     password: "demo-password-123",
@@ -87,6 +96,17 @@ export const demoReviewer = {
 
 /** The site the reviewer was invited to, by name. */
 export const REVIEWED_SITE = "Northwind Supply";
+
+/**
+ * Northwind, the base seed's business, whose site the reviewer was invited to.
+ *
+ * The demo owner is in several businesses (the base seed's site-only ones, and
+ * the showcase's), so a signed-in owner with no business chosen is asked which
+ * one at `/choose` — and org-scoped pages fall back to whichever membership the
+ * list returns first. A spec about Northwind opens it by id first, the way
+ * accounts' "Your businesses" does.
+ */
+export const NORTHWIND_ORG = "seed_org";
 
 export default defineConfig({
     testDir: "./tests",

@@ -71,7 +71,7 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
         ],
         keyLabel: "slug",
         // Mirrors ProductsService.create: an explicit slug wins, otherwise it is
-        // derived from the name. Uniqueness is @@unique([storeId, slug]).
+        // derived from the name. Unique per business (@@unique([organizationId, slug])).
         keyOf: (v) => {
             const slug = slugify(v.slug ?? v.name ?? "");
             return slug === "" ? null : slug;

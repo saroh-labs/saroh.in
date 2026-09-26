@@ -27,7 +27,8 @@ import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import { mayAddStorefront } from "@/lib/business-limits";
+import { providerName } from "@/lib/payments/providers";
+import { heldStock } from "@/lib/stores/closing";
 import {
     newStorefrontHref,
     storefrontDetailsHref,
@@ -73,15 +74,6 @@ const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
     closed: key === "SUN",
 }));
 
-/** What each provider is called on screen. */
-const PROVIDER_NAME: Record<string, string> = {
-    STRIPE: "Stripe",
-    RAZORPAY: "Razorpay",
-    CASHFREE: "Cashfree",
-    DODO: "Dodo Payments",
-};
-const providerName = (p: string) => PROVIDER_NAME[p] ?? p;
-
 const ordersLabel = (n: number) =>
     n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
 
@@ -110,13 +102,14 @@ export function StorefrontsScreen({
     storefronts: StorefrontSummary[];
     /** `null` when the chosen storefront could not be read. */
     selected: StorefrontSettings | null;
+    /** May make one, and the plan has room for another. */
     canCreate: boolean;
     canEdit: boolean;
     canClose: boolean;
 }) {
-    // One storefront per business for now (ADR-006): the screen is about
-    // "your storefront", and a list and a New button appear only for a
-    // business that already has more than one, or may still add one.
+    // A business with one storefront sees "your storefront"; the list
+    // appears once there are several (ADR-010), and New while the plan
+    // allows another (`canCreate` carries that).
     const many = storefronts.length > 1;
     const title = many ? "Storefronts" : "Storefront";
     const header = (
@@ -124,9 +117,7 @@ export function StorefrontsScreen({
             breadcrumb={["Sell", title]}
             title={title}
             actions={
-                canCreate &&
-                storefronts.length > 0 &&
-                mayAddStorefront(storefronts.length) ? (
+                canCreate && storefronts.length > 0 ? (
                     <Button asChild variant="brand">
                         <Link href={newStorefrontHref}>New storefront</Link>
                     </Button>
@@ -1308,6 +1299,7 @@ function ClosingSection({
     const orders = store.orderCount;
     const kept = `${orders} past ${orders === 1 ? "order stays" : "orders stay"}`;
     const paused = Boolean(store.pausedAt);
+    const stock = heldStock(store);
     const resume = () => {
         save({ paused: false }, `${store.name} is taking payments again`);
     };
@@ -1335,9 +1327,11 @@ function ClosingSection({
                     ? `${store.name} is paused: customers cannot pay for orders here until it is turned back on. Everything is kept.`
                     : store.unfulfilled > 0
                       ? `Pausing stops ${store.name} taking payments and keeps everything. ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still waiting to go out, so it cannot be closed until ${store.unfulfilled === 1 ? "that one is" : "they are"} fulfilled or cancelled.`
-                      : orders > 0
-                        ? `Pausing stops ${store.name} taking payments and keeps everything. Closing it permanently cannot be undone, and its ${kept} on the business's record either way.`
-                        : `Pausing stops ${store.name} taking payments and keeps everything. Nothing has been sold here yet, so closing it removes it cleanly.`}
+                      : stock
+                        ? `Pausing stops ${store.name} taking payments and keeps everything. ${stock} So it can't be closed yet — move or count out its stock first.`
+                        : orders > 0
+                          ? `Pausing stops ${store.name} taking payments and keeps everything. Closing it permanently cannot be undone, and its ${kept} on the business's record either way.`
+                          : `Pausing stops ${store.name} taking payments and keeps everything. Nothing has been sold here yet, so closing it removes it cleanly.`}
             </Note>
             <div className="flex flex-wrap gap-2">
                 {canEdit ? (
@@ -1353,7 +1347,9 @@ function ClosingSection({
                     <Button
                         variant="outline"
                         className="border-destructive/40 text-destructive hover:border-destructive hover:text-destructive"
-                        disabled={closing || store.unfulfilled > 0}
+                        disabled={
+                            closing || store.unfulfilled > 0 || stock !== null
+                        }
                         onClick={() => setOpen(true)}
                     >
                         Close permanently

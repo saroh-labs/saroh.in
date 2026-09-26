@@ -7,6 +7,12 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { listAt } from "../products/listings.service";
+import { sanitizeRichHtml } from "../sites/sanitize";
+import {
+    assertCurrencyChangeAllowed,
+    defaultProductCurrency,
+} from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
@@ -86,8 +92,8 @@ export class ImportsService {
         entity: ImportEntity,
         dto: PreviewImportDto,
     ): Promise<PreviewResult> {
-        await this.requireWrite(storeId, userId);
-        return this.plan(storeId, entity, dto);
+        const organizationId = await this.requireWrite(storeId, userId);
+        return this.plan(storeId, organizationId, entity, dto);
     }
 
     async apply(
@@ -97,7 +103,7 @@ export class ImportsService {
         dto: ApplyImportDto,
     ): Promise<ApplyResult> {
         const organizationId = await this.requireWrite(storeId, userId);
-        const { plan } = await this.plan(storeId, entity, dto);
+        const { plan } = await this.plan(storeId, organizationId, entity, dto);
 
         if (!isApplicable(plan)) {
             throw new BadRequestException({
@@ -105,7 +111,8 @@ export class ImportsService {
                     plan.fileIssues.length > 0
                         ? "This file cannot be imported as mapped"
                         : "There is nothing to import",
-                fileIssues: plan.fileIssues,
+                // `details` is the one slot the error filter forwards.
+                details: { fileIssues: plan.fileIssues },
             });
         }
 
@@ -160,6 +167,7 @@ export class ImportsService {
 
     private async plan(
         storeId: string,
+        organizationId: string | null,
         entity: ImportEntity,
         dto: PreviewImportDto,
     ): Promise<PreviewResult> {
@@ -189,7 +197,11 @@ export class ImportsService {
             records: parsed.records,
             mapping,
             policy: dto.policy ?? "SKIP",
-            existingKeys: await this.existingKeys(storeId, entity),
+            existingKeys: await this.existingKeys(
+                storeId,
+                organizationId,
+                entity,
+            ),
             requiredFields: descriptor.requiredFields,
             keyOf: descriptor.keyOf,
             validateRow: descriptor.validateRow,
@@ -200,11 +212,16 @@ export class ImportsService {
 
     private async existingKeys(
         storeId: string,
+        organizationId: string | null,
         entity: ImportEntity,
     ): Promise<Set<string>> {
         if (entity === "products") {
+            // A product's address is unique in its business (#510): a row
+            // whose slug the catalogue has updates that product, whichever
+            // storefront sells it (#531).
+            if (!organizationId) return new Set();
             const rows = await prisma.product.findMany({
-                where: { storeId },
+                where: { organizationId },
                 select: { slug: true },
             });
             return new Set(rows.map((r) => r.slug));
@@ -229,22 +246,69 @@ export class ImportsService {
             const slug = row.key;
             const data = {
                 name: required(row, "name"),
-                description: v.description ?? null,
+                // Rendered as HTML on the product page and the shop, so it
+                // is cleaned here as every editor save cleans it.
+                description: v.description
+                    ? sanitizeRichHtml(v.description).trim() || null
+                    : null,
                 image: v.image ?? null,
                 price: required(row, "price"),
-                currency: v.currency ?? "USD",
                 status: v.status ?? "DRAFT",
             };
+            // Every storefront belongs to a business; so does every product.
+            if (!organizationId) {
+                throw new BadRequestException(
+                    "This storefront is not attached to a business.",
+                );
+            }
             if (row.outcome === "CREATE") {
-                // organizationId is stamped here for the same reason as #173:
-                // a NULL is invisible to org-scoped queries and to RLS.
-                await tx.product.create({
-                    data: { storeId, organizationId, slug, ...data },
+                // Left blank: the storefront's currency, else the
+                // business's (DEC-030) — never a USD guess.
+                const currency =
+                    v.currency ??
+                    (await defaultProductCurrency(tx, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    undefined;
+                // The business's product, sold at this storefront (#510).
+                const product = await tx.product.create({
+                    data: { storeId, organizationId, slug, currency, ...data },
+                    select: { id: true },
+                });
+                await listAt(tx, {
+                    organizationId,
+                    productId: product.id,
+                    storeId,
                 });
             } else {
-                await tx.product.update({
-                    where: { storeId_slug: { storeId, slug } },
-                    data,
+                // The catalogue's product, now also sold here (a listing it
+                // already has is kept as it is). A blank currency keeps the
+                // product's; another one must suit every storefront that
+                // sells it (DEC-030).
+                const current = await tx.product.findUniqueOrThrow({
+                    where: { organizationId_slug: { organizationId, slug } },
+                    select: { id: true, currency: true },
+                });
+                if (v.currency && v.currency !== current.currency) {
+                    await assertCurrencyChangeAllowed(tx, {
+                        productId: current.id,
+                        name: data.name,
+                        currency: v.currency,
+                    });
+                }
+                const product = await tx.product.update({
+                    where: { id: current.id },
+                    data: {
+                        ...data,
+                        ...(v.currency ? { currency: v.currency } : {}),
+                    },
+                    select: { id: true },
+                });
+                await listAt(tx, {
+                    organizationId,
+                    productId: product.id,
+                    storeId,
                 });
             }
             return;

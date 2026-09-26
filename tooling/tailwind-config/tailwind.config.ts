@@ -229,12 +229,28 @@ const config = {
                     member: "hsl(var(--role-member))",
                     reviewer: "hsl(var(--role-reviewer))",
                 },
+                // The bookings diary: one-to-one and class blocks (globals.css).
+                diary: {
+                    one: "hsl(var(--diary-one))",
+                    class: "hsl(var(--diary-class))",
+                    foreground: "hsl(var(--diary-foreground))",
+                },
                 chart: {
                     1: "hsl(var(--chart-1))",
                     2: "hsl(var(--chart-2))",
                     3: "hsl(var(--chart-3))",
                     4: "hsl(var(--chart-4))",
                     5: "hsl(var(--chart-5))",
+                },
+                // The Business Calendar's layers (globals.css).
+                layer: {
+                    1: "hsl(var(--layer-1))",
+                    2: "hsl(var(--layer-2))",
+                    3: "hsl(var(--layer-3))",
+                    4: "hsl(var(--layer-4))",
+                    5: "hsl(var(--layer-5))",
+                    6: "hsl(var(--layer-6))",
+                    foreground: "hsl(var(--layer-foreground))",
                 },
             },
             fontFamily: {

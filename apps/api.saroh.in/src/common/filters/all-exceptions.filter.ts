@@ -59,7 +59,11 @@ function extractClientMessage(exception: HttpException): {
     if (typeof response === "string") {
         return { message: response };
     }
-    const body = response as { message?: unknown; details?: unknown };
+    const body = response as {
+        message?: unknown;
+        details?: unknown;
+        field?: unknown;
+    };
     if (Array.isArray(body.message)) {
         // class-validator / ValidationPipe returns an array of field messages.
         return { message: "Validation failed", details: body.message };
@@ -68,9 +72,16 @@ function extractClientMessage(exception: HttpException): {
         // An exception may say WHY in a shape a client can branch on — a
         // preview link's 410 names `expired` or `revoked` (#198) — and that
         // travels as `details`, the same slot validation already uses.
-        return body.details === undefined
-            ? { message: body.message }
-            : { message: body.message, details: body.details };
+        if (body.details !== undefined) {
+            return { message: body.message, details: body.details };
+        }
+        // Most services name the field a refusal is about beside the
+        // message, `{ message, field }`; it travels as `details.field`, where
+        // the app's `toFailure` reads it. Dropping it put every such refusal
+        // in a toast instead of under its field.
+        return typeof body.field === "string"
+            ? { message: body.message, details: { field: body.field } }
+            : { message: body.message };
     }
     return { message: exception.message };
 }

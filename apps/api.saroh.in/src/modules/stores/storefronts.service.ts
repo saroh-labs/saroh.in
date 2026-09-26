@@ -3,15 +3,30 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { recordableChanges } from "../audit/audit-changes";
+import {
+    AuditAction,
+    AuditOutcome,
+    AuditService,
+} from "../audit/audit.service";
+import { EntitlementService } from "../billing/entitlement.service";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
+import { storefrontLimit } from "../organizations/business-limits";
+import { lockStockLevels } from "../products/stock-levels";
+import { openingHoursText } from "./opening-hours-text";
 import type { OpeningHoursDay, UpdateStorefrontDto } from "./storefronts.dto";
 
 /** What the schema falls back to before a storefront ever saves settings. */
 const SCHEMA_CURRENCY = "USD";
+
+/** Why a storefront that still holds stock cannot close. */
+export const STOCK_STILL_HERE = "Move or count out its stock first.";
 
 export interface StorefrontSummary {
     id: string;
@@ -19,6 +34,12 @@ export interface StorefrontSummary {
     orderCount: number;
     kind: "SHOP" | "ONLINE";
     paused: boolean;
+}
+
+/** How many storefronts a business has, and how many it may have. */
+export interface StorefrontAllowance {
+    used: number;
+    limit: number;
 }
 
 /** A payment provider the business has connected, as a storefront sees it. */
@@ -44,6 +65,11 @@ export interface StorefrontSettings extends StorefrontSummary {
     freeShippingThreshold: string | null;
     /** Orders still waiting to go out — closing is refused while any are. */
     unfulfilled: number;
+    /**
+     * Units on the shelf here and units promised from it — closing is
+     * refused while either is above 0 (#512).
+     */
+    stock: { onHand: number; promised: number };
     /** Only a SHOP has these; an ONLINE store keeps them but shows none. */
     address: string | null;
     openingHours: OpeningHoursDay[] | null;
@@ -79,6 +105,28 @@ export interface StorefrontSettings extends StorefrontSummary {
  */
 @Injectable()
 export class StorefrontsService {
+    // Optional so the unit specs build it bare; the module provides it.
+    constructor(
+        @Optional() private readonly audit?: AuditService,
+        // Holds no state, so the unit specs' fresh one reads the same plan.
+        @Optional()
+        private readonly entitlements: EntitlementService = new EntitlementService(),
+    ) {}
+
+    /**
+     * How many storefronts the business has and may have — the plan's
+     * `storefronts` entitlement under the product's ceiling — so the
+     * workspace offers "New storefront" only where creating one would
+     * succeed. For rendering; `StoresService.createForUser` still decides.
+     */
+    async allowance(organizationId: string): Promise<StorefrontAllowance> {
+        const [used, entitlements] = await Promise.all([
+            prisma.store.count({ where: { organizationId, deletedAt: null } }),
+            this.entitlements.getEntitlements(organizationId),
+        ]);
+        return { used, limit: storefrontLimit(entitlements) };
+    }
+
     async list(organizationId: string): Promise<StorefrontSummary[]> {
         const stores = await prisma.store.findMany({
             where: { organizationId, deletedAt: null },
@@ -104,26 +152,42 @@ export class StorefrontsService {
         storeId: string,
     ): Promise<StorefrontSettings> {
         const store = await this.require(organizationId, storeId);
-        const [settings, unfulfilled, latestOrder, providers] =
-            await Promise.all([
-                prisma.storeSettings.findUnique({ where: { storeId } }),
-                prisma.order.count({
-                    where: {
-                        storeId,
-                        status: { in: [...UNFULFILLED_STATUSES] },
-                    },
-                }),
-                prisma.order.findFirst({
-                    where: { storeId },
-                    orderBy: { createdAt: "desc" },
-                    select: { currency: true },
-                }),
-                prisma.merchantPaymentProvider.findMany({
-                    where: { organizationId },
-                    orderBy: { createdAt: "asc" },
-                    select: { provider: true, status: true },
-                }),
-            ]);
+        const [
+            settings,
+            unfulfilled,
+            latestOrder,
+            providers,
+            onHand,
+            promised,
+        ] = await Promise.all([
+            prisma.storeSettings.findUnique({ where: { storeId } }),
+            prisma.order.count({
+                where: {
+                    storeId,
+                    status: { in: [...UNFULFILLED_STATUSES] },
+                },
+            }),
+            prisma.order.findFirst({
+                where: { storeId },
+                orderBy: { createdAt: "desc" },
+                select: { currency: true },
+            }),
+            prisma.merchantPaymentProvider.findMany({
+                where: { organizationId },
+                orderBy: { createdAt: "asc" },
+                select: { provider: true, status: true },
+            }),
+            // A shelf below 0 (sold past a short count) is not stock
+            // here, so only what is above 0 adds up.
+            prisma.stockLevel.aggregate({
+                where: { storeId, onHand: { gt: 0 } },
+                _sum: { onHand: true },
+            }),
+            prisma.stockLevel.aggregate({
+                where: { storeId, promised: { gt: 0 } },
+                _sum: { promised: true },
+            }),
+        ]);
         const connected = providers.filter((p) => p.status === "CONNECTED");
         const named = settings?.checkoutProvider ?? null;
 
@@ -144,6 +208,10 @@ export class StorefrontsService {
                 ? toMoneyString(settings.freeShippingThreshold)
                 : null,
             unfulfilled,
+            stock: {
+                onHand: onHand._sum.onHand ?? 0,
+                promised: promised._sum.promised ?? 0,
+            },
             kind: settings?.kind === "SHOP" ? "SHOP" : "ONLINE",
             address: settings?.address ?? null,
             openingHours:
@@ -165,10 +233,16 @@ export class StorefrontsService {
         };
     }
 
+    /**
+     * `actorUserId` is who is saving, for the audit row a change of hours
+     * writes; without one (a caller that is not a person) nothing is
+     * recorded.
+     */
     async update(
         organizationId: string,
         storeId: string,
         dto: UpdateStorefrontDto,
+        actorUserId?: string,
     ): Promise<StorefrontSettings> {
         const current = await this.get(organizationId, storeId);
 
@@ -297,7 +371,45 @@ export class StorefrontsService {
             }
         });
 
-        return this.get(organizationId, storeId);
+        const saved = await this.get(organizationId, storeId);
+        if (dto.openingHours !== undefined && actorUserId) {
+            await this.recordHours(organizationId, actorUserId, current, saved);
+        }
+        return saved;
+    }
+
+    /**
+     * A change of opening hours in Settings › Activity (#509): the week
+     * before and after, as text, and which storefront. A save that leaves
+     * the week as it was records nothing.
+     */
+    private async recordHours(
+        organizationId: string,
+        actorUserId: string,
+        before: StorefrontSettings,
+        after: StorefrontSettings,
+    ): Promise<void> {
+        const changes = recordableChanges([
+            {
+                field: "openingHours",
+                before: openingHoursText(before.openingHours),
+                after: openingHoursText(after.openingHours),
+            },
+        ]);
+        if (changes.length === 0) return;
+        await this.audit?.record({
+            action: AuditAction.StorefrontHoursUpdate,
+            actorUserId,
+            organizationId,
+            targetType: "storefront",
+            targetId: after.id,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: ["openingHours"],
+                storefront: after.name,
+                changes: changes as unknown as Prisma.InputJsonArray,
+            },
+        });
     }
 
     /**
@@ -317,9 +429,36 @@ export class StorefrontsService {
                     : `${current.unfulfilled} orders here are still waiting to go out. Fulfil or cancel them first.`,
             );
         }
-        await prisma.store.update({
-            where: { id: storeId },
-            data: { deletedAt: new Date() },
+        await prisma.$transaction(async (tx) => {
+            // Stock on the shelf here, or promised from it, would be left
+            // where nobody can count, move or sell it (#512). Checked under
+            // the storefront's StockLevel locks, in id order, so a count or
+            // a move that lands meanwhile is either seen here or refused by
+            // the stock module once the storefront is closed.
+            const rows = await tx.stockLevel.findMany({
+                where: { storeId },
+                select: { id: true },
+            });
+            await lockStockLevels(
+                tx,
+                rows.map((r) => r.id),
+            );
+            const held = await tx.stockLevel.count({
+                where: {
+                    storeId,
+                    OR: [{ onHand: { gt: 0 } }, { promised: { gt: 0 } }],
+                },
+            });
+            if (held > 0) {
+                throw new ConflictException(STOCK_STILL_HERE);
+            }
+            // Soft: its orders, customers and stock log stay, and so does
+            // every catalogue product — those belong to the business, and a
+            // product's storefront link is only cleared on a hard delete.
+            await tx.store.update({
+                where: { id: storeId },
+                data: { deletedAt: new Date() },
+            });
         });
     }
 

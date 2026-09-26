@@ -3,6 +3,25 @@
 // callback against a tx stub whose delegates are the same jest mocks, so we can
 // assert whether the order write happened — or, for an illegal transition, that
 // it never did.
+// The order's invoice (ADR-008, U5) has its own specs; here the business
+// is unregistered and the invoice writes are recorded, not run.
+jest.mock("../invoices/order-invoicing", () => ({
+    loadTaxProfile: jest.fn().mockResolvedValue({
+        registered: false,
+        gstin: null,
+        state: null,
+        prefix: null,
+        timezone: null,
+        deliveryRateBps: 1800,
+        deliverySac: null,
+    }),
+    ensureOrderInvoice: jest.fn().mockResolvedValue(null),
+    creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    correctOrderInvoiceForEdit: jest
+        .fn()
+        .mockResolvedValue({ supplementary: null, creditNote: null }),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
@@ -11,12 +30,22 @@ jest.mock("@saroh/database", () => {
     const inventory = {
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
     };
+    // Settling a held line reads the row the line recorded (#510); none
+    // recorded here, and the product counts no stock.
+    const orderItem = { findMany: jest.fn().mockResolvedValue([]) };
+    const $queryRaw = jest.fn().mockResolvedValue([]);
+    // A status change is a step on the order's timeline (ADR-008).
+    const orderEvent = { create: jest.fn() };
     return {
         prisma: {
             order,
             inventory,
-            $transaction: jest.fn((cb) => cb({ order, inventory })),
+            orderEvent,
+            $transaction: jest.fn((cb) =>
+                cb({ order, inventory, orderItem, orderEvent, $queryRaw }),
+            ),
         },
     };
 });
@@ -25,13 +54,17 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
+import {
+    creditRestOfOrder,
+    ensureOrderInvoice,
+} from "../invoices/order-invoicing";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
 const orderFindFirst = prisma.order.findFirst as jest.Mock;
 const orderUpdate = prisma.order.update as jest.Mock;
 const inventoryFindUnique = prisma.inventory.findUnique as jest.Mock;
-const txMock = prisma.$transaction as jest.Mock;
+const eventCreate = prisma.orderEvent.create as jest.Mock;
 
 const STORE = "store_1";
 const USER = "user_1";
@@ -74,7 +107,9 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             service.updateStatus(STORE, ORDER, USER, { status: "PROCESSING" }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 
@@ -91,7 +126,9 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             service.updateStatus(STORE, ORDER, USER, { paymentStatus: "PAID" }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
     });
 
@@ -135,6 +172,33 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
                 data: expect.objectContaining({ paymentStatus: "PAID" }),
             }),
         );
+        // Paid by hand: the order's invoice is made in the same
+        // transaction, the way a payment webhook would (ADR-008).
+        expect(ensureOrderInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            { method: "RECORDED" },
+        );
+    });
+
+    it("a refund recorded by hand credits what is left of the invoice", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "REFUNDED",
+        });
+        expect(creditRestOfOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            "Refunded",
+            USER,
+        );
+        expect(ensureOrderInvoice).not.toHaveBeenCalled();
     });
 
     it("is idempotent: re-setting the SAME status is a no-op change, not rejected", async () => {
@@ -176,8 +240,70 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(txMock).not.toHaveBeenCalled();
+        // The guard reads the order under its row lock (#511), inside the
+        // transaction; refusing there writes nothing and rolls it back.
+        expect(eventCreate).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the kitchen stage in step and logs the change on the timeline", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "COLLECT",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
+
+        // Shipped means a courier took it, whatever it was meant to be.
+        expect(orderUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: "SHIPPED",
+                    stage: "HANDED_TO_COURIER",
+                    fulfilment: "DELIVERY",
+                }),
+            }),
+        );
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "STATUS",
+                actorUserId: USER,
+                fromStatus: "PROCESSING",
+                toStatus: "SHIPPED",
+                fromStage: "READY",
+                toStage: "HANDED_TO_COURIER",
+            }),
+        });
+    });
+
+    it("collects a PROCESSING order straight to DELIVERED (ADR-008)", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "COLLECT",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, { status: "DELIVERED" });
+
+        expect(orderUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: "DELIVERED",
+                    stage: "COLLECTED",
+                }),
+            }),
+        );
     });
 
     it("still 404s a missing order before any lifecycle check", async () => {

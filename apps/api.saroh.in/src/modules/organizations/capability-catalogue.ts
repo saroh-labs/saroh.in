@@ -135,8 +135,20 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "store:create", group: "sell", label: "Add a storefront" },
     { action: "store:write", group: "sell", label: "Change storefronts" },
     { action: "store:delete", group: "sell", label: "Delete a storefront" },
+    {
+        action: "inventory:write",
+        group: "sell",
+        label: "Count and move stock",
+        note: "Counts shelves, records deliveries and waste, and moves stock between storefronts. Prices and names still need Change storefronts.",
+    },
     { action: "order:read", group: "sell", label: "See orders" },
     { action: "order:write", group: "sell", label: "Change orders" },
+    {
+        action: "order:stage",
+        group: "sell",
+        label: "Move orders through the kitchen",
+        note: "Sees what to make and who it is for, never what anyone paid.",
+    },
     { action: "discount:read", group: "sell", label: "See discount codes" },
     {
         action: "product-review:read",

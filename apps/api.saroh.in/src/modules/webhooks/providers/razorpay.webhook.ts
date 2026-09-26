@@ -47,7 +47,15 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             event?: string;
             payload?: {
                 payment?: { entity?: { id?: string; order_id?: string } };
-                refund?: { entity?: { id?: string; payment_id?: string } };
+                refund?: {
+                    entity?: {
+                        id?: string;
+                        payment_id?: string;
+                        amount?: number;
+                        receipt?: string | null;
+                        notes?: Record<string, unknown> | unknown[] | null;
+                    };
+                };
             };
         };
 
@@ -68,6 +76,12 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             providerIntentId: payment?.order_id,
             providerPaymentRef: payment?.id,
             providerRefundId: refund?.id,
+            // Paise already. Saroh's reference rides in `receipt`, and in
+            // `notes` as a second copy (DEC-026).
+            refundAmountCents: wholeNumber(refund?.amount),
+            refundReference: refund
+                ? (nonEmpty(refund.receipt) ?? noteReference(refund.notes))
+                : undefined,
         };
     }
 }
@@ -77,8 +91,31 @@ function outcomeFor(eventType: string): WebhookOutcome {
         return "SUCCEEDED";
     }
     if (eventType === "payment.failed") return "FAILED";
-    if (eventType.startsWith("refund.")) return "REFUNDED";
+    // Only a processed refund is money handed back: `refund.created` may
+    // still fail, and `refund.speed_changed` repeats a processed one.
+    if (eventType === "refund.processed") return "REFUNDED";
+    if (eventType === "refund.failed") return "REFUND_FAILED";
     return "IGNORED";
+}
+
+function wholeNumber(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isInteger(value) && value >= 0
+        ? value
+        : undefined;
+}
+
+function nonEmpty(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() !== ""
+        ? value.trim()
+        : undefined;
+}
+
+/** Razorpay sends `notes` as `[]` when there are none. */
+function noteReference(
+    notes: Record<string, unknown> | unknown[] | null | undefined,
+): string | undefined {
+    if (!notes || Array.isArray(notes)) return undefined;
+    return nonEmpty(notes.saroh_refund_id);
 }
 
 /** Constant-time compare of two hex strings of equal length. */

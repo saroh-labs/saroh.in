@@ -26,10 +26,23 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { auditMetadata } from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, MODULES } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
+
+/** A transaction client, for work that must commit with a lifecycle change. */
+export type ModuleTransaction = Parameters<
+    Parameters<typeof prisma.$transaction>[0]
+>[0];
+
+/**
+ * Extra work to run inside the lifecycle change's own transaction. The admin
+ * console writes its ledger entry here, so an operator's module change and the
+ * record of it commit together or not at all.
+ */
+export type AlsoInTransaction = (tx: ModuleTransaction) => Promise<void>;
 
 @Injectable()
 export class ModuleLifecycleService {
@@ -46,6 +59,7 @@ export class ModuleLifecycleService {
     async enable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
+        alsoInTransaction?: AlsoInTransaction,
     ): Promise<void> {
         authorize(ctx, "module:manage");
         const descriptor = this.descriptor(moduleKey);
@@ -98,7 +112,15 @@ export class ModuleLifecycleService {
                     disabledByUserId: null,
                 },
             });
-            await this.audit(tx, ctx, "organization.module.enabled", moduleKey);
+            await this.audit(
+                tx,
+                ctx,
+                "organization.module.enabled",
+                moduleKey,
+                undefined,
+                { module: descriptor.label, enabled: true },
+            );
+            await alsoInTransaction?.(tx);
         });
 
         // After the commit, so only a module that really is enabled is counted.
@@ -111,9 +133,10 @@ export class ModuleLifecycleService {
     async disable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
+        alsoInTransaction?: AlsoInTransaction,
     ): Promise<void> {
         authorize(ctx, "module:manage");
-        this.descriptor(moduleKey);
+        const descriptor = this.descriptor(moduleKey);
 
         // Idempotent: only an ENABLED module transitions to DISABLED. Disabling
         // an already-disabled/archived/absent module is a no-op.
@@ -181,7 +204,10 @@ export class ModuleLifecycleService {
                 ctx,
                 "organization.module.disabled",
                 moduleKey,
+                undefined,
+                { module: descriptor.label, enabled: false },
             );
+            await alsoInTransaction?.(tx);
         });
     }
 
@@ -365,6 +391,9 @@ export class ModuleLifecycleService {
         action: string,
         moduleKey: ModuleKey,
         projectId?: string,
+        // Switching on or off names the module as the business reads it
+        // ("Payments"), so Settings › Activity can say which (#509).
+        metadata?: { module: string; enabled: boolean },
     ): Promise<void> {
         await tx.auditEvent.create({
             data: {
@@ -375,6 +404,8 @@ export class ModuleLifecycleService {
                 targetType: "module",
                 targetId: moduleKey,
                 outcome: "SUCCESS",
+                // An operator's switch is Saroh support's in Activity.
+                metadata: auditMetadata(ctx.roleKey, metadata),
             },
         });
     }

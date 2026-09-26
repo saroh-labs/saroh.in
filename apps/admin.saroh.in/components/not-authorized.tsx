@@ -19,7 +19,7 @@ export function NotAuthorized({ email }: { email: string }) {
         <main className="mx-auto grid min-h-screen max-w-md place-items-center p-8">
             <div className="w-full">
                 <div className="mb-6 flex justify-center">
-                    <Wordmark suffix="control" />
+                    <Wordmark suffix="console" />
                 </div>
                 <EmptyState
                     title="Not authorized"

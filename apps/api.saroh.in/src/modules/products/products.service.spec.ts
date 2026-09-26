@@ -19,7 +19,7 @@ const strangerEmail = `prod-stranger-${process.pid}@example.com`;
 describe("Products catalog (dev DB)", () => {
     const stores = new StoresService(new FeatureFlagService());
     const products = new ProductsService(stores);
-    const categories = new CategoriesService(stores);
+    const categories = new CategoriesService();
     const variants = new VariantsService(products);
     const inventory = new InventoryService(products);
 
@@ -69,11 +69,11 @@ describe("Products catalog (dev DB)", () => {
     });
 
     it("creates a category", async () => {
-        const res = await categories.create(storeId, ownerId, {
+        const res = await categories.create(orgId, {
             name: "Apparel",
         });
         categoryId = res.id;
-        const list = await categories.list(storeId, ownerId);
+        const list = await categories.list(orgId);
         expect(list.some((c) => c.id === categoryId)).toBe(true);
     });
 
@@ -164,17 +164,21 @@ describe("Products catalog (dev DB)", () => {
         expect(row.id).toBe(productId);
         expect(row.variantCount).toBe(1);
         expect(row.sku).toBe("TS-RED-L");
-        expect(row.inventory).toEqual({ quantity: 42, lowStockAlert: 5 });
+        expect(row.inventory).toEqual({
+            quantity: 42,
+            promised: 0,
+            lowStockAlert: 5,
+        });
     });
 
     it("rejects a category cycle", async () => {
-        const child = await categories.create(storeId, ownerId, {
+        const child = await categories.create(orgId, {
             name: "Shirts",
             parentId: categoryId,
         });
         // Make the parent a child of its own child → loop.
         await expect(
-            categories.update(storeId, categoryId, ownerId, {
+            categories.update(orgId, categoryId, {
                 name: "Apparel",
                 slug: "apparel",
                 parentId: child.id,
@@ -184,18 +188,31 @@ describe("Products catalog (dev DB)", () => {
 
     it("blocks deleting a category that has children", async () => {
         await expect(
-            categories.remove(storeId, categoryId, ownerId),
+            categories.remove(orgId, categoryId),
         ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it("deletes a product (variants + inventory cascade)", async () => {
-        await products.remove(storeId, productId, ownerId);
+    it("won't delete a counted product; deletes one never counted (variants cascade)", async () => {
+        // Its stock was counted: the log stays, so it can't be deleted.
+        await expect(
+            products.remove(storeId, productId, ownerId),
+        ).rejects.toBeInstanceOf(ConflictException);
+
+        const fresh = await products.create(storeId, ownerId, {
+            name: "Plain Tee",
+            price: "9.99",
+        });
+        await variants.create(storeId, fresh.id, ownerId, {
+            sku: "PT-L",
+            title: "Large",
+        });
+        await products.remove(storeId, fresh.id, ownerId);
         const gone = await prisma.product.findUnique({
-            where: { id: productId },
+            where: { id: fresh.id },
         });
         expect(gone).toBeNull();
         const orphanVariants = await prisma.productVariant.count({
-            where: { productId },
+            where: { productId: fresh.id },
         });
         expect(orphanVariants).toBe(0);
     });

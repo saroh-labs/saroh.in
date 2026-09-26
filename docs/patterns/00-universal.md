@@ -50,6 +50,129 @@ files often show them (`backend-nestjs.md`). Gap: 38 source files were over when
 this was written, led by `sites.service.ts`, `site-editor.tsx` and
 `bookings.service.ts`. Seed data is exempt.
 
+Still over after #508 split the booking page and the bookings service (U10),
+each with why it stops there:
+
+- `bookings/bookings.service.ts` (1,298) — the merchant's side: service and
+  rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
+  hand behind one controller. Under 400 means one injectable per feature and
+  a controller and DI change, not a move.
+- `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
+  (418) — one class sharing its rate limiters, and one serializable write
+  with its helpers; a little over, and cutting them splits a method.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (643) — its state, effects
+  and handlers (the hold poll, confirm, letting a hold go) share one
+  component's state; the drawing is already in `steps/`. Less means a
+  reducer or hook seam, which is new logic.
+- Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
+  (1,173), `calendar/calendar.service.ts` (1,051),
+  `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
+- `organizations/organization-settings-form.tsx` (1,246) — one form holds
+  every Business card (profile, tax and invoices, address, number format)
+  and the cross-field rules that re-check them together; the number-format
+  editor already went to `invoice-number-fields.tsx`, the time zone picker
+  to `time-zone-select.tsx`, and the Hours card, which saves to the
+  storefronts, to `business-hours-section.tsx`. Less
+  means a card per file sharing one form context.
+- `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
+  member drawer and the invite dialog share the screen's roster and role
+  state. Each piece is its own function already; moving them is a file split
+  with props threaded through, not yet done.
+- `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
+  `SETTINGS_PAGES`) and every rule that filters it by role, module and
+  site; half of it is the table itself. Splitting data from rules is a move,
+  not yet made.
+- `modules/module-list.tsx` (430) — one list and its row, switch and state
+  tag; a little over, and the row carries most of it.
+
+Added or grown past 400 by the Products and Stock release (#510–#531), each
+with why it stops there:
+
+- `stock/stock.service.ts` (1,147) — the stock module's one writer: every
+  shelf change (count, received, wasted, returned, move, undo, and the
+  order flows' sale and return) goes through `recordEntry` or the batched
+  count and undo, under one set of lock and below-zero rules — and, with
+  no entry, `setWarnings` (a warning level alone, #534). It also finds
+  and creates rows under the product's lock. Row resolution, the batch
+  writers and the order flows' writers are each a seam. Splitting them
+  means exporting the private `Row` and lock helpers across files, and it
+  hasn't been done yet.
+- `stock/reserve.ts` (901) — every hold, release, sale, kitchen undo and
+  refund put-back an order makes, plus `reserveOnPayment`. They share one
+  line loader, one lock order and the invariant (promised = sum of held).
+  Online payment (`reserveOnPayment`) is the natural cut once the online
+  checkout calls it.
+- `collections/collections.service.ts` (818; the cards' website pages,
+  #524) — hand-picked and automatic
+  collections, their products and a product's collections, around the one
+  category tree. The product page's reads (`forProduct`, `setForProduct`)
+  could move to their own service, as the controller's product routes
+  already are.
+- `stock/levels-read.ts` (423) and `stock/stock-checks.service.ts`
+  (448) — the Stock screen's levels, and its four checks. Each is one
+  reader, now paged (#527). The levels left `stock-reads.service.ts` (217
+  now, the log) when paging grew them, and how a product's lines and
+  cells are drawn and judged went to `stock/product-lines.ts` (#534), which
+  the Products list's Needs you shares; a little over, and cutting either
+  further splits a query from the words it builds.
+- `products/serialize.ts` (596), `products/inventory.service.ts` (545) and
+  `products/variants.service.ts` (474) — grew with listings, stock per
+  storefront, Track stock and the per-variant switch. `inventory.service`'s
+  first switch (`switchStore`) and `serialize`'s stock words are the seams.
+  Moving them is a file split with nothing to gain until they change again.
+- `products/products.service.ts` (927; 648 before this release) and
+  `stores/stores.service.ts` (411) — the catalogue's reads and section
+  saves, now business-wide with listings and the delete guard; and a
+  storefront's create with its caps and, now, the business's currency. The
+  catalogue list read and the storefront caps are the seams; a little over
+  for the second, and not yet cut for the first.
+- `backfill/catalogue-settings.ts` (624), `backfill/merge-same-products.ts`
+  (493), `backfill/merge-same-products.move.ts` (523),
+  `backfill/listings-stock-levels.ts` (491) and `backfill/held-stock.ts`
+  (481) — one-off backfills, each one exported unit that the integration
+  suite runs twice. The merge is already split, into deciding and moving.
+- `stores/catalogue-screen.tsx` (425; 401 before the Collections chip,
+  #524) — the Products list's rows, paging, bulk bar, quick look and
+  delete confirm share its list state. The Collections chip's cards and
+  sheet went to their own `commerce/collections/collections-panel.tsx`,
+  passed in as a slot; the list's reload and paging are the next seam.
+- `commerce/collections/collection-sheet.tsx` (401; #524) — New and Edit
+  collection: reading the one to edit, its draft and field errors, the
+  save, the delete confirm and the leave-unsaved confirm share its state.
+  The fields and the products picker already went to
+  `collection-fields.tsx`, `kind-choice.tsx` and `products-picker.tsx`;
+  the load-save-delete flow, as a hook, is the next seam. One line over,
+  and not yet cut.
+- `sites/media-picker.tsx` (509) — the media library dialog. Photos and
+  videos (#517) added the video rules and the poster frame to its one
+  upload state. Less means an upload hook, which is new logic.
+- `lib/products/editor-sections.ts` (762) — every editor section's schema,
+  how it reads a saved product and the patch it sends, plus the media rules
+  and the shell's hint and saved message. Each part is small and the
+  sections share its limits and helpers; the Editor and the product page's
+  sheets import it from one place. The media rules and the shell's part are
+  the seams. The Editor's newer words and rules (#525) went to their own
+  files instead: `editor-labels.ts`, `editor-stock.ts`, `variant-rows.ts`,
+  `listing-changes.ts`.
+- `product-editor-v2/photos-section.tsx` (458) and `editor-shell.tsx`
+  (416) — the media set's staged list with its upload, drop and address
+  paths; and the header, jumps, create flow and two columns. The library
+  panel went to `photo-library-panel.tsx`, and the status pill, read-only
+  note, next steps and leave dialog to `editor-parts.tsx`. A little over;
+  what is left shares one component's state.
+
+Split rather than listed: `providers/provider-list.tsx` (435 before; 120
+now) along its rows, which went to `provider-row.tsx` (331); and
+`lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
+along its own seam — what a save recorded, the counts a stock line says and
+the words for them went to `activity-changes.ts` (265), leaving the line an
+event becomes. The Editor's `variants-section.tsx` (822 before; 390 now, #525)
+went along its row, its add row and its save — `variant-row.tsx`,
+`variant-add-row.tsx`, `variant-save.ts`, with the row rules in
+`lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 332
+now) along its two ways of counting, to `stock-fields.tsx` and
+`lib/products/editor-stock.ts`.
+
 ## 7. No `any`, no `@ts-ignore`
 
 **Adopted** — Gap: one `any` (`payments/crypto.ts`); no `@ts-ignore`. Suppress

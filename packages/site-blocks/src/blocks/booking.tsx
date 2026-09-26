@@ -164,10 +164,16 @@ export default function BookingSection({
     content,
     apiUrl = DEFAULT_API_URL,
     slots: givenSlots,
+    bookHref,
 }: {
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /**
+     * The site's booking page (U19), on a live site only — a preview has no
+     * `/book`, so the link is left out there.
+     */
+    bookHref?: string;
     /**
      * Sample slots to draw instead of fetching (previews, #267). A fixture's
      * Service id belongs to no Service, and a picker thumbnail must not show a
@@ -411,6 +417,16 @@ export default function BookingSection({
             ) : null}
             {content.description ? (
                 <p className="text-site-body mt-3">{content.description}</p>
+            ) : null}
+            {bookHref && serviceId ? (
+                <p className="mt-3 text-sm">
+                    <a
+                        href={`${bookHref}?service=${encodeURIComponent(serviceId)}`}
+                        className="text-site-fg font-semibold underline underline-offset-4"
+                    >
+                        See every time for two weeks
+                    </a>
+                </p>
             ) : null}
 
             {/* Slot picker */}

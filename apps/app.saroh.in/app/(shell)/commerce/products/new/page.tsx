@@ -1,9 +1,12 @@
-import { ProductEditor } from "@/components/commerce/product-editor";
+import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
+import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-access";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "New product" };
@@ -22,21 +25,19 @@ export default async function NewProductPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores] = await Promise.all([
+    const [{ storefront }, stores, organization] = await Promise.all([
         searchParams,
         listBusinessStores(),
+        resolveActiveOrganization(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    if (organization?.actions && !organization.actions.includes("store:read")) {
+        return <NoProductAccess organization={organization} />;
+    }
+    const store = pickStorefront(stores, storefront);
 
     if (store) {
-        const context = await loadEditorContext(store);
-        return (
-            <PageContainer width="full">
-                <ProductEditor {...context} />
-            </PageContainer>
-        );
+        const context = await loadEditorContext(store, undefined, stores);
+        return <ProductEditorV2 {...context} product={null} />;
     }
 
     return (

@@ -1,113 +1,157 @@
-import type { ProductListItem, ProductStatus } from "./service";
+import type {
+    CatalogueListing,
+    CatalogueProduct,
+    ProductStatus,
+} from "./service";
 
-/** One place a catalogue row is sold, and what it looks like there. */
-export interface CataloguePlace {
-    storeId: string;
-    storeName: string;
-    product: ProductListItem;
-}
+/** One storefront that sells a catalogue row, and its stock there. */
+export type CataloguePlace = CatalogueListing;
 
 /**
  * One row of the business's catalogue.
  *
- * Products are stored per storefront today, but the catalogue belongs to the
- * business (the "Saroh Products Screen" design, after Square's single item
- * library): the same SKU sold in two storefronts is ONE product, carrying the
- * places that sell it. Where the price differs between them the row says
- * "varies" rather than picking a winner. A product with no SKU cannot be
- * matched to anything, so it stays its own row.
+ * The catalogue belongs to the business (#531, the "Saroh Products Screen"
+ * design, after Square's single item library): the API returns one product
+ * per row, with each storefront that sells it — its listings — and the
+ * stock on each shelf. Read under the storefront filter (#519), the row's
+ * stock is that storefront's; otherwise the shelves added up. Nothing is
+ * matched or merged here.
  */
 export interface CatalogueRow {
+    /** The product's id: one row per catalogue product. */
     key: string;
+    id: string;
     name: string;
+    /** The cover photo; the tile falls back to initials without one. */
+    image: string | null;
     sku: string | null;
     variantCount: number;
+    /** Each variant it sells in this view, with its own price if any. */
+    variants: CatalogueProduct["variants"];
     status: ProductStatus;
     price: string;
+    /** Lowest and highest variant price when they differ, else null. */
+    priceRange: { low: string; high: string } | null;
     currency: string;
-    /** The price differs between the places that sell it. */
-    varies: boolean;
-    /** Summed across places that track stock; `null` when none do. */
+    /** On hand; `null` when nothing here counts stock. */
     stock: number | null;
-    /** The tightest low-stock threshold among those places. */
+    /** Promised to open orders. */
+    promised: number;
+    /** On hand minus promised, never below 0 — what the shop sells. */
+    canSell: number | null;
+    /** The product's own warning level (the lowest of its shelves). */
     lowStockAlert: number | null;
+    /**
+     * Untracked and marked sold out by hand (#515) wherever it is counted:
+     * the stock column says "Sold out", not "Not tracked".
+     */
+    soldOut: boolean;
     updatedAt: string;
-    /** In a collection (a category) in at least one place. */
-    inCollection: boolean;
+    categoryId: string | null;
+    /** Where it is sold; empty when no storefront sells it just now. */
     places: CataloguePlace[];
 }
 
-/** A row always has at least one place. */
-type Places = [CataloguePlace, ...CataloguePlace[]];
-
-export function mergeCatalogue(
-    stores: { id: string; name: string }[],
-    productsByStore: Record<string, ProductListItem[]>,
+export function catalogueRows(
+    products: readonly CatalogueProduct[],
 ): CatalogueRow[] {
-    const groups = new Map<string, Places>();
-    for (const store of stores) {
-        for (const product of productsByStore[store.id] ?? []) {
-            const key = product.sku ?? `${store.id}:${product.id}`;
-            const place = { storeId: store.id, storeName: store.name, product };
-            const seen = groups.get(key);
-            if (seen) seen.push(place);
-            else groups.set(key, [place]);
-        }
+    return products.map((p) => {
+        const inv = p.inventory;
+        return {
+            key: p.id,
+            id: p.id,
+            name: p.name,
+            image: p.image,
+            sku: p.sku,
+            variantCount: p.variantCount,
+            variants: p.variants,
+            status: p.status,
+            price: p.price,
+            priceRange: priceRange(p.price, p.variants),
+            currency: p.currency,
+            stock: inv ? inv.quantity : null,
+            promised: inv ? inv.promised : 0,
+            canSell: inv ? Math.max(0, inv.quantity - inv.promised) : null,
+            lowStockAlert: inv ? inv.lowStockAlert : null,
+            soldOut: !inv && p.soldOut === true,
+            updatedAt: p.updatedAt,
+            categoryId: p.categoryId,
+            places: p.listings,
+        };
+    });
+}
+
+/**
+ * A price range is the variants', never a storefront's (the design): a
+ * variant without its own price sells at the product's.
+ */
+export function priceRange(
+    price: string,
+    variants: readonly { price: string | null }[],
+): { low: string; high: string } | null {
+    if (variants.length < 2) return null;
+    const prices = variants.map((v) => v.price ?? price);
+    const sorted = [...prices].sort((a, b) => Number(a) - Number(b));
+    const low = sorted[0];
+    const high = sorted[sorted.length - 1];
+    return Number(low) === Number(high) ? null : { low, high };
+}
+
+/**
+ * The row's second line, as the design writes it: "2 variants · SKU ·
+ * where it sells". A product without variants says nothing about them —
+ * never "0 variants" — so it reads as its SKU (if any) and its
+ * storefronts. `places` is left out when the view needn't say where.
+ */
+export function rowFacts(
+    row: Pick<CatalogueRow, "variantCount" | "sku" | "places">,
+    showPlaces: boolean,
+): { variants: string | null; sku: string | null; places: string | null } {
+    const n = row.variantCount;
+    return {
+        variants: n > 0 ? `${n} ${n === 1 ? "variant" : "variants"}` : null,
+        sku: row.sku?.trim() ? row.sku : null,
+        places:
+            showPlaces && row.places.length > 0
+                ? row.places.map((p) => p.storeName).join(" · ")
+                : null,
+    };
+}
+
+/** Stock as the row says it, and the colour role that reinforces it. */
+export type StockTone = "plain" | "warn" | "danger" | "muted";
+
+/**
+ * The Inventory column: "30 in stock", "Out of stock", "Not tracked",
+ * "Sold out". Coloured by what can be sold: nothing to sell is danger, at or
+ * under the product's own warning level is the accent, else plain. `null`
+ * stock means nothing here counts it, never a failed read: the stock comes
+ * in the catalogue read itself, and that read failing fails the page (its
+ * error boundary), so no row ever shows a guessed zero or "Not tracked".
+ */
+export function stockWords(
+    row: Pick<CatalogueRow, "stock" | "canSell" | "lowStockAlert" | "soldOut">,
+): { text: string; tone: StockTone } {
+    if (row.stock === null || row.canSell === null) {
+        return row.soldOut
+            ? { text: "Sold out", tone: "danger" }
+            : { text: "Not tracked", tone: "muted" };
     }
-    return Array.from(groups.entries(), ([key, places]) => toRow(key, places));
+    if (row.stock <= 0) return { text: "Out of stock", tone: "danger" };
+    const text = `${row.stock} in stock`;
+    if (row.canSell <= 0) return { text, tone: "danger" };
+    if (row.lowStockAlert !== null && row.lowStockAlert > 0) {
+        if (row.canSell <= row.lowStockAlert) return { text, tone: "warn" };
+    }
+    return { text, tone: "plain" };
 }
 
-/** The same row seen from one storefront: its own price, stock and status. */
-export function inStorefront(
-    row: CatalogueRow,
-    storeId: string,
-): CatalogueRow | null {
-    const here = row.places.filter((p) => p.storeId === storeId);
-    const first = here.at(0);
-    if (!first) return null;
-    const rest = here.slice(1);
-    // "Sold at" and "varies" stay facts about the product, not the filter.
-    return {
-        ...toRow(row.key, [first, ...rest]),
-        places: row.places,
-        varies: row.varies,
-    };
-}
-
-function toRow(key: string, places: Places): CatalogueRow {
-    const first = places[0].product;
-    const tracked = places.filter((p) => p.product.inventory);
-    const published = places.some((p) => p.product.status === "PUBLISHED");
-    const allArchived = places.every((p) => p.product.status === "ARCHIVED");
-    return {
-        key,
-        name: first.name,
-        sku: first.sku,
-        variantCount: Math.max(...places.map((p) => p.product.variantCount)),
-        // Live anywhere is live; archived only when archived everywhere.
-        status: published ? "PUBLISHED" : allArchived ? "ARCHIVED" : "DRAFT",
-        price: first.price,
-        currency: first.currency,
-        varies: places.some((p) => p.product.price !== first.price),
-        stock: tracked.length
-            ? tracked.reduce(
-                  (n, p) => n + (p.product.inventory?.quantity ?? 0),
-                  0,
-              )
-            : null,
-        lowStockAlert: tracked.length
-            ? Math.min(
-                  ...tracked.map(
-                      (p) => p.product.inventory?.lowStockAlert ?? 0,
-                  ),
-              )
-            : null,
-        updatedAt: places.reduce(
-            (latest, p) =>
-                p.product.updatedAt > latest ? p.product.updatedAt : latest,
-            first.updatedAt,
-        ),
-        inCollection: places.some((p) => p.product.categoryId !== null),
-        places,
-    };
+/** Two letters from the product's words: "Rye & caraway loaf" → "RC". */
+export function initials(name: string): string {
+    return name
+        .split(/[\s&]+/)
+        .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w))
+        .slice(0, 2)
+        .map((w) => w.charAt(0).toUpperCase())
+        .join("");
 }

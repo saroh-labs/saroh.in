@@ -38,7 +38,7 @@ export function ordersToCsv(orders: BusinessOrder[]): string {
         o.customer?.name ?? "",
         o.customer?.email ?? "",
         o.itemCount,
-        o.total,
+        o.total ?? "",
         o.currency,
         STANDING_WORD[o.standing],
     ]);

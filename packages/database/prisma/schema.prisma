@@ -104,6 +104,8 @@ model Organization {
   // Explicit customer identity links (#120): a user-confirmed connection between
   // a CRM Contact and a commerce Customer. Never an automatic merge.
   customerIdentityLinks CustomerIdentityLink[]
+  contactNotes          ContactNote[]
+  contactNoteAllergens  ContactNoteAllergen[]
 
   // Saved list views (#124): per-actor, per-resource named filter sets.
   savedViews SavedView[]
@@ -120,9 +122,34 @@ model Organization {
   // Per-organization feature-flag overrides (S1-012)
   featureFlagOverrides FeatureFlagOverride[]
 
+  // Time-bounded raises of one plan limit, granted from the admin console.
+  entitlementOverrides EntitlementOverride[]
+
   // Uploaded media objects, org-owned (S2-008). Bytes live in object storage
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
+
+  // Products v2 (#460): photos, per-variant stock, store options, defaults.
+  productImages      ProductImage[]
+  variantInventory   VariantInventory[]
+  productOptions     ProductOption[]
+  productOptionVals  ProductOptionValue[]
+  catalogueDefaults  CatalogueDefaults[]
+  productFields      ProductField[]
+  productFieldValues ProductFieldValue[]
+  storeAllergens     StoreAllergen[]
+  productAllergens   ProductAllergen[]
+
+  // Listings and stock per storefront (#510).
+  productListings        ProductListing[]
+  productListingVariants ProductListingVariant[]
+  stockLevels            StockLevel[]
+  stockEntries           StockEntry[]
+  stockCheckResolutions  StockCheckResolution[]
+
+  // Collections: hand-picked or automatic by category (#516).
+  collections        Collection[]
+  collectionProducts CollectionProduct[]
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
@@ -213,9 +240,10 @@ model Organization {
   // Subscriptions, invoices, courses and class packs (ADR-007).
   subscriptionPlans     SubscriptionPlan[]
   customerSubscriptions CustomerSubscription[]
+  subscriptionSkips     SubscriptionSkip[]
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
-  invoiceSequence       InvoiceSequence?
+  invoiceSequences      InvoiceSequence[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -223,6 +251,15 @@ model Organization {
   classPackServices     ClassPackService[]
   packPurchases         PackPurchase[]
   packRedemptions       PackRedemption[]
+
+  // Staff who take bookings, their hours and the business's booking rules
+  // (ADR-008, U3).
+  staffMembers    StaffMember[]
+  staffServices   StaffService[]
+  staffHours      StaffHours[]
+  staffTimeOff    StaffTimeOff[]
+  staffExtraHours StaffExtraHours[]
+  bookingRules    BookingRules?
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -246,6 +283,52 @@ model BusinessProfile {
   // sets it; the subscribe flow asks when it is missing.
   timezone String?
 
+  // GST (ADR-008, U5). A registered business issues tax invoices; its GSTIN
+  // is `taxId`, checked against `gstState` (a two-digit GST state code, e.g.
+  // "29" Karnataka) when registration is switched on. Unregistered: receipts.
+  // `gstState` is also the state of the registered address below, registered
+  // or not — one field, so the address and the GSTIN can never disagree.
+  gstRegistered Boolean @default(false)
+  gstState      String?
+
+  // The registered address (CGST rule 46: a tax invoice names the supplier's
+  // address). Required once GST-registered; its state is `gstState`. Copied
+  // onto each invoice at issue (`Invoice.sellerAddress`).
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  postalCode          String?
+  // The invoice number's prefix ("RC" → RC/26-27/0001 when registered,
+  // RC-0001 when not). Null: the legacy INV series.
+  invoicePrefix       String?
+  // How the business's invoice numbers are built — { parts, separator,
+  // digits, restart } (invoices/numbering.ts, NumberFormat). Null: the
+  // default for its GST standing, the numbers every business had before it
+  // could choose (RC/26-27/0001 registered, RC-0001 not).
+  invoiceNumberFormat Json?
+  // Delivery on an order's invoice is a taxed line: this rate and SAC.
+  deliveryGstRate     Decimal @default(18) @db.Decimal(5, 2)
+  deliverySacCode     String?
+
+  // The logo printed at the top of the business's invoices and receipts: a
+  // library object, and the address it is served from, taken when it was
+  // set (the product-photo pattern). The library refuses to delete it while
+  // it is the logo; the SetNull is only a backstop.
+  logoMediaId String?
+  logoMedia   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+  logoUrl     String?
+
+  // Products (#484, the business's since #529): how the editor suggests a
+  // SKU. Null = the built-in pattern; suggestions off leave the SKU empty.
+  skuPattern String?
+  skuSuggest Boolean @default(true)
+
+  // Track stock for the whole business (#515). Off: every product always
+  // sells and nothing is counted, whatever its own switch says; turned off
+  // only while nothing is promised anywhere, with a counted-to-0 entry per
+  // shelf that had stock. No profile yet reads as on.
+  stockTracking Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -267,6 +350,9 @@ model Membership {
   // rather than to an error nobody can sign in past. Still OWNER, ADMIN,
   // MEMBER or REVIEWER for every business that has invented nothing.
   role String @default("MEMBER")
+
+  // The staff member this team member is on the diary as, if any (U3).
+  staffMember StaffMember?
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -406,12 +492,19 @@ model Media {
   sizeBytes   Int
   filename    String
   purpose     String? // logical bucketing, e.g. product-image, avatar
-  status      String  @default("PENDING") // PENDING → READY
+  status      String  @default("PENDING") // PENDING → READY, or FAILED when the bytes are not what the type says
 
   uploadedByUserId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Products that show this object. Taking it off a product never deletes it.
+  productImages  ProductImage[]    @relation("ProductImageMedia")
+  // Product videos that use it as their poster.
+  productPosters ProductImage[]    @relation("ProductImagePoster")
+  // The business whose logo it is (at most one: a logo is per business).
+  businessLogos  BusinessProfile[] @relation("BusinessLogo")
 
   @@index([organizationId])
 }
@@ -474,6 +567,19 @@ model Store {
 
   productReviews ProductReview[]
 
+  productOptions    ProductOption[]
+  catalogueDefaults CatalogueDefaults[]
+  productFields     ProductField[]
+  allergens         StoreAllergen[]
+
+  // What it sells from the business's catalogue, and its shelf (#510).
+  listings     ProductListing[]
+  stockLevels  StockLevel[]
+  stockEntries StockEntry[]
+
+  // The target of (storeId, organizationId) foreign keys: a listing or a
+  // stock row can only name a storefront of its own business.
+  @@unique([id, organizationId])
   @@index([slug])
   @@index([createdAt])
 }
@@ -540,30 +646,92 @@ model StoreInvitation {
 // E-COMMERCE: PRODUCTS
 // ============================================================================
 
+// A product in the business's catalogue (#510, ADR-010). Storefronts sell it
+// through a ProductListing and count it in StockLevel.
 model Product {
-  id             String        @id @default(cuid())
-  storeId        String
-  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when a product belonged to
+  // one. Kept for the readers that still scope by it until #531; a store
+  // going never takes a catalogue product with it. Dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   name        String
   slug        String
   description String? @db.Text
+  // The cover, mirrored from the first ProductImage so lists, orders and
+  // imports keep reading one string. Written only through the photo set.
   image       String?
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  price    Decimal @db.Decimal(10, 2)
-  currency String  @default("USD")
+  price    Decimal  @db.Decimal(10, 2)
+  // The printed / compare-at price, shown struck through. At or above price.
+  mrp      Decimal? @db.Decimal(10, 2)
+  currency String   @default("USD")
 
-  status String @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  status     String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  // When it was last archived (#485); null unless status is ARCHIVED.
+  archivedAt DateTime?
+
+  // Details (products v2). Each customer-facing one has a switch in
+  // shopFields: { howToUse, materials, keyPoints, maker, warranty, returns }.
+  howToUse     String?
+  materials    String?  @db.Text
+  keyPoints    String[] @default([])
+  madeHere     Boolean  @default(true)
+  maker        String?
+  madeIn       String?
+  supplierCode String? // team only, never on the shop
+  warranty     String?
+  returnsMode  String   @default("STOREFRONT") // STOREFRONT | OWN
+  returnsText  String?
+  shopFields   Json     @default("{}")
+
+  // GST (ADR-008, U5): the rate the price includes and the HSN code, printed
+  // on a registered business's tax invoice. Null rate: not set (0% on paper).
+  gstRate Decimal? @db.Decimal(5, 2)
+  hsnCode String?
+
+  // SEO — stored and edited; the website renders them later (#473).
+  seoTitle       String?
+  seoDescription String?
+  seoImageId     String?
+  seoImage       ProductImage? @relation("ProductSeoImage", fields: [seoImageId], references: [id], onDelete: SetNull)
+
+  // Track stock (#515). Off: it always sells and nothing counts it — its
+  // StockLevel rows stay (at 0, for the log) but hold nothing. Turned off
+  // only while nothing is promised, with a counted-to-0 entry per shelf that
+  // had stock; turned on at 0. A line placed while off stays untracked for
+  // life. Counts only while the business tracks stock too
+  // (BusinessProfile.stockTracking). stockTrackedAt: when it last started
+  // counting, so a sale made before then isn't a missed one.
+  stockTracked   Boolean   @default(false)
+  stockTrackedAt DateTime?
+
+  // The one store option its variants are chosen by ("Customers choose by").
+  optionId String?
+  option   ProductOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
 
   // Relations
   variants   ProductVariant[]
   orderItems OrderItem[]
+  // The stock as it was counted before StockLevel (#510). No longer
+  // written; kept until a later deploy drops it.
   inventory  Inventory?
+  images     ProductImage[]   @relation("ProductImages")
+
+  // Where it is sold, and its shelf at each storefront (#510).
+  listings        ProductListing[]
+  listingVariants ProductListingVariant[]
+  stockLevels     StockLevel[]
+  stockEntries    StockEntry[]
+
+  // The hand-picked collections it is in (#516). Kept while it is archived.
+  collections CollectionProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -572,10 +740,18 @@ model Product {
 
   reviews ProductReview[]
 
-  @@unique([storeId, slug])
+  fieldValues ProductFieldValue[]
+  allergens   ProductAllergen[]
+
+  // A product's address is unique in its business (#510).
+  @@unique([organizationId, slug])
+  // The target of (productId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([storeId])
   @@index([categoryId])
   @@index([organizationId])
+  @@index([optionId])
+  @@index([seoImageId])
 }
 
 model ProductVariant {
@@ -586,20 +762,256 @@ model ProductVariant {
   sku   String
   title String // e.g., "Red / Large"
 
-  price Decimal? @db.Decimal(10, 2)
+  price Decimal? @db.Decimal(10, 2) // null = the product's
+  mrp   Decimal? @db.Decimal(10, 2) // null = the product's
   image String?
+
+  // Its value of the product's option; deleting a value in use is refused.
+  optionValueId String?
+  optionValue   ProductOptionValue? @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+  // The product photo shown when someone picks it; null = the cover.
+  imageId       String?
+  photo         ProductImage?       @relation("VariantPhoto", fields: [imageId], references: [id], onDelete: SetNull)
+  position      Int                 @default(0)
+
+  // No longer written (#510); StockLevel counts per storefront.
+  inventory  VariantInventory?
+  orderItems OrderItem[]
+
+  // The storefronts that sell it, and its shelf at each (#510).
+  listings     ProductListingVariant[]
+  stockLevels  StockLevel[]
+  stockEntries StockEntry[]
 
   createdAt DateTime @default(now())
 
   @@unique([productId, sku])
+  // The target of (variantId, productId) foreign keys: a row naming a
+  // variant names that variant's own product.
+  @@unique([id, productId])
+  @@index([optionValueId])
+  @@index([imageId])
 }
 
-model Category {
+// A product's photos, in the order customers see them; position 0 is the
+// cover. At most five (enforced by the API). Taking one off deletes this row,
+// never the Media object behind it.
+model ProductImage {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation("ProductImages", fields: [productId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  url      String
+  mediaId  String?
+  media    Media?  @relation("ProductImageMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+  alt      String  @default("")
+  width    Int?
+  height   Int?
+  position Int
+
+  // "photo" or "video" (#517). A video always comes from an uploaded MP4 or
+  // MOV (mediaId); its poster is an image from the library, never a free URL.
+  // posterUrl mirrors the poster's address the way url mirrors the media's.
+  kind          String  @default("photo")
+  durationSec   Int?
+  posterMediaId String?
+  poster        Media?  @relation("ProductImagePoster", fields: [posterMediaId], references: [id], onDelete: SetNull)
+  posterUrl     String?
+
+  // Photographer credit, for images from a licensed library (e.g. Unsplash).
+  creditName String?
+  creditUrl  String?
+
+  createdAt DateTime @default(now())
+
+  variants    ProductVariant[] @relation("VariantPhoto")
+  seoProducts Product[]        @relation("ProductSeoImage")
+
+  @@index([productId, position])
+  @@index([organizationId])
+}
+
+// The business's variant option names ("Size", "Shade") and their values.
+model ProductOption {
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  position Int    @default(0)
+
+  values   ProductOptionValue[]
+  products Product[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, name])
+  @@index([storeId])
+}
+
+model ProductOptionValue {
   id             String        @id @default(cuid())
-  storeId        String
-  store          Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  optionId       String
+  option         ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  value    String
+  position Int    @default(0)
+
+  variants ProductVariant[]
+
+  @@unique([optionId, value])
+  @@index([organizationId])
+}
+
+// What a new product starts with. key "all" is All products; otherwise the
+// key is the category's id and a null field falls through to "all".
+model CatalogueDefaults {
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key        String
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  howToUse      String?
+  lowStockAlert Int?
+  returnsMode   String? // STOREFRONT | OWN
+  returnsText   String?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([storeId])
+}
+
+/// A thing a product records beyond the standard details (#482) — "Keeps
+/// for", "Skin type" — asked of the products in the categories it names.
+/// Team only unless `onShop`. Deleting one keeps its values for 30 days.
+model ProductField {
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name      String
+  type      String    @default("TEXT") // TEXT | NUMBER | DATE | YES_NO
+  onShop    Boolean   @default(false)
+  position  Int       @default(0)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  categories ProductFieldCategory[]
+  values     ProductFieldValue[]
+
+  @@index([storeId])
+  @@index([organizationId])
+}
+
+model ProductFieldCategory {
+  id         String       @id @default(cuid())
+  fieldId    String
+  field      ProductField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, categoryId])
+  @@index([categoryId])
+}
+
+model ProductFieldValue {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fieldId        String
+  field          ProductField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  value String
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, fieldId])
+  @@index([fieldId])
+  @@index([organizationId])
+}
+
+/// The business's allergen list (#483, #529) — what the editor offers under
+/// "Contains" and "May contain". A new business starts with none.
+model StoreAllergen {
+  id             String       @id @default(cuid())
+  // The storefront it was first made at, from when settings were kept per
+  // storefront. The business owns it (#529); nothing reads this, and it is
+  // dropped in a later deploy.
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  position Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  products     ProductAllergen[]
+  // Customers' notes that name it (U8). Removing it is refused while any do.
+  contactNotes ContactNoteAllergen[]
+
+  @@index([storeId])
+  @@index([organizationId])
+}
+
+model ProductAllergen {
+  id             String        @id @default(cuid())
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  allergenId     String
+  // NoAction, not deferrable: it fails a same-statement cascade just as
+  // Restrict would, so deleting a storefront in one statement is refused
+  // while its products list allergens. Remove ProductAllergen rows (or the
+  // products, which cascade them) before StoreAllergen, in one transaction —
+  // as the seed's deleteSeeded removes products before their store. Removing
+  // an allergen a product lists is refused in the API with the count.
+  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: NoAction)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind String // CONTAINS | MAY_CONTAIN
+
+  @@unique([productId, allergenId])
+  @@index([allergenId])
+  @@index([organizationId])
+}
+
+// The business's product categories (#529): one list, whatever storefront
+// sells the product. Slugs are unique per business.
+model Category {
+  id             String       @id @default(cuid())
+  // The storefront it was first made at; nothing reads it (see ProductOption).
+  storeId        String?
+  store          Store?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   name     String
   slug     String
@@ -612,9 +1024,66 @@ model Category {
   createdAt DateTime @default(now())
 
   discountReach DiscountCategory[]
+  defaults      CatalogueDefaults[]
+  fields        ProductFieldCategory[]
+  // Automatic collections that fill themselves from it (#516).
+  collections   Collection[]
 
-  @@unique([storeId, slug])
+  @@unique([organizationId, slug])
+  // The target of (categoryId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([storeId])
+}
+
+/// A collection (#516): hand-picked (its products are stored, in order) or
+/// automatic by category (its products are read from the category when
+/// asked, never stored) — never both. Archived products don't show in
+/// either; a hand-picked membership is kept, so "Sell again" restores it.
+model Collection {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  slug        String
+  description String?
+
+  // Set: automatic — every product in this category that isn't archived.
+  // Null: hand-picked. A category an automatic collection uses can't be
+  // deleted: the categories service says which collection, and the key
+  // refuses it too. NoAction, not Restrict, so deleting the business —
+  // which takes both — still works (checked at the end of the statement).
+  categoryId String?
+  category   Category? @relation(fields: [categoryId, organizationId], references: [id, organizationId], onDelete: NoAction)
+
+  products CollectionProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  // The target of (collectionId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([categoryId])
+}
+
+/// A product hand-picked into a collection, at a position (#516).
+model CollectionProduct {
+  collectionId   String
+  collection     Collection   @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  createdAt DateTime @default(now())
+
+  @@id([collectionId, productId])
+  // A hand-picked collection's products, in order.
+  @@index([collectionId, position])
+  @@index([productId])
   @@index([organizationId])
 }
 
@@ -638,6 +1107,190 @@ model Inventory {
 
   @@index([storeId])
   @@index([organizationId])
+}
+
+// Stock for one variant. A product with variants counts here, one row per
+// variant; its total is the sum. Orders reserve and commit against the
+// variant their line names.
+model VariantInventory {
+  id             String         @id @default(cuid())
+  variantId      String         @unique
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  productId      String
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  quantity      Int @default(0)
+  reserved      Int @default(0) // promised to open orders; only Orders moves it
+  lowStockAlert Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([organizationId])
+}
+
+// A storefront selling a product from the business's catalogue (#510,
+// ADR-010). A product with variants sells only the variants listed in
+// ProductListingVariant; a new variant is listed wherever its product is.
+// Unlisting keeps the storefront's StockLevel rows and their stock.
+model ProductListing {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  storeId   String
+  store     Store   @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // Marked Sold out by hand at this storefront (#515). Only an untracked
+  // product carries it: it refuses new shop and staff orders here until it
+  // is marked available again. Turning tracking on clears it.
+  soldOutAt       DateTime?
+  soldOutByUserId String?
+
+  variants ProductListingVariant[]
+
+  @@unique([storeId, productId])
+  // The target of (listingId, productId) foreign keys.
+  @@unique([id, productId])
+  @@index([productId])
+  @@index([organizationId])
+}
+
+// A variant a storefront sells. A variant with no row at a storefront that
+// lists its product is "Not sold here".
+model ProductListingVariant {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  listingId String
+  productId String
+  listing   ProductListing @relation(fields: [listingId, productId], references: [id, productId], onDelete: Cascade)
+  product   Product        @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  @@unique([listingId, variantId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([organizationId])
+}
+
+// One storefront's shelf of one product (variantId null: the product counts
+// as a whole) or of one variant (#510). A product counts stock at a
+// storefront while it has a row there. `promised` belongs to Orders: the
+// sum of open lines' heldQuantity on this row. Written only under a row
+// lock, found and created rather than upserted (the uniques are partial).
+model StockLevel {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  storeId   String
+  store     Store           @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  onHand        Int @default(0)
+  promised      Int @default(0)
+  lowStockAlert Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  orderItems       OrderItem[]
+  entries          StockEntry[]
+  checkResolutions StockCheckResolution[]
+
+  @@unique([id, organizationId])
+  @@unique([storeId, productId], map: "StockLevel_storeId_productId_whole_key", where: raw("\"variantId\" IS NULL"))
+  @@unique([storeId, variantId], map: "StockLevel_storeId_variantId_key", where: raw("\"variantId\" IS NOT NULL"))
+  @@index([productId])
+  @@index([variantId])
+  @@index([organizationId])
+  // Rows promising anything, for the held-stock check (#511).
+  @@index([organizationId], map: "StockLevel_promising_idx", where: raw("promised <> 0"))
+}
+
+// The stock log (#513): one entry for every change to what is on a shelf —
+// never a promise — so a row's entries add up to its on hand, and each entry
+// reads before + quantity = after. Entries are never edited or deleted; Undo
+// writes a REVERSED entry pointing at the one it undoes. A move is two
+// entries (−N here, +N there) sharing a pairId. A count keeps what the
+// counter was shown (expected) and what they counted; the shelf had moved
+// meanwhile when expected differs from before ("Count didn't match").
+// Store, product and variant repeat the row's, for filtering the log.
+enum StockEntryKind {
+  SOLD
+  RETURNED
+  BAKED
+  RECEIVED
+  WASTED
+  COUNTED
+  MOVED
+  REVERSED
+}
+
+model StockEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  stockLevelId String
+  stockLevel   StockLevel      @relation(fields: [stockLevelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  storeId      String
+  store        Store           @relation(fields: [storeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  productId    String
+  product      Product         @relation(fields: [productId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  variantId    String?
+  variant      ProductVariant? @relation(fields: [variantId, productId], references: [id, productId], onDelete: Cascade)
+
+  kind     StockEntryKind
+  // Signed change to on hand.
+  quantity Int
+  before   Int
+  after    Int
+
+  // COUNTED only: what the counter was shown, and what they counted.
+  expected Int?
+  counted  Int?
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // The two sides of a move, or of undoing one.
+  pairId  String?
+
+  // On a REVERSED entry: the entry it undoes. Unique, so nothing is undone twice.
+  reversesId String?     @unique
+  reverses   StockEntry? @relation("StockEntryReversal", fields: [reversesId], references: [id], onDelete: SetNull)
+  reversedBy StockEntry? @relation("StockEntryReversal")
+
+  // Who made the change. Not a foreign key, like OrderEvent: someone who
+  // leaves the team keeps their entries. Null for the system.
+  actorUserId String?
+  note        String?
+  // Why Saroh wrote this entry, not a person or an order: TRACKING_OFF
+  // (Track stock turned off counted the shelf to 0), PER_VARIANT (the switch
+  // to counting each variant) or VARIANT_REMOVED (a removed variant's stock
+  // taken back to the product). Null for everything else. An entry Saroh
+  // wrote is never undone through the stock log.
+  system      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([stockLevelId, createdAt])
+  @@index([storeId, createdAt])
+  @@index([productId])
+  @@index([variantId])
+  @@index([orderId])
+  @@index([pairId])
 }
 
 // ============================================================================
@@ -708,6 +1361,42 @@ model Cart {
 // E-COMMERCE: ORDERS
 // ============================================================================
 
+// A stock check someone has looked at and resolved (#514). The checks
+// themselves are computed when read (GET organizations/:org/stock/checks):
+// a shelf short of what is promised, a count that didn't match the log, a
+// sale not taken from stock, and promised not adding up to what open order
+// lines hold. `key` names one check ("short:<stockLevelId>", …);
+// `fingerprint` is what it read when it was resolved, so a check whose
+// numbers move on opens again. Never deleted by the app.
+enum StockCheckKind {
+  SHORT
+  COUNT_MISMATCH
+  SALE_NOT_TAKEN
+  PROMISED_MISMATCH
+}
+
+model StockCheckResolution {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key         String
+  kind        StockCheckKind
+  fingerprint String
+
+  // The shelf the check is about, when it is about one.
+  stockLevelId String?
+  stockLevel   StockLevel? @relation(fields: [stockLevelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // Who resolved it. Not a foreign key, like StockEntry.actorUserId.
+  resolvedByUserId String?
+  note             String?
+  resolvedAt       DateTime @default(now())
+
+  @@unique([organizationId, key])
+  @@index([stockLevelId])
+}
+
 model Order {
   id             String        @id @default(cuid())
   storeId        String
@@ -739,6 +1428,34 @@ model Order {
   // Org-owned payment intents against this order (Stage 5 — S5-002).
   paymentIntents PaymentIntent[]
 
+  // The kitchen flow (ADR-008, U6). The stage sits UNDER `status`: each
+  // stage move maps to a status move (order-stage.ts), and every move is an
+  // OrderEvent. Existing orders were backfilled from their status.
+  stage      OrderStage      @default(NEW)
+  fulfilment OrderFulfilment @default(COLLECT)
+
+  // Where a DELIVERY order goes. `deliveryState` is also the place of
+  // supply for GST when no bill-to state is set (U5).
+  deliveryName       String?
+  deliveryPhone      String?
+  deliveryLine1      String?
+  deliveryLine2      String?
+  deliveryCity       String?
+  deliveryState      String?
+  deliveryPostalCode String?
+
+  // What the counter needs to know ("no sesame", "ring the bell").
+  notes       String?
+  // A typed courier tracking link — no courier integration (ADR-008).
+  trackingUrl String?
+
+  events       OrderEvent[]
+  stockEntries StockEntry[]
+
+  // Its invoice, and the credit notes and supplementary invoices that
+  // correct it (ADR-008, U5). The order stays the ledger.
+  invoices Invoice[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -760,12 +1477,115 @@ model OrderItem {
   productId String
   product   Product @relation(fields: [productId], references: [id])
 
+  // The variant bought. Null on lines from before per-variant stock, and on
+  // products without variants; those move the product's own stock.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
   quantity Int
   price    Decimal @db.Decimal(10, 2)
 
+  // Where this line's reservation sits, set when the order first holds
+  // stock; every later release or fulfil settles on the same row. NONE: the
+  // product counted no stock, so nothing was held. Null only on lines from
+  // before this was recorded (open ones were backfilled).
+  stockRow StockRow?
+
+  // The storefront shelf row the line's stock sits on (#510), set with
+  // stockRow and kept after the line is fulfilled, and how many units the
+  // line holds on it right now. Null with stockRow NONE, for life.
+  stockLevelId String?
+  stockLevel   StockLevel? @relation(fields: [stockLevelId], references: [id], onDelete: SetNull)
+  heldQuantity Int         @default(0)
+  // How many units the line took off that shelf when it was fulfilled
+  // (#511): a kitchen undo holds them again, and a return puts back at most
+  // this many less what was already put back.
+  soldQuantity Int         @default(0)
+
   review ProductReview?
 
+  // What has been refunded of this line (U6): caps the next line refund.
+  refundLines PaymentRefundLine[]
+
+  // The invoice lines that bill it (U5): a line refund credits these.
+  invoiceLines InvoiceLine[]
+
   @@index([orderId])
+  @@index([variantId])
+  @@index([stockLevelId])
+  // Lines holding stock, for the held-stock check (#511): few of all lines.
+  @@index([stockLevelId], map: "OrderItem_holding_idx", where: raw("\"heldQuantity\" <> 0"))
+}
+
+enum StockRow {
+  PRODUCT
+  VARIANT
+  NONE
+}
+
+// The kitchen stage (ADR-008). NEW → PREPARING → READY → COLLECTED, or
+// READY → HANDED_TO_COURIER → DELIVERED for a delivery.
+enum OrderStage {
+  NEW
+  PREPARING
+  READY
+  COLLECTED
+  HANDED_TO_COURIER
+  DELIVERED
+}
+
+enum OrderFulfilment {
+  COLLECT
+  DELIVERY
+}
+
+enum OrderEventKind {
+  // A kitchen stage move (and the status move it maps to).
+  STAGE
+  // The Undo of the last STAGE step; `undoesEventId` names it.
+  UNDO
+  // A status change made outside the kitchen flow (cancel, the legacy PATCH).
+  STATUS
+  // Items, address, fulfilment or notes changed before preparing.
+  EDIT
+  // A refund asked for, by line or in full.
+  REFUND
+}
+
+// One step on an order's timeline (ADR-008, U6): who, when, from → to. Undo
+// reverts only the latest step, within a server-side limit, and marks it
+// `undoneAt`. Org-owned, RLS org_isolation.
+model OrderEvent {
+  id             String @id @default(cuid())
+  organizationId String
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  kind OrderEventKind
+
+  // Who took the step. Not a foreign key: someone who leaves the team keeps
+  // their steps on the timeline. Null for the system (a webhook).
+  actorUserId String?
+
+  fromStage  OrderStage?
+  toStage    OrderStage?
+  fromStatus String?
+  toStatus   String?
+  note       String?
+
+  // Money this step moved (a refund, an edit's difference), minor units.
+  // Left out of every read by a role without a money permission.
+  amountCents Int?
+
+  // Set on a STAGE step when it is undone; on the UNDO step, which one.
+  undoneAt      DateTime?
+  undoesEventId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -1004,6 +1824,11 @@ model StoreSettings {
   // Theme
   theme        String  @default("light") // light, dark, custom
   primaryColor String?
+
+  // Products (#484). Moved to the business (BusinessProfile, #529) and no
+  // longer read; dropped in a later deploy.
+  skuPattern String?
+  skuSuggest Boolean @default(true)
 
   updatedAt DateTime @updatedAt
 }
@@ -1367,6 +2192,68 @@ model AdminAuditEvent {
   @@index([targetType, targetId, createdAt])
 }
 
+// An operator's note on one Organization, written in the admin console and
+// read only there. Relation-free like AdminAuditEvent: a note is the platform's
+// record about a business, not the business's own data, so it never cascades
+// from a tenant delete and no tenant path reads it.
+model AdminOrganizationNote {
+  id String @id @default(cuid())
+
+  organizationId String
+  authorUserId   String
+  body           String
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+// A durable bulk operation run from the admin console: retry a set of failed
+// jobs, replay a set of webhook deliveries. The operation and one row per
+// target are written before anything executes, so a restart resumes from the
+// items still PENDING and the record says what happened to each one.
+model AdminOperation {
+  id String @id @default(cuid())
+
+  kind        String // "jobs.retry" | "webhooks.replay"
+  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  actorUserId String
+  reason      String
+
+  idempotencyKey String @unique
+
+  total     Int @default(0)
+  succeeded Int @default(0)
+  skipped   Int @default(0)
+  failed    Int @default(0)
+
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  items AdminOperationItem[]
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model AdminOperationItem {
+  id String @id @default(cuid())
+
+  operationId String
+  operation   AdminOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  targetType String // "job" | "webhook_event"
+  targetId   String
+
+  status      String    @default("PENDING") // PENDING | DONE | SKIPPED | FAILED
+  detail      String?
+  processedAt DateTime?
+
+  @@unique([operationId, targetId])
+  @@index([operationId, status])
+}
+
 // ============================================================================
 // PROJECTS, TEAMS & PROJECT-LEVEL ACCESS (S1-010)
 // ============================================================================
@@ -1480,6 +2367,47 @@ model CustomerIdentityLink {
   createdAt      DateTime @default(now())
 
   @@unique([contactId, customerId])
+  @@index([organizationId])
+}
+
+// ContactNote: what the team has written down about a person (U8, ADR-008).
+// Free text, plus the allergens it names as ids from the storefront's own
+// allergen list — structured, not typed, so an order's allergy banner matches
+// a product's "Contains" / "May contain" exactly rather than by spelling.
+// Rooted on the Contact (every business kind has one); deleted with it.
+model ContactNote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  body String @default("")
+
+  allergens ContactNoteAllergen[]
+
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([contactId, createdAt])
+  @@index([organizationId])
+}
+
+// One allergen a note names. NoAction on the allergen, as ProductAllergen:
+// removing an allergen from the list is refused in the API while a note names
+// it, so an allergy is never dropped from a customer's record in passing.
+model ContactNoteAllergen {
+  noteId         String
+  note           ContactNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  allergenId     String
+  allergen       StoreAllergen @relation(fields: [allergenId], references: [id], onDelete: NoAction)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, allergenId])
+  @@index([allergenId])
   @@index([organizationId])
 }
 
@@ -2118,6 +3046,9 @@ model Contact {
   packPurchases     PackPurchase[]
   courseEnrollments CourseEnrollment[]
 
+  // What the team has written down about this person (U8).
+  notes ContactNote[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2349,6 +3280,8 @@ model Job {
   // the next run is enqueued with insert-on-conflict-do-nothing, so a retried
   // or reclaimed run can never fork a second chain.
   @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
+  // One waiting run of the booking-hold sweep (U19), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -2431,6 +3364,10 @@ model Service {
   priceCents Int? // optional price, minor units
   currency   String? // ISO 4217 when priced
 
+  // GST (ADR-008, U5): the rate the price includes and the SAC code.
+  gstRate Decimal? @db.Decimal(5, 2)
+  sacCode String?
+
   // IANA timezone the AvailabilityRules are expressed in, e.g. "Asia/Kolkata".
   timezone String
 
@@ -2446,6 +3383,8 @@ model Service {
   bookings          Booking[]
   courses           Course[]
   classPackServices ClassPackService[]
+  // Who takes it (U3). None: the service's own weekly rules, as before.
+  staffServices     StaffService[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2498,6 +3437,12 @@ model Booking {
 
   status String @default("CONFIRMED") // PENDING → CONFIRMED → CANCELLED
 
+  // A PENDING booking made to pay now on the booking page (U19, ADR-008)
+  // holds its place until this instant; after it the place is free again —
+  // at read time, and for good when the sweep job cancels the hold. Null on
+  // every other booking.
+  holdExpiresAt DateTime?
+
   // How the appointment actually went: ATTENDED, NO_SHOW, or null for one
   // nobody has said yet (#241). SEPARATE from `status` on purpose — status
   // says whether the booking stands, this says how it went, and collapsing
@@ -2529,6 +3474,26 @@ model Booking {
   courseEnrollment   CourseEnrollment? @relation(fields: [courseEnrollmentId], references: [id], onDelete: SetNull)
   packRedemption     PackRedemption?
 
+  // Who takes it (U3). Null on every booking made before staff existed —
+  // there is no backfill; the calendar shows them as Unassigned. SetNull so
+  // removing a person keeps their bookings.
+  staffId String?
+  staff   StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  // How it was paid: MEMBERSHIP | PACK | PAID | DESK, or null when nobody
+  // said (every booking made before this column). A membership booking names
+  // the subscription whose monthly classes it uses.
+  paidWith       String?
+  subscriptionId String?
+  subscription   CustomerSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  // Cancelled inside the business's free-cancellation window: a class paid
+  // with a pack or a membership keeps the class used (U3).
+  cancelledLate Boolean @default(false)
+
+  // A paid online booking's own invoice (ADR-008).
+  invoices Invoice[]
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -2541,6 +3506,134 @@ model Booking {
   // `migrate dev` as drift, and the migration it generates DROPS it.
   @@index([organizationId, outcome, endAt])
   @@index([courseEnrollmentId])
+  // One person's diary across services — the clash check and the calendar.
+  @@index([staffId, startAt])
+  @@index([subscriptionId])
+  // The sweep job's read: holds whose time ran out.
+  @@index([status, holdExpiresAt])
+  // The whole-business calendar's month: every booking in a date range.
+  @@index([organizationId, startAt])
+}
+
+/// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
+/// front-desk trainer may never sign in, so the membership is optional.
+model StaffMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The team member this person is, when they have an account. One staff
+  // member per membership; removing the member keeps the person on the diary.
+  membershipId String?     @unique
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  name  String // shown on the calendar and, as a display name, on the booking page
+  title String? // e.g. "Trainer", "Physio"
+
+  status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
+  archivedAt DateTime?
+
+  services   StaffService[]
+  hours      StaffHours[]
+  timeOff    StaffTimeOff[]
+  extraHours StaffExtraHours[]
+  bookings   Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+/// Which services a person takes. For a class, the person is its instructor:
+/// shown beside it and checked for clashes, but the class keeps its own times.
+model StaffService {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([staffId, serviceId])
+  @@index([organizationId])
+  @@index([serviceId])
+}
+
+/// A person's weekly working hours, in the business's own timezone.
+model StaffHours {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  dayOfWeek   Int // 0 = Sunday … 6 = Saturday
+  startMinute Int // minutes from local midnight, inclusive
+  endMinute   Int // exclusive; > startMinute
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, dayOfWeek])
+}
+
+/// Time a person is away. The reason is for the team only — no public read
+/// ever carries it, or that the person is off at all.
+model StaffTimeOff {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  startAt DateTime // absolute; a whole day starts at local midnight
+  endAt   DateTime // exclusive
+  allDay  Boolean  @default(false)
+  reason  String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, startAt])
+}
+
+/// One-off hours on one date, on top of the weekly ones (a closed day opened).
+model StaffExtraHours {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  date        DateTime @db.Date // the business's local calendar date
+  startMinute Int
+  endMinute   Int
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([staffId, date])
+}
+
+/// Business-wide booking rules (U3). No row, or a null column, is no rule —
+/// what every business had before, so nothing changes until one is set.
+model BookingRules {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  bookAheadDays        Int? // how far ahead a customer may book
+  latestBookingMinutes Int? // the latest a customer may book before a start
+  freeCancelHours      Int? // cancel at least this long before to get a class back
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -2638,7 +3731,9 @@ model PaymentIntent {
   amountCents Int // server-calculated from the Order or Invoice; minor units
   currency    String
 
-  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED
+  // CREATED → REQUIRES_PAYMENT → PROCESSING → SUCCEEDED | FAILED | CANCELLED,
+  // or SUPERSEDED: an edit's unpaid difference charge a later edit replaced
+  // (payments/intent-state.ts); money paid on it anyway is owed back.
   status String @default("CREATED")
 
   idempotencyKey String? // dedupe client "create intent" calls
@@ -2669,7 +3764,9 @@ model PaymentAttempt {
   provider    String
   providerRef String? // provider payment id
   // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
-  // taken on an invoice that was already paid or void when it arrived.
+  // taken on an invoice that was already paid or void when it arrived, or
+  // STOCK_HELD: Saroh's note that this payment's order held its units
+  // (stock/reserve.ts reserveOnPayment), not a provider interaction.
   status      String
   rawResponse Json? // provider response (sanitized), for audit
 
@@ -2695,11 +3792,50 @@ model PaymentRefund {
   providerRefundId String?
   reason           String?
 
+  // The client's key for one refund request (U6): a retry with the same key
+  // returns this refund instead of making another.
+  idempotencyKey String?
+  // Money handed back because the order was edited down before preparing —
+  // it lowers the order total, rather than refunding what was bought.
+  forEdit        Boolean @default(false)
+
+  // The order lines this refund covers, when it was asked for by line.
+  lines PaymentRefundLine[]
+
+  // The credit note this refund made on the order's invoice (U5).
+  creditNote Invoice?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([paymentIntentId, idempotencyKey])
   @@index([organizationId])
   @@index([paymentIntentId])
+}
+
+// How much of one order line a refund covers (U6). The next line refund is
+// capped at the line's paid amount less every non-failed row here.
+model PaymentRefundLine {
+  id             String @id @default(cuid())
+  organizationId String
+
+  paymentRefundId String
+  paymentRefund   PaymentRefund @relation(fields: [paymentRefundId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  quantity        Int
+  amountCents     Int
+  // Units the refund puts back on the shelf ("Put N back in stock", #511):
+  // a Returned entry once the provider confirms the refund, never before.
+  putBackQuantity Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([paymentRefundId])
+  @@index([orderItemId])
+  @@index([organizationId])
 }
 
 // WebhookEvent — the SIGNED webhook inbox (S5-003). Every provider callback is
@@ -3023,6 +4159,30 @@ model Subscription {
   @@index([planId])
 }
 
+// EntitlementOverride — one plan limit raised for one Organization, for a
+// while, by an operator (admin console). `EntitlementService` applies the
+// highest live override over the plan's own value; an expired or revoked row
+// is history and changes nothing. Numeric caps only: a feature a plan does not
+// include is a plan change, not a limit.
+model EntitlementOverride {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key   String
+  value Int
+
+  reason          String
+  grantedByUserId String
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, expiresAt])
+}
+
 // BillingWebhookEvent — the idempotent inbox for Saroh's billing-provider
 // webhooks (S7-005), the SaaS analogue of the merchant WebhookEvent. Signature
 // is verified before any write; @@unique([provider, providerEventId]) makes a
@@ -3325,7 +4485,12 @@ model SubscriptionPlan {
   interval    String // WEEK | MONTH | QUARTER | YEAR
   status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
 
-  subscriptions CustomerSubscription[]
+  // A membership's classes a month (U3). Null: as many as they like.
+  classesPerMonth Int?
+
+  subscriptions   CustomerSubscription[]
+  // Subscriptions switching to this plan at their next renewal.
+  pendingSwitches CustomerSubscription[] @relation("PendingPlan")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3361,7 +4526,22 @@ model CustomerSubscription {
   cancelledAt        DateTime?
   createdByUserId    String?
 
+  // The collection schedule: the ISO weekday (1 Monday … 7 Sunday) the
+  // customer collects on, in the subscription's timezone, and what they
+  // collect. Null weekday: nothing is collected (a membership). Collections
+  // are dated from it within each period, so a monthly plan can collect weekly.
+  collectionWeekday Int?
+  collectionNote    String?
+
+  // A plan change booked for the next renewal: the renewal (or a resume
+  // past the paid period) switches plan, price and interval, then clears it.
+  pendingPlanId String?
+  pendingPlan   SubscriptionPlan? @relation("PendingPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
+
   invoices Invoice[]
+  skips    SubscriptionSkip[]
+  // Classes booked on this membership (U3).
+  bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3372,6 +4552,25 @@ model CustomerSubscription {
   @@index([organizationId])
   @@index([contactId])
   @@index([status, currentPeriodEnd])
+  @@index([pendingPlanId])
+}
+
+// One collection a subscriber will not make, by its date in the
+// subscription's timezone. A period whose every collection is skipped before
+// it is invoiced is not charged; otherwise a skip changes the pickup only.
+model SubscriptionSkip {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   CustomerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  date            DateTime @db.Date // the collection's local date
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@unique([subscriptionId, date])
+  @@index([organizationId])
 }
 
 // A bill. DRAFT → ISSUED → PAID, or VOID. An issued invoice never changes: a
@@ -3381,15 +4580,52 @@ model Invoice {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  number String? // INV-0001…, assigned on issue; null while DRAFT
-  status String  @default("DRAFT") // DRAFT | ISSUED | PAID | VOID
+  number String? // INV-0001, RC/26-27/0001, PF-0001…; assigned on issue, null while DRAFT
+  // DRAFT | ISSUED | PAID | VOID | CREDITED. CREDITED: an issued invoice a
+  // credit note cancelled in full (ADR-008) — a registered business never voids.
+  status String  @default("DRAFT")
+
+  // INVOICE | CREDIT_NOTE | SUPPLEMENTARY (ADR-008). A credit note (down) or
+  // a supplementary invoice (up) corrects `relatedInvoiceId`, never edits it.
+  kind             String    @default("INVOICE")
+  relatedInvoiceId String?
+  relatedInvoice   Invoice?  @relation("InvoiceCorrection", fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+  corrections      Invoice[] @relation("InvoiceCorrection")
+
+  // What it bills when it is not hand-written: an order (one INVOICE per
+  // order; the order is the ledger, so it has no pay link) or a paid online
+  // booking. A credit note made by a refund names the refund.
+  orderId         String?
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  bookingId       String?
+  booking         Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  paymentRefundId String?        @unique
+  paymentRefund   PaymentRefund? @relation(fields: [paymentRefundId], references: [id], onDelete: SetNull)
 
   // Who it is billed to. The name and email are copied on issue, so an
   // invoice reads the same after the contact is edited or deleted.
-  contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  billToName  String?
-  billToEmail String?
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  billToName    String?
+  billToEmail   String?
+  // A registered buyer's GSTIN, their state (GST state code) and address.
+  billToGstin   String?
+  billToState   String?
+  billToAddress String?
+
+  // GST, frozen on issue (ADR-008). `sellerGstin` set = a tax invoice; null
+  // = a receipt. Place of supply is a GST state code; `taxType` INTRA (CGST +
+  // SGST) or INTER (IGST).
+  sellerGstin   String?
+  sellerState   String?
+  // The business's registered address as printed, frozen on issue like the
+  // GSTIN: settings edited later never change issued paper.
+  sellerAddress String?
+  placeOfSupply String?
+  taxType       String?
+  cgst          Decimal @default(0) @db.Decimal(12, 2)
+  sgst          Decimal @default(0) @db.Decimal(12, 2)
+  igst          Decimal @default(0) @db.Decimal(12, 2)
 
   currency String
   subtotal Decimal @db.Decimal(12, 2)
@@ -3441,9 +4677,16 @@ model Invoice {
   // One live invoice per subscription period: the renewal job's idempotency
   // key. Voided invoices are left out, so a voided period can be reissued.
   @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  // One invoice per order and per booking (ADR-008): the idempotency key of
+  // the payment reconciliation. Corrections are other kinds.
+  @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
+  @@unique([bookingId], map: "Invoice_one_per_booking", where: raw("kind = 'INVOICE'"))
   @@index([organizationId, status])
   @@index([contactId])
   @@index([subscriptionId])
+  @@index([orderId])
+  @@index([bookingId])
+  @@index([relatedInvoiceId])
 }
 
 model InvoiceLine {
@@ -3457,20 +4700,44 @@ model InvoiceLine {
   description String
   quantity    Int
   unitPrice   Decimal @db.Decimal(12, 2)
+  // What the line comes to: quantity × unit price less its discount. On a
+  // tax invoice this includes GST (prices include it).
   amount      Decimal @db.Decimal(12, 2)
+
+  // The order discount's share of this line, spread before tax (ADR-008).
+  discount Decimal @default(0) @db.Decimal(12, 2)
+
+  // GST, derived from `amount` and frozen (ADR-008). Null on a receipt.
+  hsnSac       String?
+  gstRate      Decimal? @db.Decimal(5, 2)
+  taxableValue Decimal? @db.Decimal(12, 2)
+  cgst         Decimal  @default(0) @db.Decimal(12, 2)
+  sgst         Decimal  @default(0) @db.Decimal(12, 2)
+  igst         Decimal  @default(0) @db.Decimal(12, 2)
+
+  // The order line it bills, so a line refund credits the right line.
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
 
   @@index([invoiceId])
   @@index([organizationId])
+  @@index([orderItemId])
 }
 
 // The last invoice number a business issued. Allocated with one
 // insert-or-increment statement on the issuing transaction, so numbers never
 // repeat and the first invoice needs no row to exist beforehand.
+// One counter per business and series (ADR-008): "INV" (the legacy series
+// every business had), "RC" / "RCCN" for a counter that never restarts,
+// "RC/26-27" / "RCCN/26-27" per financial year, "RC/2026-09" per month.
 model InvoiceSequence {
-  organizationId String       @id
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  series         String       @default("INV")
   lastNumber     Int          @default(0)
   updatedAt      DateTime     @updatedAt
+
+  @@id([organizationId, series])
 }
 
 // A fixed series of dated sessions on one service, sold once.

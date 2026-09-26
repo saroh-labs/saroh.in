@@ -28,6 +28,13 @@ import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { trimmedOr } from "@/lib/forms/values";
 import { createService } from "@/lib/services/actions";
 
+import {
+    gstDefaults,
+    gstFields,
+    gstPayload,
+    ServiceGstFields,
+} from "@/components/bookings/service-gst-fields";
+
 /**
  * Create a bookable Service (S4-003). Collects the terms a Service needs to be
  * bookable — name, slot duration, buffers, capacity, timezone and an optional
@@ -73,6 +80,7 @@ const formSchema = z
             { message: "Price must be a positive amount" },
         ),
         currency: z.string().optional(),
+        ...gstFields,
         ...locationFields,
     })
     .superRefine(checkLocation);
@@ -93,6 +101,7 @@ export function CreateServiceForm() {
             timezone: guessTimezone(),
             price: "",
             currency: "",
+            ...gstDefaults(),
             locationType: "IN_PERSON",
             meetingUrl: "",
         },
@@ -119,12 +128,17 @@ export function CreateServiceForm() {
             currency: values.currency?.trim()
                 ? values.currency.trim().toUpperCase()
                 : undefined,
+            ...gstPayload(values),
             ...locationPayload(values),
         });
 
         if (!res.ok) {
             if (res.field === "meetingUrl") {
                 form.setError("meetingUrl", { message: res.error });
+                return;
+            }
+            if (res.field === "gstRate" || res.field === "sacCode") {
+                form.setError(res.field, { message: res.error });
                 return;
             }
             showError(res.error);
@@ -336,6 +350,8 @@ export function CreateServiceForm() {
                         )}
                     />
                 </div>
+
+                <ServiceGstFields disabled={isSubmitting} index={5} />
 
                 <Button
                     type="submit"

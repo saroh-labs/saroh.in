@@ -1,3 +1,4 @@
+import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import {
     ANALYTICS_DAYS,
@@ -11,6 +12,7 @@ import {
     LEADS,
     LIVE_PAYMENT_PROVIDER,
     MODULE_STATES,
+    ONLINE_STOCK,
     ORDERS,
     ORG_NAME,
     ORG_SLUG,
@@ -32,12 +34,16 @@ import {
 } from "./data";
 import type { Db } from "./helpers";
 import {
+    assertHeldStock,
     at,
+    balanceStockLog,
     buildAnalyticsRows,
     emailFor,
     hashPassword,
     id,
+    listProductAt,
     publishSeedPost,
+    setStockLevel,
     writeSite,
 } from "./helpers";
 
@@ -247,6 +253,14 @@ export async function seed(): Promise<void> {
     await seedProviders(prisma, org.id, siteIds, now);
     await seedAnalytics(prisma, org.id, now);
 
+    // Every shelf the seed set opens its stock log (#513), counted by the
+    // owner when the seed ran — never later than now.
+    await balanceStockLog(prisma, {
+        organizationId: org.id,
+        at: now,
+        actorUserId: user.id,
+    });
+    await assertHeldStock(prisma, org.id);
     await report(prisma, org.id);
 }
 
@@ -507,12 +521,15 @@ async function seedCommerce(
     const categories: string[] = [];
     for (let i = 0; i < CATEGORIES.length; i++) {
         const c = CATEGORIES[i];
+        // The business's categories (#529): keyed by the business, not the
+        // storefront.
         const category = await prisma.category.upsert({
-            where: { storeId_slug: { storeId: store.id, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.slug },
+            },
+            update: { name: c.name },
             create: {
                 id: id("category", i),
-                storeId: store.id,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.slug,
@@ -522,10 +539,13 @@ async function seedCommerce(
     }
 
     const productIds: string[] = [];
+    const variantsOf: string[][] = [];
     for (let i = 0; i < PRODUCTS.length; i++) {
         const p = PRODUCTS[i];
         const product = await prisma.product.upsert({
-            where: { storeId_slug: { storeId: store.id, slug: p.slug } },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: p.slug },
+            },
             update: { name: p.name, price: p.price, status: "PUBLISHED" },
             create: {
                 id: id("product", i),
@@ -542,9 +562,10 @@ async function seedCommerce(
         });
         productIds.push(product.id);
 
+        const variantIds: string[] = [];
         for (let v = 0; v < p.variants.length; v++) {
             const variant = p.variants[v];
-            await prisma.productVariant.upsert({
+            const row = await prisma.productVariant.upsert({
                 where: {
                     productId_sku: { productId: product.id, sku: variant.sku },
                 },
@@ -557,22 +578,42 @@ async function seedCommerce(
                     price: variant.price,
                 },
             });
+            variantIds.push(row.id);
         }
 
-        // Deliberately includes a zero and two near-zero quantities, so the
-        // out-of-stock and low-stock presentations have something to render.
-        await prisma.inventory.upsert({
-            where: { productId: product.id },
-            update: { quantity: p.stock },
-            create: {
-                id: id("inventory", i),
-                productId: product.id,
-                storeId: store.id,
-                organizationId: orgId,
-                quantity: p.stock,
-            },
+        // Sold at the storefront, every variant with it (#510).
+        await listProductAt(prisma, {
+            id: id("listing", i),
+            orgId,
+            storeId: store.id,
+            productId: product.id,
+            variants: variantIds.map((variantId, v) => ({
+                id: id("listingvariant", i, v),
+                variantId,
+            })),
         });
+
+        // Counted as a whole, not per variant. Deliberately includes a zero
+        // and two near-zero quantities, so the out-of-stock and low-stock
+        // presentations have something to render. `stock` is what the
+        // storefront can sell: the open orders below hold their units on
+        // top of it (holdOpenLines), so a zero stays sold out, not short.
+        await setStockLevel(prisma, {
+            id: id("stocklevel", i),
+            orgId,
+            storeId: store.id,
+            productId: product.id,
+            onHand: p.stock,
+            promised: 0,
+        });
+        variantsOf.push(variantIds);
     }
+    await seedOnlineStorefront(prisma, {
+        orgId,
+        userId,
+        productIds,
+        variantsOf,
+    });
 
     // Customers mirror the first contacts, so the same person exists on both
     // sides of the commerce/CRM divide. They are NOT auto-linked — that is
@@ -652,7 +693,97 @@ async function seedCommerce(
         });
     }
 
+    // Open orders hold their units, as the order form's reserve does, and
+    // closed ones hold nothing (#511) — every seeded order in the business,
+    // the showcase's included, so a re-seed never leaves a stale hold.
+    await holdOpenLines(prisma, {
+        organizationId: orgId,
+        orderIdPrefix: SEED_PREFIX,
+    });
+
     return store.id;
+}
+
+/**
+ * Northwind's second storefront, "Online" (#526): some of the catalogue,
+ * each counted as a whole on its own shelf, so Move stock and the
+ * several-storefront screens have somewhere to go. Nothing is ordered
+ * there, so nothing is promised; its log opens with `balanceStockLog`.
+ * Northwind is the write sandbox: re-seeding counts every shelf back.
+ */
+async function seedOnlineStorefront(
+    prisma: Db,
+    a: {
+        orgId: string;
+        userId: string;
+        productIds: readonly string[];
+        variantsOf: readonly string[][];
+    },
+) {
+    const storeId = id("store", "online");
+    await prisma.store.upsert({
+        where: { slug: `${STORE_SLUG}-online` },
+        update: { name: "Online", organizationId: a.orgId, deletedAt: null },
+        create: {
+            id: storeId,
+            organizationId: a.orgId,
+            name: "Online",
+            slug: `${STORE_SLUG}-online`,
+            description: "The website's shop: delivered anywhere in India.",
+        },
+    });
+    await prisma.storeOwner.upsert({
+        where: { storeId_userId: { storeId, userId: a.userId } },
+        update: { role: "OWNER" },
+        create: {
+            id: id("storeowner", "online"),
+            storeId,
+            userId: a.userId,
+            role: "OWNER",
+        },
+    });
+    await prisma.storeSettings.upsert({
+        where: { storeId },
+        update: { currency: CURRENCY, collectionEnabled: false },
+        create: {
+            id: id("storesettings", "online"),
+            storeId,
+            currency: CURRENCY,
+            collectionEnabled: false,
+        },
+    });
+    await prisma.storeFeatures.upsert({
+        where: { storeId },
+        update: { ecommerceEnabled: true },
+        create: {
+            id: id("storefeatures", "online"),
+            storeId,
+            ecommerceEnabled: true,
+        },
+    });
+    for (const [slug, onHand] of Object.entries(ONLINE_STOCK)) {
+        const i = PRODUCTS.findIndex((p) => p.slug === slug);
+        if (i < 0)
+            throw new Error(`Northwind sells no "${slug}" to list Online`);
+        await listProductAt(prisma, {
+            id: id("listing", i, "online"),
+            orgId: a.orgId,
+            storeId,
+            productId: a.productIds[i],
+            variants: a.variantsOf[i].map((variantId, v) => ({
+                id: id("listingvariant", i, v, "online"),
+                variantId,
+            })),
+        });
+        await setStockLevel(prisma, {
+            id: id("stocklevel", i, "online"),
+            orgId: a.orgId,
+            storeId,
+            productId: a.productIds[i],
+            onHand,
+            promised: 0,
+        });
+    }
 }
 
 // --- Content ------------------------------------------------------------
@@ -1201,13 +1332,62 @@ export async function deleteSeeded(
         // classes spent from packs first; plans and packs are `Restrict` from
         // what was sold on them, so they go after the sales.
         () => prisma.invoiceLine.deleteMany({ where }),
+        // Corrections (credit notes, supplementary invoices) before the
+        // invoices they correct (ADR-008).
+        () =>
+            prisma.invoice.deleteMany({
+                where: { ...where, relatedInvoiceId: { not: null } },
+            }),
         () => prisma.invoice.deleteMany({ where }),
         () => prisma.packRedemption.deleteMany({ where }),
+        // An order's money and timeline (U5, U6): cascade from the order, but
+        // written with seeded ids, so removed and counted explicitly.
+        () => prisma.paymentRefundLine.deleteMany({ where }),
+        () => prisma.paymentRefund.deleteMany({ where }),
+        () => prisma.paymentAttempt.deleteMany({ where }),
+        () => prisma.paymentIntent.deleteMany({ where }),
+        () => prisma.orderEvent.deleteMany({ where }),
+        // Reviews hang off the order line they were left for (#471).
+        () => prisma.productReview.deleteMany({ where }),
+        () => prisma.reviewInvitation.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
+        // A customer's link to a contact, and the allergens a note names:
+        // before the storefront, whose allergen list a note's allergens
+        // hold on to (NoAction) — so a store cannot go while a note names one.
+        () => prisma.customerIdentityLink.deleteMany({ where }),
+        () =>
+            prisma.contactNoteAllergen.deleteMany({
+                where: { noteId: { startsWith: prefix } },
+            }),
+        () => prisma.subscriptionSkip.deleteMany({ where }),
+        // Stock and where a product is sold (#510), before the variants and
+        // products they hang off. Inventory and VariantInventory are no longer
+        // written, but rows an older seed left still clear.
+        () => prisma.stockLevel.deleteMany({ where }),
+        () => prisma.productListingVariant.deleteMany({ where }),
+        () => prisma.productListing.deleteMany({ where }),
         () => prisma.inventory.deleteMany({ where }),
+        // Products v2: stock per variant and photos before what they hang off;
+        // option values after the variants that choose them (Restrict).
+        () => prisma.variantInventory.deleteMany({ where }),
         () => prisma.productVariant.deleteMany({ where }),
+        () => prisma.productImage.deleteMany({ where }),
+        // What a product contains, then the store's allergen list (U8).
+        () => prisma.productAllergen.deleteMany({ where }),
         () => prisma.product.deleteMany({ where }),
+        () => prisma.storeAllergen.deleteMany({ where }),
+        () => prisma.productOptionValue.deleteMany({ where }),
+        () => prisma.productOption.deleteMany({ where }),
+        () => prisma.catalogueDefaults.deleteMany({ where }),
+        // Collections (#516): a seeded one, and any automatic one filled from
+        // a seeded category — the category holds on to it (NoAction).
+        () =>
+            prisma.collection.deleteMany({
+                where: {
+                    OR: [where, { categoryId: { startsWith: prefix } }],
+                },
+            }),
         () => prisma.category.deleteMany({ where }),
         () => prisma.customer.deleteMany({ where }),
         // Posts hang off a Site (ADR-004), so they clear before the sites do —
@@ -1229,6 +1409,16 @@ export async function deleteSeeded(
         // seeded ids, so they are removed explicitly and counted.
         () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
+        // Who takes bookings, their hours and the business's rules (U3), and
+        // the team's notes on a person (U8): cascade from their parents, but
+        // written with seeded ids, so removed and counted explicitly.
+        () => prisma.contactNote.deleteMany({ where }),
+        () => prisma.staffService.deleteMany({ where }),
+        () => prisma.staffHours.deleteMany({ where }),
+        () => prisma.staffTimeOff.deleteMany({ where }),
+        () => prisma.staffExtraHours.deleteMany({ where }),
+        () => prisma.staffMember.deleteMany({ where }),
+        () => prisma.bookingRules.deleteMany({ where }),
         () => prisma.courseEnrollment.deleteMany({ where }),
         () => prisma.courseSession.deleteMany({ where }),
         () => prisma.course.deleteMany({ where }),

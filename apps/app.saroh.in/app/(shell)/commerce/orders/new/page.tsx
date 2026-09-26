@@ -5,9 +5,11 @@ import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { OrderForm } from "@/components/stores/order-form";
 import { listCustomers } from "@/lib/customers/service";
+import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { newOrderHref } from "@/lib/orders/links";
 import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
+import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -27,9 +29,7 @@ export default async function NewOrderPage({
         searchParams,
         listBusinessStores(),
     ]);
-    const store =
-        stores.find((s) => s.id === storefront) ??
-        (stores.length === 1 ? stores[0] : undefined);
+    const store = pickStorefront(stores, storefront);
 
     if (!store) {
         return (
@@ -47,11 +47,14 @@ export default async function NewOrderPage({
         );
     }
 
-    const [customers, products, checkout] = await Promise.all([
+    const [customers, products, checkout, business] = await Promise.all([
         listCustomers(store.id),
-        listProducts(store.id),
+        listProducts({ storefront: store.id }),
         // The storefront's tax and delivery, as the form's starting figures.
         getStorefront(store.id).catch(() => null),
+        // GST standing: a registered business's prices include GST, so the
+        // form adds no tax — the total it shows is the one the API saves.
+        getInvoiceBusiness().catch(() => null),
     ]);
 
     return (
@@ -74,12 +77,22 @@ export default async function NewOrderPage({
             <OrderForm
                 storeId={store.id}
                 customers={customers}
-                products={products.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    price: p.price,
-                }))}
+                // Set to Not sold (archived): nobody orders it (DEC-032).
+                products={products
+                    .filter((p) => p.status !== "ARCHIVED")
+                    .map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        variants: p.variants,
+                        // Counted here and nothing on the shelf (#511), or
+                        // untracked and marked sold out here by hand (#515).
+                        soldOut:
+                            p.soldOut === true ||
+                            (p.inventory !== null && p.inventory.quantity <= 0),
+                    }))}
                 checkout={checkout}
+                gstRegistered={business?.registered ?? false}
             />
         </PageContainer>
     );

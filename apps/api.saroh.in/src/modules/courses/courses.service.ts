@@ -9,10 +9,8 @@ import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import {
-    BookingEventType,
-    BookingsService,
-} from "../bookings/bookings.service";
+import { BookingEventType } from "../bookings/booking-event-type";
+import { BookingsService } from "../bookings/bookings.service";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";

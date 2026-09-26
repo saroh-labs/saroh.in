@@ -1,28 +1,76 @@
 import {
+    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { variantHasHistory, variantHasStock } from "../stock/stock-words";
+import { recordEntry } from "../stock/stock.service";
+import { COUNTING_ROWS } from "../stock/tracking";
+import type { ProductScope } from "./product-access";
+import { assertMrpAtOrAbovePrice } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
-import type { CreateVariantDto, UpdateVariantDto } from "./variants.dto";
+import { lockProduct, lockProductStock } from "./stock-levels";
+import type {
+    CreateVariantDto,
+    ReorderVariantsDto,
+    UpdateVariantDto,
+} from "./variants.dto";
+
+const SKU_TAKEN = {
+    message: "Another variant already has this SKU.",
+    field: "sku",
+};
 
 /**
  * Product variants (SKUs). Scoped to a product within a store; authorization
  * and product-existence are delegated to ProductsService. SKU is unique per
  * product (@@unique([productId, sku])).
+ *
+ * Products v2 (#462): a variant can carry its value of the product's option,
+ * one of the product's photos, its own MRP and a position. Once the product
+ * counts stock per variant, a new variant starts with its own count of 0, and
+ * a variant with stock promised to open orders cannot be removed.
+ *
+ * #510: a new variant is sold wherever its product is listed, and counted
+ * at every storefront that counts the product per variant.
+ *
+ * #531: the work takes a `ProductScope`; the storefront-shaped methods are
+ * the old routes' aliases (resolve, then call the scoped one).
  */
 @Injectable()
 export class VariantsService {
     constructor(private readonly products: ProductsService) {}
 
     async list(storeId: string, productId: string, userId: string) {
-        await this.products.assertProductReadable(storeId, productId, userId);
+        return this.listIn(
+            await this.products.access.readViaStore(storeId, userId, productId),
+            productId,
+        );
+    }
+
+    async listIn(scope: ProductScope, productId: string) {
+        const { storeId } = scope;
         const variants = await prisma.productVariant.findMany({
             where: { productId },
-            orderBy: { createdAt: "asc" },
+            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+            include: {
+                stockLevels: {
+                    where: { storeId, ...COUNTING_ROWS },
+                    select: {
+                        onHand: true,
+                        promised: true,
+                        lowStockAlert: true,
+                    },
+                },
+                listings: {
+                    where: { listing: { storeId } },
+                    select: { id: true },
+                },
+            },
         });
         return variants.map(serializeVariant);
     }
@@ -33,23 +81,86 @@ export class VariantsService {
         userId: string,
         dto: CreateVariantDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        return this.createIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            dto,
+        );
+    }
+
+    async createIn(
+        scope: ProductScope,
+        productId: string,
+        dto: CreateVariantDto,
+    ) {
+        const { organizationId } = scope;
+        await this.assertCoherent(productId, dto);
+
+        const last = await prisma.productVariant.findFirst({
+            where: { productId },
+            orderBy: { position: "desc" },
+            select: { position: true },
+        });
         try {
-            const variant = await prisma.productVariant.create({
-                data: {
-                    productId,
-                    sku: dto.sku,
-                    title: dto.title,
-                    price: dto.price ?? null,
-                    image: dto.image ?? null,
-                },
+            const variant = await prisma.$transaction(async (tx) => {
+                // Lock order: the product, then its stock rows.
+                await lockProduct(tx, productId);
+                const created = await tx.productVariant.create({
+                    data: {
+                        productId,
+                        sku: dto.sku,
+                        title: dto.title,
+                        price: dto.price ?? null,
+                        mrp: dto.mrp ?? null,
+                        image: dto.image ?? null,
+                        optionValueId: dto.optionValueId ?? null,
+                        imageId: dto.imageId ?? null,
+                        position: (last?.position ?? -1) + 1,
+                    },
+                });
+                // Sold wherever the product is listed.
+                const listings = await tx.productListing.findMany({
+                    where: { productId },
+                    select: { id: true },
+                });
+                if (listings.length > 0) {
+                    await tx.productListingVariant.createMany({
+                        data: listings.map((l) => ({
+                            organizationId,
+                            listingId: l.id,
+                            productId,
+                            variantId: created.id,
+                        })),
+                    });
+                }
+                // A product counting per variant counts every variant: at
+                // each storefront that counts it so, a new one starts at
+                // nothing on hand rather than untracked.
+                const rows = await lockProductStock(tx, productId);
+                const stores = new Set(
+                    rows.filter((r) => r.variantId).map((r) => r.storeId),
+                );
+                for (const storeId of Array.from(stores)) {
+                    await tx.stockLevel.create({
+                        data: {
+                            organizationId,
+                            storeId,
+                            productId,
+                            variantId: created.id,
+                        },
+                    });
+                }
+                return created;
             });
             return { id: variant.id };
-        } catch {
-            throw new ConflictException({
-                message: "That SKU already exists for this product",
-                field: "sku",
-            });
+        } catch (error) {
+            if (isUniqueViolation(error))
+                throw new ConflictException(SKU_TAKEN);
+            throw error;
         }
     }
 
@@ -60,7 +171,24 @@ export class VariantsService {
         userId: string,
         dto: UpdateVariantDto,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        return this.updateIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            variantId,
+            dto,
+        );
+    }
+
+    async updateIn(
+        _scope: ProductScope,
+        productId: string,
+        variantId: string,
+        dto: UpdateVariantDto,
+    ) {
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
             select: { id: true },
@@ -68,6 +196,7 @@ export class VariantsService {
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
+        await this.assertCoherent(productId, dto);
         try {
             await prisma.productVariant.update({
                 where: { id: variantId },
@@ -75,16 +204,68 @@ export class VariantsService {
                     sku: dto.sku,
                     title: dto.title,
                     price: dto.price ?? null,
+                    mrp: dto.mrp ?? null,
                     image: dto.image ?? null,
+                    optionValueId: dto.optionValueId ?? null,
+                    imageId: dto.imageId ?? null,
                 },
             });
             return { id: variantId };
-        } catch {
-            throw new ConflictException({
-                message: "That SKU already exists for this product",
-                field: "sku",
+        } catch (error) {
+            if (isUniqueViolation(error))
+                throw new ConflictException(SKU_TAKEN);
+            throw error;
+        }
+    }
+
+    /** Put the variants in the order given; every variant, each once. */
+    async reorder(
+        storeId: string,
+        productId: string,
+        userId: string,
+        dto: ReorderVariantsDto,
+    ) {
+        return this.reorderIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            dto,
+        );
+    }
+
+    async reorderIn(
+        scope: ProductScope,
+        productId: string,
+        dto: ReorderVariantsDto,
+    ) {
+        const current = await prisma.productVariant.findMany({
+            where: { productId },
+            select: { id: true },
+        });
+        const known = new Set(current.map((v) => v.id));
+        const given = new Set(dto.ids);
+        if (
+            given.size !== dto.ids.length ||
+            given.size !== known.size ||
+            dto.ids.some((id) => !known.has(id))
+        ) {
+            throw new BadRequestException({
+                message: "List every variant of this product once.",
+                field: "ids",
             });
         }
+        await prisma.$transaction(
+            dto.ids.map((id, position) =>
+                prisma.productVariant.update({
+                    where: { id },
+                    data: { position },
+                }),
+            ),
+        );
+        return this.listIn(scope, productId);
     }
 
     async remove(
@@ -93,15 +274,201 @@ export class VariantsService {
         variantId: string,
         userId: string,
     ) {
-        await this.products.assertProductWritable(storeId, productId, userId);
+        return this.removeIn(
+            await this.products.access.writeViaStore(
+                storeId,
+                userId,
+                productId,
+            ),
+            productId,
+            variantId,
+        );
+    }
+
+    async removeIn(scope: ProductScope, productId: string, variantId: string) {
+        const { organizationId, userId } = scope;
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: { id: true },
+            select: { id: true, title: true },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        await prisma.productVariant.delete({ where: { id: variantId } });
+
+        await prisma.$transaction(async (tx) => {
+            // Lock order: the product, then its stock rows.
+            await lockProduct(tx, productId);
+            const rows = await lockProductStock(tx, productId);
+            const own = rows.filter((r) => r.variantId === variantId);
+            // Stock promised to an open order is a promise to a customer:
+            // the variant stays until those orders are fulfilled or
+            // cancelled, at every storefront.
+            const promised = own.reduce((n, r) => n + r.promised, 0);
+            if (promised > 0) {
+                throw new ConflictException({
+                    message: `${variant.title} has ${promised} promised to open orders, so it can't be removed yet.`,
+                    field: "variantId",
+                });
+            }
+            // The stock log is never edited (DEC-032): removing the variant
+            // would take its shelves' entries with it, and leave its sold
+            // lines nothing to return to. One with real history stays: a
+            // line that sold or holds it, or a change that moved stock and
+            // wasn't undone. Saroh's own counts (the per-variant switch,
+            // Track stock off) and counts that changed nothing aren't
+            // history: a variant added by mistake can still go, and what it
+            // holds comes back to the product below.
+            const [logged, sold] = await Promise.all([
+                tx.stockEntry.count({
+                    where: {
+                        variantId,
+                        system: null,
+                        quantity: { not: 0 },
+                        kind: { not: "REVERSED" },
+                        reversedBy: { is: null },
+                    },
+                }),
+                tx.orderItem.count({
+                    where: {
+                        variantId,
+                        OR: [
+                            { soldQuantity: { gt: 0 } },
+                            { heldQuantity: { gt: 0 } },
+                        ],
+                    },
+                }),
+            ]);
+            if (logged > 0 || sold > 0) {
+                throw new ConflictException({
+                    message: variantHasHistory(variant.title),
+                    field: "variantId",
+                });
+            }
+            // A product counts as a whole or per variant, never both, and
+            // that is decided across the business: while another variant
+            // counts at any storefront, its units have no whole-product
+            // shelf to go back to — at a storefront where it counts alone
+            // as much as next to other variants — and would vanish with
+            // the shelf.
+            const othersAnywhere = rows.some(
+                (r) => r.variantId !== null && r.variantId !== variantId,
+            );
+            for (const row of own) {
+                if (row.onHand === 0 || !othersAnywhere) continue;
+                const store = await tx.store.findUnique({
+                    where: { id: row.storeId },
+                    select: { name: true },
+                });
+                throw new ConflictException({
+                    message: variantHasStock(
+                        variant.title,
+                        row.onHand,
+                        store?.name ?? "this storefront",
+                    ),
+                    field: "variantId",
+                });
+            }
+            await tx.productVariant.delete({ where: { id: variantId } });
+            // The last variant counting anywhere takes its count back to the
+            // product at each storefront, so the product does not silently
+            // lose its stock. The product's shelf logs it as a count (#513);
+            // the variant's shelf goes with the variant. While another
+            // variant still counts, nothing comes back (its units were
+            // refused above) and no whole-product shelf is made.
+            for (const row of othersAnywhere ? [] : own) {
+                const whole = rows.find(
+                    (r) => r.storeId === row.storeId && r.variantId === null,
+                );
+                let wholeId = whole?.id;
+                if (wholeId) {
+                    await tx.stockLevel.update({
+                        where: { id: wholeId },
+                        data: { lowStockAlert: row.lowStockAlert },
+                    });
+                } else {
+                    const made = await tx.stockLevel.create({
+                        data: {
+                            organizationId,
+                            storeId: row.storeId,
+                            productId,
+                            lowStockAlert: row.lowStockAlert,
+                        },
+                        select: { id: true },
+                    });
+                    wholeId = made.id;
+                }
+                if (row.onHand !== 0) {
+                    const current = await tx.stockLevel.findUniqueOrThrow({
+                        where: { id: wholeId },
+                        select: { onHand: true },
+                    });
+                    await recordEntry(tx, {
+                        stockLevelId: wholeId,
+                        kind: "COUNTED",
+                        quantity: row.onHand,
+                        counted: current.onHand + row.onHand,
+                        actorUserId: userId,
+                        note: `Took back ${variant.title}'s stock`,
+                        system: "VARIANT_REMOVED",
+                        allowNegative: true,
+                    });
+                }
+            }
+        });
         return { id: variantId };
     }
+
+    /**
+     * A variant's option value belongs to the product's option, its photo is
+     * one of the product's own, and its MRP is not below what it sells for.
+     */
+    private async assertCoherent(
+        productId: string,
+        dto: CreateVariantDto,
+    ): Promise<void> {
+        const product = await prisma.product.findUniqueOrThrow({
+            where: { id: productId },
+            select: { price: true, mrp: true, optionId: true },
+        });
+        if (dto.optionValueId) {
+            const value = await prisma.productOptionValue.findFirst({
+                where: {
+                    id: dto.optionValueId,
+                    optionId: product.optionId ?? "__none__",
+                },
+                select: { id: true },
+            });
+            if (!value) {
+                throw new BadRequestException({
+                    message: product.optionId
+                        ? "Pick one of this product's option values."
+                        : "Choose what customers pick by first (Size, Shade…).",
+                    field: "optionValueId",
+                });
+            }
+        }
+        if (dto.imageId) {
+            const image = await prisma.productImage.findFirst({
+                where: { id: dto.imageId, productId, kind: "photo" },
+                select: { id: true },
+            });
+            if (!image) {
+                throw new BadRequestException({
+                    message: "Pick one of this product's photos.",
+                    field: "imageId",
+                });
+            }
+        }
+        const price = dto.price ?? product.price.toString();
+        const mrp = dto.mrp ?? product.mrp?.toString() ?? null;
+        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price");
+    }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "P2002"
+    );
 }

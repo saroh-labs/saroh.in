@@ -3,11 +3,8 @@ import Link from "next/link";
 
 import { OrganizationSwitcher } from "@/components/organizations/organization-switcher";
 import { CommandTrigger } from "@/components/shared/command-trigger";
-import { HelpLink } from "@/components/shared/help-link";
-import { MobileNav } from "@/components/shared/mobile-nav";
-import type { NavCounts } from "@/components/shared/nav-items";
+import { NotificationsLink } from "@/components/shared/notifications-link";
 import { SkinSwitcher } from "@/components/shared/skin-switcher";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserMenu } from "@/components/shared/user-menu";
 import type { Organization } from "@/lib/organizations/service";
 
@@ -15,7 +12,9 @@ import type { Organization } from "@/lib/organizations/service";
  * The top bar, across the full width above the rail (the "Saroh Products
  * Screen" design). Left: the mark, a slash, and the business switcher — the
  * business is the one scope above a screen, so it is said once, here. Right:
- * search, help, and your account. Everything else is the rail's job.
+ * search, notifications and your account (the "Saroh Settings" design,
+ * 2026-09-25). Help and appearance moved into the account menu. Everything
+ * else is the rail's job.
  *
  * It sits on Paper with the rail, so the working area below is the one white
  * surface. Presentational: `AppShell` fetches session, organization and
@@ -34,11 +33,11 @@ type AppHeaderProps =
           user: HeaderUser;
           organizations: Organization[];
           activeOrg: Organization | null;
-          unread: number;
-          /** `null` = availability unknown; see `filterNavGroups`. */
-          moduleKeys: string[] | null;
-          /** Work waiting behind a route; see `NavCounts`. */
-          counts?: NavCounts;
+          /**
+           * Unread notifications, or `null` when the actor may not read
+           * them — then there is no bell.
+           */
+          unread: number | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -51,7 +50,6 @@ export function AppHeader(props: AppHeaderProps) {
                     <Wordmark />
                 </Link>
                 <div className="flex items-center gap-1.5">
-                    <ThemeToggle />
                     <SkinSwitcher />
                     <UserMenu name={props.user.name} email={props.user.email} />
                 </div>
@@ -59,20 +57,14 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, unread, moduleKeys, counts, user } =
-        props;
+    const { organizations, activeOrg, user, unread } = props;
 
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
         // truncates, and search, help and the account button keep their size.
+        // No menu button: below 760px the tab bar at the foot of the screen
+        // is the navigation, so the header only says where you are.
         <header className="sticky top-0 z-30 flex h-[61px] items-center gap-1 border-b bg-background px-2 py-[9px] sm:px-3.5 print:hidden">
-            <MobileNav
-                unread={unread}
-                moduleKeys={moduleKeys}
-                role={activeOrg?.role ?? null}
-                counts={counts}
-                organizationName={activeOrg?.name}
-            />
             <Link
                 href="/"
                 aria-label="Saroh — go to Home"
@@ -90,9 +82,13 @@ export function AppHeader(props: AppHeaderProps) {
                 />
             ) : null}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <CommandTrigger />
-                <HelpLink />
-                <ThemeToggle />
+                <CommandTrigger
+                    actor={{
+                        role: activeOrg?.role ?? null,
+                        actions: activeOrg?.actions ?? null,
+                    }}
+                />
+                {unread !== null ? <NotificationsLink unread={unread} /> : null}
                 {/* Renders nothing while only one skin is offered. */}
                 <SkinSwitcher />
                 <UserMenu

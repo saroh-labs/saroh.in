@@ -1,9 +1,11 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     Patch,
     Post,
+    Put,
     Query,
     UseGuards,
 } from "@nestjs/common";
@@ -14,7 +16,11 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
-import { OnboardOrganizationDto, UpdateOrganizationDto } from "./dto";
+import {
+    OnboardOrganizationDto,
+    SetLogoDto,
+    UpdateOrganizationDto,
+} from "./dto";
 import { OrganizationContextService } from "./organization-context.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
@@ -100,6 +106,23 @@ export class OrganizationsController {
         @Body() dto: UpdateOrganizationDto,
     ) {
         return this.settings.update(ctx, dto);
+    }
+
+    /**
+     * Set or replace the business logo (OWNER/ADMIN, `org:update`): an image
+     * already uploaded to the business's library. Returns the settings.
+     */
+    @Put(":organizationId/logo")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    setLogo(@OrgContext() ctx: OrganizationContext, @Body() dto: SetLogoDto) {
+        return this.settings.setLogo(ctx, dto.mediaId);
+    }
+
+    /** Take the logo off. The image stays in the library. */
+    @Delete(":organizationId/logo")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    removeLogo(@OrgContext() ctx: OrganizationContext) {
+        return this.settings.removeLogo(ctx);
     }
 
     @Get(":organizationId")

@@ -8,7 +8,7 @@ import { BadRequestException } from "@nestjs/common";
  */
 
 /** The largest amount a `Decimal(12, 2)` column holds, in minor units. */
-const MAX_CENTS = 999_999_999_999;
+export const MAX_CENTS = 999_999_999_999;
 
 export function toCents(amount: string): number {
     const [whole, frac = ""] = amount.split(".");
@@ -25,6 +25,10 @@ export interface LineInput {
     description: string;
     quantity: number;
     unitPrice: string;
+    /** GST in percent, on a registered business's invoice (ADR-008). */
+    gstRate?: string | null;
+    /** HSN or SAC. */
+    hsnSac?: string | null;
 }
 
 export interface PricedLine extends LineInput {

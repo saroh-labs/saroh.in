@@ -15,6 +15,7 @@ import { ForbiddenException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -27,9 +28,10 @@ import { OrganizationOrdersController } from "./organization-orders.controller";
  */
 describe("OrganizationOrdersController", () => {
     const listForOrganization = jest.fn().mockResolvedValue([]);
-    const controller = new OrganizationOrdersController({
-        listForOrganization,
-    } as unknown as OrdersService);
+    const controller = new OrganizationOrdersController(
+        { listForOrganization } as unknown as OrdersService,
+        {} as unknown as OrderKitchenService,
+    );
 
     const as = (
         role: OrganizationContext["role"],
@@ -43,21 +45,31 @@ describe("OrganizationOrdersController", () => {
 
     beforeEach(() => listForOrganization.mockClear());
 
-    it.each(["REVIEWER", "MEMBER"] as const)(
-        "refuses a %s, who cannot read orders",
-        (role) => {
-            expect(() => controller.list(as(role))).toThrow(ForbiddenException);
-            expect(listForOrganization).not.toHaveBeenCalled();
-        },
-    );
+    it("refuses a REVIEWER, who cannot read orders", () => {
+        expect(() => controller.list(as("REVIEWER"))).toThrow(
+            ForbiddenException,
+        );
+        expect(listForOrganization).not.toHaveBeenCalled();
+    });
+
+    it("gives a MEMBER, who moves kitchen stages, the kitchen's view", async () => {
+        await controller.list(as("MEMBER"));
+        expect(listForOrganization).toHaveBeenCalledWith(
+            "org_1",
+            { storeId: undefined },
+            { kitchenOnly: true },
+        );
+    });
 
     it.each(["OWNER", "ADMIN"] as const)(
-        "lets a %s read them",
+        "lets a %s read them in full",
         async (role) => {
             await controller.list(as(role));
-            expect(listForOrganization).toHaveBeenCalledWith("org_1", {
-                storeId: undefined,
-            });
+            expect(listForOrganization).toHaveBeenCalledWith(
+                "org_1",
+                { storeId: undefined },
+                { kitchenOnly: false },
+            );
         },
     );
 

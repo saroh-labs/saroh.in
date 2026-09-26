@@ -72,8 +72,14 @@ export interface ModuleDescriptor {
      * at routes that actually exist.
      */
     rootRoutes: readonly string[];
-    /** The representative OrgAction gating the module's primary capability. */
-    requiredAction: OrgAction;
+    /**
+     * The representative OrgAction gating the module's primary capability —
+     * or several, any one of which reaches it. Commerce takes `order:read` or
+     * `order:stage`: a Member at the counter moves orders through the kitchen
+     * (DEC-024) and must reach Sell to do it; each route inside still asks
+     * for its own action.
+     */
+    requiredAction: OrgAction | readonly OrgAction[];
     /** Hard *enable-time* dependencies — a module cannot be enabled without these. */
     dependencies: readonly ModuleKey[];
     /** Whether a Project may select this module from its Organization's enabled set. */
@@ -168,7 +174,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         description:
             "Catalog, inventory, carts, and orders for selling products.",
         rootRoutes: ["/commerce"],
-        requiredAction: "order:read",
+        requiredAction: ["order:read", "order:stage"],
         dependencies: [],
         projectSelectable: true,
         rolloutFlag: FlagKey.MODULE_COMMERCE,
@@ -298,11 +304,17 @@ export function validateModuleRegistry(
             );
         }
 
-        // Required action must be a registered OrgAction.
-        if (!ORG_ACTION_SET.has(m.requiredAction)) {
-            throw new Error(
-                `module ${m.key} references an unknown OrgAction: ${m.requiredAction}`,
-            );
+        // Every required action must be a registered OrgAction.
+        const required =
+            typeof m.requiredAction === "string"
+                ? [m.requiredAction]
+                : m.requiredAction;
+        for (const action of required) {
+            if (!ORG_ACTION_SET.has(action)) {
+                throw new Error(
+                    `module ${m.key} references an unknown OrgAction: ${action}`,
+                );
+            }
         }
 
         // Optional entitlement key, when set, must be a registered entitlement.

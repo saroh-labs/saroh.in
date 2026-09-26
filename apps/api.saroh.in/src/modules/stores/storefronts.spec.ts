@@ -13,6 +13,8 @@ jest.mock("@saroh/database", () => {
     const tx = {
         store: { update: jest.fn() },
         storeSettings: { upsert: jest.fn() },
+        stockLevel: { findMany: jest.fn(), count: jest.fn() },
+        $queryRaw: jest.fn(),
     };
     return {
         prisma: {
@@ -20,8 +22,12 @@ jest.mock("@saroh/database", () => {
                 findMany: jest.fn(),
                 findFirst: jest.fn(),
                 update: jest.fn(),
+                count: jest.fn(),
             },
             storeSettings: { findUnique: jest.fn() },
+            stockLevel: { aggregate: jest.fn() },
+            subscription: { findUnique: jest.fn() },
+            entitlementOverride: { findMany: jest.fn() },
             order: { count: jest.fn(), findFirst: jest.fn() },
             merchantPaymentProvider: {
                 findMany: jest.fn(),
@@ -43,18 +49,24 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { openingHoursText } from "./opening-hours-text";
 import { StorefrontsController } from "./storefronts.controller";
 import { StorefrontsService } from "./storefronts.service";
 
 const db = prisma as unknown as {
     store: Record<string, jest.Mock>;
     storeSettings: Record<string, jest.Mock>;
+    stockLevel: Record<string, jest.Mock>;
+    subscription: Record<string, jest.Mock>;
+    entitlementOverride: Record<string, jest.Mock>;
     order: Record<string, jest.Mock>;
     merchantPaymentProvider: Record<string, jest.Mock>;
     $transaction: jest.Mock;
     __tx: {
         store: Record<string, jest.Mock>;
         storeSettings: Record<string, jest.Mock>;
+        stockLevel: Record<string, jest.Mock>;
+        $queryRaw: jest.Mock;
     };
 };
 
@@ -77,6 +89,11 @@ beforeEach(() => {
     db.storeSettings.findUnique!.mockResolvedValue(null);
     db.order.count!.mockResolvedValue(0);
     db.order.findFirst!.mockResolvedValue(null);
+    db.stockLevel.aggregate!.mockResolvedValue({ _sum: {} });
+    db.subscription.findUnique!.mockResolvedValue(null);
+    db.entitlementOverride.findMany!.mockResolvedValue([]);
+    db.__tx.stockLevel.findMany!.mockResolvedValue([]);
+    db.__tx.stockLevel.count!.mockResolvedValue(0);
     db.merchantPaymentProvider.findMany!.mockResolvedValue([]);
     db.merchantPaymentProvider.findUnique!.mockResolvedValue(null);
 });
@@ -120,9 +137,13 @@ describe("StorefrontsController authorization", () => {
     it("lets an Admin change and close", async () => {
         await controller.update(as("ADMIN"), "st_1", { name: "x" });
         await controller.close(as("ADMIN"), "st_1");
-        expect(service.update).toHaveBeenCalledWith("org_1", "st_1", {
-            name: "x",
-        });
+        // Who saved, for the audit row a change of hours writes.
+        expect(service.update).toHaveBeenCalledWith(
+            "org_1",
+            "st_1",
+            { name: "x" },
+            "user_1",
+        );
         expect(service.close).toHaveBeenCalledWith("org_1", "st_1");
     });
 
@@ -243,13 +264,64 @@ describe("StorefrontsService", () => {
             /2 orders here/,
         );
         expect(db.store.update).not.toHaveBeenCalled();
+        expect(db.__tx.store.update).not.toHaveBeenCalled();
     });
 
     it("closes by setting it aside, not by erasing it", async () => {
         await service.close("org_1", "st_1");
-        expect(db.store.update).toHaveBeenCalledWith({
+        expect(db.__tx.store.update).toHaveBeenCalledWith({
             where: { id: "st_1" },
             data: { deletedAt: expect.any(Date) },
+        });
+    });
+
+    it("will not close while stock is on hand or promised there", async () => {
+        db.__tx.stockLevel.findMany!.mockResolvedValue([
+            { id: "sl_b" },
+            { id: "sl_a" },
+        ]);
+        db.__tx.stockLevel.count!.mockResolvedValue(1);
+        await expect(service.close("org_1", "st_1")).rejects.toThrow(
+            ConflictException,
+        );
+        await expect(service.close("org_1", "st_1")).rejects.toThrow(
+            "Move or count out its stock first",
+        );
+        expect(db.__tx.stockLevel.count).toHaveBeenCalledWith({
+            where: {
+                storeId: "st_1",
+                OR: [{ onHand: { gt: 0 } }, { promised: { gt: 0 } }],
+            },
+        });
+        expect(db.__tx.store.update).not.toHaveBeenCalled();
+    });
+
+    it("checks the stock under the storefront's row locks, in id order", async () => {
+        db.__tx.stockLevel.findMany!.mockResolvedValue([
+            { id: "sl_b" },
+            { id: "sl_a" },
+        ]);
+        await service.close("org_1", "st_1");
+        const [, ids] = db.__tx.$queryRaw.mock.calls[0] as [unknown, string[]];
+        expect(ids).toEqual(["sl_a", "sl_b"]);
+        expect(db.__tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            db.__tx.stockLevel.count!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("says how much stock a storefront holds", async () => {
+        db.stockLevel
+            .aggregate!.mockResolvedValueOnce({ _sum: { onHand: 3 } })
+            .mockResolvedValueOnce({ _sum: { promised: 1 } });
+        const s = await service.get("org_1", "st_1");
+        expect(s.stock).toEqual({ onHand: 3, promised: 1 });
+    });
+
+    it("reads how many storefronts the plan allows", async () => {
+        db.store.count!.mockResolvedValue(2);
+        await expect(service.allowance("org_1")).resolves.toEqual({
+            used: 2,
+            limit: 5,
         });
     });
 });
@@ -325,5 +397,95 @@ describe("StorefrontsService — checkout, pause and a shop's week", () => {
         );
         await service.update("org_1", "st_1", { openingHours: week as never });
         expect(db.__tx.storeSettings.upsert).toHaveBeenCalled();
+    });
+});
+
+describe("opening hours in Settings › Activity (#509)", () => {
+    const day = (
+        d: string,
+        open = "09:00",
+        close = "18:00",
+        closed = false,
+    ) => ({
+        day: d,
+        open,
+        close,
+        closed,
+    });
+    const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI"].map((d) => day(d));
+
+    it("says a week as a person reads it, neighbouring days once", () => {
+        expect(
+            openingHoursText([
+                ...WEEKDAYS,
+                day("SAT", "10:00", "14:00"),
+                day("SUN", "00:00", "00:00", true),
+            ] as never),
+        ).toBe("Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed");
+        expect(openingHoursText(null)).toBeNull();
+    });
+
+    it("records a storefront's week before and after, by who saved it", async () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const service = new StorefrontsService({ record } as never);
+        const before = [...WEEKDAYS, day("SAT"), day("SUN")];
+        const after = [
+            ...WEEKDAYS,
+            day("SAT", "10:00", "14:00"),
+            day("SUN", "00:00", "00:00", true),
+        ];
+        db.storeSettings
+            .findUnique!.mockResolvedValueOnce({
+                taxRate: "0",
+                openingHours: before,
+            })
+            .mockResolvedValue({ taxRate: "0", openingHours: after });
+
+        await service.update(
+            "org_1",
+            "st_1",
+            { openingHours: after as never },
+            "user_1",
+        );
+
+        expect(record).toHaveBeenCalledWith({
+            action: "storefront.hours.update",
+            actorUserId: "user_1",
+            organizationId: "org_1",
+            targetType: "storefront",
+            targetId: "st_1",
+            outcome: "SUCCESS",
+            metadata: {
+                fields: ["openingHours"],
+                storefront: "High Street",
+                changes: [
+                    {
+                        field: "openingHours",
+                        before: "Mon–Sun 09:00–18:00",
+                        after: "Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed",
+                    },
+                ],
+            },
+        });
+    });
+
+    it("records nothing when the week is saved as it was, or nobody saved it", async () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const service = new StorefrontsService({ record } as never);
+        const week = [...WEEKDAYS, day("SAT"), day("SUN")];
+        db.storeSettings.findUnique!.mockResolvedValue({
+            taxRate: "0",
+            openingHours: week,
+        });
+
+        await service.update(
+            "org_1",
+            "st_1",
+            { openingHours: week as never },
+            "user_1",
+        );
+        await service.update("org_1", "st_1", { name: "Shop" });
+
+        expect(record).not.toHaveBeenCalled();
     });
 });

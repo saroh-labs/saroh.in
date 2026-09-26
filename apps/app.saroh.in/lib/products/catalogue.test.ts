@@ -1,28 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogueRow } from "./catalogue";
-import { inStorefront, mergeCatalogue } from "./catalogue";
-import type { ProductListItem } from "./service";
-
-function product(
-    over: Partial<ProductListItem> & { id: string; storeId: string },
-): ProductListItem {
-    return {
-        name: "Sourdough loaf",
-        slug: "sourdough",
-        description: null,
-        image: null,
-        categoryId: null,
-        price: "4.80",
-        currency: "GBP",
-        status: "PUBLISHED",
-        updatedAt: "2026-09-18T07:10:00.000Z",
-        variantCount: 2,
-        sku: "SD-800",
-        inventory: { quantity: 42, lowStockAlert: 5 },
-        ...over,
-    };
-}
+import {
+    catalogueRows,
+    initials,
+    priceRange,
+    rowFacts,
+    stockWords,
+} from "./catalogue";
+import { catalogueProduct } from "./catalogue.fixture";
 
 /** The single row a case expects; fails the test when there is not exactly one. */
 function only(rows: CatalogueRow[]): CatalogueRow {
@@ -33,98 +19,138 @@ function only(rows: CatalogueRow[]): CatalogueRow {
     return row;
 }
 
-const STORES = [
-    { id: "market", name: "Market Street" },
-    { id: "online", name: "Online" },
-];
+describe("the row's second line (#524)", () => {
+    const places = [
+        { storeName: "Hill Road" },
+        { storeName: "Online" },
+    ] as CatalogueRow["places"];
 
-describe("mergeCatalogue", () => {
-    it("makes one row of a SKU sold in two storefronts", () => {
-        const rows = mergeCatalogue(STORES, {
-            market: [product({ id: "p1", storeId: "market" })],
-            online: [
-                product({
-                    id: "p9",
-                    storeId: "online",
-                    price: "5.20",
-                    inventory: { quantity: 30, lowStockAlert: 10 },
-                    updatedAt: "2026-09-18T08:02:00.000Z",
-                }),
-            ],
+    it("says its variants, SKU and storefronts, as the design does", () => {
+        expect(
+            rowFacts({ variantCount: 1, sku: "RYE-800", places }, true),
+        ).toEqual({
+            variants: "1 variant",
+            sku: "RYE-800",
+            places: "Hill Road · Online",
         });
-        const row = only(rows);
+        expect(rowFacts({ variantCount: 3, sku: null, places }, false)).toEqual(
+            { variants: "3 variants", sku: null, places: null },
+        );
+    });
+
+    it("never says 0 variants", () => {
+        expect(rowFacts({ variantCount: 0, sku: null, places }, true)).toEqual({
+            variants: null,
+            sku: null,
+            places: "Hill Road · Online",
+        });
+        expect(
+            rowFacts({ variantCount: 0, sku: null, places: [] }, true),
+        ).toEqual({ variants: null, sku: null, places: null });
+    });
+});
+
+describe("catalogueRows (#531, #519)", () => {
+    it("is one row per catalogue product, naming every storefront that sells it", () => {
+        const row = only(catalogueRows([catalogueProduct({ id: "p1" })]));
+        expect(row.key).toBe("p1");
         expect(row.places.map((p) => p.storeName)).toEqual([
             "Market Street",
             "Online",
         ]);
-        // Price differs by storefront: say "varies", never pick a winner.
-        expect(row.varies).toBe(true);
         expect(row.stock).toBe(72);
+        expect(row.canSell).toBe(72);
         expect(row.lowStockAlert).toBe(5);
-        expect(row.updatedAt).toBe("2026-09-18T08:02:00.000Z");
     });
 
-    it("keeps a product with no SKU as its own row", () => {
-        const rows = mergeCatalogue(STORES, {
-            market: [product({ id: "a", storeId: "market", sku: null })],
-            online: [product({ id: "b", storeId: "online", sku: null })],
-        });
-        expect(rows).toHaveLength(2);
+    it("never merges two products, even with the same SKU", () => {
+        const rows = catalogueRows([
+            catalogueProduct({ id: "a" }),
+            catalogueProduct({ id: "b" }),
+        ]);
+        expect(rows.map((r) => r.key)).toEqual(["a", "b"]);
     });
 
-    it("is live when live anywhere, archived only when archived everywhere", () => {
-        const mixed = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({ id: "p1", storeId: "market", status: "DRAFT" }),
-                ],
-                online: [product({ id: "p2", storeId: "online" })],
-            }),
-        );
-        expect(mixed.status).toBe("PUBLISHED");
-        const gone = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({
-                        id: "p1",
-                        storeId: "market",
-                        status: "ARCHIVED",
-                    }),
-                ],
-                online: [
-                    product({ id: "p2", storeId: "online", status: "DRAFT" }),
-                ],
-            }),
-        );
-        expect(gone.status).toBe("DRAFT");
-    });
-
-    it("reads stock as unknown when no place tracks it", () => {
+    it("reads stock as unknown when nothing counts it", () => {
         const row = only(
-            mergeCatalogue(STORES, {
-                market: [
-                    product({ id: "p1", storeId: "market", inventory: null }),
-                ],
-            }),
+            catalogueRows([catalogueProduct({ id: "p1", inventory: null })]),
         );
         expect(row.stock).toBeNull();
+        expect(row.canSell).toBeNull();
+        expect(stockWords(row)).toEqual({
+            text: "Not tracked",
+            tone: "muted",
+        });
+    });
+
+    it("says Sold out for an untracked product marked sold out by hand (#515)", () => {
+        const row = only(
+            catalogueRows([
+                catalogueProduct({ id: "p1", inventory: null, soldOut: true }),
+            ]),
+        );
+        expect(stockWords(row)).toEqual({ text: "Sold out", tone: "danger" });
+    });
+
+    it("takes what is promised off what can be sold", () => {
+        const row = only(
+            catalogueRows([
+                catalogueProduct({
+                    id: "p1",
+                    inventory: { quantity: 4, promised: 6, lowStockAlert: 5 },
+                }),
+            ]),
+        );
+        expect(row.canSell).toBe(0);
+        expect(stockWords(row)).toEqual({
+            text: "4 in stock",
+            tone: "danger",
+        });
     });
 });
 
-describe("inStorefront", () => {
-    it("shows one storefront's price and stock, and keeps where it is sold", () => {
-        const row = only(
-            mergeCatalogue(STORES, {
-                market: [product({ id: "p1", storeId: "market" })],
-                online: [
-                    product({ id: "p2", storeId: "online", price: "5.20" }),
-                ],
-            }),
-        );
-        const online = inStorefront(row, "online");
-        expect(online?.price).toBe("5.20");
-        expect(online?.places).toHaveLength(2);
-        expect(online?.varies).toBe(true);
-        expect(inStorefront(row, "elsewhere")).toBeNull();
+describe("stockWords", () => {
+    const at = (stock: number, lowStockAlert: number, promised = 0) => ({
+        stock,
+        canSell: Math.max(0, stock - promised),
+        lowStockAlert,
+        soldOut: false,
+    });
+
+    it("is out of stock at nothing on the shelf", () => {
+        expect(stockWords(at(0, 5))).toEqual({
+            text: "Out of stock",
+            tone: "danger",
+        });
+    });
+
+    it("warns at the product's own level, not a fixed five", () => {
+        expect(stockWords(at(8, 10)).tone).toBe("warn");
+        expect(stockWords(at(4, 3)).tone).toBe("plain");
+        // A level of 0 never warns.
+        expect(stockWords(at(1, 0)).tone).toBe("plain");
+    });
+});
+
+describe("priceRange", () => {
+    it("is the variants' range, a variant without a price selling at the product's", () => {
+        expect(priceRange("260", [{ price: null }, { price: "480" }])).toEqual({
+            low: "260",
+            high: "480",
+        });
+    });
+
+    it("is null with one variant or one price", () => {
+        expect(priceRange("260", [{ price: "300" }])).toBeNull();
+        expect(
+            priceRange("260", [{ price: null }, { price: "260.00" }]),
+        ).toBeNull();
+    });
+});
+
+describe("initials", () => {
+    it("takes two words, skipping symbols", () => {
+        expect(initials("Rye & caraway loaf")).toBe("RC");
+        expect(initials("Mug")).toBe("M");
     });
 });

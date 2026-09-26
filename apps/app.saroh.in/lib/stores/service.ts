@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList } from "@/lib/api/http";
 
 import { listStorefronts } from "@/lib/stores/storefronts";
@@ -40,19 +41,20 @@ async function mutate(
     input: CreateStoreInput | UpdateStoreInput,
 ): Promise<StoreResult<{ id: string }>> {
     const res = await apiFetch(path, { method, body: JSON.stringify(input) });
-    const data = (await res.json().catch(() => null)) as {
-        id?: string;
-        message?: string;
-        field?: "name" | "slug" | "logo";
-    } | null;
-
-    if (res.ok && data?.id) {
-        return { ok: true, data: { id: data.id } };
+    const data: unknown = await res.json().catch(() => null);
+    const id = (data as { id?: unknown } | null)?.id;
+    if (res.ok && typeof id === "string") {
+        return { ok: true, data: { id } };
     }
+    const failure = toFailure(data, "Something went wrong");
+    const field = failure.field;
     return {
         ok: false,
-        error: data?.message ?? "Something went wrong",
-        field: data?.field,
+        error: failure.error,
+        field:
+            field === "name" || field === "slug" || field === "logo"
+                ? field
+                : undefined,
     };
 }
 

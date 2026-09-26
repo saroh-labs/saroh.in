@@ -23,8 +23,12 @@ const buttonVariants = cva(
      * still clears 4.5:1: WCAG exempts disabled text and the brand declines the
      * exemption, because permissions depend on reading it. Pair a disabled
      * button with a nearby reason ("Refunds need a manager").
+     *
+     * AN ICON WITHOUT A SIZE IS 16PX. Lucide draws at 24px unless told
+     * otherwise, and a pencil at 24 beside a 13px label reads as a mistake.
+     * An icon that states its own size (`size-*`, `h-*`) keeps it.
      */
-    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold [&_svg]:shrink-0 [&_svg:not([class*='size-']):not([class*='h-'])]:size-4 ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground",
     {
         variants: {
             variant: {

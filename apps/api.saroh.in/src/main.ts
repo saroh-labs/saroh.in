@@ -18,17 +18,20 @@ import "reflect-metadata";
 import "./env";
 
 import { ValidationPipe } from "@nestjs/common";
+import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 import { NestFactory } from "@nestjs/core";
 import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
+import { corsOptionsFor } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { OriginGuard } from "./common/guards/origin.guard";
 import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
 
@@ -94,6 +97,10 @@ async function bootstrap() {
     // disabled here; AuthModule re-adds JSON/urlencoded for the other routes.
     const app = await NestFactory.create(AppModule, { bodyParser: false });
 
+    // The client's address from behind the proxies in front (#508), before
+    // anything reads `req.ip`.
+    trustProxy(app, env.TRUST_PROXY);
+
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.
     app.use(correlationIdMiddleware);
@@ -110,13 +117,20 @@ async function bootstrap() {
         ...DEV_HOSTNAMES.map((host) => `https://${host}.localhost`),
         ...Array.from({ length: 13 }, (_, i) => `http://localhost:${3000 + i}`),
     ];
-    app.enableCors({
-        origin: env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
-            ...getTrustedOrigins(),
-            ...devOrigins,
-        ],
-        credentials: true,
-    });
+    const trustedOrigins = env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [
+        ...getTrustedOrigins(),
+        ...devOrigins,
+    ];
+    // Guardless `/public/*` routes answer any origin, without credentials:
+    // merchants' own sites call them (U19). See common/cors.ts.
+    app.enableCors(
+        (
+            req: { url?: string },
+            callback: (error: Error | null, options: CorsOptions) => void,
+        ) => {
+            callback(null, corsOptionsFor(req.url ?? "", trustedOrigins));
+        },
+    );
 
     app.useGlobalPipes(
         // Shared with DTO specs, so what a test accepts is what the API accepts

@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
@@ -6,10 +7,46 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
+import {
+    DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+    hasIsoBmffSignature,
+    ISO_BMFF_SNIFF_BYTES,
+    isVideoContentType,
+    VIDEO_UPLOAD_PURPOSE,
+} from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import { OBJECT_STORAGE } from "./object-storage.provider";
+
+/** What a merchant reads when a file is neither a photo nor a video. */
+export const NOT_PHOTO_OR_VIDEO_MESSAGE =
+    "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
+/** What a merchant reads when a video is over the cap. */
+export const VIDEO_TOO_BIG_MESSAGE =
+    "That video is over 50 MB. Keep it under a minute, or export it smaller.";
+/** What a merchant reads when a "video" turns out not to be one. */
+export const NOT_A_VIDEO_MESSAGE =
+    "That file is not a video we can show. Choose an MP4 or MOV.";
+
+/**
+ * A video goes through the video purpose, is an MP4 or MOV, and is at most
+ * 50 MB (#517) — said in the merchant's words here, before the storage port's
+ * own check would refuse it less kindly.
+ */
+function assertVideoUpload(input: CreateUploadInput): void {
+    const video = isVideoContentType(input.contentType);
+    if (!video && input.purpose !== VIDEO_UPLOAD_PURPOSE) return;
+    if (!video) throw new BadRequestException(NOT_PHOTO_OR_VIDEO_MESSAGE);
+    if (input.purpose !== VIDEO_UPLOAD_PURPOSE) {
+        throw new BadRequestException(
+            "Videos go on a product. Add it under the product's Photos and videos.",
+        );
+    }
+    if (input.contentLength > DEFAULT_MAX_VIDEO_UPLOAD_BYTES) {
+        throw new BadRequestException(VIDEO_TOO_BIG_MESSAGE);
+    }
+}
 
 /** Input for issuing an upload URL — the validated {@link CreateUploadDto} shape. */
 export interface CreateUploadInput {
@@ -59,6 +96,7 @@ export class MediaService {
         input: CreateUploadInput,
     ): Promise<CreateUploadResult> {
         authorize(ctx, "media:write");
+        assertVideoUpload(input);
 
         const signed = await this.storage.createSignedUploadUrl({
             organizationId: ctx.organizationId,
@@ -114,6 +152,34 @@ export class MediaService {
         authorize(ctx, "media:write");
 
         const media = await this.requireOwned(ctx, mediaId);
+        if (media.status === "FAILED") {
+            throw new BadRequestException(
+                "That upload didn't go through. Upload the file again.",
+            );
+        }
+
+        /*
+         * A video is checked for what it is, not what it was labelled (#517).
+         * The type on the upload is the client's word; a page or a script
+         * sent as video/mp4 would otherwise be served from our storage. MP4
+         * and MOV both open with an ISO-BMFF `ftyp` box, so the first bytes
+         * — one ranged GET — settle it. Anything else is marked FAILED and
+         * its object deleted, so nothing can put it on a product.
+         */
+        if (isVideoContentType(media.contentType)) {
+            const start = await this.storage.readObjectStart(
+                media.key,
+                ISO_BMFF_SNIFF_BYTES,
+            );
+            if (!start || !hasIsoBmffSignature(start)) {
+                await prisma.media.update({
+                    where: { id: media.id },
+                    data: { status: "FAILED" },
+                });
+                await this.storage.deleteObject(media.key);
+                throw new BadRequestException(NOT_A_VIDEO_MESSAGE);
+            }
+        }
 
         const head = await this.storage.headObject(media.key);
         // Reconcile the authoritative size from storage when available; the
@@ -205,10 +271,74 @@ export class MediaService {
             );
         }
 
+        // A product showing it keeps a live link to the object; deleting it
+        // would leave a broken photo on that product. Take it off first.
+        const onProducts = await prisma.productImage.count({
+            where: { mediaId: media.id },
+        });
+        if (onProducts > 0) {
+            throw new ConflictException(
+                onProducts === 1
+                    ? "This image is on a product. Take it off the product before deleting it."
+                    : `This image is on ${onProducts} products. Take it off them before deleting it.`,
+            );
+        }
+
+        // The business logo prints on its invoices; deleting it would leave
+        // them with a broken image. Remove it as the logo first.
+        const asLogo = await prisma.businessProfile.count({
+            where: { logoMediaId: media.id },
+        });
+        if (asLogo > 0) {
+            throw new ConflictException(
+                "This image is your business logo. Remove it in Settings → Business before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 
         return { id: media.id, deleted: true };
+    }
+
+    /**
+     * The address a READY library object is served from, for another module
+     * that stores a reference to it (a product photo). Tenant-scoped: another
+     * organization's id, or one still uploading, is not found. Null when
+     * storage has no public base configured (local dev without R2).
+     */
+    async readyObject(
+        organizationId: string,
+        mediaId: string,
+    ): Promise<{
+        id: string;
+        url: string | null;
+        contentType: string;
+        sizeBytes: number;
+    }> {
+        const media = await prisma.media.findUnique({
+            where: { id: mediaId },
+            select: {
+                id: true,
+                organizationId: true,
+                key: true,
+                status: true,
+                contentType: true,
+                sizeBytes: true,
+            },
+        });
+        if (
+            media?.organizationId !== organizationId ||
+            media.status !== "READY"
+        ) {
+            throw new NotFoundException("That photo is not in your library");
+        }
+        return {
+            id: media.id,
+            url: this.publicUrlFor(media.key),
+            contentType: media.contentType,
+            sizeBytes: media.sizeBytes,
+        };
     }
 
     /**

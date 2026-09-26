@@ -26,6 +26,13 @@ export interface PlatformMetrics {
 
 export interface AdminFlag {
     key: string;
+    /** What it is for, who owns it, and when it should go. */
+    metadata: {
+        purpose: string;
+        owner: string;
+        reviewBy: string;
+        removeWhen: string;
+    };
     /** `null` = never configured, which is NOT the same as disabled. */
     enabledByDefault: boolean | null;
     overrides: {
@@ -109,21 +116,22 @@ export type AdminPermission =
     | "webhooks:replay"
     | "providers:read"
     | "providers:recheck"
-    | "incidents:read"
-    | "incidents:write"
     | "subscription:read"
     | "subscription:override"
     | "flags:read"
     | "flags:publish"
     | "staff:read"
     | "staff:grant"
-    | "audit:read";
+    | "audit:read"
+    | "waitlist:invite";
 
 export type ControlPlaneResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string };
+    { ok: true; data: T } | { ok: false; error: string };
 
-async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
+export async function adminFetch(
+    path: string,
+    init?: RequestInit,
+): Promise<Response> {
     const cookie = (await headers()).get("cookie") ?? "";
     return fetch(`${API_URL}/admin${path}`, {
         ...init,
@@ -137,8 +145,11 @@ async function adminFetch(path: string, init?: RequestInit): Promise<Response> {
 }
 
 /** Read a control-plane resource. `null` when the caller is not staff (403). */
-async function getJson<T>(path: string): Promise<T | null> {
-    const res = await adminFetch(path);
+export async function getJson<T>(
+    path: string,
+    init?: RequestInit,
+): Promise<T | null> {
+    const res = await adminFetch(path, init);
     // 401/403 is a legitimate "you are not staff", not an outage — the caller
     // renders the not-authorized state. Anything else is a real failure and
     // throws, so an API outage never masquerades as "access denied".
@@ -166,8 +177,45 @@ export function listFlags(): Promise<AdminFlag[] | null> {
     return getJson<AdminFlag[]>("/flags");
 }
 
+/** The flag screen's override targets: id, name and slug, unpaged. */
 export function listOrganizations(): Promise<AdminOrganization[] | null> {
-    return getJson<AdminOrganization[]>("/organizations");
+    return getJson<AdminOrganization[]>("/organizations?for=picker");
+}
+
+/**
+ * Send an operator write. Authorization and validation are the API's; this
+ * only forwards, and hands back the API's own reason when it refuses.
+ */
+export async function adminWrite<T = unknown>(
+    path: string,
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
+    body: unknown,
+    fallback: string,
+): Promise<ControlPlaneResult<T>> {
+    const res = await adminFetch(path, {
+        method,
+        body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) {
+        return { ok: false, error: await readError(res, fallback) };
+    }
+    const text = await res.text();
+    return { ok: true, data: (text ? JSON.parse(text) : null) as T };
+}
+
+export interface FlagExplanation {
+    value: boolean;
+    source: "OVERRIDE" | "DEFAULT" | "UNCONFIGURED" | "UNKNOWN_KEY";
+}
+
+/** Why a business sees the value it sees for a flag, from the resolver itself. */
+export function explainFlag(
+    flagKey: string,
+    organizationId: string,
+): Promise<FlagExplanation | null> {
+    return getJson<FlagExplanation>(
+        `/flags/${encodeURIComponent(flagKey)}/explain?organizationId=${encodeURIComponent(organizationId)}`,
+    );
 }
 
 export function flagHistory(flagKey: string): Promise<FlagChange[] | null> {
@@ -192,7 +240,10 @@ export function listAudit(
 }
 
 /** Extract the API's error-envelope message so operators see the real reason. */
-async function readError(res: Response, fallback: string): Promise<string> {
+export async function readError(
+    res: Response,
+    fallback: string,
+): Promise<string> {
     const body = (await res.json().catch(() => null)) as {
         error?: { message?: string; details?: unknown };
         message?: string;

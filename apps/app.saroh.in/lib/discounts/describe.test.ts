@@ -53,7 +53,7 @@ describe("describeDiscount", () => {
 
     it("admits a narrow code that reaches nothing now", () => {
         expect(reachOf({ appliesTo: "COLLECTION", targets: [] })).toBe(
-            "no collection",
+            "no category",
         );
     });
 });

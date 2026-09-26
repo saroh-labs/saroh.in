@@ -18,5 +18,7 @@ import { WebhooksService } from "./webhooks.service";
     imports: [PaymentsModule],
     controllers: [WebhooksController],
     providers: [WebhooksService, webhookProviderFactoryProvider],
+    // Exported for the admin console, which replays failed deliveries.
+    exports: [WebhooksService],
 })
 export class WebhooksModule {}

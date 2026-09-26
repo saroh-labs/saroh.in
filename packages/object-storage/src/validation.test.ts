@@ -4,8 +4,13 @@ import {
     buildUploadInputSchema,
     DEFAULT_ALLOWED_CONTENT_TYPES,
     DEFAULT_MAX_UPLOAD_BYTES,
+    DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
     extensionForContentType,
+    hasIsoBmffSignature,
     isAllowedContentType,
+    isVideoContentType,
+    VIDEO_CONTENT_TYPES,
+    VIDEO_UPLOAD_PURPOSE,
 } from "./validation";
 
 describe("content-type allowlist", () => {
@@ -144,5 +149,103 @@ describe("upload input schema", () => {
                 filename: "x.webp",
             }).success,
         ).toBe(true);
+    });
+});
+
+describe("videos (#517)", () => {
+    const schema = buildUploadInputSchema({
+        allowlist: DEFAULT_ALLOWED_CONTENT_TYPES,
+        maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES,
+    });
+    const video = (over: Record<string, unknown> = {}) => ({
+        organizationId: "org-1",
+        contentType: "video/mp4",
+        contentLength: 40 * 1024 * 1024,
+        filename: "pour.mp4",
+        purpose: VIDEO_UPLOAD_PURPOSE,
+        ...over,
+    });
+
+    it("accepts an MP4 or a MOV up to 50 MB under the video purpose", () => {
+        expect(schema.safeParse(video()).success).toBe(true);
+        expect(
+            schema.safeParse(
+                video({
+                    contentType: "video/quicktime",
+                    filename: "pour.mov",
+                    contentLength: DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+                }),
+            ).success,
+        ).toBe(true);
+    });
+
+    it("refuses a 60 MB video", () => {
+        expect(
+            schema.safeParse(video({ contentLength: 60 * 1024 * 1024 }))
+                .success,
+        ).toBe(false);
+    });
+
+    it("refuses a video under any other purpose, and other video types", () => {
+        expect(schema.safeParse(video({ purpose: "site-image" })).success).toBe(
+            false,
+        );
+        expect(schema.safeParse(video({ purpose: undefined })).success).toBe(
+            false,
+        );
+        expect(
+            schema.safeParse(video({ contentType: "video/webm" })).success,
+        ).toBe(false);
+    });
+
+    it("keeps the 25 MB cap for a photo, whatever its purpose", () => {
+        expect(
+            schema.safeParse(
+                video({
+                    contentType: "image/jpeg",
+                    filename: "big.jpg",
+                    contentLength: DEFAULT_MAX_UPLOAD_BYTES + 1,
+                }),
+            ).success,
+        ).toBe(false);
+    });
+
+    it("knows the video types", () => {
+        expect(isVideoContentType("video/mp4")).toBe(true);
+        expect(isVideoContentType("video/quicktime")).toBe(true);
+        expect(isVideoContentType("image/png")).toBe(false);
+        expect(Object.keys(VIDEO_CONTENT_TYPES)).toEqual([
+            "video/mp4",
+            "video/quicktime",
+        ]);
+    });
+});
+
+describe("hasIsoBmffSignature", () => {
+    const bytes = (...parts: (number[] | string)[]) =>
+        new Uint8Array(
+            parts.flatMap((p) =>
+                typeof p === "string" ? [...p].map((c) => c.charCodeAt(0)) : p,
+            ),
+        );
+
+    it("accepts an MP4 and a MOV ftyp box", () => {
+        expect(hasIsoBmffSignature(bytes([0, 0, 0, 0x20], "ftypisom"))).toBe(
+            true,
+        );
+        expect(hasIsoBmffSignature(bytes([0, 0, 0, 0x14], "ftypqt  "))).toBe(
+            true,
+        );
+    });
+
+    it("refuses a file that only says it is a video", () => {
+        expect(hasIsoBmffSignature(bytes("<!doctype html>"))).toBe(false);
+        expect(hasIsoBmffSignature(bytes([0, 0, 0, 0x20], "moovabcd"))).toBe(
+            false,
+        );
+        expect(hasIsoBmffSignature(bytes([0, 0, 0, 4], "ftypisom"))).toBe(
+            false,
+        );
+        expect(hasIsoBmffSignature(bytes([0, 0, 0, 0x20], "ftyp"))).toBe(false);
     });
 });

@@ -10,6 +10,13 @@ import { Prisma, prisma } from "@saroh/database";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { gstInsideOrder } from "../invoices/order-invoice";
+import {
+    creditRestOfOrder,
+    ensureOrderInvoice,
+    loadTaxProfile,
+} from "../invoices/order-invoicing";
+import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type {
     CreateOrderDto,
@@ -17,18 +24,20 @@ import type {
     PaymentStatus,
     UpdateOrderDto,
 } from "./dto";
-import type { OrderLine } from "./order-inventory";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
+import {
+    fromCents,
+    priceOrderLines,
+    toCents,
+    withGstRates,
+} from "./order-pricing";
+import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import {
     serializeOrderDetail,
     serializeOrderSummary,
     serializeOrganizationOrder,
 } from "./serialize";
-
-/** Money helpers — integer-cents math so totals never drift on floats. */
-const toCents = (s: string) => Math.round(Number(s) * 100);
-const fromCents = (c: number) => (c / 100).toFixed(2);
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -56,7 +65,7 @@ export class OrdersService {
     ) {}
 
     async list(storeId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        await this.requireOrderRead(storeId, userId);
         const orders = await prisma.order.findMany({
             where: { storeId },
             orderBy: { createdAt: "desc" },
@@ -83,6 +92,7 @@ export class OrdersService {
     async listForOrganization(
         organizationId: string,
         filter?: { storeId?: string },
+        view: { kitchenOnly?: boolean } = {},
     ) {
         const orders = await prisma.order.findMany({
             where: {
@@ -96,17 +106,20 @@ export class OrdersService {
                 _count: { select: { items: true } },
             },
         });
-        return orders.map(serializeOrganizationOrder);
+        return orders.map((o) => serializeOrganizationOrder(o, view));
     }
 
     async get(storeId: string, orderId: string, userId: string) {
-        await this.stores.getForUser(storeId, userId);
+        await this.requireOrderRead(storeId, userId);
         const order = await prisma.order.findFirst({
             where: { id: orderId, storeId },
             include: {
                 customer: CUSTOMER_SELECT,
                 items: {
-                    include: { product: { select: { name: true } } },
+                    include: {
+                        product: { select: { name: true } },
+                        variant: { select: { title: true } },
+                    },
                 },
                 discountRedemption: {
                     select: {
@@ -138,31 +151,15 @@ export class OrdersService {
                 field: "customerId",
             });
         }
-
-        // Snapshot each line's price from its product (must be in this store).
-        const lines: (OrderLine & {
-            priceCents: number;
-            categoryId: string | null;
-        })[] = [];
-        for (const item of dto.items) {
-            const product = await prisma.product.findFirst({
-                where: { id: item.productId, storeId },
-                // The category too: a collection code matches on it.
-                select: { price: true, categoryId: true },
-            });
-            if (!product) {
-                throw new BadRequestException({
-                    message: "Unknown product in order",
-                    field: "items",
-                });
-            }
-            lines.push({
-                productId: item.productId,
-                quantity: item.quantity,
-                priceCents: toCents(product.price.toString()),
-                categoryId: product.categoryId,
+        // The same rule an edit keeps: there is nowhere to deliver to.
+        if (dto.fulfilment === "DELIVERY" && !dto.address) {
+            throw new BadRequestException({
+                message: "A delivery needs an address.",
+                field: "address",
             });
         }
+
+        const lines = await priceOrderLines(storeId, dto.items);
 
         // An order is taken in its storefront's currency. The form never sent
         // one, so every order fell to the column's USD — a rupee shop's
@@ -188,7 +185,14 @@ export class OrdersService {
             (sum, l) => sum + l.priceCents * l.quantity,
             0,
         );
-        const taxCents = toCents(dto.tax ?? "0");
+        // A GST-registered business's prices include GST: the storefront's
+        // add-on tax is ignored, and `tax` records the GST inside the total
+        // instead of adding to it (ADR-008).
+        const profile = organizationId
+            ? await loadTaxProfile(prisma, organizationId)
+            : null;
+        const registered = profile?.registered ?? false;
+        let taxCents = registered ? 0 : toCents(dto.tax ?? "0");
         const shippingCents = toCents(dto.shipping ?? "0");
         // A code and a typed amount are mutually exclusive: two answers to
         // "why did this come off" would leave no way to tell which was meant.
@@ -230,6 +234,17 @@ export class OrdersService {
             0,
             subtotalCents + taxCents + shippingCents - discountCents,
         );
+        if (registered && profile) {
+            taxCents = gstInsideOrder(await withGstRates(lines), {
+                shippingCents,
+                discountCents,
+                deliveryState:
+                    dto.fulfilment === "DELIVERY"
+                        ? (dto.address?.state ?? null)
+                        : null,
+                profile,
+            });
+        }
 
         const data = {
             storeId,
@@ -241,9 +256,24 @@ export class OrdersService {
             shipping: fromCents(shippingCents),
             discount: fromCents(discountCents),
             total: fromCents(totalCents),
+            // The kitchen flow (ADR-008): collected unless said otherwise.
+            fulfilment: dto.fulfilment ?? "COLLECT",
+            notes: dto.notes ?? null,
+            ...(dto.address
+                ? {
+                      deliveryName: dto.address.name ?? null,
+                      deliveryPhone: dto.address.phone ?? null,
+                      deliveryLine1: dto.address.line1,
+                      deliveryLine2: dto.address.line2 ?? null,
+                      deliveryCity: dto.address.city,
+                      deliveryState: dto.address.state,
+                      deliveryPostalCode: dto.address.postalCode,
+                  }
+                : {}),
             items: {
                 create: lines.map((l) => ({
                     productId: l.productId,
+                    variantId: l.variantId ?? null,
                     quantity: l.quantity,
                     price: fromCents(l.priceCents),
                 })),
@@ -258,13 +288,23 @@ export class OrdersService {
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
-                        const order = await tx.order.create({
+                        const { items, ...order } = await tx.order.create({
                             data: { ...data, orderId: orderNumber },
-                            select: { id: true },
+                            select: {
+                                id: true,
+                                items: {
+                                    select: {
+                                        id: true,
+                                        productId: true,
+                                        variantId: true,
+                                        quantity: true,
+                                    },
+                                },
+                            },
                         });
                         await applyInventoryTransition(
                             tx,
-                            lines,
+                            items,
                             "RELEASED",
                             "RESERVED",
                         );
@@ -332,48 +372,64 @@ export class OrdersService {
         dto: UpdateOrderDto,
     ) {
         await this.requireWrite(storeId, userId);
-        const order = await prisma.order.findFirst({
-            where: { id: orderId, storeId },
-            select: {
-                id: true,
-                status: true,
-                paymentStatus: true,
-                items: { select: { productId: true, quantity: true } },
-            },
-        });
-        if (!order) {
-            throw new NotFoundException("Order not found");
-        }
-
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
-        const statusChanging =
-            nextStatus != null && nextStatus !== order.status;
-
-        // Guard the lifecycle BEFORE any write: an illegal status/payment move
-        // throws 400 (naming the from→to) and nothing is persisted. Same→same
-        // is a no-op (not "changing"), so it is never asserted — re-PATCHing an
-        // unchanged status stays idempotent. The inline null-checks narrow the
-        // dto fields so no non-null assertion is needed.
-        if (nextStatus != null && nextStatus !== order.status) {
-            assertStatusTransition(order.status as OrderStatus, nextStatus);
-        }
-        if (nextPayment != null && nextPayment !== order.paymentStatus) {
-            assertPaymentTransition(
-                order.paymentStatus as PaymentStatus,
-                nextPayment,
-            );
-        }
 
         await prisma.$transaction(async (tx) => {
+            // Lock order (#511): the Order, then its StockLevel rows — the
+            // order a refund settling and a cancel both take. The order is
+            // read under its lock, so two status changes take turns and each
+            // moves stock from where the other left it.
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} AND "storeId" = ${storeId} FOR UPDATE`;
+            const order = await tx.order.findFirst({
+                where: { id: orderId, storeId },
+                select: {
+                    id: true,
+                    status: true,
+                    paymentStatus: true,
+                    stage: true,
+                    fulfilment: true,
+                    organizationId: true,
+                    items: { select: { id: true } },
+                },
+            });
+            if (!order) {
+                throw new NotFoundException("Order not found");
+            }
+            const statusChanging =
+                nextStatus != null && nextStatus !== order.status;
+
+            // Guard the lifecycle BEFORE any write: an illegal status/payment
+            // move throws 400 (naming the from→to) and nothing is persisted.
+            // Same→same is a no-op (not "changing"), so it is never asserted
+            // — re-PATCHing an unchanged status stays idempotent.
+            if (nextStatus != null && nextStatus !== order.status) {
+                assertStatusTransition(order.status as OrderStatus, nextStatus);
+            }
+            if (nextPayment != null && nextPayment !== order.paymentStatus) {
+                assertPaymentTransition(
+                    order.paymentStatus as PaymentStatus,
+                    nextPayment,
+                );
+            }
+
             if (statusChanging) {
                 await applyInventoryTransition(
                     tx,
                     order.items,
                     phaseOf(order.status),
-                    phaseOf(dto.status as string),
+                    phaseOf(nextStatus),
+                    userId,
                 );
             }
+            // The kitchen stage follows a status set here, so the next
+            // kitchen step is not refused as out of step (ADR-008).
+            const kitchen = statusChanging
+                ? stageForStatus(nextStatus, {
+                      stage: order.stage,
+                      fulfilment: order.fulfilment,
+                  })
+                : null;
             await tx.order.update({
                 where: { id: orderId },
                 data: {
@@ -381,8 +437,38 @@ export class OrdersService {
                     ...(dto.paymentStatus
                         ? { paymentStatus: dto.paymentStatus }
                         : {}),
+                    ...(kitchen ?? {}),
                 },
             });
+            // Paid by hand (pay later, cash at the counter): the order's
+            // invoice is made now, once — the same one a payment webhook
+            // would have made (ADR-008). Refunded by hand: what is left of
+            // it is credited.
+            const paymentChanging =
+                nextPayment != null && nextPayment !== order.paymentStatus;
+            if (paymentChanging && nextPayment === "PAID") {
+                await ensureOrderInvoice(tx, orderId, {
+                    method: "RECORDED",
+                });
+            }
+            if (paymentChanging && nextPayment === "REFUNDED") {
+                await creditRestOfOrder(tx, orderId, "Refunded", userId);
+            }
+            if (statusChanging && order.organizationId) {
+                // On the order's timeline too, as a step outside the kitchen.
+                await tx.orderEvent.create({
+                    data: {
+                        organizationId: order.organizationId,
+                        orderId,
+                        kind: "STATUS",
+                        actorUserId: userId,
+                        fromStage: order.stage,
+                        toStage: kitchen?.stage ?? order.stage,
+                        fromStatus: order.status,
+                        toStatus: nextStatus,
+                    },
+                });
+            }
         });
         return { id: orderId };
     }
@@ -436,6 +522,17 @@ export class OrdersService {
                 ruleAmount: applied.ruleAmount,
             },
         });
+    }
+
+    /**
+     * Reading a storefront's orders — with their totals — takes `order:read`,
+     * not only a way into the store (the rule is shared with the customer
+     * list; see `requireOrderRead`). Without it this older read handed a
+     * Member at the counter every order's prices, which the
+     * organization-scoped read Order Detail uses leaves out.
+     */
+    private requireOrderRead(storeId: string, userId: string) {
+        return requireOrderRead(this.stores, storeId, userId, "orders");
     }
 
     private async requireWrite(

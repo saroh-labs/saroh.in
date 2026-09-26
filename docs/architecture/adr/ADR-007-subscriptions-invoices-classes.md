@@ -1,6 +1,7 @@
 # ADR-007 — Subscriptions, invoices, online classes, courses and class packs
 
 **Status:** Accepted — 2026-09-22 (DEC-019)
+**Amended by:** [ADR-008](./ADR-008-operations-staff-gst-kitchen.md) (2026-09-23, DEC-023) — every order is invoiced; a GST-registered business credits an issued invoice instead of voiding it; GST tax invoices
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-003](./ADR-003-organization-modules.md) (modules) · [ADR-006](./ADR-006-one-storefront-one-website.md) (one storefront, one website) · DEC-010 (merchant payments run on the business's own providers)
 
 ---
@@ -94,6 +95,8 @@ business pays Saroh). To keep the two apart in code and in conversation:
 - Status `DRAFT` → `ISSUED` → `PAID`, or `VOID`. An issued invoice's lines never
   change; a mistake is voided and reissued, so a number once given out always
   means the same thing.
+  _Amended by ADR-008: a GST-registered business corrects an issued invoice
+  with a credit note or supplementary invoice, never a void._
 - Paid by hand first (cash, UPI, bank transfer, card at the counter —
   recorded, nothing charged). Paying through the business's own provider (a pay
   link) extends `PaymentIntent`, which today requires an order, to take an
@@ -141,6 +144,11 @@ business pays Saroh). To keep the two apart in code and in conversation:
 - What it is for: a subscription period, a course enrollment, a class pack
   purchase, or entered by hand. Store orders keep their own receipt and are
   not invoiced in this ADR.
+
+    > **Amended by [ADR-008](./ADR-008-operations-staff-gst-kitchen.md)
+    > (2026-09-23):** every order and every paid online booking now makes its
+    > own invoice. The order stays the ledger — its invoice has no pay link and
+    > mirrors the order's payment and refunds.
 
 ### Online classes
 
@@ -218,9 +226,10 @@ credit. The balance is **derived** from purchases minus live redemptions.
 ## 3. What this is not
 
 - Not GST tax invoices (no GSTIN, HSN/SAC or CGST/SGST/IGST split). Revisit
-  when a business needs to file with them.
+  when a business needs to file with them. _Revisited in ADR-008._
 - Not automatic charging.
-- Not a replacement for store orders and receipts.
+- Not a replacement for store orders and receipts. _ADR-008 invoices every
+  order; the order stays the ledger._
 - Not hotel stays: bookings stay timed slots within a day.
 
 ## 4. Build order

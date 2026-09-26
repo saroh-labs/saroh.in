@@ -113,4 +113,11 @@ export interface ObjectStorage {
 
     /** Confirm an upload landed; resolves `null` when the key does not exist. */
     headObject(key: string): Promise<HeadObjectResult | null>;
+
+    /**
+     * Read the first `length` bytes of an object (a ranged GET), to check what
+     * a file really is rather than what it was labelled. Resolves `null` when
+     * the key does not exist or its bytes cannot be read.
+     */
+    readObjectStart(key: string, length: number): Promise<Uint8Array | null>;
 }

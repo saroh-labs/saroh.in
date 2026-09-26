@@ -26,6 +26,8 @@ jest.mock("@saroh/database", () => {
         ...actual,
         runInOrgContext: jest.fn((_org: string, fn: () => unknown) => fn()),
         prisma: {
+            // The lifecycle gate: no row means "not closed" (organization-lifecycle.gate.ts).
+            organization: { findUnique: jest.fn().mockResolvedValue(null) },
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
                 cb(client),
@@ -410,6 +412,68 @@ describe("PublicInvoicesService.createIntent", () => {
         await expect(service.createIntent(TOKEN, {})).rejects.toMatchObject({
             status: 429,
         });
+    });
+});
+
+describe("PublicInvoicesService.createIntent — a pay-now hold (U19)", () => {
+    const HOLD_DRAFT = {
+        id: "inv_1",
+        organizationId: "org_1",
+        status: "DRAFT",
+        source: "BOOKING",
+        total: dec("800.00"),
+        currency: "INR",
+    };
+
+    it("starts paying a hold's draft for its stored total while the hold lasts", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({
+            ...HOLD_DRAFT,
+            booking: {
+                status: "PENDING",
+                holdExpiresAt: new Date(Date.now() + 10 * 60_000),
+            },
+        });
+        providerFindMany.mockResolvedValue([connectedRow()]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+
+        const result = await service.createIntent(TOKEN, { amount: 1 });
+
+        expect(fake.calls[0]?.amountCents).toBe(80000);
+        expect(intentCreate.mock.calls[0][0].data).toMatchObject({
+            invoiceId: "inv_1",
+            amountCents: 80000,
+        });
+        expect(result.amountCents).toBe(80000);
+    });
+
+    it("refuses once the hold has run out: the place may be someone else's", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({
+            ...HOLD_DRAFT,
+            booking: {
+                status: "PENDING",
+                holdExpiresAt: new Date(Date.now() - 60_000),
+            },
+        });
+
+        await expect(service.createIntent(TOKEN, {})).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(fake.calls).toHaveLength(0);
+    });
+
+    it("still refuses a hand-written draft", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({
+            ...HOLD_DRAFT,
+            source: "MANUAL",
+            booking: null,
+        });
+        await expect(service.createIntent(TOKEN, {})).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(fake.calls).toHaveLength(0);
     });
 });
 

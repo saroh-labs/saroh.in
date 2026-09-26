@@ -27,6 +27,9 @@ const ROOT = resolve(import.meta.dirname, "..");
 const APP_DIR = join(ROOT, "apps/app.saroh.in/app");
 const APP_ROOT = join(ROOT, "apps/app.saroh.in");
 const API_SRC = join(ROOT, "apps/api.saroh.in/src");
+// The admin console's own routes: the API's health board sends operators to
+// them, in a `consoleHref` field so they are never mistaken for the app's.
+const ADMIN_DIR = join(ROOT, "apps/admin.saroh.in/app");
 
 /** Walk a directory tree, yielding absolute file paths. */
 function* walk(dir) {
@@ -46,11 +49,11 @@ function* walk(dir) {
  * (they never appear in a URL) and dynamic segments `[id]` / `[...slug]` become
  * wildcards, so `/stores/[storeId]` matches a concrete `/stores/abc123`.
  */
-function appRoutePatterns() {
+function appRoutePatterns(dir = APP_DIR) {
     const patterns = [];
-    for (const file of walk(APP_DIR)) {
+    for (const file of walk(dir)) {
         if (!/[/\\]page\.tsx?$/.test(file)) continue;
-        const segments = relative(APP_DIR, file)
+        const segments = relative(dir, file)
             .replace(/[/\\]page\.tsx?$/, "")
             .split(/[/\\]/)
             .filter((s) => s && !/^\(.*\)$/.test(s));
@@ -99,6 +102,26 @@ function emittedHrefs() {
                 });
             }
         });
+    }
+    return found;
+}
+
+/**
+ * Console destinations the API emits, in `consoleHref:` keys — the admin
+ * console's health board sends operators to its own screens. Checked against
+ * admin.saroh.in's routes, not the app's.
+ */
+function emittedConsoleHrefs() {
+    const found = [];
+    for (const file of walk(API_SRC)) {
+        if (!/\.tsx?$/.test(file) || /\.spec\.tsx?$/.test(file)) continue;
+        // The whole file, not line by line: a formatter is free to put the key
+        // and its string on separate lines, and a missed link is a silent one.
+        const text = readFileSync(file, "utf8");
+        for (const m of text.matchAll(/\bconsoleHref:\s*"(\/[^"]*)"/g)) {
+            const line = text.slice(0, m.index).split("\n").length;
+            found.push({ href: m[1], file: relative(ROOT, file), line });
+        }
     }
     return found;
 }
@@ -162,16 +185,25 @@ const all = [
     ...inAppLinks().map((h) => ({ ...h, source: "app.saroh.in" })),
 ];
 
+/** Compare paths only; a query string or fragment does not change the route. */
+const pathOf = (href) => href.split(/[?#]/)[0].replace(/\/$/, "") || "/";
+
 const broken = all.filter(({ href }) => {
-    // Compare paths only; a query string or fragment does not change the route.
-    const path = href.split(/[?#]/)[0].replace(/\/$/, "") || "/";
     if (NOT_APP_ROUTES.some((re) => re.test(href))) return false;
-    return !patterns.some((p) => p.regex.test(path));
+    return !patterns.some((p) => p.regex.test(pathOf(href)));
 });
+
+const adminPatterns = appRoutePatterns(ADMIN_DIR);
+const consoleLinks = emittedConsoleHrefs();
+for (const link of consoleLinks) {
+    if (!adminPatterns.some((p) => p.regex.test(pathOf(link.href)))) {
+        broken.push({ ...link, source: "api.saroh.in → admin console" });
+    }
+}
 
 if (broken.length > 0) {
     console.error(
-        `\n${broken.length} destination(s) have no route in app.saroh.in:\n`,
+        `\n${broken.length} destination(s) have no route to land on:\n`,
     );
     for (const { href, file, line, source } of broken) {
         console.error(`  ${href}   (${source})\n      ${file}:${line}`);
@@ -183,6 +215,7 @@ if (broken.length > 0) {
 }
 
 console.log(
-    `check-app-routes: ${all.length} destination(s) resolve against ${patterns.length} app route(s) ` +
+    `check-app-routes: ${all.length} destination(s) resolve against ${patterns.length} app route(s), ` +
+        `${consoleLinks.length} console destination(s) against ${adminPatterns.length} console route(s) ` +
         `(${skipped.length} dynamic link(s) not statically checkable).`,
 );

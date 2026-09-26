@@ -30,6 +30,32 @@ export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 
+// Not a page block: a product as its shop page shows it (#465) — the
+// workspace's Customer view today, the storefront product page later.
+export {
+    default as ProductPage,
+    formatAmount,
+    percentOff,
+    stockLabel,
+} from "./product/product-page";
+export type {
+    ProductPageData,
+    ProductPageImage,
+    ProductPageReview,
+    ProductPageVariant,
+    StockWord,
+} from "./product/product-page";
+
+// Not a page block either: the booking page on a merchant's site (U19),
+// `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
+export {
+    default as BookingFlow,
+    BookingUnavailable,
+} from "./booking-flow/booking-flow";
+export type { BookingFlowProps } from "./booking-flow/booking-flow";
+export { isBookingPage } from "./booking-flow/model";
+export type { BookingPageData, BookingService } from "./booking-flow/model";
+
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";

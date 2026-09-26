@@ -79,6 +79,33 @@ describe("ModuleLifecycleService", () => {
                     action: "organization.module.enabled",
                     actorUserId: "user_1",
                     targetId: "CRM",
+                    // Named as the business reads it, for Activity (#509).
+                    metadata: { module: "CRM", enabled: true },
+                }),
+            }),
+        );
+    });
+
+    it("a Saroh operator's switch is marked byOperator for Activity (DEC-035)", async () => {
+        const OPERATOR: OrganizationContext = {
+            organizationId: "org_1",
+            userId: "u_staff",
+            role: "MEMBER",
+            roleKey: "platform-operator",
+            actions: new Set(["module:manage"]),
+        };
+        const db = makeDb();
+        const svc = new ModuleLifecycleService(makeReadiness(), db as never);
+        await svc.enable(OPERATOR, "CRM");
+        expect(db.auditEvent.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    action: "organization.module.enabled",
+                    metadata: {
+                        module: "CRM",
+                        enabled: true,
+                        byOperator: true,
+                    },
                 }),
             }),
         );
@@ -141,6 +168,7 @@ describe("ModuleLifecycleService", () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     action: "organization.module.disabled",
+                    metadata: { module: "Website", enabled: false },
                 }),
             }),
         );

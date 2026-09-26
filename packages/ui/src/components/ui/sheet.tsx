@@ -50,27 +50,59 @@ const sheetVariants = cva(
 interface SheetContentProps
     extends
         React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-        VariantProps<typeof sheetVariants> {}
+        VariantProps<typeof sheetVariants> {
+    /**
+     * False when the sheet draws its own close button in its header — a
+     * quick look puts it beside the status, where the design has it.
+     */
+    closeButton?: boolean;
+}
 
 const SheetContent = React.forwardRef<
     React.ElementRef<typeof SheetPrimitive.Content>,
     SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-    <SheetPortal>
-        <SheetOverlay />
-        <SheetPrimitive.Content
-            ref={ref}
-            className={cn(sheetVariants({ side }), className)}
-            {...props}
-        >
-            {children}
-            <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground ring-offset-background transition-colors duration-fast hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-            </SheetPrimitive.Close>
-        </SheetPrimitive.Content>
-    </SheetPortal>
-));
+>(
+    (
+        {
+            side = "right",
+            className,
+            children,
+            closeButton = true,
+            onInteractOutside,
+            ...props
+        },
+        ref,
+    ) => (
+        <SheetPortal>
+            <SheetOverlay />
+            <SheetPrimitive.Content
+                ref={ref}
+                className={cn(sheetVariants({ side }), className)}
+                {...props}
+                // A toast is not "outside": Undo on "Stopped selling" is
+                // pressed while the quick look that did it is still open, and
+                // pressing it must not close the sheet it is about.
+                onInteractOutside={(event) => {
+                    onInteractOutside?.(event);
+                    const target = event.target as Element | null;
+                    if (target?.closest("[data-sonner-toaster]")) {
+                        event.preventDefault();
+                    }
+                }}
+            >
+                {children}
+                {closeButton ? (
+                    /* A 30px target (44 on touch), not a bare 16px glyph:
+                       closing a sheet is the most common thing done in one. */
+                    <SheetPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none coarse:size-11">
+                        <X className="size-4" strokeWidth={2.1} />
+                        <span className="sr-only">Close</span>
+                    </SheetPrimitive.Close>
+                ) : null}
+            </SheetPrimitive.Content>
+        </SheetPortal>
+    ),
+);
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 function SheetHeader({

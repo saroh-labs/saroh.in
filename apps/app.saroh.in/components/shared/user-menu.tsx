@@ -15,17 +15,16 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { LogOut, SunMoon, UserCog } from "lucide-react";
+import { CircleHelp, LogOut, SunMoon, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
+import Link from "next/link";
 
-import { accountsLoginUrl, accountsUrl } from "@/lib/accounts";
+import { accountsLoginUrl } from "@/lib/accounts";
+import { HELP_URL } from "@/lib/help/links";
 
 /**
- * All three, including System — which is the one thing the top bar's toggle
- * cannot offer, because a two-state flip has nowhere to put a third state.
- * The toggle is the quick "not this, the other one"; this is where someone
- * hands the decision back to their machine. Both write the same next-themes
- * value, so they always agree.
+ * All three, including System. Appearance lives only here since the top
+ * bar lost its light/dark toggle (the "Saroh Settings" design, 2026-09-25).
  */
 const APPEARANCE = [
     { value: "light", label: "Light" },
@@ -34,9 +33,11 @@ const APPEARANCE = [
 ] as const;
 
 /**
- * The account menu, at the right of the top bar (the "Saroh Products Screen"
+ * The account menu, at the right of the top bar (the "Saroh Settings"
  * design): your monogram and first name, then what is YOURS rather than the
- * business's — account settings and appearance — and signing out.
+ * business's — your profile, appearance and help — and signing out. The
+ * design keeps only Your profile; appearance and help moved here when the
+ * top bar lost them, so neither went missing.
  *
  * Business settings are not here on purpose. They belong to the business you
  * are in and live in the rail; this menu follows you into every business you
@@ -96,11 +97,12 @@ export function UserMenu({
                     </span>
                 </DropdownMenuLabel>
                 <DropdownMenuItem asChild>
-                    {/* Cross-origin: accounts.saroh.in owns identity. */}
-                    <a href={`${accountsUrl}/account`}>
-                        <UserCog />
-                        <span className="flex-1">Account settings</span>
-                    </a>
+                    {/* Your login and alerts; identity edits link on from
+                        there to accounts.saroh.in. */}
+                    <Link href="/settings/profile">
+                        <UserRound />
+                        <span className="flex-1">Your profile</span>
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="gap-2.5 rounded-[7px] px-[9px] py-[7px] text-[13px] [&>svg]:size-4">
@@ -127,6 +129,12 @@ export function UserMenu({
                         </DropdownMenuRadioGroup>
                     </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuItem asChild>
+                    <a href={HELP_URL} target="_blank" rel="noreferrer">
+                        <CircleHelp />
+                        <span className="flex-1">Help centre</span>
+                    </a>
+                </DropdownMenuItem>
                 <p className="px-[9px] pb-1 pt-2 text-[11px] leading-[1.45] text-muted-foreground">
                     These are yours, not {businessName ?? "the business"}
                     &apos;s. They follow you into every business you belong to.

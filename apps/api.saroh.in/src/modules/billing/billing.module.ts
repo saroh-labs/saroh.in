@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AuditModule } from "../audit/audit.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
@@ -30,7 +31,7 @@ import { SubscriptionsService } from "./subscriptions.service";
  * it into `AppModule`.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule)],
+    imports: [AuditModule, forwardRef(() => OrganizationsModule)],
     controllers: [PlansController, BillingController, BillingWebhookController],
     providers: [
         PlansService,

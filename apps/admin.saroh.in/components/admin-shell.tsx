@@ -2,88 +2,80 @@ import { Badge } from "@saroh/ui/badge";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { AppsMenu } from "@/components/apps-menu";
+import { ConsoleDrawer } from "@/components/console-drawer";
+import { ConsoleRail } from "@/components/console-rail";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { StaffIdentity } from "@/lib/control-plane";
-
-const NAV = [
-    { href: "/", label: "Dashboard" },
-    { href: "/flags", label: "Releases", permission: "flags:read" },
-    { href: "/audit", label: "Audit", permission: "audit:read" },
-] as const;
+import { instanceApps } from "@/lib/sibling-apps";
 
 /**
- * Chrome for the control plane. Deliberately plainer than app.saroh.in's shell:
- * this is an internal operations surface, and the visual distance from the
- * tenant product is a feature — an operator should never be unsure which of the
- * two they are looking at.
+ * Chrome for the console.
+ *
+ * It reuses the workspace's own parts — the rail at its three widths, the
+ * shared tokens, `PageHeader` on every screen — and is still unmistakably not
+ * a merchant surface, because it is dark by default and says what it is in the
+ * bar: who you are on it, and — in the apps menu — which instance this is
+ * (`docs/product-transformation/information-architecture.md`, and the plan's
+ * D7). Before this it was a top bar with no rail and no dark mode at all,
+ * which read as unfinished rather than as deliberately different.
  */
-export function AdminShell({
+export async function AdminShell({
     staff,
     children,
 }: {
     staff: StaffIdentity;
     children: React.ReactNode;
 }) {
-    const visibleNavigation = NAV.filter(
-        (item) =>
-            !("permission" in item) ||
-            staff.permissions.includes(item.permission),
-    );
+    const instance = await instanceApps();
 
     return (
-        <div className="min-h-screen">
-            {/* A thin brand rule across the top: the cheapest possible signal
-                that this is the control plane and not a tenant workspace. */}
-            <div className="h-1 w-full bg-brand-surface" aria-hidden />
-            <header className="border-b bg-card px-4 sm:px-6">
-                <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-7 gap-y-3">
-                        <Link href="/" className="shrink-0">
-                            <Wordmark suffix="control" />
-                        </Link>
-                        <nav
-                            aria-label="Control plane"
-                            className="flex items-center gap-1"
-                        >
-                            {visibleNavigation.map((item) => (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors duration-fast ease-out hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </nav>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="hidden min-w-0 text-right sm:block">
-                            <p className="truncate text-sm">{staff.email}</p>
-                            <p className="truncate text-xs text-muted-foreground">
-                                {staff.roles.map(formatRole).join(" · ")}
-                            </p>
-                        </div>
-                        <SignOutButton />
-                    </div>
+        <div className="flex min-h-screen flex-col">
+            {/* Sticky, at a fixed 56px, so the rail can sit exactly below it
+                and only the work area moves with the page. */}
+            <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3 sm:px-4">
+                <ConsoleDrawer permissions={staff.permissions} />
+                <Link href="/" className="shrink-0">
+                    <Wordmark suffix="console" />
+                </Link>
+                <div className="ml-auto flex min-w-0 items-center gap-3">
+                    <p className="hidden min-w-0 truncate text-[12px] text-muted-foreground md:block">
+                        {staff.email}
+                        <span aria-hidden> · </span>
+                        <span className="sr-only">, </span>
+                        {staff.roles.map(formatRole).join(" · ")}
+                    </p>
+                    {instance && <AppsMenu instance={instance} />}
+                    <SignOutButton />
                 </div>
             </header>
 
-            {staff.viaBootstrap && (
-                <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5 sm:px-6">
-                    <div className="mx-auto flex max-w-7xl items-center gap-2.5 text-sm text-foreground">
-                        <Badge variant="outline" className="shrink-0">
-                            Break-glass
-                        </Badge>
-                        <p>
-                            You are here via the <code>ADMIN_ALLOWLIST</code>{" "}
-                            path, not a recorded grant. Add a PlatformAdmin
-                            grant so staff access is revocable and attributable.
-                        </p>
-                    </div>
+            <div className="flex min-h-0 flex-1">
+                <ConsoleRail permissions={staff.permissions} />
+                {/* The work area steps up from the ground in dark, which is
+                    the design system's rule read in the console's direction.
+                    Not a <main>: each screen's `PageContainer` is that. */}
+                <div className="min-w-0 flex-1 bg-card/40">
+                    {/* In the work area rather than across the top, so the
+                        header and rail keep one fixed height to stick at. */}
+                    {staff.viaBootstrap && (
+                        <div className="border-b border-warning/30 bg-warning-subtle px-4 py-2.5">
+                            <div className="flex items-center gap-2.5 text-sm text-warning-subtle-foreground">
+                                <Badge variant="outline" className="shrink-0">
+                                    Break-glass
+                                </Badge>
+                                <p>
+                                    You are here via the{" "}
+                                    <code>ADMIN_ALLOWLIST</code> path, not a
+                                    recorded grant. Add a PlatformAdmin grant so
+                                    staff access is revocable and attributable.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {children}
                 </div>
-            )}
-
-            {children}
+            </div>
         </div>
     );
 }

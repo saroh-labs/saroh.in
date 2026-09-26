@@ -57,15 +57,20 @@ export class CashfreeWebhookProvider implements WebhookProvider {
                 refund?: {
                     cf_refund_id?: string | number;
                     refund_id?: string;
+                    order_id?: string;
+                    refund_amount?: number | string;
                     refund_status?: string;
                 };
             };
         };
 
         const eventType = body.type ?? "unknown";
-        const orderRef = body.data?.order?.order_id;
         const payment = body.data?.payment;
         const refund = body.data?.refund;
+        // The merchant `refund_id` is Saroh's reference (DEC-026).
+        const reference = refund?.refund_id?.trim();
+        // A refund webhook carries its order id on the refund, not `order`.
+        const orderRef = body.data?.order?.order_id ?? refund?.order_id;
 
         const providerPaymentRef =
             payment?.cf_payment_id != null
@@ -77,8 +82,14 @@ export class CashfreeWebhookProvider implements WebhookProvider {
                 : (refund?.refund_id ?? undefined);
 
         // Cashfree has no single event-id field, so derive a stable idempotency
-        // key from the type + the payment/refund id of this delivery.
-        const providerEventId = `${eventType}:${providerRefundId ?? providerPaymentRef ?? orderRef ?? "unknown"}`;
+        // key from the type + the payment/refund id of this delivery. A refund
+        // is reported more than once (PENDING, then SUCCESS or CANCELLED), so
+        // its status is part of the key — or the first report would swallow
+        // the one that settles it as a duplicate.
+        const refundStatus = refund?.refund_status
+            ? `:${refund.refund_status}`
+            : "";
+        const providerEventId = `${eventType}:${providerRefundId ?? providerPaymentRef ?? orderRef ?? "unknown"}${refundStatus}`;
 
         return {
             providerEventId,
@@ -89,6 +100,8 @@ export class CashfreeWebhookProvider implements WebhookProvider {
             orderRef,
             providerPaymentRef,
             providerRefundId,
+            refundAmountCents: majorToMinor(refund?.refund_amount),
+            refundReference: reference === "" ? undefined : reference,
         };
     }
 }
@@ -102,9 +115,32 @@ function outcomeFor(eventType: string, refundStatus?: string): WebhookOutcome {
         return "FAILED";
     }
     if (eventType === "REFUND_STATUS_WEBHOOK") {
-        return refundStatus === "SUCCESS" ? "REFUNDED" : "IGNORED";
+        if (refundStatus === "SUCCESS") return "REFUNDED";
+        // Cashfree gave up (CANCELLED), or never made it (FAILED, REJECTED).
+        // PENDING, PENDING_APPROVAL and ONHOLD are still on their way.
+        if (
+            refundStatus === "CANCELLED" ||
+            refundStatus === "FAILED" ||
+            refundStatus === "REJECTED"
+        ) {
+            return "REFUND_FAILED";
+        }
+        return "IGNORED";
     }
     return "IGNORED";
+}
+
+/**
+ * Cashfree's `refund_amount` is in rupees — a number or a string like
+ * "400.50". Read as decimal text, never through float multiplication.
+ */
+function majorToMinor(amount: number | string | undefined): number | undefined {
+    if (amount == null) return undefined;
+    const text = typeof amount === "number" ? amount.toFixed(2) : amount.trim();
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+    if (!match) return undefined;
+    const [, whole, fraction = ""] = match;
+    return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
 }
 
 /** Constant-time compare of two base64 strings. */

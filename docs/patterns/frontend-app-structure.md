@@ -34,6 +34,13 @@ components/shared/             app shell, navigation, command menu
   It is LEFT-ALIGNED: centring each page inside its own max-width moved the
   heading between screens, which is what made the app feel unsettled. Full-bleed
   editors — the site editor, the post editor — are deliberately outside it.
+  So is the product page (`commerce/products/[productId]/page.tsx`, #523): the
+  "Saroh Product Detail" design draws its header, access line, archived
+  banner and tab bar edge to edge, each ruled off by a full-width border,
+  with a 22px gutter inside them (`px-4 sm:px-[22px]`, the design's own) —
+  not PageContainer's 26px. Its header, banners and tab panel carry that
+  gutter themselves, and the crumbs bar above them the design's `9px 14px`
+  (`px-3.5`); keep them in step if one changes.
 - **Current** — **Pages are Server Components that read.** A `page.tsx` calls
   `requireSession()` and its `lib/<domain>/service.ts`, and may hold
   view-shaping helpers for that page (`siteState()` in `sites/page.tsx`).
@@ -46,7 +53,7 @@ components/shared/             app shell, navigation, command menu
   `components/shared/app-shell.tsx` reads session, organizations, the active
   organization, modules and counts once per render and passes props down.
 - **Current** — **Navigation has one source.**
-  `components/shared/nav-items.tsx` feeds the sidebar, the mobile drawer and the
+  `components/shared/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A

@@ -3,6 +3,7 @@ import {
     allows,
     authorize,
     builtInActions,
+    canWriteStock,
     isBuiltInRole,
     resolveCapabilities,
 } from "./organization-policy";
@@ -130,5 +131,66 @@ describe("allows / authorize", () => {
             actions: new Set<never>(),
         });
         expect(() => authorize(actor, "order:read")).toThrow(/stock-clerk/);
+    });
+});
+
+/**
+ * "Count and move stock" (#513). `store:write` has always covered setting
+ * stock, so every role holding it counts — including a role the business
+ * saved before `inventory:write` existed — and `canWriteStock` is the one
+ * question every stock write asks.
+ */
+describe("inventory:write", () => {
+    it("is implied by store:write on a stored role", () => {
+        const set = resolveCapabilities("shop-manager", [
+            "store:read",
+            "store:write",
+        ]);
+        expect(set.has("inventory:write")).toBe(true);
+    });
+
+    it("can be granted on its own", () => {
+        const set = resolveCapabilities("stock-clerk", [
+            "store:read",
+            "inventory:write",
+        ]);
+        expect(set.has("inventory:write")).toBe(true);
+        expect(set.has("store:write")).toBe(false);
+    });
+
+    it("is not held by a stored role with neither", () => {
+        const set = resolveCapabilities("front-desk", ["store:read"]);
+        expect(set.has("inventory:write")).toBe(false);
+    });
+
+    it("Owner and Admin hold it, Member and Reviewer do not", () => {
+        expect(resolveCapabilities("OWNER").has("inventory:write")).toBe(true);
+        expect(resolveCapabilities("ADMIN").has("inventory:write")).toBe(true);
+        expect(resolveCapabilities("MEMBER").has("inventory:write")).toBe(
+            false,
+        );
+        expect(resolveCapabilities("REVIEWER").has("inventory:write")).toBe(
+            false,
+        );
+    });
+
+    it("canWriteStock: inventory:write or store:write", () => {
+        const withActions = (actions: string[]) =>
+            ctx({
+                roleKey: "custom",
+                actions: resolveCapabilities("custom", actions),
+            });
+        expect(canWriteStock(withActions(["store:write"]))).toBe(true);
+        expect(canWriteStock(withActions(["inventory:write"]))).toBe(true);
+        expect(canWriteStock(withActions(["store:read"]))).toBe(false);
+        // A context resolved before custom roles: the shipped map.
+        expect(canWriteStock(ctx({ role: "OWNER" }))).toBe(true);
+        expect(canWriteStock(ctx({ role: "ADMIN" }))).toBe(true);
+        expect(canWriteStock(ctx({ role: "MEMBER" }))).toBe(false);
+        // A hand-built context that holds store:write but was never resolved
+        // still counts.
+        expect(
+            canWriteStock(ctx({ actions: new Set(["store:write"] as const) })),
+        ).toBe(true);
     });
 });

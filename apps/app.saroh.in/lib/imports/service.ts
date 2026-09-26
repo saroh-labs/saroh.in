@@ -1,3 +1,4 @@
+import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson } from "@/lib/api/http";
 
 /**
@@ -73,13 +74,15 @@ async function post<T>(path: string, body: unknown): Promise<Result<T>> {
         method: "POST",
         body: JSON.stringify(body),
     });
-    const data = (await res.json().catch(() => null)) as
-        (T & { message?: string; fileIssues?: RowIssue[] }) | null;
+    const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
+    // A refused file lists its problems under `error.details.fileIssues`.
+    const details = (data as { error?: { details?: unknown } } | null)?.error
+        ?.details as { fileIssues?: RowIssue[] } | undefined;
     return {
         ok: false,
-        error: data?.message ?? "Something went wrong",
-        ...(data?.fileIssues ? { fileIssues: data.fileIssues } : {}),
+        error: toFailure(data, "Something went wrong").error,
+        ...(details?.fileIssues ? { fileIssues: details.fileIssues } : {}),
     };
 }
 

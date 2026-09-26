@@ -433,3 +433,158 @@ own first, which clears the bookings' link, then deletes the contact. When
 a row references two parents that cascade from each other, clear the inner
 one first.
 **Category**: database · `apps/api.saroh.in/src/modules/contacts/contacts.service.ts`
+
+## Frontend — a colour class written in `lib/` never reached the CSS (U17)
+
+**Problem**: The Business Calendar's layer chips rendered with no fill, though
+`bg-layer-1` was a real colour in the shared Tailwind config and its
+`--layer-1` variable was in the page's CSS.
+**Root cause**: Tailwind only generates the classes it finds in its `content`
+globs. `app.saroh.in` scans `app/`, `components/`, `pages/`, `src/` and
+`packages/ui/src` — not `lib/`. The tone → class map lived in
+`lib/calendar/layers.ts`, so every class in it was dropped from the build.
+**Fix**: The class strings moved to `components/calendar/tones.ts`; `lib/`
+keeps the tone numbers. Any whole class string a component picks from a map
+has to live in a scanned folder.
+**Category**: frontend · `apps/app.saroh.in/components/calendar/tones.ts`
+
+## Frontend — a worktree's app under another portless name refused every Server Action (U14)
+
+**Problem**: Running a worktree's `app.saroh.in` as
+`https://orders-app.saroh.localhost` rendered pages fine, but every button that
+called a Server Action failed with "An unexpected response was received from
+the server", and nothing reached the API.
+**Root cause**: The auth middleware (`packages/auth/src/middleware.ts`) refuses
+a POST whose `Origin` is not in `BETTER_AUTH_TRUSTED_ORIGINS` with a 403
+"Untrusted request origin". The app's `.env` lists only
+`https://app.saroh.localhost`.
+**Fix**: Start the second app with its own origin added —
+`BETTER_AUTH_TRUSTED_ORIGINS=…,https://orders-app.saroh.localhost` (and
+`API_URL` for its own API). No code change; reads work either way, which is
+why it looks like a bug in the screen.
+**Category**: local dev · `packages/auth/src/middleware.ts`
+
+## Site — a merchant's home and booking page answered 500 in production only
+
+**Problem**: After a deploy, a merchant's home page and booking page on
+`saroh.app` answered 500, while `next dev` showed them fine.
+**Root cause**: `apps/saroh.app/app/[domain]/layout.tsx` exported a
+`generateStaticParams` returning `[]` as a placeholder. An empty list is not
+harmless: it makes every tenant route an on-demand static page, and the
+renderer reads the publication with `no-store` so a publish shows at once.
+In a production build that pair is a hard error ("Page changed from static
+to dynamic at runtime"); `next dev` renders everything dynamically, so it
+never showed.
+**Fix**: No `generateStaticParams` in the tenant layout, not even an empty
+one (`d6d3672a`); tenant pages render per request. Pre-rendering, if it
+comes, needs a list of hosts and a cached read together. Check a routing
+change with `next build && next start`, not only `next dev`.
+**Category**: frontend · `apps/saroh.app/app/[domain]/layout.tsx`
+
+## CI — browser specs set in the showcase failed with a 404 or a sign-in that never landed
+
+**Problem**: The bookings, subscriptions, order, customer and product-editor
+e2e specs passed locally and failed in CI on a 404, or on signing in as
+Rye's Member.
+**Root cause**: They are set in the showcase businesses (Pulse Fitness,
+Rye & Co., Leela & Loom — `seed_sc_*`), and the CI job ran only the base
+seed, which has Northwind alone.
+**Fix**: CI runs `db:seed:showcase` (`8603c9d9`), which runs the base seed
+first so Northwind is unchanged; it is a turbo task with `^build`, like
+`db:seed`, so the block contract is built before it runs. A spec that needs
+a showcase business needs that seed wherever it runs.
+**Category**: CI · `.github/workflows/ci.yml` · `turbo.json`
+
+## E2E — a spec found the wrong order, or a customer with nothing upcoming
+
+**Problem**: e2e specs that opened a showcase order or customer by a seeded
+id passed one day and failed the next — `seed_sc_rc_order_62` was Sana's
+order, not Priya's; Meera's bookings opened on Past.
+**Root cause**: The showcase lays its diary, orders and memberships out
+relative to today, so which id holds which scene moves with the date the
+seed ran.
+**Fix**: Specs find showcase records by what they are, through the API —
+Priya's latest order from the org's orders list; a Pulse member with an
+active membership, a late cancel and a class to come (`5cfe427a`). Never
+hard-code a showcase id or date in a spec; Northwind's fixed ids are fine.
+**Category**: e2e · `e2e/tests/order-detail.spec.ts` · `e2e/tests/customer-detail.spec.ts`
+
+## Forms — Save stayed off after every field was filled in
+
+**Problem**: On Business → Tax and invoices, turning GST on with a GSTIN
+that was fixed, then the registered address filled in, left the earlier
+refusal showing and Save off, though nothing was wrong any more.
+**Root cause**: React Hook Form re-validates only the field that changed. A
+rule that spans fields (a registration needs a GSTIN and an address) put
+its error on another field, which nothing re-checked when the field it
+depends on changed.
+**Fix**: While any refusal shows, each change re-checks the whole form with
+`form.trigger()` (`e890237c`); a cross-field rule needs `trigger()` on the
+dependent field (or the lot) when the field it reads changes. The invoice
+number fields do the same with `form.trigger(NUMBER_FIELDS)`.
+**Category**: frontend · `apps/app.saroh.in/components/organizations/organization-settings-form.tsx` · `frontend-forms.md`
+
+## Forms — the description read Unsaved the moment the editor opened (#525)
+
+**Problem**: Every product with a description opened with Description marked
+Unsaved, so Save all saved it too, though nobody had typed.
+**Root cause**: Tiptap's `editor.setEditable(editable)` emits an `update`
+event by default (its second argument, `emitUpdate`, is `true`). The editor
+called it in an effect on mount, `onUpdate` handed `editor.getHTML()` to the
+form, and Tiptap's spelling of the saved HTML (a list item wrapped in a
+`<p>`, say) differs from what the API stored — a change, as far as the form
+could tell.
+**Fix**: `setEditable(!disabled, false)`, and `onUpdate` passes on only a
+transaction with `docChanged`. Anything that feeds a Tiptap editor's HTML
+into a dirty check should ignore updates that didn't change the document.
+**Category**: frontend · `apps/app.saroh.in/components/commerce/product-sections/description-editor.tsx` · `frontend-forms.md`
+
+## Database — Load more skipped a product in the Needs you view (#534)
+
+**Problem**: On the Products list's Needs you view, restocking the last row
+with its own "+N · Add" and then pressing Load more never showed the next
+product.
+**Root cause**: The page read used Prisma's `cursor: { id }, skip: 1`.
+Prisma finds the cursor row's place from the row itself, whether or not the
+`where` still keeps it, and `skip: 1` then throws away the first row after
+it — a real one, once the cursor row has left the filter (restocked out of
+Needs you, archived out of a collection, renamed out of a search).
+**Fix**: An explicit keyset: read the cursor product's `createdAt` (scoped
+to the organization) and add `createdAt < c OR (createdAt = c AND id > c.id)`
+to the where, matching the order `[createdAt desc, id asc]`; no `cursor`,
+no `skip` (`afterInList` in `products/catalogue-page.ts`). Any paged read
+whose filter can drop the cursor row needs the same.
+**Category**: database · Prisma · `apps/api.saroh.in/src/modules/products/catalogue-page.ts`
+
+## Security — a CodeQL ReDoS alert: fixed without knowing whether it mattered
+
+**Problem**: CodeQL raised `js/polynomial-redos` (and, alongside it,
+`js/type-confusion-through-parameter-tampering` and `js/double-escaping`)
+on regexes that look harmless — `/<[^>]*>/`, `/\s*\n\s*/`, `/\/+$/`. The
+first round of fixes in `dcd778ab` rewrote them, but said nothing about
+whether any of them could actually be abused, so a reviewer could not tell
+a real hole from a quiet cleanup.
+**Root cause**: A regex with an unbounded repeat that can restart at every
+position (`<[^>]*>` on a run of "<" with no ">") is quadratic: 8 KB takes
+~25 ms, 32 KB ~350 ms. Whether that matters depends on who writes the input
+and how long it can be — a 500-character merchant field never hurts; a
+public, uncapped enquiry field does.
+**Fix**: The method `3c20713d` set down, now for every such alert:
+
+1. Find who reaches the input (a visitor, a signed-in merchant, a developer's
+   config) and what caps its length (a contract `max()`, the 100 KB JSON
+   body).
+2. Benchmark the old form at growing sizes (8/16/32/64 KB) to see the curve.
+3. Prefer a linear form — a character class that excludes its own opener
+   (`<[^<>]*>`), a split and trim, an index scan — that accepts exactly what
+   the old one did.
+4. Say in the comment and the commit whether it was exploitable and by whom,
+   or that it was a false positive and why; never imply a hole that wasn't.
+5. Add a regression test on the pathological input (a run of "<", of
+   spaces) with a time bound the old form fails.
+   In #532 (`dcd778ab` and its follow-up): the block-contract `piecesOf` was
+   reachable by a signed-in merchant on the API (a hero subheading has no cap
+   below the body limit, ~3 s at 100 KB); the contact block's address (500
+   characters) and the product editor's `stripHtml` (the merchant's own
+   browser) were not.
+   **Category**: security · CodeQL · `packages/block-contract/src/examples.ts` · `packages/site-blocks/src/blocks/contact.tsx`

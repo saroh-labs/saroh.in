@@ -1,5 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
-import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import type { StorefrontAllowance } from "@/lib/business-limits";
 
 /**
  * Sell → Storefronts: every storefront in the business and the settings that
@@ -49,6 +50,11 @@ export interface StorefrontSettings extends StorefrontSummary {
     freeShippingThreshold: string | null;
     /** Orders still waiting to go out — closing is refused while any are. */
     unfulfilled: number;
+    /**
+     * Units on the shelf here and promised from it — closing is refused
+     * while either is above 0. Absent from an API that predates it.
+     */
+    stock?: { onHand: number; promised: number };
     address: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
@@ -80,10 +86,113 @@ export type StorefrontInput = Partial<
     > & { paused: boolean }
 >;
 
+/**
+ * How many storefronts the business has and how many its plan allows
+ * (ADR-010). `null` when it cannot be read — Sell switched off, or the API
+ * down — which offers "New storefront" and leaves the refusal to the API.
+ */
+export async function getStorefrontAllowance(): Promise<StorefrontAllowance | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<StorefrontAllowance>(`${base}/storefronts/allowance`);
+}
+
 export async function listStorefronts(): Promise<StorefrontSummary[]> {
     const base = await orgBase();
     if (!base) return [];
     return (await getJson<StorefrontSummary[]>(`${base}/storefronts`)) ?? [];
+}
+
+/**
+ * Each storefront and the payment provider its checkout really charges
+ * through (`effectiveProvider`), for the "Used by" line on Settings →
+ * Providers. One read per storefront — a business has one or two.
+ *
+ * Tolerant by design: with Sell switched off the storefront routes answer
+ * 404, and a line of detail on another page must not take that page down,
+ * so any failure is simply "no storefronts to name".
+ */
+export async function listCheckoutProviders(): Promise<
+    { name: string; provider: string | null }[]
+> {
+    const base = await orgBase();
+    if (!base) return [];
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (!res.ok) return [];
+        const stores = (await res.json()) as StorefrontSummary[];
+        const settings = await Promise.all(
+            stores.map(async (s) => {
+                const one = await apiFetch(
+                    `${base}/storefronts/${encodeURIComponent(s.id)}`,
+                );
+                if (!one.ok) return null;
+                const body = (await one.json()) as StorefrontSettings;
+                return { name: body.name, provider: body.effectiveProvider };
+            }),
+        );
+        return settings.filter((s) => s !== null);
+    } catch {
+        return [];
+    }
+}
+
+/** A storefront's week, for Business → Hours. */
+export interface StorefrontHours {
+    id: string;
+    name: string;
+    openingHours: OpeningHoursDay[] | null;
+}
+
+/**
+ * What Business → Hours can say about the storefronts' hours: each one's
+ * week, or why there are none to read — Sell switched off (the storefront
+ * routes answer 404) or a person the API won't show them to.
+ */
+export type StorefrontHoursRead =
+    | { state: "ok"; storefronts: StorefrontHours[] }
+    | { state: "sell-off" }
+    | { state: "unavailable" };
+
+/**
+ * Every storefront's opening hours, one read per storefront (a business has
+ * one or two).
+ *
+ * Tolerant, like {@link listCheckoutProviders}: the Business page must not be
+ * taken down — or turned into a 403 — by one of its tabs, so a refusal or a
+ * failure is said on the tab rather than thrown.
+ */
+export async function listStorefrontHours(): Promise<StorefrontHoursRead> {
+    const base = await orgBase();
+    if (!base) return { state: "unavailable" };
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (res.status === 404) return { state: "sell-off" };
+        if (!res.ok) return { state: "unavailable" };
+        const stores = (await res.json()) as StorefrontSummary[];
+        const weeks = await Promise.all(
+            stores.map(async (s): Promise<StorefrontHours | null> => {
+                const one = await apiFetch(
+                    `${base}/storefronts/${encodeURIComponent(s.id)}`,
+                );
+                if (!one.ok) return null;
+                const body = (await one.json()) as StorefrontSettings;
+                return {
+                    id: body.id,
+                    name: body.name,
+                    openingHours: body.openingHours,
+                };
+            }),
+        );
+        // A storefront that couldn't be read would be saved over blind.
+        if (weeks.some((w) => w === null)) return { state: "unavailable" };
+        return {
+            state: "ok",
+            storefronts: weeks.filter((w) => w !== null),
+        };
+    } catch {
+        return { state: "unavailable" };
+    }
 }
 
 export async function getStorefront(

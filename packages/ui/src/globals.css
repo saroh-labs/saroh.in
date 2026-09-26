@@ -214,6 +214,16 @@
         --role-member: 36 82% 47%; /* Saffron #D98A15 */
         --role-reviewer: 209 44% 27%; /* Slate #264562 */
 
+        /* ---- the bookings diary ----
+           A one-to-one booking and a class wear their own fill on the
+           calendar, in the legend and on the service cards, so the kind reads
+           at a glance; the kind is always named beside it too. Paper text on
+           both clears 7:1. The same fills on dark: they are blocks of colour
+           on the ground, not tints. */
+        --diary-one: 33 100% 22%; /* Umber #6E3800 */
+        --diary-class: 203 26% 33%; /* Slate #3F5A6B */
+        --diary-foreground: 45 100% 98%; /* #FFFDF6 */
+
         /* ---- chart series: W6, Saffron and slate ----
            Up to six unrelated series; slate is the only hue from outside the
            brand and stays at low chroma. Use the steps in order. Every fill
@@ -224,6 +234,20 @@
         --chart-3: 33 52% 51%;
         --chart-4: 209 44% 27%;
         --chart-5: 209 35% 42%;
+
+        /* ---- calendar layers (Business Calendar) ----
+           One fill per kind of dated thing, as the "Saroh Business Calendar"
+           design draws them: umber for what the business mostly does, then
+           green, slate, clay, bronze and navy. Chips carry their count in
+           words on the fill, so colour only groups — it never says alone
+           what a chip is. Paper-white text clears 4.5:1 on every fill. */
+        --layer-1: 31 100% 22%; /* #6E3800 */
+        --layer-2: 145 45% 34%; /* #2F7D4F */
+        --layer-3: 203 26% 33%; /* #3F5A6B */
+        --layer-4: 33 85% 31%; /* #91550C */
+        --layer-5: 33 86% 26%; /* #7A4709 */
+        --layer-6: 209 44% 27%; /* #264562 */
+        --layer-foreground: 46 100% 98%; /* #FFFDF6 */
 
         /* ---- shape ----
            10px anchor: md 8 (buttons, inputs), xl 14 (cards), 2xl 18 (panels).
@@ -348,11 +372,26 @@
         --role-member: 36 82% 47%;
         --role-reviewer: 209 42% 60%; /* #6E9BC4 */
 
+        --diary-one: 33 100% 22%;
+        --diary-class: 203 26% 33%;
+        --diary-foreground: 45 100% 98%;
+
         --chart-1: 35 76% 36%;
         --chart-2: 33 58% 50%;
         --chart-3: 31 69% 69%;
         --chart-4: 210 31% 47%;
         --chart-5: 210 34% 61%;
+
+        /* The design keeps the layer fills on dark: they are filled chips
+           with light text, and each still clears 3:1 against the raised
+           surface as a mark. Defined here, not inherited, on purpose. */
+        --layer-1: 31 100% 22%;
+        --layer-2: 145 45% 34%;
+        --layer-3: 203 26% 33%;
+        --layer-4: 33 85% 31%;
+        --layer-5: 33 86% 26%;
+        --layer-6: 209 44% 27%;
+        --layer-foreground: 46 100% 98%;
 
         --shadow-color: 0 0% 0%;
     }

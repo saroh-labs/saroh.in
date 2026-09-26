@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Put,
     Query,
@@ -17,19 +18,33 @@ import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { ProductStatus } from "./dto";
-import { CreateProductDto, UpdateProductDto } from "./dto";
+import {
+    CreateProductDto,
+    PatchProductDto,
+    ReplaceProductImagesDto,
+    UpdateProductDto,
+} from "./dto";
+import { ProductImagesService } from "./product-images.service";
+import { ProductOverviewService } from "./product-overview.service";
 import { ProductsService } from "./products.service";
 
 /**
- * Product catalog endpoints, scoped to a store. The caller is the session user
- * (BetterAuthGuard → @CurrentUser); ProductsService delegates authorization to
- * the store membership rules (read = access, write = canWrite).
+ * The old per-storefront product addresses, kept for one release (#531):
+ * `OrganizationProductsController` (organizations/:organizationId/products)
+ * is the business's catalogue now, and these are its aliases. Each resolves
+ * the product through the storefront, under the storefront's own access
+ * rules (the session user via BetterAuthGuard → @CurrentUser; read =
+ * access, write = canWrite), and calls the same service.
  */
 @Controller("stores/:storeId/products")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
 @RequireModule("COMMERCE")
 export class ProductsController {
-    constructor(private readonly products: ProductsService) {}
+    constructor(
+        private readonly products: ProductsService,
+        private readonly overview: ProductOverviewService,
+        private readonly images: ProductImagesService,
+    ) {}
 
     @Get()
     list(
@@ -59,6 +74,47 @@ export class ProductsController {
         return this.products.get(storeId, productId, user.id);
     }
 
+    /** The product page: product, stock by variant, and its panels. */
+    @Get(":productId/overview")
+    getOverview(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.overview.get(storeId, productId, user.id);
+    }
+
+    /** One editor section's save; returns the whole product. */
+    @Patch(":productId")
+    patch(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: PatchProductDto,
+    ) {
+        return this.products.patch(storeId, productId, user.id, dto);
+    }
+
+    @Get(":productId/images")
+    listImages(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.images.list(storeId, productId, user.id);
+    }
+
+    /** Replace the ordered photo set; the first is the cover. */
+    @Put(":productId/images")
+    replaceImages(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body() dto: ReplaceProductImagesDto,
+    ) {
+        return this.images.replace(storeId, productId, user.id, dto);
+    }
+
     @Put(":productId")
     update(
         @CurrentUser() user: AuthUser,
@@ -67,6 +123,17 @@ export class ProductsController {
         @Body() dto: UpdateProductDto,
     ) {
         return this.products.update(storeId, productId, user.id, dto);
+    }
+
+    /** A draft copy of the product (#518). */
+    @Post(":productId/duplicate")
+    @HttpCode(201)
+    duplicate(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+    ) {
+        return this.products.duplicate(storeId, productId, user.id);
     }
 
     @Delete(":productId")

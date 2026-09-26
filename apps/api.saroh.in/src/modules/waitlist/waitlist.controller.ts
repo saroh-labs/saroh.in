@@ -7,7 +7,7 @@ import {
     Ip,
     Post,
 } from "@nestjs/common";
-import { createHash } from "node:crypto";
+import { hashClientIp } from "../../common/client-ip";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { JoinWaitlistDto } from "./dto";
@@ -39,9 +39,7 @@ export class WaitlistController {
     async join(@Body() dto: JoinWaitlistDto, @Ip() ip: string) {
         // The raw IP is hashed immediately and never leaves this handler — it
         // is used as the rate-limit key and stored only as a digest.
-        const ipHash = ip
-            ? createHash("sha256").update(ip).digest("hex")
-            : undefined;
+        const ipHash = hashClientIp(ip);
 
         if (ipHash && !this.limiter.take(ipHash)) {
             throw new HttpException(

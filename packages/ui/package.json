@@ -18,19 +18,21 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hook-form": "^7.51.5"
+    "react-hook-form": "^7.51.5",
+    "next": ">=15"
   },
   "devDependencies": {
     "@saroh/eslint-config": "workspace:*",
     "@saroh/tailwind-config": "workspace:*",
     "@saroh/tsconfig": "workspace:*",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@turbo/gen": "^2.10.9",
     "@types/node": "catalog:",
     "@types/react": "19.2.15",
     "@types/react-dom": "catalog:react19",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.1.0",
     "jsdom": "^25.0.1",
+    "next": "catalog:next16",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
     "react-hook-form": "catalog:",
@@ -80,6 +82,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "catalog:",
+    "use-debounce": "^10.1.1",
     "vaul": "^1.1.2",
     "zod": "catalog:"
   },
@@ -106,6 +109,7 @@
     "./postcss.config": "./postcss.config.js",
     "./tailwind.config": "./tailwind.config.ts",
     "./lib/*": "./src/lib/*.ts",
+    "./data-view": "./src/components/ui/data-view/index.ts",
     "./*": "./src/components/ui/*.tsx"
   }
 }

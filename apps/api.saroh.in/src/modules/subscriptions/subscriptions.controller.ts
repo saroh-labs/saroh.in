@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -21,9 +22,12 @@ import {
 } from "../capabilities/require-module.decorator";
 import {
     CancelSubscriptionDto,
+    ChangePlanDto,
+    CollectionScheduleDto,
     ListPlansQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
+    SkipCollectionDto,
     SubscribeDto,
 } from "./dto";
 import { SubscriptionsService } from "./subscriptions.service";
@@ -163,5 +167,69 @@ export class SubscriptionsController {
         @Param("subscriptionId") id: string,
     ) {
         return this.subscriptions.keep(ctx, id);
+    }
+
+    /** Set or stop the collection schedule (weekday and what is collected). */
+    @Patch(":subscriptionId/collection")
+    setCollection(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Body() dto: CollectionScheduleDto,
+    ) {
+        return this.subscriptions.setCollection(ctx, id, dto);
+    }
+
+    /** Skip one collection still to come. */
+    @Post(":subscriptionId/skips")
+    @HttpCode(200)
+    skip(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Body() dto: SkipCollectionDto,
+    ) {
+        return this.subscriptions.skipCollection(ctx, id, dto);
+    }
+
+    /** Undo a skip: the collection is back. */
+    @Delete(":subscriptionId/skips/:date")
+    unskip(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Param("date") date: string,
+    ) {
+        return this.subscriptions.unskipCollection(ctx, id, date);
+    }
+
+    /** Change plan from the next renewal. */
+    @Post(":subscriptionId/plan-change")
+    @HttpCode(200)
+    changePlan(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Body() dto: ChangePlanDto,
+    ) {
+        return this.subscriptions.changePlan(ctx, id, dto);
+    }
+
+    /** Undo a booked plan change. */
+    @Delete(":subscriptionId/plan-change")
+    cancelPlanChange(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+    ) {
+        return this.subscriptions.cancelPlanChange(ctx, id);
+    }
+
+    /**
+     * Retry a failed charge: a new pay link for the overdue latest invoice,
+     * replacing the old one. Answers with the token, shown once.
+     */
+    @Post(":subscriptionId/retry")
+    @HttpCode(200)
+    retry(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+    ) {
+        return this.subscriptions.retryPayment(ctx, id);
     }
 }

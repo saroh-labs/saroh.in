@@ -1,20 +1,27 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
-import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
+import {
+    MAX_STOREFRONTS_PER_BUSINESS,
+    storefrontLimit,
+} from "../organizations/business-limits";
 import type { OrgAction } from "../organizations/organization-policy";
 import {
     isBuiltInRole,
     resolveCapabilities,
 } from "../organizations/organization-policy";
 
+import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
 
@@ -53,7 +60,13 @@ const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
  */
 @Injectable()
 export class StoresService {
-    constructor(private readonly featureFlags: FeatureFlagService) {}
+    constructor(
+        private readonly featureFlags: FeatureFlagService,
+        // Optional so the specs that only exercise access build it with one
+        // argument; it holds no state, so a fresh one reads the same plan.
+        @Optional()
+        private readonly entitlements: EntitlementService = new EntitlementService(),
+    ) {}
 
     /** Stores the user owns or is a member of (newest first), non-deleted. */
     listForUser(userId: string) {
@@ -147,6 +160,25 @@ export class StoresService {
         }
         // DUAL-READ fallback to the legacy owner/member write check.
         return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
+    }
+
+    /**
+     * Whether the caller's membership in the store's business permits an
+     * action beyond the store's own read/write — `order:read` or
+     * `product-review:read` on a product page that shows orders and reviews.
+     * Membership only: a legacy store grant says nothing about those areas.
+     */
+    async memberAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store?.organizationId) return false;
+        return this.orgAllows(store.organizationId, userId, action);
     }
 
     // ------------------------------------------------------------------
@@ -252,8 +284,11 @@ export class StoresService {
      * as of B5) and is proven by the caller (the org-scoped controller resolves
      * it from the request context, never the client body).
      *
-     * A business has one storefront for now (ADR-006): a second is refused
-     * before anything else is checked.
+     * Two caps on the business's live storefronts, checked before anything
+     * else, as `SitesService.createFromTemplate` checks websites: the
+     * product's ceiling first (a 409 — upgrading would not help), then the
+     * plan's `storefronts` entitlement (a 403 at the plan limit). The lower
+     * of the two wins (ADR-010).
      */
     async createForUser(
         userId: string,
@@ -265,8 +300,24 @@ export class StoresService {
         });
         if (existing >= MAX_STOREFRONTS_PER_BUSINESS) {
             throw new ConflictException({
-                message:
-                    "This business already has its storefront. Its name, web address and settings are changed from Sell, under Storefront.",
+                message: `This business has ${existing} storefronts, as many as Saroh allows. Close one it no longer sells from to add another.`,
+            });
+        }
+        try {
+            await this.entitlements.check(
+                organizationId,
+                "storefronts",
+                existing,
+            );
+        } catch (err) {
+            if (!(err instanceof ForbiddenException)) throw err;
+            // The check's own words are for a developer; say it as the
+            // merchant meets it.
+            const limit = storefrontLimit(
+                await this.entitlements.getEntitlements(organizationId),
+            );
+            throw new ForbiddenException({
+                message: `Your plan includes ${limit === 1 ? "one storefront" : `${limit} storefronts`}. A bigger plan adds more.`,
             });
         }
 
@@ -284,6 +335,10 @@ export class StoresService {
             });
         }
 
+        // A business sells in one currency (DEC-030): a new storefront takes
+        // the business's, rather than reading as the column default (USD)
+        // until someone saves its settings.
+        const currency = await businessCurrency(prisma, organizationId);
         try {
             const store = await prisma.store.create({
                 data: {
@@ -293,6 +348,7 @@ export class StoresService {
                     organization: { connect: { id: organizationId } },
                     // Nested create runs in one transaction → no orphan store.
                     owners: { create: { userId, role: "OWNER" } },
+                    ...(currency ? { settings: { create: { currency } } } : {}),
                 },
             });
             return { id: store.id };

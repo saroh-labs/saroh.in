@@ -1,133 +1,87 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Checkbox } from "@saroh/ui/checkbox";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@saroh/ui/dropdown-menu";
-import { Label } from "@saroh/ui/label";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { MoreHorizontal, Repeat } from "lucide-react";
+import { Repeat, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
-import { DataView } from "@/components/shared/data-view/data-view";
-import type {
-    DataColumn,
-    DataFilter,
-} from "@/components/shared/data-view/types";
-import { invoiceMoney } from "@/lib/invoices/money";
 import { LIST_LIMIT } from "@/lib/lists/capped";
+import type {
+    Optional,
+    Plan,
+    Subscription,
+    SubscriptionCharge,
+} from "@/lib/subscriptions/service";
+import type { ListTab } from "@/lib/subscriptions/view";
 import {
-    cancelSubscription,
-    keepSubscription,
-    pauseSubscription,
-    resumeSubscription,
-} from "@/lib/subscriptions/actions";
-import {
-    checkedLine,
-    intervalWords,
-    nextLine,
-    periodEndDay,
-    renewalsLate,
-    rowInvoice,
-    standing,
-} from "@/lib/subscriptions/renewal";
-import type { Plan, Renewals, Subscription } from "@/lib/subscriptions/service";
+    initials,
+    listTab,
+    money,
+    monthlyTotal,
+    olderPrice,
+    rowWhen,
+    shortPrice,
+    TAB_LABEL,
+    TAB_TONE,
+} from "@/lib/subscriptions/view";
 
+import { PaymentsCrumbs } from "./payments-crumbs";
+import { Pill } from "./pill";
 import { SubscribeDialog } from "./subscribe-dialog";
+import { SubscriptionQuickLook } from "./subscription-quick-look";
 
-const STATUS = {
-    ACTIVE: { label: "Active", variant: "success" },
-    OVERDUE: { label: "Overdue", variant: "error" },
-    PAUSED: { label: "Paused", variant: "neutral" },
-    CANCELLED: { label: "Cancelled", variant: "neutral" },
-} as const;
+const TABS: ListTab[] = ["active", "failed", "paused", "cancelled"];
+const SEARCH_FROM = 8;
 
-/**
- * The tabs, after the design. They never overlap: an overdue subscription is
- * on Overdue whether it is running or paused, and a cancelled one is on
- * Cancelled whatever it still owes — its invoices say that.
- */
-const FILTERS: DataFilter<Subscription>[] = [
-    {
-        id: "active",
-        label: "Active",
-        predicate: (s) => standing(s) === "ACTIVE",
-    },
-    {
-        id: "overdue",
-        label: "Overdue",
-        predicate: (s) => standing(s) === "OVERDUE",
-    },
-    {
-        id: "paused",
-        label: "Paused",
-        predicate: (s) => standing(s) === "PAUSED",
-    },
-    {
-        id: "cancelled",
-        label: "Cancelled",
-        predicate: (s) => standing(s) === "CANCELLED",
-    },
-];
-
-/** "March", or "March 2025" when it was not this year. */
-const since = (iso: string) => {
-    const d = new Date(iso);
-    const thisYear = d.getFullYear() === new Date().getFullYear();
-    return new Intl.DateTimeFormat("en-GB", {
-        month: "long",
-        ...(thisYear ? {} : { year: "numeric" }),
-    }).format(d);
-};
+const TAB_CLASS =
+    "inline-flex items-center px-3.5 py-2.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11";
 
 /**
- * Billing → Subscriptions, after the "Saroh Billing and Classes" design:
- * who is on which plan, when each renews, and the latest invoice with how
- * late it is. The line above the list says when renewals were last
- * checked, because there is no scheduler to look at otherwise.
+ * Payments → Subscriptions, after "Saroh Subscriptions": who is on which
+ * plan, sorted by where each stands (Active / Payment failed / Paused /
+ * Cancelled). A row opens a quick look; every change happens on the
+ * subscription's own page, which the quick look opens with the step ready.
+ *
+ * `now` comes from the server, so the words a row says are the same when
+ * the page is drawn and when it hydrates.
  */
 export function SubscriptionsScreen({
     subscriptions,
     truncated = false,
     plans,
     contacts,
-    renewals,
+    charges,
+    renewNote,
     canWrite,
-    initialFilterId,
+    initialTab,
     openSubscribe,
+    nowIso,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
     truncated?: boolean;
     plans: Plan[];
     contacts: ContactOption[];
-    /** Null when it could not be read: the line is left out. */
-    renewals: Renewals | null;
+    /** Each subscription's invoices, for the quick look's last charges. */
+    charges: Optional<Record<string, SubscriptionCharge[]>>;
+    /** "Renewals last ran …", and whether that is late; null when unknown. */
+    renewNote: { text: string; late: boolean } | null;
     canWrite: boolean;
-    initialFilterId?: string;
+    initialTab: ListTab;
     /** `?subscribe=1`, from the command menu. */
     openSubscribe?: boolean;
+    nowIso: string;
 }) {
     const router = useRouter();
+    const now = new Date(nowIso);
+    const [tab, setTab] = useState<ListTab>(initialTab);
+    const [query, setQuery] = useState("");
+    const [peekId, setPeekId] = useState<string | null>(null);
     const [subscribing, setSubscribing] = useState(Boolean(openSubscribe));
 
     /** Drop `?subscribe=1` on close, so a refresh or Back doesn't reopen it. */
@@ -138,170 +92,212 @@ export function SubscriptionsScreen({
         url.searchParams.delete("subscribe");
         router.replace(url.pathname + url.search, { scroll: false });
     }
-    const [cancelling, setCancelling] = useState<Subscription | null>(null);
 
-    const columns: DataColumn<Subscription>[] = [
-        {
-            id: "member",
-            header: "Member",
-            priority: "primary",
-            sortValue: (s) => s.contact.name.toLowerCase(),
-            cell: (s) => (
-                <span className="min-w-0">
-                    <Link
-                        href={`/contacts/${s.contact.id}`}
-                        // The padding, taken back by the margin, makes a
-                        // 28px target on a phone without moving the text.
-                        className="-my-1 block truncate py-1 text-[13.5px] font-medium underline-offset-4 hover:underline"
-                    >
-                        {s.contact.name}
-                    </Link>
-                    <span className="block truncate text-[11.5px] text-muted-foreground">
-                        Since {since(s.startedAt)}
-                    </span>
-                </span>
-            ),
-        },
-        {
-            id: "plan",
-            header: "Plan",
-            priority: "secondary",
-            sortValue: (s) => s.plan.name,
-            cell: (s) => (
-                <span className="min-w-0">
-                    <span className="block truncate text-[13px]">
-                        {intervalWords(s.interval).adj} ·{" "}
-                        {invoiceMoney(s.price, s.currency)}
-                    </span>
-                    <span className="block truncate text-[11.5px] text-muted-foreground">
-                        {s.plan.name}
-                    </span>
-                </span>
-            ),
-        },
-        {
-            id: "next",
-            header: "Next",
-            // Secondary, so a phone still says when it renews.
-            priority: "secondary",
-            width: "150px",
-            sortValue: (s) => s.nextRenewalAt ?? s.endsAt ?? "9999",
-            cell: (s) => <span className="text-[13px]">{nextLine(s)}</span>,
-        },
-        {
-            id: "invoice",
-            header: "Invoice",
-            priority: "detail",
-            width: "210px",
-            cell: (s) => {
-                const inv = rowInvoice(s);
-                return inv ? (
-                    <span className="min-w-0">
-                        <Link
-                            href={`/billing/invoices/${inv.id}`}
-                            className={
-                                s.overdue
-                                    ? "block font-mono text-[12.5px] text-destructive-subtle-foreground underline-offset-4 hover:underline"
-                                    : "block font-mono text-[12.5px] underline-offset-4 hover:underline"
-                            }
-                        >
-                            {inv.number}
-                        </Link>
-                        <span className="block text-[11.5px] text-muted-foreground">
-                            {inv.note}
-                        </span>
-                    </span>
-                ) : (
-                    <span className="text-muted-foreground">—</span>
-                );
-            },
-        },
-        {
-            id: "status",
-            header: "Status",
-            priority: "secondary",
-            width: "112px",
-            sortValue: (s) => standing(s),
-            cell: (s) => {
-                const st = STATUS[standing(s)];
-                return <Badge variant={st.variant}>{st.label}</Badge>;
-            },
-        },
-    ];
+    /** The tab is in the address, so Back and a shared link land on it. */
+    function pick(next: ListTab) {
+        setTab(next);
+        setPeekId(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("view");
+        if (next === "active") url.searchParams.delete("tab");
+        else url.searchParams.set("tab", next);
+        window.history.replaceState(null, "", url.pathname + url.search);
+    }
+
+    const count = (t: ListTab) =>
+        subscriptions.filter((s) => listTab(s) === t).length;
+    const failed = count("failed");
+    const needle = query.trim().toLowerCase();
+    const rows = subscriptions.filter(
+        (s) =>
+            listTab(s) === tab &&
+            (!needle ||
+                s.contact.name.toLowerCase().includes(needle) ||
+                s.plan.name.toLowerCase().includes(needle)),
+    );
+    const running = subscriptions.filter((s) => listTab(s) === "active");
+    const total = monthlyTotal(subscriptions);
+    const monthly = total ? money(total.amount, total.currency) : null;
+    const livePlans = plans.filter((p) => p.status === "ACTIVE").length;
+    const peek = subscriptions.find((s) => s.id === peekId) ?? null;
 
     return (
         <>
-            <PageHeader
-                breadcrumb={["Billing", "Subscriptions"]}
-                title="Subscriptions"
-                className="mb-0"
-                actions={
-                    <>
-                        {canWrite ? (
-                            <Button onClick={() => setSubscribing(true)}>
-                                Subscribe someone
-                            </Button>
-                        ) : null}
-                        <Button variant="outline" asChild>
-                            <Link href="/billing/plans">Plans</Link>
-                        </Button>
-                    </>
-                }
-            />
-            {renewals ? (
-                <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground">
-                    <span
-                        aria-hidden
-                        className={cn(
-                            "mt-[7px] size-1.5 shrink-0 rounded-full",
-                            renewalsLate(renewals)
-                                ? "bg-warning"
-                                : "bg-success",
-                        )}
-                    />
-                    {checkedLine(renewals)}
-                </p>
-            ) : null}
-            <DataView
-                viewId="subscriptions"
-                rows={subscriptions}
-                columns={columns}
-                rowKey={(s) => s.id}
-                rowActions={
-                    canWrite
-                        ? (s) => (
-                              <RowActions
-                                  sub={s}
-                                  onCancel={() => setCancelling(s)}
-                              />
-                          )
-                        : undefined
-                }
-                modes={["table", "list"]}
-                hideModeToggle
-                filters={FILTERS}
-                initialFilterId={initialFilterId}
-                noun={{ one: "subscription", other: "subscriptions" }}
-                searchPlaceholder="Search members"
-                searchableColumnIds={["member", "plan"]}
-                emptyState={{
-                    icon: <Repeat />,
-                    title: "No one is subscribed yet",
-                    note: "Put someone on a plan and their first invoice is issued at once; each renewal after that invoices itself.",
-                    action: canWrite ? (
-                        <Button onClick={() => setSubscribing(true)}>
+            <PaymentsCrumbs here="Subscriptions" />
+            <div className="px-6 pt-5">
+                <div className="mb-1.5 flex flex-wrap items-center gap-3">
+                    <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
+                        Subscriptions
+                    </h1>
+                    <span className="ml-auto text-[12.5px] text-muted-foreground">
+                        {running.length} active
+                        {monthly ? ` · about ${monthly} a month` : ""}
+                    </span>
+                    {canWrite ? (
+                        <Button
+                            className="h-[38px] rounded-[9px] px-4 text-[14px] font-semibold"
+                            onClick={() => setSubscribing(true)}
+                        >
                             Subscribe someone
                         </Button>
-                    ) : undefined,
-                }}
-            />
-            {truncated ? (
-                <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                    Showing the newest {LIST_LIMIT} subscriptions and every
-                    active or paused one; older cancelled ones are not listed.
-                </p>
-            ) : null}
+                    ) : null}
+                </div>
+                {renewNote ? (
+                    <p
+                        className={cn(
+                            "mb-3 text-[12px]",
+                            renewNote.late
+                                ? "font-medium text-warning-subtle-foreground"
+                                : "text-muted-foreground",
+                        )}
+                        role={renewNote.late ? "status" : undefined}
+                    >
+                        {renewNote.text}
+                    </p>
+                ) : (
+                    <div className="mb-3" />
+                )}
+                <div className="flex flex-wrap items-end gap-x-0.5 border-b border-border">
+                    {/* `contents`, so the tabs and the Plans link wrap as one
+                        row on a phone, as the design's do. */}
+                    <div
+                        role="tablist"
+                        aria-label="Subscriptions"
+                        className="contents"
+                    >
+                        {TABS.map((t) => {
+                            const on = t === tab;
+                            const n = count(t);
+                            return (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    role="tab"
+                                    id={`tab-${t}`}
+                                    aria-selected={on}
+                                    aria-controls="subscriptions-panel"
+                                    onClick={() => pick(t)}
+                                    className={cn(
+                                        TAB_CLASS,
+                                        on
+                                            ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
+                                            : "font-medium text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    {TAB_LABEL[t]}
+                                    <Count n={n} danger={t === "failed"} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {/* Plans keep their own page for now (the redesign is
+                        follow-up work); the tab the design draws is a link. */}
+                    <Link
+                        href="/billing/plans"
+                        className={cn(
+                            TAB_CLASS,
+                            "font-medium text-muted-foreground hover:text-foreground",
+                        )}
+                    >
+                        Plans
+                        <Count n={livePlans} />
+                    </Link>
+                    {/* Search earns its row only on a list long enough to
+                        need it; a phone has little room to spare. */}
+                    {subscriptions.length > SEARCH_FROM ? (
+                        <label className="relative mb-1.5 ml-auto flex w-full items-center sm:w-[220px]">
+                            <span className="sr-only">Search subscribers</span>
+                            <Search
+                                aria-hidden
+                                className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground"
+                            />
+                            <Input
+                                type="search"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search by name or plan"
+                                className="h-8 rounded-[8px] pl-8 text-[12.5px]"
+                            />
+                        </label>
+                    ) : null}
+                </div>
+            </div>
+            <div
+                id="subscriptions-panel"
+                role="tabpanel"
+                aria-labelledby={`tab-${tab}`}
+                className="px-6 pb-[26px] pt-4"
+            >
+                {failed > 0 && tab !== "failed" ? (
+                    <div
+                        role="alert"
+                        className="mb-3.5 flex flex-wrap items-center gap-3 rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
+                    >
+                        <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
+                            {failed}{" "}
+                            {failed === 1 ? "renewal isn't" : "renewals aren't"}{" "}
+                            paid and {failed === 1 ? "needs" : "need"} you.
+                        </span>
+                        <Button
+                            variant="outline"
+                            className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px] font-semibold coarse:h-11"
+                            onClick={() => pick("failed")}
+                        >
+                            Show them
+                        </Button>
+                    </div>
+                ) : null}
+                {subscriptions.length === 0 ? (
+                    <EmptyState
+                        icon={<Repeat />}
+                        title="No one is subscribed yet"
+                        description="Put someone on a plan and their first invoice is issued at once; each renewal after that invoices itself."
+                        action={
+                            canWrite ? (
+                                <Button onClick={() => setSubscribing(true)}>
+                                    Subscribe someone
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                ) : rows.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
+                        {needle
+                            ? `No ${TAB_LABEL[tab].toLowerCase()} subscriptions match “${query.trim()}”.`
+                            : `No ${TAB_LABEL[tab].toLowerCase()} subscriptions.`}
+                    </div>
+                ) : (
+                    <ul className="flex flex-col gap-2">
+                        {rows.map((s) => (
+                            <li key={s.id}>
+                                <Row
+                                    sub={s}
+                                    plans={plans}
+                                    now={now}
+                                    open={s.id === peekId}
+                                    onOpen={() => setPeekId(s.id)}
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {truncated ? (
+                    <p className="mt-3 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                        Showing the newest {LIST_LIMIT} subscriptions and every
+                        active or paused one; older cancelled ones are not
+                        listed.
+                    </p>
+                ) : null}
+            </div>
 
+            <SubscriptionQuickLook
+                sub={peek}
+                onClose={() => setPeekId(null)}
+                plans={plans}
+                charges={charges}
+                canWrite={canWrite}
+                now={now}
+            />
             {canWrite ? (
                 <SubscribeDialog
                     open={subscribing}
@@ -310,216 +306,92 @@ export function SubscriptionsScreen({
                     plans={plans}
                 />
             ) : null}
-            {cancelling ? (
-                <CancelDialog
-                    sub={cancelling}
-                    onClose={() => setCancelling(null)}
-                />
-            ) : null}
         </>
     );
 }
 
-/**
- * A row's menu. Pause is taken back with Undo, since it is reversible;
- * cancel asks first.
- */
-function RowActions({
-    sub,
-    onCancel,
-}: {
-    sub: Subscription;
-    onCancel: () => void;
-}) {
-    const router = useRouter();
-    const name = sub.contact.name;
-
-    async function pause() {
-        const res = await pauseSubscription(sub.id);
-        if (!res.ok) return showError(res.error);
-        router.refresh();
-        showUndo(`${name}'s ${sub.plan.name} is paused`, () => {
-            void resumeSubscription(sub.id).then((r) => {
-                if (!r.ok) showError(r.error);
-                router.refresh();
-            });
-        });
-    }
-
-    async function resume() {
-        const res = await resumeSubscription(sub.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${name}'s ${sub.plan.name} is running again`);
-        router.refresh();
-    }
-
-    async function keep() {
-        const res = await keepSubscription(sub.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${name}'s ${sub.plan.name} will keep renewing`);
-        router.refresh();
-    }
-
-    if (sub.status === "CANCELLED") return null;
+function Count({ n, danger = false }: { n: number; danger?: boolean }) {
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${name}'s subscription`}
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-                {sub.status === "ACTIVE" ? (
-                    <DropdownMenuItem onSelect={() => void pause()}>
-                        Pause
-                    </DropdownMenuItem>
-                ) : (
-                    <DropdownMenuItem onSelect={() => void resume()}>
-                        Resume
-                    </DropdownMenuItem>
-                )}
-                {sub.endsAt ? (
-                    <DropdownMenuItem onSelect={() => void keep()}>
-                        Keep it renewing
-                    </DropdownMenuItem>
-                ) : (
-                    <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={onCancel}
-                    >
-                        Cancel…
-                    </DropdownMenuItem>
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <span
+            className={cn(
+                "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
+                danger && n > 0
+                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
+                    : "bg-muted text-muted-foreground",
+            )}
+        >
+            {n}
+        </span>
     );
 }
 
-/**
- * "Now or at the end of this period?", and — when the period has an open
- * invoice — whether to void it too. Unchecked by default: someone who has
- * already had the month may still owe for it.
- */
-function CancelDialog({
+function Row({
     sub,
-    onClose,
+    plans,
+    now,
+    open,
+    onOpen,
 }: {
     sub: Subscription;
-    onClose: () => void;
+    plans: readonly Plan[];
+    now: Date;
+    open: boolean;
+    onOpen: () => void;
 }) {
-    const router = useRouter();
-    const voidId = useId();
-    const paused = sub.status === "PAUSED";
-    const [when, setWhen] = useState<"now" | "periodEnd">(
-        paused ? "now" : "periodEnd",
-    );
-    const open =
-        sub.latestInvoice?.status === "ISSUED" ? sub.latestInvoice : null;
-    const [voidToo, setVoidToo] = useState(false);
-    const [busy, setBusy] = useState(false);
-    const end = periodEndDay(sub);
-
-    async function run() {
-        setBusy(true);
-        const res = await cancelSubscription(
-            sub.id,
-            when,
-            voidToo && open ? open.id : undefined,
-        );
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            router.refresh();
-            return;
-        }
-        showSuccess(
-            when === "now"
-                ? `${sub.contact.name}'s ${sub.plan.name} is cancelled`
-                : `${sub.contact.name}'s ${sub.plan.name} ends ${end}`,
-        );
-        onClose();
-        router.refresh();
-    }
-
+    const tab = listTab(sub);
+    const when = rowWhen(sub, now);
+    const older = olderPrice(sub, plans);
     return (
-        <Dialog open onOpenChange={(o) => (!o ? onClose() : undefined)}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Cancel {sub.contact.name}&apos;s {sub.plan.name}?
-                    </DialogTitle>
-                    <DialogDescription>
-                        No more invoices after this. Their invoices and history
-                        stay.
-                    </DialogDescription>
-                </DialogHeader>
-                <RadioGroup
-                    value={when}
-                    onValueChange={(v) => setWhen(v as "now" | "periodEnd")}
-                    className="grid gap-2"
-                >
-                    {!paused ? (
-                        <Label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-[10px] border border-border p-3 font-normal">
-                            <RadioGroupItem
-                                value="periodEnd"
-                                className="mt-0.5"
-                            />
-                            <span>
-                                <span className="block font-medium">
-                                    At the end of this period
-                                </span>
-                                <span className="block text-[12.5px] text-muted-foreground">
-                                    It runs until {end}, then stops.
-                                </span>
-                            </span>
-                        </Label>
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-haspopup="dialog"
+            className={cn(
+                "flex w-full flex-wrap items-center gap-3 rounded-[11px] border border-border px-3.5 py-3 text-left hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                open
+                    ? "bg-brand-subtle shadow-[inset_3px_0_0_hsl(var(--highlight))]"
+                    : "bg-card",
+            )}
+        >
+            <span
+                aria-hidden
+                className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-muted text-[12px] font-bold text-foreground"
+            >
+                {initials(sub.contact.name)}
+            </span>
+            <span className="min-w-0 flex-[2_1_200px]">
+                <span className="block text-[14px] font-semibold text-foreground">
+                    {sub.contact.name}
+                </span>
+                <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                    {sub.plan.name}
+                    {sub.pendingPlan && tab !== "cancelled"
+                        ? ` → ${sub.pendingPlan.name} next renewal`
+                        : ""}
+                    {older ? (
+                        <>
+                            {" · "}
+                            <span className="text-brand">older price</span>
+                        </>
                     ) : null}
-                    <Label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-[10px] border border-border p-3 font-normal">
-                        <RadioGroupItem value="now" className="mt-0.5" />
-                        <span>
-                            <span className="block font-medium">Now</span>
-                            <span className="block text-[12.5px] text-muted-foreground">
-                                It stops today.
-                            </span>
-                        </span>
-                    </Label>
-                </RadioGroup>
-                {open ? (
-                    <div className="flex items-start gap-3">
-                        <Checkbox
-                            id={voidId}
-                            checked={voidToo}
-                            onCheckedChange={(c) => setVoidToo(c === true)}
-                            className="mt-0.5"
-                        />
-                        <Label
-                            htmlFor={voidId}
-                            className="font-normal leading-[1.5]"
-                        >
-                            Void {open.number} too
-                            <span className="block text-[12.5px] text-muted-foreground">
-                                Only if they should not pay for this period.
-                            </span>
-                        </Label>
-                    </div>
-                ) : null}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        Keep it
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => void run()}
-                    >
-                        {busy ? "Cancelling…" : "Cancel subscription"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </span>
+            </span>
+            <span className="min-w-0 flex-[1_1_110px]">
+                <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+            </span>
+            <span
+                className={cn(
+                    "min-w-0 flex-[2_1_200px] text-[12.5px]",
+                    when.danger
+                        ? "text-destructive-subtle-foreground"
+                        : "text-muted-foreground",
+                )}
+            >
+                {when.text}
+            </span>
+            <span className="shrink-0 font-display text-[14px] font-semibold tabular-nums text-foreground">
+                {shortPrice(sub.price, sub.currency, sub.interval)}
+            </span>
+        </button>
     );
 }

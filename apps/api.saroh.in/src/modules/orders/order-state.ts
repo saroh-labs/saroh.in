@@ -14,7 +14,10 @@ import type { OrderStatus, PaymentStatus } from "./dto";
  *
  * Commerce semantics:
  *  - PENDING    → PROCESSING | CANCELLED   (not yet worked or dropped)
- *  - PROCESSING → SHIPPED    | CANCELLED   (worked, then dispatched or dropped)
+ *  - PROCESSING → SHIPPED | DELIVERED | CANCELLED
+ *                                          (worked, then dispatched, collected
+ *                                           at the counter — ADR-008 — or
+ *                                           dropped)
  *  - SHIPPED    → DELIVERED                (in the customer's hands — a shipped
  *                                           order can no longer be cancelled)
  *  - DELIVERED  → {}                        (terminal)
@@ -35,7 +38,10 @@ import type { OrderStatus, PaymentStatus } from "./dto";
 /** Allowed order-status transitions. Terminal states map to an empty set. */
 export const STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
     PENDING: ["PROCESSING", "CANCELLED"],
-    PROCESSING: ["SHIPPED", "CANCELLED"],
+    // DELIVERED straight from PROCESSING: a collection order handed over at
+    // the counter (ADR-008). Nothing moves backwards here; a step back is
+    // only an Undo of the last kitchen step (order-stage.ts).
+    PROCESSING: ["SHIPPED", "DELIVERED", "CANCELLED"],
     SHIPPED: ["DELIVERED"],
     DELIVERED: [],
     CANCELLED: [],

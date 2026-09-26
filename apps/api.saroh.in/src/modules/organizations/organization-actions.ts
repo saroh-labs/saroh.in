@@ -27,6 +27,12 @@ export type OrgAction =
     | "store:read"
     | "store:write"
     | "store:delete"
+    // Count and move stock (#513): counts, received/baked/wasted entries,
+    // moves between storefronts, undoing them, warning levels. Narrower than
+    // `store:write` — prices, names, listings and tracking stay there — and
+    // implied by it (`resolveCapabilities`), so whoever changes storefronts
+    // can still count.
+    | "inventory:write"
     | "site:create"
     | "site:read"
     | "site:update"
@@ -60,6 +66,10 @@ export type OrgAction =
     | "booking:write"
     | "order:read"
     | "order:write"
+    // The kitchen (DEC-024, ADR-008): read an order's kitchen view with no
+    // money in it, and move its stage or undo the last step. Narrower than
+    // `order:read` on purpose — it is what a Member at the counter holds.
+    | "order:stage"
     | "discount:read"
     | "discount:write"
     // Product reviews. Named apart from "review", which is site review (the
@@ -115,6 +125,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "store:read",
     "store:write",
     "store:delete",
+    "inventory:write",
     "site:create",
     "site:read",
     "site:update",
@@ -145,6 +156,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "booking:write",
     "order:read",
     "order:write",
+    "order:stage",
     "discount:read",
     "discount:write",
     "product-review:read",

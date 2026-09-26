@@ -486,9 +486,17 @@ export class ClassPacksService {
             select: { id: true },
         });
         if (!booking) notFound("Booking");
-        const returned = await prisma.$transaction((tx) =>
-            reversePackInTx(tx, booking.id),
-        );
+        const returned = await prisma.$transaction(async (tx) => {
+            const back = await reversePackInTx(tx, booking.id);
+            // No longer paid with a pack, so it no longer says so (U3).
+            if (back) {
+                await tx.booking.updateMany({
+                    where: { id: booking.id, paidWith: "PACK" },
+                    data: { paidWith: null },
+                });
+            }
+            return back;
+        });
         return { bookingId: booking.id, returned };
     }
 

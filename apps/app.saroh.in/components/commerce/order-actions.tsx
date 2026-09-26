@@ -8,30 +8,28 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { MoreHorizontal, Printer } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { updateOrder } from "@/lib/orders/actions";
-import type { Step } from "@/lib/orders/lifecycle";
 import {
     canCancel,
-    nextStep,
     PAYMENT_LABEL,
     PAYMENT_TRANSITIONS,
 } from "@/lib/orders/lifecycle";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
-type Pending =
-    | { kind: "step"; step: Step }
-    | { kind: "cancel" }
-    | { kind: "payment"; to: PaymentStatus };
+type Pending = { kind: "cancel" } | { kind: "payment"; to: PaymentStatus };
+export type { Pending as OrderMenuPending };
 
 /**
- * What can be done to an order from its header: the next step for its goods,
- * printing it, and — in the menu — cancelling it or recording a payment by
- * hand. Every move is forward-only on the server, so each one asks first.
+ * The order header's menu: cancelling it, or recording a payment by hand.
+ * Both are forward-only on the server, so each one asks first. The goods move
+ * through the kitchen stepper instead (ADR-008), which has an Undo.
+ *
+ * `pending` can be opened from outside — the payment banner's "Paid in cash"
+ * asks the same question as the menu's "Record as paid".
  */
 export function OrderActions({
     storeId,
@@ -39,32 +37,32 @@ export function OrderActions({
     orderRef,
     status,
     paymentStatus,
+    pending,
+    onPendingChange,
 }: {
     storeId: string;
     orderId: string;
     orderRef: string;
     status: OrderStatus;
     paymentStatus: PaymentStatus;
+    pending: Pending | null;
+    onPendingChange: (p: Pending | null) => void;
 }) {
     const router = useRouter();
-    const [pending, setPending] = useState<Pending | null>(null);
-    const [busy, setBusy] = useState(false);
-    const step = nextStep(status);
+    const setPending = onPendingChange;
     // Recording a payment by hand is for money that moved outside Saroh —
     // cash, a bank transfer. A card refund goes through Refund instead, which
     // actually sends the money back.
     const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus];
 
     async function commit(p: Pending) {
-        setBusy(true);
         const res = await updateOrder(
             storeId,
             orderId,
             p.kind === "payment"
                 ? { paymentStatus: p.to }
-                : { status: p.kind === "cancel" ? "CANCELLED" : p.step.to },
+                : { status: "CANCELLED" },
         );
-        setBusy(false);
         if (!res.ok) {
             showError(res.error);
             return;
@@ -72,9 +70,7 @@ export function OrderActions({
         showSuccess(
             p.kind === "cancel"
                 ? `${orderRef} cancelled — its stock is back on the shelves`
-                : p.kind === "payment"
-                  ? `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}`
-                  : `${orderRef}: ${p.step.label.toLowerCase()} done`,
+                : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}`,
         );
         router.refresh();
     }
@@ -83,21 +79,13 @@ export function OrderActions({
 
     return (
         <>
-            <Button
-                variant="outline"
-                onClick={() => window.print()}
-                className="print:hidden"
-            >
-                <Printer className="mr-1.5 size-4" />
-                Print
-            </Button>
             {canCancel(status) || paymentMoves.length > 0 ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
                             variant="outline"
                             size="icon"
-                            className="print:hidden"
+                            className="size-[38px] rounded-[9px] bg-card coarse:size-11 print:hidden"
                             aria-label={`More actions for ${orderRef}`}
                         >
                             <MoreHorizontal className="size-4" />
@@ -125,15 +113,6 @@ export function OrderActions({
                     </DropdownMenuContent>
                 </DropdownMenu>
             ) : null}
-            {step ? (
-                <Button
-                    className="print:hidden"
-                    disabled={busy}
-                    onClick={() => setPending({ kind: "step", step })}
-                >
-                    {step.label}
-                </Button>
-            ) : null}
             {confirm ? (
                 <ConfirmDialog
                     open
@@ -160,9 +139,6 @@ function confirmCopy(p: Pending): {
     body: string;
     verb: string;
 } {
-    if (p.kind === "step") {
-        return { title: p.step.title, body: p.step.body, verb: p.step.label };
-    }
     if (p.kind === "cancel") {
         return {
             title: "Cancel this order?",
@@ -171,7 +147,7 @@ function confirmCopy(p: Pending): {
         };
     }
     const bodies: Record<PaymentStatus, string> = {
-        PAID: "For a payment taken outside Saroh — cash, or a bank transfer. Nothing is charged.",
+        PAID: "For a payment taken outside Saroh — cash, or a bank transfer. Nothing is charged, and nothing is sent to the customer.",
         FAILED: "The customer tried to pay and it did not go through. They can still pay later.",
         REFUNDED:
             "For money returned outside Saroh. Nothing is sent back from here — to refund a card payment, use Refund.",

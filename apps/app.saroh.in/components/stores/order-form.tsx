@@ -21,6 +21,57 @@ interface ProductLite {
     id: string;
     name: string;
     price: string;
+    variants?: { id: string; title: string; price: string | null }[];
+    /**
+     * Nothing on the shelf at this storefront (#511): it can't be ordered
+     * here. The API is the one that decides — it counts what is promised to
+     * other orders too, and says "Only N left" when there are fewer than
+     * asked for.
+     */
+    soldOut?: boolean;
+}
+
+/**
+ * What a line can be for. A product with variants is bought as one of them
+ * — "Linen Wrap Dress · M" — at that variant's price, so each is its own
+ * choice; the key carries both ids ("product:variant") to the submit.
+ */
+interface Sellable {
+    key: string;
+    productId: string;
+    variantId?: string;
+    label: string;
+    price: string;
+    soldOut: boolean;
+}
+
+function sellablesOf(products: ProductLite[]): Sellable[] {
+    return products.flatMap((p) =>
+        p.variants && p.variants.length > 0
+            ? p.variants.map((v) => ({
+                  key: `${p.id}:${v.id}`,
+                  productId: p.id,
+                  variantId: v.id,
+                  label: `${p.name} · ${v.title}`,
+                  price: v.price ?? p.price,
+                  soldOut: p.soldOut ?? false,
+              }))
+            : [
+                  {
+                      key: p.id,
+                      productId: p.id,
+                      label: p.name,
+                      price: p.price,
+                      soldOut: p.soldOut ?? false,
+                  },
+              ],
+    );
+}
+
+/** The line a new row starts on: the first thing that isn't sold out. */
+function firstSellable(products: ProductLite[]): string {
+    const all = sellablesOf(products);
+    return (all.find((s) => !s.soldOut) ?? all.at(0))?.key ?? "";
 }
 /**
  * What the storefront says about checkout (Sell → Storefronts). Defaults, not
@@ -88,12 +139,18 @@ export function OrderForm({
     customers,
     products,
     checkout = null,
+    gstRegistered = false,
 }: {
     storeId: string;
     customers: CustomerLite[];
     products: ProductLite[];
     /** `null` when it could not be read: the form then assumes nothing. */
     checkout?: CheckoutDefaults | null;
+    /**
+     * A GST-registered business's prices include GST (ADR-008): the API
+     * ignores the storefront's add-on tax, so the form offers none.
+     */
+    gstRegistered?: boolean;
 }) {
     const router = useRouter();
     // Amounts as money, in the storefront's currency, for reading. Inputs keep
@@ -104,7 +161,7 @@ export function OrderForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
             customerId: "",
-            lines: [{ productId: products[0]?.id ?? "", quantity: 1 }],
+            lines: [{ productId: firstSellable(products), quantity: 1 }],
             tax: "0",
             shipping: "0",
             discount: "0",
@@ -116,6 +173,13 @@ export function OrderForm({
         name: "lines",
     });
     const { isSubmitting } = form.formState;
+    // The API's refusal of a line ("Sourdough — Sold out") is about the lines
+    // as they were sent: any change to them clears it, until the next save.
+    const linesChanged = () => {
+        if (form.formState.errors.lines?.type === "server") {
+            form.clearErrors("lines");
+        }
+    };
 
     // Watch the value-bearing fields so the totals recompute as the user types.
     const watchedLines = form.watch("lines");
@@ -127,8 +191,9 @@ export function OrderForm({
     // two answers to "why did this come off" would leave no way to tell.
     const typedOff = toCents(discount) > 0;
 
-    const priceOf = (id: string) =>
-        toCents(products.find((p) => p.id === id)?.price ?? "0");
+    const sellables = sellablesOf(products);
+    const priceOf = (key: string) =>
+        toCents(sellables.find((s) => s.key === key)?.price ?? "0");
     // No `?? []`: `lines` has a default value and RHF types the watched result
     // as the schema's array, so the fallback was unreachable.
     const subtotalCents = watchedLines.reduce(
@@ -138,9 +203,10 @@ export function OrderForm({
     // Tax follows the storefront's rate until the merchant types their own.
     // Written into the field rather than computed beside it, so what is on
     // screen is exactly what is sent.
-    const taxBasisPoints = checkout?.taxEnabled
-        ? Math.round(Number(checkout.taxRate) * 100)
-        : 0;
+    const taxBasisPoints =
+        checkout?.taxEnabled && !gstRegistered
+            ? Math.round(Number(checkout.taxRate) * 100)
+            : 0;
     const suggestedTax = money(
         Math.round((subtotalCents * taxBasisPoints) / 10_000),
     );
@@ -157,10 +223,12 @@ export function OrderForm({
     const qualifiesForFree = freeOver !== null && subtotalCents >= freeOver;
     const offersDelivery = checkout?.shippingEnabled ?? true;
 
+    // The sum `orders.service.ts` saves: GST is inside a registered
+    // business's prices, so nothing is added for it.
     const totalCents = Math.max(
         0,
         subtotalCents +
-            toCents(tax) +
+            (gstRegistered ? 0 : toCents(tax)) +
             toCents(shipping) -
             (discountCode ? 0 : toCents(discount)),
     );
@@ -168,11 +236,20 @@ export function OrderForm({
     async function onSubmit(values: FormValues) {
         const items = values.lines
             .filter((l) => l.productId && l.quantity > 0)
-            .map((l) => ({ productId: l.productId, quantity: l.quantity }));
+            .map((l) => {
+                const sellable = sellables.find((s) => s.key === l.productId);
+                return {
+                    productId: sellable?.productId ?? l.productId,
+                    ...(sellable?.variantId
+                        ? { variantId: sellable.variantId }
+                        : {}),
+                    quantity: l.quantity,
+                };
+            });
         const res = await createOrder(storeId, {
             customerId: values.customerId,
             items,
-            tax: values.tax,
+            tax: gstRegistered ? "0" : values.tax,
             shipping: values.shipping,
             ...(values.discountCode.trim()
                 ? { discountCode: values.discountCode.trim().toUpperCase() }
@@ -181,6 +258,10 @@ export function OrderForm({
         if (!res.ok) {
             if (res.field === "discountCode") {
                 form.setError("discountCode", { message: res.error });
+            } else if (res.field === "items") {
+                // "Sourdough — Sold out", "… — Only 2 left at Hill Road":
+                // said under the lines, where it is fixed.
+                form.setError("lines", { type: "server", message: res.error });
             } else {
                 showError(res.error);
             }
@@ -258,7 +339,15 @@ export function OrderForm({
             </div>
 
             <div className="space-y-3">
-                <Label>Items</Label>
+                <Label>
+                    Items
+                    {gstRegistered ? (
+                        <span className="font-normal text-muted-foreground">
+                            {" "}
+                            · prices include GST
+                        </span>
+                    ) : null}
+                </Label>
                 {fields.map((line, i) => {
                     // `.at(i)` rather than `[i]`: it returns `T | undefined`,
                     // which is the truth. `fields` (from useFieldArray) and
@@ -276,12 +365,20 @@ export function OrderForm({
                                     <OptionSelect
                                         aria-label="Product"
                                         value={field.value}
-                                        onValueChange={field.onChange}
+                                        onValueChange={(v) => {
+                                            linesChanged();
+                                            field.onChange(v);
+                                        }}
                                         disabled={isSubmitting}
                                         className="flex-1"
-                                        options={products.map((p) => ({
-                                            value: p.id,
-                                            label: `${p.name} — ${show(toCents(p.price))}`,
+                                        options={sellables.map((s) => ({
+                                            value: s.key,
+                                            label: s.soldOut
+                                                ? `${s.label} — Sold out`
+                                                : `${s.label} — ${show(toCents(s.price))}`,
+                                            disabled:
+                                                s.soldOut &&
+                                                s.key !== field.value,
                                         }))}
                                     />
                                 )}
@@ -294,6 +391,7 @@ export function OrderForm({
                                 className="w-20"
                                 {...form.register(`lines.${i}.quantity`, {
                                     valueAsNumber: true,
+                                    onChange: linesChanged,
                                 })}
                             />
                             <span className="w-20 text-right text-sm tabular-nums text-muted-foreground">
@@ -307,23 +405,32 @@ export function OrderForm({
                                 variant="ghost"
                                 size="sm"
                                 disabled={isSubmitting || fields.length === 1}
-                                onClick={() => remove(i)}
+                                onClick={() => {
+                                    linesChanged();
+                                    remove(i);
+                                }}
                             >
                                 ✕
                             </Button>
                         </div>
                     );
                 })}
+                {form.formState.errors.lines?.type === "server" ? (
+                    <p role="alert" className="text-sm text-destructive">
+                        {form.formState.errors.lines.message}
+                    </p>
+                ) : null}
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
+                        linesChanged();
                         append({
-                            productId: products[0]?.id ?? "",
+                            productId: firstSellable(products),
                             quantity: 1,
-                        })
-                    }
+                        });
+                    }}
                     disabled={isSubmitting}
                 >
                     Add item
@@ -332,25 +439,29 @@ export function OrderForm({
 
             <div
                 className={
-                    offersDelivery
+                    offersDelivery && !gstRegistered
                         ? "grid grid-cols-3 gap-4"
                         : "grid grid-cols-2 gap-4"
                 }
             >
-                <div className="grid gap-2">
-                    <Label htmlFor="tax">
-                        Tax
-                        {taxBasisPoints > 0
-                            ? ` (${Number(checkout?.taxRate)}%)`
-                            : null}
-                    </Label>
-                    <Input
-                        id="tax"
-                        inputMode="decimal"
-                        disabled={isSubmitting}
-                        {...form.register("tax")}
-                    />
-                </div>
+                {/* GST is already in a registered business's prices; there
+                    is no tax to add on. */}
+                {gstRegistered ? null : (
+                    <div className="grid gap-2">
+                        <Label htmlFor="tax">
+                            Tax
+                            {taxBasisPoints > 0
+                                ? ` (${Number(checkout?.taxRate)}%)`
+                                : null}
+                        </Label>
+                        <Input
+                            id="tax"
+                            inputMode="decimal"
+                            disabled={isSubmitting}
+                            {...form.register("tax")}
+                        />
+                    </div>
+                )}
                 {/* A storefront that does not deliver has no shipping to
                     charge; the field stays at 0 rather than inviting one. */}
                 {offersDelivery ? (
@@ -431,6 +542,11 @@ export function OrderForm({
                     <p className="text-lg font-semibold tabular-nums">
                         Total {show(totalCents)}
                     </p>
+                    {gstRegistered ? (
+                        <p className="text-[12px] text-muted-foreground">
+                            Includes GST
+                        </p>
+                    ) : null}
                     {discountCode ? (
                         <p className="text-[12px] text-muted-foreground">
                             Before{" "}

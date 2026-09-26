@@ -48,6 +48,7 @@ const STANDING_WORD = {
     OVERDUE: "Overdue",
     PAID: "Paid",
     VOID: "Void",
+    CREDITED: "Credited",
 } as const;
 
 const initials = (name: string) =>

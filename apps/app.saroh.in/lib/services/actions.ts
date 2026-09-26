@@ -57,8 +57,11 @@ export async function replaceRules(
     return replaceRulesApi(serviceId, rules);
 }
 
-export async function cancelBooking(bookingId: string) {
-    return cancelBookingApi(bookingId);
+export async function cancelBooking(
+    bookingId: string,
+    options: { returnCredit?: boolean } = {},
+) {
+    return cancelBookingApi(bookingId, options);
 }
 
 /** Move a booking to another slot (#121). */
@@ -83,8 +86,9 @@ export async function listAvailability(
     serviceId: string,
     fromISO: string,
     toISO: string,
+    staffId?: string,
 ): Promise<Slot[]> {
-    return listAvailabilityApi(serviceId, fromISO, toISO);
+    return listAvailabilityApi(serviceId, fromISO, toISO, staffId);
 }
 
 /**

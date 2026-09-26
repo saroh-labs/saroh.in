@@ -9,11 +9,13 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
+import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { ContactsService } from "../contacts/contacts.service";
 import { InvoicesService } from "../invoices/invoices.service";
 import { CoursesService } from "./courses.service";
 
 const bookings = new BookingsService();
+const publicBookings = new PublicBookingsService();
 const courses = new CoursesService(bookings, new InvoicesService());
 
 const DAY = 86_400_000;
@@ -249,7 +251,7 @@ describe("courses (real database)", () => {
         const serviceId = await makeService(2);
         await openCourse(serviceId, 2, [7]);
         await expect(
-            bookings.book(
+            publicBookings.book(
                 serviceId,
                 {
                     startAt: slot(7).toISOString(),
@@ -260,7 +262,7 @@ describe("courses (real database)", () => {
         ).rejects.toThrow("fully booked");
         // A time the course does not hold is still open.
         await expect(
-            bookings.book(
+            publicBookings.book(
                 serviceId,
                 {
                     startAt: slot(8).toISOString(),
@@ -283,7 +285,7 @@ describe("courses (real database)", () => {
         });
         try {
             await expect(
-                bookings.book(
+                publicBookings.book(
                     serviceId,
                     {
                         startAt: slot(9).toISOString(),

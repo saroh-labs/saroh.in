@@ -108,6 +108,8 @@ export function ProviderSetupDialog(
               label: string;
               trigger: string;
               urgent: boolean;
+              /** The provider the dialog opens on. */
+              provider?: PaymentProviderName;
               connected: ConnectedPaymentProvider[];
           }
         | {
@@ -115,6 +117,10 @@ export function ProviderSetupDialog(
               label: string;
               trigger: string;
               urgent: boolean;
+              /** The channel the dialog opens on (Email by default). */
+              channel?: CommsChannel;
+              /** The provider the dialog opens on, on that channel. */
+              provider?: string;
               connected: ConnectedCommsProvider[];
           },
 ) {
@@ -133,11 +139,14 @@ export function ProviderSetupDialog(
             <DialogContent className="max-w-[480px]">
                 {props.kind === "payments" ? (
                     <PaymentsForm
+                        initialProvider={props.provider}
                         connected={props.connected}
                         onDone={() => setOpen(false)}
                     />
                 ) : (
                     <MessagingForm
+                        initialChannel={props.channel ?? "EMAIL"}
+                        initialProvider={props.provider}
                         connected={props.connected}
                         onDone={() => setOpen(false)}
                     />
@@ -148,16 +157,24 @@ export function ProviderSetupDialog(
 }
 
 function PaymentsForm({
+    initialProvider,
     connected,
     onDone,
 }: {
+    initialProvider?: PaymentProviderName;
     connected: ConnectedPaymentProvider[];
     onDone: () => void;
 }) {
     const router = useRouter();
-    const current = connected.find((c) => c.status === "CONNECTED");
     const [provider, setProvider] = useState<PaymentProviderName>(
-        current?.provider ?? "RAZORPAY",
+        initialProvider ??
+            connected.find((c) => c.status === "CONNECTED")?.provider ??
+            "RAZORPAY",
+    );
+    // Several payment providers can be connected at once, so "already
+    // connected" is about the one picked — its keys are what Save replaces.
+    const current = connected.find(
+        (c) => c.provider === provider && c.status === "CONNECTED",
     );
     const [keyId, setKeyId] = useState("");
     const [keySecret, setKeySecret] = useState("");
@@ -227,9 +244,7 @@ function PaymentsForm({
             />
 
             <div className="grid gap-1.5">
-                <Label htmlFor={ids.provider}>
-                    {current ? "Replace with" : "Provider"}
-                </Label>
+                <Label htmlFor={ids.provider}>Provider</Label>
                 <OptionSelect
                     id={ids.provider}
                     value={provider}
@@ -303,20 +318,24 @@ function PaymentsForm({
 }
 
 function MessagingForm({
+    initialChannel,
+    initialProvider,
     connected,
     onDone,
 }: {
+    initialChannel: CommsChannel;
+    initialProvider?: string;
     connected: ConnectedCommsProvider[];
     onDone: () => void;
 }) {
     const router = useRouter();
-    const [channel, setChannel] = useState<CommsChannel>("EMAIL");
+    const [channel, setChannel] = useState<CommsChannel>(initialChannel);
     const spec = CHANNELS[channel];
     const current = connected.find(
         (c) => c.channel === channel && c.status === "CONNECTED",
     );
     const [provider, setProvider] = useState(
-        current?.provider ?? spec.providers[0].value,
+        initialProvider ?? current?.provider ?? spec.providers[0].value,
     );
     const [values, setValues] = useState<Record<string, string>>({});
     const [fromAddress, setFromAddress] = useState(current?.fromAddress ?? "");

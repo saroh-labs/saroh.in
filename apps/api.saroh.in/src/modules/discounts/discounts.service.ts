@@ -217,12 +217,12 @@ export class DiscountsService {
         }
 
         // A collection includes the collections inside it: naming "Bakery"
-        // means the bread in it too. Walked here, over this storefront's own
-        // categories, so the pure core only ever sees a resolved set.
+        // means the bread in it too. Walked here, over the business's
+        // categories (#529), so the pure core only ever sees a resolved set.
         let categoryIds = discount.categories.map((c) => c.categoryId);
         if (discount.appliesTo === "COLLECTION" && categoryIds.length > 0) {
             const all = await prisma.category.findMany({
-                where: { storeId: order.storeId },
+                where: { organizationId },
                 select: { id: true, parentId: true },
             });
             const named = new Set(categoryIds);
@@ -393,10 +393,10 @@ export class DiscountsService {
                   })
                 : r.appliesTo === "COLLECTION"
                   ? await prisma.category.count({
-                        where: { id: { in: ids }, store: { organizationId } },
+                        where: { id: { in: ids }, organizationId },
                     })
                   : await prisma.product.count({
-                        where: { id: { in: ids }, store: { organizationId } },
+                        where: { id: { in: ids }, organizationId },
                     });
         if (found !== ids.length) {
             throw new NotFoundException({

@@ -51,11 +51,16 @@ export function NewBookingDialog({
     services,
     contacts,
     canUsePacks = false,
+    triggerClassName,
+    plainTrigger = false,
 }: {
     services: { id: string; name: string; timezone: string; minutes: number }[];
     contacts: { id: string; name: string; email: string }[];
     /** May read and spend class packs (`pack:read` and `pack:write`). */
     canUsePacks?: boolean;
+    triggerClassName?: string;
+    /** The calendar's button: words only, as the Bookings design draws it. */
+    plainTrigger?: boolean;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -209,8 +214,11 @@ export function NewBookingDialog({
             }}
         >
             <DialogTrigger asChild>
-                <Button disabled={services.length === 0}>
-                    <Plus className="mr-1.5 size-4" />
+                <Button
+                    disabled={services.length === 0}
+                    className={triggerClassName}
+                >
+                    {plainTrigger ? null : <Plus className="mr-1.5 size-4" />}
                     New booking
                 </Button>
             </DialogTrigger>

@@ -1,8 +1,13 @@
 import { PageContainer } from "@/components/shared/page-container";
 import { StorefrontsScreen } from "@/components/stores/storefronts-screen";
+import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { getStorefront, listStorefronts } from "@/lib/stores/storefronts";
+import {
+    getStorefront,
+    getStorefrontAllowance,
+    listStorefronts,
+} from "@/lib/stores/storefronts";
 
 /**
  * Sell → Storefronts: the places the business sells from, and each one's own
@@ -21,11 +26,15 @@ export default async function StorefrontsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [organization, storefronts, { storefront }] = await Promise.all([
-        resolveActiveOrganization(),
-        listStorefronts(),
-        searchParams,
-    ]);
+    const [organization, storefronts, allowance, { storefront }] =
+        await Promise.all([
+            resolveActiveOrganization(),
+            listStorefronts(),
+            // How many the plan allows; unreadable offers New and lets the
+            // API decide.
+            getStorefrontAllowance().catch(() => null),
+            searchParams,
+        ]);
 
     const chosen =
         storefronts.find((s) => s.id === storefront) ?? storefronts.at(0);
@@ -46,7 +55,16 @@ export default async function StorefrontsPage({
                 businessName={organization?.name ?? "This business"}
                 storefronts={storefronts}
                 selected={selected}
-                canCreate={may("store:create")}
+                canCreate={
+                    may("store:create") &&
+                    mayAddStorefront(
+                        allowance && {
+                            // The list is the fresher count of the two.
+                            used: storefronts.length,
+                            limit: allowance.limit,
+                        },
+                    )
+                }
                 canEdit={may("store:write")}
                 canClose={may("store:delete")}
             />

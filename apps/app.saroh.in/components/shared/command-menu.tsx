@@ -16,6 +16,7 @@ import {
     Receipt,
     ReceiptText,
     Repeat,
+    SlidersHorizontal,
     Store,
     Target,
     Ticket,
@@ -24,13 +25,22 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import type { StorefrontAllowance } from "@/lib/business-limits";
 import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
+import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
+import { searchSettings } from "@/lib/settings/search";
 
 import type { NavAction, NavRole } from "./nav-items";
-import { navCan, navFor } from "./nav-items";
+import {
+    NOTIFICATIONS_NAV,
+    WEBSITE_HREF,
+    navCan,
+    navFor,
+    settingsPagesFor,
+} from "./nav-items";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -121,7 +131,10 @@ const ACTIONS: {
     icon: typeof UserRound;
     moduleKey?: string;
     action?: NavAction;
-    /** Offered only while the business may still make one (ADR-006). */
+    /**
+     * Offered only while the business may still make one: one website
+     * (ADR-006), storefronts up to the plan (ADR-010).
+     */
     limit?: "website" | "storefront";
 }[] = [
     {
@@ -211,7 +224,8 @@ export function CommandMenu({
     // the quick actions the palette offers.
     actions: permissions = null,
     sites = [],
-    storefrontCount = null,
+    storefronts = null,
+    stockTracked = null,
 }: {
     moduleKeys?: string[] | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
@@ -227,15 +241,27 @@ export function CommandMenu({
      * in `NAV_GROUPS` rather than in the sidebar alone.
      */
     sites?: { id: string; name: string }[];
-    /** How many storefronts the business has; `null` = unknown, and offered. */
-    storefrontCount?: number | null;
+    /**
+     * How many storefronts the business has and may have; `null` = unknown,
+     * and "New storefront" is offered.
+     */
+    storefronts?: StorefrontAllowance | null;
+    /** The business tracks stock; off, Sell › Stock is not offered. */
+    stockTracked?: boolean | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
-    const groups = navFor({ role, actions: permissions, moduleKeys, sites });
+    const groups = navFor({
+        role,
+        actions: permissions,
+        moduleKeys,
+        sites,
+        storefronts: storefronts?.used ?? null,
+        stockTracked,
+    });
 
     const available = moduleKeys === null ? null : new Set(moduleKeys);
     const actions = ACTIONS.filter(
@@ -243,9 +269,7 @@ export function CommandMenu({
             (!a.moduleKey || !available || available.has(a.moduleKey)) &&
             (!a.action || navCan({ role, actions: permissions }, a.action)) &&
             (a.limit !== "website" || mayAddWebsite(sites.length)) &&
-            (a.limit !== "storefront" ||
-                storefrontCount === null ||
-                mayAddStorefront(storefrontCount)),
+            (a.limit !== "storefront" || mayAddStorefront(storefronts)),
     );
 
     useEffect(() => {
@@ -306,7 +330,8 @@ export function CommandMenu({
         setOpen(false);
         setQuery("");
         setHits([]);
-        router.push(href);
+        // An open edit may hold the page: it asks, and goes if discarded.
+        if (mayNavigate(href)) router.push(href);
     };
 
     const typed = query.trim().length >= 2;
@@ -416,9 +441,39 @@ export function CommandMenu({
                     const groupMatches = group.label
                         ? matches(group.label)
                         : false;
-                    const items = group.items.filter(
-                        (item) => groupMatches || matches(item.label),
-                    );
+                    /*
+                     * A section's pages are destinations too — Services and
+                     * Courses live under Bookings now, and before they did
+                     * they were rows of their own here. They carry the
+                     * section's icon, and match on its name, so "bookings"
+                     * finds the whole section. Website's children are the
+                     * merchant's sites, which have their own group below.
+                     */
+                    const entries = group.items.flatMap((item) => {
+                        const own = {
+                            key: item.href,
+                            href: item.href,
+                            label: item.label,
+                            icon: item.icon,
+                            hit: groupMatches || matches(item.label),
+                        };
+                        if (item.href === WEBSITE_HREF) return [own];
+                        const pages = (item.children ?? []).flatMap((child) =>
+                            child.href && !child.create
+                                ? [
+                                      {
+                                          key: `${item.href}>${child.href}`,
+                                          href: child.href,
+                                          label: child.label,
+                                          icon: item.icon,
+                                          hit: own.hit || matches(child.label),
+                                      },
+                                  ]
+                                : [],
+                        );
+                        return [own, ...pages];
+                    });
+                    const items = entries.filter((entry) => entry.hit);
                     if (items.length === 0) return null;
                     return (
                         <CommandGroup key={i} heading={group.label ?? "Go to"}>
@@ -426,8 +481,8 @@ export function CommandMenu({
                                 const Icon = item.icon;
                                 return (
                                     <CommandItem
-                                        key={item.href}
-                                        value={item.href}
+                                        key={item.key}
+                                        value={item.key}
                                         onSelect={() => go(item.href)}
                                     >
                                         <Icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
@@ -439,6 +494,75 @@ export function CommandMenu({
                     );
                 })}
                 {/*
+                 * The settings screen's tabs. The rail offers one Settings row
+                 * now, so its pages are listed here, matched on their own
+                 * names and on "settings" — and, once something is typed, the
+                 * settings on them, the same ones Search settings finds:
+                 * "GSTIN" goes to Business, on its tax tab.
+                 */}
+                {(() => {
+                    const actor = { role, actions: permissions };
+                    const pages = settingsPagesFor(actor).filter(
+                        (page) => matches("Settings") || matches(page.label),
+                    );
+                    const settings = needle
+                        ? searchSettings(needle, actor, {
+                              limit: 5,
+                              byPage: false,
+                          })
+                        : [];
+                    if (pages.length === 0 && settings.length === 0) {
+                        return null;
+                    }
+                    return (
+                        <CommandGroup heading="Settings">
+                            {pages.map((page) => (
+                                <CommandItem
+                                    key={page.href}
+                                    value={page.href}
+                                    onSelect={() => go(page.href)}
+                                >
+                                    <page.icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    {page.label}
+                                </CommandItem>
+                            ))}
+                            {settings.map((hit) => (
+                                <CommandItem
+                                    key={`${hit.href}#${hit.label}`}
+                                    value={`${hit.href}#${hit.label}`}
+                                    onSelect={() => go(hit.href)}
+                                >
+                                    <SlidersHorizontal className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {hit.label}
+                                    </span>
+                                    <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                                        {hit.where}
+                                    </span>
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    );
+                })()}
+                {/*
+                 * Notifications left the rail for the top bar, so the nav
+                 * groups above no longer carry it; it stays one search away.
+                 */}
+                {navCan(
+                    { role, actions: permissions },
+                    NOTIFICATIONS_NAV.action,
+                ) && matches(NOTIFICATIONS_NAV.label) ? (
+                    <CommandGroup heading="You">
+                        <CommandItem
+                            value={NOTIFICATIONS_NAV.href}
+                            onSelect={() => go(NOTIFICATIONS_NAV.href)}
+                        >
+                            <NOTIFICATIONS_NAV.icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                            {NOTIFICATIONS_NAV.label}
+                        </CommandItem>
+                    </CommandGroup>
+                ) : null}
+                {/*
                  * The merchant's own things, flattened out of the tree the
                  * rail draws (#212). This menu read `group.items` alone, so
                  * a site was never reachable here by name however it appeared
@@ -449,6 +573,9 @@ export function CommandMenu({
                     const leaves: { label: string; href: string }[] = [];
                     for (const group of groups) {
                         for (const item of group.items) {
+                            // Only Website's children are sites; a
+                            // section's pages are listed with it above.
+                            if (item.href !== WEBSITE_HREF) continue;
                             for (const child of item.children ?? []) {
                                 if (child.href) {
                                     leaves.push({

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { holdOpenLines } from "../../backfill/held-stock";
 import { assertDatabaseTarget } from "../../database-target";
 import {
     ANALYTICS_DAYS,
@@ -7,10 +8,12 @@ import {
     CONTACTS as BASE_CONTACTS,
     OWNER_EMAIL,
     PLAN,
+    SEED_PREFIX,
 } from "../data";
 import type { Db } from "../helpers";
 import {
     at,
+    balanceStockLog,
     buildAnalyticsRows,
     emailFor,
     hashPassword,
@@ -21,6 +24,7 @@ import {
 } from "../helpers";
 import { deleteSeeded } from "../run";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
+import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
 import {
     invoiceRows,
@@ -29,7 +33,9 @@ import {
     planPacks,
     planSubscriptions,
 } from "./billing";
-import { checkShowcase } from "./check";
+import { checkBoutique, seedBoutique } from "./boutique";
+import type { RyeCounts } from "./check";
+import { checkRye, checkShowcase } from "./check";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -44,6 +50,7 @@ import {
     NORTHWIND_LEADS,
     NORTHWIND_NEW_CATEGORIES,
     NORTHWIND_NEW_PRODUCTS,
+    PULSE,
     RETIRED_BUSINESS_KEYS,
     ROLE_ACCOUNTS,
     SHOWCASE_BUSINESSES,
@@ -55,6 +62,8 @@ import {
 } from "./data";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import type { PulseCounts } from "./pulse";
+import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
 
 /**
@@ -154,6 +163,24 @@ export async function seedShowcase(): Promise<void> {
             prefix: sid("nw", ""),
         },
     ];
+    // The beauty & dresses boutique the products screens are filmed in (#471).
+    businesses.push(
+        await seedBoutique({ prisma, now, demoUserId: ctx.demoUserId }),
+    );
+    // The GST bakery the invoices, orders and subscriptions screens are
+    // filmed in (U9). Nisha works its counter as a Member.
+    businesses.push(
+        await seedBakery({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            counterUserId: await ensureTeamMember(ctx, {
+                first: "Nisha",
+                last: "Kulkarni",
+                role: "MEMBER",
+            }),
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -162,7 +189,16 @@ export async function seedShowcase(): Promise<void> {
         });
     }
 
+    // Every shelf the showcase set opens its stock log (#513), counted by
+    // each business's owner at the seed's (past) now.
+    await balanceStockLog(prisma, { at: now });
     const counts = await checkShowcase(prisma, now, businesses);
+    await checkBoutique(prisma);
+    const pulse = businesses.find((b) => b.name === PULSE.name);
+    const pulseCounts: PulseCounts | null = pulse
+        ? await checkPulse(prisma, pulse.id, now)
+        : null;
+    const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -170,6 +206,12 @@ export async function seedShowcase(): Promise<void> {
         );
     }
     console.table(counts);
+    if (pulseCounts) {
+        console.log("[showcase] Pulse Fitness, as its films need it:");
+        console.table(pulseCounts);
+    }
+    console.log("[showcase] Rye & Co., as its films need it:");
+    console.table(ryeCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
@@ -363,6 +405,7 @@ async function clearVolume(ctx: Context, key: string) {
     await p.submission.deleteMany({ where });
     await p.activity.deleteMany({ where });
     await p.lead.deleteMany({ where });
+    await p.contactNote.deleteMany({ where });
     await p.bookingEvent.deleteMany({ where });
     await p.booking.deleteMany({ where });
     await p.courseEnrollment.deleteMany({ where });
@@ -418,11 +461,12 @@ async function seedNorthwind(
     // Categories: the base three plus labels, tools and shipping.
     for (const c of NORTHWIND_NEW_CATEGORIES) {
         await prisma.category.upsert({
-            where: { storeId_slug: { storeId, slug: c.slug } },
-            update: { name: c.name, organizationId: orgId },
+            where: {
+                organizationId_slug: { organizationId: orgId, slug: c.slug },
+            },
+            update: { name: c.name },
             create: {
                 id: sid(key, "category", c.slug),
-                storeId,
                 organizationId: orgId,
                 name: c.name,
                 slug: c.slug,
@@ -430,7 +474,10 @@ async function seedNorthwind(
         });
     }
     const categories = await prisma.category.findMany({
-        where: { storeId, slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) } },
+        where: {
+            organizationId: orgId,
+            slug: { in: Object.keys(NORTHWIND_CATEGORY_INDEX) },
+        },
         select: { id: true, slug: true },
     });
     const categoryId = (slug: string) => {
@@ -447,12 +494,14 @@ async function seedNorthwind(
         products: NORTHWIND_NEW_PRODUCTS,
         productId: (i) => sid(key, "product", i),
         variantId: (i, v) => sid(key, "variant", i, v),
-        inventoryId: (i) => sid(key, "inventory", i),
+        listingId: (i) => sid(key, "listing", i),
+        listingVariantId: (i, v) => sid(key, "listingvariant", i, v),
+        stockLevelId: (i) => sid(key, "stocklevel", i),
         createdAt: (i) => at(now, -(200 - i * 3), 11),
     });
     const baseProducts = await prisma.product.findMany({
         where: {
-            storeId,
+            organizationId: orgId,
             slug: { in: Object.keys(NORTHWIND_BASE_PRODUCT_DEMAND) },
         },
         select: { id: true, slug: true },
@@ -535,6 +584,12 @@ async function seedNorthwind(
         customerCreatedAt,
     );
     await writeOrders(ctx, key, planned);
+    // The open ones hold their units, as the order form's reserve does
+    // (#511); what each product can sell stays its catalogue `stock`.
+    await holdOpenLines(prisma, {
+        organizationId: orgId,
+        orderIdPrefix: SEED_PREFIX,
+    });
 
     // CRM: the best customers are contacts too, plus prospects not yet buying.
     const prospects = makePeople(
@@ -928,6 +983,31 @@ async function seedBusiness(
         createdAt,
     });
 
+    // Pulse Fitness's people, their hours and its booking rules (U9):
+    // structure, before the bookings that name who takes them.
+    const pulseStaff =
+        key === PULSE.key
+            ? await upsertPulseStaff(prisma, {
+                  orgId,
+                  now,
+                  createdAt,
+                  services,
+                  ownerMembershipId: (
+                      await prisma.membership.findUniqueOrThrow({
+                          where: {
+                              organizationId_userId: {
+                                  organizationId: orgId,
+                                  userId: ownerId,
+                              },
+                          },
+                          select: { id: true },
+                      })
+                  ).id,
+                  ownerUserId: ownerId,
+                  id: (...parts) => sid(key, ...parts),
+              })
+            : null;
+
     // Generated volume is rewritten whole, so clear it before anything below
     // writes some.
     await clearVolume(ctx, key);
@@ -1108,6 +1188,31 @@ async function seedBusiness(
             if (event.type === "BOOKED" && by) event.actorUserId = by;
         }
     }
+    const bookings = [...diary.bookings, ...(courses?.bookings ?? [])];
+    const events = [...diary.events, ...(courses?.events ?? [])];
+
+    // Pulse Fitness: who takes each booking, how each was paid, late cancels,
+    // the pack and membership states its films show, and notes (U9).
+    const pulse =
+        pulseStaff && biz.billing && packs && subscriptions
+            ? planPulse({
+                  now,
+                  orgId,
+                  id: (...parts) => sid(key, ...parts),
+                  rng: rngFor(key, "operations"),
+                  staff: pulseStaff,
+                  services,
+                  bookings,
+                  events,
+                  packs,
+                  packFixtures: biz.billing.packs,
+                  subscriptions,
+                  planFixtures: biz.billing.plans,
+                  contacts: billingCtx.contacts,
+                  pool: billingCtx.pool,
+                  team: teamIds,
+              })
+            : null;
 
     // A contact exists from the first thing they did.
     const contactRng = rngFor(key, "contacts");
@@ -1214,21 +1319,24 @@ async function seedBusiness(
             data: courses.enrollments,
         });
     }
-    const bookings = [...diary.bookings, ...(courses?.bookings ?? [])];
-    const events = [...diary.events, ...(courses?.events ?? [])];
+    // Plans and the people on them before the bookings: a class booked on a
+    // membership names its subscription.
+    if (biz.billing && packs && subscriptions) {
+        await writeCatalogue(ctx, packs, subscriptions);
+        await createInChunks(subscriptions.subscriptions, (data) =>
+            prisma.customerSubscription.createMany({ data }),
+        );
+    }
     await createInChunks(bookings, (data) =>
         prisma.booking.createMany({ data }),
     );
     await createInChunks(events, (data) =>
         prisma.bookingEvent.createMany({ data }),
     );
+    if (pulse) await prisma.contactNote.createMany({ data: pulse.notes });
 
     let sold = "";
     if (biz.billing && packs && subscriptions) {
-        await writeCatalogue(ctx, packs, subscriptions);
-        await createInChunks(subscriptions.subscriptions, (data) =>
-            prisma.customerSubscription.createMany({ data }),
-        );
         await prisma.packPurchase.createMany({ data: packs.purchases });
         await prisma.packRedemption.createMany({ data: packs.redemptions });
 
@@ -1288,6 +1396,7 @@ async function writeCatalogue(
                 price: plan.price,
                 currency: plan.currency,
                 interval: plan.interval,
+                classesPerMonth: plan.classesPerMonth,
                 status: plan.status,
                 updatedAt: plan.updatedAt,
             },
@@ -1354,10 +1463,13 @@ async function writeInvoices(
         p.invoiceLine.createMany({ data }),
     );
     const lastNumber = Math.max(rows.lastNumber, ...handNumbers);
+    // The seeded numbers are INV-000n: the legacy series (ADR-008).
     await p.invoiceSequence.upsert({
-        where: { organizationId: orgId },
+        where: {
+            organizationId_series: { organizationId: orgId, series: "INV" },
+        },
         update: { lastNumber },
-        create: { organizationId: orgId, lastNumber },
+        create: { organizationId: orgId, series: "INV", lastNumber },
     });
 }
 

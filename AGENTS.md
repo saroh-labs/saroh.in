@@ -7,6 +7,7 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
 ## Layout
 
 - `apps/api.saroh.in` — the NestJS API, the only service that talks to the database (has its own `AGENTS.md`)
+- `apps/admin.saroh.in` — the operator console for one instance (has its own `AGENTS.md`)
 - `apps/*` — Next.js apps: `app` (merchant workspace), `accounts` (sign-in), `admin`, `saroh.app` (merchant sites), and the marketing, docs, help, templates and UI sites
 - `packages/*` — shared code (`auth`, `database`, `ui`, `site-blocks`, …); `tooling/*` — ESLint, Tailwind, tsconfig
 - `e2e/` — Playwright tests against the running stack
@@ -30,6 +31,15 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
 
+## UX design audits
+
+Whenever the user asks for a UX audit, design audit, usability audit, or a
+design review of any screen (for example "let's do the UX design audit",
+"audit this screen", "review the UX"), read **AUDIT-PLAYBOOK.md** first and
+follow it exactly. That means loading all 14 skills it lists with
+`read_skill_prompt` (in Claude Code, the Skill tool) before auditing. The user
+shouldn't have to name the file or the skills.
+
 ## Triggers — read before you change
 
 Not every agent loads skills on its own — Claude Code in this repo does not — so
@@ -39,6 +49,7 @@ the right-hand files **before** writing code.
 | When you are about to…                                                                                     | Read first                                                                                     |
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Make any change                                                                                            | `docs/patterns/00-universal.md`                                                                |
+| Audit or review the UX or design of a screen                                                               | `AUDIT-PLAYBOOK.md`                                                                            |
 | Run the stack, seed or pick a database, or check a change in a browser by hand                             | `docs/architecture/LOCAL_DEV.md`                                                               |
 | Design or change anything a merchant sees, decide what to build, or write copy, a claim or a status        | `docs/patterns/saroh-product.md` · `PRODUCT.md`                                                |
 | Debug anything non-obvious                                                                                 | `docs/architecture/DEV_LEARNINGS.md`                                                           |
@@ -54,6 +65,7 @@ the right-hand files **before** writing code.
 | Add or change an API module, controller, service, DTO or guard                                             | `docs/patterns/backend-nestjs.md` · `.agents/skills/saroh-architecture/SKILL.md`               |
 | Change `schema.prisma`, add a model, or store money                                                        | `docs/patterns/backend-data-and-money.md` · `.agents/skills/saroh-migrations/SKILL.md`         |
 | Touch roles, membership, invitations, organization context, capability gates, entitlements or staff access | `docs/patterns/backend-auth-and-access.md` · `.agents/skills/saroh-module-capability/SKILL.md` |
+| Change the admin console, or add an `/admin` endpoint or staff permission                                  | `apps/admin.saroh.in/AGENTS.md` · `docs/patterns/backend-auth-and-access.md`                   |
 | Enqueue a background job, or write or register a handler                                                   | `docs/patterns/backend-jobs.md`                                                                |
 | Touch invoices, subscriptions, the renewal job, courses or class packs                                     | `docs/patterns/backend-billing-and-classes.md` · ADR-007                                       |
 | Call a payment, billing, messaging or storage provider, or receive a webhook                               | `docs/patterns/backend-integrations.md`                                                        |

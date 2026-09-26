@@ -11,6 +11,7 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+import { Logger } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import {
@@ -98,6 +99,25 @@ describe("subscription.renew", () => {
         ]);
         // …and the next run is still enqueued.
         expect(jobCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts a period left uncharged by skips in the run's log", async () => {
+        findMany.mockResolvedValue([
+            { id: "sub_1", organizationId: "org_1" },
+            { id: "sub_2", organizationId: "org_1" },
+        ]);
+        renewOne
+            .mockResolvedValueOnce("uncharged")
+            .mockResolvedValueOnce("renewed");
+        const log = jest
+            .spyOn(Logger.prototype, "log")
+            .mockImplementation(() => undefined);
+
+        await handler.handle(JOB);
+        expect(log).toHaveBeenCalledWith(
+            expect.stringContaining('"renewed":1,"advanced":0,"uncharged":1'),
+        );
+        log.mockRestore();
     });
 
     it("schedules the next run an hour on", async () => {
