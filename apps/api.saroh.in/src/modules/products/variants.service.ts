@@ -312,9 +312,22 @@ export class VariantsService {
             }
             // The stock log is never edited (DEC-032): removing the variant
             // would take its shelves' entries with it, and leave its sold
-            // lines nothing to return to. One with any history stays.
+            // lines nothing to return to. One with real history stays: a
+            // line that sold or holds it, or a change that moved stock and
+            // wasn't undone. Saroh's own counts (the per-variant switch,
+            // Track stock off) and counts that changed nothing aren't
+            // history: a variant added by mistake can still go, and what it
+            // holds comes back to the product below.
             const [logged, sold] = await Promise.all([
-                tx.stockEntry.count({ where: { variantId } }),
+                tx.stockEntry.count({
+                    where: {
+                        variantId,
+                        system: null,
+                        quantity: { not: 0 },
+                        kind: { not: "REVERSED" },
+                        reversedBy: { is: null },
+                    },
+                }),
                 tx.orderItem.count({
                     where: {
                         variantId,
