@@ -55,7 +55,7 @@ class FakeChallenge extends ChallengeVerifier {
 
 type Sent = { to: string; code: string; businessName: string };
 
-function build(options: { addressLimit?: number } = {}) {
+function build(options: { addressLimit?: number; verifyLimit?: number } = {}) {
     const sent: Sent[] = [];
     let outcome: EmailOutcome = "sent";
     const sender = jest.fn(
@@ -79,7 +79,7 @@ function build(options: { addressLimit?: number } = {}) {
         challenge,
         alerts,
         new FixedWindowRateLimiter(options.addressLimit ?? 1_000, 600_000),
-        new FixedWindowRateLimiter(1_000, 600_000),
+        new FixedWindowRateLimiter(options.verifyLimit ?? 1_000, 600_000),
     );
     return {
         api: new SignInController(service),
@@ -409,22 +409,58 @@ describe("site sign-in: the visitor's own limits", () => {
         ).resolves.toMatchObject({ sent: true });
     });
 
-    it("answers the per-address request limiter with its retry time", async () => {
+    it("meets a busy address with the challenge, never a refusal, and counts it per business (review A-2)", async () => {
         const t = build({ addressLimit: 2 });
         const site = await business();
+        const other = await business();
         await t.api.requestCode(relay(site.host), { email: email() });
         await t.api.requestCode(relay(site.host), { email: email() });
         const third = await refusal(
             t.api.requestCode(relay(site.host), { email: email() }),
         );
-        expect(third.status).toBe(429);
-        expect(third.body.details?.retryAfter).toBeGreaterThan(500);
+        expect(third.status).toBe(400);
+        expect(third.body.details).toMatchObject({ reason: "challenge" });
+        await expect(
+            t.api.requestCode(relay(site.host), {
+                email: email(),
+                challenge: "ok",
+            }),
+        ).resolves.toMatchObject({ sent: true });
         // Someone on another address is untouched.
         await expect(
             t.api.requestCode(relay(site.host, "198.51.100.9"), {
                 email: email(),
             }),
         ).resolves.toMatchObject({ sent: true });
+        // The same address on another business's site is untouched too.
+        await expect(
+            t.api.requestCode(relay(other.host), { email: email() }),
+        ).resolves.toMatchObject({ sent: true });
+    });
+
+    it("counts verify tries per email: another customer on the same address can still sign in (review A-2)", async () => {
+        const t = build({ verifyLimit: 3 });
+        const site = await business();
+        const guessed = email();
+        const who = email();
+        await t.api.requestCode(relay(site.host), { email: guessed });
+        await t.api.requestCode(relay(site.host), { email: who });
+        const code = t.lastCode();
+        for (let i = 0; i < 3; i += 1) {
+            await refusal(
+                t.api.verify(relay(site.host), {
+                    email: guessed,
+                    code: "000000",
+                }),
+            );
+        }
+        const fourth = await refusal(
+            t.api.verify(relay(site.host), { email: guessed, code: "000000" }),
+        );
+        expect(fourth.status).toBe(429);
+        await expect(
+            t.api.verify(relay(site.host), { email: who, code }),
+        ).resolves.toHaveProperty("token");
     });
 
     it("kills the old code when a new one is sent", async () => {
@@ -462,7 +498,7 @@ describe("site sign-in: the visitor's own limits", () => {
 });
 
 describe("site sign-in: limits someone else can fill never refuse", () => {
-    it("sends a returning customer's code, unchallenged, past the new-email ceiling", async () => {
+    it("asks a returning customer for the challenge exactly as a new email, so it never tells who has an account (review A-1)", async () => {
         const t = build();
         const site = await business();
         const who = email();
@@ -475,15 +511,25 @@ describe("site sign-in: limits someone else can fill never refuse", () => {
         await pastCodes(
             site.organizationId,
             Array.from(
-                { length: NEW_BUSINESS_CEILINGS.newDestinationsPerHour * 2 },
+                { length: NEW_BUSINESS_CEILINGS.newDestinationsPerHour / 2 },
                 () => ({ agoMs: 60_000, newDestination: true }),
             ),
         );
 
-        await expect(
+        const known = await refusal(
             t.api.requestCode(relay(site.host), { email: who }),
+        );
+        const unknown = await refusal(
+            t.api.requestCode(relay(site.host), { email: email() }),
+        );
+        expect(known).toEqual(unknown);
+        expect(known.body.details).toMatchObject({ reason: "challenge" });
+        await expect(
+            t.api.requestCode(relay(site.host), {
+                email: who,
+                challenge: "ok",
+            }),
         ).resolves.toMatchObject({ sent: true });
-        expect(t.challenge.verifyCalls).toHaveLength(0);
     });
 
     it("asks a new email for the challenge past half the ceiling; still sends past all of it, and alerts", async () => {
@@ -721,6 +767,76 @@ describe("site sign-in: wrong, old and refused", () => {
             t.api.verify(relay(site.host), { email: who, code: right }),
         );
         expect(after.body.details).toEqual({ reason: "expired" });
+    });
+
+    it("needs the challenge for an email's next code once its codes were guessed at 25 times today, and alerts (review A-3)", async () => {
+        const t = build();
+        const site = await business();
+        const who = email();
+        // Five codes, each tried five times and never used: 25 wrong tries.
+        await pastCodes(
+            site.organizationId,
+            Array.from({ length: 5 }, (_, i) => ({
+                email: who,
+                address: `198.51.100.${i + 20}`,
+                agoMs: (i + 2) * 60 * 60_000,
+            })),
+        );
+        await prisma.customerSignInCode.updateMany({
+            where: {
+                organizationId: site.organizationId,
+                destinationHash: destinationHashFor(site.organizationId, who),
+            },
+            data: { attempts: 5 },
+        });
+
+        const errors = jest.spyOn(process.stderr, "write");
+        try {
+            const r = await refusal(
+                t.api.requestCode(relay(site.host), { email: who }),
+            );
+            expect(r.status).toBe(400);
+            expect(r.body.details).toMatchObject({ reason: "challenge" });
+            const lines = errors.mock.calls.map((c) => String(c[0]));
+            expect(lines.some((l) => l.includes("failed-tries"))).toBe(true);
+        } finally {
+            errors.mockRestore();
+        }
+        await expect(
+            t.api.requestCode(relay(site.host), {
+                email: who,
+                challenge: "ok",
+            }),
+        ).resolves.toMatchObject({ sent: true });
+        // Another email at the same business is untouched.
+        await expect(
+            t.api.requestCode(relay(site.host), { email: email() }),
+        ).resolves.toMatchObject({ sent: true });
+    });
+
+    it("does not count a used code's right try as a wrong one (review A-3)", async () => {
+        const t = build();
+        const site = await business();
+        const who = email();
+        // Six codes, each used on its fifth try: 24 wrong tries, 30 in all.
+        await pastCodes(
+            site.organizationId,
+            Array.from({ length: 6 }, (_, i) => ({
+                email: who,
+                address: `198.51.100.${i + 40}`,
+                agoMs: (i + 2) * 60 * 60_000,
+            })),
+        );
+        await prisma.customerSignInCode.updateMany({
+            where: {
+                organizationId: site.organizationId,
+                destinationHash: destinationHashFor(site.organizationId, who),
+            },
+            data: { attempts: 5, consumedAt: new Date() },
+        });
+        await expect(
+            t.api.requestCode(relay(site.host), { email: who }),
+        ).resolves.toMatchObject({ sent: true });
     });
 
     it("refuses an expired code", async () => {

@@ -5,6 +5,7 @@ import type {
     VerifyResult,
 } from "@saroh/site-blocks";
 
+import type { SiteCall } from "./customer-session";
 import { siteAccountsFetch } from "./customer-session";
 
 /**
@@ -14,7 +15,7 @@ import { siteAccountsFetch } from "./customer-session";
  *
  *   GET  public/site-accounts/options   → the challenge and the phone
  *   POST public/site-accounts/codes     → 202 · 429 limit|wait · 400 challenge · 503 unavailable
- *   POST public/site-accounts/sessions  → 201 token · 400 invalid|expired · 409 merged · 403 blocked
+ *   POST public/site-accounts/sessions  → 201 token · 400 invalid|expired · 409 merged · 403 blocked|closed
  */
 
 interface ApiError {
@@ -66,6 +67,20 @@ export function codeResult(status: number, body: unknown): CodeRequestResult {
     return { ok: false, reason: "error" };
 }
 
+/**
+ * A code request that never reached the API. Without a relay secret on
+ * this server no code can go, and the customer is told so honestly — the
+ * try-again line with the business's phone — rather than a broken sheet
+ * (review M-1). Anything else is a trip that failed.
+ */
+export function codeCallFailed(
+    reason: Extract<SiteCall, { ok: false }>["reason"],
+): CodeRequestResult {
+    return reason === "unconfigured"
+        ? { ok: false, reason: "unavailable" }
+        : { ok: false, reason: "error" };
+}
+
 /** A new session's token, or why there isn't one. */
 export type SessionAnswer =
     | { ok: true; token: string; expiresAt: Date }
@@ -96,7 +111,15 @@ export function sessionAnswer(status: number, body: unknown): SessionAnswer {
     if (status === 409 && typeof details.signsInAs === "string") {
         return { ok: false, reason: "merged", signsInAs: details.signsInAs };
     }
-    if (status === 403) return { ok: false, reason: "blocked" };
+    // A blocked customer's 403 says so; any other 403 is the business not
+    // taking sign-ins (suspended or closing), which is not the customer's
+    // doing (review A-7).
+    if (status === 403) {
+        return {
+            ok: false,
+            reason: details.reason === "blocked" ? "blocked" : "closed",
+        };
+    }
     if (status === 429) {
         return {
             ok: false,

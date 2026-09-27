@@ -111,6 +111,9 @@ const envSchema = z.object({
     SITE_CODES_SMTP_PORT: z.string().optional(),
     SITE_CODES_SMTP_USER: z.string().optional(),
     SITE_CODES_SMTP_PASS: z.string().optional(),
+    // `true` / `false`: whether that SMTP connection starts in TLS. Unset,
+    // the port decides — 465 is TLS, anything else STARTTLS.
+    SITE_CODES_SMTP_SECURE: z.enum(["true", "false"]).optional(),
     // With no SMTP: `log` prints the code (development's default) and leaves
     // it where a local browser test reads it; `fail` makes every send fail,
     // to see the "couldn't send" path and alert. Development, or named
@@ -179,3 +182,13 @@ function loadEnv(): z.infer<typeof envSchema> {
 }
 
 export const env = loadEnv();
+
+/**
+ * `NODE_ENV` as the process was actually given it — the shell, the run
+ * script or `.env` — before the schema's `development` default. A gate that
+ * hands out something unsafe outside development (the public site-secret
+ * fallbacks, the fake code email) reads this, never `env.NODE_ENV`, so a
+ * host that forgot to set `NODE_ENV` stays closed (review A-4).
+ */
+export const declaredNodeEnv: string | undefined =
+    process.env.NODE_ENV === "" ? undefined : process.env.NODE_ENV;

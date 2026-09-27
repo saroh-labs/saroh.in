@@ -46,6 +46,8 @@ export type VerifyResult =
     /** A merge retired this email: it signs in as another now. */
     | { ok: false; reason: "merged"; signsInAs: string }
     | { ok: false; reason: "blocked" }
+    /** The business isn't taking sign-ins (suspended or closing). */
+    | { ok: false; reason: "closed" }
     | { ok: false; reason: "limit"; retryAfterSeconds: number }
     | { ok: false; reason: "error" };
 

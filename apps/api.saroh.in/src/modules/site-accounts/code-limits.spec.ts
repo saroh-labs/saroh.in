@@ -4,6 +4,7 @@ import {
     ceilingsFor,
     challengeLikely,
     decideCodeRequest,
+    DESTINATION_FAILED_TRIES_PER_DAY,
     NEW_BUSINESS_CEILINGS,
 } from "./code-limits";
 
@@ -18,17 +19,23 @@ function counts(over: Partial<CodeCounts> = {}): CodeCounts {
         own: [],
         destinationToday: 0,
         destinationLatest: null,
+        destinationFailedToday: 0,
         businessNewLastHour: 0,
         businessToday: 0,
         ...over,
     };
 }
 
-function decide(over: Partial<CodeCounts> = {}, newDestination = false) {
+function decide(
+    over: Partial<CodeCounts> = {},
+    newDestination = false,
+    addressBusy = false,
+) {
     return decideCodeRequest({
         counts: counts(over),
         newDestination,
         ceilings: CEILINGS,
+        addressBusy,
         now: NOW,
     });
 }
@@ -136,12 +143,24 @@ describe("decideCodeRequest — the business's ceilings", () => {
         });
     });
 
-    it("never challenges a returning customer for the new-email ceiling", () => {
+    it("asks a returning customer for the same challenge, so it never tells whether the email has an account (review A-1)", () => {
+        for (const businessNewLastHour of [
+            half - 1,
+            half,
+            CEILINGS.newDestinationsPerHour * 3,
+        ]) {
+            const known = decide({ businessNewLastHour }, false);
+            const unknown = decide({ businessNewLastHour }, true);
+            expect(known.kind).toBe("send");
+            expect((known as { challenge: boolean }).challenge).toBe(
+                (unknown as { challenge: boolean }).challenge,
+            );
+        }
         expect(
             decide({
                 businessNewLastHour: CEILINGS.newDestinationsPerHour * 3,
             }),
-        ).toEqual({ kind: "send", challenge: false, alerts: [] });
+        ).toEqual({ kind: "send", challenge: true, alerts: [] });
     });
 
     it("challenges everyone past the daily ceiling and alerts, never refuses", () => {
@@ -150,6 +169,29 @@ describe("decideCodeRequest — the business's ceilings", () => {
             challenge: true,
             alerts: ["daily"],
         });
+    });
+});
+
+describe("decideCodeRequest — what someone else did never refuses", () => {
+    it("asks a busy visitor address for the challenge instead of refusing (review A-2)", () => {
+        expect(decide({}, false, true)).toEqual({
+            kind: "send",
+            challenge: true,
+            alerts: [],
+        });
+    });
+
+    it("asks for the challenge and alerts once an email's codes have been guessed at 25 times today (review A-3)", () => {
+        expect(
+            decide({
+                destinationFailedToday: DESTINATION_FAILED_TRIES_PER_DAY - 1,
+            }),
+        ).toEqual({ kind: "send", challenge: false, alerts: [] });
+        expect(
+            decide({
+                destinationFailedToday: DESTINATION_FAILED_TRIES_PER_DAY,
+            }),
+        ).toEqual({ kind: "send", challenge: true, alerts: ["failed-tries"] });
     });
 });
 

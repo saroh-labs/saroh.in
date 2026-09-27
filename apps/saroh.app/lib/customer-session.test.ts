@@ -1,11 +1,27 @@
 import { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as SiteRelay from "./site-relay";
+
 const jar = vi.hoisted(() => ({
     value: undefined as string | undefined,
     set: vi.fn(),
     requestHeaders: new Headers(),
 }));
+
+const relay = vi.hoisted(() => ({ missingSecret: false }));
+vi.mock("./site-relay", async (importOriginal) => {
+    const real = await importOriginal<typeof SiteRelay>();
+    return {
+        ...real,
+        relayFor: (headers: Headers, host: string) => {
+            if (relay.missingSecret) {
+                throw new Error("SITE_RELAY_SECRET is not set.");
+            }
+            return real.relayFor(headers, host);
+        },
+    };
+});
 
 vi.mock("next/headers", () => ({
     cookies: () =>
@@ -25,7 +41,9 @@ import {
     CUSTOMER_SESSION_HEADER,
     getSignedInCustomer,
     SESSION_COOKIE,
+    SESSION_COOKIE_MAX_AGE_MS,
     sessionCookie,
+    setSessionCookie,
     siteAccountsFetch,
 } from "./customer-session";
 
@@ -41,6 +59,7 @@ function setCookieHeader(cookie: ReturnType<typeof sessionCookie>): string {
 const fetchMock = vi.fn();
 
 beforeEach(() => {
+    relay.missingSecret = false;
     jar.value = undefined;
     jar.set.mockReset();
     jar.requestHeaders = new Headers({
@@ -77,6 +96,20 @@ describe("the session cookie", () => {
         expect(header).toMatch(/; Path=\//);
         expect(header).toContain(`Expires=${new Date(0).toUTCString()}`);
         expect(header.toLowerCase()).not.toContain("domain=");
+    });
+});
+
+describe("keeping a new session (review A-5)", () => {
+    it("keeps the cookie for the longest a session can last, not the session's first end", async () => {
+        const now = new Date("2026-10-01T10:00:00Z");
+        await setSessionCookie("tok", now);
+        expect(jar.set).toHaveBeenCalledWith(
+            sessionCookie(
+                "tok",
+                new Date(now.getTime() + SESSION_COOKIE_MAX_AGE_MS),
+            ),
+        );
+        expect(SESSION_COOKIE_MAX_AGE_MS).toBe(90 * 24 * 60 * 60_000);
     });
 });
 
@@ -121,11 +154,58 @@ describe("calls to the API", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("clears the cookie when the API refuses the session", async () => {
+    it("clears the cookie when the API says the session is over", async () => {
         jar.value = "revoked";
-        fetchMock.mockResolvedValue(new Response("{}", { status: 401 }));
+        fetchMock.mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    error: {
+                        statusCode: 401,
+                        details: { reason: "signed-out" },
+                    },
+                }),
+                { status: 401 },
+            ),
+        );
         await expect(getSignedInCustomer()).resolves.toBeNull();
         expect(jar.set).toHaveBeenCalledWith(clearedSessionCookie());
+    });
+
+    it("keeps the cookie on a 401 that isn't about the session, such as a relay the API couldn't check (review A-6)", async () => {
+        jar.value = "good";
+        fetchMock.mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    error: {
+                        statusCode: 401,
+                        message:
+                            "This request must come from the business's website.",
+                    },
+                }),
+                { status: 401 },
+            ),
+        );
+        await expect(getSignedInCustomer()).resolves.toBeNull();
+        expect(jar.set).not.toHaveBeenCalled();
+    });
+
+    it("answers unconfigured, logs an ERROR and never throws when this server has no relay secret (review M-1)", async () => {
+        relay.missingSecret = true;
+        const errors = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        try {
+            await expect(siteAccountsFetch("codes")).resolves.toEqual({
+                ok: false,
+                reason: "unconfigured",
+            });
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(String(errors.mock.calls[0]?.[0])).toContain(
+                "site_relay_secret_missing",
+            );
+        } finally {
+            errors.mockRestore();
+        }
     });
 
     it("makes no call without a served host", async () => {
