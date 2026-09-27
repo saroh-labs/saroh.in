@@ -74,7 +74,9 @@ export interface SignInOptions {
  * address visits many businesses' sites):
  *
  * - code requests are counted per business and visitor address, and past
- *   the limit a code needs the challenge rather than being refused;
+ *   the limit a code needs the challenge rather than being refused — when
+ *   Turnstile is configured. Without it that challenge could not be asked,
+ *   so past the limit the address waits out the window (429 `limit`);
  * - verify tries are counted per business, email and visitor address — only
  *   the visitor's own tries at their own email — and past it they wait.
  *
@@ -200,10 +202,23 @@ export class SignInCodesService {
                 email,
             );
 
+            const addressKey = `${site.organizationId}:${relay.clientHash}`;
             const addressBusy = !this.codeLimiter.take(
-                `${site.organizationId}:${relay.clientHash}`,
+                addressKey,
                 now.getTime(),
             );
+            if (addressBusy && !this.challenge.configured) {
+                // No challenge to ask, so the limit is a refusal: the one
+                // hard stop on one address asking this business for code
+                // after code (A-2).
+                throw limited(
+                    "limit",
+                    this.codeLimiter.retryAfterSeconds(
+                        addressKey,
+                        now.getTime(),
+                    ),
+                );
+            }
 
             const returning = await prisma.customerAccount.count({
                 where: {

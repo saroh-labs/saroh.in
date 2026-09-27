@@ -438,6 +438,32 @@ describe("site sign-in: the visitor's own limits", () => {
         ).resolves.toMatchObject({ sent: true });
     });
 
+    it("refuses a busy address, per business, when no challenge is configured (re-review 2)", async () => {
+        const t = build({ addressLimit: 2 });
+        t.challenge.isConfigured = false;
+        const site = await business();
+        const other = await business();
+        await t.api.requestCode(relay(site.host), { email: email() });
+        await t.api.requestCode(relay(site.host), { email: email() });
+        const third = await refusal(
+            t.api.requestCode(relay(site.host), { email: email() }),
+        );
+        expect(third.status).toBe(429);
+        expect(third.body.details).toMatchObject({ reason: "limit" });
+        expect(third.body.details?.retryAfter).toBeGreaterThan(0);
+        expect(third.body.details?.retryAfter).toBeLessThanOrEqual(600);
+        expect(t.sent).toHaveLength(2);
+        // Another address, and the same address on another site, still get a code.
+        await expect(
+            t.api.requestCode(relay(site.host, "198.51.100.9"), {
+                email: email(),
+            }),
+        ).resolves.toMatchObject({ sent: true });
+        await expect(
+            t.api.requestCode(relay(other.host), { email: email() }),
+        ).resolves.toMatchObject({ sent: true });
+    });
+
     it("counts verify tries per email: another customer on the same address can still sign in (review A-2)", async () => {
         const t = build({ verifyLimit: 3 });
         const site = await business();
