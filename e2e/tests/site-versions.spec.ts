@@ -225,3 +225,47 @@ test.describe("taking a version back", () => {
         ).toHaveCount(1);
     });
 });
+
+test.describe("the editor's status after a reload (G2)", () => {
+    test("says what is not published yet, and nothing once it is", async ({
+        page,
+    }) => {
+        await signIn(page, demoUser);
+        const id = await siteId(page);
+        await page.goto(`${urls.APP_URL}/sites/${id}`);
+
+        /*
+         * Read through Publish's title rather than the pill: another test in
+         * this file can leave a change request open, and a review outranks
+         * "Not published" in the pill. The title always says what goes live.
+         */
+        const publish = page.getByRole("button", { name: /^Publish/ }).first();
+        const toggle = page
+            .getByRole("complementary", { name: "Inspector" })
+            .getByRole("button", { name: /^(Visible|Hidden)$/ })
+            .first();
+        await expect(toggle).toBeVisible({ timeout: 30_000 });
+
+        // One block's visibility flips; the autosave counts it.
+        await toggle.click();
+        await expect(publish).toHaveAttribute("title", /^Put live: .*block/, {
+            timeout: 30_000,
+        });
+
+        // The count is the server's, so a reload says the same.
+        await page.reload();
+        await expect(publish).toHaveAttribute("title", /^Put live: .*block/, {
+            timeout: 30_000,
+        });
+
+        // Put it back, publish, and nothing is waiting.
+        await toggle.click();
+        await expect(publish).toBeEnabled({ timeout: 30_000 });
+        await publishFromEditor(page);
+        await expect(publish).toHaveAttribute(
+            "title",
+            "Nothing has changed since the last publish",
+            { timeout: 30_000 },
+        );
+    });
+});

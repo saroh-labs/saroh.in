@@ -170,8 +170,6 @@ export function SiteEditor({
                 {...review}
                 {...publish}
                 {...viewport}
-                rail={selection.rail}
-                setRail={setRail}
             />
 
             <div
@@ -283,6 +281,8 @@ export function SiteEditor({
                     awaitingNavigation={publish.siteFlags.awaitingNavigation}
                     publishing={publish.publishing}
                     neverPublished={publish.neverPublished}
+                    pendingSummary={publish.pendingSummary}
+                    pendingKnown={publish.pendingKnown}
                     review={review.review}
                     onPublish={() => void publish.onPublish()}
                     onClose={() => publish.setChecking(false)}

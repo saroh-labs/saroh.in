@@ -274,7 +274,10 @@ describe("SiteEditor shell", () => {
         // The bar: breadcrumb, page switcher, status and every action.
         const crumbs = $("nav[aria-label=Breadcrumb]");
         expect(crumbs?.textContent).toContain("Flour & Ferment");
-        expect($(`a[href='/sites/${siteId}/pages']`)).not.toBeNull();
+        // G2: the way out is the Website crumb, as the design draws it.
+        const back = $(`a[href='/sites/${siteId}/pages']`);
+        expect(back?.textContent).toBe("Website");
+        expect(back?.getAttribute("aria-label")).toBe("Back to Website");
         expect(button(/^Page: Home\. Switch or manage pages$/)).toBeTruthy();
         expect($("[role=status]")?.textContent).toBe("Published");
         expect($("[role=group][aria-label='Preview width']")).not.toBeNull();
@@ -283,14 +286,22 @@ describe("SiteEditor shell", () => {
         }
         expect(button("Zoom").textContent).toContain("100%");
         expect(button("Preview")).toBeTruthy();
-        expect(button("Style").getAttribute("aria-pressed")).toBe("false");
+        // G2: Style is the rail's Brand tab, not a button in the bar.
+        expect(() => button("Style")).toThrow();
         expect(button("Share for review").disabled).toBe(false);
+        // Nothing waiting, and it still publishes: that makes a new version.
         expect(button("Publish").disabled).toBe(false);
-        expect(button("Publish").title).toBe("Make these changes live");
+        expect(button("Publish").title).toBe(
+            "Nothing has changed since the last publish",
+        );
 
-        // The rail: its two tabs, the block count and header/footer locks.
-        expect(button("This page").getAttribute("aria-selected")).toBe("true");
-        expect(button("Add block")).toBeTruthy();
+        // The rail: Page · Add · Brand (G2), the block count and the locks.
+        expect(
+            $$("[role=tablist][aria-label='Editor panels'] [role=tab]").map(
+                (t) => t.textContent,
+            ),
+        ).toEqual(["Page", "Add", "Brand"]);
+        expect(button("Page").getAttribute("aria-selected")).toBe("true");
         expect(host.textContent).toContain("4 blocks");
         expect(button("Header")).toBeTruthy();
         expect(button("Footer")).toBeTruthy();
@@ -326,14 +337,62 @@ describe("SiteEditor shell", () => {
             initialPendingSiteChanges: null,
             address: null,
         });
-        expect(button("Publish site")).toBeTruthy();
+        // G2: the design's one word; the title says what it does.
+        expect(button("Publish").title).toBe("Put this site live");
         expect($("[role=status]")?.textContent).toBe("Not published yet");
         expect(host.textContent).toContain("Nothing’s live yet");
         expect(host.textContent).toContain("Not published yet");
         expect(host.textContent).not.toContain("⌘-click");
     });
 
-    it("says what publishing would change beside the pill", () => {
+    it("says in the pill what is not published yet, and Publish puts it live", () => {
+        render({
+            initialPendingChanges: 2,
+            initialPendingSiteChanges: ["footer"],
+        });
+        expect($("[role=status]")?.textContent).toBe(
+            "Not published · 2 blocks, footer",
+        );
+        // The pill says it, so the line beside it does not say it twice.
+        expect($("nav[aria-label=Breadcrumb] span[title]")).toBeNull();
+        expect(button("Publish").title).toBe("Put live: 2 blocks, footer");
+    });
+
+    it("never says Published when the count of what's changed is missing", () => {
+        render({
+            initialPendingChanges: null,
+            initialPendingSiteChanges: null,
+        });
+        expect($("[role=status]")?.textContent).toBe(
+            "Couldn't check what's changed",
+        );
+        expect(button("Publish").title).toBe("Put this site live as it is now");
+    });
+
+    it("says what a save counted, and says so when a save comes back without a count", async () => {
+        actions.saveDraftSections
+            .mockResolvedValueOnce({
+                ok: true,
+                data: {
+                    revision: 2,
+                    pendingSectionChanges: 1,
+                    pendingSiteChanges: [],
+                },
+            })
+            .mockResolvedValueOnce({ ok: true, data: { revision: 3 } });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+        click(button(/Hidden$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect($("[role=status]")?.textContent).toBe(
+            "Couldn't check what's changed",
+        );
+    });
+
+    it("says what publishing would change beside the pill when a verdict outranks it", () => {
         render({
             initialPendingChanges: 2,
             initialPendingSiteChanges: ["style"],
@@ -347,6 +406,8 @@ describe("SiteEditor shell", () => {
                 },
             },
         });
+        // The design's pill for an approval that still covers the draft.
+        expect($("[role=status]")?.textContent).toBe("Approved");
         const line = $("nav[aria-label=Breadcrumb] span[title]");
         expect(line?.textContent).toMatch(
             /^2 sections and .+ changed · Approved by Asha · 3 open notes$/,
@@ -419,19 +480,23 @@ describe("SiteEditor shell", () => {
         expect(button(/^Move — /)).toBeTruthy();
     });
 
-    it("opens the style panel from the bar and comes back", () => {
-        render();
-        click(button("Style"));
-        expect(button("Style").getAttribute("aria-pressed")).toBe("true");
-        expect(() => button("This page")).toThrow();
-        click(button("Style"));
-        expect(button("This page")).toBeTruthy();
+    it("opens the style panel from the Brand tab and comes back from Page", () => {
+        const { siteId } = render();
+        click(button("Brand"));
+        expect(button("Brand").getAttribute("aria-selected")).toBe("true");
+        expect(host.textContent).toContain("plain system font");
+        expect(() => button("Header")).toThrow();
+        // Remembered, so a reload comes back to it as it did to Style.
+        expect(prefs.getPlace(siteId, SECTIONS.length).rail).toBe("style");
+        click(button("Page"));
+        expect(button("Page").getAttribute("aria-selected")).toBe("true");
+        expect(button("Header")).toBeTruthy();
     });
 
-    it("shows the Add block tab and adds a block after the selected one", () => {
+    it("shows the Add tab and adds a block after the selected one", () => {
         render();
-        click(button("Add block"));
-        expect(button("Add block").getAttribute("aria-selected")).toBe("true");
+        click(button("Add"));
+        expect(button("Add").getAttribute("aria-selected")).toBe("true");
         const before = $$("[data-block-index]").length;
         // Any block with a single look goes straight in.
         const tile = Array.from(
@@ -440,7 +505,7 @@ describe("SiteEditor shell", () => {
         if (!tile) throw new Error("No Contact tile");
         click(tile);
         // Back on the page's blocks, with the new one selected second.
-        expect(button("This page").getAttribute("aria-selected")).toBe("true");
+        expect(button("Page").getAttribute("aria-selected")).toBe("true");
         expect(host.textContent).toContain("5 blocks");
         expect($$("[data-block-index]").length).toBe(before + 1);
         const rows = $$("aside li button[aria-current]");
@@ -488,9 +553,8 @@ describe("SiteEditor shell", () => {
         // An autosave does not announce itself.
         expect(toast.showSuccess).not.toHaveBeenCalled();
         expect(button("Publish").disabled).toBe(false);
-        expect($("nav[aria-label=Breadcrumb] span[title]")?.textContent).toBe(
-            "1 section changed",
-        );
+        // G2: the pill carries what the save counted.
+        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
     });
 
     it("stops saving and offers a reload when someone else saved", async () => {
@@ -512,10 +576,56 @@ describe("SiteEditor shell", () => {
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
     });
 
+    it("names what goes live in the check, and reads Published after", async () => {
+        render({
+            initialPendingChanges: 1,
+            initialPendingSiteChanges: ["footer"],
+        });
+        expect($("[role=status]")?.textContent).toBe(
+            "Not published · 1 block, footer",
+        );
+        await press(button("Publish"));
+        expect(document.body.textContent).toContain(
+            "Publishing puts live: 1 section and the footer.",
+        );
+        const go = Array.from(
+            document.querySelectorAll<HTMLButtonElement>("button"),
+        ).filter((b) => b.textContent.startsWith("Publish"));
+        await press(go[go.length - 1]);
+        await wait(0);
+        expect(actions.publishSite).toHaveBeenCalledTimes(1);
+        expect($("[role=status]")?.textContent).toBe("Published");
+    });
+
+    it("publishes while a page is out for review, and records the bypass", async () => {
+        const inReview = { ...REVIEW, pending: true, outstanding: true };
+        actions.publishSite.mockResolvedValue({
+            ok: true,
+            data: { bypassed: true },
+        });
+        render({ initialReview: inReview, initialPendingChanges: 1 });
+        expect($("[role=status]")?.textContent).toBe("In review");
+        // The pill says In review, so the line says what would go live.
+        expect(
+            $("nav[aria-label=Breadcrumb] span[title]")?.textContent,
+        ).toContain("1 section changed");
+        expect(button("Publish").disabled).toBe(false);
+        await press(button("Publish"));
+        await press(button("Publish without approval"));
+        expect(actions.publishSite).toHaveBeenCalledTimes(1);
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Flour & Ferment is live at flour.saroh.app. Recorded as published without approval.",
+        );
+    });
+
     it("publishes through the check and says where the site is live", async () => {
         const { siteId } = render();
         await press(button("Publish"));
         expect(actions.getSiteFlags).toHaveBeenCalledWith(siteId);
+        // Nothing waiting: the check says so, and still publishes.
+        expect(document.body.textContent).toContain(
+            "Nothing has changed since the last publish.",
+        );
         const go = Array.from(
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).filter((b) => b.textContent.startsWith("Publish"));

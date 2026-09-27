@@ -10,7 +10,6 @@ import {
     Eye,
     Link2,
     Monitor,
-    Palette,
     Smartphone,
     Tablet,
 } from "lucide-react";
@@ -22,10 +21,10 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import { DEVICES, ZOOMS } from "@/components/sites/editor-constants";
 import {
+    publishTitle,
     STATUS_BADGE,
     statusReadout,
 } from "@/components/sites/editor/status-readout";
-import type { EditorRailTab } from "@/components/sites/editor/use-editor-selection";
 import type { DraftReadiness } from "@/components/sites/editor/use-publish";
 import { unfinishedPhrase } from "@/components/sites/held-back-copy";
 import { PagesPanel } from "@/components/sites/pages-panel";
@@ -33,10 +32,12 @@ import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import type { ReviewState, SiteFlags, SitePage } from "@/lib/sites/service";
 
 /**
- * The editor's top bar: where you are (site, page, status), how the page is
- * shown (theme, width, zoom, full-screen preview, Style), and the two ways
+ * The editor's top bar: where you are (Website, site, page, status), how the
+ * page is shown (theme, width, zoom, full-screen preview), and the two ways
  * work leaves the editor (Share for review, Publish). Moved out of
- * `site-editor.tsx` unchanged (#260).
+ * `site-editor.tsx` (#260), then laid out as Saroh Site Editor.dc.html draws
+ * it (G2): the status is true after a reload, Publish says what it puts
+ * live, and Style moved to the rail's Brand tab.
  *
  * ONE line, and it has to stay one line: the actions never shrink, the
  * breadcrumb truncates instead. Losing the end of a page name is a smaller
@@ -62,6 +63,8 @@ export function EditorTopBar({
     askForReview,
     neverPublished,
     pendingSummary,
+    pendingShort,
+    pendingKnown,
     publishing,
     siteFlags,
     openCheck,
@@ -70,8 +73,6 @@ export function EditorTopBar({
     zoom,
     setZoom,
     setFullScreen,
-    rail,
-    setRail,
 }: {
     siteId: string;
     siteName: string;
@@ -92,6 +93,8 @@ export function EditorTopBar({
     askForReview: () => Promise<void>;
     neverPublished: boolean;
     pendingSummary: string | null;
+    pendingShort: string | null;
+    pendingKnown: boolean;
     publishing: boolean;
     siteFlags: SiteFlags;
     openCheck: (draft: DraftReadiness) => Promise<void>;
@@ -100,8 +103,6 @@ export function EditorTopBar({
     zoom: Zoom;
     setZoom: (next: Zoom) => void;
     setFullScreen: (open: boolean) => void;
-    rail: EditorRailTab;
-    setRail: (next: EditorRailTab) => void;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -122,25 +123,54 @@ export function EditorTopBar({
         review,
         neverPublished,
         pendingSummary,
+        pendingShort,
+        pendingKnown,
         lastSavedAt,
         openNotes,
     });
+    const publishHint = publishTitle({
+        publishing,
+        dirty: dirty || saving || styleDirty,
+        onlyHeldBack,
+        heldBack,
+        neverPublished,
+        pendingShort,
+        pendingKnown,
+    });
 
     return (
-        <header className="flex h-14 shrink-0 items-center gap-3 overflow-hidden border-b px-4">
+        <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
             <nav
                 aria-label="Breadcrumb"
-                className="flex min-w-0 items-center gap-2 text-sm"
+                className="flex min-w-0 items-center gap-1 text-sm"
             >
+                {/*
+                 * The design's trail: back to Website, the business, then
+                 * the page menu. The business name is where you are, not a
+                 * link; the way out is the Website crumb before it.
+                 */}
                 <Link
                     href={`/sites/${siteId}/pages`}
+                    aria-label="Back to Website"
                     title={address ?? undefined}
-                    className="flex min-w-0 shrink items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                    <ChevronLeft aria-hidden className="size-4 shrink-0" />
-                    <span className="truncate">{siteName}</span>
+                    <ChevronLeft aria-hidden className="size-[15px] shrink-0" />
+                    Website
                 </Link>
-                <span aria-hidden className="text-muted-foreground">
+                <span
+                    aria-hidden
+                    className="px-px text-[0.9375rem] text-muted-foreground/70"
+                >
+                    /
+                </span>
+                <span className="min-w-0 truncate text-[0.84375rem] font-medium text-muted-foreground">
+                    {siteName}
+                </span>
+                <span
+                    aria-hidden
+                    className="px-px text-[0.9375rem] text-muted-foreground/70"
+                >
                     /
                 </span>
                 {/*
@@ -153,14 +183,14 @@ export function EditorTopBar({
                         <button
                             type="button"
                             aria-label={`Page: ${activePage?.title ?? "Page"}. Switch or manage pages`}
-                            className="flex min-w-0 items-center gap-1 rounded font-semibold transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="flex h-[30px] min-w-0 shrink-0 items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <span className="truncate">
+                            <span className="max-w-[12rem] truncate">
                                 {activePage?.title ?? "Page"}
                             </span>
                             <ChevronDown
                                 aria-hidden
-                                className="size-4 shrink-0 text-muted-foreground"
+                                className="size-[13px] shrink-0 text-muted-foreground"
                             />
                         </button>
                     </PopoverTrigger>
@@ -181,26 +211,34 @@ export function EditorTopBar({
                         />
                     </PopoverContent>
                 </Popover>
-                <span aria-hidden className="text-muted-foreground">
-                    /
-                </span>
+                {/*
+                 * "Published", "Not published · 2 blocks, footer" or "Not
+                 * published yet" (G2), worked out from the server's count
+                 * so it is the same after a reload. It may truncate — the
+                 * full words are in its title and in Publish's — but it
+                 * never pushes Publish off the bar.
+                 */}
                 <Badge
                     role="status"
                     variant={STATUS_BADGE[status.tone]}
-                    title={statusDetail || undefined}
-                    className="shrink-0 whitespace-nowrap uppercase tracking-[0.06em]"
+                    title={
+                        [status.label, statusDetail]
+                            .filter(Boolean)
+                            .join("\n") || undefined
+                    }
+                    className="ml-1 min-w-0 shrink truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em]"
                 >
-                    {status.label}
+                    <span className="truncate">{status.label}</span>
                 </Badge>
                 {/*
-                 * What the pill sums up, said in the bar as it was
-                 * before the redesign: what publishing would change,
-                 * the reviewer's verdict and how many notes are open.
-                 * It truncates rather than wraps — Publish never moves.
+                 * What the pill leaves out: the reviewer's verdict, how many
+                 * notes are open, and what publishing would change when a
+                 * review outranks it in the pill. It truncates rather than
+                 * wraps — Publish never moves.
                  */}
                 {statusLine ? (
                     <span
-                        className="min-w-0 truncate text-xs text-muted-foreground"
+                        className="ml-1 min-w-0 truncate text-[0.71875rem] text-muted-foreground"
                         title={statusDetail}
                     >
                         {statusLine}
@@ -272,56 +310,46 @@ export function EditorTopBar({
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5"
+                    className="h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground"
                     onClick={() => setFullScreen(true)}
                 >
-                    <Eye aria-hidden className="size-4" />
+                    <Eye aria-hidden className="size-[15px]" />
                     Preview
                 </Button>
 
-                <Button
-                    variant={rail === "style" ? "secondary" : "outline"}
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    onClick={() =>
-                        setRail(rail === "style" ? "sections" : "style")
-                    }
-                    aria-pressed={rail === "style"}
-                >
-                    <Palette aria-hidden className="size-4" />
-                    Style
-                </Button>
-
+                {/*
+                 * Style is the rail's Brand tab now (G2), as the design
+                 * draws it, so the bar no longer carries a button for it.
+                 */}
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5"
+                    className="h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground"
                     disabled={asking || review.pending}
                     onClick={() => void askForReview()}
                 >
-                    <Link2 aria-hidden className="size-4" />
+                    <Link2 aria-hidden className="size-[15px]" />
                     {review.pending ? "In review" : "Share for review"}
                 </Button>
 
                 {/*
                  * The one action that puts the site in front of the
                  * public. Not disabled while In review: publishing then
-                 * is allowed and recorded as a bypass (#278).
+                 * is allowed and recorded as a bypass (#278, DEC-047).
+                 * Its title says what it puts live (G2). Unlike the
+                 * design it stays pressable when nothing has changed:
+                 * publishing again is how a new version is made.
                  */}
                 <Button
                     size="sm"
-                    className="wk-press h-8"
-                    title="Make these changes live"
+                    className="wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold"
+                    title={publishHint}
                     onClick={() =>
                         void openCheck({ dirty, onlyHeldBack, heldBack })
                     }
                     disabled={publishing || dirty || saving || styleDirty}
                 >
-                    {publishing
-                        ? "Publishing…"
-                        : neverPublished
-                          ? "Publish site"
-                          : "Publish"}
+                    {publishing ? "Publishing…" : "Publish"}
                     {/*
                      * The outstanding flag count as a badge, so the
                      * button keeps its width while the number moves.

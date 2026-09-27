@@ -1,4 +1,7 @@
-import { heldBackSummary } from "@/components/sites/held-back-copy";
+import {
+    heldBackSummary,
+    unfinishedPhrase,
+} from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import type { EditorStatus, EditorStatusTone } from "@/lib/sites/editor-status";
@@ -56,8 +59,9 @@ export const STATUS_BADGE: Record<
 
 /**
  * What the top bar says about the draft: the pill, the line beside it, and
- * the fuller account its title gives on hover. Moved out of `site-editor.tsx`
- * unchanged (#260).
+ * the fuller account its title gives on hover (#260). Since G2 the pill says
+ * what publishing would put live itself, and the line carries only what the
+ * pill leaves out.
  */
 export function statusReadout({
     saving,
@@ -70,6 +74,8 @@ export function statusReadout({
     review,
     neverPublished,
     pendingSummary,
+    pendingShort,
+    pendingKnown,
     lastSavedAt,
     openNotes,
 }: {
@@ -83,6 +89,10 @@ export function statusReadout({
     review: ReviewState;
     neverPublished: boolean;
     pendingSummary: string | null;
+    /** The same, in the pill's words: "2 blocks, footer". */
+    pendingShort: string | null;
+    /** Whether the server's count of what's changed arrived (G2). */
+    pendingKnown: boolean;
     lastSavedAt: Date | null;
     openNotes: number;
 }): { status: EditorStatus; detail: string; line: string } {
@@ -97,10 +107,20 @@ export function statusReadout({
             pending: review.pending,
             outcome: review.latestApproval?.outcome ?? null,
             approvalIsStale: review.approvalIsStale,
+            openNotes,
         },
         neverPublished,
-        hasPendingChanges: pendingSummary !== null,
+        pending: pendingShort,
+        pendingKnown,
     });
+    /*
+     * Whether the pill already names what would go live. When a review or
+     * an approval outranks it, the line says it instead, so it is never only
+     * in a hover title (00-universal §15).
+     */
+    const pillSaysPending =
+        pendingShort !== null &&
+        status.label === `Not published · ${pendingShort}`;
     /*
      * What the pill leaves out, for anyone who hovers it: when it last saved,
      * what publishing would change, and the reviewer's verdict in full.
@@ -127,7 +147,7 @@ export function statusReadout({
 
     /** The visible line beside the pill: the same facts, in one row. */
     const line = [
-        pendingSummary ? `${pendingSummary} changed` : null,
+        pendingSummary && !pillSaysPending ? `${pendingSummary} changed` : null,
         review.latestApproval
             ? APPROVAL_BADGE[review.latestApproval.outcome].text(
                   review.latestApproval.by,
@@ -142,4 +162,38 @@ export function statusReadout({
         .join(" · ");
 
     return { status, detail, line };
+}
+
+/**
+ * What the Publish button says it will do, on hover and to assistive tech
+ * (G2): what it puts live, or why it is waiting. The button stays pressable
+ * when nothing has changed — publishing again is how a new version is made,
+ * and how a bypass is recorded — so the title says that instead.
+ */
+export function publishTitle({
+    publishing,
+    dirty,
+    onlyHeldBack,
+    heldBack,
+    neverPublished,
+    pendingShort,
+    pendingKnown,
+}: {
+    publishing: boolean;
+    dirty: boolean;
+    onlyHeldBack: boolean;
+    heldBack: HeldBackSection[];
+    neverPublished: boolean;
+    pendingShort: string | null;
+    pendingKnown: boolean;
+}): string {
+    if (publishing) return "Publishing your site";
+    if (onlyHeldBack) {
+        return `Finish or remove ${unfinishedPhrase(heldBack)} before publishing`;
+    }
+    if (dirty) return "Saving your changes — publish is available in a moment";
+    if (neverPublished) return "Put this site live";
+    if (!pendingKnown) return "Put this site live as it is now";
+    if (pendingShort) return `Put live: ${pendingShort}`;
+    return "Nothing has changed since the last publish";
 }

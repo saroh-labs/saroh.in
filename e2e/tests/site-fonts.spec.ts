@@ -133,10 +133,11 @@ test.describe("merchant sites load no Saroh font", () => {
         }
         await page.goto(`${urls.APP_URL}/sites/${id}`);
 
-        const style = page.getByRole("button", { name: "Style" });
-        await expect(style).toBeVisible({ timeout: 30_000 });
-        if ((await style.getAttribute("aria-pressed")) !== "true") {
-            await style.click();
+        // The Style panel is the rail's Brand tab since G2.
+        const brand = page.getByRole("tab", { name: "Brand" });
+        await expect(brand).toBeVisible({ timeout: 30_000 });
+        if ((await brand.getAttribute("aria-selected")) !== "true") {
+            await brand.click();
         }
         await expect(
             page.getByText(
