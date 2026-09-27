@@ -130,33 +130,44 @@ const ist = (date: string, hhmm: string) =>
 // morning (today's board squeezed), the counter's day and late evening.
 const TIMES = ["00:00", "05:30", "09:00", "12:30", "15:00", "18:30", "23:30"];
 
-describe("Rye & Co. seeded on any day", () => {
-    it("reviews have buyers and the stock log chains, 60 days running", () => {
-        const start = ist("2026-09-01", "00:00").getTime();
-        for (let d = 0; d < 60; d++) {
-            const date = new Date(start + d * DAY + 5.5 * 3_600_000)
-                .toISOString()
-                .slice(0, 10);
-            for (const t of TIMES) checkDay(ist(date, t));
-        }
-    });
+// 420 whole seeds in one test: ~6s on a CI runner, past vitest's 5s default.
+const SWEEP_TIMEOUT_MS = 60_000;
 
-    it("the same across month, year and leap-day boundaries", () => {
-        const dates = [
-            "2026-03-31",
-            "2026-04-01",
-            "2026-12-31",
-            "2027-01-01",
-            "2027-02-28",
-            "2027-03-01",
-            "2028-02-28",
-            "2028-02-29",
-            "2028-03-01",
-            "2028-12-31",
-            "2029-01-01",
-        ];
-        for (const date of dates) {
-            for (const t of TIMES) checkDay(ist(date, t));
-        }
-    });
+describe("Rye & Co. seeded on any day", () => {
+    it(
+        "reviews have buyers and the stock log chains, 60 days running",
+        () => {
+            const start = ist("2026-09-01", "00:00").getTime();
+            for (let d = 0; d < 60; d++) {
+                const date = new Date(start + d * DAY + 5.5 * 3_600_000)
+                    .toISOString()
+                    .slice(0, 10);
+                for (const t of TIMES) checkDay(ist(date, t));
+            }
+        },
+        SWEEP_TIMEOUT_MS,
+    );
+
+    it(
+        "the same across month, year and leap-day boundaries",
+        () => {
+            const dates = [
+                "2026-03-31",
+                "2026-04-01",
+                "2026-12-31",
+                "2027-01-01",
+                "2027-02-28",
+                "2027-03-01",
+                "2028-02-28",
+                "2028-02-29",
+                "2028-03-01",
+                "2028-12-31",
+                "2029-01-01",
+            ];
+            for (const date of dates) {
+                for (const t of TIMES) checkDay(ist(date, t));
+            }
+        },
+        SWEEP_TIMEOUT_MS,
+    );
 });
