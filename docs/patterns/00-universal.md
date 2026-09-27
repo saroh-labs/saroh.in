@@ -60,10 +60,13 @@ each with why it stops there:
 - `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
   (418) — one class sharing its rate limiters, and one serializable write
   with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (643) — its state, effects
-  and handlers (the hold poll, confirm, letting a hold go) share one
-  component's state; the drawing is already in `steps/`. Less means a
-  reducer or hook seam, which is new logic.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (892; 643 before E7, E11,
+  G18 and A9's sign-in at the last step) — its state, effects and handlers
+  (the hold poll, confirm, letting a hold go, signing in and "Not you?")
+  share one component's state; the drawing is already in `steps/` and the
+  pure rules in `flow-helpers.ts` and `initial-start.ts`. Less means a
+  reducer or hook seam, which is new logic; the sign-in handlers are the
+  first one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
   `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
