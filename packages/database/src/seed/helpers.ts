@@ -743,10 +743,17 @@ export async function balanceStockLog(
  * on. The seeds write settings and orders after that backfill ran on an
  * empty database, so they apply it once their orders exist. Idempotent.
  * The legacy DELIVERY word and LOCAL_DELIVERY both count as a delivery.
+ *
+ * Only the storefronts of `organizationIds`, the businesses the seed just
+ * wrote: a seed run against a database holding other businesses must not
+ * rewrite what their owners chose (review M-5). An empty list touches none.
  */
 export async function syncStorefrontFulfilmentTypes(
     prisma: Db,
+    organizationIds: readonly string[],
 ): Promise<number> {
+    if (organizationIds.length === 0) return 0;
+    const scope = [...organizationIds];
     return prisma.$executeRaw`
         UPDATE "StoreSettings" s
         SET "fulfilmentTypes" = ARRAY(
@@ -764,5 +771,9 @@ export async function syncStorefrontFulfilmentTypes(
                 SELECT 3, 'SHIPPING' WHERE s."shippingEnabled"
             ) offered
             ORDER BY pos
+        )
+        WHERE s."storeId" IN (
+            SELECT st."id" FROM "Store" st
+            WHERE st."organizationId" = ANY(${scope}::text[])
         )`;
 }
