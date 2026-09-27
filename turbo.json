@@ -62,6 +62,11 @@
         "R2_PUBLIC_BASE_URL",
         // Signs saroh.app's calls to the api's site sign-in routes (ADR-011).
         "SITE_RELAY_SECRET",
+        // The api's fake site-code transport writes to os.tmpdir(), which the
+        // e2e runner reads (`e2e/tests/site-codes.ts`). Strict env mode drops
+        // TMPDIR, so on macOS the api fell back to /tmp while the runner read
+        // /var/folders/…/T and never found a code.
+        "TMPDIR",
         "npm_package_version"
     ],
     "tasks": {
