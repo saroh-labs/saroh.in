@@ -1,14 +1,15 @@
 "use server";
 
-import type { EditOrderInput } from "./kitchen-service";
+import type { CourierFields } from "./courier";
+import type { EditOrderInput, MoveStageInput } from "./kitchen-service";
 import {
     editOrderBeforePreparing,
     moveOrderStage,
     refundOrderLines,
     retryOrderRefund,
+    saveOrderCourier,
     undoOrderStage,
 } from "./kitchen-service";
-import type { KitchenStage } from "./read";
 import type {
     CreateOrderInput,
     OrderResult,
@@ -38,11 +39,12 @@ export async function updateOrder(
 
 /* One order's kitchen flow (ADR-008) — org-scoped; the API authorizes each. */
 
-export async function moveStage(
-    orderId: string,
-    input: { to: KitchenStage; trackingUrl?: string; note?: string },
-) {
+export async function moveStage(orderId: string, input: MoveStageInput) {
     return moveOrderStage(orderId, input);
+}
+
+export async function saveCourier(orderId: string, input: CourierFields) {
+    return saveOrderCourier(orderId, input);
 }
 
 export async function undoStage(orderId: string, eventId: string) {

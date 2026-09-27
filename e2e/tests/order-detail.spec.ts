@@ -76,8 +76,21 @@ async function priyaOrderToday(page: Page): Promise<string> {
 const shown = (page: Page, text: string | RegExp) =>
     page.getByText(text).locator("visible=true").first();
 
-/** A paid, collected-at-the-counter order to walk through the kitchen. */
-async function freshOrder(page: Page): Promise<string> {
+const ADDRESS = {
+    line1: "14 Lake View Road",
+    city: "Pune",
+    state: "Maharashtra",
+    postalCode: "411001",
+};
+
+/**
+ * A paid order to walk through the kitchen: collected at the counter, or
+ * (B10) delivered by the business or shipped by a courier.
+ */
+async function freshOrder(
+    page: Page,
+    fulfilment: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING" = "PICKUP",
+): Promise<string> {
     const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
     const made = await page.request.post(
         `${urls.API_URL}/stores/${NW_STORE}/orders`,
@@ -92,6 +105,9 @@ async function freshOrder(page: Page): Promise<string> {
                         quantity: 1,
                     },
                 ],
+                ...(fulfilment === "PICKUP"
+                    ? {}
+                    : { fulfilment, address: ADDRESS }),
             },
         },
     );
@@ -102,6 +118,23 @@ async function freshOrder(page: Page): Promise<string> {
         { headers, data: { paymentStatus: "PAID" } },
     );
     expect(paid.ok()).toBe(true);
+    return id;
+}
+
+/** Walk an order to Ready through the API, as the kitchen would have. */
+async function readyOrder(
+    page: Page,
+    fulfilment: "LOCAL_DELIVERY" | "SHIPPING",
+): Promise<string> {
+    const id = await freshOrder(page, fulfilment);
+    const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
+    for (const to of ["PREPARING", "READY"]) {
+        const moved = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND}/orders/${id}/stage`,
+            { headers, data: { to } },
+        );
+        expect(moved.ok()).toBe(true);
+    }
     return id;
 }
 
@@ -268,3 +301,111 @@ async function memberPage(browser: Browser): Promise<Page> {
     await signIn(page, member);
     return page;
 }
+
+/**
+ * The shipping panel (B10, DEC-045): handing a Shipping order to a courier
+ * records who took it and their number, both optional, and the number can
+ * be added later. A local delivery goes out with the business's own people
+ * and is never asked for a courier. Saroh books no pickup and sends nothing.
+ */
+test.describe("shipping on order detail", () => {
+    test("hand over with a courier and number: on the card and in the timeline", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await readyOrder(page, "SHIPPING");
+        await page.goto(`/commerce/orders/${id}`);
+
+        await expect(
+            page.getByRole("button", { name: "Print packing slip" }),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "Hand to courier", exact: true })
+            .click();
+        const panel = page.getByRole("region", { name: "Hand to courier" });
+        await expect(panel.getByText(/^To 14 Lake View Road/)).toBeVisible();
+        await panel.getByRole("radio", { name: "Blue Dart" }).click();
+        await panel.getByLabel("Tracking number").fill("BD 9920 1140");
+        await panel.getByRole("button", { name: "Handed over" }).click();
+
+        await expect(
+            shown(page, "Handed to Blue Dart · BD 9920 1140."),
+        ).toBeVisible();
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(card.getByText("Blue Dart ·")).toBeVisible();
+        await expect(card.getByText("BD 9920 1140")).toBeVisible();
+        await expect(card.getByText("No tracking number yet")).toHaveCount(0);
+        const timeline = page.getByRole("region", { name: "What happened" });
+        await expect(
+            timeline.getByText("Handed to Blue Dart · BD 9920 1140"),
+        ).toBeVisible();
+        await expect(page.getByText(/texted|emailed|sms sent/i)).toHaveCount(0);
+    });
+
+    test("hand over without a number, then add it", async ({ page }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await readyOrder(page, "SHIPPING");
+        await page.goto(`/commerce/orders/${id}`);
+
+        await page
+            .getByRole("button", { name: "Hand to courier", exact: true })
+            .click();
+        await page
+            .getByRole("region", { name: "Hand to courier" })
+            .getByRole("button", { name: "Handed over" })
+            .click();
+        await expect(shown(page, /^Handed to Delhivery\./)).toBeVisible();
+
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(card.getByText("No tracking number yet")).toBeVisible();
+        await card
+            .getByRole("button", { name: "Add the tracking number" })
+            .click();
+        const panel = page.getByRole("region", {
+            name: "Tracking",
+            exact: true,
+        });
+        await expect(panel.getByLabel("Tracking number")).toBeFocused();
+        await panel.getByLabel("Tracking number").fill("1487 2290 3314");
+        await panel.getByRole("button", { name: "Save" }).click();
+
+        await expect(shown(page, "Tracking number saved.")).toBeVisible();
+        await expect(card.getByText("1487 2290 3314")).toBeVisible();
+        await expect(card.getByText("No tracking number yet")).toHaveCount(0);
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText("Edited · tracking number 1487 2290 3314"),
+        ).toBeVisible();
+    });
+
+    test("a local delivery never asks for a courier", async ({ page }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await readyOrder(page, "LOCAL_DELIVERY");
+        await page.goto(`/commerce/orders/${id}`);
+
+        await expect(
+            page.getByRole("button", { name: "Hand to courier" }),
+        ).toHaveCount(0);
+        await page
+            .getByRole("button", { name: "Send out for delivery", exact: true })
+            .click();
+        await expect(
+            page.getByRole("group", { name: /Out for delivery, step 4 of 5/ }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("region", { name: "Hand to courier" }),
+        ).toHaveCount(0);
+        await expect(
+            page
+                .getByRole("region", { name: "Customer" })
+                .getByText("Tracking"),
+        ).toHaveCount(0);
+    });
+});

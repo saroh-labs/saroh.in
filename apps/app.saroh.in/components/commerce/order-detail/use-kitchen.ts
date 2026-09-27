@@ -16,8 +16,11 @@ import {
     moveStage,
     refundLines,
     retryRefund as retryRefundAction,
+    saveCourier as saveCourierAction,
     undoStage,
 } from "@/lib/orders/actions";
+import type { CourierFields } from "@/lib/orders/courier";
+import { OWN_DRIVER, shipmentWords } from "@/lib/orders/courier";
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
@@ -31,7 +34,8 @@ export type PendingHold = Hold & {
     amount?: number;
 };
 
-export type Panel = null | "refund" | "edit" | "courier";
+/** `courier` hands the order over; `tracking` fills in its details after. */
+export type Panel = null | "refund" | "edit" | "courier" | "tracking";
 
 /**
  * What Order Detail does, apart from how it looks: stage moves with their
@@ -101,7 +105,7 @@ export function useKitchen({
 
     const move = (
         to: KitchenStage,
-        extra: { trackingUrl?: string; note?: string } = {},
+        extra: CourierFields & { note?: string } = {},
         said?: string,
     ) =>
         new Promise<void>((resolve) => {
@@ -238,6 +242,48 @@ export function useKitchen({
         });
     };
 
+    /**
+     * Hand it to the courier with whatever of their details are known now
+     * (all optional, B10). Nothing is sent to the customer.
+     */
+    const handOver = (fields: CourierFields) => {
+        const courier = fields.courierName ?? null;
+        const said =
+            courier === OWN_DRIVER
+                ? "Out with your own driver."
+                : courier
+                  ? `Handed to ${shipmentWords({ courier, number: fields.trackingNumber ?? null })}.`
+                  : "Handed to the courier.";
+        const later =
+            courier !== OWN_DRIVER && !fields.trackingNumber
+                ? " Add the tracking number when you have it."
+                : "";
+        return move("HANDED_TO_COURIER", fields, `${said}${later}`);
+    };
+
+    /** Fill in or correct the courier's details after the handover. */
+    const saveCourier = (fields: CourierFields) => {
+        if (Object.keys(fields).length === 0) {
+            setPanel(null);
+            return;
+        }
+        startTransition(async () => {
+            const res = await saveCourierAction(order.id, fields);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            setPanel(null);
+            showSuccess(
+                fields.trackingNumber
+                    ? "Tracking number saved."
+                    : "Tracking details saved.",
+                `It stays on the order — nothing is sent to ${first}.`,
+            );
+            refresh();
+        });
+    };
+
     const saveEdit = (input: EditOrderInput) => {
         startTransition(async () => {
             const res = await editBeforePreparing(order.id, input);
@@ -276,5 +322,7 @@ export function useKitchen({
         startRefund,
         retryRefund,
         saveEdit,
+        handOver,
+        saveCourier,
     };
 }
