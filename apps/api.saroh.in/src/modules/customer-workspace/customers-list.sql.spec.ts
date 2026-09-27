@@ -97,11 +97,18 @@ describe("customers list SQL", () => {
     });
 
     it("scopes the unlinked store customers to the business and, when asked, a storefront", () => {
-        expect(unlinkedCte("org").values).toEqual(["org", "org"]);
+        const placeholders = ["%@account.invalid", "%@removed.invalid"];
+        expect(unlinkedCte("org").values).toEqual(["org", placeholders, "org"]);
         expect(unlinkedCte("org", "store_1").values).toEqual([
             "org",
             "store_1",
+            placeholders,
             "org",
         ]);
+        // Driven from the business's orders, never every store customer
+        // (review C-2).
+        expect(unlinkedCte("org").sql).toMatch(
+            /FROM "Order" o[\s\S]*GROUP BY o\."customerId"[\s\S]*FROM paid\s+JOIN "Customer" cu/,
+        );
     });
 });
