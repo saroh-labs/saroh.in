@@ -8,7 +8,7 @@ import {
     UpdateAutomationRuleDto,
 } from "../modules/automations/dto";
 import { CancelSubscriptionDto } from "../modules/billing/dto";
-import { CreateServiceDto } from "../modules/bookings/dto";
+import { CreateServiceDto, UpdateServiceDto } from "../modules/bookings/dto";
 import { CreatePostDto, UpdatePostDto } from "../modules/content/dto";
 import { CreateFormDto } from "../modules/forms/dto";
 import { validationPipeOptions } from "./validation";
@@ -116,6 +116,22 @@ const BOOLEAN_FIELDS: {
             reason: "Rolling out to the pilot org",
             idempotencyKey: "flag-rollout-0001",
         },
+    },
+    {
+        what: "whether the booking page offers a service",
+        dto: CreateServiceDto,
+        field: "showOnBookingPage",
+        rest: {
+            name: "Root canal",
+            durationMinutes: 60,
+            timezone: "Asia/Kolkata",
+        },
+    },
+    {
+        what: "whether the booking page still offers a service",
+        dto: UpdateServiceDto,
+        field: "showOnBookingPage",
+        rest: {},
     },
 ];
 
