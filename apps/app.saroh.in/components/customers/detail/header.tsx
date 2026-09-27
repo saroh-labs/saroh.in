@@ -53,8 +53,8 @@ export function Crumbs({ here, sells }: { here: string; sells: boolean }) {
 }
 
 /**
- * Who they are: initials, name and its word (Returning, Member), since when,
- * and how to reach them — then Edit details and More, which are for owners
+ * Who they are: initials, name and its word (Returning, Member), what the
+ * team must know (Needs attention's tags), since when, and how to reach them — then Edit details and More, which are for owners
  * and admins. A Member reads the page and is told what is not theirs.
  */
 export function Header({
@@ -64,6 +64,7 @@ export function Header({
     since,
     email,
     phone,
+    attention,
     canEdit,
     onEdit,
     menu,
@@ -74,6 +75,8 @@ export function Header({
     since: string;
     email: string;
     phone: string | null;
+    /** Needs attention's tags, beside the name (C5). */
+    attention?: React.ReactNode;
     canEdit: boolean;
     onEdit: () => void;
     /** What More holds; empty hides it. */
@@ -94,6 +97,7 @@ export function Header({
                             {name}
                         </h1>
                         {tag ? <Pill tone={tag.tone}>{tag.label}</Pill> : null}
+                        {attention}
                     </div>
                     <p className="mt-1 text-[13px] text-muted-foreground">
                         {since}

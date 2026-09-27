@@ -1,6 +1,9 @@
+import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
+
+import type { AttentionEntry, AttentionInput } from "./attention";
 
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
@@ -98,5 +101,57 @@ export function deleteNote(
     return destroy<{ ok: true }>(
         `/customers/${encodeURIComponent(contactId)}/notes/${encodeURIComponent(noteId)}`,
         "Could not delete the note.",
+    );
+}
+
+const attentionPath = (contactId: string, entryId?: string) =>
+    `/customers/${encodeURIComponent(contactId)}/attention` +
+    (entryId ? `/${encodeURIComponent(entryId)}` : "");
+
+/**
+ * Add or change a Needs attention entry (C1). A refusal keeps the field it is
+ * about, so the sheet can put it there.
+ */
+async function writeAttention(
+    path: string,
+    method: "POST" | "PATCH",
+    input: AttentionInput,
+): Promise<ApiResult<AttentionEntry>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(`${base}${path}`, {
+        method,
+        body: JSON.stringify(input),
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: body as AttentionEntry };
+    return toFailure(
+        body,
+        method === "POST"
+            ? "Could not add that to Needs attention."
+            : "Could not save that change.",
+    );
+}
+
+export function createAttention(contactId: string, input: AttentionInput) {
+    return writeAttention(attentionPath(contactId), "POST", input);
+}
+
+export function updateAttention(
+    contactId: string,
+    entryId: string,
+    input: AttentionInput,
+) {
+    return writeAttention(attentionPath(contactId, entryId), "PATCH", input);
+}
+
+/** Take an entry off the list; the API keeps the row, stamped removed. */
+export function removeAttention(
+    contactId: string,
+    entryId: string,
+): Promise<CrmResult<{ ok: true }>> {
+    return destroy<{ ok: true }>(
+        attentionPath(contactId, entryId),
+        "Could not take that off Needs attention.",
     );
 }
