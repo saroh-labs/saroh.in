@@ -63,6 +63,40 @@ export function describePendingChanges(
     return parts.length > 0 ? joinList(parts) : null;
 }
 
+/** The same kinds in the fewest words, for the editor's status pill (G2). */
+const SHORT_LABELS: Record<SiteChangeKind, string> = {
+    name: "site name",
+    search: "search",
+    shareImage: "share image",
+    posts: "blog address",
+    // The style is edited in the rail's Brand tab (G2), so the pill uses the
+    // word on that tab.
+    style: "brand",
+    footer: "footer",
+    menu: "menu",
+    pages: "pages",
+};
+
+/**
+ * "2 blocks, brand, footer", or `null` when nothing is waiting: what follows
+ * "Not published ·" in the editor's pill (G2). The long form above is for
+ * sentences. This one sits in an uppercase pill, so it lists rather than
+ * joining with "and", and says blocks, as the rest of the editor does.
+ */
+export function shortPendingChanges(
+    sections: number | null | undefined,
+    site: readonly string[] | null | undefined,
+): string | null {
+    const parts: string[] = [];
+    if (sections && sections > 0) {
+        parts.push(sections === 1 ? "1 block" : `${sections} blocks`);
+    }
+    for (const kind of site ?? []) {
+        if (isKind(kind)) parts.push(SHORT_LABELS[kind]);
+    }
+    return parts.length > 0 ? parts.join(", ") : null;
+}
+
 /** How many things publishing would change: sections plus site-level settings. */
 export function pendingChangeCount(
     sections: number | null | undefined,
