@@ -7,6 +7,8 @@
  */
 import { prisma } from "@saroh/database";
 
+import { analyzeAsOwner } from "../../../test/analyze";
+
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import {
@@ -663,8 +665,14 @@ describe("Customers list paging (DB)", () => {
         });
 
         // What autovacuum does after a bulk load: without statistics the
-        // planner guesses a handful of rows and nests loops over 5,000.
-        await prisma.$executeRawUnsafe("ANALYZE");
+        // planner guesses a handful of rows and nests loops over 5,000. As
+        // the owner: under TEST_RLS the suite's role may not analyze, and its
+        // ANALYZE was silently skipped (test/analyze.ts).
+        analyzeAsOwner();
+        const [stats] = await prisma.$queryRaw<{ rows: number }[]>`
+            SELECT reltuples::int AS rows FROM pg_class
+            WHERE oid = '"Contact"'::regclass`;
+        expect(stats.rows).toBeGreaterThanOrEqual(n);
 
         const started = Date.now();
         const page = await list.list(ctx, {});
