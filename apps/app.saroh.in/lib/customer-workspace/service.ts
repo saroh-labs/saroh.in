@@ -2,6 +2,8 @@ import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
+import type { UnlinkPreview } from "./site-account";
+
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
  * *connects* a person's CRM + commerce records without merging them; links are
@@ -71,6 +73,32 @@ export async function linkCustomer(
         ok: false,
         error: toFailure(data, "Could not link customer.").error,
     };
+}
+
+/** What "This isn't them" would move (A4), for its confirm. */
+export async function getUnlinkPreview(
+    contactId: string,
+): Promise<CrmResult<UnlinkPreview>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(
+        `${base}/customers/${encodeURIComponent(contactId)}/account/unlink`,
+    );
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: data as UnlinkPreview };
+    return toFailure(data, "Couldn't check what would move.");
+}
+
+/** "This isn't them": the site account leaves this customer (A4). */
+export function unlinkAccount(
+    contactId: string,
+): Promise<CrmResult<{ contactId: string }>> {
+    return mutate<{ contactId: string }>(
+        `/customers/${encodeURIComponent(contactId)}/account/unlink`,
+        "POST",
+        {},
+        "Couldn't separate them.",
+    );
 }
 
 export interface NoteInput {

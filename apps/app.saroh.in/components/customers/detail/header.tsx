@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
-import { Lock } from "lucide-react";
+import { Globe, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
 
@@ -64,6 +64,7 @@ export function Header({
     since,
     email,
     phone,
+    signsIn,
     canEdit,
     onEdit,
     menu,
@@ -74,6 +75,8 @@ export function Header({
     since: string;
     email: string;
     phone: string | null;
+    /** "Signs in on your website as ‹email›" (A4); null when they don't. */
+    signsIn?: string | null;
     canEdit: boolean;
     onEdit: () => void;
     /** What More holds; empty hides it. */
@@ -100,12 +103,18 @@ export function Header({
                     </p>
                     {canEdit ? (
                         <div className="mt-[5px] flex flex-wrap gap-3.5 text-[13px]">
-                            <a
-                                href={`mailto:${email}`}
-                                className="text-brand hover:text-foreground"
-                            >
-                                {email}
-                            </a>
+                            {email ? (
+                                <a
+                                    href={`mailto:${email}`}
+                                    className="text-brand hover:text-foreground"
+                                >
+                                    {email}
+                                </a>
+                            ) : (
+                                <span className="text-foreground/75">
+                                    No email
+                                </span>
+                            )}
                             <span className="text-foreground/75">
                                 {phone?.trim() ? phone : "No phone"}
                             </span>
@@ -120,6 +129,15 @@ export function Header({
                             Ask an owner if you need them.
                         </div>
                     )}
+                    {signsIn ? (
+                        <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                            <Globe
+                                aria-hidden
+                                className="size-[13px] shrink-0"
+                            />
+                            {signsIn}
+                        </div>
+                    ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button

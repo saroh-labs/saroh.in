@@ -1,6 +1,7 @@
 "use client";
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,9 +11,17 @@ import { deletedLine } from "@/lib/contacts/removal";
 import {
     restoreOffersAction,
     stopOffersAction,
+    unlinkAccountAction,
+    unlinkPreviewAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
+import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
+import {
+    signsInLine,
+    unlinkConfirm,
+    unlinkedLine,
+} from "@/lib/customer-workspace/site-account";
 import type { OrderFilter, TabKey } from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
@@ -78,6 +87,7 @@ export function CustomerDetailScreen({
     const [linking, setLinking] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [stopping, setStopping] = useState(false);
+    const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
     const name = d.contact.name;
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
@@ -109,6 +119,21 @@ export function CustomerDetailScreen({
         });
     }
 
+    // "This isn't them" (A4): read what would move, then ask.
+    async function askNotThem() {
+        const res = await unlinkPreviewAction(d.contact.id);
+        if (!res.ok) return showError(res.error);
+        setNotThem(res.data);
+    }
+
+    async function separate(preview: UnlinkPreview) {
+        setNotThem(null);
+        const res = await unlinkAccountAction(d.contact.id);
+        if (!res.ok) return showError(res.error);
+        showSuccess(unlinkedLine(preview.email));
+        router.refresh();
+    }
+
     async function remove() {
         setRemoving(false);
         const res = await deleteContact(d.contact.id);
@@ -124,6 +149,14 @@ export function CustomerDetailScreen({
                   {
                       label: "Link a store customer…",
                       go: () => setLinking(true),
+                  },
+              ]
+            : []),
+        ...(d.siteAccount?.canUnlink
+            ? [
+                  {
+                      label: "This isn't them…",
+                      go: () => void askNotThem(),
                   },
               ]
             : []),
@@ -226,6 +259,11 @@ export function CustomerDetailScreen({
                     since={sinceLine(d, bizName, now)}
                     email={d.contact.email}
                     phone={d.contact.phone}
+                    signsIn={
+                        d.siteAccount
+                            ? signsInLine(d.siteAccount, canWrite)
+                            : null
+                    }
                     canEdit={canWrite}
                     onEdit={() => setEditing((n) => n + 1)}
                     menu={menu}
@@ -273,6 +311,17 @@ export function CustomerDetailScreen({
                     suggestions={suggestions}
                     open={linking}
                     onOpenChange={setLinking}
+                />
+            ) : null}
+            {notThem ? (
+                <ConfirmDialog
+                    open
+                    onOpenChange={(o) => (o ? null : setNotThem(null))}
+                    {...unlinkConfirm(name, notThem)}
+                    confirmLabel="Separate them"
+                    cancelLabel="Keep them together"
+                    icon={Unlink}
+                    onConfirm={() => void separate(notThem)}
                 />
             ) : null}
             <ConfirmDialog
