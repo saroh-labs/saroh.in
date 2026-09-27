@@ -1,17 +1,41 @@
 import Link from "next/link";
+import { Fragment } from "react";
+
+const CHEVRON = (
+    <svg
+        aria-hidden
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="text-muted-foreground"
+    >
+        <path
+            d="M9.5 5 L16.5 12 L9.5 19"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
 
 /**
  * The bar over every Payments screen in the design: "Payments › Subscriptions",
- * or a back link and the record's name on a detail page.
+ * "Payments › Plans › Monthly" (a `trail` of links between), or a back link
+ * and the record's name on a detail page.
  */
 export function PaymentsCrumbs({
     here,
     back,
+    trail = [],
     children,
 }: {
     here: string;
     /** On a detail page: the list it came from. */
     back?: { href: string; label: string };
+    /** Links between "Payments" and `here`, as Plan Detail's "Plans". */
+    trail?: { href: string; label: string }[];
     /** What sits at the right-hand end of the bar. */
     children?: React.ReactNode;
 }) {
@@ -56,23 +80,22 @@ export function PaymentsCrumbs({
                     className="flex items-center gap-2 text-[12px]"
                 >
                     <span className="text-muted-foreground">Payments</span>
-                    <svg
-                        aria-hidden
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className="text-muted-foreground"
+                    {CHEVRON}
+                    {trail.map((t) => (
+                        <Fragment key={t.href}>
+                            <Link
+                                href={t.href}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                {t.label}
+                            </Link>
+                            {CHEVRON}
+                        </Fragment>
+                    ))}
+                    <span
+                        aria-current="page"
+                        className="min-w-0 truncate text-foreground"
                     >
-                        <path
-                            d="M9.5 5 L16.5 12 L9.5 19"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                    <span aria-current="page" className="text-foreground">
                         {here}
                     </span>
                 </nav>
