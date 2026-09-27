@@ -473,6 +473,8 @@ function home(
     const money = moneyDb({ unpaid: opts.unpaid, overdue: opts.overdue });
     const db = {
         ...money,
+        // D8's paused-subscriptions source: Payments on, so it has nothing.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         paymentIntent: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),

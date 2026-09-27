@@ -19,6 +19,7 @@ import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
 import { failedRenewals, overdueInvoices } from "./home-money-sources";
 import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import { openOrderWords } from "./home-order-rows";
+import { pausesWaitingOnPayments } from "./home-pause-sources";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 
 export type {
@@ -357,6 +358,18 @@ export class HomeService {
                 unavailable,
             );
             if (renewals) actions.push(renewals);
+        }
+        // Pauses that ended with Payments off (D8): shown because Payments
+        // is off, so not gated on it.
+        if (holds(input, "subscription:read")) {
+            const waiting = await this.attempt(
+                { moduleKey: "PAYMENTS", label: "Paused subscriptions" },
+                () =>
+                    pausesWaitingOnPayments(this.db, input.organizationId, now),
+                null,
+                unavailable,
+            );
+            if (waiting) actions.push(waiting);
         }
         if (available.has("PAYMENTS") && canReadInvoices) {
             const overdue = await this.attempt(

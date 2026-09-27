@@ -108,6 +108,8 @@ function build(views: View[], fixture: Fixture = {}) {
             findMany: jest.fn().mockResolvedValue([]),
         },
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        // D8's paused-subscriptions source: Payments on, so it has nothing.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const stockChecks = { openShort: jest.fn().mockResolvedValue([]) };
     return new HomeService(availability, db as never, stockChecks as never);
