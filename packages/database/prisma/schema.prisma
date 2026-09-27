@@ -1463,6 +1463,15 @@ model Order {
 
   reviewInvitation ReviewInvitation?
 
+  // An order a customer started at the site's checkout (G13). Until it is
+  // paid it is an abandoned checkout, not an order: the Orders list and its
+  // counts leave out every `placedOnline` order still UNPAID (plan B, B1).
+  // False for every order taken by staff and for every order before G13.
+  placedOnline Boolean   @default(false)
+  // When the money for the order arrived (G13 sets it on payment). Null
+  // until then, and for every order before G13.
+  paidAt       DateTime?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
