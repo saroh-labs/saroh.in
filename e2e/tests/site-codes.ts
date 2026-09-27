@@ -32,6 +32,27 @@ function lastCode(email: string): string | null {
     }
 }
 
+/** Where this run's addresses start, so back-to-back runs rarely share one. */
+let visitors = Math.floor(Math.random() * 254);
+
+/**
+ * Stand in for a different customer on a merchant's site: a visitor address
+ * of their own (TEST-NET-3, one per call).
+ *
+ * Off the platform every visitor reaches the API as the loopback address
+ * (`visitorAddress`, `apps/saroh.app/lib/site-relay.ts`), so one run's
+ * customers would share the public booking limit (5 a minute for a service,
+ * per address) and the sign-in code limits, and the sixth booking of a run
+ * would be refused as "a lot of tries at once". Each test here is a new
+ * customer with a new email; this gives them a new address too, the way the
+ * platform's edge would. The limits themselves are the API's unit tests'.
+ */
+export async function asNewVisitor(page: Page): Promise<void> {
+    visitors += 1;
+    const address = `203.0.113.${(visitors % 254) + 1}`;
+    await page.setExtraHTTPHeaders({ "x-real-ip": address });
+}
+
 /** The code the API just sent to `email`. */
 export async function readSiteCode(
     email: string,

@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { demoUser, urls } from "../playwright.config";
-import { signInOnSheet } from "./site-codes";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * A customer's session on a merchant's site (ADR-011; round-2 plan A, A3),
@@ -110,6 +110,9 @@ test.describe("site sign-in: in the browser", () => {
     const ORG = "seed_org";
     const SERVICE = "Warehouse walkthrough";
     const OTHER_SITE = `${renderer.protocol}//monsoon.${renderer.host}`;
+
+    // A new customer, from an address of their own (`asNewVisitor`).
+    test.beforeEach(({ page }) => asNewVisitor(page));
 
     async function signInStaff(page: Page) {
         await page.goto(`${urls.ACCOUNTS_URL}/login`);

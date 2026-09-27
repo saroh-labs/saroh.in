@@ -2,7 +2,7 @@ import type { Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
-import { signInOnSheet } from "./site-codes";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * The customer's booking page on a merchant's site, end to end (U19):
@@ -163,6 +163,9 @@ async function cancel(page: Page, id: string) {
 }
 
 test.describe("the booking page", () => {
+    // Each test is a different customer, from an address of their own.
+    test.beforeEach(({ page }) => asNewVisitor(page));
+
     test("pay at the desk: signed in at the last step, booked, and in the team's calendar as paid at the desk", async ({
         page,
     }, testInfo) => {
