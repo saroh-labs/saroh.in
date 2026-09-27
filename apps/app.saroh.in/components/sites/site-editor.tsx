@@ -46,6 +46,7 @@ import {
     sectionTitle,
     ZOOMS,
 } from "@/components/sites/editor-constants";
+import { useEditorReview } from "@/components/sites/editor/use-editor-review";
 import {
     activeSection,
     useEditorSelection,
@@ -77,11 +78,8 @@ import { StylePanel } from "@/components/sites/style-panel";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import {
-    getReviewState,
     getSiteFlags,
-    listComments,
     publishSite,
-    requestReview,
     saveDraftSections,
     updateSiteStyle,
 } from "@/lib/sites/actions";
@@ -276,9 +274,16 @@ export function SiteEditor({
         SiteChangeKind[] | null
     >(initialPendingSiteChanges);
     const [checking, setChecking] = useState(false);
-    const [comments, setComments] =
-        useState<SiteCommentView[]>(initialComments);
-    const [review, setReview] = useState<ReviewState>(initialReview);
+    const {
+        comments,
+        review,
+        openNotes,
+        asking,
+        refreshReview,
+        askForReview,
+        notedKeys,
+        notesByKey,
+    } = useEditorReview({ siteId, pageId, initialComments, initialReview });
     /*
      * Whether anything is live yet (#288).
      *
@@ -293,7 +298,6 @@ export function SiteEditor({
      * publishing.
      */
     const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
-    const openNotes = review.openNotes;
 
     /*
      * One counter per re-read below. Both fire from several places — every
@@ -303,20 +307,7 @@ export function SiteEditor({
      * number and only the newest may write; the same rule `measuring` keeps
      * for the share image in site settings.
      */
-    const reviewRequest = useRef(0);
     const flagsRequest = useRef(0);
-
-    /** Re-read notes and the verdict together — they move together. */
-    async function refreshReview() {
-        const request = ++reviewRequest.current;
-        const [next, state] = await Promise.all([
-            listComments(siteId),
-            getReviewState(siteId),
-        ]);
-        if (request !== reviewRequest.current) return;
-        setComments(next);
-        setReview(state);
-    }
 
     /** Re-read flags from the server. They settle after a save, not per key. */
     async function refreshFlags() {
@@ -366,7 +357,6 @@ export function SiteEditor({
 
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
-    const [asking, setAsking] = useState(false);
 
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
@@ -945,29 +935,6 @@ export function SiteEditor({
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
 
     /*
-     * Section keys on this page carrying an unresolved note. The issue asks
-     * for it directly: "the section list should show which sections carry
-     * unresolved ones." Resolved notes do not mark anything — a settled note
-     * is history, and a dot for it would never go out.
-     */
-    const notedKeys = new Set(
-        comments
-            .filter(
-                (c) =>
-                    c.pageId === pageId && c.resolvedAt === null && !c.orphaned,
-            )
-            .map((c) => c.sectionKey),
-    );
-
-    /** Open notes per block on this page — the canvas draws them as pins. */
-    const notesByKey = new Map<string, number>();
-    for (const c of comments) {
-        if (c.pageId !== pageId || c.resolvedAt !== null || c.orphaned)
-            continue;
-        notesByKey.set(c.sectionKey, (notesByKey.get(c.sectionKey) ?? 0) + 1);
-    }
-
-    /*
      * The header the canvas draws, with the menu resolved the way publish
      * resolves it: over the pages that will be written, so an entry for a
      * hidden page is absent here exactly as it will be on the live site.
@@ -1039,30 +1006,6 @@ export function SiteEditor({
     ]
         .filter(Boolean)
         .join(" · ");
-
-    /**
-     * Share for review (#335): ask for a review, which is what reviewers
-     * are notified of and what puts the page In review (#278). It blocks
-     * nothing — publishing while it stands is recorded as a bypass.
-     */
-    async function askForReview() {
-        setAsking(true);
-        try {
-            const res = await requestReview(siteId);
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            showSuccess(
-                "Asked for a review. Reviewers can comment on any block and cannot change the page.",
-            );
-            // Still disabled until the refreshed state reads In review, so a
-            // second click cannot send a second request in between.
-            await refreshReview();
-        } finally {
-            setAsking(false);
-        }
-    }
 
     return (
         /*
