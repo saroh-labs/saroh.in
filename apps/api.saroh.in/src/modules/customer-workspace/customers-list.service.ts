@@ -515,7 +515,7 @@ export class CustomersListService {
                     },
                 ],
             },
-            orderBy: { createdAt: "asc" },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             select: {
                 id: true,
                 firstName: true,
@@ -527,17 +527,27 @@ export class CustomersListService {
                 },
             },
         });
-        for (const c of contacts) {
+        const views = contacts.map((c) => {
             const account = c.customerAccounts[0]?.email ?? null;
-            const view = {
-                contactId: c.id,
-                name: personName(c),
-                email: contactEmailForDisplay(c.email, account),
+            return {
+                own: normaliseEmail(c.email),
+                account: normaliseEmail(account),
+                view: {
+                    contactId: c.id,
+                    name: personName(c),
+                    email: contactEmailForDisplay(c.email, account),
+                },
             };
-            for (const e of [c.email, account]) {
-                const key = normaliseEmail(e);
+        });
+        // The contact whose own email it is holds it first; one holding it
+        // only through its site account (a separate contact, DEC-049) comes
+        // second. Oldest, then id, breaks a tie, so the answer never changes
+        // between two reads.
+        for (const pass of ["own", "account"] as const) {
+            for (const v of views) {
+                const key = v[pass];
                 if (key && emails.includes(key) && !out.has(key)) {
-                    out.set(key, view);
+                    out.set(key, v.view);
                 }
             }
         }
