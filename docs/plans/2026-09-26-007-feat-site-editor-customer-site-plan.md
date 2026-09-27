@@ -80,9 +80,12 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   Each block's panel says where the real value lives.
 - R10. A public catalogue and product page on the merchant's site, read
   through listings at one storefront (ADR-010), with Sold out honoured
-  (DEC-032).
+  (DEC-032). The storefront the site sells from is chosen by the merchant
+  or shown to them, never picked silently.
 - R11. A bag and checkout that turn into an order at the storefront, paid
   online. The customer signs in at the last step (plan A, defaults 2 and 3).
+  A site without customer accounts, or without a way to take payment,
+  offers "Ask about ordering" instead of a checkout.
 - R12. Module pages — Shop/Book, Prices, Journal, Contact — sit beside
   free-form pages (DEC-046). They appear only for modules that are on, and
   each list section has display options:
@@ -105,7 +108,9 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   and buy.
 - R17. New-site setup: start from the modules or from one of four templates,
   with placeholder text marked per field on the server (default 64) and
-  "Publish anyway" when placeholders remain.
+  "Publish anyway" when placeholders remain. **Moved to the Brand track with
+  G21** (2026-09-27): each template carries a brand, so it follows H9. Kept
+  here so the ID is not reused.
 - R18. Publishing while a page is out for review stays allowed, and the
   bypass is recorded as today (DEC-047, #278).
 - R19. Merchant sites never wear Saroh's brand. The `check:blocks` gates G2
@@ -138,7 +143,10 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   still open there).
 - Corner and button styles; removing "Runs on Saroh" (overview "Later").
 - A second website per business (ADR-006 stands for websites).
-- Guest checkout (default 3: sign-in is asked for at the last step).
+- Guest checkout. Where accounts are on, sign-in is asked for at the last
+  step (default 3). Where they are not yet on (per-site rollout, default
+  71), the shop shows "Ask about ordering" and has no checkout (G13).
+- New-site setup with templates (G21, R17): the Brand track, after H9.
 - Pay-at-pickup on the shop. The site takes online payment only; staff take
   counter payments in the workspace.
 
@@ -203,12 +211,54 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   - saroh.app's readers are in `apps/saroh.app/lib/publication.ts` and
     `checkout.ts`. Its routes are `app/[domain]/{page,[slug]/page,[slug]/[postSlug]/page,book/page,checkout/[orderId]/page}.tsx`
     and `app/preview/[token]/*`.
+  - `app/[domain]/book/page.tsx` is a **static** segment, so it wins over
+    `[slug]`; its own comment says a merchant page at `/book` is shadowed.
+    The seeds already have such pages: Northwind's "Book a walkthrough" and
+    two showcase sites' "Free intro" sit at `/book` and cannot be seen today
+    (`packages/database/src/seed/data.ts`, `seed/showcase/data.ts`).
+  - Page paths are checked by `assertPathIsFree(siteId, path)` in
+    `modules/sites/site-access.ts`, called on page create and rename in
+    `sites.service.ts`. Nothing reserves a path yet.
+  - Every saroh.app read runs on its server, so the API sees saroh.app's
+    address, not the visitor's. The booking flow is the exception: it calls
+    the API from the browser (`packages/site-blocks/src/booking-flow/api.ts`).
 - **Catalogue (ADR-010):** `modules/products/{listings.service,listings.controller,catalogue-page,organization-products.controller}.ts`.
-  Stock and "can sell" are in `modules/stock/` (DEC-032);
-  `reserveOnPayment` comes from the round-1 plan (U2).
-- **Hours:** `StoreSettings.openingHours` (JSON), written to every storefront
-  from Settings › Hours (DEC-034). The time zone is
-  `BusinessProfile.timezone` (DEC-033).
+  Stock and "can sell" are in `modules/stock/` (DEC-032).
+- **Online orders (round-1 plan, R5):**
+  - `reserveOnPayment(tx, { organizationId, orderId, paymentIntentId })` in
+    `modules/stock/reserve.ts` locks an intent **whose `orderId` is that
+    order**, then the order, then the rows. It refuses any other intent. So
+    the order must exist, unpaid, before its intent is made. Nothing calls it
+    yet ("when the online checkout exists").
+  - An unpaid online order's lines have no `stockRow`, so they hold nothing
+    (reserve.ts). A refusal records a PENDING refund keyed
+    `sold-out:<intent>`, and `PaymentsService.sendAutomaticRefund` sends it
+    after the transaction commits.
+  - Intents are made in `payments.service.ts`: `createIntentForOrder`
+    (staff, `payment:manage`) and `createIntentForOrderPublic`. Both go
+    through `createIntentInternal`, which takes the amount only from
+    `order.total` and the provider from the storefront's `checkoutProvider`.
+  - The order's invoice is made on payment (`ensureOrderInvoice` in
+    `modules/invoices/order-invoicing.ts`), so an unpaid order takes no
+    invoice number.
+  - `Order` has no field that marks an order as placed online, and no
+    `paidAt`.
+- **Tenant context on public paths:** `OrgRlsInterceptor` sets the
+  organization only for `OrganizationGuard` requests. Public paths fall
+  through to the permissive branch. `modules/payments/public-invoices.service.ts`
+  is the pattern: resolve the organization from the row, then run the work
+  in `runInOrgContext(organizationId, …)`.
+- **Rate limits:** `FixedWindowRateLimiter` (`modules/bookings/rate-limiter.ts`),
+  keyed by the DEC-027 client address. Plan A (A2/A3) adds the signed
+  client-address header by which saroh.app's server passes on the visitor's
+  address. Unsigned callers are limited by their own address.
+- **Hours and places:** `StoreSettings.openingHours` (JSON), written to every
+  storefront from Settings › Hours (DEC-034). `StoreSettings.kind` is `SHOP`
+  (a place with an address, hours and collection) or `ONLINE` (none of
+  them). The time zone is `BusinessProfile.timezone` (DEC-033).
+- **Picking a storefront:** `apps/app.saroh.in/lib/stores/pick.ts` returns
+  the only storefront, or `undefined` when there are several and none is
+  named, so the page asks rather than guesses (ADR-010).
 - **Gates:** `scripts/check-blocks.mjs` (G2: no Saroh token in a site block;
   G6: nothing outside `packages/site-blocks` draws `--site-*`), run by
   `pnpm run check:blocks`.
@@ -253,7 +303,10 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   `lib/sites/pending.ts`. Nothing new is stored.
 - **Undo is client-side and draft-only.** The draft autosaves as today, and an
   Undo re-applies the previous draft. The toast lasts 10 seconds and one Undo
-  undoes one action. Only these still confirm:
+  undoes one action. The timer is one shared helper
+  (`apps/app.saroh.in/lib/hold-undo.ts`), built in G3 because G3 lands first,
+  so B6's bulk hold and F4's hold-before-send use it too and time out the
+  same way. Only these still confirm:
   - "Start this site again";
   - discarding every unpublished change;
   - restoring a past version.
@@ -262,11 +315,16 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   never item values. The public read for each is a narrow endpoint that
   derives the organization from the Site (backend-auth-and-access: "derive
   the organization; never accept it").
-- **The storefront a site sells from.** A site has one "sells from"
-  storefront (`Site.storefrontId`, nullable). It defaults to the business's
-  first open storefront that has listings, and the picker appears only when
-  there are several (ADR-010, `lib/stores/pick.ts`). Visit us, Product grid,
-  the catalogue and checkout read it.
+- **The storefront a site sells from is shown, never silent** (G11). A site
+  has one "sells from" storefront (`Site.storefrontId`, nullable). It is set
+  automatically only when the business has exactly one open storefront with
+  listings, and the editor then says so: "Your site sells from Online ·
+  Change". With several, it stays unset, as `pickStorefront` does, until
+  the merchant answers "Which storefront does this site sell from?". Until
+  then the shop, Product grid and checkout render nothing live, and the
+  pre-publish check says why. Product grid, the catalogue and checkout read
+  it. **Visit us does not**: an `ONLINE` storefront has no address or hours,
+  so Visit us binds its own `SHOP` storefront (G8).
 - **Module pages are `Page` rows with a `kind`**: `FREE` (today's pages),
   `SHOP`, `BOOK`, `PRICES`, `JOURNAL` or `CONTACT`, with at most one of each
   module kind per site (a partial unique index). The merchant adds one from
@@ -275,11 +333,56 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   blocks. A module page whose module is off leaves the nav, and its address
   shows "This isn't available right now" with a link home rather than a 404,
   so shared links still land somewhere.
+- **`/book` and `/shop` are dedicated routes, and the Book and Shop module
+  pages dress them** (decided here; G11, G14, G15):
+  - The two routes stay static segments. They exist whenever their module
+    is on (`/book` today, `/shop` from G11), whether or not a module page
+    has been added, so default 132 holds: nothing is added to an existing
+    site's menu.
+  - The Book and Shop pages **have fixed paths** (`/book`, `/shop`), which
+    can't be edited. `[slug]` never renders them; their route does. The
+    route draws the module page's sections, with their display options, in
+    place of its built-in listing. Without a module page it draws the
+    built-in listing: today's booking flow, or a product grid of everything
+    sold. Deep links (`/book?service=`, `/shop/<product>`) always go
+    straight to the flow or the product page.
+  - **Reserved paths:** `/book`, `/shop` and `/checkout`, and everything
+    under them. `assertPathIsFree` refuses a free-form page at one, naming
+    what the address is for and suggesting another.
+  - **Pages already there:** a free-form page at `/book` is shadowed today
+    and stays so, and the editor flags it with "Change address". A
+    free-form page at `/shop` is live today through `[slug]`. The `/shop`
+    route keeps rendering it until the merchant moves it, so G11 hides
+    nothing that is live. A Shop page can't be added while it's there.
+  - Prices, Journal and Contact pages are rendered by `[slug]`, at default
+    paths the merchant can change.
 - **The bag is the browser's until checkout**: per site, in `localStorage`
   (wrapped in try/catch), holding only listing and variant ids and
-  quantities. Prices and availability are re-read at checkout. The order is
-  created only when payment succeeds (`reserveOnPayment`, DEC-032, R5 of the
-  round-1 plan). An unpaid checkout holds nothing.
+  quantities. Prices and availability are re-read at checkout.
+- **Checkout follows the existing online-order pattern** (G13, round-1
+  R5). Checkout start creates an **unpaid online order** at the sells-from
+  storefront. The server prices it from listings, it holds no stock, and
+  it is marked `placedOnline`. Its intent comes from the
+  `createIntentForOrder` path, with the amount taken only from the order.
+  The success webhook calls `reserveOnPayment(tx, { organizationId,
+  orderId, paymentIntentId })` and then `ensureOrderInvoice`. An abandoned
+  (unpaid online) order stays hidden from Orders, as B1 says, takes no
+  invoice number, and is closed after 24 hours. A late payment for a closed
+  order is refunded by `reserveOnPayment` (DEC-032).
+- **Checkout needs customer accounts on the site.** The checkout is offered
+  only where plan A's per-site accounts switch is on (read live through
+  A2's options read, not from the snapshot), a provider is connected and
+  the storefront isn't paused. Anywhere else, the product page and bag
+  offer **"Ask about ordering"**, which opens the site's enquiry form with
+  the product named. No guest checkout is built.
+- **Public shop, bag and checkout endpoints run in the site's tenant
+  context and are rate-limited per visitor.** Each resolves the Site, and
+  so its organization, first. It then runs in `runInOrgContext(organizationId)`,
+  as `public-invoices.service.ts` does, so RLS scopes every query even if a
+  filter is missing. Limits use `FixedWindowRateLimiter`, keyed by the
+  visitor's address: plan A's signed client-address header when saroh.app
+  relays the call, otherwise the caller's own DEC-027 address. Checkout
+  start is also limited per customer account.
 - **Header and footer text:** the header's name is the site's `name`, and the
   footer text is the existing `Site.footer`. Both are edited in the inspector
   under `site:update`, locked from Remove and Move, with the reason written
@@ -304,8 +407,8 @@ No new action. Everything maps to today's keys (see the permission matrix §2, "
 | Publish, including during review (DEC-047) | `site:publish` |
 | Open the editor | `section:write`; without it, `/sites/:id` redirects to `/review` (#275) |
 | Comment and approve | `site:comment`, `site:approve` (unchanged) |
-| Public reads (Visit us, Journal, Plans, catalogue, product page) | none; the organization is derived from the Site, and only published, live records are served |
-| Checkout | a signed-in customer session (plan A); none for browsing |
+| Public reads (Visit us, Journal, Plans, catalogue, product page) | none; the organization is derived from the Site, the read runs in that organization's RLS context, and only published, live records are served |
+| Checkout (quote and start) | a signed-in customer session (plan A) on a site with accounts on; the quote alone needs none. Rate-limited per visitor address and, for start, per account |
 | Media upload for the text-block photo | `media:write` (unchanged) |
 
 ---
@@ -322,7 +425,19 @@ No new action. Everything maps to today's keys (see the permission matrix §2, "
 - Which services a Book page lists follows each service's "Show on booking
   page" (default 43, plan E1).
 - Checkout signs in at the last step, and guest checkout ends where accounts
-  are on (defaults 2 and 3).
+  are on (defaults 2 and 3). Where accounts are not on yet, the shop offers
+  "Ask about ordering" and no checkout (2026-09-27).
+- How `/book` and `/shop` relate to the Book and Shop module pages: they are
+  dedicated routes at reserved paths, and a module page supplies their
+  sections and menu entry (Key Technical Decisions).
+- Checkout creates an unpaid online order at start, and the webhook holds
+  stock with `reserveOnPayment` (the round-1 pattern, 2026-09-27).
+- The sells-from storefront is set on its own only when there is one
+  candidate, and the editor says which. Otherwise the merchant picks.
+- New-site setup (G21) moves to the Brand track (user, 2026-09-27).
+- Phase 1 is G1–G6, G8, G17 and G18 (user, 2026-09-27). The catalogue and
+  Product grid (G11, G12) move to phase 2 with checkout, so no product page
+  goes live without a way to order.
 
 ### Deferred to Implementation
 
@@ -364,37 +479,50 @@ erDiagram
 ```mermaid
 flowchart LR
   G1[G1 editor split] --> G2[G2 top bar + status + rail tabs]
-  G1 --> G3[G3 Undo toasts]
-  G1 --> G4[G4 narrow layout]
-  G1 --> G5[G5 in-place preview]
-  G1 --> G6[G6 header + footer text]
+  G2 --> G3[G3 Undo toasts]
+  G3 --> G6[G6 header + footer text]
+  G6 --> G5[G5 in-place preview]
+  G5 --> G4[G4 narrow layout]
   G1 --> G7[G7 text-block photo]
   G8[G8 Visit us]
+  G17[G17 site header + footer v2]
+  G8 --> G18[G18 On today + open/closed]
+  G17 --> G18
+  H1[[H1 font fix: booking flow]] --> G18
   G10[G10 Journal]
   D5[[D5 drafts: published-only]] --> G9[G9 Plans block]
-  G11[G11 public catalogue + product page] --> G12[G12 Product grid]
+  G11[G11 sells-from + catalogue + /shop] --> G12[G12 Product grid]
   G11 --> G13[G13 bag + checkout]
-  A3[[A3 site session]] --> G13
+  A3[[A3 site session + accounts switch]] --> G13
   B2[[B2 fulfilment types]] --> G13
-  G8 --> G14[G14 module pages: contract + API]
+  G8 --> G14[G14 module pages: contract + API + reserved paths]
   G10 --> G14
   G12 --> G14
-  G14 --> G15[G15 module pages: renderer + nav]
+  G14 --> G15[G15 module pages: renderer + nav + /book, /shop]
   G15 --> G16[G16 module pages: editor]
   G2 --> G16
   G15 --> G19[G19 module-gated nav]
-  G17[G17 site header + footer v2]
-  G18[G18 On today + open/closed]
   G9 --> G20[G20 Prices page]
   A11[[A11 buy packs online]] --> G20
   E12[[E12 Class packs module]] --> G20
   G15 --> G20
-  H2[[H2 brand contract]] --> G21[G21 new-site setup]
-  H3[[H3 catalogues]] --> G21
-  G14 --> G21
 ```
 
-Phase 1: G1–G8, G10–G12, G17, G18. Phase 2: G9, G13–G16, G19–G21.
+**Phase 1 (9 units): G1–G6, G8, G17, G18.** Phase 2 (11 units): G7, G9–G16,
+G19, G20. G21 is the **Brand track** (after H9), not in this round's phases
+or counts.
+
+**Order within phase 1.** G2–G6 all edit the hooks and panels G1 creates, so
+they land **one after another, not in parallel**: G1 → G2 → G3 → G6 → G5 →
+G4. G2 settles the top bar and rail first. G3 changes the draft hook. G6
+touches the inspector and canvas, and G5 then adds the preview flag to the
+canvas. G4 goes last because it re-lays out the rail, inspector host and
+canvas that the others have just changed. Each rebases on the one before.
+G8, G17 and G18 don't touch the editor files and run beside that chain.
+G8 and G18 both extend `section-contract.ts`, so G8 lands first. G18's
+header line follows G17 (`site-chrome.tsx`). Its link into the booking flow
+follows H1, which edits every booking-flow step for fonts in phase 1 (and
+E7, which edits the same steps).
 
 ---
 
@@ -447,7 +575,8 @@ Page · Add · Brand.
 
 **Requirements:** R2, R3, R18
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G1, and first in the editor chain (G1 → G2 → G3 → G6 → G5
+→ G4) · **Phase:** 1
 
 **Files:**
 - Modify: `components/sites/editor/editor-top-bar.tsx`, `editor-rail.tsx`,
@@ -485,16 +614,23 @@ selected position.
 
 **Requirements:** R4
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G2 (after it in the editor chain) · **Phase:** 1
 
 **Files:**
 - Modify: `components/sites/editor/use-editor-draft.ts`, `add-block-panel.tsx`,
   `block-inspector.tsx`
-- Create: `components/sites/editor/use-undo.ts`
-- Test: `components/sites/editor/use-undo.test.ts`
+- Create: `apps/app.saroh.in/lib/hold-undo.ts` (the shared, pure 10-second
+  hold: start, undo, commit, and what happens on navigation and failure),
+  `components/sites/editor/use-undo.ts` (the editor's hook over it)
+- Test: `apps/app.saroh.in/lib/hold-undo.test.ts`,
+  `components/sites/editor/use-undo.test.ts`
 
 **Approach:**
 - `use-undo` keeps the previous draft for one action for 10 seconds.
+- The timer lives in `lib/hold-undo.ts`, not in the editor, because B6
+  (bulk moves in Orders) and F4 (hold before sending) need the same
+  hold-then-commit-or-undo. G3 is the first of the three to land, so it
+  builds the helper and the others reuse it.
 - Removing, moving, hiding or resetting a theme shows "Removed Quote ·
   Undo". The Remove-section confirmation dialog goes.
 - Adding inserts below the selected section and selects the new one.
@@ -521,7 +657,8 @@ bottom bar, and the inspector as a sheet.
 
 **Requirements:** R5
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G5. Last in the editor chain, because it re-lays out the
+rail, inspector host and canvas that G2, G3, G5 and G6 change · **Phase:** 1
 
 **Files:**
 - Modify: `components/sites/editor/{editor-rail,inspector-host,editor-canvas}.tsx`
@@ -551,7 +688,7 @@ fully usable, and navigating updates the editor.
 
 **Requirements:** R6
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G6 (both edit `editor-canvas.tsx`) · **Phase:** 1
 
 **Files:**
 - Modify: `components/sites/editor/editor-canvas.tsx`,
@@ -586,7 +723,7 @@ shown.
 
 **Requirements:** R7
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G3 (both edit `block-inspector.tsx`) · **Phase:** 1
 
 **Files:**
 - Modify: `components/sites/block-inspector.tsx`, `editor-canvas.tsx`,
@@ -600,8 +737,10 @@ shown.
 **Approach:**
 - The name and footer save through the existing `site:update` calls, and
   pending changes include them.
-- A role with `section:write` but not `site:update` sees both fields read-only,
-  with "Only owners and admins change these".
+- Someone with `section:write` but not `site:update` sees both fields
+  read-only, with a line saying who can change them (the wording H8 uses).
+  Roles are default bundles (DEC-039), so the gate is the capability, never
+  a role name.
 - The lock reads "On every page — can't be removed or moved", beside the
   control, never in a tooltip.
 
@@ -622,7 +761,8 @@ right.
 
 **Requirements:** R8
 
-**Dependencies:** G1 · **Phase:** 1
+**Dependencies:** G1 · **Phase:** 2 (re-sliced 2026-09-27). It edits the
+contract and a field editor, not G1's files.
 
 **Files:**
 - Modify: `packages/block-contract/src/section-contract.ts` (an optional
