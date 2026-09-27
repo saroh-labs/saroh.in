@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { listOrderRows } from "@/lib/orders/business-service";
@@ -58,6 +59,8 @@ export default async function OrdersPage({
 
     return (
         <PageContainer width="full">
+            {/* B17: storefronts still on the 2-hour Pick-up default. */}
+            <LateRuleNotice />
             <OrdersScreen
                 query={query}
                 page={page}
