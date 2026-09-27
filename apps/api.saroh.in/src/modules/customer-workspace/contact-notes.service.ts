@@ -274,11 +274,14 @@ export class ContactNotesService {
                         organizationId: ctx.organizationId,
                     })),
                 });
+                // Only the allergens this edit adds: one the note already
+                // named and the team took off Needs attention stays off.
+                const had = new Set(current.allergens.map((a) => a.id));
                 await ensureAllergyEntries(tx, {
                     organizationId: ctx.organizationId,
                     contactId,
                     userId: ctx.userId,
-                    allergenIds,
+                    allergenIds: allergenIds.filter((id) => !had.has(id)),
                 });
             }
             await this.audit(tx, ctx, "contact.note.updated", noteId, {

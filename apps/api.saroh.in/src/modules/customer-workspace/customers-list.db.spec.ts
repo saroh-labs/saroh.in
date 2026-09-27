@@ -482,6 +482,37 @@ describe("Customers list (DB)", () => {
         });
     });
 
+    it("leaves out a payer with no usable email, whom no link can come for (review C-4)", async () => {
+        const blank = await makeStoreCustomer(org, online, "  ", "Walk-in");
+        await makeOrder(org, online, blank, { total: "80" });
+        const anonymised = await makeStoreCustomer(
+            org,
+            online,
+            `gone-${next()}@removed.invalid`,
+        );
+        await makeOrder(org, online, anonymised, { total: "90" });
+        // Another business's paying store customer, never linked, is never
+        // counted here (review C-2).
+        const elsewhere = await makeStore(otherOrg, "Elsewhere shop");
+        const theirs = await makeStoreCustomer(
+            otherOrg,
+            elsewhere,
+            `theirs-${next()}@example.com`,
+        );
+        await makeOrder(otherOrg, elsewhere, theirs, { total: "70" });
+
+        expect((await list.list(ctx, {})).unlinkedPaying).toBe(1);
+        const sheet = await list.unlinked(ctx, {});
+        expect(sheet.rows.map((r) => r.customerId)).toEqual([unlinkedCustomer]);
+
+        await prisma.order.deleteMany({
+            where: { customerId: { in: [blank, anonymised, theirs] } },
+        });
+        await prisma.customer.deleteMany({
+            where: { id: { in: [blank, anonymised, theirs] } },
+        });
+    });
+
     it("narrows to who bought at a storefront, and refuses another business's", async () => {
         expect(idsOf(await list.list(ctx, { store: online }))).toEqual([ravi]);
         const market_ = await list.list(ctx, { store: market });

@@ -11,7 +11,9 @@ import { allergenKey } from "./allergen-match";
  * One entry per allergen name per person: an allergen already on their list
  * (active, or waiting as a suggestion) is not added twice. Only ever adds —
  * taking an allergen off a note leaves the entry for the team to remove on
- * Needs attention, since it may have been added there on its own.
+ * Needs attention, since it may have been added there on its own. An edit
+ * passes only the allergens it adds (`contact-notes.service.ts`), so an
+ * entry the team removed isn't brought back by the note that named it.
  */
 export async function ensureAllergyEntries(
     tx: Pick<Prisma.TransactionClient, "contactAttention" | "storeAllergen">,

@@ -2447,6 +2447,9 @@ model CustomerIdentityLink {
 
   @@unique([contactId, customerId])
   @@index([organizationId])
+  // "Is this store customer linked?" (review C-2): the unlinked payers, the
+  // payment path and the backfill all ask it by the customer.
+  @@index([customerId])
 }
 
 /// Why a store customer is linked to a contact (C2, DEC-041).
