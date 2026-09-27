@@ -27,6 +27,9 @@ const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 export const PLAN_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
+/** The most classes a month a plan can include (the Plan Editor's limit). */
+export const PLAN_CLASSES_MAX = 60;
+
 export const SUBSCRIPTION_STATUSES = ["ACTIVE", "PAUSED", "CANCELLED"] as const;
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
@@ -62,6 +65,15 @@ export class PlanInputDto {
     @IsOptional()
     @IsIn(INTERVALS)
     interval?: Interval;
+
+    /** A membership's classes a month, 1–60; null is as many as they like. */
+    @IsOptional()
+    @IsInt({ message: "How many classes a month?" })
+    @Min(1, { message: "How many classes a month?" })
+    @Max(PLAN_CLASSES_MAX, {
+        message: `${PLAN_CLASSES_MAX} a month is the most`,
+    })
+    classesPerMonth?: number | null;
 }
 
 export class ListPlansQueryDto {

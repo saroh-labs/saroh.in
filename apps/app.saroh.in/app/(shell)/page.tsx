@@ -2,16 +2,20 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import type { HomeSetup } from "@/components/home/home-dashboard";
 import { HomeDashboard } from "@/components/home/home-dashboard";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
+import type { Organization } from "@/lib/organizations/service";
 import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
+import { loadReadyChecklist } from "@/lib/settings/ready-service";
 
 /**
  * Action-oriented Home (#119). Answers "where am I / what should I do next"
@@ -38,16 +42,15 @@ export default async function Home() {
     const chosen = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
     if (organizations.length > 1 && !chosen) redirect("/choose");
 
-    const home = await getHome();
+    const [home, business] = await Promise.all([
+        getHome(),
+        resolveActiveOrganization(organizations),
+    ]);
     // A business with nothing on is asked what it wants to do first, and the
     // question needs to know what may be turned on and by whom. Everyone
     // else never pays for the read.
-    const [modules, business] = home.hasAnyModule
-        ? [null, null]
-        : await Promise.all([
-              listModules(),
-              resolveActiveOrganization(organizations),
-          ]);
+    const modules = home.hasAnyModule ? null : await listModules();
+    const setup = home.hasAnyModule ? await loadSetup(business) : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -63,8 +66,29 @@ export default async function Home() {
                     home={home}
                     modules={modules}
                     businessName={business?.name ?? "This business"}
+                    setup={setup}
                 />
             </div>
         </PageContainer>
     );
+}
+
+/**
+ * "Get ready to take money" (F8): for owners and admins only (`org:update`),
+ * whose steps they are. Best-effort — a settings read that fails leaves the
+ * checklist off Home, never Home itself.
+ */
+async function loadSetup(
+    business: Organization | null,
+): Promise<HomeSetup | null> {
+    const may = business?.actions
+        ? business.actions.includes("org:update")
+        : business?.role === "OWNER" || business?.role === "ADMIN";
+    if (!business || !may) return null;
+    const settings = await getOrganizationSettings().catch(() => null);
+    if (!settings) return null;
+    return {
+        list: await loadReadyChecklist(settings),
+        businessId: settings.id,
+    };
 }

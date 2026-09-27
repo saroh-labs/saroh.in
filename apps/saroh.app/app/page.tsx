@@ -28,7 +28,7 @@ export default function RendererRoot() {
                 <div className="mb-6 flex justify-center">
                     <Wordmark suffix="app" />
                 </div>
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                     Nothing is published at this address
                 </h1>
                 <p className="mt-3 text-sm text-muted-foreground">

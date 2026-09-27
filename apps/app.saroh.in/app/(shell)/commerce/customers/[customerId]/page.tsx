@@ -14,7 +14,7 @@ import type { Customer, CustomerListItem } from "@/lib/customers/service";
 import { getCustomer, listCustomers } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/business-service";
-import { listBusinessOrders } from "@/lib/orders/business-service";
+import { listAllOrderRows } from "@/lib/orders/business-service";
 import { requireSession } from "@/lib/session";
 import type { Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -63,10 +63,14 @@ export default async function CustomerPage({
     const { store, customer } = found;
 
     const [orders, elsewhere] = await Promise.all([
-        listBusinessOrders().catch(() => null),
+        // Asked of the API by customer, rather than reading every order in
+        // the business and keeping theirs.
+        listAllOrderRows({ customerId: customer.id })
+            .then((r) => r.rows)
+            .catch(() => null),
         otherPlaces(stores, store, customer),
     ]);
-    const theirs = (orders ?? []).filter((o) => o.customer?.id === customer.id);
+    const theirs = orders ?? [];
     const name =
         [customer.firstName, customer.lastName]
             .filter(Boolean)

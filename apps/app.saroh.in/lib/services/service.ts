@@ -15,8 +15,17 @@ import { apiFetch, orgBase } from "@/lib/api/http";
 
 export type ServiceStatus = "ACTIVE" | "ARCHIVED";
 
-/** Where a service happens (ADR-007): at the business, or by a link. */
-export type LocationType = "IN_PERSON" | "ONLINE";
+/**
+ * Where a service happens (ADR-007): at the business, by a link, or either,
+ * chosen per booking (E1; the booking page asks from E7).
+ */
+export type LocationType = "IN_PERSON" | "ONLINE" | "EITHER";
+
+/**
+ * What is paid at booking (E1), as a share of the price. The API stores it
+ * now and takes it from E8; nothing in the workspace sets it before then.
+ */
+export type DepositMode = "NONE" | "PERCENT_25" | "PERCENT_50" | "FULL";
 
 /** A bookable Service (mirror of the api's Service row, JSON-serialized). */
 export interface Service {
@@ -41,6 +50,13 @@ export interface Service {
     meetingUrl: string | null;
     createdAt: string;
     updatedAt: string;
+    /** Visits one booking of it is, 1 to 12 (E1; honoured from E9/E10). */
+    visits: number;
+    depositMode: DepositMode;
+    /** What is paid at booking, in paise, worked out by the API; null for none. */
+    depositCents: number | null;
+    /** Whether the booking page offers it; staff book it either way. */
+    showOnBookingPage: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -169,6 +185,9 @@ export interface CreateServiceInput {
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
+    visits?: number;
+    depositMode?: DepositMode;
+    showOnBookingPage?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -188,6 +207,9 @@ export interface UpdateServiceInput {
     locationType?: LocationType;
     /** `null` clears it; the API also clears it on going back to in person. */
     meetingUrl?: string | null;
+    visits?: number;
+    depositMode?: DepositMode;
+    showOnBookingPage?: boolean;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */

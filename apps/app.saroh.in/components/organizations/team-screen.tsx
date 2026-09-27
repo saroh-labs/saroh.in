@@ -148,8 +148,9 @@ const TEAM_TABS = ["roles", "people"] as const;
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
  * role's ring colour (the avatar has one token per built-in, so invented roles
- * wear a neutral ring), per-person extra permissions (the column is drawn,
- * empty), and requiring two-step sign-in (the switch is drawn off and says
+ * wear a neutral ring), per-person extra permissions (the People column for
+ * them comes back with the grants, F17 — until then it would say "—" for
+ * everyone, DEC-048), and requiring two-step sign-in (the switch is drawn off and says
  * so — Saroh has no two-step sign-in).
  */
 export function TeamScreen({
@@ -374,11 +375,13 @@ function PeopleTab({
     onEdit: (member: OrganizationMember) => void;
     onRemove: (member: OrganizationMember) => void;
 }) {
-    // The design's four columns need about 600px; the panel is that wide
-    // only once the settings list sits beside it on a wide screen. Narrower,
-    // a row is the person — role under their name — and their buttons.
+    // The design's columns need about 600px; the panel is that wide only
+    // once the settings list sits beside it on a wide screen. Narrower, a
+    // row is the person — role under their name — and their buttons. The
+    // design's Extra permissions column is left out until something can
+    // grant one person more than their role (F17, DEC-048).
     const grid =
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,1fr)_150px]";
+        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
     const rowButton = "text-[12.5px]";
 
     return (
@@ -398,7 +401,6 @@ function PeopleTab({
                 >
                     <span>Person</span>
                     <span>Role</span>
-                    <span>Extra permissions</span>
                     <span />
                 </div>
                 <ul>
@@ -462,14 +464,6 @@ function PeopleTab({
                                     <RoleDot role={role} size={9} />
                                     <span className="truncate text-[13px]">
                                         {book.labelOf(role)}
-                                    </span>
-                                </div>
-                                {/* Nothing grants one person more than their
-                                    role yet, so every row says none. */}
-                                <div className="hidden min-w-0 xl:block">
-                                    <span className="text-[13px] text-muted-foreground">
-                                        <span aria-hidden>—</span>
-                                        <span className="sr-only">None</span>
                                     </span>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-1.5">

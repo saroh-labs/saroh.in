@@ -6,11 +6,19 @@ import Link from "next/link";
 import { firstRunJobs } from "@/lib/home/first-run";
 import type { HomeModel } from "@/lib/home/service";
 import type { ModuleView } from "@/lib/modules/schema";
+import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
 import { NumbersBand } from "./numbers-band";
 import { Schedule } from "./schedule";
+import { TakeMoneyChecklist } from "./take-money-checklist";
+
+/** "Get ready to take money", for someone who may change the business. */
+export interface HomeSetup {
+    list: ReadyChecklist;
+    businessId: string;
+}
 
 /**
  * Home as a dashboard rather than a menu (#119, redesign step 3).
@@ -41,11 +49,14 @@ export function HomeDashboard({
     home,
     modules,
     businessName,
+    setup = null,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
     modules: ModuleView[] | null;
     businessName: string;
+    /** Null for someone who may not change the business (`org:update`). */
+    setup?: HomeSetup | null;
 }) {
     // Nothing on yet: ask what the business wants to do, on Home itself,
     // rather than an empty dashboard whose every band says "nothing yet".
@@ -84,11 +95,23 @@ export function HomeDashboard({
                     to `min-width: auto`, so this column refused to shrink below
                     its content's min-content width and pushed the whole page
                     into a horizontal scroll at 320px (#178, §18). */}
-                <div className="min-w-0 space-y-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Needs you
-                    </h2>
-                    <NeedsYou actions={home.actions} now={now} />
+                <div className="grid min-w-0 content-start gap-5">
+                    {/* "Get ready to take money" leads while fewer than half
+                        its steps are done, and moves to the foot of the
+                        column once more are; each slot draws only when it's
+                        the checklist's place (F8). */}
+                    {setup ? (
+                        <TakeMoneyChecklist {...setup} slot="first" />
+                    ) : null}
+                    <div className="min-w-0 space-y-3">
+                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            Needs you
+                        </h2>
+                        <NeedsYou actions={home.actions} now={now} />
+                    </div>
+                    {setup ? (
+                        <TakeMoneyChecklist {...setup} slot="late" />
+                    ) : null}
                 </div>
 
                 {showSchedule ? (

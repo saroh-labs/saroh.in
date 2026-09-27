@@ -17,7 +17,12 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { allows, authorize } from "../organizations/organization-policy";
-import { EditOrderDto, MoveStageDto, UndoStageDto } from "./dto";
+import {
+    EditOrderDto,
+    ListOrdersQuery,
+    MoveStageDto,
+    UndoStageDto,
+} from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrdersService } from "./orders.service";
 
@@ -52,7 +57,7 @@ export class OrganizationOrdersController {
     @Get()
     list(
         @OrgContext() ctx: OrganizationContext,
-        @Query("storeId") storeId?: string,
+        @Query() query: ListOrdersQuery = {},
     ) {
         // The guards prove the caller belongs to this business and that
         // Commerce is on. Neither says they may see its ORDERS — customer
@@ -66,14 +71,27 @@ export class OrganizationOrdersController {
         // line the order read draws.
         const full = allows(ctx, "order:read");
         if (!full && !allows(ctx, "order:stage")) authorize(ctx, "order:read");
+
+        // v2 (plan B, B1): rows, tab counts and a cursor. Money needs
+        // `order:read`; a customer's phone and email need `contact:read`.
+        if (query.v === "2") {
+            const { v: _v, late, ...filter } = query;
+            return this.orders.listRows(
+                ctx.organizationId,
+                {
+                    ...filter,
+                    late: late === undefined ? undefined : late === "true",
+                },
+                { money: full, contact: allows(ctx, "contact:read") },
+            );
+        }
+
+        // Without `v=2`, today's bare array for one release, so an app built
+        // before this API keeps working (B2d removes it). `storeId` narrows
+        // within the organization; it cannot widen past it.
         return this.orders.listForOrganization(
             ctx.organizationId,
-            {
-                // Narrows within the organization; it cannot widen past it.
-                // `??` would keep an empty string, which would filter on a
-                // storefront that cannot exist and return nothing.
-                storeId: storeId === "" ? undefined : storeId,
-            },
+            { storeId: query.storeId },
             { kitchenOnly: !full },
         );
     }

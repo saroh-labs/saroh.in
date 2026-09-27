@@ -21,7 +21,11 @@
   plus an allowlist in `scripts/check-blocks.mjs` of Saroh surfaces on a
   merchant's page (404, error and loading boundaries, checkout, the site header
   and footer, preview frames). A surface that draws no block goes on the list
-  with its reason; a block goes in the package.
+  with its reason; a block goes in the package. **G7:** no Saroh typeface on a
+  merchant's site — no `font-sans`, `font-display` or `font-mono` in a block,
+  and no `packages/ui/fonts` path or `next/font` import in `apps/saroh.app`.
+  Blocks set type with `font-site-heading` and `font-site-body` (see "Type and
+  the mark").
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
   `border` did not until `00cd219`).
 
@@ -154,8 +158,15 @@
   money and large figures, never body copy. JetBrains Mono (`font-mono`) **only
   where a value is measured**: a SKU, an order reference, a timestamp, a token
   value, a route. A label or eyebrow is 11px Geist 600, uppercase at 0.1em —
-  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>` and is never loaded. `saroh.app`
-  keeps its old faces.
+  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>` and is never loaded.
+- **Current** — **`saroh.app` loads no Saroh face** (H1). A merchant's text is
+  set through `--site-font-heading` and `--site-font-body` (`font-site-heading`
+  and `font-site-body`, from the site-blocks preset). `SiteTheme` defaults both
+  to a neutral system stack with `Noto Sans Devanagari`, and each class carries
+  that stack as its `var()` fallback for a surface drawn before `SiteTheme`
+  mounts. The root layout imports no `next/font`, and a block never writes
+  `font-sans`, `font-display` or `font-mono`, which all resolve to Saroh's
+  faces. Gate G7 enforces both.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

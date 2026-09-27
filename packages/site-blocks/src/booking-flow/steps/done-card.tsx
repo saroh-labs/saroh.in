@@ -51,7 +51,7 @@ export function DoneCard({
             <h2
                 ref={headingRef}
                 tabIndex={-1}
-                className="font-display text-site-fg mb-1.5 mt-4 text-[32px] font-semibold tracking-[-0.03em] outline-none"
+                className="font-site-heading text-site-fg mb-1.5 mt-4 text-[32px] font-semibold tracking-[-0.03em] outline-none"
             >
                 You&apos;re booked{phase.first ? `, ${phase.first}` : ""}.
             </h2>

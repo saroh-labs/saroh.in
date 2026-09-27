@@ -1,4 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+
+import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
+import { SiteMenu, SiteNavRow } from "./site-header-menu";
 
 /**
  * The parts of a site that are not its pages: header and footer. Shared by
@@ -13,136 +17,195 @@ export interface SiteFooterContent {
     value: string;
 }
 
+/** Where a footer line breaks into more than one line. */
+const BLOCK_OR_BREAK =
+    /<\/?(p|div|ul|ol|li|h[1-6]|blockquote|table|pre|hr|br)\b/i;
+
 /**
- * The merchant's own footer (#202).
+ * A merchant's footer as one line, or `null` when it is more than that.
  *
- * The Style panel has offered a Footer colour since #189 and this app had
- * nothing to paint with it: `--site-footer-bg` and `--site-footer-fg` were
- * resolved, published and read by nobody, so five swatches sat there looking
- * exactly like the five working rows above them and did nothing at all.
+ * The footer ends in "Runs on Saroh" (G17, default 67), set after the
+ * merchant's own line with a " · ", as the design draws it. That only works
+ * for a line: plain text with no line break, or html that is a single
+ * paragraph. Anything richer (two paragraphs, a list, a heading) keeps its
+ * own block, and "Runs on Saroh" goes on the line below it.
  *
- * Nothing renders when the merchant has written nothing. An empty band in
- * their footer colour would be this app inventing a footer they never asked
- * for — and the colour row would still be lying, just more colourfully.
+ * The html branch hands back the paragraph's inner markup. Publish sanitized
+ * the whole value, and a `<p>`'s contents are inline markup, so drawing them
+ * inside a `<span>` is the same markup, one wrapper lighter.
+ */
+export function footerLine(
+    footer: SiteFooterContent,
+): { kind: "text" | "html"; value: string } | null {
+    const value = footer.value.trim();
+    if (footer.format !== "html") {
+        return value.includes("\n") ? null : { kind: "text", value };
+    }
+    const inner = /^<p>([\s\S]*)<\/p>$/i.exec(value)?.[1];
+    if (inner === undefined || BLOCK_OR_BREAK.test(inner)) return null;
+    return { kind: "html", value: inner };
+}
+
+/**
+ * The foot of every page (#202, G17): the merchant's own line, then
+ * "Runs on Saroh" linking to saroh.in.
+ *
+ * "Runs on Saroh" stays on every site this round (default 67), so the footer
+ * always renders now. With nothing written, the merchant's line is the site's
+ * name, which the header already shows to everyone. Nothing from the business
+ * profile is published here: `parseSiteFooter` in the API says why that stays
+ * the merchant's to write.
+ *
+ * The link is plain text in the site's own footer colours and type, never
+ * Saroh's colours or font: a merchant's site does not wear the brand. The
+ * merchant's Footer colour (#189) still paints the band.
  *
  * SAFETY. `value` is rendered with `dangerouslySetInnerHTML` when the format is
  * html, and that is safe for exactly one reason: publish sanitized it through
  * the same allowlist as `richText.value` before writing the immutable snapshot,
  * so what arrives here is already-cleaned markup. The editor's canvas passes a
  * draft footer the API sanitized the same way (`footerPreview`), so no caller
- * hands this raw author input. Markdown renders as escaped pre-wrapped text, because there is
- * no markdown library in this app's dependencies and guessing at one would mean
- * emitting HTML nobody cleaned.
+ * hands this raw author input. Markdown renders as escaped pre-wrapped text,
+ * because there is no markdown library in this app's dependencies and
+ * guessing at one would mean emitting HTML nobody cleaned.
  */
 export function SiteFooter({
     footer,
+    name,
 }: {
     footer: SiteFooterContent | null | undefined;
+    /** The site's name: the footer's line when the merchant wrote none. */
+    name: string;
 }) {
-    if (!footer || footer.value.trim() === "") return null;
+    const written = footer && footer.value.trim() !== "" ? footer : null;
+    const line = written
+        ? footerLine(written)
+        : { kind: "text" as const, value: name.trim() };
 
     return (
-        <footer className="bg-site-footer-bg text-site-footer-fg w-full px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <div className="mx-auto max-w-screen-xl text-sm">
-                {footer.format === "html" ? (
-                    <div
-                        /* The merchant's footer text colour governs, not the
-                           prose defaults — the same reason richText overrides
-                           them: a chosen palette must not be repainted by a
-                           typography plugin's greys. */
-                        className="prose prose-sm prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg max-w-none"
-                        // Sanitized at publish — see the safety note above.
-                        dangerouslySetInnerHTML={{ __html: footer.value }}
-                    />
-                ) : (
-                    <p className="whitespace-pre-wrap">{footer.value}</p>
-                )}
+        <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-7 pt-5 sm:px-[var(--site-page-margin)]">
+            <div className="mx-auto max-w-screen-xl text-center text-[12.5px]">
+                {written && line === null ? (
+                    written.format === "html" ? (
+                        <div
+                            /* The merchant's footer text colour governs, not the
+                               prose defaults — the same reason richText overrides
+                               them: a chosen palette must not be repainted by a
+                               typography plugin's greys. */
+                            className="prose prose-sm prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg mx-auto mb-3 max-w-none"
+                            // Sanitized at publish — see the safety note above.
+                            dangerouslySetInnerHTML={{ __html: written.value }}
+                        />
+                    ) : (
+                        <p className="mb-3 whitespace-pre-wrap text-sm">
+                            {written.value}
+                        </p>
+                    )
+                ) : null}
+                <p>
+                    {line && line.value !== "" ? (
+                        <>
+                            {line.kind === "html" ? (
+                                <span
+                                    // Sanitized at publish — see above.
+                                    dangerouslySetInnerHTML={{
+                                        __html: line.value,
+                                    }}
+                                />
+                            ) : (
+                                <span>{line.value}</span>
+                            )}
+                            {" · "}
+                        </>
+                    ) : null}
+                    <a
+                        href="https://saroh.in"
+                        target="_blank"
+                        rel="noopener"
+                        className="focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
+                    >
+                        Runs on Saroh
+                    </a>
+                </p>
             </div>
         </footer>
     );
 }
 
 /**
- * The site's name and its menu (#206).
+ * The site's header (#206, G17), in one row: the name, the menu, the bag,
+ * Sign in or the avatar, and the main button ("Book" or "Order").
  *
- * With no menu the header is what it always was: the name, centred, linking
- * home. With one, the name goes left and the menu sits beside it from `sm` up.
+ * Below 820px the menu and the main button fold into a menu button; its list
+ * opens under the header with the main button full-width at its foot
+ * (`SiteMenu`). With no menu and no main button there is no menu button.
  *
- * ON A PHONE THE MENU IS A <details>. No JavaScript, no hover (§19), and it
- * works before hydration and with scripts blocked. A horizontal row of six
- * entries at 375px is not a menu, it is a scroll bar; a disclosure that opens
- * a list is the same information a thumb can use.
+ * SLOTS. `bag` and `account` are drawn only when given. The bag (G13) and
+ * sign-in (plan A, A3) are not built yet, and an empty slot draws nothing
+ * rather than a button that goes nowhere. The main button follows the same
+ * rule: `action` is `null` unless its page serves for this site.
+ *
+ * Drawn in the site's own tokens and type; the name is set in
+ * `font-site-heading`. The logo and the letter tile belong to the Brand track
+ * (plan H) and come with it.
  */
 export function SiteHeader({
     name,
     navigation,
     basePath = "",
+    action = null,
+    bag,
+    account,
 }: {
     name: string;
-    navigation: { label: string; href: string }[];
+    navigation: SiteNavItem[];
     /**
      * Prefix for every link, "" on a live site. A draft preview (#198) lives
      * under /preview/<token>, and a menu that pointed at "/about" would drop
      * the reviewer out of the preview onto the live site — or a 404.
      */
     basePath?: string;
+    /** "Book" to /book, "Order" to /shop, or none. */
+    action?: SiteHeaderAction | null;
+    /** The bag and its count (G13). Nothing is drawn until it is given. */
+    bag?: ReactNode;
+    /** Sign in, or the signed-in customer's avatar (A3). Same rule. */
+    account?: ReactNode;
 }) {
-    const hasMenu = navigation.length > 0;
     const to = (href: string) =>
         basePath && href.startsWith("/") ? `${basePath}${href}` : href;
-    const linkClass =
-        "rounded-[var(--site-radius)] px-2 py-1 text-sm text-site-body transition-colors hover:text-site-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent";
+    const items = navigation.map((item) => ({
+        label: item.label,
+        href: to(item.href),
+    }));
+    const main = action ? { label: action.label, href: to(action.href) } : null;
+    const hasMenu = items.length > 0 || main !== null;
+
     return (
-        <header className="border-site-border bg-site-surface left-0 right-0 top-0 z-30 border-b">
-            <div
-                className={
-                    hasMenu
-                        ? "mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-6 px-5 sm:px-[var(--site-page-margin)]"
-                        : "mx-auto flex h-16 max-w-screen-xl items-center justify-center px-10 sm:px-20"
-                }
-            >
-                <Link href={to("/")} className="flex items-center">
-                    <span className="text-site-fg inline-block truncate text-lg font-medium tracking-tight">
+        <header className="border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b">
+            <div className="mx-auto flex min-h-11 max-w-screen-xl items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
+                <Link
+                    href={to("/")}
+                    aria-label={`${name} — home`}
+                    className="text-site-fg focus-visible:ring-site-accent flex min-w-0 items-center rounded-[var(--site-radius)] focus-visible:outline-none focus-visible:ring-2"
+                >
+                    <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">
                         {name}
                     </span>
                 </Link>
-                {hasMenu ? (
-                    <>
-                        <nav
-                            aria-label="Site"
-                            className="hidden sm:flex sm:items-center sm:gap-1"
-                        >
-                            {navigation.map((item) => (
-                                <Link
-                                    key={item.href}
-                                    href={to(item.href)}
-                                    className={linkClass}
-                                >
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </nav>
-                        <details className="relative sm:hidden">
-                            <summary className="border-site-border text-site-fg cursor-pointer list-none rounded-[var(--site-radius)] border px-3 py-1.5 text-sm [&::-webkit-details-marker]:hidden">
-                                Menu
-                            </summary>
-                            <nav
-                                aria-label="Site"
-                                className="border-site-border bg-site-surface absolute right-0 top-full z-40 mt-2 flex min-w-44 flex-col gap-1 rounded-[var(--site-radius)] border p-2"
-                            >
-                                {navigation.map((item) => (
-                                    <Link
-                                        key={item.href}
-                                        href={to(item.href)}
-                                        className={linkClass + " block"}
-                                    >
-                                        {item.label}
-                                    </Link>
-                                ))}
-                            </nav>
-                        </details>
-                    </>
+                {items.length > 0 ? <SiteNavRow items={items} /> : null}
+                <span className="flex-1" />
+                {bag ?? null}
+                {account ?? null}
+                {main ? (
+                    <Link
+                        href={main.href}
+                        className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg coarse:min-h-11 hidden h-10 shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] px-4 text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 min-[820px]:inline-flex"
+                    >
+                        {main.label}
+                    </Link>
                 ) : null}
+                {hasMenu ? <SiteMenu items={items} action={main} /> : null}
             </div>
         </header>
     );

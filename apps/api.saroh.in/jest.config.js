@@ -186,6 +186,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/serialize.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
+        // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
+        // runs against Postgres in order-list.db.spec.ts.
+        "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
+        "<rootDir>/src/modules/orders/order-row.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -215,6 +219,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/collections.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        // D1: a plan's monthly figure and who pays what.
+        "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

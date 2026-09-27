@@ -131,4 +131,34 @@ describe("OrdersService.listForOrganization", () => {
             createdAt: "desc",
         });
     });
+
+    // Plan B, B1: the route without `v=2` answers exactly as before, for
+    // an app built before the API, one release (B2d removes it).
+    it("answers the old row shape key for key, unpaged", async () => {
+        const orders = await service().listForOrganization("org_1");
+
+        expect(Object.keys(orders[0]!).sort()).toEqual(
+            [
+                "currency",
+                "customer",
+                "id",
+                "itemCount",
+                "orderId",
+                "placedAt",
+                "standing",
+                "store",
+                "total",
+            ].sort(),
+        );
+        expect(findMany.mock.calls[0][0]).not.toHaveProperty("take");
+    });
+
+    it("leaves out an abandoned checkout: placed online and never paid", async () => {
+        await service().listForOrganization("org_1");
+
+        expect(findMany.mock.calls[0][0].where.NOT).toEqual({
+            placedOnline: true,
+            paymentStatus: "UNPAID",
+        });
+    });
 });

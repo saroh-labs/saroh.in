@@ -65,7 +65,7 @@ export function SummaryAside({
                 <span className={cn("flex-1 text-sm", onDarkMuted)}>
                     {dueLabel}
                 </span>
-                <span className="font-display text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
+                <span className="font-site-heading text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
                     {due}
                 </span>
             </div>
@@ -139,7 +139,7 @@ export function PhoneBar({
                     <p className={cn("truncate text-xs", onDarkMuted)}>
                         {dueLabel}
                     </p>
-                    <p className="font-display text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
+                    <p className="font-site-heading text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
                         {due}
                     </p>
                 </div>

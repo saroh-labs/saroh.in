@@ -260,6 +260,11 @@ model Organization {
   staffTimeOff    StaffTimeOff[]
   staffExtraHours StaffExtraHours[]
   bookingRules    BookingRules?
+
+  // A business's own customers who sign in on its site (ADR-011, DEC-037).
+  customerAccounts    CustomerAccount[]
+  customerSignInCodes CustomerSignInCode[]
+  customerSessions    CustomerSession[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -1463,6 +1468,15 @@ model Order {
 
   reviewInvitation ReviewInvitation?
 
+  // An order a customer started at the site's checkout (G13). Until it is
+  // paid it is an abandoned checkout, not an order: the Orders list and its
+  // counts leave out every `placedOnline` order still UNPAID (plan B, B1).
+  // False for every order taken by staff and for every order before G13.
+  placedOnline Boolean   @default(false)
+  // When the money for the order arrived (G13 sets it on payment). Null
+  // until then, and for every order before G13.
+  paidAt       DateTime?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
@@ -2634,7 +2648,13 @@ model Site {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
 
+  // Customers signed in on this site (ADR-011): a session is good only on the
+  // site, and so the host, it was made for.
+  customerSessions CustomerSession[]
+
   @@unique([organizationId, slug])
+  // The target of (siteId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([organizationId])
 }
 
@@ -3052,11 +3072,27 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The email proven to belong to this person (DEC-049): a sign-in code for
+  // it, or a confirmation of their online order or booking sent to it. A
+  // site account links to an existing contact only when this is set. A staff
+  // edit of the email, or "This isn't them", clears both. Never backfilled.
+  emailVerifiedAt  DateTime?
+  emailVerifiedVia ContactEmailVerifiedVia?
+
+  // The customer's account on the business's site (ADR-011). At most one
+  // that isn't REMOVED (a partial unique on CustomerAccount).
+  customerAccounts         CustomerAccount[] @relation("CustomerAccountContact")
+  // Accounts staff said "This isn't them" about this contact (A4), so the
+  // pair is never suggested again.
+  unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
   // person independently.
   @@unique([organizationId, email])
+  // The target of (contactId, organizationId) foreign keys.
+  @@unique([id, organizationId])
   @@index([organizationId])
 }
 
@@ -3373,9 +3409,11 @@ model Service {
 
   status String @default("ACTIVE") // ACTIVE → ARCHIVED
 
-  // Online classes (ADR-007): IN_PERSON | ONLINE. An ONLINE service carries
-  // an https meeting link, frozen into each booking's snapshot. The link is a
-  // shared credential: every public booker receives it.
+  // Online classes (ADR-007): IN_PERSON | ONLINE | EITHER. An ONLINE or
+  // EITHER service carries an https meeting link, frozen into each booking's
+  // snapshot. The link is a shared credential: every public booker of an
+  // online booking receives it. EITHER is chosen per booking
+  // (`Booking.locationType`).
   locationType String  @default("IN_PERSON")
   meetingUrl   String?
 
@@ -3389,6 +3427,18 @@ model Service {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  // Round 2 (E1). Columns land before behaviour: nothing honours `visits`
+  // until E9/E10 or `depositMode` until E8, so every service books as one
+  // visit with nothing taken at booking until then.
+  // How many visits one booking of it is (a treatment): 1 to 12, CHECKed.
+  visits            Int     @default(1)
+  // What is paid at booking: NONE | PERCENT_25 | PERCENT_50 | FULL, of
+  // `priceCents`, worked out on the server. Only a priced service has one.
+  depositMode       String  @default("NONE")
+  // Whether the business's booking page and services lists offer it. A
+  // hidden service is still booked by staff.
+  showOnBookingPage Boolean @default(true)
 
   @@index([organizationId])
   @@index([siteId])
@@ -3493,6 +3543,11 @@ model Booking {
 
   // A paid online booking's own invoice (ADR-008).
   invoices Invoice[]
+
+  // Where an EITHER service's booking happens: IN_PERSON | ONLINE, CHECKed
+  // (E1 adds it, E7 writes it). Null — every booking before it, and every
+  // booking of a service that isn't EITHER — means "as the service says".
+  locationType String?
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
@@ -4890,4 +4945,133 @@ model PackRedemption {
 
   @@index([organizationId])
   @@index([purchaseId])
+}
+
+// ---------------------------------------------------------------------------
+// Customer accounts on merchant sites (ADR-011, DEC-037, DEC-049)
+// ---------------------------------------------------------------------------
+
+/// How a contact's email came to be verified (DEC-049).
+enum ContactEmailVerifiedVia {
+  SIGN_IN_CODE
+  ORDER_CONFIRMATION
+  BOOKING_CONFIRMATION
+  STAFF_CONFIRMED
+}
+
+enum CustomerAccountStatus {
+  ACTIVE
+  BLOCKED
+  // Retired by a contact merge (C9): the row stays, pointing at the survivor,
+  // and keeps its email reserved so a later sign-in can't recreate the pair.
+  MERGED
+  // Privacy removal (C11): frees the email and the contact.
+  REMOVED
+}
+
+/// A business's customer, signed in on that business's site with an email
+/// code. Belongs to one business, is exactly one Contact, and is never a
+/// Better Auth `User` (ADR-011).
+model CustomerAccount {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Deleting the contact takes the account and its sessions with it; privacy
+  // removal (C11) is the normal path and this the backstop.
+  contactId String
+  contact   Contact @relation("CustomerAccountContact", fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The verified sign-in email, lower-cased and trimmed. The contact's own
+  // email may be a reserved placeholder (contacts/contact-email.ts) when
+  // another contact already held this one (DEC-049).
+  email           String
+  emailVerifiedAt DateTime
+
+  status CustomerAccountStatus @default(ACTIVE)
+
+  // The survivor's account, when a merge retired this one (MERGED).
+  mergedIntoId String?
+  mergedInto   CustomerAccount?  @relation("CustomerAccountMerge", fields: [mergedIntoId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  mergedFrom   CustomerAccount[] @relation("CustomerAccountMerge")
+
+  // The contact staff said "This isn't them" about (A4), so duplicate
+  // suggestions never pair the two again.
+  unlinkedFromContactId String?
+  unlinkedFromContact   Contact? @relation("CustomerAccountUnlinkedFrom", fields: [unlinkedFromContactId], references: [id], onDelete: SetNull)
+
+  linkedAt       DateTime  @default(now())
+  lastSignedInAt DateTime?
+
+  sessions CustomerSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One live account per email per business. A MERGED account keeps its
+  // email reserved; only REMOVED frees it. The same email at two businesses
+  // is two accounts.
+  @@unique([organizationId, email], map: "CustomerAccount_one_live_per_email", where: raw("status <> 'REMOVED'"))
+  // One live account per contact.
+  @@unique([contactId], map: "CustomerAccount_one_live_per_contact", where: raw("status <> 'REMOVED'"))
+  // The target of (accountId, organizationId) and merge foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([mergedIntoId])
+  @@index([unlinkedFromContactId])
+}
+
+/// A six-digit code sent to a destination to sign in on a business's site.
+/// Only keyed hashes are stored, of the destination and of the code, so a
+/// database read reveals neither. The limits count these rows (A2).
+model CustomerSignInCode {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  destinationHash String
+  codeHash        String
+  expiresAt       DateTime
+  attempts        Int       @default(0)
+  consumedAt      DateTime?
+  // Set when a newer code for the same destination replaces this one.
+  retiredAt       DateTime?
+  // The visitor's relayed address, hashed (hashClientIp).
+  clientHash      String?
+  // The destination had no ACTIVE or MERGED account when the code was asked
+  // for: only these count against the business's hourly ceiling.
+  newDestination  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, destinationHash, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([createdAt])
+}
+
+/// A signed-in customer's session on one site. The token is 256 random bits,
+/// shown once and stored only as its SHA-256.
+model CustomerSession {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        CustomerAccount @relation(fields: [accountId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  siteId         String
+  site           Site            @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  // A short summary of the browser ("Chrome on Android"), never the raw header.
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([siteId])
+  @@index([expiresAt])
 }

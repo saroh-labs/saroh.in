@@ -15,10 +15,7 @@ import type {
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { formatMoneyMajor } from "@/lib/format/money";
-import type {
-    BusinessOrder,
-    OrderStanding,
-} from "@/lib/orders/business-service";
+import type { OrderRow, OrderStanding } from "@/lib/orders/business-service";
 import { ordersToCsv } from "@/lib/orders/export";
 import { newOrderHref, orderHref } from "@/lib/orders/links";
 
@@ -54,7 +51,7 @@ const STANDING: Record<
  * "Cancelled" is a real state and a real question, so the tab is named for
  * what it can actually show.
  */
-const FILTERS: DataFilter<BusinessOrder>[] = [
+const FILTERS: DataFilter<OrderRow>[] = [
     { id: "all", label: "All" },
     {
         id: "unfulfilled",
@@ -74,7 +71,7 @@ const FILTERS: DataFilter<BusinessOrder>[] = [
 ];
 
 /** Two letters from the name, or one from the email when there is no name. */
-function initials(order: BusinessOrder): string {
+function initials(order: OrderRow): string {
     const name = order.customer?.name ?? "";
     const letters = name
         .split(/[\s&]+/)
@@ -106,7 +103,7 @@ export function OrdersScreen({
     initialFilterId,
     kitchen = false,
 }: {
-    orders: BusinessOrder[];
+    orders: OrderRow[];
     stores: { id: string; name: string }[];
     /** From `?view=`, so a link from Home lands on the right tab. */
     initialFilterId?: string;
@@ -125,7 +122,7 @@ export function OrdersScreen({
         [orders, storeId],
     );
 
-    const allColumns: DataColumn<BusinessOrder>[] = [
+    const allColumns: DataColumn<OrderRow>[] = [
         {
             id: "order",
             header: "Order",
@@ -289,7 +286,7 @@ export function OrdersScreen({
  * storefront when the list is filtered to one, and dated, so a folder of
  * exports sorts itself.
  */
-function downloadCsv(rows: BusinessOrder[], storeName?: string) {
+function downloadCsv(rows: OrderRow[], storeName?: string) {
     // A byte-order mark, so Excel reads ₹ and names in the right encoding.
     const blob = new Blob(["\ufeff", ordersToCsv(rows)], {
         type: "text/csv;charset=utf-8",
