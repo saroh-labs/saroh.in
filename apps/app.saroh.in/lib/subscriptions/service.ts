@@ -154,6 +154,43 @@ export interface SubscriptionCharge {
 export type Optional<T> =
     { state: "ok"; data: T } | { state: "denied" } | { state: "failed" };
 
+/** A plan as an event names it (D9). */
+export interface SubscriptionEventPlan {
+    id: string;
+    name: string;
+    price: string;
+    currency: string;
+    interval: Interval;
+}
+
+/** One thing done to a subscription, from its log (D9). */
+export interface SubscriptionEvent {
+    id: string;
+    /** SUBSCRIBED, PAUSED, RESUMED, … — the API's SUBSCRIPTION_EVENT_KINDS. */
+    kind: string;
+    actor: {
+        kind: "TEAM" | "CUSTOMER" | "JOB" | "OPERATOR";
+        /** Null for Saroh support, the job and a customer. */
+        userId: string | null;
+        /** A team member's name now, "Saroh support", "Saroh"; else null. */
+        name: string | null;
+    };
+    /** The invoice it issued or acted on; null without `invoice:read`. */
+    invoice: { id: string; number: string | null } | null;
+    note: string | null;
+    /** What the kind needs to be said in words. */
+    data: Record<string, unknown>;
+    createdAt: string;
+}
+
+export interface SubscriptionEventsPage {
+    /** Newest first. */
+    events: SubscriptionEvent[];
+    nextCursor: string | null;
+    /** It began before the log was kept: "Earlier changes weren't recorded". */
+    earlierUnrecorded: boolean;
+}
+
 /** The person on it, from the customer read: how to reach them, and allergies. */
 export interface SubscriberCard {
     phone: string | null;
@@ -219,6 +256,21 @@ export async function listCharges(
         );
         return res;
     });
+}
+
+/**
+ * Its log, newest first, a page at a time (D9). Optional: a failed read is
+ * named in the Changes card and costs nothing else on the page.
+ */
+export async function listSubscriptionEvents(
+    id: string,
+    cursor?: string,
+): Promise<Optional<SubscriptionEventsPage>> {
+    const query = new URLSearchParams({ limit: "50" });
+    if (cursor) query.set("cursor", cursor);
+    return optionalRead((base) =>
+        apiFetch(`${base}${sub(id)}/events?${query.toString()}`),
+    );
 }
 
 /**

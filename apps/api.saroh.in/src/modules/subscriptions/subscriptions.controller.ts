@@ -26,6 +26,7 @@ import {
     CollectionScheduleDto,
     ListPlanEventsQueryDto,
     ListPlansQueryDto,
+    ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
     SkipCollectionDto,
@@ -130,6 +131,16 @@ export class SubscriptionsController {
         @Param("subscriptionId") id: string,
     ) {
         return this.subscriptions.get(ctx, id);
+    }
+
+    /** What was done to it and by whom, newest first, a page at a time (D9). */
+    @Get(":subscriptionId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Query() query: ListSubscriptionEventsQueryDto,
+    ) {
+        return this.subscriptions.events(ctx, id, query);
     }
 
     /** Subscribe a contact; answers with the subscription and issues its first invoice. */

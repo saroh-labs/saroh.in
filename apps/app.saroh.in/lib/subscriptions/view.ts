@@ -503,69 +503,6 @@ export function gstNote(
 
 // — Changes ————————————————————————————————————————————————————
 
-export interface ChangeRow {
-    what: string;
-    when: string;
-}
-
-/**
- * What has changed on it, from the facts it keeps — there is no change log
- * yet, so each line is something the subscription itself records, newest
- * first. A change without a moment of its own (a booked plan change) says
- * when it takes effect instead.
- */
-export function changeRows(sub: Subscription, now: Date): ChangeRow[] {
-    const tz = sub.timezone;
-    const rows: { at: string; row: ChangeRow }[] = [];
-    if (sub.pendingPlan) {
-        rows.push({
-            at: "9999",
-            row: {
-                what: `Switching to ${sub.pendingPlan.name} (${money(sub.pendingPlan.price, sub.pendingPlan.currency)})`,
-                when: `From ${dayText(sub.pendingPlan.from, tz, now)}`,
-            },
-        });
-    }
-    for (const c of sub.collection?.upcoming ?? []) {
-        if (!c.skipped) continue;
-        rows.push({
-            at: "9998",
-            row: {
-                what: `Skipping ${dayText(c.date, tz, now, true)}`,
-                when: "Nothing is collected that day",
-            },
-        });
-    }
-    if (sub.cancelledAt) {
-        rows.push({
-            at: sub.cancelledAt,
-            row: { what: "Cancelled", when: dayText(sub.cancelledAt, tz, now) },
-        });
-    } else if (sub.endsAt) {
-        rows.push({
-            at: "9997",
-            row: {
-                what: "Set to end with its period",
-                when: `Ends ${dayText(sub.endsAt, tz, now)}`,
-            },
-        });
-    }
-    if (sub.pausedAt && sub.status === "PAUSED") {
-        rows.push({
-            at: sub.pausedAt,
-            row: { what: "Paused", when: dayText(sub.pausedAt, tz, now) },
-        });
-    }
-    rows.push({
-        at: sub.startedAt,
-        row: {
-            what: `Started on ${sub.plan.name} at ${money(sub.price, sub.currency)}`,
-            when: dayText(sub.startedAt, tz, now),
-        },
-    });
-    return rows.sort((a, b) => b.at.localeCompare(a.at)).map((r) => r.row);
-}
-
 // — Renewals ———————————————————————————————————————————————————
 
 /**

@@ -20,6 +20,7 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
         },
         subscriptionPlanEvent: { create: jest.fn() },
+        subscriptionEvent: { create: jest.fn() },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -163,6 +164,7 @@ beforeEach(() => {
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
     tx.invoice!.findFirst!.mockResolvedValue(null);
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
+    issueInTx.mockResolvedValue({ id: "inv_new", number: "INV-0001" });
 });
 
 afterEach(() => jest.useRealTimers());
@@ -1495,6 +1497,9 @@ describe("changing plan from the next renewal", () => {
             id: "plan_2",
             name: "Weekly box",
             status: "ACTIVE",
+            price: decimal("300"),
+            currency: "INR",
+            interval: "WEEK",
         });
     });
 
@@ -1833,5 +1838,275 @@ describe("a failed charge", () => {
         await expect(
             service.retryPayment(member, "sub_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+});
+
+describe("the subscription's log (D9)", () => {
+    /** Each event written, as its row's data. */
+    const logged = () =>
+        tx.subscriptionEvent!.create!.mock.calls.map(
+            ([a]) => (a as { data: Record<string, unknown> }).data,
+        );
+    const byOwner = { actorKind: "TEAM", actorUserId: "user_1" };
+
+    it("records a subscribe with its first invoice and the plan it was sold at", async () => {
+        db.customerSubscription!.count!.mockResolvedValue(0);
+        await service.subscribe(owner, { contactId: "c_1", planId: "plan_1" });
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                organizationId: "org_1",
+                subscriptionId: "sub_1",
+                kind: "SUBSCRIBED",
+                ...byOwner,
+                invoiceId: "inv_new",
+                data: {
+                    plan: {
+                        id: "plan_1",
+                        name: "Monthly membership",
+                        price: "1200.00",
+                        currency: "INR",
+                        interval: "MONTH",
+                    },
+                    startsAt: null,
+                },
+            }),
+        ]);
+    });
+
+    it("records a pause by the team member, and nothing for a refused one", async () => {
+        await service.pause(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({ kind: "PAUSED", ...byOwner }),
+        ]);
+
+        tx.subscriptionEvent!.create!.mockClear();
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-20T00:00:00Z") }),
+        );
+        await expect(service.pause(owner, "sub_1")).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(logged()).toEqual([]);
+    });
+
+    it("records a Saroh operator's action as OPERATOR", async () => {
+        await service.pause(
+            { ...owner, userId: "op_1", roleKey: "platform-operator" },
+            "sub_1",
+        );
+        expect(logged()[0]).toMatchObject({
+            kind: "PAUSED",
+            actorKind: "OPERATOR",
+            actorUserId: "op_1",
+        });
+    });
+
+    it("records a resume inside the paid period with the days it added", async () => {
+        jest.setSystemTime(at("2026-09-10T09:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-05T09:00:00Z") }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "RESUMED",
+                invoiceId: null,
+                data: { extendedDays: 5 },
+            }),
+        ]);
+    });
+
+    it("records a resume past the paid period with its new invoice, after the booked plan it switched to", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                pendingPlanId: "plan_2",
+                pendingPlan: WEEKLY_BOX,
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual([
+            "PLAN_CHANGED",
+            "RESUMED",
+        ]);
+        expect(logged()[0]!.data).toEqual({
+            from: {
+                id: "plan_1",
+                name: "Monthly membership",
+                price: "1200.00",
+                currency: "INR",
+                interval: "MONTH",
+            },
+            to: {
+                id: "plan_2",
+                name: "Weekly box",
+                price: "300.00",
+                currency: "INR",
+                interval: "MONTH",
+            },
+        });
+        expect(logged()[1]).toMatchObject({
+            invoiceId: "inv_new",
+            data: { restarted: true },
+        });
+    });
+
+    it("records an end when a resume finds its last period over", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "ENDED",
+                ...byOwner,
+                data: { at: "2026-10-01T00:00:00.000Z" },
+            }),
+        ]);
+    });
+
+    it("records a cancel now, and one left to run out with when it ends", async () => {
+        await service.cancel(owner, "sub_1", { when: "now" });
+        await service.cancel(owner, "sub_1", { when: "periodEnd" });
+        expect(logged().map((e) => [e.kind, e.data])).toEqual([
+            ["CANCELLED", {}],
+            ["CANCEL_SCHEDULED", { endsAt: "2026-10-01T00:00:00.000Z" }],
+        ]);
+    });
+
+    it("records Keep", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ cancelAtPeriodEnd: true }),
+        );
+        await service.keep(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual(["KEPT"]);
+    });
+
+    it("records a booked plan change, the one it replaced, and taking it back", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...WEEKLY_BOX,
+            id: "plan_3",
+            name: "Loaf and beans",
+            status: "ACTIVE",
+        });
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ pendingPlanId: "plan_2", pendingPlan: WEEKLY_BOX }),
+        );
+        await service.changePlan(owner, "sub_1", { planId: "plan_3" });
+        await service.cancelPlanChange(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual([
+            "PLAN_CHANGE_BOOKED",
+            "PLAN_CHANGE_CANCELLED",
+        ]);
+        expect(logged()[0]!.data).toEqual({
+            to: expect.objectContaining({ id: "plan_3", price: "300.00" }),
+            from: "2026-10-01T00:00:00.000Z",
+            replaced: expect.objectContaining({ id: "plan_2" }),
+        });
+        expect(logged()[1]!.data).toEqual({
+            plan: expect.objectContaining({ id: "plan_2", name: "Weekly box" }),
+        });
+    });
+
+    it("records a new collection day and the period it then invoiced, and nothing for a save that changes nothing", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ collectionWeekday: 6, collectionNote: "1 loaf" }),
+        );
+        await service.setCollection(owner, "sub_1", { weekday: 6 });
+        expect(logged()).toEqual([]);
+        await service.setCollection(owner, "sub_1", {
+            weekday: 3,
+            note: "1 loaf",
+        });
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "COLLECTION_CHANGED",
+                data: { weekday: [6, 3] },
+            }),
+            // The old day's skips had left the period uncharged (none here).
+            expect.objectContaining({
+                kind: "INVOICED",
+                invoiceId: "inv_new",
+                data: {
+                    periodStart: "2026-09-01T00:00:00.000Z",
+                    periodEnd: "2026-10-01T00:00:00.000Z",
+                },
+            }),
+        ]);
+    });
+
+    it("records a skip and its undo by date", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ collectionWeekday: 6 }),
+        );
+        await service.skipCollection(owner, "sub_1", { date: "2026-09-26" });
+        tx.subscriptionSkip!.findFirst!.mockResolvedValueOnce({ id: "skip_1" });
+        await service.unskipCollection(owner, "sub_1", "2026-09-26");
+        expect(logged().map((e) => [e.kind, e.data])).toEqual([
+            ["COLLECTION_SKIPPED", { date: "2026-09-26" }],
+            ["COLLECTION_UNSKIPPED", { date: "2026-09-26" }],
+            // The period had no invoice, so the undo invoiced it.
+            ["INVOICED", expect.anything()],
+        ]);
+    });
+
+    it("records nothing for a retry with nothing to retry", async () => {
+        await expect(service.retryPayment(owner, "sub_1")).rejects.toThrow();
+        expect(logged()).toEqual([]);
+    });
+
+    describe("renewal, by the job", () => {
+        const now = at("2026-10-01T02:00:00Z");
+
+        it("records RENEWED by the job with its invoice and period", async () => {
+            await service.renewOne("sub_1", now);
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "RENEWED",
+                    actorKind: "JOB",
+                    actorUserId: null,
+                    invoiceId: "inv_new",
+                    data: {
+                        periodStart: "2026-10-01T00:00:00.000Z",
+                        periodEnd: "2026-11-01T00:00:00.000Z",
+                    },
+                }),
+            ]);
+        });
+
+        it("records the end of one set to end, and nothing when nothing was due", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValueOnce(
+                sub({ cancelAtPeriodEnd: true }),
+            );
+            await service.renewOne("sub_1", now);
+            await service.renewOne("sub_1", at("2026-09-20T00:00:00Z"));
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "ENDED",
+                    actorKind: "JOB",
+                    data: { at: "2026-10-01T00:00:00.000Z" },
+                }),
+            ]);
+        });
+
+        it("records a period already invoiced with that invoice", async () => {
+            tx.invoice!.findFirst!.mockResolvedValueOnce({ id: "inv_old" });
+            await expect(service.renewOne("sub_1", now)).resolves.toBe(
+                "advanced",
+            );
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "RENEWED",
+                    invoiceId: "inv_old",
+                }),
+            ]);
+        });
     });
 });

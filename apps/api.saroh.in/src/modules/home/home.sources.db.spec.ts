@@ -11,7 +11,11 @@
 import { prisma } from "@saroh/database";
 
 import { StockChecksService } from "../stock/stock-checks.service";
-import { failedRenewals, overdueInvoices } from "./home-money-sources";
+import {
+    failedRenewals,
+    overdueInvoices,
+    readRenewalSignals,
+} from "./home-money-sources";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -399,5 +403,58 @@ describe("Home F1 sources (DB)", () => {
                 (e) => e.title,
             ),
         ).toEqual(["Theirs"]);
+    });
+
+    it("reads a renewal's RENEWAL_FAILED and MANDATE_LIMIT_LOW from the subscription log (D9), only this business's", async () => {
+        const theirs = await prisma.customerSubscription.findFirstOrThrow({
+            where: { organizationId: otherOrgId },
+            select: { id: true },
+        });
+        const event = (
+            organizationId: string,
+            subscriptionId: string,
+            kind: string,
+            createdAt: Date,
+        ) =>
+            prisma.subscriptionEvent.create({
+                data: {
+                    organizationId,
+                    subscriptionId,
+                    kind,
+                    actorKind: "JOB",
+                    createdAt,
+                },
+            });
+        await event(orgId, liveSubId, "PAUSED", ago(DAY));
+        await event(orgId, liveSubId, "RENEWAL_FAILED", ago(3 * DAY));
+        await event(orgId, liveSubId, "MANDATE_LIMIT_LOW", ago(2 * DAY));
+        await event(otherOrgId, theirs.id, "RENEWAL_FAILED", ago(DAY));
+
+        const signals = await readRenewalSignals(prisma, orgId, [
+            liveSubId,
+            theirs.id,
+        ]);
+        expect(signals.sort((a, b) => a.at.getTime() - b.at.getTime())).toEqual(
+            [
+                {
+                    subscriptionId: liveSubId,
+                    kind: "RENEWAL_FAILED",
+                    at: ago(3 * DAY),
+                },
+                {
+                    subscriptionId: liveSubId,
+                    kind: "MANDATE_LIMIT_LOW",
+                    at: ago(2 * DAY),
+                },
+            ],
+        );
+        expect(await readRenewalSignals(prisma, orgId, [])).toEqual([]);
+
+        // The latest since the unpaid invoice was issued names the row.
+        const action = await failedRenewals(prisma, orgId, NOW, true);
+        expect(action?.evidence?.[0]).toMatchObject({
+            id: liveSubId,
+            tag: "Autopay limit too low",
+        });
     });
 });

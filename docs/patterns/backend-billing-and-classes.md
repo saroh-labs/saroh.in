@@ -278,6 +278,23 @@
   operator's change reads as Saroh support (DEC-035). There is no backfill:
   a plan without a CREATED event says "Earlier changes weren't recorded"
   (`earlierUnrecorded`).
+- **Everything done to a subscription is a subscription event** (D9).
+  Each action writes one `SubscriptionEvent` inside its own transaction,
+  after the subscription's row lock, through
+  `subscriptions/subscription-events.ts` (`subscriptionEventLog(tx, …)`,
+  bound to the actor): TEAM or OPERATOR from the context, JOB for the
+  renewal job, CUSTOMER with `customerAccountId` from a customer's own
+  session (epic A). A refused action rolls back and writes none; the job
+  writes RENEWED once per period, since a redelivered run finds the period
+  already moved under the lock. A new action that changes a subscription
+  adds a kind to `SUBSCRIPTION_EVENT_KINDS` and records it. Who did it is
+  named by `event-actors.ts`, shared with the plan log, so an operator is
+  Saroh support in both. The log is append-only, keyed to its subscription
+  by `(subscriptionId, organizationId)`, and read newest first by cursor
+  (`GET subscriptions/:id/events`); the invoice an event names is left out
+  without `invoice:read`. No backfill: without a SUBSCRIBED event the read
+  says `earlierUnrecorded`. Home's failed-renewal source reads its
+  RENEWAL_FAILED and MANDATE_LIMIT_LOW events (F1, written by D13).
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.

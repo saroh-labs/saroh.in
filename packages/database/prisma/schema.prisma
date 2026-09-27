@@ -274,6 +274,9 @@ model Organization {
 
   // Every change to a plan, append-only (plan 2026-09-26-004, D2).
   subscriptionPlanEvents SubscriptionPlanEvent[]
+
+  // Everything done to a subscription, append-only (plan 2026-09-26-004, D9).
+  subscriptionEvents SubscriptionEvent[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -4794,13 +4797,58 @@ model CustomerSubscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Everything done to it, newest last (D9).
+  events SubscriptionEvent[]
+
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
+  // The composite key its events point at, so an event can't name another
+  // business's subscription (D9).
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@index([contactId])
   @@index([status, currentPeriodEnd])
   @@index([pendingPlanId])
+}
+
+// One thing done to a subscription: what, who did it and when (plan
+// 2026-09-26-004, D9). Written in the same transaction as the action it
+// records. Append-only: nothing updates or deletes a row; it goes only with
+// its subscription.
+model SubscriptionEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   CustomerSubscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // SUBSCRIBED | PAUSED | RESUMED | CANCELLED | CANCEL_SCHEDULED | KEPT |
+  // ENDED | PLAN_CHANGE_BOOKED | PLAN_CHANGE_CANCELLED | PLAN_CHANGED | ...
+  // (SUBSCRIPTION_EVENT_KINDS in subscription-events.ts).
+  kind              String
+  // TEAM | CUSTOMER | JOB | OPERATOR. An operator's action reads as Saroh
+  // support (DEC-035).
+  actorKind         String
+  // The team member or operator. Not a foreign key: someone who leaves the
+  // team keeps their actions in the log. Null for the job and a customer.
+  actorUserId       String?
+  // The customer's site account, when they acted themselves (ADR-011).
+  // Not a foreign key, for the same reason.
+  customerAccountId String?
+  // The invoice the action issued or acted on. Not a foreign key: the log
+  // outlives a voided invoice, and only links to it.
+  invoiceId         String?
+  note              String?
+  // What the kind needs to be said in words, e.g. { weeks: 4 } or
+  // { to: { id, name, price } }; money as "1500.00".
+  data              Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  // Also serves Home's failed-renewal read (F1), which asks by subscription.
+  @@index([organizationId, subscriptionId, createdAt])
 }
 
 // One collection a subscriber will not make, by its date in the

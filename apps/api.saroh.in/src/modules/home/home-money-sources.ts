@@ -31,7 +31,8 @@ export interface RenewalSignal {
 /**
  * Reads the RENEWAL_FAILED and MANDATE_LIMIT_LOW events of these
  * subscriptions. Only D13 (a mandate charge) writes them, so before autopay
- * there are none and no renewal reads "Payment failed".
+ * there are none and no renewal reads "Payment failed". A parameter, so
+ * the unit specs can hand in their own.
  */
 export type RenewalSignalReader = (
     db: Db,
@@ -39,13 +40,36 @@ export type RenewalSignalReader = (
     subscriptionIds: readonly string[],
 ) => Promise<RenewalSignal[]>;
 
+const RENEWAL_EVENT_KINDS: RenewalEventKind[] = [
+    "RENEWAL_FAILED",
+    "MANDATE_LIMIT_LOW",
+];
+
 /**
- * The event read. D9's `SubscriptionEvent` table is not on this branch yet,
- * so there is nothing to read: D9 (or D13, which writes the two kinds)
- * replaces this body with the query on it. Nothing else here changes.
+ * The event read, from D9's subscription log. Only D13 writes these two
+ * kinds, so until autopay this finds none. Every event of theirs is read:
+ * `renewalTag` keeps the ones since the unpaid invoice was issued.
  */
-export const readRenewalSignals: RenewalSignalReader = () =>
-    Promise.resolve([]);
+export const readRenewalSignals: RenewalSignalReader = async (
+    db,
+    organizationId,
+    subscriptionIds,
+) => {
+    if (subscriptionIds.length === 0) return [];
+    const rows = await db.subscriptionEvent.findMany({
+        where: {
+            organizationId,
+            subscriptionId: { in: [...subscriptionIds] },
+            kind: { in: RENEWAL_EVENT_KINDS },
+        },
+        select: { subscriptionId: true, kind: true, createdAt: true },
+    });
+    return rows.map((r) => ({
+        subscriptionId: r.subscriptionId,
+        kind: r.kind as RenewalEventKind,
+        at: r.createdAt,
+    }));
+};
 
 const EVENT_TAGS: Record<RenewalEventKind, string> = {
     RENEWAL_FAILED: "Payment failed",
