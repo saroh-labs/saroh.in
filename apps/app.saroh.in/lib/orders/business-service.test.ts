@@ -11,6 +11,12 @@ import {
     listOrderRows,
     orderListQuery,
 } from "@/lib/orders/business-service";
+import {
+    rowAge,
+    rowMoney,
+    rowProgress,
+    rowSubline,
+} from "@/lib/orders/list-row";
 
 const page = (ids: string[], nextCursor: string | null) => ({
     rows: ids.map((id) => ({ id })),
@@ -45,25 +51,60 @@ describe("listOrderRows", () => {
     });
 
     it("reads an older API's bare array as one page, not a crash (O-2)", async () => {
-        // An API rolled back past B1 answers every order, unpaged.
+        // An API rolled back past B1 answers every order, unpaged, in the
+        // old `OrganizationOrderDto` shape: no steps, payment or status.
+        const old = (id: string, standing: string, total: string | null) => ({
+            id,
+            orderId: id.slice(1),
+            standing,
+            total,
+            currency: "INR",
+            placedAt: "2026-09-27T09:00:00.000Z",
+            itemCount: 2,
+            store: { id: "s1", name: "Hill Road" },
+            customer: { id: "c1", name: "Asha Rao", email: "asha@example.com" },
+        });
         getJson.mockResolvedValue([
-            { id: "o1", status: "PENDING", standing: "UNFULFILLED" },
-            { id: "o2", status: "SHIPPED", standing: "FULFILLED" },
-            { id: "o3", status: "DELIVERED", standing: "FULFILLED" },
-            {
-                id: "o4",
-                status: "DELIVERED",
-                standing: "REFUNDED",
-                payment: "REFUNDED",
-            },
+            old("o1", "UNFULFILLED", "480.00"),
+            old("o2", "FULFILLED", "120.00"),
+            old("o3", "CANCELLED", "90.00"),
+            old("o4", "REFUNDED", null),
         ]);
         const all = await listOrderRows();
         expect(all.rows.map((r) => r.id)).toEqual(["o1", "o2", "o3", "o4"]);
-        expect(all.counts).toEqual({ all: 4, open: 2, refunded: 1 });
+        expect(all.counts).toEqual({ all: 4, open: 1, refunded: 1 });
         expect(all.nextCursor).toBeNull();
 
+        // Every row is whole, and the row code draws it without throwing.
+        for (const r of all.rows) {
+            expect(r.steps).toEqual([]);
+            expect(r.productNames).toEqual([]);
+            expect(() => rowProgress(r)).not.toThrow();
+            expect(() => rowAge(r)).not.toThrow();
+            expect(() => rowMoney(r)).not.toThrow();
+            expect(rowSubline(r, true)).toBe("2 items · Hill Road");
+        }
+        const [o1, o2, o3, o4] = all.rows;
+        expect(rowProgress(o1)).toMatchObject({
+            word: "Open",
+            tone: "new",
+            index: null,
+        });
+        expect(rowProgress(o2)).toMatchObject({
+            word: "Fulfilled",
+            tone: "done",
+        });
+        expect(rowAge(o2)).toBeNull();
+        expect(rowProgress(o3).word).toBe("Cancelled");
+        expect(o4.payment).toBe("REFUNDED");
+        expect(o1.payment).toBe("PAID");
+        expect(o4.total).toBeUndefined();
+        expect(rowMoney(o1)).toEqual({ total: "₹480", unpaid: null });
+
         const open = await listOrderRows({ tab: "open" });
-        expect(open.rows.map((r) => r.id)).toEqual(["o1", "o2"]);
+        expect(open.rows.map((r) => r.id)).toEqual(["o1"]);
+        const refunded = await listOrderRows({ tab: "refunded" });
+        expect(refunded.rows.map((r) => r.id)).toEqual(["o4"]);
         // listAllOrderRows stops rather than asking for a next page.
         expect((await listAllOrderRows()).complete).toBe(true);
     });

@@ -56,13 +56,19 @@ export function rowProgress(row: ProgressFields): RowProgress {
         count === 0 ? null : Math.min(Math.max(row.stepIndex, 0), count - 1);
     const step = index === null ? undefined : row.steps[index];
     const last = index !== null && index === count - 1;
-    const tone: StepTone = last
-        ? "done"
-        : step?.stage === "READY"
-          ? "ready"
-          : index === 0
-            ? "new"
-            : "prog";
+    // No steps (an old row, O-2): done once fulfilled, else waiting to start.
+    const tone: StepTone =
+        index === null
+            ? row.standing === "FULFILLED"
+                ? "done"
+                : "new"
+            : last
+              ? "done"
+              : step?.stage === "READY"
+                ? "ready"
+                : index === 0
+                  ? "new"
+                  : "prog";
     const next = index === null ? null : (row.steps[index + 1]?.label ?? null);
     return {
         word:
@@ -118,6 +124,8 @@ export function rowAge(
     if (row.steps.length > 0 && row.stepIndex >= row.steps.length - 1) {
         return null;
     }
+    // With no steps to go by (an old row, O-2), fulfilled is done.
+    if (row.steps.length === 0 && row.standing === "FULFILLED") return null;
     const words = ageWords(row.ageMinutes);
     return row.late === true
         ? { text: `Late · ${words}`, late: true }
