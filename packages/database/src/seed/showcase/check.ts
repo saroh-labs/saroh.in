@@ -465,13 +465,14 @@ export async function checkShowcase(
     );
     // The Stock screen's "Last change" reads the newest entry and who made
     // it: an entry is never later than now, and only one Saroh wrote itself
-    // (Track stock turned off, …) is by nobody.
+    // (Track stock turned off, …) is by nobody. Northwind's base seed writes
+    // on the wall clock, the showcase at its own now: the later of the two.
     fail(
         "stock entries dated in the future, or made by nobody",
         await prisma.$queryRaw<Row[]>`
             SELECT id, "organizationId", "createdAt", "actorUserId" FROM "StockEntry"
             WHERE "organizationId" = ANY(${orgs})
-              AND ("createdAt" > ${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC'
+              AND ("createdAt" > ${new Date(Math.max(Date.now(), now.getTime())).toISOString()}::timestamptz AT TIME ZONE 'UTC'
                    OR ("actorUserId" IS NULL AND "system" IS NULL))`,
     );
 
@@ -889,7 +890,7 @@ export async function checkRye(
     const stock = await checkRyeStock(prisma, orgId);
     failures.push(...stock.failures);
     // The Product Detail and Editor films' details, reviews and codes (#522).
-    const page = await checkRyeProductPage(prisma, orgId);
+    const page = await checkRyeProductPage(prisma, orgId, now);
     failures.push(...page.failures);
 
     if (failures.length > 0) {
