@@ -193,20 +193,160 @@ ADD COLUMN "courierName" TEXT, ADD COLUMN "trackingNumber" TEXT`. Nullable,
 
 ## Release 2 · switch (B2c)
 
-To be filled in by B2c: the backfill migration
-(`<ts>_order_fulfilment_switch`: COLLECT → PICKUP and DELIVERY →
-LOCAL_DELIVERY, the column default PICKUP), its row count and timing from
-the rehearsal, and what it locks. It rewrites `Order.fulfilment` for every
-row, so it takes row locks on every order; time it on a production-sized
-copy.
+**Release 1 (B2a) must be live in production, API and app, before this
+release deploys.** B2c ships in a PR of its own, one release after the one
+that carries B2a (round 2's Phase 1 branch). The image that serves while its
+migration runs, and the tag a rollback lands on, must be one that reads the
+new values; an app built before B2a would still offer "Hand to courier" on a
+ready local delivery, which this API refuses. Check before you start:
 
-- The backfill rewrites values the running release-1 image already reads,
-  so it keeps serving during the migration. It may still write COLLECT or
-  DELIVERY until the new image serves; B2d catches those.
-- A former DELIVERY order at HANDED_TO_COURIER becomes a LOCAL_DELIVERY
-  order at HANDED_TO_COURIER, and moves on by the legacy
-  HANDED_TO_COURIER → DELIVERED move (kept for good).
-- Rollback: deploy the release-1 tag.
+- the API that production serves is release 1 or later: its
+  `GET organizations/:org/orders/:orderId` answers `fulfilmentType` and
+  `steps`;
+- both release-1 migrations are applied:
+
+    ```sql
+    SELECT migration_name, finished_at FROM "_prisma_migrations"
+    WHERE migration_name IN ('20261009130000_order_fulfilment_values',
+                             '20261009130001_store_fulfilment_types');
+    -- two rows, both finished
+    ```
+
+- the app in production was built from release 1 or later.
+
+### The migration and its locks
+
+| Migration                                | What it does                                                                                                                                                                                   | Locks held until it commits                                                                                                                                                                                                                                                                                                                          | Time                                                                                                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261011100000_order_fulfilment_switch` | One `UPDATE "Order"`: COLLECT → PICKUP and DELIVERY → LOCAL_DELIVERY, on every row still in a legacy word. Then `ALTER COLUMN "fulfilment" SET DEFAULT 'PICKUP'`. Stages and `updatedAt` stay. | A row lock on **every order it renames**, from the UPDATE until the commit (a new tuple each; no table lock, no index on the column). An order edit, kitchen move, status PATCH or payment webhook that updates an order row waits for the commit. Reads never wait. The default change is a brief ACCESS EXCLUSIVE lock on `Order` with no rewrite. | Measured locally (Postgres 17, `Order` with its 5 indexes): the showcase seed, **667 orders, 17.9 ms**; the same rows copied to **200,767 orders, 5.55 s** (about 28 µs a row). Linear in the number of orders. |
+
+At today's production size this is milliseconds, and a normal window is
+enough. If production holds more than about 50,000 orders when this ships
+(over a second of row locks), re-time it on a restored copy (as
+`PRODUCTS_STOCK_ROLLOUT.md` does) and pick a quiet hour: every kitchen move
+waits for the whole UPDATE.
+
+### Checklist
+
+This release **can** go through the automatic push-to-deploy (backup,
+migrate, deploy), once the checks above hold: the migration only renames
+values the running release-1 image already reads, so that image keeps
+serving while it runs, and nothing after it is needed by the new image.
+
+1. **Back up** (the host's rollout does it before it migrates).
+2. **Migrate** with the new image: `db:migrate:deploy` applies
+   `20261011100000_order_fulfilment_switch`.
+3. **Deploy** the new API image and wait for `/health/ready`.
+4. **Sweep orders the old image wrote during the deploy** (optional,
+   idempotent). Between the migration and the new image serving, the
+   release-1 image may still create or edit an order in COLLECT or
+   DELIVERY. They read and move exactly as the renamed ones do, and B2d's
+   migration converts them. To convert them now, run the migration's
+   UPDATE again; it touches only the stragglers:
+
+    ```sql
+    UPDATE "Order"
+    SET "fulfilment" = CASE "fulfilment"
+            WHEN 'COLLECT' THEN 'PICKUP'::"OrderFulfilment"
+            ELSE 'LOCAL_DELIVERY'::"OrderFulfilment"
+        END
+    WHERE "fulfilment" IN ('COLLECT', 'DELIVERY');
+    ```
+
+5. **Verify** (read-only). Every query must return no rows, the first once
+   step 4 has run (before it, only orders placed or edited during the deploy
+   window may appear):
+
+    ```sql
+    -- Every order is in its type's own name.
+    SELECT id, fulfilment FROM "Order"
+    WHERE fulfilment IN ('COLLECT', 'DELIVERY');
+
+    -- New orders default to Pick-up.
+    SELECT column_default FROM information_schema.columns
+    WHERE table_name = 'Order' AND column_name = 'fulfilment'
+      AND column_default <> '''PICKUP''::"OrderFulfilment"';
+
+    -- Each new stage only on its own type: Out for delivery is a local
+    -- delivery's, Sent a digital order's.
+    SELECT id, fulfilment, stage FROM "Order"
+    WHERE (stage = 'OUT_FOR_DELIVERY' AND fulfilment <> 'LOCAL_DELIVERY')
+       OR (stage = 'SENT' AND fulfilment <> 'DIGITAL');
+
+    -- No appointment order yet: they come only by booking (E9).
+    SELECT id FROM "Order"
+    WHERE fulfilment IN ('APPOINTMENT_IN_PERSON', 'APPOINTMENT_ONLINE');
+
+    -- Only a storefront's own ways are ever stored on it (as release 1).
+    SELECT "storeId" FROM "StoreSettings"
+    WHERE NOT ("fulfilmentTypes" <@ ARRAY['PICKUP', 'LOCAL_DELIVERY', 'SHIPPING']::"OrderFulfilment"[]);
+    ```
+
+    And one that should return rows on a business that delivered before
+    the switch: the local deliveries still with a courier move on by the
+    legacy step.
+
+    ```sql
+    SELECT id, stage FROM "Order"
+    WHERE fulfilment = 'LOCAL_DELIVERY' AND stage = 'HANDED_TO_COURIER';
+    ```
+
+6. **Deploy the app** (Vercel) after the API, as always. The release-1 app
+   already draws what the API sends (`steps`, `next.stages`), so it needs no
+   change for this release; redeploy it only if it changed.
+
+### What changes for callers
+
+- **Writes use the types' own names.** Create and edit still accept either
+  vocabulary, and store PICKUP, LOCAL_DELIVERY, SHIPPING or DIGITAL. Every
+  read still answers the legacy `fulfilment` word beside `fulfilmentType`
+  until release 3.
+- **Shipping and Digital open.** Create and edit take SHIPPING (it needs an
+  address, like a delivery) and DIGITAL (no address). The appointment types
+  are refused with 400 "An appointment is made by booking it, not by adding
+  an order.": they are written only by booking (E9).
+- **A local delivery goes out for delivery.** A ready local delivery is
+  offered `OUT_FOR_DELIVERY` (SHIPPED), then DELIVERED. `HANDED_TO_COURIER`
+  from READY is refused with 400 "This order is a local delivery, so it goes
+  out for delivery, not to a courier."; a courier's name or tracking number
+  on a local delivery is refused with 409 "A local delivery isn't handed to
+  a courier." A shipment is the order that goes by courier.
+- **In-flight courier orders.** A former DELIVERY order already
+  HANDED_TO_COURIER is now LOCAL_DELIVERY at HANDED_TO_COURIER. It keeps its
+  step ("Handed to courier" in its `steps`), its courier and tracking
+  number, and moves on by the legacy HANDED_TO_COURIER → DELIVERED move
+  (kept for good). A handover made before the switch can still be undone in
+  its window; the order is then ready and goes out for delivery.
+- **Digital** moves NEW → SENT (PENDING → DELIVERED) in one step, only once
+  paid; it has no Preparing step.
+- The store-scoped status PATCH to SHIPPED puts a local delivery at
+  `OUT_FOR_DELIVERY` (one already with a courier stays there) and a
+  shipment at `HANDED_TO_COURIER`.
+
+### Rollback
+
+Deploy the release-1 tag. It reads every value and stage this release
+writes: PICKUP, LOCAL_DELIVERY, SHIPPING and DIGITAL orders, and orders at
+`OUT_FOR_DELIVERY` or `SENT`, and it moves each on (release 1 keeps the
+moves out of the new stages; its tests cover a row stored as
+LOCAL_DELIVERY, one Out for delivery, and a Shipping one). Leave the
+migration applied: the renamed rows are exactly what release 1 reads, and
+the PICKUP default is a value it reads (it always writes a value of its
+own). After a rollback it writes COLLECT and DELIVERY again, beside the
+renamed rows; B2d's migration converts those. Redeploy the previous app
+build only if the app had changed.
+
+### Rehearsal (to do before production)
+
+Start the release-1 tag against a database migrated by this release, and
+check that Orders, Order Detail and a kitchen move work, including a local
+delivery Out for delivery, a Shipping order and a Digital one. Plan B's
+verification for B2c; the orchestrator runs it on the development
+environment. The row count and timing above came from B2c's local run on
+the showcase seed (`db:seed:showcase`, then put back in the legacy words)
+and a copy grown to 200,767 orders.
+
+---
 
 ## Release 3 · contract (B2d)
 
