@@ -35,6 +35,7 @@ import type {
     BookingStart,
     BookingWhere,
     BookResult,
+    HoldView,
 } from "./model";
 import {
     asksWhere,
@@ -86,6 +87,10 @@ const POLL_MS = 4_000;
 
 /** A booking that came back not standing: a replayed hold that was let go. */
 const TIME_GONE = "That time has gone. Pick another one.";
+
+/** The hold couldn't be let go, so it may still stand (K-2). */
+const LEAVE_HOLD_FAILED =
+    "We couldn't let go of the time we're holding for you. Try again.";
 
 /** Class sessions shown before "Show more". */
 const SESSIONS_SHOWN = 10;
@@ -577,7 +582,47 @@ export default function BookingFlow({
         setLeaving(true);
         const held = phase;
         try {
-            await releaseHold(apiUrl, held.token);
+            const released = await releaseHold(apiUrl, held.token).catch(
+                (): Result<HoldView> => OFFLINE_RESULT,
+            );
+            // Paid a moment ago: the place is theirs, so say so — never
+            // book it again at the desk or send them back to choose.
+            if (released.ok && released.value.state === "CONFIRMED") {
+                const standing = released.value.booking;
+                setPhase({
+                    kind: "done",
+                    booking: standing
+                        ? {
+                              ...held.booking,
+                              online: standing.online,
+                              meetingUrl: standing.meetingUrl,
+                          }
+                        : held.booking,
+                    paid: true,
+                    price: held.price,
+                    when: held.when,
+                    first: bookerFirst,
+                });
+                return;
+            }
+            // The hold may still stand: booking at the desk now would only
+            // be refused as theirs already, so stay here and say it (K-2).
+            if (
+                then === "desk" &&
+                (!released.ok || released.value.state === "HELD")
+            ) {
+                setPhase((p) =>
+                    p.kind === "paying" && p.token === held.token
+                        ? {
+                              ...p,
+                              payError: released.ok
+                                  ? LEAVE_HOLD_FAILED
+                                  : released.message,
+                          }
+                        : p,
+                );
+                return;
+            }
             if (then !== "desk" || !service || !chosenStart) {
                 backToChoosing();
                 return;
