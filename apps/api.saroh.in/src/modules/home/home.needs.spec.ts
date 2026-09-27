@@ -15,6 +15,7 @@ const ZONE = "Asia/Kolkata";
 const NOW = new Date("2026-09-18T04:00:00.000Z");
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const MIN = 60_000;
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
 function ev(over: Partial<HomeEvidence> & { id: string }): HomeEvidence {
@@ -312,6 +313,42 @@ describe("openOrderWords", () => {
         });
     });
 
+    it("goes by the storefront's own threshold, in minutes under an hour (B17)", () => {
+        const counter = { PICKUP: 20, LOCAL_DELIVERY: 1440, SHIPPING: 2880 };
+        const pickup = order({
+            fulfilment: "PICKUP",
+            createdAt: ago(25 * MIN),
+        });
+        expect(openOrderWords(pickup, "Dev", NOW, ZONE, counter)).toMatchObject(
+            { tag: "Late · 25 min", tone: "bad" },
+        );
+        // The default two hours: not late yet, due today.
+        expect(openOrderWords(pickup, "Dev", NOW, ZONE)).toMatchObject({
+            tag: "Due today",
+            tone: "due",
+        });
+        const slow = { PICKUP: 120, LOCAL_DELIVERY: 1440, SHIPPING: 72 * 60 };
+        const shipping = order({
+            fulfilment: "SHIPPING",
+            createdAt: ago(50 * HOUR),
+        });
+        expect(openOrderWords(shipping, "Dev", NOW, ZONE).tone).toBe("bad");
+        expect(openOrderWords(shipping, "Dev", NOW, ZONE, slow)).toMatchObject({
+            tone: "due",
+            tag: "Due tomorrow",
+        });
+    });
+
+    it("never calls a shipped or refunded order late, as Orders wouldn't", () => {
+        const shipped = order({ status: "SHIPPED", createdAt: ago(5 * DAY) });
+        expect(openOrderWords(shipped, "Dev", NOW, ZONE).tag).toBeUndefined();
+        const refunded = order({
+            paymentStatus: "REFUNDED",
+            createdAt: ago(5 * DAY),
+        });
+        expect(openOrderWords(refunded, "Dev", NOW, ZONE).tag).toBeUndefined();
+    });
+
     it("asks for the hand-over once a pick-up is ready", () => {
         const ready = order({ fulfilment: "COLLECT", stage: "READY" });
         expect(openOrderWords(ready, "Dev", NOW, ZONE).headline).toBe(
@@ -389,6 +426,11 @@ describe("HomeService needs", () => {
                 count: jest.fn().mockResolvedValue(0),
                 findMany: jest.fn().mockResolvedValue([]),
             },
+            storeSettings: {
+                aggregate: jest.fn().mockResolvedValue({
+                    _max: { pickupLateAfterMinutes: null },
+                }),
+            },
             businessProfile: {
                 findUnique: jest
                     .fn()
@@ -427,6 +469,7 @@ describe("HomeService needs", () => {
         paymentStatus: "PAID",
         stage: "NEW",
         fulfilment: "DELIVERY",
+        store: { settings: null },
         customer: { firstName: "Anika", lastName: "Rao", email: "a@x.in" },
     };
     const overdueInvoice = {

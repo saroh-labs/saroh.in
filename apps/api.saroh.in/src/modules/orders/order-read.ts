@@ -1,5 +1,5 @@
 import { toMoneyString } from "../../common/money";
-import type { FulfilmentView, LateView } from "./fulfilment";
+import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
@@ -296,6 +296,8 @@ export interface ReadOptions {
     /** Names for the people on the timeline. */
     actors: ReadonlyMap<string, string | null>;
     now: Date;
+    /** The thresholds the order's storefront sets (B17); defaults if absent. */
+    lateThresholds?: LateThresholds;
     /** Payments on superseded edit charges not yet handed back. */
     owedBack?: { id: string; amountCents: number }[];
     /**
@@ -383,7 +385,8 @@ export function serializeOrderRead(
         orderId: order.orderId,
         placedAt: order.createdAt,
         updatedAt: order.updatedAt,
-        store: order.store,
+        // Only who it is: the settings row the late rule read stays here.
+        store: { id: order.store.id, name: order.store.name },
         status: order.status,
         paymentStatus: order.paymentStatus,
         refundStanding: refundStanding(
@@ -395,8 +398,8 @@ export function serializeOrderRead(
         // The legacy word and the type, their steps and where it stands
         // (fulfilment.ts); the app draws these and keeps no copy.
         ...fulfilmentView(order.fulfilment, stage),
-        // Late by its type's threshold (the defaults until B17): the rule
-        // the Orders list's Late filter runs, so the two never disagree.
+        // Late by the threshold its storefront sets for its type (B17): the
+        // rule the Orders list's Late filter runs, so the two never disagree.
         ...lateOf(
             {
                 fulfilment: order.fulfilment,
@@ -406,6 +409,7 @@ export function serializeOrderRead(
                 placedAt: order.createdAt,
             },
             opts.now,
+            opts.lateThresholds,
         ),
         customer: order.customer
             ? {

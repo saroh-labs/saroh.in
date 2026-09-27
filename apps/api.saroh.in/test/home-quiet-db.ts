@@ -1,7 +1,8 @@
 /**
  * For Home's specs that build the whole service on a mocked Prisma: gives
- * the header's reads (F6, `home-last-day.ts`) a quiet answer — a business
- * with nothing new in the last 24 hours — wherever the spec's own mock
+ * the header's reads (F6, `home-last-day.ts`) and the paused-subscriptions
+ * source (D8, `home-pause-sources.ts`) a quiet answer — a business with
+ * nothing new in the last 24 hours and no pause waiting — wherever the spec's own mock
  * doesn't answer them, so what each spec asserts reads as it did.
  *
  * In `test/`, which the build leaves out as it does the specs.
@@ -13,6 +14,8 @@ const QUIET: Record<string, Table> = {
     booking: { count: 0, findFirst: null },
     invoice: { findFirst: null, groupBy: [] },
     productReview: { count: 0 },
+    organizationModule: { findFirst: null },
+    customerSubscription: { count: 0, findMany: [] },
 };
 
 export function quietLastDay<T extends object>(db: T): T {

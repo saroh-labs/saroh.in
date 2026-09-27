@@ -1890,10 +1890,21 @@ model StoreSettings {
 
   // The physical ways this storefront's orders leave (DEC-045): only
   // PICKUP, LOCAL_DELIVERY and SHIPPING are ever stored here; Digital and the
-  // appointment types follow the product. Kept in step with
-  // `collectionEnabled` and `shippingEnabled` until B17 replaces those two
-  // toggles with a chip set.
+  // appointment types follow the product. Set by B17's chips, which keep
+  // `collectionEnabled` (Pick-up) and `shippingEnabled` (any delivery) in
+  // step; a save of either toggle from an older app still updates it.
   fulfilmentTypes OrderFulfilment[] @default([])
+
+  // When this storefront's open orders count as late, in minutes from when
+  // each was placed, per way it offers (B17; default 16, DEC-045). Bounds
+  // (5 minutes to 30 days) are the API's. Never stored on an order: a change
+  // re-labels open orders on the next read.
+  pickupLateAfterMinutes        Int       @default(120)
+  localDeliveryLateAfterMinutes Int       @default(1440)
+  shippingLateAfterMinutes      Int       @default(2880)
+  // When the one-time "Pick-up orders now count as late after 2 hours"
+  // notice on Orders was dismissed for this storefront (B17).
+  lateRuleNoticeDismissedAt     DateTime?
 }
 
 model StoreFeatures {

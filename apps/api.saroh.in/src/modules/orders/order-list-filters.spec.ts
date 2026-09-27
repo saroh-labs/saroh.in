@@ -8,7 +8,7 @@ import { storedValuesOf } from "./fulfilment";
 import {
     computedConditions,
     dayRange,
-    DEFAULT_LATE_AFTER_MINUTES,
+    lateSettingsJoin,
     lateSql,
     orderConditions,
     paymentStandingOf,
@@ -41,14 +41,18 @@ describe("fulfilment words (read through fulfilment.ts, B2a)", () => {
         ]);
     });
 
-    it("judges late by each type's default, under both words (default 16)", () => {
-        expect(DEFAULT_LATE_AFTER_MINUTES).toEqual({
-            COLLECT: 120,
-            PICKUP: 120,
-            DELIVERY: 1440,
-            LOCAL_DELIVERY: 1440,
-            SHIPPING: 2880,
-        });
+    it("judges late by the type's storefront column, under both words (B17)", () => {
+        const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
+        for (const column of [
+            'ss."pickupLateAfterMinutes"',
+            'ss."localDeliveryLateAfterMinutes"',
+            'ss."shippingLateAfterMinutes"',
+        ]) {
+            expect(s.sql).toContain(column);
+        }
+        expect(lateSettingsJoin().sql).toBe(
+            'LEFT JOIN "StoreSettings" ss ON ss."storeId" = o."storeId"',
+        );
     });
 });
 
@@ -182,7 +186,7 @@ describe("the conditions", () => {
         expect(tabCondition(undefined).sql).toBe("TRUE");
     });
 
-    it("gives every type with a late rule its default threshold", () => {
+    it("falls back to each type's default for a storefront without settings", () => {
         const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
         expect(s.values).toEqual(
             expect.arrayContaining([

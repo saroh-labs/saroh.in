@@ -1,5 +1,5 @@
 import { fromMinor, toMoneyString } from "../../common/money";
-import type { FulfilmentView, LateView } from "./fulfilment";
+import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
@@ -101,6 +101,11 @@ export interface RowView {
     /** `contact:read`: the customer's phone and email. */
     contact: boolean;
     now: Date;
+    /**
+     * The thresholds the order's storefront sets (B17); the defaults when
+     * absent. The list reads them once per storefront in the page.
+     */
+    lateThresholds?: LateThresholds;
 }
 
 export function serializeOrderRow(
@@ -160,8 +165,8 @@ export function serializeOrderRow(
         // The legacy word (COLLECT or DELIVERY until B2d), the type, and
         // the type's steps with where the order stands on them.
         ...fulfilmentView(order.fulfilment, order.stage as OrderStage),
-        // Late by the type's threshold (the defaults until B17), on the
-        // same clock as the page's Late filter.
+        // Late by the threshold its storefront sets for its type (B17), on
+        // the same clock as the page's Late filter.
         ...lateOf(
             {
                 fulfilment: order.fulfilment,
@@ -171,6 +176,7 @@ export function serializeOrderRow(
                 placedAt: order.createdAt,
             },
             view.now,
+            view.lateThresholds,
         ),
         standing: orderStanding(order.status, order.paymentStatus),
         payment: paymentStandingOf(order.paymentStatus, captured, refunded),

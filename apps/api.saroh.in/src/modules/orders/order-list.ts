@@ -2,10 +2,12 @@ import { NotFoundException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import { businessTimezone } from "../bookings/staff-availability";
+import { lateThresholdsByStore, thresholdsFor } from "./late-thresholds";
 import type { OrderListFilter, OrderListView } from "./order-list-filters";
 import {
     computedConditions,
     dayRange,
+    lateSettingsJoin,
     lateSql,
     openSql,
     orderConditions,
@@ -73,6 +75,7 @@ export async function listOrderRows(
             ${lateSql(now)} AS late
         FROM "Order" o
         LEFT JOIN "Customer" c ON c.id = o."customerId"
+        ${lateSettingsJoin()}
         LEFT JOIN LATERAL (
             SELECT COALESCE(SUM(pi."amountCents"), 0) AS captured,
                 COALESCE(SUM((
@@ -147,6 +150,12 @@ export async function listOrderRows(
           })
         : [];
     const byId = new Map(loaded.map((o) => [o.id, o]));
+    // Each storefront's late thresholds, once per storefront in the page:
+    // the numbers `lateSql` read for the Late filter and the counts.
+    const thresholds = await lateThresholdsByStore(
+        prisma,
+        loaded.map((o) => o.store.id),
+    );
 
     return {
         rows: page.flatMap((id) => {
@@ -157,6 +166,7 @@ export async function listOrderRows(
                           money: view.money,
                           contact: view.contact,
                           now,
+                          lateThresholds: thresholdsFor(thresholds, o.store.id),
                       }),
                   ]
                 : [];

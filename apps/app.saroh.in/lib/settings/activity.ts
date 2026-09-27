@@ -1,4 +1,5 @@
 import { productHref } from "@/lib/products/links";
+import { storefrontHref } from "@/lib/stores/links";
 
 import type { BusinessTab } from "./activity-changes";
 import {
@@ -47,6 +48,7 @@ export const ACTIVITY_ACTIONS = [
     "organization.onboard",
     "profile.update",
     "storefront.hours.update",
+    "storefront.fulfilment.update",
     "organization.module.enabled",
     "organization.module.disabled",
     "organization.plan.changed",
@@ -123,6 +125,9 @@ const TEAM = (view: "people" | "roles" = "people") => ({
 const MODULES = { label: "Modules", href: "/settings/modules" };
 const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
+/** A storefront's own settings, or the list when it isn't named. */
+const STOREFRONTS_HREF = (storeId: string | null) =>
+    storeId ? storefrontHref(storeId) : "/commerce/storefronts";
 
 const business = (tab?: BusinessTab) => ({
     label: tab ? TAB_LABEL[tab] : "Business",
@@ -200,6 +205,20 @@ export function activityLine(
         }
         case "storefront.hours.update":
             return line("changed the opening hours", business("hours"));
+        case "storefront.fulfilment.update": {
+            // How orders leave, or when they count as late (B17).
+            const where = text(meta.storefront);
+            const late = fieldsOf(meta).some((f) =>
+                f.endsWith("LateAfterMinutes"),
+            );
+            return line(
+                `${late ? "changed when orders count as late" : "changed how orders leave"}${where ? ` at ${where}` : ""}`,
+                {
+                    label: "Storefronts",
+                    href: STOREFRONTS_HREF(event.targetId),
+                },
+            );
+        }
         case "organization.module.enabled":
             return line(
                 `switched on ${moduleName(meta, event.targetId)}`,

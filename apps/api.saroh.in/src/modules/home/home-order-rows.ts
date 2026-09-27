@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 
-import { DEFAULT_LATE_AFTER_MINUTES } from "../orders/order-list-filters";
+import type { LateFacts, LateThresholds } from "../orders/fulfilment";
+import { lateOf, typeOf } from "../orders/fulfilment";
 import type { HomeTone } from "./home-model";
 import { placedWords } from "./home-needs";
 
@@ -8,10 +9,11 @@ import { placedWords } from "./home-needs";
  * What an open order says on Needs you (F3): what to do with it, whether it
  * is late, and when it was placed. Pure.
  *
- * Late is the Orders list's rule (`lateSql`), said here for one row: an
- * order not yet handed over, placed longer ago than its fulfilment's
- * threshold (DEC-045). The two read the same thresholds, so Home and the
- * Orders list's Late filter never disagree about an order.
+ * Late is `lateOf`, the rule Order Detail, the Orders list's rows and its
+ * Late filter (`lateSql`) run: an open order not yet handed over, placed
+ * longer ago than the threshold its storefront sets for its type (B17;
+ * DEC-045). All of them read the same storefront's thresholds, so Home and
+ * Orders never disagree about an order.
  */
 
 export interface OpenOrderFacts {
@@ -31,27 +33,68 @@ export interface OrderWords {
     tone: HomeTone;
 }
 
-const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
-const NOT_HANDED_OVER = ["NEW", "PREPARING", "READY"];
+/** A moment every threshold has passed by (30 days is the longest). */
+const EVENTUALLY = new Date(8.64e15);
 
 /** "#1042" for a storefront's number, and "ORD-001" as it is. */
 export function orderNumber(orderId: string): string {
     return /^\d/.test(orderId) ? `#${orderId}` : orderId;
 }
 
-/** Minutes after placing an order turns late, or null when it never does. */
-function lateAfter(order: OpenOrderFacts): number | null {
-    if (!order.fulfilment) return null;
-    if (order.stage && !NOT_HANDED_OVER.includes(order.stage)) return null;
-    if (order.paymentStatus === "REFUNDED") return null;
-    return DEFAULT_LATE_AFTER_MINUTES[order.fulfilment] ?? null;
+/** What `lateOf` reads, or null for an old fixture missing any of it. */
+function factsOf(order: OpenOrderFacts): LateFacts | null {
+    if (!order.fulfilment || !order.stage || !order.status) return null;
+    return {
+        fulfilment: order.fulfilment,
+        stage: order.stage,
+        status: order.status,
+        paymentStatus: order.paymentStatus ?? "UNPAID",
+        placedAt: order.createdAt,
+    };
 }
 
-/** "Late · 3 h" under a day, "Late · 2 days" after, from when it was placed. */
+/**
+ * Whether the order is late now, and, if not, when it turns late — only for
+ * an order that will, left as it is (open, not handed over, a type with a
+ * threshold).
+ */
+function lateness(
+    order: OpenOrderFacts,
+    now: Date,
+    thresholds?: LateThresholds,
+): { late: boolean; deadline: Date | null } {
+    const facts = factsOf(order);
+    if (!facts) return { late: false, deadline: null };
+    const today = lateOf(facts, now, thresholds);
+    if (today.late) return { late: true, deadline: null };
+    if (
+        today.lateAfterMinutes === null ||
+        !lateOf(facts, EVENTUALLY, thresholds).late
+    ) {
+        return { late: false, deadline: null };
+    }
+    return {
+        late: false,
+        deadline: new Date(
+            order.createdAt.getTime() + today.lateAfterMinutes * MINUTE_MS,
+        ),
+    };
+}
+
+/**
+ * "Late · 25 min" under an hour, "Late · 3 h" under a day, "Late · 2 days"
+ * after, from when it was placed (the Home design's words; minutes because a
+ * counter's threshold can be 20 of them).
+ */
 function lateTag(placed: Date, now: Date): string {
     const ms = now.getTime() - placed.getTime();
-    if (ms < DAY_MS) return `Late · ${Math.max(1, Math.floor(ms / HOUR_MS))} h`;
+    if (ms < HOUR_MS) {
+        return `Late · ${Math.max(1, Math.floor(ms / MINUTE_MS))} min`;
+    }
+    if (ms < DAY_MS) return `Late · ${Math.floor(ms / HOUR_MS)} h`;
     const days = Math.floor(ms / DAY_MS);
     return `Late · ${days} day${days === 1 ? "" : "s"}`;
 }
@@ -69,7 +112,7 @@ function dueTag(deadline: Date, now: Date, zone: string): string {
 /** What to do with the order, by how it reaches the customer. */
 function headline(order: OpenOrderFacts, who: string): string {
     const n = orderNumber(order.orderId);
-    if (order.fulfilment === "COLLECT" || order.fulfilment === "PICKUP") {
+    if (order.fulfilment && typeOf(order.fulfilment) === "PICKUP") {
         return order.stage === "READY"
             ? `Hand over order ${n} to ${who}`
             : `Get order ${n} ready for ${who}`;
@@ -77,18 +120,18 @@ function headline(order: OpenOrderFacts, who: string): string {
     return `Send order ${n} to ${who}`;
 }
 
+/**
+ * `thresholds` are the order's storefront's (B17); without them, the
+ * defaults every storefront starts on.
+ */
 export function openOrderWords(
     order: OpenOrderFacts,
     customer: string | null,
     now: Date,
     zone: string,
+    thresholds?: LateThresholds,
 ): OrderWords {
-    const after = lateAfter(order);
-    const deadline =
-        after === null
-            ? null
-            : new Date(order.createdAt.getTime() + after * 60_000);
-    const late = deadline !== null && deadline < now;
+    const { late, deadline } = lateness(order, now, thresholds);
     return {
         headline: headline(order, customer ?? "a customer"),
         detail: placedWords(order.createdAt.toISOString(), now, zone),
