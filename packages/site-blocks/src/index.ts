@@ -61,4 +61,5 @@ export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
 export { SiteFooter, SiteHeader } from "./site-chrome";
 export type { SiteFooterContent } from "./site-chrome";
+export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

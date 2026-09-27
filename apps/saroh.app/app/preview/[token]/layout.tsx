@@ -60,7 +60,10 @@ export default async function PreviewLayout({
 
             <div>{children}</div>
 
-            <SiteFooter footer={snapshot.site.footer} />
+            <SiteFooter
+                footer={snapshot.site.footer}
+                name={snapshot.site.name}
+            />
             <KeepLinksInside base={base} />
         </div>
     );

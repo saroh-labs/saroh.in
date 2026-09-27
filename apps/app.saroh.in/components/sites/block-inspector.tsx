@@ -307,7 +307,7 @@ export function FixedBlockInspector({
                     ? "It shows the site's name and its menu. The menu lists the pages you add to it, and both are changed in Website settings, where a change is understood to reach every page."
                     : hasFooter
                       ? "What is written here is changed in Website settings, where a change is understood to reach every page."
-                      : "Nothing is written at the foot of this site yet, so visitors see no footer. Write one in Website settings."}
+                      : "Nothing is written at the foot of this site yet, so visitors see the site's name and “Runs on Saroh”. Write your own line in Website settings."}
             </p>
             <Button asChild variant="outline" size="sm">
                 {/* A new tab, for the same reason as the Services link. */}
