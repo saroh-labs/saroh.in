@@ -111,8 +111,10 @@ const envSchema = z.object({
     SITE_CODES_SMTP_PORT: z.string().optional(),
     SITE_CODES_SMTP_USER: z.string().optional(),
     SITE_CODES_SMTP_PASS: z.string().optional(),
-    // Development only, with no SMTP: `log` prints the code (the default),
-    // `fail` makes every send fail, to see the "couldn't send" path and alert.
+    // With no SMTP: `log` prints the code (development's default) and leaves
+    // it where a local browser test reads it; `fail` makes every send fail,
+    // to see the "couldn't send" path and alert. Development, or named
+    // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
 
     // Payments (S5-002 — org merchant credential encryption at rest).

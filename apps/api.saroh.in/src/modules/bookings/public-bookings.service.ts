@@ -5,6 +5,7 @@ import {
     Injectable,
     NotFoundException,
     Optional,
+    UnauthorizedException,
 } from "@nestjs/common";
 import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
@@ -51,8 +52,24 @@ import {
 } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 import type { BookInput, ReserveWith } from "./reservation";
-import { bookingByKey, loadBookableService, reserve } from "./reservation";
+import {
+    alreadyBooked,
+    bookingByKey,
+    holdsSlotAlready,
+    loadBookableService,
+    reserve,
+} from "./reservation";
 import { serviceStaff } from "./staff-availability";
+
+/**
+ * A customer signed in on the business's site (A9): who `CustomerSessionGuard`
+ * says they are. The booking goes on their account's contact.
+ */
+export interface SignedInCustomer {
+    organizationId: string;
+    accountId: string;
+    contactId: string;
+}
 
 /** Who takes a service, as the booking page may show them: a name and an id. */
 export interface PublicStaff {
@@ -283,15 +300,27 @@ export class PublicBookingsService {
      */
     async bookOnline(
         serviceId: string,
-        input: BookInput,
+        given: BookInput,
         ipHash: string | undefined,
         now: Date = new Date(),
+        signedIn?: SignedInCustomer,
     ): Promise<{ booking: Booking; payToken: string | null }> {
         // 1. Load the Service. Org is derived from HERE, never the client.
         const { service, rules } = await loadBookableService(serviceId, {
             bookingPage: true,
         });
+        // A signed-in customer books only their own business's services:
+        // another business's service is as good as missing (A9).
+        if (signedIn && service.organizationId !== signedIn.organizationId) {
+            throw new NotFoundException("Service not found");
+        }
         await assertOrganizationOpen(service.organizationId);
+        // The booker is the account's, never the page's (A9): its verified
+        // email, and its contact's name and phone. A name typed on the page
+        // is used only when the contact has none yet.
+        const input = signedIn
+            ? await this.signedInBooker(signedIn, given)
+            : given;
         // Where and the note are checked before anything is held (E7): an
         // answer to Where the service can't give, or a note past its length.
         const place = bookingLocation(service.locationType, input.locationType);
@@ -351,6 +380,25 @@ export class PublicBookingsService {
         const existing = await bookingByKey(serviceId, input);
         if (existing) return this.replay(existing, input, place, now);
 
+        // The same person, the same session (A9): said before anything is
+        // held. The reservation checks it again under its lock.
+        const account = signedIn
+            ? { accountId: signedIn.accountId, contactId: signedIn.contactId }
+            : undefined;
+        if (
+            account &&
+            (await holdsSlotAlready(
+                prisma,
+                service.organizationId,
+                account,
+                serviceId,
+                startAt,
+                now,
+            ))
+        ) {
+            throw alreadyBooked();
+        }
+
         // 5. Who it is with (U3) — after the replay, so a retried request is
         //    not refused by the person its own first attempt booked.
         //    A double submit can lose here too, once its twin has committed:
@@ -408,21 +456,90 @@ export class PublicBookingsService {
             },
         };
         if (price) person.holdUntil = holdExpiry(now);
-        const booking = await reserve(
-            this.activation,
-            service,
-            startAt,
-            endAt,
-            input,
-            { source: `booking:service:${serviceId}`, actorUserId: null },
-            also,
-            person,
-        );
+        let booking: Booking;
+        try {
+            booking = await reserve(
+                this.activation,
+                service,
+                startAt,
+                endAt,
+                input,
+                {
+                    source: `booking:service:${serviceId}`,
+                    actorUserId: null,
+                    account,
+                },
+                also,
+                person,
+            );
+        } catch (err) {
+            // Two tabs of one customer racing for one slot: the loser's
+            // conflict is theirs already, not the slot being full.
+            if (
+                account &&
+                err instanceof ConflictException &&
+                (await holdsSlotAlready(
+                    prisma,
+                    service.organizationId,
+                    account,
+                    serviceId,
+                    startAt,
+                ))
+            ) {
+                throw alreadyBooked();
+            }
+            throw err;
+        }
         // An idempotency race replays the winner, which made its own token.
         if (made.bookingId !== booking.id) {
             return this.replay(booking, input, place, now);
         }
         return { booking, payToken: made.payToken };
+    }
+
+    /**
+     * The booking request as the signed-in customer's account makes it
+     * (A9): the account's verified email, and its contact's name and phone.
+     * Read in the business's RLS context the customer route runs in.
+     */
+    private async signedInBooker(
+        customer: SignedInCustomer,
+        given: BookInput,
+    ): Promise<BookInput> {
+        const account = await prisma.customerAccount.findFirst({
+            where: {
+                id: customer.accountId,
+                organizationId: customer.organizationId,
+                contactId: customer.contactId,
+                status: "ACTIVE",
+            },
+            select: {
+                email: true,
+                contact: {
+                    select: { firstName: true, lastName: true, phone: true },
+                },
+            },
+        });
+        // Signed out between the guard and here (unlinked, blocked, merged).
+        if (!account) {
+            throw new UnauthorizedException({
+                message: "Sign in to continue.",
+                details: { reason: "signed-out" },
+            });
+        }
+        const known = [account.contact.firstName, account.contact.lastName]
+            .map((part) => part?.trim() ?? "")
+            .filter(Boolean)
+            .join(" ");
+        // An empty name is no name.
+        const typed = given.bookerName?.trim() ?? "";
+        const bookerName = [known, typed].find((n) => n !== "");
+        return {
+            ...given,
+            bookerEmail: account.email,
+            bookerName,
+            bookerPhone: account.contact.phone ?? undefined,
+        };
     }
 
     /**

@@ -130,8 +130,33 @@ describe("counting and moving", () => {
         });
     });
 
-    it("moves nothing by default until a unit adds its mover", async () => {
-        expect(await countUnlinkMoves(tx, scope)).toEqual(new Map());
+    it("moves bookings the account made by default (A9)", () => {
+        expect(UNLINK_MOVERS.map((m) => [m.key, m.model])).toEqual([
+            ["bookings", "Booking"],
+        ]);
+    });
+
+    it("counts and moves only what the account made on that contact since it linked", async () => {
+        const booking = {
+            count: jest.fn().mockResolvedValue(2),
+            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        };
+        const db = { booking } as unknown as Prisma.TransactionClient;
+        const where = {
+            organizationId: "org_1",
+            customerAccountId: "acc_1",
+            contactId: "c_farah",
+            createdAt: { gte: scope.since },
+        };
+
+        expect((await countUnlinkMoves(db, scope)).get("bookings")).toBe(2);
+        expect(booking.count).toHaveBeenCalledWith({ where });
+
+        await applyUnlinkMoves(db, { ...scope, toContactId: "c_new" });
+        expect(booking.updateMany).toHaveBeenCalledWith({
+            where,
+            data: { contactId: "c_new" },
+        });
     });
 });
 
