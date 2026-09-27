@@ -18,6 +18,7 @@ import * as path from "node:path";
 import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { isRlsTestMode } from "../../../test/rls-mode";
 import { reservedAccountEmail } from "../contacts/contact-email";
 import {
     CustomerAccountRepository,
@@ -424,7 +425,13 @@ describe("CustomerAccountRepository", () => {
     });
 });
 
-describe("org_isolation on the customer tables", () => {
+// This group installs the migrations' policies itself, which needs the table
+// owner. In RLS mode (TEST_RLS=on) the suite already runs as the NOBYPASSRLS
+// role on a schema built from the migrations, policies included, so every
+// spec here is the check and this one could not DROP/CREATE a policy anyway.
+const describeOutsideRlsMode = isRlsTestMode() ? describe.skip : describe;
+
+describeOutsideRlsMode("org_isolation on the customer tables", () => {
     const TABLES = [
         "CustomerAccount",
         "CustomerSignInCode",
