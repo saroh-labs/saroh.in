@@ -1,25 +1,29 @@
+import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import {
     getRenewals,
     listChargesBySubscription,
-    listPlans,
+    listPlansOptional,
     listSubscriptions,
 } from "@/lib/subscriptions/service";
-import { gstNote, ranLine, tabFromQuery } from "@/lib/subscriptions/view";
+import { gstNote, ranLine, screenTabFromQuery } from "@/lib/subscriptions/view";
 
 export const metadata = { title: "Subscriptions" };
 
 const FALLBACK_ZONE = "Asia/Kolkata";
 
 /**
- * Payments → Subscriptions (plan 2026-09-23-003, U12). The list and the
- * plans are required reads. When renewals last ran and each subscription's
- * charges are optional: a line left out, or a quick look that says its
- * charges could not be read — never the page.
+ * Payments → Subscriptions (plan 2026-09-23-003, U12), with Plans as its
+ * last tab (`?tab=plans`, D3). The list is the required read. The plans,
+ * when renewals last ran and each subscription's charges are optional: a
+ * Plans tab that says it couldn't read them, a line left out, or a quick
+ * look that says its charges could not be read — never the page.
  */
 export default async function SubscriptionsPage({
     searchParams,
@@ -27,21 +31,44 @@ export default async function SubscriptionsPage({
     searchParams: Promise<{ tab?: string; view?: string; subscribe?: string }>;
 }) {
     await requireSession();
-    const [{ rows: subscriptions, truncated }, plans, organization, params] =
+    const [organization, params] = await Promise.all([
+        resolveActiveOrganization(),
+        searchParams,
+    ]);
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+
+    // Told so, and who can change it, on both tabs — rather than a read that
+    // is refused halfway down the page.
+    if (organization?.actions && !may("subscription:read")) {
+        return (
+            <AccessDenied
+                title="You can't open subscriptions"
+                description={`Your role in ${organization.name} can't see subscriptions or plans. An owner or admin can change that in Team.`}
+            />
+        );
+    }
+
+    const canWrite = may("subscription:write");
+    const [{ rows: subscriptions, truncated }, planRead, modules] =
         await Promise.all([
             listSubscriptions(),
-            listPlans(),
-            resolveActiveOrganization(),
-            searchParams,
+            listPlansOptional(),
+            modulesOrUnknown(),
         ]);
-    const canWrite = organization?.actions
-        ? organization.actions.includes("subscription:write")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const [contacts, renewals, charges] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         getRenewals().catch(() => null),
         listChargesBySubscription(),
     ]);
+    const plans = planRead.state === "ok" ? planRead.data : null;
+    const appointments = modules
+        ? modules.some(
+              (m) => m.key === "APPOINTMENTS" && m.readiness !== "DISABLED",
+          )
+        : null;
 
     const now = new Date();
     // Renewals run on each subscription's own zone; the line reads in the
@@ -62,11 +89,12 @@ export default async function SubscriptionsPage({
                 subscriptions={subscriptions}
                 truncated={truncated}
                 plans={plans}
+                showClasses={plansShowClasses(appointments, plans ?? [])}
                 contacts={contacts}
                 charges={charges}
                 renewNote={renewNote}
                 canWrite={canWrite}
-                initialTab={tabFromQuery(params.tab ?? params.view)}
+                initialTab={screenTabFromQuery(params.tab ?? params.view)}
                 openSubscribe={canWrite && params.subscribe === "1"}
                 nowIso={now.toISOString()}
             />

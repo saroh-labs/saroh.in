@@ -17,6 +17,7 @@ import {
     paysBy,
     ranLine,
     rowWhen,
+    screenTabFromQuery,
     tabFromQuery,
 } from "./view";
 
@@ -94,6 +95,14 @@ describe("listTab", () => {
         expect(tabFromQuery("paused")).toBe("paused");
         expect(tabFromQuery("plans")).toBe("active");
         expect(tabFromQuery(undefined)).toBe("active");
+    });
+
+    it("opens Plans from ?tab=plans, and a list tab otherwise (D3)", () => {
+        expect(screenTabFromQuery("plans")).toBe("plans");
+        expect(screenTabFromQuery("failed")).toBe("failed");
+        expect(screenTabFromQuery("overdue")).toBe("failed");
+        expect(screenTabFromQuery("Plans")).toBe("active");
+        expect(screenTabFromQuery(undefined)).toBe("active");
     });
 });
 

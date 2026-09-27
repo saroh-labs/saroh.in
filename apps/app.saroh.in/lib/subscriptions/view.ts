@@ -52,6 +52,14 @@ export function tabFromQuery(value: string | undefined): ListTab {
         : "active";
 }
 
+/** The screen's tabs: the four lists, then Plans (D3). */
+export type ScreenTab = ListTab | "plans";
+
+/** `?tab=plans` opens Plans; anything else is a list tab. */
+export function screenTabFromQuery(value: string | undefined): ScreenTab {
+    return value === "plans" ? "plans" : tabFromQuery(value);
+}
+
 export function money(amount: string | number, currency: string): string {
     return formatMoneyMajor(amount, currency) ?? String(amount);
 }
