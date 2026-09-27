@@ -279,6 +279,35 @@ describe("StorefrontsService", () => {
         });
     });
 
+    it("moves only the toggle an older app sent: a local-only storefront gains no Shipping (O-4)", async () => {
+        // Saved with the chips as Local delivery alone: shipping stays on
+        // for it, as `fulfilmentPatch` keeps the toggles in step.
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: ["LOCAL_DELIVERY"],
+            collectionEnabled: false,
+            shippingEnabled: true,
+            taxRate: "0",
+        });
+        await service.update("org_1", "st_1", { collectionEnabled: true });
+        expect(db.__tx.storeSettings.upsert!.mock.calls[0][0].update).toEqual({
+            collectionEnabled: true,
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+        });
+    });
+
+    it("reads an empty list from the toggles, as a row the old image made (O-3)", async () => {
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
+            collectionEnabled: true,
+            shippingEnabled: true,
+            taxRate: "0",
+        });
+        expect((await service.get("org_1", "st_1")).fulfilmentTypes).toEqual([
+            "PICKUP",
+            "SHIPPING",
+        ]);
+    });
+
     it("reads a legacy word stored in the list as its type (B2a)", async () => {
         db.storeSettings.findUnique!.mockResolvedValue({
             fulfilmentTypes: ["SHIPPING", "COLLECT"],

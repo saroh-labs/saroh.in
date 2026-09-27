@@ -69,6 +69,35 @@ export function fulfilmentPatch(dto: UpdateStorefrontDto): {
     return patch;
 }
 
+/**
+ * The ways a storefront offers after an app from before B17's chips saves
+ * its old toggles: only the toggle that was sent moves anything (O-4).
+ *
+ * - Collection on adds Pick-up; off takes it away.
+ * - Shipping on adds Shipping; off takes it away. A local delivery the
+ *   storefront offers stays either way.
+ *
+ * Recomputing both from the row's toggles used to add Shipping to a
+ * local-only storefront when only collection was sent: saving the chips
+ * keeps `shippingEnabled` on for local delivery (`fulfilmentPatch`), so the
+ * stored toggle said "shipping" when the storefront never shipped.
+ *
+ * Always in table order.
+ */
+export function typesAfterToggles(
+    current: readonly StorefrontFulfilmentType[],
+    toggles: { collectionEnabled?: boolean; shippingEnabled?: boolean },
+): StorefrontFulfilmentType[] {
+    const types = new Set(current);
+    const turn = (type: StorefrontFulfilmentType, on: boolean | undefined) => {
+        if (on === true) types.add(type);
+        if (on === false) types.delete(type);
+    };
+    turn("PICKUP", toggles.collectionEnabled);
+    turn("SHIPPING", toggles.shippingEnabled);
+    return STOREFRONT_FULFILMENT_TYPES.filter((t) => types.has(t));
+}
+
 /** "2 hours", "20 minutes", "90 minutes", "1 hour": as the field shows it. */
 export function lateAfterWords(minutes: number): string {
     if (minutes % 60 === 0) {

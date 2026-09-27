@@ -291,6 +291,36 @@ describe("a storefront's ways", () => {
             storefrontTypesOf(["SHIPPING", "DELIVERY", "DIGITAL", "PICKUP"]),
         ).toEqual(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]);
     });
+
+    it("read an empty list from the toggles, as a row the old image made (O-3)", () => {
+        // The image before B2a creates a row without the column: `[]`.
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: true,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["PICKUP", "SHIPPING"]);
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: false,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["SHIPPING"]);
+        // Saved empty on purpose: both toggles went off with it.
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: false,
+                shippingEnabled: false,
+            }),
+        ).toEqual([]);
+        // A stored list is read as stored, whatever the toggles say.
+        expect(
+            storefrontTypesOf(["LOCAL_DELIVERY"], {
+                collectionEnabled: true,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["LOCAL_DELIVERY"]);
+    });
 });
 
 describe("the late rule (DEC-045, default 16)", () => {

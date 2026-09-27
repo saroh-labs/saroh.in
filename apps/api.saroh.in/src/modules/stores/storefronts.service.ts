@@ -20,11 +20,7 @@ import type {
     LateThresholds,
     StorefrontFulfilmentType,
 } from "../orders/fulfilment";
-import {
-    NEW_STOREFRONT_TYPES,
-    storefrontTypesFrom,
-    storefrontTypesOf,
-} from "../orders/fulfilment";
+import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "../orders/fulfilment";
 import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
@@ -35,6 +31,7 @@ import {
     fulfilmentChanges,
     fulfilmentPatch,
     lateRuleNotices,
+    typesAfterToggles,
 } from "./storefront-fulfilment";
 import type { OpeningHoursDay, UpdateStorefrontDto } from "./storefronts.dto";
 
@@ -246,7 +243,7 @@ export class StorefrontsService {
                 (settings?.openingHours as OpeningHoursDay[] | null) ?? null,
             collectionEnabled: settings?.collectionEnabled ?? false,
             fulfilmentTypes: settings
-                ? storefrontTypesOf(settings.fulfilmentTypes)
+                ? storefrontTypesOf(settings.fulfilmentTypes, settings)
                 : NEW_STOREFRONT_TYPES,
             lateAfterMinutes: lateThresholdsOf(settings),
             tipsEnabled: settings?.tipsEnabled ?? false,
@@ -378,24 +375,20 @@ export class StorefrontsService {
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
                 : {}),
-            // Which ways it offers follows the two toggles (B2a) when an app
-            // from before B17's chips saves them; a local delivery it offered
-            // stays. The chips, when sent, decide instead (below).
+            // Which ways it offers follows the toggle an app from before
+            // B17's chips saves (B2a) — only the one it sent (O-4). The
+            // chips, when sent, decide instead (below).
             ...((dto.collectionEnabled !== undefined ||
                 dto.shippingEnabled !== undefined) &&
             dto.fulfilmentTypes === undefined
                 ? {
-                      fulfilmentTypes: storefrontTypesFrom({
-                          collectionEnabled:
-                              dto.collectionEnabled ??
-                              current.collectionEnabled,
-                          shippingEnabled:
-                              dto.shippingEnabled ?? current.shippingEnabled,
-                          localDelivery:
-                              current.fulfilmentTypes.includes(
-                                  "LOCAL_DELIVERY",
-                              ),
-                      }),
+                      fulfilmentTypes: typesAfterToggles(
+                          current.fulfilmentTypes,
+                          {
+                              collectionEnabled: dto.collectionEnabled,
+                              shippingEnabled: dto.shippingEnabled,
+                          },
+                      ),
                   }
                 : {}),
             // The chips and the thresholds (B17), with the toggles in step.
