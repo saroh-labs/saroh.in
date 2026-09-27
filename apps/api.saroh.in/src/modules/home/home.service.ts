@@ -20,6 +20,7 @@ import { failedRenewals, overdueInvoices } from "./home-money-sources";
 import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import { openOrderWords } from "./home-order-rows";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
+import { readToday, todayScope } from "./home-today";
 
 export type {
     HomeAction,
@@ -31,6 +32,8 @@ export type {
     HomeNeed,
     HomeNumber,
     HomeSeverity,
+    HomeToday,
+    HomeTodayItem,
     HomeTone,
     HomeUnavailable,
 } from "./home-model";
@@ -306,6 +309,20 @@ export class HomeService {
             }
         }
 
+        // The business's day, in its zone (F5): bookings, classes, pick-ups.
+        const scope = todayScope(input, available);
+        const today = scope
+            ? await this.attempt(
+                  {
+                      moduleKey: scope.bookings ? "APPOINTMENTS" : "COMMERCE",
+                      label: "Today",
+                  },
+                  () => readToday(this.db, input, scope, { now, zone }),
+                  null,
+                  unavailable,
+              )
+            : null;
+
         // Money taken through an invoice's pay link after the invoice was
         // already paid or voided (U13). The customer is owed it back, so it
         // is ATTENTION: already wrong, and only the merchant can put it right.
@@ -430,6 +447,7 @@ export class HomeService {
             numbers,
             unavailable,
             ...flattenNeeds(actions, zone),
+            today,
         };
     }
 

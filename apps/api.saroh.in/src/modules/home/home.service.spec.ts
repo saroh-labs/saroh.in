@@ -200,8 +200,10 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
     it("still returns the parts that answered when open orders fail", async () => {
         const home = await buildWithFailure("order").build(INPUT);
 
+        // Today reads orders for its pick-ups, so it is named too (F5).
         expect(home.unavailable).toEqual([
             { moduleKey: "COMMERCE", label: "Open orders" },
+            { moduleKey: "APPOINTMENTS", label: "Today" },
         ]);
         // The schedule survived, which is the whole point.
         expect(home.upcoming).toHaveLength(1);
@@ -212,8 +214,11 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
 
         expect(home.unavailable).toEqual([
             { moduleKey: "APPOINTMENTS", label: "Schedule" },
+            { moduleKey: "APPOINTMENTS", label: "Today" },
         ]);
         expect(home.upcoming).toEqual([]);
+        // Today failed with it: never shown as an empty day.
+        expect(home.today).toBeNull();
     });
 
     // The distinction §30 exists for: a failed source must never be reported
