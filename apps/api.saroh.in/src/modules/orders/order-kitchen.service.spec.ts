@@ -860,6 +860,39 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
             courierName: "Delhivery",
             trackingNumber: "AWB4411",
         });
+        // The step on the timeline names them as they were at the handover.
+        expect(mockDb.events.at(-1)).toMatchObject({
+            kind: "STAGE",
+            toStage: "HANDED_TO_COURIER",
+            note: "Delhivery · AWB4411",
+        });
+    });
+
+    it("a handover with neither leaves its step unnamed, and a courier alone names it", async () => {
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+        });
+        expect(mockDb.events.at(-1)).toMatchObject({
+            toStage: "HANDED_TO_COURIER",
+            note: null,
+        });
+
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+            courierName: "Blue Dart",
+            trackingNumber: null,
+        });
+        expect(mockDb.events.at(-1)).toMatchObject({ note: "Blue Dart" });
     });
 
     it("are refused on any other step, and nothing moves", async () => {

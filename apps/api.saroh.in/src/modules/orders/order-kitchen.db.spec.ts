@@ -929,6 +929,12 @@ describe("fulfilment types, release 2: the switch (real database)", () => {
             kind: "EDIT",
             note: "tracking number AWB 1234 5678",
         });
+        // The handover's own step names the courier it went with (B10).
+        expect(read.events.at(-2)).toMatchObject({
+            kind: "STAGE",
+            toStage: "HANDED_TO_COURIER",
+            note: "Delhivery",
+        });
 
         // Still editable once delivered; null clears one.
         await kitchen.moveStage(member, order.id, { to: "DELIVERED" });

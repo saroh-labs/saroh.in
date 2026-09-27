@@ -193,7 +193,14 @@ export class OrderKitchenService {
                     toStage: move.to,
                     fromStatus: move.fromStatus,
                     toStatus: move.toStatus,
-                    note: dto.note ?? null,
+                    // The handover's step says who took it and their number
+                    // ("Delhivery · AWB4411"), as they were at the handover:
+                    // the order's own fields may be corrected later.
+                    note:
+                        dto.note ??
+                        (move.to === "HANDED_TO_COURIER"
+                            ? handoverNote(dto)
+                            : null),
                 },
                 select: { id: true },
             });
@@ -772,6 +779,14 @@ const COURIER_FIELD_WORDS: Record<CourierField, string> = {
     trackingNumber: "A tracking number",
     trackingUrl: "A tracking link",
 };
+
+/** The handover step's words: the courier and number given with it, if any. */
+function handoverNote(dto: MoveStageDto): string | null {
+    const words = [dto.courierName, dto.trackingNumber].filter(
+        (w): w is string => typeof w === "string" && w !== "",
+    );
+    return words.length > 0 ? words.join(" · ") : null;
+}
 
 /**
  * Record the courier's name, number or link on an order handed to a courier
