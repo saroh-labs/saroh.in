@@ -1,34 +1,27 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import {
-    ChevronDown,
-    ChevronLeft,
-    Eye,
-    Link2,
-    Monitor,
-    Smartphone,
-    Tablet,
-} from "lucide-react";
+import { ChevronDown, ChevronLeft, Ellipsis } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
-import { DEVICES, ZOOMS } from "@/components/sites/editor-constants";
 import {
     publishTitle,
     STATUS_BADGE,
     statusReadout,
 } from "@/components/sites/editor/status-readout";
+import type { TopBarActionProps } from "@/components/sites/editor/top-bar-actions";
+import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
+import type { EditorLayout } from "@/components/sites/editor/use-editor-layout";
 import type { DraftReadiness } from "@/components/sites/editor/use-publish";
 import { unfinishedPhrase } from "@/components/sites/held-back-copy";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import type { EditorStatus } from "@/lib/sites/editor-status";
 import type { ReviewState, SiteFlags, SitePage } from "@/lib/sites/service";
 
 /**
@@ -39,9 +32,11 @@ import type { ReviewState, SiteFlags, SitePage } from "@/lib/sites/service";
  * it (G2): the status is true after a reload, Publish says what it puts
  * live, and Style moved to the rail's Brand tab.
  *
- * ONE line, and it has to stay one line: the actions never shrink, the
- * breadcrumb truncates instead. Losing the end of a page name is a smaller
- * loss than losing Publish.
+ * ONE line on a desk: the actions never shrink, the breadcrumb truncates
+ * instead. Losing the end of a page name is a smaller loss than losing
+ * Publish. Narrow (G4), the actions wrap to a second line rather than run off
+ * the bar, as the design's bar does; on a phone, the status and every action
+ * fold into one menu beside the page switcher.
  */
 export function EditorTopBar({
     siteId,
@@ -74,6 +69,8 @@ export function EditorTopBar({
     setZoom,
     previewing,
     setPreviewing,
+    layout,
+    openFeedback,
 }: {
     siteId: string;
     siteName: string;
@@ -106,6 +103,9 @@ export function EditorTopBar({
     /** Preview in place (G5), on or off. */
     previewing: boolean;
     setPreviewing: (on: boolean) => void;
+    layout: EditorLayout;
+    /** Narrow: open the inspector on Feedback, with nothing selected. */
+    openFeedback: () => void;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -140,9 +140,35 @@ export function EditorTopBar({
         pendingShort,
         pendingKnown,
     });
+    const phone = layout === "phone";
+    const actions: TopBarActionProps = {
+        ...{ device, setDevice, zoom, setZoom, previewing, setPreviewing },
+        ...{ asking, publishing, publishHint, openNotes },
+        inReview: review.pending,
+        askForReview: () => void askForReview(),
+        publishDisabled: publishing || dirty || saving || styleDirty,
+        flagCount: siteFlags.flags.length,
+        onPublish: () => void openCheck({ dirty, onlyHeldBack, heldBack }),
+        onFeedback: layout === "narrow" ? openFeedback : undefined,
+    };
+    const readout = (
+        <StatusReadout
+            status={status}
+            detail={statusDetail}
+            line={statusLine}
+        />
+    );
 
     return (
-        <header className="flex h-[52px] shrink-0 items-center gap-3 overflow-hidden border-b px-3.5">
+        <header
+            data-editor-bar=""
+            className={cn(
+                "flex shrink-0 items-center gap-3 border-b px-3.5",
+                layout === "narrow"
+                    ? "min-h-[52px] flex-wrap gap-y-2 py-2"
+                    : "h-[52px] overflow-hidden",
+            )}
+        >
             <nav
                 aria-label="Breadcrumb"
                 className="flex min-w-0 items-center gap-1 text-sm"
@@ -156,20 +182,25 @@ export function EditorTopBar({
                     href={`/sites/${siteId}/pages`}
                     aria-label="Back to Website"
                     title={address ?? undefined}
-                    className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                 >
                     <ChevronLeft aria-hidden className="size-[15px] shrink-0" />
                     Website
                 </Link>
-                <span
-                    aria-hidden
-                    className="px-px text-[0.9375rem] text-muted-foreground/70"
-                >
-                    /
-                </span>
-                <span className="min-w-0 truncate text-[0.84375rem] font-medium text-muted-foreground">
-                    {siteName}
-                </span>
+                {/* A phone keeps the way out and the page; the name goes. */}
+                {phone ? null : (
+                    <>
+                        <span
+                            aria-hidden
+                            className="px-px text-[0.9375rem] text-muted-foreground/70"
+                        >
+                            /
+                        </span>
+                        <span className="min-w-0 truncate text-[0.84375rem] font-medium text-muted-foreground">
+                            {siteName}
+                        </span>
+                    </>
+                )}
                 <span
                     aria-hidden
                     className="px-px text-[0.9375rem] text-muted-foreground/70"
@@ -186,7 +217,12 @@ export function EditorTopBar({
                         <button
                             type="button"
                             aria-label={`Page: ${activePage?.title ?? "Page"}. Switch or manage pages`}
-                            className="flex h-[30px] min-w-0 shrink-0 items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className={cn(
+                                "flex h-[30px] min-w-0 items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
+                                // On a phone a long page name gives way
+                                // before the menu beside it does.
+                                !phone && "shrink-0",
+                            )}
                         >
                             <span className="max-w-[12rem] truncate">
                                 {activePage?.title ?? "Page"}
@@ -214,162 +250,106 @@ export function EditorTopBar({
                         />
                     </PopoverContent>
                 </Popover>
-                {/*
-                 * "Published", "Not published · 2 blocks, footer" or "Not
-                 * published yet" (G2), worked out from the server's count
-                 * so it is the same after a reload. It may truncate — the
-                 * full words are in its title and in Publish's — but it
-                 * never pushes Publish off the bar.
-                 */}
-                <Badge
-                    role="status"
-                    variant={STATUS_BADGE[status.tone]}
-                    title={
-                        [status.label, statusDetail]
-                            .filter(Boolean)
-                            .join("\n") || undefined
-                    }
-                    className="ml-1 min-w-0 shrink truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em]"
-                >
-                    <span className="truncate">{status.label}</span>
-                </Badge>
-                {/*
-                 * What the pill leaves out: the reviewer's verdict, how many
-                 * notes are open, and what publishing would change when a
-                 * review outranks it in the pill. It truncates rather than
-                 * wraps — Publish never moves.
-                 */}
-                {statusLine ? (
-                    <span
-                        className="ml-1 min-w-0 truncate text-[0.71875rem] text-muted-foreground"
-                        title={statusDetail}
-                    >
-                        {statusLine}
-                    </span>
-                ) : null}
+                {phone ? null : readout}
             </nav>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-                <ThemeToggle />
-                {/*
-                 * Width only — the preview is already local, and
-                 * switching must not become a re-fetch.
-                 */}
-                <div
-                    role="group"
-                    aria-label="Preview width"
-                    className="flex h-8 items-center gap-0.5 rounded-md border p-0.5"
-                >
-                    {DEVICES.map((d) => {
-                        const Icon =
-                            d.key === "phone"
-                                ? Smartphone
-                                : d.key === "tablet"
-                                  ? Tablet
-                                  : Monitor;
-                        return (
-                            <button
-                                key={d.key}
-                                type="button"
-                                onClick={() => setDevice(d.key)}
-                                aria-pressed={device === d.key}
-                                aria-label={`Show at ${d.label.toLowerCase()} width`}
-                                title={d.label}
-                                className={cn(
-                                    "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    device === d.key
-                                        ? "bg-secondary text-foreground"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                <Icon aria-hidden className="size-4" />
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/*
-                 * The zoom readout IS the control (spec §2): no ⌘scroll,
-                 * no pinch, no shortcut.
-                 */}
-                <OptionSelect
-                    aria-label="Zoom"
-                    size="sm"
-                    value={String(zoom)}
-                    onValueChange={(v) => {
-                        setZoom(v === "fit" ? "fit" : (Number(v) as Zoom));
-                    }}
-                    options={ZOOMS.map((z) => ({
-                        value: String(z),
-                        label: z === "fit" ? "Fit" : `${z}%`,
-                    }))}
-                    className="h-8 w-[4.75rem] tabular-nums text-muted-foreground"
-                />
-
-                {/*
-                 * Preview removes the editing tools from the same canvas;
-                 * it does not switch to another renderer (G5). While it is
-                 * on, the button says where it goes back to, as the design
-                 * does, and Escape returns too.
-                 */}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    aria-pressed={previewing}
-                    className={cn(
-                        "h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground",
-                        previewing && "bg-secondary",
-                    )}
-                    onClick={() => setPreviewing(!previewing)}
-                >
-                    <Eye aria-hidden className="size-[15px]" />
-                    {previewing ? "Editing" : "Preview"}
-                </Button>
-
-                {/*
-                 * Style is the rail's Brand tab now (G2), as the design
-                 * draws it, so the bar no longer carries a button for it.
-                 */}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground"
-                    disabled={asking || review.pending}
-                    onClick={() => void askForReview()}
-                >
-                    <Link2 aria-hidden className="size-[15px]" />
-                    {review.pending ? "In review" : "Share for review"}
-                </Button>
-
-                {/*
-                 * The one action that puts the site in front of the
-                 * public. Not disabled while In review: publishing then
-                 * is allowed and recorded as a bypass (#278, DEC-047).
-                 * Its title says what it puts live (G2). Unlike the
-                 * design it stays pressable when nothing has changed:
-                 * publishing again is how a new version is made.
-                 */}
-                <Button
-                    size="sm"
-                    className="wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold"
-                    title={publishHint}
-                    onClick={() =>
-                        void openCheck({ dirty, onlyHeldBack, heldBack })
-                    }
-                    disabled={publishing || dirty || saving || styleDirty}
-                >
-                    {publishing ? "Publishing…" : "Publish"}
-                    {/*
-                     * The outstanding flag count as a badge, so the
-                     * button keeps its width while the number moves.
-                     */}
-                    {!publishing && siteFlags.flags.length > 0 ? (
-                        <span className="ml-1.5 rounded bg-background/20 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
-                            {siteFlags.flags.length}
-                        </span>
-                    ) : null}
-                </Button>
-            </div>
+            {phone ? (
+                <PhoneMenu status={readout} actions={actions} />
+            ) : (
+                <TopBarActions {...actions} />
+            )}
         </header>
+    );
+}
+
+/**
+ * "Published", "Not published · 2 blocks, footer" or "Not published yet" (G2),
+ * worked out from the server's count so it is the same after a reload, then
+ * what the pill leaves out: the reviewer's verdict, how many notes are open,
+ * and what publishing would change when a review outranks it in the pill.
+ * Both truncate rather than wrap — they never push Publish off the bar — and
+ * the full words are in their titles and in Publish's.
+ */
+function StatusReadout({
+    status,
+    detail,
+    line,
+}: {
+    status: EditorStatus;
+    detail: string;
+    line: string;
+}) {
+    return (
+        <>
+            <Badge
+                role="status"
+                variant={STATUS_BADGE[status.tone]}
+                title={
+                    [status.label, detail].filter(Boolean).join("\n") ||
+                    undefined
+                }
+                className="ml-1 min-w-0 shrink truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em]"
+            >
+                <span className="truncate">{status.label}</span>
+            </Badge>
+            {line ? (
+                <span
+                    className="ml-1 min-w-0 truncate text-[0.71875rem] text-muted-foreground"
+                    title={detail}
+                >
+                    {line}
+                </span>
+            ) : null}
+        </>
+    );
+}
+
+/**
+ * A phone's bar (G4): the status, the view and Publish folded into one menu,
+ * so the page switcher keeps its room and every control keeps a thumb-sized
+ * target. What the status says is written out inside it, since a phone has
+ * no hover to read a title with.
+ */
+function PhoneMenu({
+    status,
+    actions,
+}: {
+    status: ReactNode;
+    actions: TopBarActionProps;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    aria-label="Status, view and publish"
+                    className="ml-auto grid size-11 shrink-0 place-items-center rounded-[9px] border bg-card text-muted-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <Ellipsis aria-hidden className="size-5" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3 p-3"
+            >
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
+                    {status}
+                </div>
+                <TopBarActions
+                    stacked
+                    {...actions}
+                    // Preview and Publish end the visit to the menu.
+                    setPreviewing={(on) => {
+                        setOpen(false);
+                        actions.setPreviewing(on);
+                    }}
+                    onPublish={() => {
+                        setOpen(false);
+                        actions.onPublish();
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
     );
 }

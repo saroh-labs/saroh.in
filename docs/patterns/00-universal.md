@@ -164,7 +164,7 @@ with why it stops there:
   note, next steps and leave dialog to `editor-parts.tsx`. A little over;
   what is left shares one component's state.
 
-Split rather than listed: `sites/site-editor.tsx` (2,160 before; 296 now,
+Split rather than listed: `sites/site-editor.tsx` (2,160 before; under 300 since
 round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
 became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
 what the server last accepted, the save and its autosave share one set of
