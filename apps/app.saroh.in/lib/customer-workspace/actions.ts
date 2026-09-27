@@ -4,8 +4,16 @@ import { revalidatePath } from "next/cache";
 
 import { setConsent } from "@/lib/messages/service";
 
+import type { AttentionInput } from "./attention";
 import type { NoteInput, WorkspaceResult } from "./service";
-import { createNote, deleteNote, linkCustomer } from "./service";
+import {
+    createAttention,
+    createNote,
+    deleteNote,
+    linkCustomer,
+    removeAttention,
+    updateAttention,
+} from "./service";
 
 /**
  * Server actions for Customer Detail (#120, U18). Each forwards the session
@@ -29,6 +37,36 @@ export async function addNoteAction(contactId: string, input: NoteInput) {
 
 export async function deleteNoteAction(contactId: string, noteId: string) {
     const result = await deleteNote(contactId, noteId);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** Needs attention (C5): add an entry. */
+export async function addAttentionAction(
+    contactId: string,
+    input: AttentionInput,
+) {
+    const result = await createAttention(contactId, input);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+export async function updateAttentionAction(
+    contactId: string,
+    entryId: string,
+    input: AttentionInput,
+) {
+    const result = await updateAttention(contactId, entryId, input);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** Sent when the Undo window closes, never before. */
+export async function removeAttentionAction(
+    contactId: string,
+    entryId: string,
+) {
+    const result = await removeAttention(contactId, entryId);
     if (result.ok) revalidatePath(`/customers/${contactId}`);
     return result;
 }
