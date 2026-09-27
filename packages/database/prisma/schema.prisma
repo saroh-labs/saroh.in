@@ -3373,9 +3373,11 @@ model Service {
 
   status String @default("ACTIVE") // ACTIVE → ARCHIVED
 
-  // Online classes (ADR-007): IN_PERSON | ONLINE. An ONLINE service carries
-  // an https meeting link, frozen into each booking's snapshot. The link is a
-  // shared credential: every public booker receives it.
+  // Online classes (ADR-007): IN_PERSON | ONLINE | EITHER. An ONLINE or
+  // EITHER service carries an https meeting link, frozen into each booking's
+  // snapshot. The link is a shared credential: every public booker of an
+  // online booking receives it. EITHER is chosen per booking
+  // (`Booking.locationType`).
   locationType String  @default("IN_PERSON")
   meetingUrl   String?
 
@@ -3389,6 +3391,18 @@ model Service {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  // Round 2 (E1). Columns land before behaviour: nothing honours `visits`
+  // until E9/E10 or `depositMode` until E8, so every service books as one
+  // visit with nothing taken at booking until then.
+  // How many visits one booking of it is (a treatment): 1 to 12, CHECKed.
+  visits            Int     @default(1)
+  // What is paid at booking: NONE | PERCENT_25 | PERCENT_50 | FULL, of
+  // `priceCents`, worked out on the server. Only a priced service has one.
+  depositMode       String  @default("NONE")
+  // Whether the business's booking page and services lists offer it. A
+  // hidden service is still booked by staff.
+  showOnBookingPage Boolean @default(true)
 
   @@index([organizationId])
   @@index([siteId])
@@ -3493,6 +3507,11 @@ model Booking {
 
   // A paid online booking's own invoice (ADR-008).
   invoices Invoice[]
+
+  // Where an EITHER service's booking happens: IN_PERSON | ONLINE, CHECKed
+  // (E1 adds it, E7 writes it). Null — every booking before it, and every
+  // booking of a service that isn't EITHER — means "as the service says".
+  locationType String?
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
