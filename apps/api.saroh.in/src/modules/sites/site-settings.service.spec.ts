@@ -15,11 +15,12 @@ jest.mock("@saroh/database", () => {
     return { prisma: client };
 });
 
-import { NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import type { OrgAction } from "../organizations/organization-actions";
 import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
@@ -147,6 +148,41 @@ describe("SitesService.updateSettings — authorization", () => {
         await expect(
             service.updateSettings(OWNER, "site_elsewhere", { seoTitle: "x" }),
         ).rejects.toBeInstanceOf(NotFoundException);
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+});
+
+/*
+ * The header's name (round 2, G6). The site editor's inspector edits it
+ * through this same settings save, so it takes the same gate.
+ */
+describe("SitesService.updateSettings — the site name (G6)", () => {
+    /*
+     * A role a business made itself: it may edit blocks but not the site's
+     * settings. The inspector shows it the name read-only, and the API is
+     * what makes that true — the gate is the capability, never a role name.
+     */
+    const BLOCKS_ONLY: OrganizationContext = {
+        organizationId: "org_1",
+        userId: "u_3",
+        role: "MEMBER",
+        roleKey: "copywriter",
+        actions: new Set<OrgAction>(["site:read", "section:write"]),
+    };
+
+    it("writes the name and nothing else", async () => {
+        await service.updateSettings(OWNER, SITE, { name: "Rye & Co." });
+
+        const { data } = siteUpdate.mock.calls[0][0];
+        expect(data).toEqual({ name: "Rye & Co." });
+        // The address stays where it is: renaming never moves the site.
+        expect("slug" in data).toBe(false);
+    });
+
+    it("refuses the name with a 403 to a role that can edit blocks but not the site", async () => {
+        await expect(
+            service.updateSettings(BLOCKS_ONLY, SITE, { name: "Renamed" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
         expect(siteUpdate).not.toHaveBeenCalled();
     });
 });

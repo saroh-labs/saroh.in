@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { EditorStatusInput } from "./editor-status";
 import { editorStatus, PENDING_UNKNOWN } from "./editor-status";
+import { shortPendingChanges } from "./pending";
 
 const base: EditorStatusInput = {
     saving: false,
@@ -35,6 +36,15 @@ describe("the editor's status pill", () => {
         expect(label({ pending: "2 blocks, footer" })).toBe(
             "Not published · 2 blocks, footer",
         );
+    });
+
+    it("counts the name and the footer typed in the inspector as not published (G6)", () => {
+        expect(label({ pending: shortPendingChanges(0, ["name"]) })).toBe(
+            "Not published · site name",
+        );
+        expect(
+            label({ pending: shortPendingChanges(1, ["name", "footer"]) }),
+        ).toBe("Not published · 1 block, site name, footer");
     });
 
     it("says a site that was never published is not published yet", () => {

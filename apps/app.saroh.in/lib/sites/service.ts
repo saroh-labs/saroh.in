@@ -432,6 +432,11 @@ export interface SiteDetail extends SiteSummary {
  * someone else changed.
  */
 export interface SiteSettingsInput {
+    /**
+     * The name in the site's header (G6). Never null or blank: the API
+     * refuses both, because a site always has a name.
+     */
+    name?: string;
     seoTitle?: string | null;
     seoDescription?: string | null;
     socialImageUrl?: string | null;

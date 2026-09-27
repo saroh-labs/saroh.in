@@ -1,9 +1,8 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Info, PanelBottom, PanelTop } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
@@ -256,107 +255,6 @@ export function BlockInspector({
                 Written copy edits here and on the page at the same time.
                 Prices, dates and stock come from the workspace and change
                 there.
-            </p>
-        </div>
-    );
-}
-
-/**
- * The header or footer, selected (#336, #338). They are on every page, so
- * the inspector says that before anything else, and the actions a page block
- * has are here but disabled WITH the reason — absent, they would leave a
- * merchant hunting for a Remove that was never going to exist.
- */
-export function FixedBlockInspector({
-    part,
-    siteId,
-    hasFooter,
-}: {
-    part: "header" | "footer";
-    siteId: string;
-    /** Whether anything is written at the foot of the site yet. */
-    hasFooter: boolean;
-}) {
-    const Icon = part === "header" ? PanelTop : PanelBottom;
-    const reason =
-        "On every page, so it cannot be removed or moved from one page.";
-    return (
-        <div className="space-y-4 p-4">
-            <div className="space-y-1.5">
-                <h2 className="flex items-center gap-2 text-base font-semibold">
-                    <Icon
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-muted-foreground"
-                    />
-                    {part === "header" ? "Header" : "Footer"}
-                    <Badge
-                        variant="neutral"
-                        className="uppercase tracking-[0.06em]"
-                    >
-                        Fixed
-                    </Badge>
-                </h2>
-                <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
-                    On every page of this site. Where it sits is not a per-page
-                    choice.
-                </p>
-            </div>
-
-            <p className="text-[0.8125rem] leading-relaxed">
-                {part === "header"
-                    ? "It shows the site's name and its menu. The menu lists the pages you add to it, and both are changed in Website settings, where a change is understood to reach every page."
-                    : hasFooter
-                      ? "What is written here is changed in Website settings, where a change is understood to reach every page."
-                      : "Nothing is written at the foot of this site yet, so visitors see the site's name and “Runs on Saroh”. Write your own line in Website settings."}
-            </p>
-            <Button asChild variant="outline" size="sm">
-                {/* A new tab, for the same reason as the Services link. */}
-                <Link
-                    href={`/sites/${siteId}/settings`}
-                    target="_blank"
-                    rel="noopener"
-                >
-                    Open Website settings
-                </Link>
-            </Button>
-
-            <div className="flex items-center gap-1 border-t pt-3">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    disabled
-                    aria-label={`Move — ${reason}`}
-                >
-                    ↑
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    disabled
-                    aria-label={`Move — ${reason}`}
-                >
-                    ↓
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto h-8 px-3 text-xs"
-                    disabled
-                    aria-describedby="fixed-remove-reason"
-                >
-                    Remove
-                </Button>
-            </div>
-            <p
-                id="fixed-remove-reason"
-                className="text-xs leading-relaxed text-muted-foreground"
-            >
-                {reason}
             </p>
         </div>
     );
