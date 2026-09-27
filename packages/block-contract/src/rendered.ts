@@ -265,6 +265,19 @@ const renderedServicesList = z.object({
 });
 
 /**
+ * `visitUs`, as published (G8): nothing resolves at publish. The place itself
+ * is read live by the component, from the id alone.
+ */
+const renderedVisitUs = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    storeId: z.string().optional(),
+    showMap: z.boolean().optional(),
+    showHours: z.boolean().optional(),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -290,6 +303,7 @@ export const RENDERED_SCHEMAS = {
     testimonials: renderedTestimonials,
     contact: renderedContact,
     servicesList: renderedServicesList,
+    visitUs: renderedVisitUs,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -307,6 +321,7 @@ export type RenderedFaq = RenderedContent<"faq">;
 export type RenderedTestimonials = RenderedContent<"testimonials">;
 export type RenderedContact = RenderedContent<"contact">;
 export type RenderedServicesList = RenderedContent<"servicesList">;
+export type RenderedVisitUs = RenderedContent<"visitUs">;
 
 /**
  * Validate rendered content for a block type.

@@ -10,6 +10,7 @@ import type {
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
+    RenderedVisitUs,
 } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
@@ -23,6 +24,7 @@ import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
+import VisitUsSection from "./blocks/visit-us";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -55,16 +57,23 @@ export default function SectionRenderer({
     section,
     apiUrl,
     bookHref,
+    siteId,
 }: {
     section: Section;
     /**
-     * Base URL of the public API, for the two blocks that talk to it. Optional:
+     * Base URL of the public API, for the blocks that talk to it. Optional:
      * each defaults to production, which is what the app-level env fallback did
      * before these components moved into a package (#252).
      */
     apiUrl?: string;
     /** The site's booking page (U19); live sites only. */
     bookHref?: string;
+    /**
+     * The site being shown, for the blocks that read its business's live
+     * data by site (Visit us, G8). Undefined where no site is live — the
+     * editor's canvas — and those blocks then say what they will show.
+     */
+    siteId?: string | null;
 }) {
     switch (section.type) {
         case "hero":
@@ -116,6 +125,14 @@ export default function SectionRenderer({
             return (
                 <ContactSection content={section.content as RenderedContact} />
             );
+        case "visitUs":
+            return (
+                <VisitUsSection
+                    content={section.content as RenderedVisitUs}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -162,12 +179,15 @@ export function PageSections({
     sections,
     apiUrl,
     bookHref,
+    siteId,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
     apiUrl?: string;
     /** The site's booking page (U19), linked from services; live sites only. */
     bookHref?: string;
+    /** The live site's id, for the blocks that read by site (G8). */
+    siteId?: string | null;
 }) {
     return (
         <>
@@ -178,6 +198,7 @@ export function PageSections({
                         section={section}
                         apiUrl={apiUrl}
                         bookHref={bookHref}
+                        siteId={siteId}
                     />
                 );
                 return style === undefined ? (
