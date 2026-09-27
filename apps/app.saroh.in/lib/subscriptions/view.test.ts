@@ -362,7 +362,7 @@ describe("a pause with an end date (D8)", () => {
         it("says it outlasted the paid period and waits for Payments, not that it resumes on its own", () => {
             // Paid to 1 Oct, so resuming starts a new period with its invoice.
             expect(headline(paused, null, later).line).toBe(
-                "Pause ended 16 Oct · restarts with a new invoice once Payments is on. Nothing is charged while paused.",
+                "Pause ended 16 Oct · restarts with a new invoice at the next hourly check, or once Payments is on if it's off. Nothing is charged while paused.",
             );
             expect(pausedText(paused, later)).toBe("Pause ended 16 Oct");
             expect(rowWhen(paused, later).text).toBe("Pause ended 16 Oct");

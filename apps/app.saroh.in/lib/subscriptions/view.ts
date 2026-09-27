@@ -208,8 +208,9 @@ function pauseHasEnded(
  * The detail's sentence about a pause. Once its end date has come and it
  * is still paused, it says why (review S-2): one that ended inside its
  * paid period only waits for the hourly check; one that outlasted it
- * restarts with a new invoice, which needs Payments on — the job leaves
- * it paused while Payments is off.
+ * restarts with a new invoice at the next hourly check, which needs
+ * Payments on — the job leaves it paused while Payments is off. The detail
+ * doesn't know which, so the line is true either way (re-review 6).
  */
 function pausedLine(
     sub: Pick<
@@ -228,7 +229,7 @@ function pausedLine(
         new Date(sub.currentPeriodEnd).getTime();
     return extendsPeriod
         ? `Pause ended ${day} · resumes at the next hourly check.`
-        : `Pause ended ${day} · restarts with a new invoice once Payments is on.`;
+        : `Pause ended ${day} · restarts with a new invoice at the next hourly check, or once Payments is on if it's off.`;
 }
 
 /** A row's line under the status: when it next charges, or why it stopped. */
