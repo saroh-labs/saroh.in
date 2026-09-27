@@ -12,12 +12,13 @@ import {
     SiteTheme,
 } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
+import { showInfo } from "@saroh/ui/toast";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import { env } from "@/env";
-import { merchantLinkUrl } from "@/lib/sites/merchant-link";
+import { merchantLinkUrl, previewLinkTarget } from "@/lib/sites/merchant-link";
 
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -63,6 +64,10 @@ import { resolveStyleVariables } from "@/lib/sites/style";
  */
 const PREVIEW_SCOPE = "site-preview-scope";
 
+/** What a form sent on a draft says: it went nowhere (G5). */
+export const FORM_NOT_SENT = "Preview — not sent";
+export const FORM_NOT_SENT_DETAIL = "Forms send from your live site.";
+
 function toRenderedSection(
     section: Section,
     resolvePage: (pageId: string) => string | undefined,
@@ -87,6 +92,8 @@ export function DraftPreview({
     onOpenNotes,
     siteAddress,
     siteId,
+    onOpenPage,
+    onFormBlocked,
 }: {
     /**
      * The site being drawn, so blocks that read live data (Visit us, G8)
@@ -131,6 +138,16 @@ export function DraftPreview({
     onOpenNotes?: (index: number) => void;
     /** The merchant's site address, which the page's links open on. */
     siteAddress?: string | null;
+    /**
+     * Preview in the editor (G5): a link to one of the site's pages opens it
+     * here instead of in a tab. Omitted, every link opens on the site.
+     */
+    onOpenPage?: (page: SitePage) => void;
+    /**
+     * A form was sent and stopped, since nothing here ever submits. Omitted,
+     * a toast says so.
+     */
+    onFormBlocked?: () => void;
 }) {
     /*
      * The merchant's tokens, from the SAME component the live site uses.
@@ -160,7 +177,8 @@ export function DraftPreview({
 
     // Mirrors `buildSnapshot`: the pages this publish would write, not every
     // page the editor knows about.
-    const resolvePage = pagePathResolver(pages.filter((p) => !p.hidden));
+    const shown = pages.filter((p) => !p.hidden);
+    const resolvePage = pagePathResolver(shown);
 
     /*
      * The preview answers "what will visitors see", so a hidden section is
@@ -248,20 +266,44 @@ export function DraftPreview({
              * without the unsaved-work check — and instead opens the
              * merchant's own page in a new tab (merchantLinkUrl).
              *
-             * In Preview a click opens it. On the editing canvas a click
-             * selects the block, so a button can be edited without leaving;
-             * ⌘/Ctrl-click opens the link there.
+             * In Preview a click opens it: one of the site's pages opens in
+             * the editor (G5), anything else in a new tab. On the editing
+             * canvas a click selects the block, so a button can be edited
+             * without leaving; ⌘/Ctrl-click opens the link there.
              */
             onClickCapture={(e) => {
                 const anchor = (e.target as HTMLElement).closest("a");
                 if (!anchor) return;
                 e.preventDefault();
                 if (editing && !(e.metaKey || e.ctrlKey)) return;
-                const url = merchantLinkUrl(
-                    anchor.getAttribute("href"),
-                    siteAddress,
-                );
+                const href = anchor.getAttribute("href");
+                const target = onOpenPage
+                    ? previewLinkTarget(href, shown, siteAddress)
+                    : null;
+                if (target?.kind === "page") {
+                    onOpenPage?.(target.page);
+                    return;
+                }
+                if (target?.kind === "anchor") {
+                    const el = document.getElementById(target.id);
+                    if (el && e.currentTarget.contains(el)) {
+                        el.scrollIntoView({ block: "start" });
+                    }
+                    return;
+                }
+                const url = merchantLinkUrl(href, siteAddress);
                 if (url) window.open(url, "_blank", "noopener");
+            }}
+            /*
+             * A draft is never a real visitor, so no form on it sends: an
+             * enquiry or a booking made here would reach the business as if
+             * a customer had written. Stopped before the block's own handler.
+             */
+            onSubmitCapture={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onFormBlocked) onFormBlocked();
+                else showInfo(FORM_NOT_SENT, FORM_NOT_SENT_DETAIL);
             }}
         >
             <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />

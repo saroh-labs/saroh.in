@@ -5,7 +5,6 @@ import { PanelDivider } from "@/components/sites/editor-chrome";
 import {
     canvasChromeFor,
     EditorCanvas,
-    FullScreenPreview,
 } from "@/components/sites/editor/editor-canvas";
 import { EditorRail } from "@/components/sites/editor/editor-rail";
 import { EditorTopBar } from "@/components/sites/editor/editor-top-bar";
@@ -96,6 +95,7 @@ export function SiteEditor({
     const { setSelectedIndex, setRail, setInspector } = selection;
     const viewport = useEditorViewport({
         siteId,
+        pageId,
         sectionCount: initialCount,
         initialScrollTop: selection.place.scrollTop,
     });
@@ -154,7 +154,10 @@ export function SiteEditor({
         pages,
         footer: chrome.footer,
     });
-    const preview = { siteId, address, sections, pages, style, styleOptions };
+    // Preview (G5) puts the rail and inspector away, kept mounted.
+    const tools = viewport.previewing
+        ? { hidden: true }
+        : { className: "contents" };
 
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
@@ -178,68 +181,74 @@ export function SiteEditor({
                     {
                         // Blocks, the page, the inspector (#340); see
                         // `editorColumns` for how the widths are shared.
-                        "--editor-cols": editorColumns(
-                            viewport.railWidth,
-                            viewport.panelWidth,
-                        ),
+                        "--editor-cols": viewport.previewing
+                            ? "1fr"
+                            : editorColumns(
+                                  viewport.railWidth,
+                                  viewport.panelWidth,
+                              ),
                     } as React.CSSProperties
                 }
             >
-                <EditorRail
-                    {...selection}
-                    {...siteStyle}
-                    {...draft}
-                    {...edits}
-                    styleOptions={styleOptions}
-                    {...add}
-                    flagsBySection={flagsBySection}
-                    notedKeys={review.notedKeys}
-                />
+                <div {...tools}>
+                    <EditorRail
+                        {...selection}
+                        {...siteStyle}
+                        {...draft}
+                        {...edits}
+                        styleOptions={styleOptions}
+                        {...add}
+                        flagsBySection={flagsBySection}
+                        notedKeys={review.notedKeys}
+                    />
 
-                <PanelDivider
-                    label="Resize the block list"
-                    width={viewport.railWidth}
-                    min={RAIL_MIN}
-                    max={RAIL_MAX}
-                    reset={RAIL_DEFAULT}
-                    onResize={viewport.setRailWidth}
-                    onNudge={viewport.nudgeRail}
-                />
+                    <PanelDivider
+                        label="Resize the block list"
+                        width={viewport.railWidth}
+                        min={RAIL_MIN}
+                        max={RAIL_MAX}
+                        reset={RAIL_DEFAULT}
+                        onResize={viewport.setRailWidth}
+                        onNudge={viewport.nudgeRail}
+                    />
+                </div>
 
                 <EditorCanvas
                     {...viewport}
                     {...selection}
-                    {...preview}
-                    conflict={draft.conflict}
+                    {...draft}
+                    {...{ siteId, pageId, address, pages, style, styleOptions }}
                     neverPublished={publish.neverPublished}
                     canvasChrome={canvasChrome}
                     notesByKey={review.notesByKey}
                 />
 
-                <PanelDivider
-                    label="Resize the inspector"
-                    width={viewport.panelWidth}
-                    min={PANEL_MIN}
-                    max={PANEL_MAX}
-                    reset={PANEL_DEFAULT}
-                    onResize={viewport.setPanelWidth}
-                    onNudge={viewport.nudgePanel}
-                    panelSide="right"
-                />
+                <div {...tools}>
+                    <PanelDivider
+                        label="Resize the inspector"
+                        width={viewport.panelWidth}
+                        min={PANEL_MIN}
+                        max={PANEL_MAX}
+                        reset={PANEL_DEFAULT}
+                        onResize={viewport.setPanelWidth}
+                        onNudge={viewport.nudgePanel}
+                        panelSide="right"
+                    />
 
-                <InspectorHost
-                    {...{ siteId, pageId, pages, styleOptions }}
-                    {...selection}
-                    {...draft}
-                    {...edits}
-                    {...review}
-                    style={style}
-                    active={active}
-                    fixedText={chrome}
-                    jumpToNote={jumpToNote}
-                    activeFlags={activeFlags}
-                    unreadableSections={unreadableSections}
-                />
+                    <InspectorHost
+                        {...{ siteId, pageId, pages, styleOptions }}
+                        {...selection}
+                        {...draft}
+                        {...edits}
+                        {...review}
+                        style={style}
+                        active={active}
+                        fixedText={chrome}
+                        jumpToNote={jumpToNote}
+                        activeFlags={activeFlags}
+                        unreadableSections={unreadableSections}
+                    />
+                </div>
             </div>
 
             {/*
@@ -248,15 +257,6 @@ export function SiteEditor({
              * behind it — the merchant goes back to exactly the editing state
              * they left, including unsaved selection and scroll.
              */}
-            {viewport.fullScreen ? (
-                <FullScreenPreview
-                    {...preview}
-                    device={viewport.device}
-                    setFullScreen={viewport.setFullScreen}
-                    canvasChrome={canvasChrome}
-                />
-            ) : null}
-
             {/*
              * Choosing a look before the block goes in (#267). Keyed on the
              * block so each opening starts on that block's looks.

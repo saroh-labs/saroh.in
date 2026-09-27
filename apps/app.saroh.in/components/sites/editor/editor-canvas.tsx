@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import type { RefObject, UIEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Device } from "@/components/sites/editor-constants";
 import { DEVICE_WIDTH } from "@/components/sites/editor-constants";
@@ -10,7 +11,14 @@ import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
-import { DraftPreview } from "@/components/sites/section-preview";
+import { useOpenPage } from "@/components/sites/editor/use-editor-selection";
+import { unfinishedPhrase } from "@/components/sites/held-back-copy";
+import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import {
+    DraftPreview,
+    FORM_NOT_SENT,
+    FORM_NOT_SENT_DETAIL,
+} from "@/components/sites/section-preview";
 import type {
     Section,
     SiteFooter,
@@ -60,11 +68,19 @@ export function canvasChromeFor({
     };
 }
 
+/** What Preview's bar says while nothing has been tried. */
+const PREVIEW_NOTE =
+    "This is your site with the draft. Try it; nothing is live until you publish.";
+
 /**
  * The canvas: the page, drawn with the real site blocks, in a window whose
- * bar names its address. Moved out of `site-editor.tsx` unchanged (#260).
+ * bar names its address. Moved out of `site-editor.tsx` (#260).
  *
- * Preview — width changes, data does not.
+ * Preview (G5) is this same canvas and the same renderer with the editing
+ * tools taken away — no outlines, labels or pins, and no window bar — so
+ * links and buttons work as a visitor's would. A link to one of the site's
+ * pages opens it in the editor; any other opens in a new tab. The device and
+ * zoom still apply. There is no second renderer to drift from this one.
  *
  * The canvas ground is the SAME #0b0b0b as the chrome (spec §7), not a
  * lighter tray. A raised panel here would make the canvas a second bright
@@ -78,7 +94,10 @@ export function EditorCanvas({
     device,
     switching,
     zoomScale,
+    previewing,
+    setPreviewing,
     siteId,
+    pageId,
     address,
     sections,
     pages,
@@ -92,6 +111,9 @@ export function EditorCanvas({
     selectedChrome,
     selectChrome,
     notesByKey,
+    dirty,
+    onlyHeldBack,
+    heldBack,
 }: {
     canvasRef: RefObject<HTMLDivElement | null>;
     onCanvasScroll: (e: UIEvent<HTMLDivElement>) => void;
@@ -102,8 +124,13 @@ export function EditorCanvas({
     /** Briefly dimmed while a device switch animates. */
     switching: boolean;
     zoomScale: number;
+    /** Preview: the editing tools are away and the site is usable (G5). */
+    previewing: boolean;
+    setPreviewing: (on: boolean) => void;
     /** For the blocks that read live data on the canvas (G8). */
     siteId: string;
+    /** The open page, so a link to it in Preview stays here. */
+    pageId: string;
     address?: string | null;
     sections: Section[];
     pages: SitePage[];
@@ -117,12 +144,48 @@ export function EditorCanvas({
     selectedChrome: FixedPart | null;
     selectChrome: (part: FixedPart) => void;
     notesByKey: Map<string, number>;
+    /** Work not yet saved, which holds a page switch back. */
+    dirty: boolean;
+    onlyHeldBack: boolean;
+    heldBack: HeldBackSection[];
 }) {
+    const openPage = useOpenPage({
+        siteId,
+        pageId,
+        dirty,
+        unfinished: onlyHeldBack ? unfinishedPhrase(heldBack) : undefined,
+        onSamePage: () => {
+            const el = canvasRef.current;
+            if (el) el.scrollTop = 0;
+        },
+    });
+
+    /*
+     * A form tried in Preview says, in the bar, that it went nowhere: a toast
+     * would land on top of the bar. It goes back to the note after a while.
+     */
+    const [notSent, setNotSent] = useState(false);
+    const notSentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+        () => () => {
+            if (notSentTimer.current !== null) {
+                clearTimeout(notSentTimer.current);
+            }
+        },
+        [],
+    );
+    function formBlocked() {
+        setNotSent(true);
+        if (notSentTimer.current !== null) clearTimeout(notSentTimer.current);
+        notSentTimer.current = setTimeout(() => setNotSent(false), 5000);
+    }
+
     return (
         <div
             ref={canvasRef}
             onScroll={onCanvasScroll}
-            className="min-h-0 overflow-y-auto bg-background p-6"
+            data-previewing={previewing || undefined}
+            className={`min-h-0 overflow-y-auto bg-background ${previewing ? "p-0" : "p-6"}`}
         >
             {/*
              * Someone else saved this page while this editor was open
@@ -161,9 +224,10 @@ export function EditorCanvas({
              * The first-run nudge (spec §5), in the spec's own words.
              * "It does not nag" — so it is one quiet line above the
              * preview, shown only until the site has been published
-             * once, and it never reappears afterwards.
+             * once, and it never reappears afterwards. Preview's bar says
+             * the same while it is open.
              */}
-            {neverPublished ? (
+            {neverPublished && !previewing ? (
                 <p
                     className="mx-auto mb-4 text-center text-xs text-muted-foreground"
                     style={{ maxWidth: DEVICE_WIDTH[device] }}
@@ -206,24 +270,38 @@ export function EditorCanvas({
                  * The page sits in a window whose bar names the
                  * address it lives at (#340): this is the merchant's
                  * website, not a mock-up of one, and the bar says
-                 * where a customer would find it.
+                 * where a customer would find it. Preview drops the
+                 * window: it is the site, edge to edge (G5).
                  */}
-                <div className="overflow-hidden rounded-lg border shadow-xl shadow-black/10 dark:shadow-black/40">
-                    <div className="flex h-9 items-center gap-3 border-b bg-muted px-3">
-                        <span aria-hidden="true" className="flex gap-1.5">
-                            <span className="size-2 rounded-full bg-foreground/15" />
-                            <span className="size-2 rounded-full bg-foreground/15" />
-                            <span className="size-2 rounded-full bg-foreground/15" />
-                        </span>
-                        <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                            {address ? `${address}/` : "Not published yet"}
-                        </span>
-                        {address ? (
-                            <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">
-                                ⌘-click a link to open it on your site
+                <div
+                    className={
+                        previewing
+                            ? "overflow-hidden"
+                            : "overflow-hidden rounded-lg border shadow-xl shadow-black/10 dark:shadow-black/40"
+                    }
+                >
+                    {previewing ? null : (
+                        <div className="flex h-9 items-center gap-3 border-b bg-muted px-3">
+                            <span aria-hidden="true" className="flex gap-1.5">
+                                <span className="size-2 rounded-full bg-foreground/15" />
+                                <span className="size-2 rounded-full bg-foreground/15" />
+                                <span className="size-2 rounded-full bg-foreground/15" />
                             </span>
-                        ) : null}
-                    </div>
+                            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                                {address ? `${address}/` : "Not published yet"}
+                            </span>
+                            {address ? (
+                                <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">
+                                    ⌘-click a link to open it on your site
+                                </span>
+                            ) : null}
+                        </div>
+                    )}
+                    {/*
+                     * One renderer either way. Preview only leaves out
+                     * what makes the page editable: selecting, the lock
+                     * on the header and footer, and the notes' pins.
+                     */}
                     <DraftPreview
                         siteId={siteId}
                         siteAddress={address}
@@ -231,75 +309,72 @@ export function EditorCanvas({
                         pages={pages}
                         style={style}
                         styleOptions={styleOptions}
-                        selectedIndex={selectedIndex}
-                        onSelect={(index) => {
-                            setRail("sections");
-                            setSelectedIndex(index);
-                        }}
                         chrome={canvasChrome}
-                        selectedChrome={selectedChrome}
-                        onSelectChrome={selectChrome}
-                        notesByKey={notesByKey}
-                        onOpenNotes={(index) => {
-                            setSelectedIndex(index);
-                            setInspector("feedback");
-                        }}
+                        {...(previewing
+                            ? {
+                                  onOpenPage: openPage,
+                                  onFormBlocked: formBlocked,
+                              }
+                            : {
+                                  selectedIndex,
+                                  onSelect: (index: number) => {
+                                      setRail("sections");
+                                      setSelectedIndex(index);
+                                  },
+                                  selectedChrome,
+                                  onSelectChrome: selectChrome,
+                                  notesByKey,
+                                  onOpenNotes: (index: number) => {
+                                      setSelectedIndex(index);
+                                      setInspector("feedback");
+                                  },
+                              })}
                     />
                 </div>
             </div>
+
+            {previewing ? (
+                <PreviewBar
+                    notSent={notSent}
+                    onBack={() => setPreviewing(false)}
+                />
+            ) : null}
         </div>
     );
 }
 
 /**
- * Full-screen preview: "hides everything; Escape returns". The frame keeps
- * its device width, so this is the site at the size being designed for with
- * nothing else on screen — not a maximised editor.
+ * Preview's way out, pinned to the window rather than the page: on a long
+ * page an exit that scrolled away with the content would leave a mode with
+ * no visible way back. It says what Preview is, or that a form went nowhere.
  */
-export function FullScreenPreview({
-    setFullScreen,
-    device,
-    siteId,
-    address,
-    sections,
-    pages,
-    style,
-    styleOptions,
-    canvasChrome,
+function PreviewBar({
+    notSent,
+    onBack,
 }: {
-    setFullScreen: (open: boolean) => void;
-    device: Device;
-    siteId: string;
-    address?: string | null;
-    sections: Section[];
-    pages: SitePage[];
-    style: SiteStyle;
-    styleOptions: SiteStyleOptions;
-    canvasChrome: CanvasChrome;
+    notSent: boolean;
+    onBack: () => void;
 }) {
     return (
-        <div className="fixed inset-0 z-40 overflow-y-auto bg-background p-6">
+        <div className="fixed bottom-[22px] left-1/2 z-40 flex max-w-[92vw] -translate-x-1/2 flex-wrap items-center gap-[13px] rounded-full bg-brand-surface px-3.5 py-2.5 shadow-xl shadow-black/30">
+            <span
+                role="status"
+                className="text-[0.78125rem] text-brand-surface-foreground/85"
+            >
+                {notSent
+                    ? `${FORM_NOT_SENT}. ${FORM_NOT_SENT_DETAIL}`
+                    : PREVIEW_NOTE}
+            </span>
             <button
                 type="button"
-                onClick={() => setFullScreen(false)}
-                className="fixed right-4 top-4 z-10 rounded border bg-background/80 px-2 py-1 text-xs text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                onClick={onBack}
+                className="flex shrink-0 items-center gap-2 rounded text-[0.78125rem] font-semibold text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                Escape to return
+                Back to editing
+                <kbd className="rounded border border-brand-surface-foreground/30 px-[5px] py-px font-mono text-[0.6875rem] font-normal text-brand-surface-foreground/75">
+                    Esc
+                </kbd>
             </button>
-            <div
-                className="mx-auto transition-[max-width] duration-slow ease-out motion-reduce:transition-none"
-                style={{ maxWidth: DEVICE_WIDTH[device] }}
-            >
-                <DraftPreview
-                    siteId={siteId}
-                    siteAddress={address}
-                    sections={sections}
-                    pages={pages}
-                    style={style}
-                    styleOptions={styleOptions}
-                    chrome={canvasChrome}
-                />
-            </div>
         </div>
     );
 }
