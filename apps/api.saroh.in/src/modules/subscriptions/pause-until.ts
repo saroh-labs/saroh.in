@@ -88,11 +88,58 @@ export function pausedDays(
     return Math.max(0, Math.round(to.diff(from, "days").days));
 }
 
-/** The renewal job's where for a pause whose end date has come. */
+/**
+ * The renewal job's where for a pause whose end date has come, less the
+ * ones already refused for Payments being off ({@link refusedPauseIds}).
+ */
 export function pauseEndedWhere(
     now: Date,
+    refused: readonly string[] = [],
 ): Prisma.CustomerSubscriptionWhereInput {
-    return { status: "PAUSED", pausedUntil: { lte: now } };
+    return {
+        status: "PAUSED",
+        pausedUntil: { lte: now },
+        ...(refused.length > 0 ? { id: { notIn: [...refused] } } : {}),
+    };
+}
+
+/**
+ * Pauses the job has already refused to restart and that would be refused
+ * again (review S-4): ended after the paid period, not set to end, in a
+ * business whose Payments is still off, with a RESUME_REFUSED since this
+ * pause began. Fetching them would change nothing, and they sort first
+ * (their period ended before the pause did), so the job leaves them out
+ * until Payments is back on. One refused for the first time is not here:
+ * the job still has to write its RESUME_REFUSED.
+ *
+ * Raw because it compares an event's time with its subscription's row.
+ * Payments off is as `PAYMENTS_SWITCHED_OFF` says: a PAYMENTS row that is
+ * not ENABLED.
+ */
+export async function refusedPauseIds(
+    db: Pick<Tx, "$queryRaw">,
+    now: Date,
+): Promise<string[]> {
+    const rows = await db.$queryRaw<{ id: string }[]>`
+        SELECT s.id FROM "CustomerSubscription" s
+        WHERE s.status = 'PAUSED'
+          AND s."pausedUntil" <= ${now}
+          AND s."pausedUntil" > s."currentPeriodEnd"
+          AND s."cancelAtPeriodEnd" = false
+          AND EXISTS (
+            SELECT 1 FROM "OrganizationModule" m
+            WHERE m."organizationId" = s."organizationId"
+              AND m."moduleKey" = 'PAYMENTS'
+              AND m.status <> 'ENABLED'
+          )
+          AND EXISTS (
+            SELECT 1 FROM "SubscriptionEvent" e
+            WHERE e."organizationId" = s."organizationId"
+              AND e."subscriptionId" = s.id
+              AND e.kind = 'RESUME_REFUSED'
+              AND e."createdAt" >= s."pausedAt"
+          )`;
+    return rows.map((r) => r.id);
 }
 
 export interface PausedRow {
