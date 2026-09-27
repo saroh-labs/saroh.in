@@ -118,6 +118,8 @@ export async function listOrderRows(
                   currency: true,
                   total: true,
                   createdAt: true,
+                  courierName: true,
+                  trackingNumber: true,
                   store: { select: { id: true, name: true } },
                   customer: {
                       select: {

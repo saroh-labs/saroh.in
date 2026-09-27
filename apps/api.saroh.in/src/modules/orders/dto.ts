@@ -103,6 +103,9 @@ const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 const MONEY_MSG = "Must be a number with up to 2 decimals";
 const CURRENCY_RE = /^[A-Z]{3}$/;
 
+/** The most a courier's name or a tracking number may run to (DEC-045). */
+export const COURIER_FIELD_MAX = 80;
+
 /** Where a delivery order goes (ADR-008). Every part is plain text. */
 export class DeliveryAddressInput {
     @IsOptional()
@@ -249,6 +252,24 @@ export class MoveStageDto {
     @MaxLength(500)
     trackingUrl?: string;
 
+    /** Who took it — only on the handover to a courier; optional. */
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the courier's name to 80 characters",
+    })
+    courierName?: string | null;
+
+    /** The courier's number for it — only on that handover; optional. */
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the tracking number to 80 characters",
+    })
+    trackingNumber?: string | null;
+
     @IsOptional()
     @Transform(blankToNull)
     @IsString()
@@ -279,7 +300,11 @@ export class OrderLineChangeInput {
 /**
  * Change an order before anyone starts on it (`order:write`, ADR-008): its
  * lines, its fulfilment and address, and its notes. Lines, fulfilment and
- * address only while it is New; notes at any time until it is cancelled.
+ * address only while it is New; notes until it is handed over or cancelled.
+ *
+ * The courier's name, the tracking number and the tracking link go with the
+ * handover to a courier (DEC-045): they are the only fields that change
+ * after it, and `order:stage` is enough for them. `null` clears one.
  */
 export class EditOrderDto {
     @IsOptional()
@@ -309,6 +334,31 @@ export class EditOrderDto {
     @IsString()
     @MaxLength(1000)
     notes?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the courier's name to 80 characters",
+    })
+    courierName?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the tracking number to 80 characters",
+    })
+    trackingNumber?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsUrl(
+        { protocols: ["http", "https"], require_protocol: true },
+        { message: "The tracking link must be a web address" },
+    )
+    @MaxLength(500)
+    trackingUrl?: string | null;
 }
 
 export class UpdateOrderDto {
