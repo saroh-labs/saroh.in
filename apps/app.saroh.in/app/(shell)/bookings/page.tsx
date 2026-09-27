@@ -2,17 +2,15 @@ import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
-import type { CalendarLayout } from "@/components/bookings/calendar/calendar-screen";
-import {
-    calendarHref,
-    CalendarScreen,
-} from "@/components/bookings/calendar/calendar-screen";
+import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import type { CalendarLayout } from "@/lib/services/calendar-href";
+import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
 import {
     addDays,

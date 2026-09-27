@@ -20,6 +20,8 @@ import type {
 } from "@/lib/services/booking-calendar";
 import { runsClasses } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
+import type { CalendarLayout } from "@/lib/services/calendar-href";
+import { calendarHref } from "@/lib/services/calendar-href";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import {
     addDays,
@@ -51,13 +53,9 @@ import type { QuickLookActions } from "./quick-look-types";
 import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
 
-export type CalendarLayout = "day" | "week" | "agenda";
-
-export function calendarHref(layout: CalendarLayout, date: LocalDate) {
-    const q = new URLSearchParams({ date });
-    if (layout !== "day") q.set("layout", layout);
-    return `/bookings?${q.toString()}`;
-}
+// The calendar's address lives in a plain module so the server page can
+// build it too; a server component can't call into this client file.
+export { calendarHref, type CalendarLayout };
 
 type Override = Partial<
     Pick<DiaryBooking, "status" | "outcome" | "cancelledLate">
