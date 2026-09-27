@@ -10,11 +10,13 @@ import type {
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
+    RenderedVisitUs,
 } from "@saroh/block-contract";
 import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { SAMPLE_VISIT } from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
@@ -26,6 +28,7 @@ import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
+import VisitUsSection from "./blocks/visit-us";
 import BookingFlow from "./booking-flow/booking-flow";
 import type { BookingPageData } from "./booking-flow/model";
 import { SiteTheme } from "./site-theme";
@@ -310,6 +313,19 @@ describe("block rendering", () => {
                         currency: "GBP",
                     },
                 ]}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // A sample place rather than a fetch, and a pinned clock: "Open now"
+    // depends on the moment. Friday 25 Sep 2026, 10:00 in London.
+    it("visitUs", () => {
+        const { container } = render(
+            <VisitUsSection
+                content={BLOCK_META.visitUs.fixtures.default as RenderedVisitUs}
+                visit={SAMPLE_VISIT}
+                now={new Date("2026-09-25T09:00:00Z")}
             />,
         );
         expect(container.innerHTML).toMatchSnapshot();

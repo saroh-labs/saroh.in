@@ -137,6 +137,48 @@ export async function listCheckoutProviders(): Promise<
     }
 }
 
+/** A place a site's Visit us block can show: an open SHOP storefront (G8). */
+export interface VisitPlace {
+    id: string;
+    name: string;
+}
+
+/**
+ * The shops Visit us can show, or why there are none to offer: Sell switched
+ * off (the storefront routes answer 404), a role the API won't show them to,
+ * or a failed read. Kept apart so the picker never says "no shop" because a
+ * read failed.
+ */
+export type VisitPlacesRead =
+    | { state: "ok"; places: VisitPlace[] }
+    | { state: "sell-off" }
+    | { state: "failed"; forbidden: boolean };
+
+/**
+ * Every open storefront that is a place — `SHOP`, not `ONLINE` — in the
+ * order the storefronts screen lists them. An online storefront has no
+ * address or hours, so it is never offered (G8).
+ */
+export async function listVisitPlaces(): Promise<VisitPlacesRead> {
+    const base = await orgBase();
+    if (!base) return { state: "failed", forbidden: false };
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (res.status === 404) return { state: "sell-off" };
+        if (res.status === 403) return { state: "failed", forbidden: true };
+        if (!res.ok) return { state: "failed", forbidden: false };
+        const stores = (await res.json()) as StorefrontSummary[];
+        return {
+            state: "ok",
+            places: stores
+                .filter((s) => s.kind === "SHOP")
+                .map((s) => ({ id: s.id, name: s.name })),
+        };
+    } catch {
+        return { state: "failed", forbidden: false };
+    }
+}
+
 /** A storefront's week, for Business → Hours. */
 export interface StorefrontHours {
     id: string;

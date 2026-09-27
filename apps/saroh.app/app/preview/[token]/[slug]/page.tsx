@@ -44,5 +44,11 @@ export default async function PreviewPage({
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
 
-    return <PageSections sections={page.sections} apiUrl={publicApiUrl()} />;
+    return (
+        <PageSections
+            sections={page.sections}
+            apiUrl={publicApiUrl()}
+            siteId={preview.siteId}
+        />
+    );
 }

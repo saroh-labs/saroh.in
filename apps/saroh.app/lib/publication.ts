@@ -319,6 +319,12 @@ export type PreviewLookup =
           ok: true;
           snapshot: PublicationSnapshot;
           siteName: string;
+          /**
+           * The site's id, for the blocks that read its business's live data
+           * (Visit us, G8). `null` from an API that predates it: those blocks
+           * then draw nothing rather than guess.
+           */
+          siteId: string | null;
           /** ISO date-time after which the link stops working. */
           expiresAt: string;
       }
@@ -361,6 +367,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
     const body = (await res.json().catch(() => null)) as {
         snapshot?: PublicationSnapshot;
         site?: { name?: string };
+        siteId?: string;
         expiresAt?: string;
     } | null;
     if (!body?.snapshot || !body.expiresAt) {
@@ -370,6 +377,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         ok: true,
         snapshot: body.snapshot,
         siteName: body.site?.name ?? body.snapshot.site.name,
+        siteId: body.siteId ?? null,
         expiresAt: body.expiresAt,
     };
 }

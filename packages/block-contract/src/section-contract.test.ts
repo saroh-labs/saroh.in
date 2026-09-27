@@ -290,6 +290,7 @@ describe("per-section padding override (#189)", () => {
         testimonials: { items: [{ quote: "Quick.", name: "Sam" }] },
         contact: { phone: "+44 113 496 0000" },
         servicesList: { serviceIds: ["svc_1"] },
+        visitUs: {},
     };
 
     it("is accepted on every section type", () => {

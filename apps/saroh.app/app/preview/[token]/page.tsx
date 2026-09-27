@@ -28,5 +28,11 @@ export default async function PreviewHomePage({
     const home = findHomePage(preview.snapshot);
     if (!home) notFound();
 
-    return <PageSections sections={home.sections} apiUrl={publicApiUrl()} />;
+    return (
+        <PageSections
+            sections={home.sections}
+            apiUrl={publicApiUrl()}
+            siteId={preview.siteId}
+        />
+    );
 }

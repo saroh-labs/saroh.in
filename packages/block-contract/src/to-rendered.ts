@@ -110,6 +110,8 @@ export const TO_RENDERED = {
     contact: identity,
     // Its button resolves like hero's; the services themselves are read live.
     servicesList: resolvesNestedCta,
+    // An id and two switches; the place is read live. Nothing to resolve.
+    visitUs: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

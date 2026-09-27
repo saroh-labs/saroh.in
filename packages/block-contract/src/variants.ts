@@ -112,6 +112,7 @@ const LEGACY_RESOLVERS = {
     testimonials: () => defaultVariant("testimonials"),
     contact: () => defaultVariant("contact"),
     servicesList: () => defaultVariant("servicesList"),
+    visitUs: () => defaultVariant("visitUs"),
 } satisfies Record<SectionType, LegacyResolver>;
 
 /**
