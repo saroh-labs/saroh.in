@@ -446,11 +446,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-046 Brand and fonts are their own track, and Saroh's fonts stop reaching merchant sites now
 
-**Status: Accepted — 2026-09-26** — round-2 plans G and H
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (ship the fix now; font and palette catalogues)** — round-2 plans G and H
 
 - Context: the Site Editor and Customer Site designs add a brand (any colour, backgrounds, heading and body fonts, a logo and automatic contrast), module pages, Hindi and more. Separately, `apps/saroh.app` loads Saroh's Geist and Bricolage Grotesque for every merchant site, and the booking flow styles its headings with `font-display`. That puts Saroh's brand on a merchant's page, which the `--site-*` rule forbids.
-- Decision: **the font leak is a bug, fixed in the first phase**: merchant pages load no Saroh font, and the booking flow uses the site's own type tokens. **Brand v2** (per-site fonts, the brand API and panel, a logo and contrast) **is its own design-system epic**. **The site editor keeps free-form pages and adds module pages beside them.** **Hindi is a later step** of its own.
-- Consequences: until Brand v2 ships, a merchant site's text uses a neutral system font stack, with its existing colours.
+- Decision: **the font leak is a bug, fixed in the first phase and shipped now**: merchant pages load no Saroh font, and the booking flow uses the site's own type tokens, set to a neutral system stack. **Brand v2** (the brand API and panel, a logo and contrast) **is its own design-system epic**, and it gives the merchant **choice, not one fixed brand** (2026-09-27): **a font catalogue** of curated pairings (a heading face and a body face, each with Devanagari coverage) and **a palette catalogue** of ready-made colour palettes, **plus a custom colour**. Both catalogues are **data, not code**: a new pairing or palette is a catalogue entry, and no code names an entry. Everything resolves into the site's own `--site-*` tokens, never Saroh's. **The site editor keeps free-form pages and adds module pages beside them.** **Hindi is a later step** of its own.
+- Consequences: **the fix changes every live site on the day it ships**: its text moves to the neutral stack and stays there until its merchant picks a font pairing; its colours do not change. An existing site is never restyled on its own. When its merchant first opens Brand, it is offered the nearest palette (or its own accent as a custom colour) and the pairing closest to its old type, and nothing changes until they save. A retired catalogue entry leaves the pickers and keeps rendering for the sites that use it.
 - Migration: none for the fix.
 
 ## DEC-047 Publishing while a page is in review stays allowed

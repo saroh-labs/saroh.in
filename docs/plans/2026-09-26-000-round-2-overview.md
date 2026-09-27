@@ -37,8 +37,13 @@ file name. `DESIGN-NOTES.md` has the reasoning behind them.
 | E. Bookings, services, packs and calendar | [005](./2026-09-26-005-feat-bookings-packs-calendar-plan.md) | 28 | The Service Editor (visits, deposits, "Either", show on the booking page), time off ranges and business closed, new-booking search, and the booking page's gaps. Packs, Pack Detail and Pack Editor with drafts. The Business Calendar's second pass. |
 | F. Home and Settings | [006](./2026-09-26-006-feat-home-settings-plan.md) | 16 | The Home redesign, Settings' real differences, Team's hidden column, and storefront people joining the team. |
 | G. Site editor and customer site | [007](./2026-09-26-007-feat-site-editor-customer-site-plan.md) | 21 | The #260 split first, then bound blocks, module pages, header and footer text, Undo toasts, the narrow layout and in-place preview. Customer site v2 without the brand: shop and bag, Prices, On today, open or closed, and nav gated by module. |
-| H. Design system: Brand v2 | [008](./2026-09-26-008-feat-brand-v2-plan.md) | 8 | **The font-leak fix (phase 1).** Then fonts per site, the brand API and panel, a logo, contrast and starting themes. Hindi is later. |
-| | | **135** | |
+| H. Design system: Brand v2 | [008](./2026-09-26-008-feat-brand-v2-plan.md) | 10 | **The font-leak fix (phase 1).** Then Brand v2 with choice: a font catalogue of pairings and a palette catalogue plus a custom colour, both extensible as data; the brand API and panel, a logo, contrast, starting themes, and existing sites moved across as close as they look. Hindi is later. |
+| | | **137** | |
+
+**The font fix changes every live site.** On the day H1 ships, every
+merchant site's text moves from Saroh's fonts to a neutral system font stack,
+and stays there until the merchant picks a font pairing in Brand v2. Colours
+do not change. The user chose to ship it now (2026-09-27; default 141).
 
 Also written: [the permission matrix](./2026-09-26-permission-matrix.md)
 (DEC-039), and ADR-011.
@@ -79,7 +84,7 @@ permission matrix review (DEC-039).
 | E | E6 header facts and half-hour starts · E8 deposits · E9 visits API · E10 visits on the page and in Bookings · E12 Class packs module · E13 pack API · E15 Packs list and sell dialog · E16–E17 Pack Detail · E18 Pack Editor · E19–E20 calendar API · E22 named problems · E23 money cells · E24 days off and team · E25 Week view · E27 hour grid |
 | F | F2 more Needs-you sources · F4 inline actions with Undo · F7 This week · F10 business types · F14 alerts |
 | G | G9 Plans block · G13 bag and checkout · G14–G16 module pages · G19 module-gated nav · G20 Prices · G21 new-site setup |
-| H | H2 brand contract · H3 contrast rules · H4 fonts per site · H5 renderer · H6 logo · H7 Brand panel · H8 starting themes |
+| H | H2 brand contract · H3 font and palette catalogues · H4 contrast rules · H5 font files per site · H6 renderer · H7 logo · H8 Brand panel · H9 starting themes · H10 existing sites move across |
 
 ### Phase 3
 
@@ -115,8 +120,8 @@ permission matrix review (DEC-039).
 - **Pause with an end date** (D8) comes before A8.
 - **Published-only reads** (D5, E14) come before G9, A11 and G20.
 - **Class packs module** (E12) comes before A11, G20 and F13's packs row.
-- **The editor split** (G1) comes before G2–G6, G16 and H7.
-- **The brand contract** (H2) comes before G21 and H7.
+- **The editor split** (G1) comes before G2–G6, G16 and H8.
+- **The brand contract and the catalogues** (H2, H3) come before G21 and H8.
 - **The public catalogue** (G11) comes before G12 and G13. It needs G8's
   "sells from" storefront first.
 - **Within and across epics, found while planning:**
@@ -130,7 +135,7 @@ permission matrix review (DEC-039).
   - B13 uses C2's contact helper;
   - B14 needs E9;
   - G14 needs G8, G10 and G12;
-  - H7 needs G2.
+  - H8 needs G2.
 
 ## Later (not planned this round)
 
@@ -255,11 +260,11 @@ it.
 62. The Site Editor keeps Tablet and Zoom (00-universal §15; #347 put them back).
 63. A reviewer works on `/review` (#275), not in the editor, and Members don't reply to review notes.
 64. Placeholders are marked per field on the server, not detected by pattern.
-65. Old site styles map to the nearest Brand v2 values automatically, and the old contract version keeps validating.
-66. Any hex colour is allowed, with contrast worked out automatically (button text and link shade reach 4.5:1).
+65. An existing site keeps its colours exactly until its merchant saves a brand; nothing is rewritten, and the old contract version keeps validating. When Brand first opens, it offers the nearest palette (or the site's own accent as a custom colour when no palette is close), keeps the site's band rows, and offers the font pairing closest to the site's old type.
+66. A merchant picks one of several ready-made palettes (eight to start: working names Terracotta, Sunflower, Rose, Plum, Ocean, Forest, Stone and Night) or a custom colour. Any hex is allowed as the custom colour, with contrast worked out automatically (button text and link shade reach 4.5:1); a catalogue palette must pass without adjustment.
 67. "Runs on Saroh" stays on every site this round.
 68. A site uses the business's logo unless a site logo is set, and the letter is the fallback.
-69. Fonts are self-hosted by `saroh.app` from a short curated list (5 heading, 3 body, with Devanagari coverage). Nothing is loaded from a third party at view time.
+69. Fonts come from a catalogue of pairings, each a heading face and a body face with Devanagari coverage. Six to start: Plain (Geist, Geist), Lively (Bricolage Grotesque, Geist), Geometric (Space Grotesk, Geist), Serif (Instrument Serif, Literata), Book (Literata, Literata) and Friendly (Poppins, Hind). Under Advanced, the heading or body face can be swapped. Faces are self-hosted by `saroh.app`; nothing is loaded from a third party at view time.
 70. Hindi, when it comes, is a general `locales` list with Hindi the only one offered.
 
 **Taken while writing the plans** (each plan names them where they apply)
@@ -357,14 +362,16 @@ it.
 
 *Brand (H)*
 
-141. After the font fix, every merchant site uses a neutral system font stack until Brand v2 ships, and so do Saroh's own pages in `saroh.app`. **This changes how every existing site looks on the day it ships.**
-142. A merchant may choose Geist, Bricolage Grotesque or Space Grotesk as their own font. These are served from a separate copy for sites, never from Saroh's font files.
-143. Brand v2 is version 2 of the existing site style, with no migration.
+141. After the font fix, every merchant site uses a neutral system font stack until its merchant picks a font pairing, and Saroh's own pages in `saroh.app` use it too. **This changes how every existing site looks on the day it ships** (user: ship it now, 2026-09-27).
+142. A pairing may use Geist, Bricolage Grotesque or Space Grotesk as the merchant's own font. These are served from a separate copy for sites, never from Saroh's font files.
+143. Brand v2 is version 2 of the existing site style, with no database migration: a v1 style is read as v1 until its merchant saves.
 144. The old colour rows and spacing sliders stay under "Advanced".
 145. A site in dark mode is dark for every visitor, whatever their system setting.
 146. The logo is fixed when the site is published; a later change shows as an unpublished brand change.
-147. The suggested starting theme follows the modules: clinic-like appointments suggest Calm clinic, classes or packs Bright studio, and selling only Warm bakery.
+147. The suggested starting theme follows the modules: clinic-like appointments suggest Calm clinic, classes or packs Bright studio, and selling only Warm bakery. Each theme is a palette and a pairing from the catalogues.
 148. The brand needs `site:update` and a logo upload `media:write`, so plan H waits on no permission review.
+149. A catalogue entry is never deleted. A retired palette or pairing leaves the pickers and keeps rendering for the sites that use it.
+150. The catalogues are data files in `packages/site-blocks`, read by the API, the editor and the renderer; a new entry ships with a release, not from the admin console.
 
 ## Still for the user to decide
 
@@ -372,7 +379,5 @@ it.
   end of the matrix.
 - **Saroh's own billing** (Settings › Plan & billing): when, and in which
   plan.
-- **When H1 (the font fix) ships:** every live merchant site switches from
-  Saroh's fonts to a system font stack that day (default 141).
 - **The Pick-up late rule** (default 16): the design's 2 hours, or today's
   20 minutes.

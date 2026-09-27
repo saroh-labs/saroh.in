@@ -116,8 +116,8 @@ there is no public catalogue endpoint. Staff-made orders are paid through
 
 ## Scope Boundaries
 
-- The brand — colours, backgrounds, fonts, logo, contrast, starting themes —
-  is plan 008 (H). The font-leak fix is H1, in phase 1.
+- The brand — palettes and a custom colour, backgrounds, font pairings, logo,
+  contrast, starting themes — is plan 008 (H). The font-leak fix is H1, in phase 1.
 - Hindi (EN | हिंदी) is later (DEC-046; default 70). Contract changes here
   leave room for a `locales` list and add none.
 - The customer account area, sign-in, credits online, buying packs online,
@@ -390,6 +390,7 @@ flowchart LR
   E12[[E12 Class packs module]] --> G20
   G15 --> G20
   H2[[H2 brand contract]] --> G21[G21 new-site setup]
+  H3[[H3 catalogues]] --> G21
   G14 --> G21
 ```
 
@@ -459,7 +460,7 @@ Page · Add · Brand.
   "Published", "Not published · 2 blocks, footer" or "Not published yet".
   The Publish confirmation names what goes live.
 - The rail tabs are Page (the layers and page menu), Add (the block groups)
-  and Brand (today's `style-panel.tsx` until H7 replaces it).
+  and Brand (today's `style-panel.tsx` until H8 replaces it).
 - The bypass during review keeps its wording and record (DEC-047).
 - The page title drops the "/" address, as the design does, and the address
   moves to the page menu.
@@ -1183,7 +1184,7 @@ practice, Coach & creator). Placeholder text is marked per field and counted.
 
 **Requirements:** R17
 
-**Dependencies:** H2 (each template carries a brand), G14 · **Phase:** 2
+**Dependencies:** H2 and H3 (each template carries a brand: a palette and a font pairing from the catalogues), G14 · **Phase:** 2
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/sites/sites.service.ts`
