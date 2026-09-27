@@ -3714,11 +3714,12 @@ model Booking {
 
   // The customer's site account when they booked it signed in (A9,
   // ADR-011). The contact is still the booker; this says the account made
-  // it, so "This isn't them" (A4) moves it with the account. The migration
-  // declares ON DELETE SET NULL ("customerAccountId") only, so the
-  // organization column stays: Prisma reads it as SetNull.
+  // it, so "This isn't them" (A4) moves it with the account. A single-column
+  // key (PostgreSQL 14 has no column-list SET NULL, and a composite SET NULL
+  // would null the required organization): RLS and the reservation code keep
+  // the account within the booking's business.
   customerAccountId String?
-  customerAccount   CustomerAccount? @relation(fields: [customerAccountId, organizationId], references: [id, organizationId], onDelete: SetNull)
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])

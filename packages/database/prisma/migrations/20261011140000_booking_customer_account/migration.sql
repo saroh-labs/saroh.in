@@ -12,9 +12,11 @@ CREATE INDEX "Booking_customerAccountId_startAt_idx" ON "Booking"("customerAccou
 
 -- AddForeignKey
 --
--- Composite with the organization, so a booking can only name an account of
--- its own business. SET NULL on the account column ONLY (PostgreSQL 15+):
--- a plain SET NULL would also null "organizationId", which is required, and
--- deleting a contact (which takes its account with it) would fail. Prisma
--- reads either form as SetNull, so the datamodel and this agree.
-ALTER TABLE "Booking" ADD CONSTRAINT "Booking_customerAccountId_organizationId_fkey" FOREIGN KEY ("customerAccountId", "organizationId") REFERENCES "CustomerAccount"("id", "organizationId") ON DELETE SET NULL ("customerAccountId") ON UPDATE CASCADE;
+-- A single-column foreign key, so it runs on PostgreSQL 14: the column-list
+-- form `ON DELETE SET NULL ("customerAccountId")` needs 15 or later, and a
+-- plain SET NULL on a composite key would also null the required
+-- "organizationId" (deleting a contact, which takes its account with it,
+-- would then fail). Tenant safety does not rest on this key: RLS on both
+-- tables, and the account is only ever the signed-in one of the site's own
+-- business (bookings/reservation.ts).
+ALTER TABLE "Booking" ADD CONSTRAINT "Booking_customerAccountId_fkey" FOREIGN KEY ("customerAccountId") REFERENCES "CustomerAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
