@@ -40,6 +40,8 @@ const actions = vi.hoisted(() => ({
     requestReview: vi.fn(),
     saveDraftSections: vi.fn(),
     updateSiteStyle: vi.fn(),
+    updateSiteSettings: vi.fn(),
+    updateSiteFooter: vi.fn(),
     createPage: vi.fn(),
     deletePage: vi.fn(),
     updatePage: vi.fn(),
@@ -151,6 +153,7 @@ function render(overrides: Partial<Props> = {}) {
         siteName: "Flour & Ferment",
         navigation: null,
         footerPreview: null,
+        canUpdateSite: true,
         address: "flour.saroh.app",
         initialStyle: { colours: {}, scalars: {} },
         styleOptions: STYLE_OPTIONS,
@@ -245,6 +248,34 @@ function frame(): HTMLElement {
     return el;
 }
 
+/** The inspector's text field with this label (G6). */
+function field(label: string): HTMLInputElement {
+    const el = Array.from(document.querySelectorAll("label")).find(
+        (l) => l.textContent.trim() === label,
+    );
+    const input = el ? document.getElementById(el.htmlFor) : null;
+    if (!(input instanceof HTMLInputElement)) {
+        throw new Error(`No field ${label}`);
+    }
+    return input;
+}
+
+/** Type into a field the way a person does: React hears an input event. */
+function type(input: HTMLInputElement, value: string) {
+    act(() => {
+        // The prototype's setter, so React's own value tracking sees a change.
+        Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+        )?.set?.call(input, value);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+}
+
+/** The site's header link and footer on the canvas: what G17 draws. */
+const canvasHome = () => $("header a[aria-label$='— home']");
+const canvasFooter = () => $("footer");
+
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vi.stubGlobal("ResizeObserver", FakeResizeObserver);
@@ -280,6 +311,14 @@ beforeEach(() => {
     actions.publishSite.mockResolvedValue({
         ok: true,
         data: { bypassed: false },
+    });
+    actions.updateSiteSettings.mockResolvedValue({
+        ok: true,
+        data: { id: "site" },
+    });
+    actions.updateSiteFooter.mockResolvedValue({
+        ok: true,
+        data: { id: "site" },
     });
 
     host = document.createElement("div");
@@ -503,10 +542,14 @@ describe("SiteEditor shell", () => {
 
         expect(button("Our story").getAttribute("aria-current")).toBeNull();
 
-        // The header cannot move or go: its inspector says why instead.
+        // The header cannot move or go: its inspector says why instead,
+        // beside the controls (G6).
         expect(() => button("Move block up")).toThrow();
 
-        expect(button(/^Move — /)).toBeTruthy();
+        expect(button("Move up").disabled).toBe(true);
+        expect(host.textContent).toContain(
+            "On every page — can't be removed or moved",
+        );
     });
 
     it("opens the style panel from the Brand tab and comes back from Page", () => {
@@ -806,5 +849,162 @@ describe("SiteEditor shell", () => {
         click(button(/^Feedback/));
         expect(button("This block")).toBeTruthy();
         expect(button(/^Whole site/).textContent).toContain("1");
+    });
+});
+
+/*
+ * Header and footer text in the inspector (round 2, G6). The canvas draws
+ * them with the live site's own header and footer (G17), so what is typed
+ * here is what the site will show.
+ */
+describe("SiteEditor header and footer text (G6)", () => {
+    it("edits the site name from the header; the canvas and bar follow, and it saves as a site change", async () => {
+        const { siteId } = render();
+        click(button("Header"));
+        expect(host.textContent).toContain(
+            "On every page of this site. Its text is edited here",
+        );
+        type(field("Site name"), "Rye & Co.");
+
+        expect(canvasHome()?.getAttribute("aria-label")).toBe(
+            "Rye & Co. — home",
+        );
+        expect($("nav[aria-label=Breadcrumb]")?.textContent).toContain(
+            "Rye & Co.",
+        );
+        // Publish waits for it, as it does for the look.
+        expect(button("Publish").disabled).toBe(true);
+
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteSettings).toHaveBeenCalledWith(siteId, {
+            name: "Rye & Co.",
+        });
+        expect(button("Publish").disabled).toBe(false);
+        expect($("[role=status]")?.textContent).toBe(
+            "Not published · site name",
+        );
+
+        // And the live message names the site as it is now.
+        await press(button("Publish"));
+        const go = Array.from(
+            document.querySelectorAll<HTMLButtonElement>("button"),
+        ).filter((b) => b.textContent.startsWith("Publish"));
+        await press(go[go.length - 1]);
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Rye & Co. is live at flour.saroh.app.",
+        );
+    });
+
+    it("never saves a blank name, and says why", async () => {
+        render();
+        click(button("Header"));
+        type(field("Site name"), "   ");
+
+        expect(host.textContent).toContain("Give your site a name.");
+        expect(field("Site name").getAttribute("aria-invalid")).toBe("true");
+        // The canvas keeps the last name that could be saved.
+        expect(canvasHome()?.getAttribute("aria-label")).toBe(
+            "Flour & Ferment — home",
+        );
+        await wait(1500);
+        expect(actions.updateSiteSettings).not.toHaveBeenCalled();
+    });
+
+    it("edits the footer line; the canvas draws it before Runs on Saroh, and it saves as the footer", async () => {
+        const { siteId } = render();
+        // Nothing written yet: the site's name stands in, as G17 draws it.
+        expect(canvasFooter()?.textContent).toBe(
+            "Flour & Ferment · Runs on Saroh",
+        );
+        click(button("Footer"));
+        expect(host.textContent).toContain(
+            "Nothing is written at the foot of this site yet",
+        );
+        type(field("Footer line"), "Hill Road, Bandra");
+
+        expect(canvasFooter()?.textContent).toBe(
+            "Hill Road, Bandra · Runs on Saroh",
+        );
+        expect(host.textContent).toContain("“Runs on Saroh” follows it.");
+
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledWith(siteId, {
+            format: "html",
+            value: "<p>Hill Road, Bandra</p>",
+        });
+        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+    });
+
+    it("saves an emptied footer as none, and the canvas falls back to the name", async () => {
+        const { siteId } = render({
+            footerPreview: { format: "html", value: "<p>Old line</p>" },
+        });
+        expect(canvasFooter()?.textContent).toBe("Old line · Runs on Saroh");
+        click(button("Footer"));
+        expect(field("Footer line").value).toBe("Old line");
+        type(field("Footer line"), "");
+
+        expect(canvasFooter()?.textContent).toBe(
+            "Flour & Ferment · Runs on Saroh",
+        );
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledWith(siteId, null);
+    });
+
+    it("leaves a footer richer than one line to Website settings", () => {
+        const { siteId } = render({
+            footerPreview: {
+                format: "html",
+                value: "<p>One</p><p>Two</p>",
+            },
+        });
+        click(button("Footer"));
+        expect(() => field("Footer line")).toThrow();
+        expect(host.textContent).toContain(
+            "Your footer is more than one line of plain text",
+        );
+        expect($(`a[href='/sites/${siteId}/settings']`)?.textContent).toBe(
+            "Open Website settings",
+        );
+    });
+
+    it("shows both read-only, with who can change them, without site:update", async () => {
+        render({
+            canUpdateSite: false,
+            footerPreview: { format: "html", value: "<p>Old line</p>" },
+        });
+        click(button("Header"));
+        expect(field("Site name").disabled).toBe(true);
+        expect(host.textContent).toContain(
+            "Your role can change this page's blocks but not the site's name or footer. An owner or admin can change what your role reaches in Team.",
+        );
+        click(button("Footer"));
+        expect(field("Footer line").disabled).toBe(true);
+        expect(field("Footer line").value).toBe("Old line");
+        await wait(1500);
+        expect(actions.updateSiteSettings).not.toHaveBeenCalled();
+        expect(actions.updateSiteFooter).not.toHaveBeenCalled();
+    });
+
+    it("says so when the footer does not save, and does not retry it", async () => {
+        actions.updateSiteFooter.mockResolvedValue({
+            ok: false,
+            error: "Could not save the footer.",
+        });
+        render();
+        click(button("Footer"));
+        type(field("Footer line"), "Hill Road");
+        await wait(700);
+        await wait(0);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Could not save the footer.",
+        );
+        await wait(1500);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(1);
+        // Still unsaved, so Publish still waits.
+        expect(button("Publish").disabled).toBe(true);
     });
 });

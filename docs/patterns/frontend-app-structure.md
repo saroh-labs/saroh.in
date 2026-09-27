@@ -71,7 +71,8 @@ components/shared/             app shell, navigation, command menu
 - **Current** — **Split big components along their panels.** The site
   editor is the worked example (#260): `site-editor.tsx` only composes, its
   state lives in hooks in `components/sites/editor/` (`use-editor-draft`,
-  `-style`, `-selection`, `-viewport`, `-review`, `use-publish`) and its
+  `-style`, `-selection`, `-viewport`, `-review`, `use-publish`, and
+  `use-site-chrome` for the header's name and footer's line, G6) and its
   drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
   `inspector-host`). A new editor panel or piece of editor state goes there,
   not back into `site-editor.tsx`.
