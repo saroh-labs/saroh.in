@@ -8,6 +8,7 @@ builds_on: Home (`GET /home`, ranked actions), Settings (#507, #509), custom rol
 decisions: DEC-048, DEC-039, DEC-028, DEC-029, DEC-034, DEC-038, DEC-040, ADR-011
 overview: docs/plans/2026-09-26-000-round-2-overview.md
 epic: TBD
+deepened: 2026-09-27 (doc review; the user's phase re-slice)
 ---
 
 # Home and Settings
@@ -33,7 +34,18 @@ customer messages. Settings gets the differences that are real:
 - the alerts grid, backed by per-person notification preferences.
 
 Team hides its empty "Extra permissions" column. Adding someone to a
-storefront also puts them on the business's team (DEC-048).
+storefront also puts them on the business's team (DEC-048), in a narrow
+"Storefront team" role rather than as a Member, so nobody's access widens
+without the owner choosing it (F16). Granting is bounded by reach: nobody
+grants a power they don't hold, and nobody grants to themselves (F17, and
+F19 for the role editor, which has that hole today).
+
+**Phase 1 is the Home core** (user, 2026-09-27): F1, F3, F5, F6, F8 and F15.
+After it, an owner opens Home to one ranked list of what needs doing (late
+orders, overdue invoices and renewals, stock short, a site not live), today's
+bookings and pick-ups with Arrived and No-show, the last 24 hours, and the
+take-money checklist. Everything else here is phase 2, except F18 (phase 3).
+F9, F12, F13 and F16 were phase 1 until the re-slice and keep their IDs.
 
 ---
 
@@ -105,15 +117,21 @@ roster underneath.
   API — open orders, upcoming bookings, live subscriptions, packs held — and
   what stays (default 56).
 - R13. Alerts: each person chooses which events reach them (new order, new
-  booking, payment failed, someone joins the team, Monday summary) and by
-  which channel (bell, email, WhatsApp). The channels are the ones the
-  business can actually send on.
+  booking, payment failed, someone joins the team) and by which channel
+  (bell, email, WhatsApp). The channels are the ones the business can
+  actually send on. The Monday summary is not offered until a unit builds
+  its sender.
 - R14. Team hides the "Extra permissions" column while no one has any. A
   person can be given capabilities beyond their role (F17), and the column
-  then shows them.
+  then shows them. Nobody can grant a capability they don't hold, change
+  their own extras, or change the extras of someone who can do more than
+  they can; the same reach rule applies to creating and editing roles (F19).
 - R15. Adding someone to a storefront also gives them a business membership
-  (Member) when they have none. Removing them from the team removes their
-  storefront roles. A storefront invite needs `member:invite` (DEC-048).
+  when they have none, in the narrow "Storefront team" role (the org floor
+  without customers, bookings, orders or money), never a wider one. The
+  owner is told who was added and can widen it on purpose. Removing them from
+  the team removes their storefront roles. A storefront invite needs
+  `member:invite` (DEC-048, amended 2026-09-27).
 - R16. A staff member's Home shows the work for the storefronts they are
   assigned to, each row following their own capabilities (DEC-039, F11).
 - R17. The built-in roles are default bundles (DEC-039). Member's bundle,
@@ -141,8 +159,10 @@ roster underneath.
   `components/settings/plan-billing.tsx` stays as it is.
 - Payouts and expenses (a separate Money area; DESIGN-NOTES "Calendar, second
   pass").
-- Sending the Monday summary. F14 stores the preference; the job that sends
-  it comes when business messages ship (plan A, A14).
+- The Monday summary, its preference and its sender. No unit this round
+  builds the sender (A14's events are order, booking, invoice and waitlist
+  messages), so F14 leaves the row out rather than offer a setting that does
+  nothing (default 127, changed 2026-09-27).
 - Renaming kitchen steps per business in Settings (DESIGN-NOTES "Not yet").
 
 ---
@@ -205,6 +225,20 @@ roster underneath.
   - Also `roles-tab.tsx`, and `lib/organizations/{members,member-actions,roles,role-actions}.ts`.
   - API: `modules/organizations/{organization-members,organization-roles}.service.ts`.
     Its `remove(ctx, userId)` enforces the last-OWNER invariant.
+  - **Reach, today.** `OrganizationMembersService.assertWithinReach` stops
+    anyone inviting, changing or removing someone into or out of a role that
+    can do more than they can. `OrganizationRolesService.create` and
+    `update` have **no** such check: they keep any grantable action
+    (`vetActions`), so a custom "Manager" holding `member:role:update` can
+    add `payment:manage` to their own role. The catalogue warns about it
+    ("can widen their own reach"); F19 closes it.
+  - Built-in roles can't be edited (`requireInvented` refuses them), so no
+    business holds a saved Member row today. `organization-context.service.ts`
+    would honour one if it existed (it reads a row by key for any role).
+  - A membership whose role key has no row and isn't built in resolves to
+    the Member bundle (`resolveCapabilities`), not a floor, so a custom role
+    must never be deleted out from under people (`remove` already refuses
+    while anyone holds it).
 - **Storefront roster:**
   - `apps/api.saroh.in/src/modules/members/{members.controller,members.service,dto}.ts`
     (`stores/:storeId/members`, `stores/:storeId/invitations`,
@@ -301,14 +335,36 @@ roster underneath.
   connected provider (DEC-011, DEC-036). An event a role cannot read is not
   offered to that person; Payment failed, for one, needs `payment:read` or
   `invoice:read`.
-- **One roster underneath (DEC-048).** `MembersService.acceptInvitation` and
-  every path that creates `StoreMembers` also upserts a `Membership`
-  (MEMBER) in the store's organization when the person has none, in the same
-  transaction. `OrganizationMembersService.remove` deletes the person's
-  `StoreMembers` rows in that organization's stores, in the same
-  serializable transaction. A storefront invite is refused without
+- **One roster underneath (DEC-048, amended 2026-09-27), without widening
+  anyone's access.** `MembersService.acceptInvitation` and every path that
+  creates `StoreMembers` also upserts a `Membership` in the store's
+  organization when the person has none, in the same transaction, **in the
+  "Storefront team" role**, not MEMBER. `OrganizationMembersService.remove`
+  deletes the person's `StoreMembers` rows in that organization's stores, in
+  the same serializable transaction. A storefront invite is refused without
   `member:invite` in the organization, alongside today's `StoreOwner` check.
-  A backfill gives existing storefront members a Membership.
+  A backfill gives existing storefront members a Membership the same way.
+  - **Why not Member.** The Member bundle carries the org floor's
+    `contact:read`, `booking:read` and `service:read` and, after F18, whole
+    orders with money. A storefront Viewer of one shop would gain every
+    customer's phone and email and the whole diary overnight, and nobody
+    chose that (security and product review, 2026-09-27).
+  - **The "Storefront team" role** is an ordinary custom role
+    (`OrganizationRole`, key `storefront-team`), created on first use in each
+    business, holding `org:read`, `member:read`, `module:read`, `media:read`,
+    `store:read` and `product-review:read`: enough to appear on Team and open
+    the storefronts, and nothing about customers, bookings, orders or money.
+    What someone does inside their storefront keeps coming from their
+    storefront role, exactly as today. The owner can widen the role, or move
+    a person to Member or another role, on purpose. Because it is a custom
+    role, `remove` already refuses to delete it while anyone holds it, so it
+    can never fall back to the Member bundle.
+  - **The owner is told.** Each membership the backfill or an invite creates
+    writes an Activity entry ("Added to the team as Storefront team, from
+    Hill Road"). After the backfill, Team shows owners a one-time notice
+    listing the people added, each with Change role; it goes away when
+    dismissed or when every listed person's role has been looked at.
+  - An existing business role is never lowered or replaced.
 
 ### Permissions touched
 
@@ -320,12 +376,13 @@ roster underneath.
 | Today: Arrived / No-show | `booking:write` | no |
 | Reviewer view | `site:read`, narrowed by `SiteReviewer` | no |
 | Staff landing (F11) | each source's own read, narrowed to the person's storefronts | no |
-| Extra permissions per person (F17) | `member:role:update` | a per-person grants list |
+| Extra permissions per person (F17) | `member:role:update`, **within reach**: only extras the actor holds, never their own, never on someone who can do more than they can | a per-person grants list |
+| Create or edit a custom role (F19) | `member:role:update`, **within reach**: only actions the actor holds, and never a role that already exceeds them | rule change (closes today's hole) |
 | Default bundles and templates (F18) | — (shipped defaults) | Member bundle per matrix Q1, Q4 |
 | Business types, Undo | `org:update` | no |
 | Turn-off consequences | `module:manage`, plus `module:read` for the counts | no |
 | Alerts | the signed-in person, for their own preferences | no |
-| Storefront people | `StoreOwner` today, **plus `member:invite`** | rule change (DEC-048) |
+| Storefront people | `StoreOwner` today, **plus `member:invite`**; a new membership is "Storefront team" | rule change (DEC-048, amended) |
 
 ---
 
@@ -355,8 +412,10 @@ roster underneath.
   tuned against the Rye, Pulse and Kavi seeds.
 - Whether Arrived needs a new booking field (`arrivedAt`) or maps onto an
   existing status. Read `Booking.status` and `BookingEvent` first.
-- How the Monday summary preference reads before its sender exists. The
-  default is to show it with "Starts when business messages are on".
+- Which storefront-scoped routes each storefront role (Admin, Manager,
+  Editor, Viewer) reaches today through `StoreOwner`. F16 characterises them
+  first, so "Storefront team" plus the storefront role gives exactly what
+  each person had, no more and no less.
 
 ---
 
@@ -374,6 +433,7 @@ flowchart LR
   F9[F9 Reviewer view]
   F3 --> F11[F11 staff landing]
   F16[F16 storefront people join team] --> F11
+  F19[F19 role editor within reach] --> F17
   F15 --> F17[F17 extra permissions per person]
   F17 --> F18[F18 default bundles and templates]
   B16[(B16, C13, E26)] --> F18
@@ -383,6 +443,14 @@ flowchart LR
   F14[F14 alerts]
   F15[F15 hide Extra permissions]
 ```
+
+**Order on shared files.** F1 → F3 → F5 → F6 all rewrite
+`home.service.ts` and land one at a time in that order in phase 1; F8 and
+F15 touch other files and can run beside them. In phase 2, F9, F2, F7 and
+F11 follow on `home.service.ts` one at a time, and D13 changes only F1's
+`home-money-sources.ts`. On `organization-policy.ts` and the roles service,
+F19 lands first in phase 2, before B16, C13 and E26 add the high-value keys,
+then F17, then F18.
 
 Cross-epic:
 - F2 needs A13 (messages) and C12 (booking-page notes).
@@ -409,13 +477,26 @@ named when it fails.
 - Test: `apps/api.saroh.in/src/modules/home/home.sources.spec.ts` (add to `jest.config.js` `testMatch`), updates to `home.service.spec.ts`
 
 **Approach:**
-- **Failed renewal:** a live subscription whose latest period invoice is past
-  due (`isPastDue`). It is OVERDUE, tagged "Payment failed" (or "Overdue N
-  days"), with evidence per subscription and an inline Retry. Needs
-  `subscription:read`.
-- **Overdue invoice:** invoices that are not order invoices, past due
-  (`OWED_WHERE`, `isPastDue`). One row per invoice with an inline Send
-  reminder, and the amount only with `invoice:read`.
+- **Failed renewal — the one source for it.** A live subscription whose
+  latest period invoice is unpaid, and either past due (`isPastDue`) or
+  carrying a RENEWAL_FAILED or MANDATE_LIMIT_LOW subscription event since
+  that invoice was issued. The query reads those event kinds from D9's table
+  from the start; none exist until D13 writes them, so there is no fallback
+  code. D13 (plan D) feeds this source and adds no Home row of its own.
+  - The tag says what happened: "Payment failed" only after a declined
+    mandate charge (RENEWAL_FAILED); "Autopay limit too low" after
+    MANDATE_LIMIT_LOW; otherwise "Overdue N days". Before autopay exists no
+    payment was attempted, so nothing reads "Payment failed" in phase 1.
+  - While a mandate charge is PENDING (D13), the row reads "Autopay charge in
+    progress" and offers no Retry.
+  - It is OVERDUE, with evidence per subscription and an inline Retry once
+    F4 ships (a link to the subscription until then). Needs
+    `subscription:read`.
+- **Overdue invoice:** invoices that are not order invoices and not a
+  subscription's period invoice (those are the failed-renewal source, so no
+  invoice appears twice), past due (`OWED_WHERE`, `isPastDue`). One row per
+  invoice, with an inline Send reminder once F4 ships, and the amount only
+  with `invoice:read`.
 - **Stock short:** the "short" checks from `StockChecksService` (sizes short
   for open orders). ATTENTION, with a link to Stock filtered to Needs you.
   Needs `store:read`, and is skipped when stock tracking is off for the
@@ -430,8 +511,13 @@ named when it fails.
 count); `attempt()`.
 
 **Test scenarios:**
-- Happy path: an overdue subscription invoice gives one OVERDUE row with
-  Retry; an issued invoice two days past due gives "Overdue 2 days".
+- Happy path: a subscription's period invoice two days past due gives one
+  OVERDUE row tagged "Overdue 2 days", and the same invoice is not also an
+  overdue-invoice row.
+- Happy path: a hand-written invoice two days past due gives "Overdue 2
+  days" in the overdue-invoice source.
+- Edge case: a fixture RENEWAL_FAILED event on an unpaid period invoice (not
+  yet past due) gives one row tagged "Payment failed"; no second row.
 - Edge case: an order invoice past due is not listed (the order is the
   ledger); a draft invoice is never overdue.
 - Edge case: stock tracking off gives no stock row, and not an unavailable
@@ -441,8 +527,9 @@ count); `attempt()`.
 - Permission: a caller without `invoice:read` and `subscription:read` (a
   Member by default) gets no invoice or renewal rows.
 
-**Verification:** Rye shows its short size; Pulse its failed renewal; Kavi
-Dental its overdue X-ray invoice.
+**Verification:** Rye shows its short size; Pulse its overdue renewal; the
+clinic seed (overview, "Seeds") its overdue X-ray invoice, or a Northwind
+fixture until that seed exists. Read-only on Rye and Pulse.
 
 ---
 
@@ -535,15 +622,27 @@ Member.
 - Test: `apps/app.saroh.in/lib/home/inline-actions.test.ts`, `e2e/tests/home.spec.ts` (new, on Northwind)
 
 **Approach:**
-- A confirm sheet says what will happen and who will be told ("This tells
-  Farah by email…"), only when a message will really leave. That is when the
-  business has a connected provider, or the person has an account thread
-  (plan A). Otherwise it says nothing will be sent.
+- A confirm sheet says what will happen and who will be told, only when a
+  message will really leave. For Send reminder it reads D17's `send` flag on
+  the invoice, the same one Invoice Detail reads: "This tells Farah by
+  email" for `email`, "…in their account on your site" for `thread` (only
+  once A13 exists), both when both. With no channel the inline action isn't
+  offered and the row links to the invoice, where "Copy pay link" is. Home
+  never decides on its own that a send is possible.
 - A message-sending action waits 10 seconds before calling the endpoint.
   Undo in that time cancels the call; after it, the toast reads "Sent" with
-  no Undo (default 51).
+  no Undo (default 51). The hold is the shared hold-and-undo helper that G3
+  builds in phase 1 (overview, "Shared files"), reused here and by B6, not a
+  third timer.
 - A non-sending action (Mark sent with no message) calls at once, and Undo
   uses the target's own undo (the stage undo within `UNDO_WINDOW_MS`).
+  **Once A14 tells customers on handover**, Mark sent is a sending action:
+  A14 delays that notification by 10 seconds keyed to the stage event, and
+  the stage undo cancels it while it is pending. After the notification has
+  gone, the toast says "They've already been told" and offers no silent
+  Undo (default 51).
+- Retry and Send reminder are hidden while a mandate charge is PENDING
+  (D13); the row says "Autopay charge in progress".
 - The row leaves the list on success and comes back on Undo.
 
 **Test scenarios:**
@@ -555,6 +654,10 @@ Member.
   the message names why.
 - Permission: a role without `invoice:write` sees Send reminder as a link to
   the invoice, not an inline action.
+- Edge case: no email provider and (before A13, or with no site account) no
+  thread → no inline Send reminder; the row links to the invoice.
+- Edge case (after A14): Mark sent, then Undo within 10 seconds → no
+  notification leaves; Undo after it left → "They've already been told".
 
 **Verification:** On Northwind, each action and its Undo leave the records as
 expected, and nothing is sent after an Undo.
@@ -718,7 +821,7 @@ else.
 
 **Dependencies:** None
 
-**Phase:** 1
+**Phase:** 2 (moved, 2026-09-27)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/home/home.service.ts` (`view: "reviewer"`, which reads only granted sites and their open review notes)
@@ -825,7 +928,7 @@ their views.
 
 **Dependencies:** None
 
-**Phase:** 1
+**Phase:** 2 (moved, 2026-09-27)
 
 **Files:**
 - Create: `apps/app.saroh.in/app/(shell)/settings/(sections)/{people,profile}/loading.tsx`, and `error.tsx` per section that lacks one
@@ -863,7 +966,7 @@ scenes.
 
 **Dependencies:** None. Its Class packs row comes with E12.
 
-**Phase:** 1
+**Phase:** 2 (moved, 2026-09-27)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/capabilities/readiness/{module-readiness.port,module-readiness.registry}.ts` (`deactivationImpact`), `module-lifecycle.service.ts`, `capabilities.controller.ts`, `dto.ts`
@@ -913,8 +1016,11 @@ connected provider.
 - Test: `apps/api.saroh.in/src/modules/notifications/notification-preferences.spec.ts`, `apps/app.saroh.in/lib/settings/alerts.test.ts`
 
 **Approach:**
-- The rows are New order, New booking, Payment failed, Someone joins the
-  team and Monday summary. The columns are Bell, Email and WhatsApp.
+- The rows are New order, New booking, Payment failed and Someone joins the
+  team. The columns are Bell, Email and WhatsApp. The design's Monday
+  summary row is left out: no unit this round builds its sender, and a
+  setting that does nothing breaks "copy promises only what ships" (review,
+  2026-09-27; default 127 changed). It comes back with its sender.
 - The defaults are in code, and a row is written only when changed.
 - A channel the business has no provider for is shown off, with "Connect
   email in Providers".
@@ -966,39 +1072,65 @@ team (DEC-048).
 
 **Dependencies:** None
 
-**Phase:** 1
+**Phase:** 2 (moved, 2026-09-27)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/members/{members.service,members.controller,dto}.ts`
 - Modify: `apps/api.saroh.in/src/modules/organizations/organization-members.service.ts` (`remove` also deletes the person's `StoreMembers` in that organization's stores)
-- Create: `packages/database/src/backfill/<ts>-store-members-to-memberships.ts`
-- Modify: `apps/app.saroh.in/components/stores/members-manager.tsx` ("Also added to your team as Member"), `components/organizations/team-screen.tsx` (a person's storefront roles under their name)
+- Create: `apps/api.saroh.in/src/modules/organizations/storefront-team-role.ts` (the "Storefront team" action list and `ensureStorefrontTeamRole(tx, organizationId)`, which creates the custom role row on first use)
+- Create: `packages/database/src/backfill/<ts>-store-members-to-memberships.ts` (writes an Activity entry per membership made and prints counts, no names)
+- Modify: `apps/app.saroh.in/components/stores/members-manager.tsx` ("Also added to your team, as Storefront team"), `components/organizations/team-screen.tsx` (a person's storefront roles under their name; the one-time notice listing people the backfill added, each with Change role)
 - Test: `apps/api.saroh.in/src/modules/members/members.service.spec.ts`, `packages/database/src/backfill/store-members-to-memberships.db.spec.ts`
 
 **Approach:**
 - Accepting a storefront invitation, and any direct add, upserts a
-  `Membership` (MEMBER) in the store's organization inside the same
-  transaction, unless one exists. An existing role is never lowered.
+  `Membership` in the store's organization inside the same transaction,
+  unless one exists, **in the "Storefront team" role** (Key Technical
+  Decisions): `org:read`, `member:read`, `module:read`, `media:read`,
+  `store:read`, `product-review:read`. It is narrower than Member and than
+  the org floor: no `contact:read`, `booking:read` or `service:read`, no
+  orders and no money. An existing role is never lowered or replaced.
+- What a person does inside their storefront still comes from their
+  `StoreMembers` role through `StoreOwner`, as today.
 - A storefront invite requires `member:invite` in the organization as well
   as the existing `StoreOwner` check.
 - Removing a person from the team deletes their `StoreMembers` rows for that
   organization's stores in the same serializable transaction as the
   last-owner check.
-- The backfill is idempotent: one Membership per storefront member without
-  one, logged with counts.
+- The backfill is idempotent: one "Storefront team" membership per
+  storefront member without one. It writes an Activity entry per person
+  ("Added to the team as Storefront team, from Hill Road") and logs counts.
+  It never widens anyone: nobody gains customers, bookings, orders or money
+  they couldn't see before.
+- The owner is told: Team shows Owners and Admins a one-time notice, "3
+  people from your storefronts are now on your team as Storefront team",
+  listing each with Change role. It is dismissed per business, stored on
+  the server (not in the browser), so every owner sees it once.
 
-**Execution note:** Characterization-first on today's accept and remove paths.
+**Execution note:** Characterization-first on today's accept and remove
+paths, and on what each storefront role (Admin, Manager, Editor, Viewer)
+reaches today through `StoreOwner`. The "Storefront team" list is checked
+against that characterisation: a storefront person keeps what they had and
+gains nothing business-wide beyond seeing Team and the storefront list.
 
 **Test scenarios:**
-- Happy path: accepting a Hill Road invite makes a MEMBER membership, and
-  the person appears on Team.
-- Edge case: an existing ADMIN accepting a storefront invite stays ADMIN.
+- Happy path: accepting a Hill Road invite makes a "Storefront team"
+  membership, and the person appears on Team.
+- Security: that person's `GET` of the Customers list, a contact, Bookings
+  and an order → 403; their Hill Road storefront pages work as before.
+- Edge case: an existing ADMIN or MEMBER accepting a storefront invite keeps
+  that role.
 - Edge case: removing someone from Team removes their storefront roles; the
   last OWNER still can't be removed.
+- Edge case: deleting the "Storefront team" role while anyone holds it → 400
+  (today's rule), so nobody falls back to the Member bundle.
 - Error path: a StoreOwner without `member:invite` gets a 403 on invite.
-- Integration: the backfill run twice changes nothing.
+- Integration: the backfill run twice changes nothing; its Activity entries
+  and the Team notice name exactly the people it added.
 
-**Verification:** Every storefront person on Northwind is on its Team.
+**Verification:** Every storefront person on Northwind is on its Team as
+Storefront team, and none can open Customers or Bookings unless their role
+was widened on purpose.
 
 ---
 
@@ -1009,23 +1141,34 @@ model says (DEC-039; matrix §5), and Team shows them.
 
 **Requirements:** R14
 
-**Dependencies:** F15
+**Dependencies:** F15, F19 (the reach check it extends)
 
 **Phase:** 2
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (`Membership.extraActions String[]`, default empty), with a migration
+- Modify: `packages/database/prisma/schema.prisma` (`Membership.extraActions String[]`, default empty), with an additive migration
 - Modify: `apps/api.saroh.in/src/modules/organizations/organization-policy.ts` (`resolveCapabilities` takes the role's list and the person's extras; the union, filtered to known actions, then `withImplied`), `organization-context.service.ts`, `organization-members.service.ts` and `organization-members.controller.ts` (`PUT members/:id/extra-actions`, under `member:role:update`, audited)
-- Modify: `apps/app.saroh.in/components/organizations/team-screen.tsx` (the column shows a person's extras; an "Extra permissions" sheet per person, grouped like the role editor)
+- Modify: `apps/app.saroh.in/components/organizations/team-screen.tsx` (the column shows a person's extras; an "Extra permissions" sheet per person, grouped like the role editor, offering only what the viewer may grant)
 - Test: `resolve-capabilities.spec.ts`, `organization-members.service.spec.ts`, `e2e/permissions/permissions.spec.ts`
 
 **Approach:**
 - A person's capabilities are their role's bundle plus their extras. An
   extra never removes anything; taking a power away is a role change.
-- `ownerOnly` actions (`org:delete`) can't be granted. An Admin can't grant
-  an extra they don't hold themselves.
+- **The reach rule, for every actor, Owner included** (security review,
+  2026-09-27). Holding `member:role:update` is necessary, not sufficient:
+  - **Nobody grants what they don't hold.** Every extra in the new list that
+    isn't already on the person must be allowed for the actor
+    (`allows(ctx, a)`), with implied holds counted.
+  - **Nobody changes their own extras.** `PUT` on your own membership is a
+    403, whoever you are; an owner who wants more changes their role.
+  - **Nobody changes the extras of someone who can do more than they can.**
+    The target's current capabilities (role plus extras) must be within the
+    actor's, the rule `assertWithinReach` already applies to role changes,
+    extended to a capability set.
+  - `ownerOnly` actions (`org:delete`) can't be granted at all.
 - Unknown strings are dropped on read, as role lists are.
-- The change is audited on the person's Activity ("Given: Refund orders").
+- The change is audited on the person's Activity ("Given: Refund orders"),
+  naming who gave it.
 - A Reviewer can't be given extras beyond the website (DEC-006): only
   `site:*` review capabilities.
 
@@ -1035,6 +1178,12 @@ model says (DEC-039; matrix §5), and Team shows them.
 - Edge case: removing the extra takes the power away on the next request.
 - Error path: granting `org:delete` → 400; an Admin granting `payment:manage`
   they hold → OK; a Member without `member:role:update` → 403.
+- Security: a custom "Manager" holding `member:role:update` but not
+  `order:refund` grants `order:refund` to a colleague → 403.
+- Security: anyone, an Owner included, setting extras on their own
+  membership → 403.
+- Security: a "Manager" setting extras on an Admin (who can do more) → 403,
+  even for an extra the Manager holds.
 - Integration: Team shows the column once one person has an extra, and hides
   it when the last extra is removed.
 
@@ -1069,25 +1218,96 @@ on the user's answers to matrix Q1, Q3 and Q4**.
   `order:read`, `order:create`, `booking:write`, `pack:read`, `pack:sell`).
 - `order:stage` implies `order:read`, and the kitchen view becomes a layout
   only: nobody reads an order without its money.
+- **That implication reaches every role that moves orders, whatever Q4
+  says.** Implied holds apply to saved rows, so a frozen Member row, and
+  every custom role holding `order:stage` (a "Counter" or "Kitchen" role),
+  starts reading order totals and payments the day F18 ships. Q4 decides
+  only whether the other new Member powers (`order:create`, `booking:write`,
+  `pack:sell`) reach existing businesses. So F18 tells owners first: before
+  it applies, the release note and a one-time Team notice list, per
+  business, the roles that will start seeing order money ("Member, Counter
+  — 6 people"), each with Edit role.
 - Q4 decides who gets the new Member: the proposal applies it to every
-  business that never saved its own Member, with a release note in plain
-  words; the alternative backfill freezes today's Member for existing
-  businesses.
+  business, since no business can have saved its own Member today (built-in
+  roles can't be edited, `requireInvented`); the alternative backfill
+  freezes today's Member as a saved row for existing businesses.
 - Templates (Q3) are data beside the catalogue; one pre-fills "New role" and
-  is never a built-in role.
+  is never a built-in role. Picking one is bounded by F19's reach rule.
 
 **Test scenarios:**
 - Happy path: a Member at a business with no saved Member row reads an order
   with its total, takes a new order and books a class.
-- Edge case: a business's saved Member row keeps its list, plus implied holds
-  (its Members who move orders now read them whole) — or, if Q4 freezes,
-  nothing changes for it.
+- Edge case: with Q4's freeze, an existing business's frozen Member row
+  keeps its list, plus implied holds: its Members who move orders now read
+  them whole. The notice named Member before it applied.
+- Edge case: a custom "Kitchen" role holding only `order:stage` reads order
+  totals after F18, and the notice listed it.
 - Edge case: picking the Front desk template pre-fills New role; saving it
   makes an ordinary custom role.
 - Integration: the permissions e2e rows for Member match matrix §4.
 
 **Verification:** The matrix's default bundles table matches
 `CAPABILITIES` one to one.
+
+---
+
+### F19. The role editor stays within reach
+
+**Goal:** Close today's hole: someone who can edit roles can't give a role,
+their own included, a power they don't hold.
+
+**Requirements:** R14
+
+**Dependencies:** None
+
+**Phase:** 2 (new, 2026-09-27, from the security review). It is a fix to
+shipped code and needs nothing else, so it lands first in phase 2, before
+B16, C13 and E26 add `order:refund`, `customer:remove`, `customer:merge` and
+`customer:sensitive`, and before F17. It could ship sooner as a standalone
+security fix if the user wants.
+
+**Files:**
+- Modify: `apps/api.saroh.in/src/modules/organizations/organization-roles.service.ts` (`create` and `update` take the actor's context and check reach before writing)
+- Modify: `apps/api.saroh.in/src/modules/organizations/organization-roles.controller.ts` (pass the context)
+- Modify: `apps/api.saroh.in/src/modules/organizations/organization-members.service.ts` (move `assertWithinReach`'s set comparison into a shared `withinReach(ctx, actions)` in `organization-policy.ts`, used by members, roles and F17)
+- Modify: `apps/api.saroh.in/src/modules/organizations/capability-catalogue.ts` (the `member:role:update` note: "can widen their own reach" becomes "can grant only what they hold themselves")
+- Modify: `apps/app.saroh.in/components/organizations/roles-tab.tsx` (the role editor disables the permissions the viewer doesn't hold, with the reason)
+- Test: `organization-roles.service.spec.ts`, `organization-policy.spec.ts`, `e2e/permissions/permissions.spec.ts`
+
+**Approach:**
+- **Create:** every action in the new role's list must be allowed for the
+  actor. `vetActions` still drops unknown and ungrantable strings first.
+- **Update:** the role's current list must already be within the actor's
+  reach (you can't edit a role that can do more than you, which would let
+  you strip it from people above you), and every action added must be
+  allowed for the actor. Removing an action you hold is allowed.
+- Editing the role you hold yourself is allowed only within the same rule,
+  so it can never add anything you don't already have.
+- The refusal is a 403 in words: "You can't give a role a permission you
+  don't have: Refund orders."
+- Owners and Admins are unaffected in practice (they hold everything
+  grantable); the rule bites on custom roles that hold
+  `member:role:update`.
+
+**Execution note:** Characterization-first: pin today's behaviour (a custom
+"Manager" with `member:role:update` adding `payment:manage` to their own
+role succeeds), then flip the test.
+
+**Test scenarios:**
+- Security: a "Manager" holding `member:role:update` but not
+  `payment:manage` adds `payment:manage` to their own role → 403, and the
+  role is unchanged.
+- Security: the same Manager creates a role with `order:refund` they don't
+  hold → 403.
+- Security: the Manager edits the "Senior" role, which holds
+  `payment:manage` → 403, even to rename it.
+- Happy path: an Admin adds `order:refund` to "Counter" → OK.
+- Happy path: the Manager removes `store:write` (which they hold) from a
+  role within their reach → OK.
+
+**Verification:** No path writes an `OrganizationRole.actions` or
+`Membership.extraActions` list the writer couldn't hold themselves; the
+permissions e2e covers the Manager case.
 
 ---
 
@@ -1105,8 +1325,15 @@ on the user's answers to matrix Q1, Q3 and Q4**.
     the target's own undo;
   - a send hold cancelled in the browser never reaches the API;
   - the membership upsert and store-member delete are transactional.
+- **Rollout and rollback** (overview): every migration here is additive
+  (`NotificationPreference`, `Membership.extraActions`); F10's `company` →
+  `pvt` rewrite is the one data change, and the API accepts `company` for a
+  release so the previous app keeps saving. F16's backfill only adds
+  memberships in a narrow role; rolling back the image leaves them harmless
+  (the old code reads them as ordinary custom-role memberships).
 - **API surface parity:** `GET /home` keeps its existing fields for one
-  release beside `needs`, `today`, `since`, `week` and `view`.
+  release beside `needs`, `today`, `since`, `week` and `view`, and ships
+  before the app that reads them.
 - **Integration coverage:** the permissions matrix gains Home (per role) and
   storefront invites; e2e `home.spec.ts` covers Northwind.
 - **Unchanged invariants:**
@@ -1124,10 +1351,12 @@ on the user's answers to matrix Q1, Q3 and Q4**.
 |------|------------|
 | Home becomes slow as sources grow | Each source bounded (count + first N), read in parallel via `attempt()`, with timing logged per source |
 | Undo implies a message can be recalled | The 10-second hold, and no Undo once sent (default 51) |
-| The storefront roster change widens access | Membership is created as MEMBER only; an existing role is never lowered; a storefront invite now needs `member:invite` |
-| F2 and F4 depend on other epics | They ship in parts: Mark sent and Retry by pay link first |
+| The storefront roster change widens access | A new membership is the narrow "Storefront team" role, not Member (no customers, bookings, orders or money); an existing role is never lowered; the owner is told who was added, in Activity and a Team notice; a storefront invite now needs `member:invite` |
+| Someone who edits roles or extras widens their own reach | F19 and F17: nobody grants what they don't hold, nobody changes their own extras, nobody edits a role or person above them |
+| F2 and F4 depend on other epics | They ship in parts: Mark sent and Retry by pay link first; Send reminder follows D17's send flag |
+| Home and Invoice Detail disagree on whether a reminder can be sent | Both read D17's one `send` flag |
 | The Member bundle waits on the user (matrix Q1, Q3, Q4) | Only F18 waits; F11 and F17 follow the capability model and ship in phase 2 |
-| A new Member bundle changes what existing staff see | Q4 is the user's; the release note says in plain words what Members can now see and do, or the backfill freezes today's Member |
+| F18 shows order money to staff who move orders | Under either Q4 answer, `order:stage` implies `order:read`; F18 lists the roles that gain it, in the release note and in Team, before it applies |
 
 ---
 
@@ -1136,7 +1365,11 @@ on the user's answers to matrix Q1, Q3 and Q4**.
 - Update `docs/patterns/saroh-product.md` "What it must answer" once F3 lands
   (flat list, same ranking).
 - Update `docs/patterns/backend-auth-and-access.md` for storefront invites
-  needing `member:invite` (F16).
+  needing `member:invite` and joining as "Storefront team" (F16), and for the
+  reach rule on roles and extras (F17, F19).
+- Several verifications here name "Kavi Dental". No clinic is seeded today;
+  they use the clinic seed the overview assigns ("Seeds"), or Northwind
+  until it exists.
 - New unit specs go in the explicit `testMatch` in
   `apps/api.saroh.in/jest.config.js`.
 - F10 and F14 migrations pass `db:verify:replay`. The F16 backfill runs after
@@ -1154,4 +1387,4 @@ on the user's answers to matrix Q1, Q3 and Q4**.
 - Decisions: DEC-048, DEC-039, DEC-028, DEC-029, DEC-034, DEC-035, DEC-038,
   DEC-040; ADR-011.
 - Overview and defaults: `docs/plans/2026-09-26-000-round-2-overview.md`
-  (defaults 35, 38, 51–61); matrix `docs/plans/2026-09-26-permission-matrix.md`.
+  (defaults 35, 38, 51–61, 121–130, 153–154); matrix `docs/plans/2026-09-26-permission-matrix.md`.
