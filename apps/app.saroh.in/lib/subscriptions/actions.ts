@@ -92,3 +92,11 @@ export async function updatePlan(id: string, input: PlanInput) {
 export async function setPlanArchived(id: string, archived: boolean) {
     return then(api.setPlanArchived(id, archived));
 }
+
+/**
+ * An older page of a plan's history, for History's "Show earlier" (D4). A
+ * read, so nothing is refreshed; a failure is said where the button was.
+ */
+export async function loadPlanEvents(planId: string, cursor: string) {
+    return api.listPlanEvents(planId, cursor);
+}

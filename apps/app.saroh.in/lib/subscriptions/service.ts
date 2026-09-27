@@ -294,6 +294,95 @@ export async function listPlansOptional(): Promise<Optional<Plan[]>> {
     );
 }
 
+/** One plan, or null when it does not exist (a 403 is `forbidden()`). */
+export async function getPlan(id: string): Promise<Plan | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<Plan>(`${base}${plan(id)}`);
+}
+
+/**
+ * The people on one plan (D4): its newest subscriptions and every active or
+ * paused one, as the list reads them. Optional: a failed read costs Plan
+ * Detail its Subscribers tab and nothing else.
+ */
+export async function listPlanSubscriptions(
+    planId: string,
+): Promise<Optional<CappedList<Subscription>>> {
+    const base = await orgBase();
+    if (!base) return { state: "failed" };
+    const q = `${base}/subscriptions?planId=${encodeURIComponent(planId)}`;
+    try {
+        const reads = await Promise.all(
+            [q, `${q}&status=ACTIVE`, `${q}&status=PAUSED`].map((u) =>
+                apiFetch(u),
+            ),
+        );
+        if (reads.some((r) => r.status === 403)) return { state: "denied" };
+        if (reads.some((r) => !r.ok)) return { state: "failed" };
+        const [newest, active, paused] = (await Promise.all(
+            reads.map((r) => r.json()),
+        )) as Subscription[][];
+        return { state: "ok", data: withLive(newest, active, paused) };
+    } catch {
+        return { state: "failed" };
+    }
+}
+
+/** A value a plan event records: money as "1500.00", classes as a number. */
+export type PlanEventValue = string | number | null;
+
+/** One change to a plan, as the API records it (D2). */
+export interface PlanEvent {
+    id: string;
+    kind:
+        | "CREATED"
+        | "PUBLISHED"
+        | "PRICE_CHANGED"
+        | "CLASSES_CHANGED"
+        | "RENAMED"
+        | "DESCRIPTION_CHANGED"
+        | "UPDATED"
+        | "ARCHIVED"
+        | "RESTORED"
+        | "DRAFT_DISCARDED";
+    /** `{ field: [before, after] }`, only the fields that changed. */
+    changes: Partial<Record<string, [PlanEventValue, PlanEventValue]>>;
+    actor: {
+        kind: "TEAM" | "JOB" | "OPERATOR";
+        userId: string | null;
+        /** "Saroh support" for an operator, "Saroh" for the job. */
+        name: string | null;
+    };
+    createdAt: string;
+}
+
+export interface PlanEventsPage {
+    /** Newest first. */
+    events: PlanEvent[];
+    /** Ask with this for the next, older page; null at the end. */
+    nextCursor: string | null;
+    /** The plan is older than its history: "Earlier changes weren't recorded". */
+    earlierUnrecorded: boolean;
+}
+
+/**
+ * A page of a plan's history, newest first. Optional: a failed read is
+ * named in the History tab, and the rest of Plan Detail still shows.
+ */
+export async function listPlanEvents(
+    planId: string,
+    cursor?: string | null,
+): Promise<Optional<PlanEventsPage>> {
+    return optionalRead<PlanEventsPage>((base) =>
+        apiFetch(
+            `${base}${plan(planId)}/events${
+                cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+            }`,
+        ),
+    );
+}
+
 export async function getRenewals(): Promise<Renewals | null> {
     const base = await orgBase();
     if (!base) return null;
