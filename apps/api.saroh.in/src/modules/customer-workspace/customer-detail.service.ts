@@ -34,6 +34,7 @@ import {
     loadContactNotes,
     notedAllergens,
 } from "./contact-notes.service";
+import { normaliseEmail } from "./duplicates";
 
 /**
  * One read of a customer (U8, R17), rooted on the CRM contact — the record
@@ -759,10 +760,13 @@ export class CustomerDetailService {
         email: string,
         linkedIds: string[],
     ): Promise<PossibleMatch[]> {
+        // A reserved placeholder is no email and matches nobody (C2).
+        const normalised = normaliseEmail(email);
+        if (!normalised) return [];
         const rows = await this.db.customer.findMany({
             where: {
                 organizationId,
-                email: { equals: email.trim(), mode: "insensitive" },
+                email: { equals: normalised, mode: "insensitive" },
                 ...(linkedIds.length > 0 ? { id: { notIn: linkedIds } } : {}),
             },
             orderBy: { createdAt: "asc" },

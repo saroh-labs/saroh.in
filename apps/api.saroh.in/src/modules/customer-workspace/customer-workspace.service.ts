@@ -1,28 +1,55 @@
 import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import type { CustomerLinkReason } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { MatchedOn } from "./duplicates";
+import { duplicatesOf, storeCustomerMatches } from "./duplicates";
+import {
+    contactCandidates,
+    loadContactIdentities,
+    storeCustomerCandidates,
+} from "./suggestion-candidates";
 
 /**
  * Unified customer workspace (#120, Task 5).
  *
  * The workspace *connects* a person's CRM Contact and commerce Customer records
  * without merging them. Saroh NEVER auto-links on weak evidence: only an exact
- * normalized email/phone produces a *suggestion*, and a user confirms it. Links
+ * normalized email/phone produces a *suggestion*, and a user confirms it. The
+ * one link Saroh makes itself is to a contact it has just made for a paying
+ * store customer (C2, `ensure-contact.ts`). Links
  * are Organization-scoped, audited, and reversible, and can never cross
  * Organizations (every lookup is org-scoped). The timeline read model composes
  * events across modules, excluding any module that isn't available to the actor.
  */
+/** A store customer who is likely this contact (#120): link them. */
 export interface IdentitySuggestion {
+    kind: "customer";
     customerId: string;
     name: string;
     email: string;
-    matchedOn: ("email" | "phone")[];
+    matchedOn: MatchedOn[];
 }
 
-export type TimelineEventType = "LEAD" | "BOOKING" | "ORDER" | "MESSAGE";
+/** Another contact who is likely the same person (C2): merge them (C9). */
+export interface ContactDuplicateSuggestion {
+    kind: "contact";
+    contactId: string;
+    name: string | null;
+    /** Never a reserved placeholder (`contacts/contact-email.ts`). */
+    email: string | null;
+    matchedOn: MatchedOn[];
+    /** Whether they sign in on the business's site. */
+    signsIn: boolean;
+}
+
+export type Suggestion = IdentitySuggestion | ContactDuplicateSuggestion;
+
+export type TimelineEventType =
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -31,8 +58,13 @@ export interface TimelineEvent {
     moduleKey: string;
 }
 
-const normalizeEmail = (v: string) => v.trim().toLowerCase();
-const normalizePhone = (v: string) => v.replace(/\D/g, "");
+/** How a link reads on the timeline: who or what made it (C2). */
+const LINK_TITLES: Record<CustomerLinkReason, string> = {
+    MANUAL: "Linked to their store record by your team",
+    BACKFILL: "Linked when the list was set up",
+    PAYMENT: "Linked when they paid",
+    SITE_ACCOUNT: "Linked when they signed in on your website",
+};
 
 @Injectable()
 export class CustomerWorkspaceService {
@@ -41,56 +73,64 @@ export class CustomerWorkspaceService {
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
-    /** Suggest commerce Customers that are very likely the same person as a
-     * Contact — by EXACT normalized email/phone only, never by name. */
+    /**
+     * Who is very likely the same person as a Contact — by EXACT normalised
+     * email or phone only, never by name (`duplicates.ts`). Store customers
+     * to link always; other contacts to merge when `includeContacts` (C2).
+     * Today's Customer Detail doesn't ask for them, since it can only link.
+     * Suggesting never writes anything.
+     */
     async suggestLinks(
         ctx: OrganizationContext,
         contactId: string,
-    ): Promise<IdentitySuggestion[]> {
+        opts: { includeContacts?: boolean } = {},
+    ): Promise<Suggestion[]> {
         authorize(ctx, "contact:read");
-        const contact = await this.requireContact(ctx, contactId);
+        const me = (
+            await loadContactIdentities(this.db, ctx.organizationId, [
+                contactId,
+            ])
+        ).find((c) => c.id === contactId);
+        if (!me) throw new NotFoundException("Contact not found");
 
-        const alreadyLinked = await this.db.customerIdentityLink.findMany({
-            where: { contactId },
-            select: { customerId: true },
-        });
-        const excluded = alreadyLinked.map((l) => l.customerId);
-
-        const email = normalizeEmail(contact.email);
-        const phone = contact.phone ? normalizePhone(contact.phone) : "";
-
-        const candidates = await this.db.customer.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                id: { notIn: excluded.length > 0 ? excluded : undefined },
-                OR: [
-                    { email: { equals: email, mode: "insensitive" } },
-                    ...(phone ? [{ phone }] : []),
-                ],
+        const customers = await storeCustomerCandidates(
+            this.db,
+            ctx.organizationId,
+            me,
+        );
+        const byCustomer = new Map(customers.map((c) => [c.id, c]));
+        const out: Suggestion[] = storeCustomerMatches(me, customers).map(
+            (m) => {
+                const c = byCustomer.get(m.id);
+                return {
+                    kind: "customer",
+                    customerId: m.id,
+                    name: c?.name ?? "",
+                    email: c?.email ?? "",
+                    matchedOn: m.matchedOn,
+                };
             },
-            select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-            },
-        });
+        );
+        if (!opts.includeContacts) return out;
 
-        return candidates.map((c) => {
-            const matchedOn: ("email" | "phone")[] = [];
-            if (normalizeEmail(c.email) === email) matchedOn.push("email");
-            if (phone && c.phone && normalizePhone(c.phone) === phone)
-                matchedOn.push("phone");
-            return {
-                customerId: c.id,
-                name:
-                    [c.firstName, c.lastName].filter(Boolean).join(" ") ||
-                    c.email,
-                email: c.email,
-                matchedOn,
-            };
-        });
+        const contacts = await contactCandidates(
+            this.db,
+            ctx.organizationId,
+            me,
+        );
+        const byContact = new Map(contacts.map((c) => [c.id, c]));
+        for (const m of duplicatesOf(me, contacts)) {
+            const c = byContact.get(m.id);
+            out.push({
+                kind: "contact",
+                contactId: m.id,
+                name: c?.name ?? null,
+                email: c?.displayEmail ?? null,
+                matchedOn: m.matchedOn,
+                signsIn: c?.account != null,
+            });
+        }
+        return out;
     }
 
     /** Confirm a link between a Contact and a Customer (both must be in the org). */
@@ -111,6 +151,7 @@ export class CustomerWorkspaceService {
                     contactId,
                     customerId,
                     linkedByUserId: ctx.userId,
+                    reason: "MANUAL",
                 },
                 update: {},
             });
@@ -187,7 +228,7 @@ export class CustomerWorkspaceService {
 
         const links = await this.db.customerIdentityLink.findMany({
             where: { contactId, organizationId: ctx.organizationId },
-            select: { customerId: true },
+            select: { customerId: true, reason: true, createdAt: true },
         });
         const customerIds = links.map((l) => l.customerId);
 
@@ -222,6 +263,16 @@ export class CustomerWorkspaceService {
                     at: booking.startAt.toISOString(),
                     title: "Booking",
                     moduleKey: "APPOINTMENTS",
+                });
+        }
+
+        if (available.has("COMMERCE")) {
+            for (const link of links)
+                events.push({
+                    type: "LINK",
+                    at: link.createdAt.toISOString(),
+                    title: LINK_TITLES[link.reason],
+                    moduleKey: "COMMERCE",
                 });
         }
 
