@@ -26,6 +26,12 @@ import type { OrganizationContext } from "../types/organization-context";
  * so we subscribe to the downstream stream INSIDE `runInOrgContext` (subscribing
  * outside it would run the handler after the ALS scope had already exited).
  *
+ * A customer route (a business's own customer signed in on its site; ADR-011,
+ * round-2 plan A, A3) has no `organizationContext`: `CustomerSessionGuard`
+ * sets `request.customerContext` instead, so no staff permission check can
+ * mistake a customer for a member. Its `organizationId` is read here when
+ * there is no staff context, so a customer route runs under the same RLS.
+ *
  * This is a no-op unless `RLS_ENFORCEMENT` is enabled in the environment (the
  * proxy checks the flag per query), so it is safe to register unconditionally.
  */
@@ -37,8 +43,11 @@ export class OrgRlsInterceptor implements NestInterceptor {
     ): Observable<unknown> {
         const request = context.switchToHttp().getRequest<{
             organizationContext?: OrganizationContext;
+            customerContext?: { organizationId: string };
         }>();
-        const organizationId = request.organizationContext?.organizationId;
+        const organizationId =
+            request.organizationContext?.organizationId ??
+            request.customerContext?.organizationId;
 
         if (!organizationId) {
             return next.handle();

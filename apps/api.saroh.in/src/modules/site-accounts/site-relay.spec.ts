@@ -28,6 +28,24 @@ function sign(
     );
 }
 
+describe("signSiteRelay", () => {
+    /**
+     * The same vector is pinned in saroh.app's `lib/site-relay.test.ts`
+     * (A3), which signs the header on the site's side: a format change on
+     * one side that the other doesn't make fails one of the two.
+     */
+    it("signs the vector saroh.app pins", () => {
+        expect(
+            signSiteRelay(
+                { address: "203.0.113.7", host: "kavi.saroh.app", now: NOW },
+                "saroh-dev-insecure-site-relay-secret-not-for-production",
+            ),
+        ).toBe(
+            "v1.1790000000.MjAzLjAuMTEzLjc.a2F2aS5zYXJvaC5hcHA.gWBw2J0VLDl6pASl_GPNQIo-Uyh2iB9ORmVNYgUQykw",
+        );
+    });
+});
+
 describe("verifySiteRelay", () => {
     it("accepts a header it signed and yields the host and a hashed address", () => {
         const relay = verifySiteRelay(sign(), SECRET, NOW);

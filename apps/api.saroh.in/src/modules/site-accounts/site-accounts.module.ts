@@ -4,6 +4,9 @@ import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { CustomerAccountRepository } from "./customer-account.repository";
+import { CustomerSessionGuard } from "./customer-session.guard";
+import { SessionsController } from "./sessions.controller";
+import { SessionsService } from "./sessions.service";
 import { SignInCodesService } from "./sign-in-codes.service";
 import { SignInController } from "./sign-in.controller";
 import { SiteRelayGuard } from "./site-relay";
@@ -11,20 +14,28 @@ import { SiteRelayGuard } from "./site-relay";
 /**
  * A business's customers signing in on its own site (ADR-011, DEC-037;
  * round-2 plan A). A1 laid the tables and the account repository; A2 adds
- * email codes, their limits and the signed relay (`public/site-accounts`).
- * The session guard (A3) and account ↔ contact linking (A4) build on these.
+ * email codes, their limits and the signed relay (`public/site-accounts`);
+ * A3 the session, its guard and the customer's RLS context. Account ↔
+ * contact linking (A4) builds on these.
  */
 @Module({
-    controllers: [SignInController],
+    controllers: [SignInController, SessionsController],
     providers: [
         CustomerAccountRepository,
         AccountLinkingService,
         ChallengeVerifier,
         SiteCodeAlerts,
         SiteCodeDelivery,
+        SessionsService,
         SignInCodesService,
         SiteRelayGuard,
+        CustomerSessionGuard,
     ],
-    exports: [CustomerAccountRepository, SiteRelayGuard],
+    exports: [
+        CustomerAccountRepository,
+        SiteRelayGuard,
+        SessionsService,
+        CustomerSessionGuard,
+    ],
 })
 export class SiteAccountsModule {}

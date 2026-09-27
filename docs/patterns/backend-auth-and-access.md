@@ -167,6 +167,18 @@ what the API allows.
   `SITE_RELAY_SECRET`, and anything unsigned, forged or older than 60
   seconds is a 401. The business comes from that host, and limits count the
   relayed address, never the caller's.
+- **Current** (round-2 plan A, A3) — **A signed-in customer route sits
+  behind `CustomerSessionGuard`** (`modules/site-accounts/customer-session.guard.ts`)
+  and takes the customer from `@CurrentCustomer()`. The guard checks the
+  relay, then the `x-customer-session` token against a live session of an
+  ACTIVE account on that very site (another business's site, or another site
+  of the same business, is a 401). It sets `request.customerContext`, never
+  `organizationContext`, so no staff check can mistake a customer for a
+  member; `OrgRlsInterceptor` reads its `organizationId`, so the route runs
+  under that business's RLS. In saroh.app, every call to these routes goes
+  through `lib/customer-session.ts` (`siteAccountsFetch`, `accountFetch`),
+  and every state-changing action calls `siteOrigin()` (`lib/origin.ts`)
+  first — `lib/origin.test.ts` fails when one doesn't.
 - **Adopted** (2026-09-26, DEC-039) — **New staff permissions wait for the
   matrix review** (`docs/plans/2026-09-26-permission-matrix.md`). Until then,
   build against today's actions.

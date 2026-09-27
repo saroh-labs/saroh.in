@@ -1,10 +1,4 @@
-import {
-    createHash,
-    createHmac,
-    randomBytes,
-    randomInt,
-    timingSafeEqual,
-} from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import {
     BadRequestException,
@@ -36,6 +30,8 @@ import {
 import { normaliseAccountEmail } from "./customer-account.repository";
 import type { RequestCodeDto, VerifyCodeDto } from "./dto";
 import { cleanBusinessName } from "./sender-name";
+import type { SessionIssued } from "./sessions.service";
+import { SessionsService } from "./sessions.service";
 import type { SiteHost } from "./site-host";
 import { businessPublicPhone, resolveSiteHost } from "./site-host";
 import type { SiteRelay } from "./site-relay";
@@ -62,11 +58,7 @@ export interface CodeRequested {
     resendAfterSeconds: number;
 }
 
-/** What `sessions` answers once: the token is never shown again. */
-export interface SessionIssued {
-    token: string;
-    expiresAt: string;
-}
+export type { SessionIssued } from "./sessions.service";
 
 /** What the sign-in sheet needs before anything is typed. */
 export interface SignInOptions {
@@ -75,9 +67,6 @@ export interface SignInOptions {
     phone: string | null;
     challenge: { required: boolean; siteKey: string | null };
 }
-
-/** Sessions last 30 days (default 6); A3 slides them, never past 90. */
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60_000;
 
 /** The in-process per-address limits, set generously: offices and mobile
  * networks share addresses. The durable limits are the rows (code-limits). */
@@ -109,10 +98,6 @@ export function codeHashFor(
     code: string,
 ): string {
     return hmac(["code", organizationId, destinationHash, code]);
-}
-
-export function hashSessionToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
 }
 
 function sameHash(a: string, b: string): boolean {
@@ -150,6 +135,7 @@ function wrongCode(reason: "invalid" | "expired"): BadRequestException {
 export class SignInCodesService {
     constructor(
         private readonly linking: AccountLinkingService,
+        private readonly sessions: SessionsService,
         private readonly delivery: SiteCodeDelivery,
         private readonly challenge: ChallengeVerifier,
         private readonly alerts: SiteCodeAlerts,
@@ -429,8 +415,6 @@ export class SignInCodesService {
         email: string,
         now: Date,
     ): Promise<SessionIssued> {
-        const token = randomBytes(32).toString("base64url");
-        const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
         const run = () =>
             prisma.$transaction(async (tx) => {
                 const identity = await this.linking.linkOrCreate(
@@ -455,19 +439,15 @@ export class SignInCodesService {
                         details: { reason: "blocked" },
                     });
                 }
-                await tx.customerSession.create({
-                    data: {
-                        organizationId: site.organizationId,
-                        accountId: identity.account.id,
-                        siteId: site.siteId,
-                        tokenHash: hashSessionToken(token),
-                        expiresAt,
-                        lastSeenAt: now,
-                    },
+                return this.sessions.create(tx, {
+                    organizationId: site.organizationId,
+                    siteId: site.siteId,
+                    accountId: identity.account.id,
+                    now,
                 });
             });
         try {
-            await run();
+            return await run();
         } catch (error) {
             // Two first sign-ins for one new email: the other made the
             // contact first. Once more finds it (account-linking.service).
@@ -475,11 +455,9 @@ export class SignInCodesService {
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === "P2002"
             ) {
-                await run();
-            } else {
-                throw error;
+                return run();
             }
+            throw error;
         }
-        return { token, expiresAt: expiresAt.toISOString() };
     }
 }
