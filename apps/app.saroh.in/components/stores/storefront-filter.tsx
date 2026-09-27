@@ -34,10 +34,13 @@ export function StorefrontFilter({
     note,
 }: {
     stores: { id: string; name: string }[];
-    /** How many rows a storefront holds, for the row's second line. */
-    countFor: (storeId: string) => number;
-    /** How many rows there are in all, for "All storefronts". */
-    total: number;
+    /**
+     * How many rows a storefront holds, for the row's second line; null when
+     * that couldn't be counted, and the line is left out rather than a 0.
+     */
+    countFor: (storeId: string) => number | null;
+    /** How many rows there are in all, for "All storefronts"; null likewise. */
+    total: number | null;
     value: string | null;
     onChange: (storeId: string | null) => void;
     noun: { one: string; other: string };
@@ -83,11 +86,13 @@ export function StorefrontFilter({
                                 <span className="block truncate text-[12.5px] font-medium">
                                     {c.name}
                                 </span>
-                                <span className="block text-[11px] text-muted-foreground">
-                                    {c.n === 1
-                                        ? `1 ${noun.one}`
-                                        : `${c.n} ${noun.other}`}
-                                </span>
+                                {c.n === null ? null : (
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        {c.n === 1
+                                            ? `1 ${noun.one}`
+                                            : `${c.n} ${noun.other}`}
+                                    </span>
+                                )}
                             </span>
                             {on ? <Check aria-hidden /> : null}
                         </DropdownMenuItem>

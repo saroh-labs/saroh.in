@@ -316,6 +316,21 @@ describe("filters, tabs and rows", () => {
         expect(unpaid.counts).toEqual({ all: 3, open: 2, refunded: 0 });
     });
 
+    it("narrows rows and every tab count to orders placed since an instant", async () => {
+        // The order placed exactly at `since` is in; the one a minute
+        // before is not (F6: Home's "Last 24 hours" link).
+        const since = new Date(NOW.getTime() - 12 * MIN);
+        const page = await list({ since });
+        expect(page.rows).toHaveLength(3);
+        expect(page.rows.map((r) => r.id)).toContain(unpaidDelivery);
+        expect(page.rows.map((r) => r.id)).toContain(partly);
+        expect(page.rows.map((r) => r.id)).not.toContain(refunded);
+        expect(page.counts).toEqual({ all: 3, open: 3, refunded: 0 });
+        const open = await list({ since, tab: "open" });
+        expect(open.rows).toHaveLength(3);
+        expect(open.counts).toEqual(page.counts);
+    });
+
     it("finds unpaid local deliveries by the new type name and the old word", async () => {
         const byType = await list({
             payment: "UNPAID",

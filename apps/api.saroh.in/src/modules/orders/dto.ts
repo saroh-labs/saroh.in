@@ -4,6 +4,7 @@ import {
     IsArray,
     IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     IsUrl,
@@ -465,6 +466,15 @@ export class ListOrdersQuery {
     @IsOptional()
     @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
     to?: string;
+
+    /**
+     * An instant: only orders placed from it on (Home's "Last 24 hours",
+     * round 2 F6). Narrows the rows and every tab count alike.
+     */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsISO8601({ strict: true }, { message: "since is an ISO date and time" })
+    since?: string;
 
     /** An order number or a customer's name; phone or email with `contact:read`. */
     @IsOptional()

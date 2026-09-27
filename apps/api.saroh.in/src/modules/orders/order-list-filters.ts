@@ -54,6 +54,8 @@ export interface OrderListFilter {
     /** A calendar day, YYYY-MM-DD, in the business's zone. */
     from?: string;
     to?: string;
+    /** Only orders placed at or after this instant (`?since=`, F6). */
+    since?: Date;
     q?: string;
 }
 
@@ -224,6 +226,9 @@ export function orderConditions(
     }
     if (range.gte) and.push(Prisma.sql`o."createdAt" >= ${ts(range.gte)}`);
     if (range.lt) and.push(Prisma.sql`o."createdAt" < ${ts(range.lt)}`);
+    if (filter.since) {
+        and.push(Prisma.sql`o."createdAt" >= ${ts(filter.since)}`);
+    }
     if (filter.q?.trim()) and.push(searchSql(filter.q, view));
     return Prisma.join(and, " AND ");
 }

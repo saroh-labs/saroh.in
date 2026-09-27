@@ -75,12 +75,13 @@ export class OrganizationOrdersController {
         // v2 (plan B, B1): rows, tab counts and a cursor. Money needs
         // `order:read`; a customer's phone and email need `contact:read`.
         if (query.v === "2") {
-            const { v: _v, late, ...filter } = query;
+            const { v: _v, late, since, ...filter } = query;
             return this.orders.listRows(
                 ctx.organizationId,
                 {
                     ...filter,
                     late: late === undefined ? undefined : late === "true",
+                    since: since ? new Date(since) : undefined,
                 },
                 { money: full, contact: allows(ctx, "contact:read") },
             );
