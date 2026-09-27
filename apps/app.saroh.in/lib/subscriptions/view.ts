@@ -223,6 +223,42 @@ export function initials(name: string): string {
         .slice(0, 2);
 }
 
+// — Plans (D1) —————————————————————————————————————————————————
+
+/** "8 classes a month", or "Unlimited classes" when the plan has no cap. */
+export function classesText(classesPerMonth: number | null): string {
+    if (!classesPerMonth) return "Unlimited classes";
+    return `${classesPerMonth} ${classesPerMonth === 1 ? "class" : "classes"} a month`;
+}
+
+function people(n: number): string {
+    return `${n} ${n === 1 ? "person" : "people"}`;
+}
+
+/**
+ * Who pays what, as Plan Detail says it: "12 people · current price" and
+ * "₹1,500 / month", then each older price the API lists.
+ */
+export function payRows(
+    plan: Pick<Plan, "byPrice">,
+): { label: string; amount: string; older: boolean }[] {
+    return plan.byPrice.map((b) => ({
+        label: `${people(b.count)} · ${b.current ? "current price" : "older price"}`,
+        amount: longPrice(b.price, b.currency, b.interval),
+        older: !b.current,
+    }));
+}
+
+/** A plan card's notes: "3 still on ₹1,200 — they keep it". */
+export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
+    return plan.byPrice
+        .filter((b) => !b.current)
+        .map(
+            (b) =>
+                `${b.count} still on ${money(b.price, b.currency)} — they keep it`,
+        );
+}
+
 /**
  * Whether they keep an older price: the plan sells for something else now.
  * Only said when the currencies agree — two currencies are two prices, not
