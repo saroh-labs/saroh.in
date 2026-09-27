@@ -1071,12 +1071,15 @@ const hero = (
     heading: string,
     subheading?: string,
     cta?: { label: string; href: string },
+    /** "On today" beside the headline (G18). */
+    onToday?: boolean,
 ): SeedSection => ({
     type: "hero",
     content: {
         heading,
         ...(subheading ? { subheading } : {}),
         ...(cta ? { cta: { ...cta, style: "primary" as const } } : {}),
+        ...(onToday ? { onToday: true } : {}),
     },
 });
 
@@ -1387,6 +1390,7 @@ export const PULSE: ShowcaseBusiness = {
                         "Train with people who know your name",
                         "A neighbourhood gym on 12th Main, Indiranagar. Small classes, coaches who plan your sessions, and a free first session so you can see if it fits.",
                         { label: "Book a free trial", href: "/book-a-trial" },
+                        true,
                     ),
                     {
                         type: "features",

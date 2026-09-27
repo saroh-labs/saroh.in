@@ -64,6 +64,23 @@ describe("openState", () => {
         expect(openStateText(state)).toBe("Closed · opens Mon 8am");
     });
 
+    it("on a day the business marked closed, is closed and opens the next open day (E3)", () => {
+        // Friday 25 Sep closed: at 10:00 it is not open, and Saturday opens.
+        const state = openState(PULSE, ist("2026-09-25T10:00:00"), KOLKATA, [
+            "2026-09-25",
+        ]);
+        expect(openStateText(state)).toBe("Closed · opens Sat 7am");
+    });
+
+    it("skips a closed day ahead when saying when it next opens", () => {
+        // Saturday after closing; Sunday is shut every week, Monday is a
+        // holiday: it opens Tuesday.
+        const state = openState(PULSE, ist("2026-09-26T14:00:00"), KOLKATA, [
+            "2026-09-28",
+        ]);
+        expect(openStateText(state)).toBe("Closed · opens Tue 6am");
+    });
+
     it("before opening, opens later today without naming the day", () => {
         const state = openState(PULSE, ist("2026-09-25T05:10:00"), KOLKATA);
         expect(state).toEqual({
