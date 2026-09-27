@@ -5,8 +5,8 @@
   "author": "Saroh Team",
   "license": "MIT",
   "scripts": {
-    "dev": "portless api.saroh nest start --watch",
-    "dev:app": "nest start --watch",
+    "dev": "NODE_ENV=development portless api.saroh nest start --watch",
+    "dev:app": "NODE_ENV=development nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint .",
