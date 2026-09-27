@@ -157,18 +157,50 @@ describe("waiting", () => {
     const placed = "2026-09-23T09:14:00Z";
     const at = (min: number) => Date.parse(placed) + min * 60_000;
 
-    it("counts minutes, and is late from the 20-minute target", () => {
-        expect(waiting(placed, at(16))).toEqual({
+    const pickup = {
+        placedAt: placed,
+        late: false,
+        lateAfterMinutes: 120,
+        fulfilmentLabel: "Pick-up",
+    };
+
+    it("counts minutes, and keeps no target of its own: late is the API's", () => {
+        expect(waiting(pickup, at(16))).toEqual({
             text: "Waiting 16 min",
             minutes: 16,
             late: false,
+            rule: "Pick-up orders count as late after 2 h",
         });
-        expect(waiting(placed, at(20)).late).toBe(true);
+        // Twenty minutes is no longer late by itself (B2b).
+        expect(waiting(pickup, at(20)).late).toBe(false);
+        expect(waiting({ ...pickup, late: true }, at(125))).toMatchObject({
+            text: "Late · 2 h 5 min",
+            late: true,
+        });
+    });
+
+    it("says nothing is late when the API sends no rule (an API before B2b)", () => {
+        expect(waiting({ placedAt: placed }, at(600))).toEqual({
+            text: "Waiting 10 h",
+            minutes: 600,
+            late: false,
+            rule: null,
+        });
     });
 
     it("reads hours and days as hours and days", () => {
-        expect(waiting(placed, at(222)).text).toBe("Waiting 3 h 42 min");
-        expect(waiting(placed, at(60 * 50)).text).toBe("Waiting 2 days");
+        expect(waiting(pickup, at(222)).text).toBe("Waiting 3 h 42 min");
+        expect(waiting(pickup, at(60 * 50)).text).toBe("Waiting 2 days");
+        expect(
+            waiting(
+                {
+                    ...pickup,
+                    lateAfterMinutes: 2880,
+                    fulfilmentLabel: "Shipping",
+                },
+                at(1),
+            ).rule,
+        ).toBe("Shipping orders count as late after 2 days");
     });
 });
 
