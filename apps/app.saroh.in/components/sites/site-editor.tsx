@@ -153,7 +153,7 @@ export function SiteEditor({
         pages,
         footerPreview,
     });
-    const preview = { address, sections, pages, style, styleOptions };
+    const preview = { siteId, address, sections, pages, style, styleOptions };
 
     return (
         /*

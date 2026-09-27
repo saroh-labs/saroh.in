@@ -16,6 +16,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
+import { env } from "@/env";
 import { merchantLinkUrl } from "@/lib/sites/merchant-link";
 
 import type { Section, SitePage } from "@/lib/sites/service";
@@ -85,7 +86,14 @@ export function DraftPreview({
     notesByKey,
     onOpenNotes,
     siteAddress,
+    siteId,
 }: {
+    /**
+     * The site being drawn, so blocks that read live data (Visit us, G8)
+     * show the real values on the canvas. Omitted, they say where the real
+     * values come from instead.
+     */
+    siteId?: string;
     sections: Section[];
     /**
      * The site's pages, so a button naming one draws the path publish will
@@ -187,6 +195,11 @@ export function DraftPreview({
                 const rendered = (
                     <PageSections
                         sections={[toRenderedSection(section, resolvePage)]}
+                        siteId={siteId}
+                        // The API this app talks to, so the canvas reads the
+                        // same place as the site it is drawing; unset, the
+                        // block's own default (production) applies.
+                        apiUrl={env.NEXT_PUBLIC_API_URL}
                     />
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
