@@ -150,8 +150,12 @@ export function PanelDivider({
              * 1px of line, 9px of target. `after` widens what the pointer can
              * hit without widening what the eye sees — a hairline you have to
              * hit exactly is a hairline nobody moves twice.
+             *
+             * Never hidden: it is a cell of the editor's grid, which counts a
+             * 1px column for it wherever it is mounted. Hidden, the page slid
+             * into that column and drew blank (narrow, 760–1023px).
              */
-            className="group relative z-10 hidden cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none lg:block"
+            className="group relative z-10 block cursor-col-resize bg-border after:absolute after:inset-y-0 after:-left-1 after:w-[9px] after:content-[''] hover:bg-ring focus-visible:bg-ring focus-visible:outline-none"
         >
             {/*
              * A grip in the middle of the line, so the divider says it can
