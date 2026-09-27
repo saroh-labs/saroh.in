@@ -13,9 +13,9 @@ import type {
     SubscriberCard,
     Subscription,
     SubscriptionCharge,
+    SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
 import {
-    changeRows,
     chargeRow,
     collectionRows,
     dayText,
@@ -36,8 +36,8 @@ import { Pill } from "../pill";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
 import { ActionSheet } from "./action-sheets";
+import { ChangesCard } from "./changes-card";
 import {
-    ChangesCard,
     ChargesCard,
     CollectionsCard,
     CustomerCard,
@@ -66,6 +66,8 @@ interface Action {
 export function SubscriptionDetail({
     sub,
     charges,
+    changes,
+    viewerId,
     plans,
     card,
     ran,
@@ -78,6 +80,10 @@ export function SubscriptionDetail({
 }: {
     sub: Subscription;
     charges: Optional<SubscriptionCharge[]>;
+    /** Its log's first page (D9). */
+    changes: Optional<SubscriptionEventsPage>;
+    /** Who is looking, so their own changes read "You". */
+    viewerId: string | null;
     plans: Plan[];
     card: SubscriberCard | null;
     ran: { text: string; late: boolean } | null;
@@ -413,7 +419,18 @@ export function SubscriptionDetail({
                                     : "Each renewal is invoiced with a pay link"
                             }
                         />
-                        <ChangesCard rows={changeRows(sub, now)} />
+                        <ChangesCard
+                            // A fresh page after an action starts the card over.
+                            key={
+                                changes.state === "ok"
+                                    ? (changes.data.events[0]?.id ?? "none")
+                                    : changes.state
+                            }
+                            page={changes}
+                            sub={sub}
+                            viewerId={viewerId}
+                            now={now}
+                        />
                     </div>
                 </div>
             </div>

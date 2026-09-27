@@ -12,6 +12,7 @@ import {
     getSubscription,
     listCharges,
     listPlans,
+    listSubscriptionEvents,
 } from "@/lib/subscriptions/service";
 import { ranLine } from "@/lib/subscriptions/view";
 
@@ -23,7 +24,8 @@ const STEPS = ["pause", "switch", "cancel", "restart"] as const;
  * Payments → Subscriptions → one subscription (plan 2026-09-23-003, U13),
  * after "Saroh Subscription Detail" layout 2a.
  *
- * The subscription and the plans are required; its charges, when renewals
+ * The subscription and the plans are required; its charges, its Changes
+ * log (D9), when renewals
  * last ran and the subscriber's phone and allergies are read on their own,
  * so a role without invoices, or one failed read, costs its own panel and
  * nothing else. `?do=pause|switch|cancel|restart` arrives from the list's
@@ -36,7 +38,7 @@ export default async function SubscriptionPage({
     params: Promise<{ subscriptionId: string }>;
     searchParams: Promise<{ do?: string }>;
 }) {
-    await requireSession();
+    const session = await requireSession();
     const [{ subscriptionId }, query, organization] = await Promise.all([
         params,
         searchParams,
@@ -63,16 +65,18 @@ export default async function SubscriptionPage({
 
     const canWrite = may("subscription:write");
     const step = STEPS.find((s) => s === query.do) ?? null;
-    const [plans, charges, renewals, card, contacts] = await Promise.all([
-        listPlans(),
-        listCharges(sub.id),
-        getRenewals().catch(() => null),
-        getSubscriberCard(sub.contact.id),
-        // Restarting picks the person again, so only then are they read.
-        canWrite && sub.status === "CANCELLED"
-            ? contactPickerOptions()
-            : Promise.resolve([]),
-    ]);
+    const [plans, charges, changes, renewals, card, contacts] =
+        await Promise.all([
+            listPlans(),
+            listCharges(sub.id),
+            listSubscriptionEvents(sub.id),
+            getRenewals().catch(() => null),
+            getSubscriberCard(sub.contact.id),
+            // Restarting picks the person again, so only then are they read.
+            canWrite && sub.status === "CANCELLED"
+                ? contactPickerOptions()
+                : Promise.resolve([]),
+        ]);
     const now = new Date();
 
     return (
@@ -80,6 +84,8 @@ export default async function SubscriptionPage({
             <SubscriptionDetail
                 sub={sub}
                 charges={charges}
+                changes={changes}
+                viewerId={session.user.id}
                 plans={plans}
                 card={card}
                 ran={renewals ? ranLine(renewals, sub.timezone, now) : null}

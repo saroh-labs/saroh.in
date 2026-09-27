@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
-    changeRows,
     chargeRow,
     classesText,
     collectionRows,
@@ -278,29 +277,6 @@ describe("charges", () => {
             "Not GST-registered — receipts, not tax invoices.",
         );
         expect(gstNote([])).toBe("");
-    });
-});
-
-describe("changeRows", () => {
-    it("lists what the subscription records, newest first", () => {
-        const rows = changeRows(
-            sub({
-                pendingPlan: {
-                    id: "p2",
-                    name: "Sourdough fortnightly",
-                    price: "700.00",
-                    currency: "INR",
-                    interval: "MONTH",
-                    from: "2026-09-30T18:30:00.000Z",
-                },
-            }),
-            NOW,
-        );
-        expect(rows.map((r) => r.what)).toEqual([
-            "Switching to Sourdough fortnightly (₹700)",
-            "Started on Sourdough weekly at ₹1,200",
-        ]);
-        expect(rows[0].when).toBe("From 1 Oct");
     });
 });
 

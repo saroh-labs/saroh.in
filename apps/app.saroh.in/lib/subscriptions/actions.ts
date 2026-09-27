@@ -79,6 +79,11 @@ export async function cancelPlanChange(id: string) {
     return then(api.cancelPlanChange(id));
 }
 
+/** The next page of a subscription's Changes, older than `cursor` (D9). */
+export async function loadSubscriptionEvents(id: string, cursor: string) {
+    return api.listSubscriptionEvents(id, cursor);
+}
+
 export async function createPlan(input: PlanInput) {
     return then(api.createPlan(input));
 }
