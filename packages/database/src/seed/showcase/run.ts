@@ -36,6 +36,9 @@ import {
 import { checkBoutique, seedBoutique } from "./boutique";
 import type { RyeCounts } from "./check";
 import { checkRye, checkShowcase } from "./check";
+import type { KaviCounts } from "./clinic";
+import { checkKavi, KAVI, seedClinic } from "./clinic";
+import { KAVI_DESK } from "./clinic-data";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -188,6 +191,16 @@ export async function seedShowcase(
             }),
         }),
     );
+    // The dental clinic the round-2 bookings screens are verified and filmed
+    // in (E29). Divya Kamath works its desk as a Member.
+    businesses.push(
+        await seedClinic({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -206,6 +219,7 @@ export async function seedShowcase(
         ? await checkPulse(prisma, pulse.id, now)
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
+    const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -219,6 +233,8 @@ export async function seedShowcase(
     }
     console.log("[showcase] Rye & Co., as its films need it:");
     console.table(ryeCounts);
+    console.log("[showcase] Kavi Dental, as its films need it:");
+    console.table(kaviCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
