@@ -173,6 +173,7 @@ export function statusReadout({
 export function publishTitle({
     publishing,
     dirty,
+    saveError = false,
     onlyHeldBack,
     heldBack,
     neverPublished,
@@ -181,6 +182,8 @@ export function publishTitle({
 }: {
     publishing: boolean;
     dirty: boolean;
+    /** A save failed: publish waits, and not "in a moment" (review G-4). */
+    saveError?: boolean;
     onlyHeldBack: boolean;
     heldBack: HeldBackSection[];
     neverPublished: boolean;
@@ -190,6 +193,9 @@ export function publishTitle({
     if (publishing) return "Publishing your site";
     if (onlyHeldBack) {
         return `Finish or remove ${unfinishedPhrase(heldBack)} before publishing`;
+    }
+    if (dirty && saveError) {
+        return "Not saved — publish waits until your changes save";
     }
     if (dirty) return "Saving your changes — publish is available in a moment";
     if (neverPublished) return "Put this site live";

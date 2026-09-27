@@ -47,7 +47,8 @@ function closeOnLaterChange(w: Watch | null, doc: Doc, value: unknown) {
  * - One Undo undoes one action: a second action closes the first's window
  *   (`createHoldSlot`), and so does any other change to the same document —
  *   putting back the whole previous draft would drop that newer work.
- * - Leaving the editor closes the window and takes the toast with it.
+ * - Leaving the editor closes the window and takes the toast with it, and
+ *   so does opening the pre-publish check (`settleUndo`).
  * - Irreversible actions (discard every change, restore a version, start the
  *   site again) still ask first; they are not here.
  *
@@ -127,6 +128,15 @@ export function useUndo({
     }
 
     return {
+        /**
+         * Close the Undo window now and take its toast away. Opening the
+         * pre-publish check does this: an Undo pressed behind the check
+         * would change the draft the merchant is about to publish, and
+         * Publish would put live the saved draft without it (review G-1).
+         */
+        settleUndo() {
+            void slotRef.current?.commitNow();
+        },
         removeAt(index: number) {
             if (index < 0 || index >= sections.length) return;
             const section = sections[index];

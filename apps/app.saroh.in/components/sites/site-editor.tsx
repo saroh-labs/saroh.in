@@ -117,6 +117,12 @@ export function SiteEditor({
     const { style } = siteStyle;
     // Remove, move, hide and reset act at once and offer Undo (G3).
     const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
+    /*
+     * Anything not saved yet: the page, the look, the name or the footer.
+     * Opening another page drops it, and publishing would miss it (G-1, G-3).
+     */
+    const unsaved =
+        dirty || draft.saving || siteStyle.styleDirty || chrome.chromeDirty;
 
     const add = useAddBlock({
         insertSection: draft.insertSection,
@@ -128,7 +134,7 @@ export function SiteEditor({
     const { jumpToNote, jumpToFlag } = useEditorJumps({
         siteId,
         pageId,
-        dirty,
+        dirty: unsaved,
         sections,
         setRail,
         setSelectedIndex,
@@ -163,8 +169,15 @@ export function SiteEditor({
                 // and the footer. Publish waits for all three.
                 styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
                 styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
+                saveError={draft.saveError || chrome.chromeFailed}
                 {...review}
                 {...publish}
+                openCheck={(ready) => {
+                    // An Undo pressed behind the check would change the
+                    // draft being published (G-1).
+                    if (!ready.dirty) edits.settleUndo();
+                    return publish.openCheck(ready);
+                }}
                 {...viewport}
                 openFeedback={() => setInspector("feedback")}
             />
@@ -202,6 +215,8 @@ export function SiteEditor({
                             style,
                             styleOptions,
                         }}
+                        // Holds a page switch back (G-3).
+                        dirty={unsaved}
                         neverPublished={publish.neverPublished}
                         canvasChrome={canvasChrome}
                         notesByKey={review.notesByKey}
@@ -255,6 +270,7 @@ export function SiteEditor({
                     flags={publish.siteFlags.flags}
                     awaitingNavigation={publish.siteFlags.awaitingNavigation}
                     publishing={publish.publishing}
+                    unsaved={unsaved}
                     neverPublished={publish.neverPublished}
                     pendingSummary={publish.pendingSummary}
                     pendingKnown={publish.pendingKnown}

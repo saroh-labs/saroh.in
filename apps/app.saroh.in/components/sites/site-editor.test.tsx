@@ -984,6 +984,52 @@ describe("SiteEditor shell", () => {
         expect(actions.getReviewState).toHaveBeenCalled();
     });
 
+    it("closes the Undo when the check opens, so Publish never misses a restored block (review G-1)", async () => {
+        render();
+        click(button("Remove"));
+        const removed = lastUndoId();
+        // Saved, so Publish is open while the Undo toast is still up.
+        await wait(1500);
+        expect(button("Publish").disabled).toBe(false);
+
+        await press(button("Publish"));
+        expect(toast.dismissToast).toHaveBeenCalledWith(removed);
+        // An Undo pressed now does nothing: the draft is the one checked.
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("3 blocks");
+        const go = Array.from(
+            document.querySelectorAll<HTMLButtonElement>("button"),
+        ).filter((b) => b.textContent.startsWith("Publish"));
+        expect(go[go.length - 1].disabled).toBe(false);
+    });
+
+    it("keeps the check's Publish waiting while a change is unsaved (review G-1)", async () => {
+        render();
+        click(button("Header"));
+        await press(button("Publish"));
+        // The check's own Publish: the last one, after the bar's.
+        const check = () => {
+            const last = Array.from(
+                document.querySelectorAll<HTMLButtonElement>("button"),
+            )
+                .filter((b) => b.textContent.startsWith("Publish"))
+                .at(-1);
+            if (!last) throw new Error("No Publish in the check");
+            return last;
+        };
+        expect(check().disabled).toBe(false);
+
+        type(field("Site name"), "Rye & Co.");
+        expect(check().disabled).toBe(true);
+        await press(check());
+        expect(actions.publishSite).not.toHaveBeenCalled();
+
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteSettings).toHaveBeenCalled();
+        expect(check().disabled).toBe(false);
+    });
+
     it("asks for a review and reads the state back", async () => {
         actions.getReviewState.mockResolvedValue({ ...REVIEW, pending: true });
         render();
@@ -1156,7 +1202,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(actions.updateSiteFooter).not.toHaveBeenCalled();
     });
 
-    it("says so when the footer does not save, and does not retry it", async () => {
+    it("says Not saved when the footer does not save, and tries again after a pause (review G-4)", async () => {
         actions.updateSiteFooter.mockResolvedValue({
             ok: false,
             error: "Could not save the footer.",
@@ -1169,10 +1215,89 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(toast.showError).toHaveBeenCalledWith(
             "Could not save the footer.",
         );
+        // Not every pause: the same value waits before it goes again.
         await wait(1500);
         expect(actions.updateSiteFooter).toHaveBeenCalledTimes(1);
-        // Still unsaved, so Publish still waits.
+        // Still unsaved, so Publish still waits — and says why, not "in a
+        // moment", and the pill says Not saved.
         expect(button("Publish").disabled).toBe(true);
+        expect(button("Publish").title).toBe(
+            "Not saved — publish waits until your changes save",
+        );
+        expect($("[role=status]")?.textContent).toBe("Not saved");
+
+        // It goes again on its own, without a second toast.
+        await wait(5000);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(2);
+        expect(toast.showError).toHaveBeenCalledTimes(1);
+
+        // And once it saves, Publish is free.
+        actions.updateSiteFooter.mockResolvedValue({
+            ok: true,
+            data: { id: "site" },
+        });
+        await wait(15_000);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(3);
+        expect(button("Publish").disabled).toBe(false);
+        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+    });
+
+    /** A page whose one block is a hero with a button to /about. */
+    const LINKED: Partial<Props> = {
+        initialSections: [
+            {
+                key: "s1",
+                type: "hero",
+                contractVersion: 1,
+                content: {
+                    heading: "Welcome in",
+                    cta: { label: "Go", href: "/about", style: "primary" },
+                },
+            },
+        ],
+    };
+
+    /** Click the hero's button to /about, as a browser does. */
+    function pressGo() {
+        const link = $$("a").find((a) => a.textContent.trim() === "Go");
+        if (!link) throw new Error("No link Go");
+        act(() => link.click());
+    }
+
+    it("stays on the page when a page is linked in Preview before the name saves (review G-3)", async () => {
+        const { siteId } = render(LINKED);
+        click(button("Header"));
+        type(field("Site name"), "Rye & Co.");
+        click(button("Preview"));
+        // Inside the pause, before the name has gone out.
+        pressGo();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Save this page before opening another.",
+        );
+
+        // Once it has saved, the page opens.
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteSettings).toHaveBeenCalledTimes(1);
+        pressGo();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+    });
+
+    it("stays on the page when a page is linked in Preview before the footer saves (review G-3)", async () => {
+        const { siteId } = render(LINKED);
+        click(button("Footer"));
+        type(field("Footer line"), "Hill Road");
+        click(button("Preview"));
+        pressGo();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(1);
+        pressGo();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
     });
 });
 
