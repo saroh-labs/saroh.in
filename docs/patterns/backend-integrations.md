@@ -50,6 +50,14 @@ a note saying so.
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an
   amount sent anyway is ignored rather than refused (ADR-007).
+- **Current** (E11) — **The booking page opens the provider's own window**
+  (`packages/site-blocks/src/booking-flow/checkout.ts`): Razorpay Checkout on
+  the handoff's order with the business's _public key_ (the key id stays
+  sealed, so a Razorpay connection without a public key can't take pay-now),
+  or Cashfree's drop-in on its payment session. Razorpay's is set to UPI and
+  card only; Cashfree's shows what the account has on. What the
+  window says is a hint ("Paying…"); only the webhook confirms the booking.
+  The invoice pay page still shows the handoff, not the window.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

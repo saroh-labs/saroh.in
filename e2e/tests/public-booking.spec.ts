@@ -13,12 +13,14 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * not Pulse Fitness, which is kept camera-ready. Every booking it makes is
  * cancelled again at the end.
  *
- * What it cannot do is finish a payment: the seed's provider credentials are
- * placeholders and a test cannot complete a provider's checkout, so the
- * webhook that confirms a paid hold is covered by the API's integration spec
+ * What it cannot do is take real money: the seed's provider credentials are
+ * placeholders, so the API cannot make a provider order, and the webhook that
+ * confirms a paid hold is covered by the API's integration spec
  * (`public-booking.db.spec.ts`) — the same way the invoices e2e records the
- * money by hand. Here, pay now is followed as far as the hold: held, the
- * time gone for everyone else, and let go again.
+ * money by hand. Pay now is followed as far as the hold: held, the time gone
+ * for everyone else, and let go again. The checkout itself (E11) runs against
+ * a fake provider: the handoff and Razorpay's script are stood in for in the
+ * browser, and the hold reads confirmed once the fake window has paid.
  */
 
 const ORG = "seed_org";
@@ -143,7 +145,7 @@ test.describe("the booking page", () => {
         const label = await pickTime(page, 2);
         await details(page, email);
         await expect(
-            page.getByRole("radio", { name: /^Pay ₹.* for this session/ }),
+            page.getByRole("radio", { name: /^Pay ₹\S+ now UPI or card/ }),
         ).toHaveAttribute("aria-checked", "true");
 
         const answer = page.waitForResponse(
@@ -286,6 +288,117 @@ test.describe("the booking page", () => {
             `${urls.API_URL}/organizations/${ORG}/services/bookings/${booked.reference}`,
             // The API refuses a write with no Origin (#50).
             { headers: { origin: urls.APP_URL } },
+        );
+    });
+
+    test("pay now completes against a fake provider: UPI or card, then Paying… until the hold is confirmed (E11)", async ({
+        page,
+        request,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const email = `paid-${testInfo.project.name}-${Date.now()}@example.in`;
+
+        // The fake provider: the API's handoff for the hold's invoice, and
+        // Razorpay's script, which opens a window that pays at once.
+        await page.route("**/payment-intent", (route) =>
+            route.fulfill({
+                status: 201,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    paymentIntentId: "pi_e2e",
+                    provider: "RAZORPAY",
+                    providerIntentId: "order_e2e",
+                    amountCents: 150_000,
+                    currency: "INR",
+                    publicKey: "rzp_test_e2e",
+                    clientParams: { razorpayOrderId: "order_e2e" },
+                }),
+            }),
+        );
+        await page.route(
+            "https://checkout.razorpay.com/v1/checkout.js",
+            (route) =>
+                route.fulfill({
+                    contentType: "application/javascript",
+                    body: `window.Razorpay = function (options) {
+                    window.__razorpay = JSON.parse(JSON.stringify(options));
+                    return {
+                        open: function () {
+                            setTimeout(function () {
+                                options.handler({ razorpay_payment_id: "pay_e2e", razorpay_order_id: options.order_id });
+                            }, 300);
+                        },
+                        close: function () {},
+                        on: function () {},
+                    };
+                };`,
+                }),
+        );
+        // The webhook's part: once the window has paid, the hold reads
+        // confirmed. Until then the page asks the real API.
+        let confirmed = false;
+        await page.route("**/public/services/holds/*", (route) =>
+            confirmed && route.request().method() === "GET"
+                ? route.fulfill({
+                      contentType: "application/json",
+                      body: JSON.stringify({
+                          state: "CONFIRMED",
+                          holdExpiresAt: null,
+                      }),
+                  })
+                : route.continue(),
+        );
+
+        await pickTime(page, 4);
+        await details(page, email);
+        const answer = page.waitForResponse(
+            (r) => r.url().endsWith("/book") && r.request().method() === "POST",
+        );
+        await confirmButton(page, /^Pay ₹.* and book$/, "Pay and book").click();
+        const held = (await (await answer).json()) as {
+            state: string;
+            payToken: string;
+        };
+        expect(held.state).toBe("HELD");
+
+        // The window paid: Paying…, and no way to let the hold go.
+        await expect(page.getByText("Paying…")).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Cancel and pick another time" }),
+        ).toHaveCount(0);
+        const opened = (await page.evaluate(
+            () => (window as unknown as { __razorpay: unknown }).__razorpay,
+        )) as {
+            key: string;
+            order_id: string;
+            prefill: { email: string };
+            config: {
+                display: {
+                    blocks: Record<
+                        string,
+                        { instruments: { method: string }[] }
+                    >;
+                };
+            };
+        };
+        expect(opened.key).toBe("rzp_test_e2e");
+        expect(opened.order_id).toBe("order_e2e");
+        expect(opened.prefill.email).toBe(email);
+        expect(
+            Object.values(opened.config.display.blocks).flatMap((b) =>
+                b.instruments.map((i) => i.method),
+            ),
+        ).toEqual(["upi", "card"]);
+
+        confirmed = true;
+        await expect(
+            page.getByRole("heading", { name: "You're booked, Asha." }),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(/^Paid ₹.* online\.$/)).toBeVisible();
+
+        // Nothing was paid for real: let the hold go.
+        await request.post(
+            `${urls.API_URL}/public/services/holds/${held.payToken}/release`,
         );
     });
 });
