@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { reservedAccountEmail } from "../contacts/contact-email";
 import type { OrgAction } from "../organizations/organization-actions";
 import { CustomerDetailService } from "./customer-detail.service";
 
@@ -163,6 +164,7 @@ function make(views: Views = ALL_ON) {
                 company: null,
                 source: null,
                 createdAt: LONG_AGO,
+                customerAccounts: [],
             }),
         },
         contactNote: {
@@ -772,5 +774,91 @@ describe("CustomerDetailService", () => {
         await expect(
             svc.detail({ ...OWNER, role: "REVIEWER" }, "c1"),
         ).rejects.toThrow(/contact:read/);
+    });
+});
+
+describe("CustomerDetailService: the site account (A4)", () => {
+    const LINKED = new Date("2026-09-20T10:00:00Z");
+    const account = {
+        email: "asha@example.com",
+        status: "ACTIVE",
+        linkedAt: LINKED,
+        lastSignedInAt: LINKED,
+    };
+
+    it("is null for someone who doesn't sign in", async () => {
+        const { svc } = make();
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.siteAccount).toBeNull();
+        expect(detail.contact.email).toBe("asha@example.com");
+    });
+
+    it("shows the account on a linked contact, and offers This isn't them", async () => {
+        const { svc, db } = make();
+        const contact: unknown = await db.contact.findFirst();
+        db.contact.findFirst.mockResolvedValue({
+            ...(contact as object),
+            customerAccounts: [account],
+        });
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.siteAccount).toEqual({
+            email: "asha@example.com",
+            status: "ACTIVE",
+            linkedAt: LINKED.toISOString(),
+            lastSignedInAt: LINKED.toISOString(),
+            canUnlink: true,
+        });
+        // Only accounts that sign in are read: merged and removed are not.
+        expect(
+            db.contact.findFirst.mock.calls.at(-1)[0].select.customerAccounts
+                .where,
+        ).toEqual({ status: { in: ["ACTIVE", "BLOCKED"] } });
+    });
+
+    it("shows a separate contact's account email, never the placeholder, and names them by it", async () => {
+        const { svc, db } = make();
+        db.contact.findFirst.mockResolvedValue({
+            id: "c_sep",
+            firstName: null,
+            lastName: null,
+            email: reservedAccountEmail("c_sep"),
+            phone: null,
+            company: null,
+            source: "site-account",
+            createdAt: LONG_AGO,
+            customerAccounts: [{ ...account, email: "farah@example.in" }],
+        });
+
+        const detail = await svc.detail(OWNER, "c_sep");
+
+        expect(detail.contact.email).toBe("farah@example.in");
+        expect(detail.contact.name).toBe("farah@example.in");
+        expect(JSON.stringify(detail)).not.toContain("account.invalid");
+        // The sign-in made this contact: there is nobody to part it from.
+        expect(detail.siteAccount?.canUnlink).toBe(false);
+    });
+
+    it("shows no email at all for a placeholder with no account", async () => {
+        const { svc, db } = make();
+        db.contact.findFirst.mockResolvedValue({
+            id: "c_gone",
+            firstName: "Ravi",
+            lastName: null,
+            email: reservedAccountEmail("c_gone"),
+            phone: null,
+            company: null,
+            source: "site-account",
+            createdAt: LONG_AGO,
+            customerAccounts: [],
+        });
+
+        const detail = await svc.detail(OWNER, "c_gone");
+
+        expect(detail.contact.email).toBe("");
+        expect(detail.siteAccount).toBeNull();
     });
 });
