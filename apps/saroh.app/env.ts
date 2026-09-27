@@ -10,16 +10,24 @@ import { z } from "zod";
  * fallback) is the origin of the PUBLIC read API (api.saroh.in) that the
  * renderer hits for a site's immutable publication snapshot.
  * `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` and `NGROK_URL` are server/dev-only
- * knobs.
+ * knobs. `SITE_RELAY_SECRET` signs the `x-saroh-relay` header on every call
+ * to the API's customer sign-in routes (ADR-011; `lib/site-relay.ts`); it
+ * must be byte-identical to the API's.
  *
  * Access env through this module (`import { env } from "@/env"`) — never
  * `process.env`.
  */
 export const env = createEnv({
+    shared: {
+        NODE_ENV: z
+            .enum(["development", "test", "production"])
+            .default("development"),
+    },
     server: {
         API_URL: z.string().url().optional(),
         NGROK_URL: z.string().url().optional(),
         REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS: z.string().optional(),
+        SITE_RELAY_SECRET: z.string().min(32).optional(),
     },
     client: {
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
@@ -29,10 +37,12 @@ export const env = createEnv({
             .optional(),
     },
     runtimeEnv: {
+        NODE_ENV: process.env.NODE_ENV,
         API_URL: process.env.API_URL,
         NGROK_URL: process.env.NGROK_URL,
         REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS:
             process.env.REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS,
+        SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
