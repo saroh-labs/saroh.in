@@ -10,6 +10,7 @@ import {
     needLine,
     needTitle,
     needsState,
+    seeAllLabel,
     shownNeeds,
     thingsLabel,
 } from "@/lib/home/needs";
@@ -99,7 +100,7 @@ export function NeedsYou({
                     onClick={() => setExpanded((open) => !open)}
                     className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
-                    {expanded ? "Show fewer" : `See all ${total}`}
+                    {expanded ? "Show fewer" : seeAllLabel(needs)}
                 </button>
             ) : null}
         </section>

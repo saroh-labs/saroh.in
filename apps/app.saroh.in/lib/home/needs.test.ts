@@ -7,6 +7,7 @@ import {
     needTitle,
     needsState,
     nextLine,
+    seeAllLabel,
     shownNeeds,
     thingsLabel,
 } from "./needs";
@@ -100,6 +101,17 @@ describe("shownNeeds", () => {
 
     it("offers nothing more at twelve or fewer", () => {
         expect(shownNeeds(many.slice(0, 12), false).more).toBe(false);
+    });
+});
+
+describe("seeAllLabel", () => {
+    it("counts the rows it opens, not the things a 'N more' row stands for (H-8)", () => {
+        const rows = Array.from({ length: 13 }, (_, i) =>
+            need({ id: `r${i}` }),
+        );
+        // The last is "20 more open orders": needsTotal would say 32.
+        rows.push(need({ id: "COMMERCE_OPEN_ORDERS:more" }));
+        expect(seeAllLabel(rows)).toBe("See all 14");
     });
 });
 
