@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { Subscription, SubscriptionCharge } from "./service";
+import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
     changeRows,
     chargeRow,
+    classesText,
     collectionRows,
     dayText,
     gstNote,
@@ -11,6 +12,8 @@ import {
     listTab,
     monthlyTotal,
     olderPrice,
+    olderPriceNotes,
+    payRows,
     paysBy,
     ranLine,
     rowWhen,
@@ -150,6 +153,53 @@ describe("olderPrice", () => {
         const plans = [{ id: "p1", price: "1400.00", currency: "INR" }];
         expect(olderPrice(sub(), plans)).toEqual({ listPrice: "1400.00" });
         expect(olderPrice(sub({ price: "1400.00" }), plans)).toBeNull();
+    });
+});
+
+describe("a plan's words (D1)", () => {
+    const byPrice: Plan["byPrice"] = [
+        {
+            price: "1500.00",
+            currency: "INR",
+            interval: "MONTH",
+            count: 12,
+            current: true,
+        },
+        {
+            price: "1200.00",
+            currency: "INR",
+            interval: "MONTH",
+            count: 1,
+            current: false,
+        },
+    ];
+
+    it("says classes a month, or unlimited", () => {
+        expect(classesText(8)).toBe("8 classes a month");
+        expect(classesText(1)).toBe("1 class a month");
+        expect(classesText(null)).toBe("Unlimited classes");
+    });
+
+    it("lists who pays what, current price first", () => {
+        expect(payRows({ byPrice })).toEqual([
+            {
+                label: "12 people · current price",
+                amount: "₹1,500 / month",
+                older: false,
+            },
+            {
+                label: "1 person · older price",
+                amount: "₹1,200 / month",
+                older: true,
+            },
+        ]);
+        expect(payRows({ byPrice: [] })).toEqual([]);
+    });
+
+    it("notes only the older prices on a card", () => {
+        expect(olderPriceNotes({ byPrice })).toEqual([
+            "1 still on ₹1,200 — they keep it",
+        ]);
     });
 });
 
