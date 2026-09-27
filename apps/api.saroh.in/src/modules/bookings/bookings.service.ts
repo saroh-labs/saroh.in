@@ -30,6 +30,7 @@ import {
     loadStaffing,
     openSlots,
     parseRange,
+    refuseIfClosed,
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
@@ -798,6 +799,11 @@ export class BookingsService {
                 "This service is archived, so its bookings cannot be moved. Make it active again first, or cancel the booking.",
             );
         }
+        await refuseIfClosed(
+            service.organizationId,
+            startAt,
+            new Date(startAt.getTime() + service.durationMinutes * 60_000),
+        );
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId: service.id },
         });
@@ -1025,6 +1031,10 @@ export class BookingsService {
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+        await refuseIfClosed(ctx.organizationId, startAt, endAt);
         const staffing = await loadStaffing(service);
         if (
             !staffing.perPerson &&
@@ -1034,9 +1044,6 @@ export class BookingsService {
                 "That time is not an open slot for this service",
             );
         }
-        const endAt = new Date(
-            startAt.getTime() + service.durationMinutes * 60_000,
-        );
 
         let booker: BookInput;
         if (dto.contactId) {

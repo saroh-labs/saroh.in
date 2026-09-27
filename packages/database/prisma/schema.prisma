@@ -260,6 +260,9 @@ model Organization {
   staffTimeOff    StaffTimeOff[]
   staffExtraHours StaffExtraHours[]
   bookingRules    BookingRules?
+
+  // Days or hours the whole business is closed (E3).
+  businessClosures BusinessClosure[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3619,6 +3622,27 @@ model StaffExtraHours {
 
   @@index([organizationId])
   @@index([staffId, date])
+}
+
+/// The whole business closed: nobody can be booked, on any service, with or
+/// without staff (E3). Kept apart from StaffTimeOff, whose staffId stays
+/// required. A part-day range is one row per day, written in one transaction
+/// and shown as one line. Unlike time off, a closure is public: the booking
+/// page shows the day as closed. The reason is for the team only.
+model BusinessClosure {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  startAt DateTime // absolute; a whole day starts at local midnight
+  endAt   DateTime // exclusive
+  allDay  Boolean  @default(false)
+  reason  String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, startAt])
 }
 
 /// Business-wide booking rules (U3). No row, or a null column, is no rule —

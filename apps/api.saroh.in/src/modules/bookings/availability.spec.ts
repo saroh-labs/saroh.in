@@ -12,6 +12,7 @@ import {
     isPersonSlotStart,
     isValidSlotStart,
     mergeIntervals,
+    outsideClosures,
     overlaps,
     personSlots,
     staffSlots,
@@ -571,5 +572,106 @@ describe("isPersonSlotStart", () => {
                 iso("2026-07-20T06:30:00Z"),
             ),
         ).toBe(false);
+    });
+});
+
+// ── Business closures (E3) ────────────────────────────────────────────────
+
+describe("outsideClosures — the whole business closed", () => {
+    // Every day 09:00–12:00, one-hour slots.
+    const everyDay = Array.from({ length: 7 }, (_, d) =>
+        rule(d, 9 * HOUR, 12 * HOUR),
+    );
+    const week = {
+        from: iso("2026-11-01T00:00:00Z"),
+        to: iso("2026-11-09T00:00:00Z"),
+    };
+
+    it("removes every slot on the closed days and none either side", () => {
+        const slots = enumerateSlots(ONE_HOUR, everyDay, week.from, week.to);
+        const closed = [
+            {
+                startAt: iso("2026-11-02T00:00:00Z"),
+                endAt: iso("2026-11-07T00:00:00Z"),
+            },
+        ];
+        const open = outsideClosures(slots, closed);
+        const days = [
+            ...new Set(open.map((s) => s.startAt.toISOString().slice(0, 10))),
+        ];
+        expect(days).toEqual(["2026-11-01", "2026-11-07", "2026-11-08"]);
+        expect(open).toHaveLength(9);
+    });
+
+    it("takes out only the closed hours of a part-day closure, on the grid", () => {
+        const slots = enumerateSlots(
+            ONE_HOUR,
+            [rule(1, 9 * HOUR, 18 * HOUR)],
+            iso("2026-11-02T00:00:00Z"),
+            iso("2026-11-03T00:00:00Z"),
+        );
+        const open = outsideClosures(slots, [
+            {
+                startAt: iso("2026-11-02T14:00:00Z"),
+                endAt: iso("2026-11-02T16:30:00Z"),
+            },
+        ]);
+        // 16:00 overlaps the closure's last half hour; 17:00 is after it.
+        expect(startISOs(open).map((s) => s.slice(11, 16))).toEqual([
+            "09:00",
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "17:00",
+        ]);
+    });
+
+    it("closes a whole local day across a DST change in a non-India zone", () => {
+        // 1 Nov 2026 in New York is 25 hours long (EDT to EST).
+        const ny = svc({ durationMinutes: 60, timezone: "America/New_York" });
+        const slots = enumerateSlots(
+            ny,
+            [rule(0, 0, 24 * HOUR)],
+            iso("2026-11-01T00:00:00Z"),
+            iso("2026-11-03T00:00:00Z"),
+        );
+        const open = outsideClosures(slots, [
+            {
+                startAt: iso("2026-11-01T04:00:00Z"),
+                endAt: iso("2026-11-02T05:00:00Z"),
+            },
+        ]);
+        expect(slots.length).toBeGreaterThan(0);
+        expect(open).toHaveLength(0);
+    });
+
+    it("leaves slots alone when nothing is closed", () => {
+        const slots = enumerateSlots(ONE_HOUR, everyDay, week.from, week.to);
+        expect(outsideClosures(slots, [])).toBe(slots);
+    });
+
+    it("closes a person's one-to-one starts when it is their time off", () => {
+        const open = personSlots(
+            ONE_HOUR,
+            [],
+            person("asha", {
+                timeOff: [
+                    {
+                        startAt: iso("2026-07-20T08:00:00Z"),
+                        endAt: iso("2026-07-20T10:00:00Z"),
+                    },
+                ],
+            }),
+            "UTC",
+            MON.from,
+            MON.to,
+        );
+        expect(startISOs(open).map((s) => s.slice(11, 16))).toEqual([
+            "06:00",
+            "07:00",
+            "10:00",
+            "11:00",
+        ]);
     });
 });

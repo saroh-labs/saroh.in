@@ -5,7 +5,12 @@ import { DateTime } from "luxon";
 import { paymentsOn } from "../invoices/payments-on";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { Slot } from "./availability";
-import { countOverlapping, enumerateSlots, staffSlots } from "./availability";
+import {
+    countOverlapping,
+    enumerateSlots,
+    outsideClosures,
+    staffSlots,
+} from "./availability";
 import type { BookingRulesValue } from "./booking-rules";
 import { loadBookingRules, withinBookingWindow } from "./booking-rules";
 import type { Staffing } from "./booking-slots";
@@ -15,7 +20,11 @@ import {
     toAvailabilityService,
 } from "./booking-slots";
 import { loadBookableService } from "./reservation";
-import { businessTimezone, loadPeople } from "./staff-availability";
+import {
+    businessTimezone,
+    loadClosures,
+    loadPeople,
+} from "./staff-availability";
 
 /*
  * What a website shows of the business's bookings (#508): the booking page's
@@ -118,22 +127,29 @@ export async function publicDays(
     const kind: PublicDays["kind"] = service.capacity > 1 ? "class" : "one";
 
     // What the hours alone offer (open days), and what is free now.
+    // A day the business is closed is closed on the page, not Full (E3):
+    // closures are public, unlike a person's time off.
+    const closed = await loadClosures(prisma, service.organizationId, from, to);
     let hours: Slot[];
     let starts: PublicStart[];
     if (staffing.perPerson && staffing.zone) {
         const people = await loadPeople(
             prisma,
+            service.organizationId,
             staffing.people.map((p) => p.id),
             from,
             to,
         );
-        hours = staffSlots(
-            availService,
-            rules,
-            people.map((p) => ({ ...p, busy: [], timeOff: [] })),
-            staffing.zone,
-            from,
-            to,
+        hours = outsideClosures(
+            staffSlots(
+                availService,
+                rules,
+                people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                staffing.zone,
+                from,
+                to,
+            ),
+            closed,
         );
         starts = staffSlots(
             availService,
@@ -155,7 +171,10 @@ export async function publicDays(
                 };
             });
     } else {
-        hours = enumerateSlots(availService, rules, from, to);
+        hours = outsideClosures(
+            enumerateSlots(availService, rules, from, to),
+            closed,
+        );
         const busy = await busyOverlapping(service.id, from, to);
         const [instructor] = staffing.people as (
             Staffing["people"][number] | undefined

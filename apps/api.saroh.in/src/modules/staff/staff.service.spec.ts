@@ -21,7 +21,12 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             deleteMany: jest.fn(),
         },
-        staffTimeOff: { create: jest.fn(), deleteMany: jest.fn() },
+        staffTimeOff: { createMany: jest.fn(), deleteMany: jest.fn() },
+        businessClosure: {
+            findMany: jest.fn(),
+            createMany: jest.fn(),
+            deleteMany: jest.fn(),
+        },
         bookingRules: { findUnique: jest.fn(), upsert: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         service: { findFirst: jest.fn(), count: jest.fn() },
@@ -97,6 +102,7 @@ beforeEach(() => {
     db.booking!.findMany!.mockResolvedValue([]);
     db.staffHours!.findMany!.mockResolvedValue([]);
     db.staffExtraHours!.findMany!.mockResolvedValue([]);
+    db.businessClosure!.findMany!.mockResolvedValue([]);
 });
 
 describe("StaffService — who may (U3)", () => {
@@ -144,7 +150,7 @@ describe("StaffService — who may (U3)", () => {
         await expect(write()).rejects.toBeInstanceOf(ForbiddenException);
         expect(db.staffMember!.create).not.toHaveBeenCalled();
         expect(db.staffHours!.deleteMany).not.toHaveBeenCalled();
-        expect(db.staffTimeOff!.create).not.toHaveBeenCalled();
+        expect(db.staffTimeOff!.createMany).not.toHaveBeenCalled();
         expect(db.bookingRules!.upsert).not.toHaveBeenCalled();
     });
 
@@ -244,17 +250,100 @@ describe("StaffService — time off and extra hours", () => {
             { fromDate: "2026-10-05", reason: "Wedding" },
             new Date("2026-10-01T00:00:00Z"),
         );
-        expect(db.staffTimeOff!.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
+        expect(db.staffTimeOff!.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
                     startAt: new Date("2026-10-04T18:30:00.000Z"),
                     endAt: new Date("2026-10-05T18:30:00.000Z"),
                     allDay: true,
                     reason: "Wedding",
                 }),
+            ],
+        });
+        expect(result.affected.map((b) => b.id)).toEqual(["b1"]);
+    });
+
+    it("writes a part-day range as one row per day, and lists only bookings in those hours (E3)", async () => {
+        db.booking!.findMany!.mockResolvedValue([
+            {
+                id: "inside",
+                startAt: new Date("2026-10-06T15:00:00Z"),
+                endAt: new Date("2026-10-06T16:00:00Z"),
+                serviceId: "svc_1",
+                bookerName: "Meera",
+                service: { name: "PT session" },
+                contact: null,
+            },
+            {
+                id: "morning",
+                startAt: new Date("2026-10-06T09:00:00Z"),
+                endAt: new Date("2026-10-06T10:00:00Z"),
+                serviceId: "svc_1",
+                bookerName: "Ravi",
+                service: { name: "PT session" },
+                contact: null,
+            },
+        ]);
+        const result = await service.addTimeOff(
+            ctx(),
+            "staff_1",
+            {
+                fromDate: "2026-10-05",
+                toDate: "2026-10-07",
+                startMinute: 14 * 60,
+                endMinute: 18 * 60,
+            },
+            new Date("2026-10-01T00:00:00Z"),
+        );
+        const rows = (
+            db.staffTimeOff!.createMany!.mock.calls[0]![0] as {
+                data: { startAt: Date; endAt: Date; allDay: boolean }[];
+            }
+        ).data;
+        expect(rows.map((r) => [r.startAt.toISOString(), r.allDay])).toEqual([
+            ["2026-10-05T14:00:00.000Z", false],
+            ["2026-10-06T14:00:00.000Z", false],
+            ["2026-10-07T14:00:00.000Z", false],
+        ]);
+        expect(result.affected.map((b) => b.id)).toEqual(["inside"]);
+    });
+
+    it("refuses a last day before the first, on the field", async () => {
+        const body = await refusal(
+            service.addTimeOff(ctx(), "staff_1", {
+                fromDate: "2026-11-06",
+                toDate: "2026-11-02",
             }),
         );
-        expect(result.affected.map((b) => b.id)).toEqual(["b1"]);
+        expect(body).toMatchObject({ field: "toDate" });
+        expect(db.staffTimeOff!.createMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses part-day hours that end before they start", async () => {
+        const body = await refusal(
+            service.addTimeOff(ctx(), "staff_1", {
+                fromDate: "2026-11-02",
+                startMinute: 18 * 60,
+                endMinute: 14 * 60,
+            }),
+        );
+        expect(body).toMatchObject({ field: "endMinute" });
+    });
+
+    it("takes a whole line of time off away at once, or 404s a stale one", async () => {
+        db.staffTimeOff!.deleteMany!.mockResolvedValue({ count: 2 });
+        await service.removeTimeOffMany(ctx(), "staff_1", ["t1", "t2"]);
+        expect(db.staffTimeOff!.deleteMany).toHaveBeenCalledWith({
+            where: {
+                id: { in: ["t1", "t2"] },
+                staffId: "staff_1",
+                organizationId: "org_1",
+            },
+        });
+        db.staffTimeOff!.deleteMany!.mockResolvedValue({ count: 1 });
+        await expect(
+            service.removeTimeOffMany(ctx(), "staff_1", ["t1", "gone"]),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("refuses an end before the start", async () => {

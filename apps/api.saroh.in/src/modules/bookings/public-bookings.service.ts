@@ -31,6 +31,7 @@ import {
     loadStaffing,
     openSlots,
     parseRange,
+    refuseIfClosed,
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
@@ -292,6 +293,11 @@ export class PublicBookingsService {
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
+        await refuseIfClosed(
+            service.organizationId,
+            startAt,
+            new Date(startAt.getTime() + service.durationMinutes * 60_000),
+        );
         const availService = toAvailabilityService(service);
         const staffing = await loadStaffing(service);
         if (
