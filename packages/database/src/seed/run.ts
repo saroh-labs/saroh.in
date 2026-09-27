@@ -1475,6 +1475,8 @@ export async function deleteSeeded(
         () => prisma.staffExtraHours.deleteMany({ where }),
         () => prisma.staffMember.deleteMany({ where }),
         () => prisma.bookingRules.deleteMany({ where }),
+        // Business closures (E3), written with seeded ids.
+        () => prisma.businessClosure.deleteMany({ where }),
         () => prisma.courseEnrollment.deleteMany({ where }),
         () => prisma.courseSession.deleteMany({ where }),
         () => prisma.course.deleteMany({ where }),

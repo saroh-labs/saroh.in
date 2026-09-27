@@ -961,6 +961,7 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
 
     it("makes someone new a contact, marked as added by hand", async () => {
         wireBookHappyPath();
+        contactFindUnique.mockResolvedValue(null);
         await new BookingsService().bookByHand(ctx(), "svc_1", {
             startAt: START,
             bookerEmail: "new@example.com",
@@ -972,6 +973,48 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
             firstName: "New",
             lastName: "Person",
             source: "manual",
+        });
+    });
+
+    it("books an email that is already a contact's as that contact, never renaming them (E4)", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: "9876543210",
+        });
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            bookerEmail: "priya@example.com",
+            bookerName: "P R",
+            bookerPhone: "000",
+        });
+        expect(contactFindUnique).toHaveBeenCalledWith({
+            where: {
+                organizationId_email: {
+                    organizationId: "org_SVC",
+                    email: "priya@example.com",
+                },
+            },
+        });
+        // The upsert finds them by email and updates nothing new.
+        expect(contactUpsert.mock.calls[0][0].where).toEqual({
+            organizationId_email: {
+                organizationId: "org_SVC",
+                email: "priya@example.com",
+            },
+        });
+        expect(contactUpsert.mock.calls[0][0].update).toEqual({
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: "9876543210",
+        });
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            bookerName: "Priya Raman",
+            bookerPhone: "9876543210",
         });
     });
 
@@ -2013,6 +2056,24 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
             cancelledLate: false,
         });
         expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
+
+    it("retires a pay link sent for it (E4), and leaves its invoice issued", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-19T20:00:00Z"),
+        );
+        expect(db.invoice!.updateMany).toHaveBeenCalledWith({
+            where: {
+                bookingId: "bk_1",
+                kind: "INVOICE",
+                source: "BOOKING",
+                status: "ISSUED",
+                payTokenHash: { not: null },
+            },
+            data: { payTokenHash: null },
+        });
     });
 });
 

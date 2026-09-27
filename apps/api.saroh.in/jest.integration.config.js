@@ -113,6 +113,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
         // D9: mocked Prisma; the real rows are in subscription-events.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
+        // D8: pure, with a mocked transaction; the real rows are in subscriptions.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.

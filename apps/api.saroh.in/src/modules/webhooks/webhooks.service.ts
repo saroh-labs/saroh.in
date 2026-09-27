@@ -9,6 +9,7 @@ import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { confirmHoldInTx } from "../bookings/booking-hold";
+import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
@@ -858,7 +859,7 @@ export class WebhooksService {
         await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${intent.organizationId} FOR UPDATE`;
         const invoice = await tx.invoice.findFirst({
             where: { id: invoiceId, organizationId: intent.organizationId },
-            select: { status: true, source: true },
+            select: { status: true, source: true, bookingId: true },
         });
 
         await tx.paymentIntent.update({
@@ -892,6 +893,11 @@ export class WebhooksService {
                     where: { id: invoiceId },
                     data: { status: "PAID", paidAt: new Date(), ...payment },
                 });
+                // A booking's pay link (E4): the booking reads as paid
+                // online. The invoice's lock is held, then the booking's.
+                if (invoice.source === "BOOKING" && invoice.bookingId) {
+                    await markBookingPaidInTx(tx, invoice.bookingId);
+                }
             }
             if (providerRef) {
                 await tx.paymentAttempt.create({

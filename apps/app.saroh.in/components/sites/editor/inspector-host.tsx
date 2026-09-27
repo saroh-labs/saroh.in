@@ -1,26 +1,20 @@
 "use client";
 
-import { showSuccess } from "@saroh/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { BlockFeedback } from "@/components/sites/block-feedback";
-import {
-    BlockInspector,
-    FixedBlockInspector,
-} from "@/components/sites/block-inspector";
+import { BlockInspector } from "@/components/sites/block-inspector";
 import { EditorTabs } from "@/components/sites/editor-chrome";
-import {
-    SECTION_LABELS,
-    sectionTitle,
-} from "@/components/sites/editor-constants";
+import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import type {
     ActiveSection,
     EditorInspectorTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
+import type { FixedBlockText } from "@/components/sites/fixed-block-inspector";
+import { FixedBlockInspector } from "@/components/sites/fixed-block-inspector";
 import { ReviewPanel } from "@/components/sites/review-panel";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { useServicesForPicker } from "@/components/sites/use-services-for-picker";
@@ -49,7 +43,7 @@ export function InspectorHost({
     active,
     sections,
     selectedChrome,
-    hasFooter,
+    fixedText,
     setSelectedIndex,
     comments,
     review,
@@ -77,8 +71,8 @@ export function InspectorHost({
     active: ActiveSection | null;
     sections: Section[];
     selectedChrome: FixedPart | null;
-    /** Whether the canvas draws a footer the merchant wrote. */
-    hasFooter: boolean;
+    /** The header's name and the footer's line, edited here (G6). */
+    fixedText: FixedBlockText;
     setSelectedIndex: (index: number | null) => void;
     comments: SiteCommentView[];
     review: ReviewState;
@@ -102,16 +96,6 @@ export function InspectorHost({
     const [feedbackScope, setFeedbackScope] = useState<"block" | "site">(
         "block",
     );
-    // The Remove-section confirmation (replaces window.confirm, §9). Mirrors
-    // pages-panel.tsx's pendingDelete + deleteOpen: the section removed is
-    // kept after the dialog closes so its title does not blank out during
-    // the closing animation, and so onConfirm still has something to remove
-    // once removeAt has cleared the selection and `active` has gone null.
-    const [pendingRemove, setPendingRemove] = useState<{
-        index: number;
-        title: string;
-    } | null>(null);
-    const [removeOpen, setRemoveOpen] = useState(false);
     const services = useServicesForPicker();
 
     return (
@@ -202,7 +186,7 @@ export function InspectorHost({
                     <FixedBlockInspector
                         part={selectedChrome}
                         siteId={siteId}
-                        hasFooter={hasFooter}
+                        text={fixedText}
                     />
                 ) : (
                     <BlockInspector
@@ -239,44 +223,13 @@ export function InspectorHost({
                             setSelectedIndex(active.index + delta);
                         }}
                         onRemove={() => {
-                            if (!active) return;
-                            /*
-                             * Ask first, and name the block. Autosave
-                             * commits a removal, and version history
-                             * only covers what was PUBLISHED, so copy
-                             * written since is gone for good. The
-                             * question names hiding too — usually what
-                             * a merchant reaching for Remove wants.
-                             */
-                            setPendingRemove({
-                                index: active.index,
-                                title: sectionTitle(active.section),
-                            });
-                            setRemoveOpen(true);
+                            // At once, with Undo (G3): taking a block off
+                            // the page is reversible, so it is not asked.
+                            if (active) removeAt(active.index);
                         }}
                     />
                 )}
             </div>
-            {/*
-             * Outside both branches: confirming removes the block,
-             * which sets `active` to null and would otherwise unmount
-             * this dialog mid-close.
-             */}
-            <ConfirmDialog
-                open={removeOpen}
-                onOpenChange={setRemoveOpen}
-                title={`Remove "${pendingRemove?.title ?? ""}"?`}
-                description="Anything written here since your last publish cannot be brought back. To take it off the site and keep the work, hide it instead."
-                confirmLabel="Remove section"
-                cancelLabel="Keep section"
-                onConfirm={() => {
-                    if (!pendingRemove) return;
-                    const { index, title } = pendingRemove;
-                    removeAt(index);
-                    setSelectedIndex(null);
-                    showSuccess(`Removed ${title}.`);
-                }}
-            />
         </aside>
     );
 }

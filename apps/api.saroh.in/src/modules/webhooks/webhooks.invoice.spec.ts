@@ -55,11 +55,16 @@ jest.mock("@saroh/database", () => {
 jest.mock("../bookings/booking-hold", () => ({
     confirmHoldInTx: jest.fn(),
 }));
+// A booking's pay link (E4): its own rules are `booking-pay-link.spec.ts`'s.
+jest.mock("../bookings/booking-pay-link", () => ({
+    markBookingPaidInTx: jest.fn().mockResolvedValue(true),
+}));
 
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
 import { confirmHoldInTx } from "../bookings/booking-hold";
+import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
@@ -177,7 +182,7 @@ describe("webhook success on an invoice intent", () => {
         expect(lockCall).toBeLessThan(readCall ?? 0);
         expect(invoiceFindFirst).toHaveBeenCalledWith({
             where: { id: "inv_1", organizationId: "org_1" },
-            select: { status: true, source: true },
+            select: { status: true, source: true, bookingId: true },
         });
         expect(invoiceUpdate).toHaveBeenCalledWith({
             where: { id: "inv_1" },
@@ -202,6 +207,42 @@ describe("webhook success on an invoice intent", () => {
         // An invoice intent never touches an order.
         expect(orderFindUnique).not.toHaveBeenCalled();
         expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("marks the booking paid when the invoice is a booking's pay link (E4)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            source: "BOOKING",
+            bookingId: "bk_1",
+        });
+
+        await deliver(bodyOf());
+
+        expect(invoiceUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "PAID" }),
+            }),
+        );
+        expect(markBookingPaidInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            "bk_1",
+        );
+        // The invoice first, then the booking (the lock order).
+        const [paidInvoice] = invoiceUpdate.mock.invocationCallOrder;
+        const [paidBooking] = (markBookingPaidInTx as jest.Mock).mock
+            .invocationCallOrder;
+        expect(paidInvoice).toBeLessThan(paidBooking ?? 0);
+    });
+
+    it("leaves bookings alone for any other invoice", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            source: "MANUAL",
+        });
+        await deliver(bodyOf());
+        expect(markBookingPaidInTx).not.toHaveBeenCalled();
     });
 
     it("is a no-op for a second event on an intent that already SUCCEEDED (payment.captured then order.paid)", async () => {

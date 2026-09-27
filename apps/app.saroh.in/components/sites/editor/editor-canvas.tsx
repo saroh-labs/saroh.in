@@ -35,12 +35,17 @@ export function canvasChromeFor({
     siteName,
     navigation,
     pages,
-    footerPreview,
+    footer,
 }: {
+    /** The name as the inspector has it now (G6). */
     siteName: string;
     navigation: SiteNavigation | null;
     pages: SitePage[];
-    footerPreview: SiteFooter | null;
+    /**
+     * The footer to draw: the inspector's line as typed (G6), or the API's
+     * sanitized copy when it is richer than a line (#336).
+     */
+    footer: SiteFooter | null;
 }): CanvasChrome {
     return {
         name: siteName,
@@ -51,7 +56,7 @@ export function canvasChromeFor({
                 : [];
         }),
         // Sanitizing can leave nothing; nothing is no footer.
-        footer: footerPreview?.value.trim() ? footerPreview : null,
+        footer: footer?.value.trim() ? footer : null,
     };
 }
 

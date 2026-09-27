@@ -16,6 +16,7 @@ import {
     FALLBACK_TIMEZONE,
 } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
     invoiceStanding,
@@ -26,6 +27,8 @@ import {
 import type { FulfilmentType } from "../orders/fulfilment";
 import { legacyWord, shipsToAddress, typeOf } from "../orders/fulfilment";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { SiteAccountView } from "../site-accounts/account-unlink.service";
+import { toSiteAccountView } from "../site-accounts/account-unlink.service";
 import type { AttentionEntryView } from "./attention-read";
 import { attentionFor, attentionSuggestionsFor } from "./attention-read";
 import type { ContactNoteView } from "./contact-notes.service";
@@ -294,12 +297,22 @@ export interface CustomerDetail {
         name: string;
         firstName: string | null;
         lastName: string | null;
+        /**
+         * The email to show: never a reserved placeholder. A site account's
+         * separate contact shows the account's email; empty when there is
+         * none to show (`contact-email.ts`).
+         */
         email: string;
         phone: string | null;
         company: string | null;
         source: string | null;
         createdAt: string;
     };
+    /**
+     * The customer's account on the business's site (A4): "Signs in on your
+     * website as ‹email›". Null when they don't sign in.
+     */
+    siteAccount: SiteAccountView | null;
     /** Whether money figures were included for this viewer. */
     money: boolean;
     /** The business's zone, for the dates the screen writes out. */
@@ -439,9 +452,26 @@ export class CustomerDetailService {
                 company: true,
                 source: true,
                 createdAt: true,
+                // The one that signs in; a merged or removed one does not.
+                customerAccounts: {
+                    where: { status: { in: ["ACTIVE", "BLOCKED"] } },
+                    select: {
+                        email: true,
+                        status: true,
+                        linkedAt: true,
+                        lastSignedInAt: true,
+                    },
+                    take: 1,
+                },
             },
         });
         if (!contact) throw new NotFoundException("Contact not found");
+        const account =
+            contact.customerAccounts.length > 0
+                ? contact.customerAccounts[0]
+                : null;
+        const shownEmail =
+            contactEmailForDisplay(contact.email, account?.email) ?? "";
 
         // NOT guarded either, as on Home: availability decides which blocks
         // may exist at all, and guessing could show a module that is off.
@@ -617,15 +647,16 @@ export class CustomerDetailService {
         return {
             contact: {
                 id: contact.id,
-                name: personName(contact),
+                name: personName({ ...contact, email: shownEmail }),
                 firstName: contact.firstName,
                 lastName: contact.lastName,
-                email: contact.email,
+                email: shownEmail,
                 phone: contact.phone,
                 company: contact.company,
                 source: contact.source,
                 createdAt: contact.createdAt.toISOString(),
             },
+            siteAccount: account ? toSiteAccountView(account, contact) : null,
             money,
             timezone,
             stats,

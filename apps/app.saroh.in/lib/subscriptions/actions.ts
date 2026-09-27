@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
-import type { PlanInput, SubscribeInput } from "./service";
+import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may, and what a subscription may become. */
@@ -26,8 +26,8 @@ async function then<T extends { ok: boolean }>(res: Promise<T>): Promise<T> {
 export async function subscribe(input: SubscribeInput) {
     return then(api.subscribe(input));
 }
-export async function pauseSubscription(id: string) {
-    return then(api.pauseSubscription(id));
+export async function pauseSubscription(id: string, choice: PauseChoice) {
+    return then(api.pauseSubscription(id, choice));
 }
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));

@@ -398,6 +398,8 @@ export function useEditorDraft({
         /** Where each sent section sits on screen, for per-block flags. */
         sentFrom: livePlan.sentFrom,
         replaceAt,
+        /** Put a previous list back: Undo (G3, `use-undo.ts`). */
+        restoreSections: setSections,
         insertSection,
         removeAt,
         move,

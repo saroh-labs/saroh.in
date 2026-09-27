@@ -25,6 +25,8 @@ import {
     useEditorViewport,
 } from "@/components/sites/editor/use-editor-viewport";
 import { usePublish } from "@/components/sites/editor/use-publish";
+import { useSiteChrome } from "@/components/sites/editor/use-site-chrome";
+import { useUndo } from "@/components/sites/editor/use-undo";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import {
@@ -38,16 +40,11 @@ import {
 import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
- * SiteEditor (S2-004) — the ticket's core deliverable. A client-side editable
- * list of sections rendered next to a LIVE `DraftPreview` that reflects local
- * state with no network round-trip (that is the "preview without publishing"
- * requirement). "Save draft" and "Publish" are the only API calls, via the
- * server actions. A dirty flag (local state vs. last-saved) gates publishing.
- *
- * Since #260 this only composes: the state lives in the hooks in `editor/`
- * (draft, style, selection, viewport, review, publish, adding a block, and
- * jumping to a note or flag) and the drawing in its panels (top bar, rail,
- * canvas, inspector host).
+ * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
+ * state. Since #260 this only composes: the state lives in the hooks in
+ * `editor/` (draft, style, header and footer text, selection, viewport,
+ * review, publish, adding a block, jumping to a note) and the drawing in its
+ * panels (top bar, rail, canvas, inspector host).
  */
 export function SiteEditor({
     siteId,
@@ -65,6 +62,7 @@ export function SiteEditor({
     siteName,
     navigation,
     footerPreview,
+    canUpdateSite,
     address,
     initialStyle,
     styleOptions,
@@ -77,13 +75,18 @@ export function SiteEditor({
     });
     const publish = usePublish({
         siteId,
-        siteName,
         address,
         initialFlags,
         initialNeverPublished,
         initialPendingChanges,
         initialPendingSiteChanges,
         refreshReview: review.refreshReview,
+    });
+    // The header's name and footer's line (G6), saved like the look.
+    const chrome = useSiteChrome({
+        ...{ siteId, siteName, footerPreview },
+        canUpdate: canUpdateSite,
+        onSaved: publish.markSitePending,
     });
     const initialCount = initialSections.length;
     const selection = useEditorSelection({
@@ -115,6 +118,8 @@ export function SiteEditor({
         onSaved: publish.markStylePending,
     });
     const { style } = siteStyle;
+    // Remove, move, hide and reset act at once and offer Undo (G3).
+    const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
 
     const add = useAddBlock({
         insertSection: draft.insertSection,
@@ -135,11 +140,7 @@ export function SiteEditor({
     });
 
     const active = activeSection(selection.selectedIndex, sections);
-    /*
-     * Flags for the page currently open, indexed by section. The server sends
-     * flags for the whole site; the rail can only draw dots for the sections it
-     * is showing.
-     */
+    // The site's flags for the open page, by section: the rail's dots.
     const flagsBySection = flagsByScreenPosition(
         publish.siteFlags.flags,
         pageId,
@@ -148,25 +149,24 @@ export function SiteEditor({
     const activeFlags =
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
     const canvasChrome = canvasChromeFor({
-        siteName,
+        siteName: chrome.displayName,
         navigation,
         pages,
-        footerPreview,
+        footer: chrome.footer,
     });
     const preview = { siteId, address, sections, pages, style, styleOptions };
 
     return (
-        /*
-         * The editor follows the workspace's theme (#335), and the bar has a
-         * toggle for it. It used to force dark; the design gives the merchant
-         * the choice, and the page on the canvas is bright either way.
-         */
+        // The workspace's theme (#335); the page on the canvas is bright.
         <div className="flex h-screen flex-col bg-background text-foreground">
             <EditorTopBar
-                {...{ siteId, siteName, address, pages, pageId }}
+                {...{ siteId, address, pages, pageId }}
+                siteName={chrome.displayName}
                 {...draft}
-                styleSaving={siteStyle.styleSaving}
-                styleDirty={siteStyle.styleDirty}
+                // Site settings saved on their own clock: the look, the name
+                // and the footer. Publish waits for all three.
+                styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
+                styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
                 {...review}
                 {...publish}
                 {...viewport}
@@ -189,6 +189,7 @@ export function SiteEditor({
                     {...selection}
                     {...siteStyle}
                     {...draft}
+                    {...edits}
                     styleOptions={styleOptions}
                     {...add}
                     flagsBySection={flagsBySection}
@@ -230,10 +231,11 @@ export function SiteEditor({
                     {...{ siteId, pageId, pages, styleOptions }}
                     {...selection}
                     {...draft}
+                    {...edits}
                     {...review}
                     style={style}
                     active={active}
-                    hasFooter={canvasChrome.footer !== null}
+                    fixedText={chrome}
                     jumpToNote={jumpToNote}
                     activeFlags={activeFlags}
                     unreadableSections={unreadableSections}
@@ -275,7 +277,7 @@ export function SiteEditor({
 
             {publish.checking ? (
                 <PrePublishCheck
-                    siteName={siteName}
+                    siteName={chrome.displayName}
                     pages={pages}
                     flags={publish.siteFlags.flags}
                     awaitingNavigation={publish.siteFlags.awaitingNavigation}
@@ -284,7 +286,7 @@ export function SiteEditor({
                     pendingSummary={publish.pendingSummary}
                     pendingKnown={publish.pendingKnown}
                     review={review.review}
-                    onPublish={() => void publish.onPublish()}
+                    onPublish={() => void publish.onPublish(chrome.displayName)}
                     onClose={() => publish.setChecking(false)}
                     onJump={jumpToFlag}
                 />

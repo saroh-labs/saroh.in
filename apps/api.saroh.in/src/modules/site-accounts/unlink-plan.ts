@@ -1,0 +1,127 @@
+import type { Prisma } from "@saroh/database";
+
+/**
+ * What moves when staff say "This isn't them" about a site account (A4,
+ * DEC-049; round-2 plan A).
+ *
+ * The account was linked to a contact it did not belong to. Unlinking moves
+ * the account to a new separate contact, and with it every record the
+ * account itself made while it was linked (since `linkedAt`): a booking made
+ * signed in, an order checked out signed in, a message the customer wrote.
+ * What staff made for the contact stays with the contact.
+ *
+ * Each kind of record the account can make is one mover here, added by the
+ * unit that first writes it with the account on it:
+ * - bookings with `customerAccountId` (A9);
+ * - orders and identity links made while signed in (G13);
+ * - thread messages the customer wrote (A13);
+ * - waitlist entries (A12);
+ * - mandates (D11).
+ *
+ * `unlink-plan.spec.ts` reads the Prisma schema and fails when a model
+ * gains a `customerAccountId` without a mover here or a reason in
+ * `UNLINK_STAYS`, so no unit can add one and forget it.
+ */
+
+/** Who is being moved, and from where. */
+export interface UnlinkScope {
+    organizationId: string;
+    accountId: string;
+    /** The contact staff said isn't them. */
+    fromContactId: string;
+    /** When the account was linked to it: only records since then move. */
+    since: Date;
+}
+
+export interface UnlinkMover {
+    /** A stable key, e.g. "bookings". */
+    key: string;
+    /** The Prisma model whose `customerAccountId` this mover reads. */
+    model: string;
+    /** How the confirm names one and many, e.g. ["booking", "bookings"]. */
+    noun: readonly [singular: string, plural: string];
+    count(tx: Prisma.TransactionClient, scope: UnlinkScope): Promise<number>;
+    move(
+        tx: Prisma.TransactionClient,
+        scope: UnlinkScope & { toContactId: string },
+    ): Promise<number>;
+}
+
+/**
+ * The records that move with the account. Empty until A9 makes the first
+ * signed-in booking; each unit above adds its own, with a db test.
+ */
+export const UNLINK_MOVERS: readonly UnlinkMover[] = [];
+
+/**
+ * Models that carry a `customerAccountId` and deliberately stay where they
+ * are, each with why. The schema guard accepts these.
+ */
+export const UNLINK_STAYS: Readonly<Record<string, string>> = {
+    SubscriptionEvent:
+        "A log of what the account did to a subscription. It names the account, not the contact, and the subscription stays with the contact.",
+};
+
+/** One kind of record, and how many of it will move. */
+export interface UnlinkMove {
+    key: string;
+    count: number;
+    /** "2 bookings", "1 booking". */
+    label: string;
+}
+
+/** Name the counts, dropping kinds with nothing to move. */
+export function unlinkMoves(
+    movers: readonly Pick<UnlinkMover, "key" | "noun">[],
+    counts: ReadonlyMap<string, number>,
+): UnlinkMove[] {
+    return movers
+        .map((m) => {
+            const count = counts.get(m.key) ?? 0;
+            return {
+                key: m.key,
+                count,
+                label: `${count} ${count === 1 ? m.noun[0] : m.noun[1]}`,
+            };
+        })
+        .filter((m) => m.count > 0);
+}
+
+/** "a", "a and b", "a, b and c". */
+function listOf(parts: readonly string[]): string {
+    if (parts.length <= 1) return parts.join("");
+    return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * The confirm's line about what moves: "2 bookings they made online move
+ * with them." or, when nothing does, that everything stays.
+ */
+export function unlinkSentence(moves: readonly UnlinkMove[]): string {
+    if (moves.length === 0) {
+        return "Nothing they did online is on this record, so everything here stays.";
+    }
+    return `${listOf(moves.map((m) => m.label))} they made online move with them.`;
+}
+
+/** Count what each mover would move, in the caller's transaction. */
+export async function countUnlinkMoves(
+    tx: Prisma.TransactionClient,
+    scope: UnlinkScope,
+    movers: readonly UnlinkMover[] = UNLINK_MOVERS,
+): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (const m of movers) counts.set(m.key, await m.count(tx, scope));
+    return counts;
+}
+
+/** Move every mover's records to the new contact; returns what moved. */
+export async function applyUnlinkMoves(
+    tx: Prisma.TransactionClient,
+    scope: UnlinkScope & { toContactId: string },
+    movers: readonly UnlinkMover[] = UNLINK_MOVERS,
+): Promise<Map<string, number>> {
+    const moved = new Map<string, number>();
+    for (const m of movers) moved.set(m.key, await m.move(tx, scope));
+    return moved;
+}

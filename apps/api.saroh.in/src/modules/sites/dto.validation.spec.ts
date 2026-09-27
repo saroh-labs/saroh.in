@@ -8,6 +8,7 @@ import {
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
+    UpdateSiteSettingsDto,
 } from "./dto";
 
 /**
@@ -122,5 +123,40 @@ describe("a hidden flag must be a real boolean (#286)", () => {
         await expect(
             pipe.transform({ hidden: false }, asBody(UpdatePageDto)),
         ).resolves.toMatchObject({ hidden: false });
+    });
+});
+
+/*
+ * The site's name through the settings PATCH (G6): optional, but never
+ * cleared, because a site's header is drawn from it.
+ */
+describe("the settings PATCH body's name (G6)", () => {
+    it("trims the name it is sent", async () => {
+        await expect(
+            pipe.transform(
+                { name: "  Rye & Co.  " },
+                asBody(UpdateSiteSettingsDto),
+            ),
+        ).resolves.toMatchObject({ name: "Rye & Co." });
+    });
+
+    it("leaves the name out when it is not sent", async () => {
+        const dto = (await pipe.transform(
+            { seoTitle: "x" },
+            asBody(UpdateSiteSettingsDto),
+        )) as UpdateSiteSettingsDto;
+        expect(dto.name).toBeUndefined();
+    });
+
+    it.each([
+        ["an empty name", { name: "" }],
+        ["a name of spaces", { name: "   " }],
+        ["null", { name: null }],
+        ["a number", { name: 7 }],
+        ["a name past 120 characters", { name: "x".repeat(121) }],
+    ])("refuses %s with a 400", async (_label, body) => {
+        await expect(
+            pipe.transform(body, asBody(UpdateSiteSettingsDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
     });
 });

@@ -173,6 +173,22 @@ export function failWhy(
         : `Renewal of ${amount} isn't paid — past due`;
 }
 
+/**
+ * A paused one, in a few words: "Paused until 17 Oct" when it resumes on
+ * its own (D8), else "Paused since 5 Sep".
+ */
+export function pausedText(
+    sub: Pick<Subscription, "pausedAt" | "pausedUntil" | "timezone">,
+    now: Date,
+): string {
+    if (sub.pausedUntil) {
+        return `Paused until ${dayText(sub.pausedUntil, sub.timezone, now)}`;
+    }
+    return sub.pausedAt
+        ? `Paused since ${dayText(sub.pausedAt, sub.timezone, now)}`
+        : "Paused";
+}
+
 /** A row's line under the status: when it next charges, or why it stopped. */
 export function rowWhen(
     sub: Subscription,
@@ -190,12 +206,7 @@ export function rowWhen(
         };
     }
     if (tab === "paused") {
-        return {
-            text: sub.pausedAt
-                ? `Paused since ${dayText(sub.pausedAt, tz, now)}`
-                : "Paused",
-            danger: false,
-        };
+        return { text: pausedText(sub, now), danger: false };
     }
     if (sub.startsAt) {
         return {
@@ -320,7 +331,9 @@ export function headline(
             pill,
             big: "—",
             when: "",
-            line: `Paused${sub.pausedAt ? ` since ${d(sub.pausedAt)}` : ""}. Nothing is charged while paused.`,
+            line: sub.pausedUntil
+                ? `Paused until ${d(sub.pausedUntil)} · resumes on its own. Nothing is charged while paused.`
+                : `${pausedText(sub, now)}. Nothing is charged while paused.`,
         };
     }
     if (tab === "cancelled") {

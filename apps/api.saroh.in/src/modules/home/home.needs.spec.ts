@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { flattenNeeds, placedWords } from "./home-needs";
@@ -368,6 +369,10 @@ describe("HomeService needs", () => {
         const orders = over.orders ?? [];
         const invoices = over.invoices ?? [];
         const db = {
+            // D8's paused-subscriptions source: Payments on, so it has nothing.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             order: {
                 count: jest.fn().mockResolvedValue(orders.length),
                 findMany: jest.fn().mockResolvedValue(orders),
@@ -399,7 +404,11 @@ describe("HomeService needs", () => {
                 ? jest.fn().mockRejectedValue(new Error("mid-migration"))
                 : jest.fn().mockResolvedValue([]),
         };
-        return new HomeService(availability, db as never, stockChecks as never);
+        return new HomeService(
+            availability,
+            quietLastDay(db) as never,
+            stockChecks as never,
+        );
     }
 
     const OWNER = {

@@ -17,6 +17,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AccountUnlinkService } from "../site-accounts/account-unlink.service";
 import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
@@ -53,6 +54,7 @@ export class CustomerWorkspaceController {
         private readonly notes: ContactNotesService,
         private readonly attention: ContactAttentionService,
         private readonly customers: CustomersListService,
+        private readonly accounts: AccountUnlinkService,
     ) {}
 
     /**
@@ -84,6 +86,25 @@ export class CustomerWorkspaceController {
         @Param("contactId") contactId: string,
     ) {
         return this.details.detail(ctx, contactId);
+    }
+
+    /** What "This isn't them" would move with the site account (A4). */
+    @Get(":contactId/account/unlink")
+    unlinkAccountPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.accounts.preview(ctx, contactId);
+    }
+
+    /** "This isn't them": the site account leaves this contact (A4). */
+    @Post(":contactId/account/unlink")
+    @HttpCode(200)
+    unlinkAccount(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.accounts.unlink(ctx, contactId);
     }
 
     @Post(":contactId/notes")

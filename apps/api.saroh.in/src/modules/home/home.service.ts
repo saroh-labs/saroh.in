@@ -5,6 +5,7 @@ import { ModuleAvailabilityService } from "../capabilities/module-availability.s
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { StockChecksService } from "../stock/stock-checks.service";
+import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
     HomeAction,
     HomeBooking,
@@ -19,6 +20,7 @@ import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
 import { failedRenewals, overdueInvoices } from "./home-money-sources";
 import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import { openOrderWords } from "./home-order-rows";
+import { pausesWaitingOnPayments } from "./home-pause-sources";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { readToday, todayScope } from "./home-today";
 
@@ -28,10 +30,12 @@ export type {
     HomeEvidence,
     HomeInline,
     HomeInput,
+    HomeLastDay,
     HomeModel,
     HomeNeed,
     HomeNumber,
     HomeSeverity,
+    HomeSinceItem,
     HomeToday,
     HomeTodayItem,
     HomeTone,
@@ -323,6 +327,14 @@ export class HomeService {
               )
             : null;
 
+        // The greeting's clock and the last 24 hours (F6), in the same zone.
+        const lastDay = await this.attempt(
+            { moduleKey: "HOME", label: "The last 24 hours" },
+            () => readLastDay(this.db, input, available, { now, zone }),
+            lastDayHeader(now, zone),
+            unavailable,
+        );
+
         // Money taken through an invoice's pay link after the invoice was
         // already paid or voided (U13). The customer is owed it back, so it
         // is ATTENTION: already wrong, and only the merchant can put it right.
@@ -374,6 +386,18 @@ export class HomeService {
                 unavailable,
             );
             if (renewals) actions.push(renewals);
+        }
+        // Pauses that ended with Payments off (D8): shown because Payments
+        // is off, so not gated on it.
+        if (holds(input, "subscription:read")) {
+            const waiting = await this.attempt(
+                { moduleKey: "PAYMENTS", label: "Paused subscriptions" },
+                () =>
+                    pausesWaitingOnPayments(this.db, input.organizationId, now),
+                null,
+                unavailable,
+            );
+            if (waiting) actions.push(waiting);
         }
         if (available.has("PAYMENTS") && canReadInvoices) {
             const overdue = await this.attempt(
@@ -448,6 +472,7 @@ export class HomeService {
             unavailable,
             ...flattenNeeds(actions, zone),
             today,
+            lastDay,
         };
     }
 

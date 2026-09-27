@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { HomeService } from "./home.service";
@@ -42,7 +43,10 @@ function build(rows: (typeof OWED)[], count = rows.length) {
             findMany: jest.fn().mockResolvedValue([]),
         },
     };
-    return { service: new HomeService(availability, db as never), db };
+    return {
+        service: new HomeService(availability, quietLastDay(db) as never),
+        db,
+    };
 }
 
 const OWNER = { organizationId: "org_1", organizationRole: "OWNER" as const };

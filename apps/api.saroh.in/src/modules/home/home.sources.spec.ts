@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import type { StockCheck } from "../stock/stock-checks.service";
@@ -473,6 +474,8 @@ function home(
     const money = moneyDb({ unpaid: opts.unpaid, overdue: opts.overdue });
     const db = {
         ...money,
+        // D8's paused-subscriptions source: Payments on, so it has nothing.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         paymentIntent: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),
@@ -506,7 +509,7 @@ function home(
     return {
         service: new HomeService(
             availability,
-            db as never,
+            quietLastDay(db) as never,
             stockChecks as never,
         ),
         db,

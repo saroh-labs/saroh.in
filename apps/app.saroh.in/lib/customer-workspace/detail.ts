@@ -1,7 +1,10 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type { DetailAttention } from "@/lib/customer-workspace/attention";
 import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
 import type { FulfilmentType } from "@/lib/orders/read";
 import type { Interval } from "@/lib/subscriptions/service";
+
+import type { SiteAccount } from "./site-account";
 
 /**
  * One read of a customer (U8, R17), as Customer Detail (U18) receives it —
@@ -166,6 +169,8 @@ export interface CustomerDetail {
         source: string | null;
         createdAt: string;
     };
+    /** Their account on the business's website (A4); null when they don't sign in. */
+    siteAccount?: SiteAccount | null;
     money: boolean;
     /** The business's zone, for the dates the screen writes out. */
     timezone: string;
@@ -176,6 +181,11 @@ export interface CustomerDetail {
         allergenChoices: { id: string; name: string }[];
     } | null;
     allergens: { id: string; name: string }[] | null;
+    /**
+     * Needs attention (DEC-040, C1) as this viewer may see it; null when it
+     * couldn't be read. Absent only from an API before C1.
+     */
+    attention?: DetailAttention | null;
     linkedCustomers?:
         | {
               linkId: string;

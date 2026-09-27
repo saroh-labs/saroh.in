@@ -12,6 +12,7 @@ import {
     monthlyTotal,
     olderPrice,
     olderPriceNotes,
+    pausedText,
     payRows,
     paysBy,
     ranLine,
@@ -38,6 +39,7 @@ const sub = (over: Partial<Subscription> = {}): Subscription => ({
     startsAt: null,
     endsAt: null,
     pausedAt: null,
+    pausedUntil: null,
     cancelledAt: null,
     overdue: false,
     overdueCount: 0,
@@ -320,6 +322,38 @@ describe("ranLine", () => {
 describe("dayText", () => {
     it("adds the year only when it is not this one", () => {
         expect(dayText("2027-01-02", TZ, NOW, true)).toBe("Sat 2 Jan 2027");
+    });
+});
+
+describe("a pause with an end date (D8)", () => {
+    // Paused 18 Sep for 4 weeks: resumes 16 Oct, Kolkata midnight.
+    const paused = sub({
+        status: "PAUSED",
+        nextRenewalAt: null,
+        pausedAt: "2026-09-18T06:00:00.000Z",
+        pausedUntil: "2026-10-15T18:30:00.000Z",
+    });
+
+    it("says the day it resumes on its own, in its zone", () => {
+        expect(headline(paused, null, NOW)).toEqual({
+            pill: { tone: "accent", label: "Paused" },
+            big: "—",
+            when: "",
+            line: "Paused until 16 Oct · resumes on its own. Nothing is charged while paused.",
+        });
+        expect(rowWhen(paused, NOW)).toEqual({
+            text: "Paused until 16 Oct",
+            danger: false,
+        });
+        expect(pausedText(paused, NOW)).toBe("Paused until 16 Oct");
+    });
+
+    it("says since when for a pause until someone resumes it", () => {
+        const open = { ...paused, pausedUntil: null };
+        expect(headline(open, null, NOW).line).toBe(
+            "Paused since 18 Sep. Nothing is charged while paused.",
+        );
+        expect(pausedText({ ...open, pausedAt: null }, NOW)).toBe("Paused");
     });
 });
 
