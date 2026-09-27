@@ -2288,6 +2288,52 @@ describe("pause with an end date (D8)", () => {
             ]);
         });
 
+        it("extends the same way when the job only gets to it after the period's end (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(
+                service.renewOne("sub_1", at("2026-11-02T08:00:00Z")),
+            ).resolves.toBe("resumed");
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                status: "ACTIVE",
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("extends a pause ending the moment the period does (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    pausedUntil: at("2026-11-01T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-11-01T00:30:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({ currentPeriodEnd: at("2026-12-02T00:00:00Z") });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("starts a restart's period on the pause's end date, not the day the job runs (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-10-31T09:00:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                anchorAt: at("2026-10-29T00:00:00Z"),
+                currentPeriodStart: at("2026-10-29T00:00:00Z"),
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).toHaveBeenCalledTimes(1);
+        });
+
         it("takes the row lock before it reads", async () => {
             tx.customerSubscription!.findUnique!.mockResolvedValue(
                 pausedFourWeeks(),

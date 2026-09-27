@@ -17,8 +17,10 @@ import { JOB, subscriptionEventLog } from "./subscription-events";
  * only), or has an end date: the start of that day in the subscription's
  * timezone. The renewal job picks a paused subscription up on that date and
  * resumes it through the same code as a manual resume, so ADR-007's rules
- * hold: inside the paid period, the period moves later by the days paused;
- * past it, a new period starts with its invoice. That second one bills, so
+ * hold, judged by the end date rather than the hour the job runs: ending on
+ * or before the paid period's end, the period moves later by the days
+ * paused; ending after it, a new period starts on the end date with its
+ * invoice. That second one bills, so
  * with Payments off it is refused: the job leaves it paused, writes one
  * RESUME_REFUSED for this pause, and Home raises it until Payments is back
  * on, when the next run resumes it.
@@ -114,10 +116,40 @@ export function pauseHasEnded(sub: PausedRow, now: Date): boolean {
     );
 }
 
+/** How a pause that reached its end date resumes, decided from its dates. */
+export interface PauseEnded {
+    /** Calendar days the pause took. */
+    days: number;
+    /** It ended on or before the paid period's end: that period moves later. */
+    extends: boolean;
+    /** The day it ended: a restart's new period starts then. */
+    on: Date;
+}
+
+/**
+ * Extend or restart, from the dates alone (review S-3): a pause ending on
+ * or before the paid period's end moves that end later by the days paused;
+ * one ending after it starts a new period on its end date. When the job
+ * gets to it doesn't come into it, so a late run lands where an on-time
+ * one would have.
+ */
+export function pauseEnded(sub: {
+    pausedAt: Date;
+    pausedUntil: Date;
+    currentPeriodEnd: Date;
+    timezone: string;
+}): PauseEnded {
+    return {
+        days: pausedDays(sub.pausedAt, sub.pausedUntil, sub.timezone),
+        extends: sub.pausedUntil <= sub.currentPeriodEnd,
+        on: sub.pausedUntil,
+    };
+}
+
 /**
  * Resume one whose pause has ended, as the renewal job, under the row lock
  * the caller holds. `resume` is the manual resume's own code, given the
- * job's log and the days the pause took.
+ * job's log and how the pause ends ({@link pauseEnded}).
  *
  * A restart past the paid period with Payments off is refused: nothing
  * changes but one RESUME_REFUSED for this pause, so the hourly run that
@@ -128,13 +160,19 @@ export async function resumeWhenDue(
     tx: Tx,
     sub: PausedRow,
     now: Date,
-    resume: (log: SubscriptionEventLog, days: number) => Promise<void>,
+    resume: (log: SubscriptionEventLog, ended: PauseEnded) => Promise<void>,
 ): Promise<"resumed" | "refused" | "skipped"> {
     if (!pauseHasEnded(sub, now) || !sub.pausedAt || !sub.pausedUntil) {
         return "skipped";
     }
     const log = subscriptionEventLog(tx, sub.organizationId, sub.id, JOB);
-    const restarts = now >= sub.currentPeriodEnd && !sub.cancelAtPeriodEnd;
+    const ended = pauseEnded({
+        pausedAt: sub.pausedAt,
+        pausedUntil: sub.pausedUntil,
+        currentPeriodEnd: sub.currentPeriodEnd,
+        timezone: sub.timezone,
+    });
+    const restarts = !ended.extends && !sub.cancelAtPeriodEnd;
     if (restarts && !(await paymentsOn(tx, sub.organizationId))) {
         const said = await tx.subscriptionEvent.findFirst({
             where: {
@@ -155,6 +193,6 @@ export async function resumeWhenDue(
         }
         return "refused";
     }
-    await resume(log, pausedDays(sub.pausedAt, sub.pausedUntil, sub.timezone));
+    await resume(log, ended);
     return "resumed";
 }
