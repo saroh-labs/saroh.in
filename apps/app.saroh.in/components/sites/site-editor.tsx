@@ -25,6 +25,7 @@ import {
     useEditorViewport,
 } from "@/components/sites/editor/use-editor-viewport";
 import { usePublish } from "@/components/sites/editor/use-publish";
+import { useUndo } from "@/components/sites/editor/use-undo";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import {
@@ -115,6 +116,8 @@ export function SiteEditor({
         onSaved: publish.markStylePending,
     });
     const { style } = siteStyle;
+    // Remove, move, hide and reset act at once and offer Undo (G3).
+    const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
 
     const add = useAddBlock({
         insertSection: draft.insertSection,
@@ -189,6 +192,7 @@ export function SiteEditor({
                     {...selection}
                     {...siteStyle}
                     {...draft}
+                    {...edits}
                     styleOptions={styleOptions}
                     {...add}
                     flagsBySection={flagsBySection}
@@ -230,6 +234,7 @@ export function SiteEditor({
                     {...{ siteId, pageId, pages, styleOptions }}
                     {...selection}
                     {...draft}
+                    {...edits}
                     {...review}
                     style={style}
                     active={active}

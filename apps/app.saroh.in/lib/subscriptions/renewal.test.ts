@@ -19,6 +19,7 @@ const base = {
     nextRenewalAt: "2026-10-01T00:00:00.000Z",
     endsAt: null,
     pausedAt: null,
+    pausedUntil: null,
     cancelledAt: null,
     overdue: false,
     overdueCount: 0,
@@ -48,6 +49,16 @@ describe("nextLine", () => {
                 pausedAt: "2026-09-05T08:00:00.000Z",
             }),
         ).toBe("Paused since 5 Sept");
+        // D8: a pause with an end date says when it resumes.
+        expect(
+            nextLine({
+                ...base,
+                status: "PAUSED",
+                nextRenewalAt: null,
+                pausedAt: "2026-09-05T08:00:00.000Z",
+                pausedUntil: "2026-10-03T00:00:00.000Z",
+            }),
+        ).toBe("Paused until 3 Oct");
         expect(
             nextLine({
                 ...base,

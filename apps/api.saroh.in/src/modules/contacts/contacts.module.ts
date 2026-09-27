@@ -3,6 +3,7 @@ import { forwardRef, Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { ContactSearchController } from "./contact-search.controller";
 import { ContactsController } from "./contacts.controller";
 import { ContactsService } from "./contacts.service";
 
@@ -13,7 +14,8 @@ import { ContactsService } from "./contacts.service";
  */
 @Module({
     imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
-    controllers: [ContactsController],
+    // The search first: its literal "search" must win over `:contactId`.
+    controllers: [ContactSearchController, ContactsController],
     providers: [ContactsService, OrganizationGuard],
     exports: [ContactsService],
 })

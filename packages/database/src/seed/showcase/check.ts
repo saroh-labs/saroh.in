@@ -142,7 +142,9 @@ export async function checkShowcase(
     );
 
     // Each invoice's dates and fields agree with its status. An order's
-    // paper and every correction are never due: the order is the ledger.
+    // paper and every correction are never due: the order is the ledger. A
+    // booking paid on the booking page is due the moment it is issued, and
+    // paid then (`confirmHoldInTx`).
     fail(
         "invoices whose status and dates disagree",
         await prisma.$queryRaw<Row[]>`
@@ -161,11 +163,13 @@ export async function checkShowcase(
                 AND (status = 'DRAFT' OR (number IS NOT NULL AND "issuedAt" <= ${at}::timestamp
                     AND "billToName" IS NOT NULL
                     AND ("dueAt" > "issuedAt" OR ("dueAt" IS NULL
-                        AND ("orderId" IS NOT NULL OR kind <> 'INVOICE')))))
+                        AND ("orderId" IS NOT NULL OR kind <> 'INVOICE'))
+                        OR (source = 'BOOKING' AND "dueAt" = "issuedAt"))))
             )`,
     );
 
     // What an invoice is for: the row it links to, for that person and price.
+    // A booking's is billed to its booker at the price it was booked at.
     // An order's invoice bills the order as placed: with its supplementary
     // invoices (less any credit note that was not a refund) it comes to the
     // order's total. A correction names an invoice of the same order.
@@ -177,6 +181,7 @@ export async function checkShowcase(
             LEFT JOIN "CourseEnrollment" ce ON ce.id = i."courseEnrollmentId"
             LEFT JOIN "PackPurchase" pp ON pp.id = i."packPurchaseId"
             LEFT JOIN "Order" o ON o.id = i."orderId"
+            LEFT JOIN "Booking" bk ON bk.id = i."bookingId"
             LEFT JOIN "Invoice" r ON r.id = i."relatedInvoiceId"
             LEFT JOIN LATERAL (
                 SELECT COALESCE(SUM(c.total) FILTER (WHERE c.kind = 'SUPPLEMENTARY'), 0) AS up,
@@ -202,6 +207,12 @@ export async function checkShowcase(
                         AND i.total = pp.price
                         AND i."subscriptionId" IS NULL AND i."courseEnrollmentId" IS NULL
                     WHEN 'MANUAL' THEN i."subscriptionId" IS NULL AND i."orderId" IS NULL
+                        AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
+                        AND i."bookingId" IS NULL
+                    WHEN 'BOOKING' THEN bk."organizationId" = i."organizationId"
+                        AND bk."contactId" = i."contactId"
+                        AND i.total * 100 = (bk.snapshot->'service'->>'priceCents')::numeric
+                        AND i."orderId" IS NULL AND i."subscriptionId" IS NULL
                         AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
                     WHEN 'ORDER' THEN o."organizationId" = i."organizationId"
                         AND i."subscriptionId" IS NULL AND i."courseEnrollmentId" IS NULL
@@ -238,6 +249,19 @@ export async function checkShowcase(
             )
             SELECT id, capacity, confirmed::int, held::int FROM load
             WHERE confirmed + held > capacity`,
+    );
+
+    // Closures (E3): the slot engine offers nothing inside one, so no
+    // booking made after a closure was put up stands inside it. One made
+    // before keeps its place, as the product keeps it.
+    fail(
+        "bookings made during a closure after it was put up",
+        await prisma.$queryRaw<Row[]>`
+            SELECT b.id, c.id AS closure FROM "Booking" b
+            JOIN "BusinessClosure" c ON c."organizationId" = b."organizationId"
+                AND c."startAt" < b."endAt" AND b."startAt" < c."endAt"
+            WHERE b."organizationId" = ANY(${orgs}) AND b.status <> 'CANCELLED'
+              AND b."createdAt" > c."createdAt"`,
     );
 
     // Courses: people on it within its seats, its seats within the service.

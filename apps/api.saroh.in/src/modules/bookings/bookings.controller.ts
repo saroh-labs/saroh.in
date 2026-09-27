@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -20,6 +21,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { payLinkUrl } from "../invoices/pay-link-url";
 import type { BookingDetail, BookingsCalendar } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
@@ -220,6 +222,22 @@ export class BookingsController {
         @Body() dto: RecordOutcomeDto,
     ): Promise<Booking> {
         return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
+    }
+
+    /**
+     * "Send a pay link" (E4): issue the booking's invoice and answer with
+     * its pay link — once: only its hash is kept, so asking again makes a
+     * new link and retires the old one. Saroh sends nothing itself yet.
+     */
+    @Post("bookings/:bookingId/pay-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async payLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+    ): Promise<{ url: string }> {
+        const { token } = await this.bookings.payLink(ctx, bookingId);
+        return { url: payLinkUrl(token) };
     }
 
     /**

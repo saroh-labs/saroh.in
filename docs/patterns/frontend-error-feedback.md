@@ -34,6 +34,14 @@
   **`dismissToasts()` clears the stack** when a screen starts an Undo of its
   own — two Undos on screen at once, for two different things, is how the
   wrong one gets pressed.
+- **Current** — **The ten-second hold is `apps/app.saroh.in/lib/hold-undo.ts`**
+  (round-2 G3; default 136), never a timer of a screen's own. `startHold`
+  takes `commit` (what happens if nobody presses Undo: on time out, "now",
+  or leaving) and `undo`; `createHoldSlot` keeps one hold at a time. A
+  failed callback ends the hold as `failed` for the caller to word. The site
+  editor's `use-undo.ts` is the reference caller; B6 and F4 reuse it.
+  `showUndo` returns the toast's id, and `dismissToast(id)` takes that one
+  Undo away when its window closes early, leaving any error toast beside it.
 
 ### An unreachable API is not a signed-out user — **Current**
 

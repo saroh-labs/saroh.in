@@ -11,8 +11,7 @@ import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
-import { listContacts } from "@/lib/contacts/service";
-import { contactName } from "@/lib/crm/format";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { LocalDate } from "@/lib/services/diary";
 import {
@@ -70,22 +69,29 @@ export default async function BookingsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [params, organization, staffList, rules, services, contacts] =
+    const [params, organization, staffList, rules, services] =
         await Promise.all([
             searchParams,
             resolveActiveOrganization(),
             readStaff(),
             getBookingRules().catch(() => null),
             listServices(),
-            // Contacts belong to CRM, which may be off: then a booking asks
-            // for a name and email instead of offering people you know.
-            listContacts().catch(() => []),
         ]);
 
     const may = (action: string) =>
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // New booking finds the customer by search (E4, `contact:read`) and can
+    // send a pay link when the viewer may issue the invoice and a provider
+    // is connected to take the money.
+    const people = {
+        canSearch: may("contact:read"),
+        payLink:
+            may("booking:write") &&
+            may("invoice:write") &&
+            (await hasPaymentProvider().catch(() => false)),
+    };
     const timezone = staffList?.timezone ?? "Asia/Kolkata";
     const now = readNow();
     const today = localDateOf(new Date(now), timezone);
@@ -144,11 +150,7 @@ export default async function BookingsPage({
                 staff={staffList?.staff ?? null}
                 services={services}
                 rules={rules}
-                contacts={contacts.map((c) => ({
-                    id: c.id,
-                    name: contactName(c),
-                    email: c.email,
-                }))}
+                people={people}
                 can={{
                     book: may("booking:write"),
                     hours: may("service:write"),
@@ -165,12 +167,9 @@ export default async function BookingsPage({
                                 name: s.name,
                                 timezone: s.timezone,
                                 minutes: s.durationMinutes,
+                                priceCents: s.priceCents,
                             }))}
-                            contacts={contacts.map((c) => ({
-                                id: c.id,
-                                name: contactName(c),
-                                email: c.email,
-                            }))}
+                            people={people}
                             // Paying with a class pack spends one (ADR-007).
                             canUsePacks={
                                 canReadPacks(organization) &&

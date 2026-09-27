@@ -63,10 +63,16 @@ vi.mock("@/lib/services/actions", () => ({
         Promise.resolve({ ok: true, services: [] }),
     ),
 }));
-const toast = vi.hoisted(() => ({
-    showError: vi.fn(),
-    showSuccess: vi.fn(),
-}));
+const toast = vi.hoisted(() => {
+    let next = 0;
+    return {
+        showError: vi.fn(),
+        showSuccess: vi.fn(),
+        // G3: each Undo toast gets an id, so the editor can take it away.
+        showUndo: vi.fn(() => `undo-${++next}`),
+        dismissToast: vi.fn(),
+    };
+});
 vi.mock("@saroh/ui/toast", async (importOriginal) => ({
     ...(await importOriginal<object>()),
     ...toast,
@@ -207,6 +213,29 @@ function resize() {
     act(() => {
         for (const fire of observers) fire([]);
     });
+}
+
+/** Press Undo on the n-th Undo toast the editor showed. */
+function undoFrom(n: number) {
+    const call = toast.showUndo.mock.calls[n] as unknown as
+        [string, () => void] | undefined;
+    if (!call) throw new Error(`No Undo toast ${n}`);
+    call[1]();
+}
+
+/** The id the last Undo toast was given. */
+function lastUndoId(): string {
+    const last = toast.showUndo.mock.results.at(-1);
+    if (!last) throw new Error("No Undo toast");
+    return last.value as string;
+}
+
+/** The keys of the sections the n-th save sent. */
+function sentKeys(n: number): (string | undefined)[] {
+    const call = actions.saveDraftSections.mock.calls[n] as
+        [string, string, Section[], number] | undefined;
+    if (!call) throw new Error(`No save ${n}`);
+    return call[2].map((section) => section.key);
 }
 
 /** The page frame on the canvas: the element the device width and zoom land on. */
@@ -524,16 +553,122 @@ describe("SiteEditor shell", () => {
         expect(() => button("Escape to return")).toThrow();
     });
 
-    it("asks before removing a block, and names it", () => {
+    it("removes a block at once, and Undo puts it back in its place with its content", () => {
         render();
         click(button("Remove"));
-        const dialog = document.querySelector(
-            "[role=alertdialog],[role=dialog]",
-        );
-        expect(dialog?.textContent).toContain('Remove "Welcome in"?');
-        click(button("Remove section"));
-        expect(toast.showSuccess).toHaveBeenCalledWith("Removed Welcome in.");
+        // G3: no question first; the block goes and Undo is offered.
+        expect(
+            document.querySelector("[role=alertdialog],[role=dialog]"),
+        ).toBeNull();
         expect(host.textContent).toContain("3 blocks");
+        expect(() => button("Welcome in")).toThrow();
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Hero taken off this page",
+            expect.any(Function),
+            { duration: 10_000 },
+        );
+
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("4 blocks");
+        // First again, selected, and with what was written in it.
+        expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
+        const rows = $$("aside li button").map((b) => b.textContent);
+        expect(rows.findIndex((t) => t.includes("Welcome in"))).toBeLessThan(
+            rows.findIndex((t) => t.includes("Our story")),
+        );
+        expect(toast.dismissToast).toHaveBeenCalledWith(lastUndoId());
+    });
+
+    it("undoes only the second of two removes, and takes the first toast away", () => {
+        render();
+        click(button("Remove"));
+        const first = lastUndoId();
+        click(button("Our story"));
+        click(button("Remove"));
+        expect(host.textContent).toContain("2 blocks");
+        // The first Undo's window closed when the second action came.
+        expect(toast.dismissToast).toHaveBeenCalledWith(first);
+
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("2 blocks");
+        act(() => undoFrom(1));
+        expect(host.textContent).toContain("3 blocks");
+        expect(button("Our story")).toBeTruthy();
+        expect(() => button("Welcome in")).toThrow();
+    });
+
+    it("saves the restored draft when autosave ran during the toast", async () => {
+        render();
+        click(button("Remove"));
+        await wait(1500);
+        expect(sentKeys(0)).toEqual(["s2"]);
+
+        act(() => undoFrom(0));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect(sentKeys(1)).toEqual(["s1", "s2"]);
+    });
+
+    it("shows the save-failed notice when saving the undone draft fails", async () => {
+        render();
+        click(button("Remove"));
+        await wait(1500);
+        actions.saveDraftSections.mockResolvedValue({
+            ok: false,
+            error: "Saroh couldn't save that.",
+        });
+        act(() => undoFrom(0));
+        await wait(1500);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Saroh couldn't save that.",
+        );
+        expect(host.textContent).toContain("Not saved");
+    });
+
+    it("moves and hides at once, each with its Undo", () => {
+        render();
+        click(button("Move block down"));
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero moved down",
+            expect.any(Function),
+            { duration: 10_000 },
+        );
+        act(() => undoFrom(0));
+        // Back on top, and the one selected.
+        expect(button("Move block up").disabled).toBe(true);
+        expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
+
+        click(button(/Visible$/));
+        expect(toast.showUndo).toHaveBeenLastCalledWith(
+            "Hero is hidden on this page",
+            expect.any(Function),
+            { duration: 10_000 },
+        );
+        act(() => undoFrom(1));
+        expect(button(/Visible$/)).toBeTruthy();
+    });
+
+    it("closes the Undo when the page is edited again after the action", () => {
+        render();
+        click(button("Our story"));
+        click(button("Remove"));
+        const removed = lastUndoId();
+        click(button("Welcome in"));
+        click(button(/Visible$/));
+        // The remove's Undo would have thrown the hide away with it.
+        expect(toast.dismissToast).toHaveBeenCalledWith(removed);
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("3 blocks");
+    });
+
+    it("takes the Undo toast away when the editor is left", () => {
+        render();
+        click(button("Remove"));
+        const removed = lastUndoId();
+        act(() => root.unmount());
+        expect(toast.dismissToast).toHaveBeenCalledWith(removed);
+        // afterEach unmounts again.
+        root = createRoot(host);
     });
 
     it("autosaves an edit after a pause, and publish waits for it", async () => {

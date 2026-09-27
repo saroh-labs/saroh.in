@@ -223,6 +223,11 @@ const SINGLE: Partial<Record<string, { rank: Rank; sub: string }>> = {
         rank: 2,
         sub: "Nobody can find you until you publish it.",
     },
+    // D8: pauses that ended while Payments is off.
+    PAYMENTS_PAUSES_WAITING: {
+        rank: 2,
+        sub: "Their pause has ended. Restarting starts a new paid period, so it waits until Payments is on.",
+    },
 };
 
 /** A module's own blocker (readiness), as one row. */

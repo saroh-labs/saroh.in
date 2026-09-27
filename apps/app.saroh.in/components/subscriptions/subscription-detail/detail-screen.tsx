@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { pauseNote, pauseOptions } from "@/lib/subscriptions/pause";
 import type {
     Optional,
     Plan,
@@ -439,7 +440,8 @@ export function SubscriptionDetail({
                 step={step}
                 onClose={() => setStep(null)}
                 busy={busy}
-                pauseNote={`Nothing is charged or collected until you resume it. The days it's paused are added to the period ${first} has paid for.`}
+                pauseOptions={pauseOptions(sub, now)}
+                pauseNote={(option) => pauseNote(option, sub, now)}
                 plans={plans}
                 currentPlanId={sub.plan.id}
                 switchNote={`Starts at the next renewal${nextText ? `, ${nextText}` : ""}. This period stays as it is — no part-payments.`}

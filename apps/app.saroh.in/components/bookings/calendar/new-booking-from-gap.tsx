@@ -7,16 +7,28 @@ import {
     DialogDescription,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
-import { ContactPicker } from "@/components/shared/contact-picker";
+import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
+import {
+    makePayLink,
+    PayLinkPanel,
+} from "@/components/bookings/pay-link-panel";
+import { CustomerPicker } from "@/components/customers/customer-picker";
+import type { CustomerPick } from "@/lib/customers/picker";
+import { pickName } from "@/lib/customers/picker";
 import { formatMoney } from "@/lib/format/money";
 import { bookByHand, listAvailability } from "@/lib/services/actions";
+import type { BookingPeople, PayChoice } from "@/lib/services/booking-pay";
+import {
+    bookerFor,
+    defaultPay,
+    paidWithFor,
+    payChoices,
+    payNote,
+} from "@/lib/services/booking-pay";
 import type { LocalDate, Span } from "@/lib/services/diary";
 import {
     clock,
@@ -38,19 +50,22 @@ export interface GapTarget {
     free: Span;
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * "New booking" from a free gap (the design): the person and the time are
  * already chosen, so it asks only what, who and how it is paid. Only the
  * one-to-one services this person takes and that fit before their next
  * booking can be picked. Instead of booking, the gap can be blocked — or,
  * inside one-off extra hours, those hours closed again.
+ *
+ * The customer is found with the shared picker (E4): by name or phone, most
+ * recent first, or added new, with their Needs attention once picked. A
+ * priced booking can be sent a pay link: the booking is made, its invoice
+ * issued, and the link shown to copy.
  */
 export function NewBookingFromGap({
     target,
     services,
-    contacts,
+    people,
     timezone,
     money,
     onClose,
@@ -58,7 +73,7 @@ export function NewBookingFromGap({
 }: {
     target: GapTarget | null;
     services: Service[];
-    contacts: ContactOption[];
+    people: BookingPeople;
     timezone: string;
     money: boolean;
     onClose: () => void;
@@ -72,7 +87,7 @@ export function NewBookingFromGap({
                         key={`${target.staff.id}${target.date}${target.free[0]}`}
                         target={target}
                         services={services}
-                        contacts={contacts}
+                        people={people}
                         timezone={timezone}
                         money={money}
                         onClose={onClose}
@@ -87,7 +102,7 @@ export function NewBookingFromGap({
 function Form({
     target,
     services,
-    contacts,
+    people,
     timezone,
     money,
     onClose,
@@ -95,27 +110,27 @@ function Form({
 }: {
     target: GapTarget;
     services: Service[];
-    contacts: ContactOption[];
+    people: BookingPeople;
     timezone: string;
     money: boolean;
     onClose: () => void;
     onBlock: (target: GapTarget) => void;
 }) {
     const router = useRouter();
-    const ids = { name: useId(), email: useId(), who: useId() };
+    const ids = { who: useId() };
     const { staff, date, free } = target;
     const start = free[0];
     const [serviceId, setServiceId] = useState<string | null>(null);
-    const [who, setWho] = useState<"known" | "new">(
-        contacts.length ? "known" : "new",
-    );
-    const [contactId, setContactId] = useState("");
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [pay, setPay] = useState<"DESK" | "PAID">("DESK");
+    const [pick, setPick] = useState<CustomerPick | null>(null);
+    const [pay, setPay] = useState<PayChoice>(defaultPay(people.payLink));
     const [saving, setSaving] = useState(false);
     const [attempt] = useState(() => crypto.randomUUID());
     const [error, setError] = useState<string | null>(null);
+    const [done, setDone] = useState<{
+        booked: string;
+        bookingId: string;
+        link: PayLinkResult;
+    } | null>(null);
 
     const offered = services.filter(
         (s) =>
@@ -166,40 +181,45 @@ function Form({
             start >= x.startMinute &&
             start < x.endMinute,
     );
-    const whoOk =
-        who === "known" ? Boolean(contactId) : EMAIL.test(email.trim());
-    const ready = Boolean(serviceId) && whoOk && !saving;
+    // A link is for something with a price: until a service is chosen,
+    // offered; an unpriced one takes it away.
+    const offerLink =
+        people.payLink && (!chosen || (chosen.priceCents ?? 0) > 0);
+    const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
+    const booker = bookerFor(pick);
+    const ready = Boolean(serviceId) && booker !== null && !saving;
     const when = `${staff.name} · ${dayLabel(date)} at ${clock(at)}`;
 
     async function book() {
         if (!serviceId || !ready) return;
         setSaving(true);
         setError(null);
+        const paidWith = paidWithFor(payNow);
         const res = await bookByHand(serviceId, {
             startAt: zonedInstant(date, at, timezone).toISOString(),
             idempotencyKey: attempt,
             staffId: staff.id,
-            paidWith: pay,
-            ...(who === "known"
-                ? { contactId }
-                : {
-                      bookerEmail: email.trim(),
-                      bookerName: name.trim() || undefined,
-                  }),
+            ...(paidWith ? { paidWith } : {}),
+            ...booker,
         });
-        setSaving(false);
         if (!res.ok) {
+            setSaving(false);
             // Most often the gap filled while this was open: say so here,
             // where the choice is, and read the calendar again.
             setError(res.error);
             router.refresh();
             return;
         }
-        const person =
-            who === "known"
-                ? (contacts.find((c) => c.id === contactId)?.name ?? "them")
-                : name.trim() || email.trim();
-        showSuccess(`Booked ${person} with ${staff.name} at ${clock(at)}.`);
+        const booked = `Booked ${pick ? pickName(pick) : "them"} with ${staff.name} at ${clock(at)}.`;
+        if (payNow === "LINK") {
+            const link = await makePayLink(res.data.id);
+            setSaving(false);
+            setDone({ booked, bookingId: res.data.id, link });
+            router.refresh();
+            return;
+        }
+        setSaving(false);
+        showSuccess(booked);
         onClose();
         router.refresh();
     }
@@ -222,6 +242,25 @@ function Form({
                     router.refresh();
                 });
             },
+        );
+    }
+
+    if (done) {
+        return (
+            <div>
+                <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                    New booking
+                </DialogTitle>
+                <DialogDescription className="mb-3 mt-[3px] text-[12.5px] text-muted-foreground">
+                    {when}
+                </DialogDescription>
+                <PayLinkPanel
+                    booked={done.booked}
+                    bookingId={done.bookingId}
+                    first={done.link}
+                    onDone={onClose}
+                />
+            </div>
         );
     }
 
@@ -288,59 +327,12 @@ function Form({
             ) : null}
 
             <Eyebrow id={`${ids.who}-cust`}>Customer</Eyebrow>
-            {contacts.length ? (
-                <div
-                    role="radiogroup"
-                    aria-labelledby={`${ids.who}-cust`}
-                    className="mb-2 flex flex-wrap gap-1.5"
-                >
-                    <Chip on={who === "known"} onClick={() => setWho("known")}>
-                        From your contacts
-                    </Chip>
-                    <Chip on={who === "new"} onClick={() => setWho("new")}>
-                        Someone new
-                    </Chip>
-                </div>
-            ) : null}
-            {who === "known" ? (
-                <div className="mb-3">
-                    <ContactPicker
-                        contacts={contacts}
-                        value={contactId}
-                        onValueChange={setContactId}
-                        aria-label="Customer"
-                        placeholder="Find someone by name or email…"
-                    />
-                </div>
-            ) : (
-                <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                    <div>
-                        <Label htmlFor={ids.name} className="text-[12.5px]">
-                            Name
-                        </Label>
-                        <Input
-                            id={ids.name}
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="mt-1 h-9"
-                            autoComplete="off"
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor={ids.email} className="text-[12.5px]">
-                            Email
-                        </Label>
-                        <Input
-                            id={ids.email}
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="mt-1 h-9"
-                            autoComplete="off"
-                        />
-                    </div>
-                </div>
-            )}
+            <CustomerPicker
+                value={pick}
+                onPick={setPick}
+                canSearch={people.canSearch}
+                labelledBy={`${ids.who}-cust`}
+            />
 
             <Eyebrow id={`${ids.who}-pay`}>Payment</Eyebrow>
             <div
@@ -348,17 +340,18 @@ function Form({
                 aria-labelledby={`${ids.who}-pay`}
                 className="flex flex-wrap gap-1.5"
             >
-                <Chip on={pay === "DESK"} onClick={() => setPay("DESK")}>
-                    Pays at the session
-                </Chip>
-                <Chip on={pay === "PAID"} onClick={() => setPay("PAID")}>
-                    Paid now
-                </Chip>
+                {payChoices(offerLink).map((c) => (
+                    <Chip
+                        key={c.key}
+                        on={payNow === c.key}
+                        onClick={() => setPay(c.key)}
+                    >
+                        {c.label}
+                    </Chip>
+                ))}
             </div>
             <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
-                {pay === "DESK"
-                    ? "Booked now; the calendar shows they pay at the session."
-                    : "Recorded as paid. Saroh takes no payment and makes no receipt for it."}
+                {payNote(payNow)}
             </p>
             {error ? (
                 <p
