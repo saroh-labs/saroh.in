@@ -4,7 +4,8 @@ name: CI
 # developer runs locally: lint, typecheck, unit tests, build, integration tests
 # (plain and under RLS), the migration replay and the browser suites. See
 # ticket S0-002. The independent gates run as parallel jobs and the slow suites
-# are sharded; `ci` and `browser-e2e` gather them under the check names the
+# are sharded, and a run checks only what its change can reach (the `changes`
+# job); `ci` and `browser-e2e` gather them under the check names the
 # branch rules and the PR page already use. Shared setup is
 # .github/actions/setup.
 #
@@ -18,6 +19,11 @@ on:
     branches: [main, development]
   push:
     branches: [main, development]
+  # Everything, regardless of what changed: by hand from the Actions tab, and
+  # weekly as a safety net for anything the path rules below might miss.
+  workflow_dispatch:
+  schedule:
+    - cron: "30 20 * * 0" # Sunday 20:30 UTC (Monday 02:00 IST)
 
 # Least privilege: the gates only read the checked-out tree. No job needs to
 # write to the repo, packages, or deployments, so we grant read-only at the top
@@ -25,25 +31,86 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded runs for the same ref (e.g. a force-push or a new commit on
-# an open PR) so CI does not pile up on stale commits.
+# Cancel superseded runs on an open PR (a new commit or a force-push) so CI does
+# not pile up on stale commits. Never on main or development: each push there
+# is checked against the commit before it, so a cancelled run would leave that
+# push's own changes unchecked.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # The gates used to run as one job, one step after another: lint, typecheck,
   # unit tests, build, then the integration suite twice (plain and under RLS),
   # about 18 minutes end to end. They are independent, so they now run side by
   # side: static checks, unit tests and the build each in their own job, and
-  # the integration suite split into shards, each against its own Postgres.
+  # the integration suite split into 4 shards per mode, each against its own
+  # Postgres.
   # `ci` at the end waits for all of them and keeps the old check's name, so a
   # branch rule that requires "Lint, typecheck, test & build" still means
   # every one of these passed.
 
+  # What this change touches, so a run checks only what it can reach. The
+  # base is the PR's merge base, or on a push the commit the branch pointed
+  # at before it (a merged PR is then exactly that PR's diff):
+  #   - a change to CI, the root manifests, the lockfile or tooling/ runs
+  #     everything (it can affect any package);
+  #   - otherwise each gate runs when a path it depends on changed, and lint,
+  #     typecheck, unit tests and build cover only the packages that changed
+  #     plus everything that depends on them (turbo's `...[base]` filter).
+  # A manual or scheduled run, a new branch, or a push whose previous commit
+  # is gone (a force-push) checks everything.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.scan.outputs.full }}
+      code: ${{ steps.scan.outputs.code }}
+      api: ${{ steps.scan.outputs.api }}
+      db: ${{ steps.scan.outputs.db }}
+      e2e: ${{ steps.scan.outputs.e2e }}
+      base: ${{ steps.scan.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scan
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # Written to the step's outputs only; nothing is printed to the log.
+          put() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
+          everything() { for k in full code api db e2e; do put "$k" true; done; put base ""; exit 0; }
+          case "$EVENT" in
+            pull_request) base=$(git merge-base "$PR_BASE" HEAD) ;;
+            push)
+              # All zeros on a new branch; missing after a force-push.
+              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ] \
+                || ! git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then everything; fi
+              base="$PUSH_BEFORE" ;;
+            *) everything ;;
+          esac
+          put base "$base"
+          files=$(git diff --name-only "$base" HEAD)
+          has() { printf '%s\n' "$files" | grep -qE "$1"; }
+          if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
+            everything
+          fi
+          put full false
+          # Anything but docs and Markdown counts as code.
+          if printf '%s\n' "$files" | grep -vqE '^(docs/|.*\.md$)'; then put code true; else put code false; fi
+          if has '^(apps/api\.saroh\.in/|packages/)'; then put api true; else put api false; fi
+          if has '^packages/database/'; then put db true; else put db false; fi
+          if has '^(apps/|packages/|e2e/|scripts/)'; then put e2e true; else put e2e false; fi
+
   static:
     name: Lint, typecheck and repo checks
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Placeholder build/runtime env. The apps validate env at build time via the
     # S0-006 typed env modules; SKIP_ENV_VALIDATION short-circuits that zod check
     # (t3-env's recommended CI/Docker pattern) so no build/test step can fail on a
@@ -55,6 +122,8 @@ jobs:
     # non-test-DB guard (which rejects TEST_DATABASE_URL == DATABASE_URL, by
     # string or by host+db) is satisfied. Nothing ever connects to this URL.
     env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
@@ -69,6 +138,8 @@ jobs:
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           turbo-cache: static
@@ -78,7 +149,7 @@ jobs:
       # not import Prisma directly) is part of `lint` via the shared nextjs
       # ESLint config.
       - name: Lint and typecheck
-        run: pnpm turbo run lint typecheck
+        run: pnpm turbo run lint typecheck $AFFECTED
 
       # Circular-dependency detection across all workspaces.
       - name: Circular dependency check
@@ -98,7 +169,11 @@ jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
@@ -113,6 +188,8 @@ jobs:
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           turbo-cache: unit
@@ -120,21 +197,27 @@ jobs:
       # The api's specs import its workspace packages (auth, block-contract,
       # …) as built; the single job used to have them from typecheck.
       - name: Build what the api imports
+        if: needs.changes.outputs.api == 'true'
         run: pnpm turbo run build --filter=@saroh/api^...
 
       - name: Unit tests (api, no database)
+        if: needs.changes.outputs.api == 'true'
         run: pnpm --filter @saroh/api test:unit
 
       # Everything else with a `test` script: the packages and the workspace
       # app (#287). `@saroh/api` is excluded: its bare `test` script is `jest`,
       # which picks up the integration specs that need a database.
       - name: Unit tests (packages and the app)
-        run: pnpm run test
+        run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
@@ -149,12 +232,15 @@ jobs:
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           turbo-cache: build
+          next-cache: "true"
 
       - name: Build
-        run: pnpm run build
+        run: pnpm turbo run build $AFFECTED
 
       # Tolerant of the registry being unreachable: the audit endpoint timed
       # out from the runner on two consecutive runs in one morning. A CRITICAL
@@ -189,13 +275,15 @@ jobs:
   #           every service call made inside its RLS context
   #           (apps/api.saroh.in/test/rls-mode.ts).
   integration:
-    name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/3)
+    name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     strategy:
       fail-fast: false
       matrix:
         mode: [plain, rls]
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     env:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
@@ -240,22 +328,25 @@ jobs:
 
       - name: Integration tests
         working-directory: apps/api.saroh.in
-        run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/3
+        run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/4
 
   # Keeps the name branch rules and the PR page already know, and passes only
   # when every job above passed. A skipped or cancelled job counts as a fail.
   ci:
     name: Lint, typecheck, test & build
     runs-on: ubuntu-latest
-    needs: [static, unit, build, integration]
+    needs: [changes, static, unit, build, integration]
     if: always()
     steps:
-      - name: Every gate passed
+      # A job skipped because the change can't reach it is fine; one that
+      # failed or was cancelled is not, and neither is `changes` itself not
+      # succeeding (its skip would otherwise wave everything through).
+      - name: Every gate that ran passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo '${{ toJSON(needs) }}' | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
-            exit 1
-          fi
+          [ "$CHANGES" = "success" ] && [ "$FAILED" != "true" ]
 
   # The migration history is not exercised anywhere else in this workflow: the
   # integration suite builds its database with `prisma db push`, which reads
@@ -269,6 +360,8 @@ jobs:
   migration-replay:
     name: Migration replay from empty
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
 
     # Its own throwaway database, created empty by the image. The name is not in
     # the S0-003 guard's allow-list on purpose, so the step names it explicitly
@@ -316,17 +409,19 @@ jobs:
   # no portless proxy on a runner, so the URLs are passed in explicitly and the
   # trusted-origin list is set to match. That list is exactly why the local
   # names exist — see docs/architecture/LOCAL_DEV.md.
-  # Split three ways by spec file, each shard with its own Postgres and its
+  # Split four ways by spec file, each shard with its own Postgres and its
   # own freshly seeded stack, so the specs still run one at a time against
   # data only they touch (the config keeps workers: 1). About 9.5 minutes of
-  # tests become about 3 per shard.
+  # tests become about 2.5 per shard.
   browser-e2e-shard:
-    name: Browser E2E (shard ${{ matrix.shard }}/3)
+    name: Browser E2E (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
 
     services:
       postgres:
@@ -397,6 +492,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           turbo-cache: e2e
+          next-cache: "true"
           playwright: "true"
 
       # Migrations, not `db push`: this stack is the one place CI exercises the
@@ -461,25 +557,26 @@ jobs:
             return 1
           }
 
-          # `tail -n 50`, not `tail -50`: the obsolete form is rejected in this
-          # context, so the first version of this dump failed silently and a
-          # failed run reported nothing about WHY the stack did not start.
+          # On a failed start the servers' logs go up as an artifact (below)
+          # rather than into this public build log.
           # The renderer serves tenants by hostname and a runner has none, so
           # it is polled on a preview token instead; a 404 there is the app
           # answering, which is what "up" means for it.
-          if ! wait_for api http://localhost:3333/health \
-            || ! wait_for accounts http://localhost:3000/login \
-            || ! wait_for app http://localhost:3003/ \
-            || ! wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'; then
-            echo "----- api -----";      tail -n 50 /tmp/api.log      || true
-            echo "----- accounts -----"; tail -n 50 /tmp/accounts.log || true
-            echo "----- app -----";      tail -n 50 /tmp/app.log      || true
-            echo "----- renderer -----"; tail -n 50 /tmp/renderer.log || true
-            exit 1
-          fi
+          wait_for api http://localhost:3333/health
+          wait_for accounts http://localhost:3000/login
+          wait_for app http://localhost:3003/
+          wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'
+
+      - name: Upload the servers' logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-logs-shard-${{ matrix.shard }}
+          path: /tmp/*.log
+          retention-days: 3
 
       - name: Run browser tests
-        run: pnpm --filter @saroh/e2e exec playwright test --shard=${{ matrix.shard }}/3
+        run: pnpm --filter @saroh/e2e exec playwright test --shard=${{ matrix.shard }}/4
 
       # The trace and screenshots are the whole point of a failed browser run:
       # without them a red build says "something looked wrong" and nothing else.
@@ -496,13 +593,16 @@ jobs:
   browser-e2e:
     name: Browser E2E (seeded stack)
     runs-on: ubuntu-latest
-    needs: [browser-e2e-shard]
+    needs: [changes, browser-e2e-shard]
     if: always()
     steps:
-      - name: Every shard passed
+      - name: Every shard that ran passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          SHARDS: ${{ needs.browser-e2e-shard.result }}
         run: |
-          echo "shards: ${{ needs.browser-e2e-shard.result }}"
-          [ "${{ needs.browser-e2e-shard.result }}" = "success" ]
+          [ "$CHANGES" = "success" ] || exit 1
+          case "$SHARDS" in success|skipped) ;; *) exit 1 ;; esac
 
   # The permission-denied states, rendered by a PRODUCTION build (#287).
   #
@@ -518,6 +618,8 @@ jobs:
   permissions-e2e:
     name: Permission states (production build)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
 
     env:
       # Bare ports: a runner has no portless, so the config's `.localhost`
