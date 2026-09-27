@@ -155,6 +155,13 @@ what the API allows.
   `.saroh.app`. The site's server routes send the token to the API, and the API
   accepts it only for the business that host resolves to. A workspace session
   never signs anyone in on a merchant site.
+- **Current** (round-2 plan A, A2) — **Site-account routes are
+  server-to-server only.** Every `public/site-accounts/*` route sits behind
+  `SiteRelayGuard` (`modules/site-accounts/site-relay.ts`): saroh.app signs
+  the visitor's address, the host it served and the time with
+  `SITE_RELAY_SECRET`, and anything unsigned, forged or older than 60
+  seconds is a 401. The business comes from that host, and limits count the
+  relayed address, never the caller's.
 - **Adopted** (2026-09-26, DEC-039) — **New staff permissions wait for the
   matrix review** (`docs/plans/2026-09-26-permission-matrix.md`). Until then,
   build against today's actions.

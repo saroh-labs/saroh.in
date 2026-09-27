@@ -14,6 +14,10 @@ export const SENSITIVE_HEADERS = new Set<string>([
     "set-cookie",
     "x-api-key",
     "x-auth-token",
+    // A merchant site's signed relay carries the visitor's address, and the
+    // customer session header is the session itself (ADR-011, plan A).
+    "x-saroh-relay",
+    "x-customer-session",
 ]);
 
 /** Body/field names (normalised) whose values must never be logged. */
