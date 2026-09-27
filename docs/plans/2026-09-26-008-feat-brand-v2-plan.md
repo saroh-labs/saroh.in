@@ -9,6 +9,7 @@ builds_on: "#189 (site style: six curated colour rows and five spacing scalars),
 decisions: DEC-046, DEC-029, ADR-002, ADR-005, DEC-047
 overview: docs/plans/2026-09-26-000-round-2-overview.md (epic H)
 epic: TBD
+deepened: 2026-09-27 (doc review; Brand v2 made its own track)
 ---
 
 # Design system: Brand v2
@@ -24,7 +25,25 @@ build if a Saroh face comes back.
 
 **H1 changes how every live site looks on the day it ships.** Every merchant
 site's text moves to the neutral stack, and stays there until the merchant
-picks a font pairing in Brand v2. Colours do not change.
+picks a font pairing. Colours do not change.
+
+**Only H1 is in round 2** (user, 2026-09-27). H2–H10, H11 and plan 007's G21
+(new-site setup, which needs the themes) are **the Brand track**: a
+separate track with its own schedule, outside round 2's phases and unit
+count. Their "Phase" lines below say so.
+
+**How long the neutral font lasts, and what merchants are told.**
+- It lasts until the Brand track's first delivery, which is **fonts first**:
+  H2, H3, H5, H6 and **H11, a font-pairing picker in today's Style panel**,
+  ahead of palettes, the logo, the Brand panel and the move-across work.
+  Round 2 sets no date for the track; the user schedules it. H11 needs no
+  site-editor unit (not G1 or G2), so the fonts can come back before the
+  editor work does.
+- H1 adds one line to today's Style panel, above the swatch rows: "Your
+  site's text now uses a plain system font. Font choices aren't available
+  yet." It promises no date. H11 replaces the line with the picker.
+- The release note for H1 says the same in merchant words, and that colours
+  and everything else are unchanged.
 
 The rest is **Brand v2**, the merchant's own small design system. The user
 asked on 2026-09-27 for **choice, not one fixed brand**:
@@ -95,7 +114,7 @@ as units.
   - the starting theme it came from, if any.
 - R5. **The font catalogue** is a list of pairings. Each names a heading face and a body face with their weights and a Devanagari face. It starts with six pairings (default 69), and every face is self-hosted by `saroh.app` and preloaded only when a site uses it; nothing is fetched from a third party at view time.
 - R6. **The palette catalogue** is a list of palettes. Each names a main colour, a background mode, and its hero, call-to-action and footer grounds. It starts with eight palettes (default 66). A custom colour is always offered beside them.
-- R7. **Both catalogues are data.** Adding a pairing or a palette is a new catalogue entry (plus font files for a pairing), validated by tests; no code in the API, renderer or editor names an entry. An entry is never deleted: a retired entry leaves the pickers and keeps rendering for the sites that use it (default 149).
+- R7. **Both catalogues are data.** Adding a pairing or a palette is a new catalogue entry (plus font files for a pairing), validated by tests; no code in the API, renderer or editor names an entry. An entry is never deleted: a retired entry leaves the pickers and keeps rendering for the sites that use it (default 149). **A shipped entry is never edited either**: its values and font files are pinned, and a re-tuned look ships as a new key with the old one retired, so no site changes look because the catalogue changed (default 155).
 - R8. Contrast is automatic and explained:
   - button text is white or dark, whichever reads better on the main colour;
   - link and accent text use the nearest shade of the main colour that reaches 4.5:1 on the background;
@@ -117,7 +136,7 @@ as units.
 - Colours and type on merchant sites only. Saroh's own tokens (`packages/ui/src/globals.css`, `tooling/tailwind-config`) and ADR-005's Ink & Saffron are unchanged, and no palette is named after or copies Saroh's brand.
 - No corner or button styles, no custom font uploads, and no photo uploads here: Site Editor photo slots are plan 007 (G7, G8).
 - No catalogue editor in the admin console: catalogue entries are added in the repo and ship with a release.
-- New-site setup with templates and placeholders is plan 007 (G21), which builds on H2, H3 and H9.
+- New-site setup with templates and placeholders is plan 007 (G21), which builds on H2, H3 and H9 and moves to the Brand track with them (2026-09-27).
 - No change to how publishing, review and the review bypass work (DEC-047).
 
 ### Deferred to Follow-Up Work
@@ -283,6 +302,18 @@ as units.
     face's files present with their licence; a Devanagari face in every
     pairing; every palette's text and buttons at or above 4.5:1 without
     adjustment (body text 7:1); a retired entry still resolves.
+  - **Shipped entries are immutable (versioned by key).** A saved v2 style
+    stores only keys and is resolved at publish, so editing Terracotta's
+    values, or swapping a face's woff2 file, would restyle every Terracotta
+    site at its merchant's next publish, a change they never chose.
+    `packages/site-blocks/src/brand/catalogue/catalogue.lock.json` holds a
+    content hash of each shipped entry's values and of each face file. The
+    catalogue test fails when a locked entry's hash changes. A re-tuned look
+    ships as a new key (`terracotta-2`) with the old one retired; the old
+    keeps rendering for the sites that hold it. Font files are content-named
+    (`literata-400.<hash>.woff2`), so a new cut is a new file beside the old.
+    Adding an entry appends to the lock; that is the only change a new entry
+    makes to it.
   - A table was considered, so entries could be added without a release. It
     was set aside: a pairing needs font files in the renderer's build anyway,
     and a JSON file in the package keeps the API, the preview and the
@@ -440,13 +471,14 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  H1[H1 font-leak fix]
+  H1[H1 font-leak fix — round 2, phase 1]
   H1 --> H2[H2 brand contract]
-  H2 --> H3[H3 catalogues]
+  H2 --> H3[H3 catalogues + font files]
   H3 --> H4[H4 contrast rules]
-  H3 --> H5[H5 font files per site]
+  H3 --> H5[H5 fonts per site]
   H4 --> H6[H6 renderer]
   H5 --> H6
+  H6 --> H11[H11 font picker in today's Style panel]
   H2 --> H7[H7 logo]
   H6 --> H8[H8 Brand panel]
   H7 --> H8
@@ -454,7 +486,16 @@ flowchart LR
   H8 --> H9[H9 starting themes]
   H4 --> H10[H10 existing sites move across]
   H10 --> H8
+  H9 --> G21[G21 new-site setup, plan 007]
 ```
+
+**Round 2:** H1 only, in phase 1, first and alone on the booking-flow files
+(overview, "Shared files").
+
+**The Brand track** (separate schedule, not in round 2's phases or count):
+fonts first — H2 → H3 → H4 and H5 → H6 → H11 — then H7, H10, H8 (after
+plan 007's G2), H9 and G21. H11 is new (2026-09-27); the others keep their
+IDs.
 
 ### H1. The font-leak fix: merchant sites load no Saroh font
 
@@ -464,7 +505,7 @@ flowchart LR
 
 **Dependencies:** None
 
-**Phase:** 1 — first, alone, small. Ships now (user, 2026-09-27).
+**Phase:** round 2, phase 1 — first, alone, small. Ships now (user, 2026-09-27).
 
 **Files:**
 - Modify: `apps/saroh.app/app/layout.tsx` (drop both `localFont` loads and the `font-sans` body class; keep `data-skin="mono"`)
@@ -472,6 +513,7 @@ flowchart LR
 - Modify: `packages/site-blocks/src/tailwind-preset.ts` (add a `fontFamily` for `site-heading` and `site-body`)
 - Modify: `packages/site-blocks/src/booking-flow/{booking-flow,summary}.tsx`, `booking-flow/steps/{done-card,sessions,paying-card,step-head,one-to-one,expired-card}.tsx` (`font-display` → `font-site-heading`)
 - Modify: `apps/saroh.app/app/page.tsx` (the apex: no `font-display`; system stack)
+- Modify: `apps/app.saroh.in/components/sites/style-panel.tsx` (one line above the swatch rows: "Your site's text now uses a plain system font. Font choices aren't available yet.")
 - Modify: any other site-blocks file the G7 grep finds using `font-sans` or `font-mono`
 - Modify: `scripts/check-blocks.mjs` (add G7)
 - Modify: `docs/patterns/frontend-design-system.md` (replace "`saroh.app` keeps its old faces" with the rule, and add G7 to "Two token layers")
@@ -480,7 +522,8 @@ flowchart LR
 
 **Approach:**
 - Grep first and list every hit in the PR description. Check `font-sans` and `font-mono` as well as `font-display`, since all three resolve to Saroh variables through `tooling/tailwind-config`.
-- The system stack is the default for every publication, old and new. **That is the visible change of this unit, and it is intended**: every live site's text changes on the day it ships and stays neutral until its merchant picks a pairing (H8). The release note says so in merchant words.
+- The system stack is the default for every publication, old and new. **That is the visible change of this unit, and it is intended**: every live site's text changes on the day it ships and stays neutral until its merchant picks a pairing, which the Brand track brings first (H11). The Style panel line and the release note say so in merchant words, and promise no date.
+- H1 lands first and alone on the booking-flow files; E7, E11 and A9 rebase onto it (overview, "Shared files").
 - G7 in `check-blocks.mjs`:
   - (a) `\bfont-(sans|display|mono)\b` in `packages/site-blocks/src` code (comments stripped by the existing `code()` helper) fails;
   - (b) any `packages/ui/fonts` path or `next/font` import under `apps/saroh.app` fails.
@@ -496,6 +539,7 @@ flowchart LR
 - Error path: reintroducing `font-display` in a booking step makes `pnpm run check:blocks` fail with G7.
 - Error path: adding `localFont` for `packages/ui/fonts` to the saroh.app layout fails G7.
 - Integration: the checkout, pay page, 404 and error boundary still render legibly (visual check in the four scenes, dark included).
+- Happy path: the Site Editor's Style panel shows the plain-font line on any site.
 
 **Verification:** `pnpm run check:blocks` passes with G7. The e2e test passes. Side-by-side on Pulse's booking page shows no Saroh face, and DevTools' network panel shows no `packages/ui/fonts` file.
 
@@ -509,7 +553,7 @@ flowchart LR
 
 **Dependencies:** H1
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/sites/site-style.ts` (a version switch; `parseSiteStyle` returns a union; v1 is untouched)
@@ -526,7 +570,8 @@ flowchart LR
   - `pairing` is a catalogue key; `headingFace` and `bodyFace` are optional face keys that override one side (Advanced).
   - `logoLetter` is one character, any script.
   - `overrides` holds the v1 band rows (hero, CTA, footer) chosen under Advanced or carried from v1 (H10).
-- Unknown keys are refused, and the whole style is replaced on save (as #189). A retired catalogue key is accepted only if the site already holds it.
+- Unknown keys are refused, and the whole style is replaced on save (as #189). A retired catalogue key is accepted when the site already holds it, **when the style comes from restoring one of the site's saved versions** (`version-history.service`), or **when it is the site's template theme** ("Go back to the template's look", H9). Only a merchant newly picking a retired entry in a picker is refused. So a restore never fails with a 400 because the catalogue moved on.
+- **Rollout.** A v2 style is unreadable by today's v1 parser ("Unknown keys are refused"), so an API rolled back below H2 would reject any site saved as v2. H2's read path ships a release before anything can write v2 (H11 or H8 are the first writers), and the rollback boundary is that release. Publications are unaffected: they carry resolved variables.
 - Until H3 lands, the validator reads an empty catalogue in tests; H2 and H3 can merge in either order behind the unexposed v2.
 - The publish path records `styleVersion` in the snapshot, so the renderer and support can tell which resolved it.
 
@@ -536,6 +581,7 @@ flowchart LR
 - Happy path: a v2 style with a palette saves and reads back identically; one with `custom` does too; a v1 style saves and reads back identically.
 - Error path: `custom` without a colour, a palette with a colour, `#12345`, `red`, an unknown palette, pairing or face key, an unknown mode, a two-character letter, or extra fields → 400 with a field-named message.
 - Edge case: a retired palette key the site already holds → accepted; newly chosen → 400.
+- Edge case: restoring a saved version whose style names a palette retired since → accepted, and the site renders it; "Go back to the template's look" to a theme whose pairing was retired → accepted.
 - Error path: another business's site → 404; someone without `site:update` → 403.
 - Integration: publishing a v1 site after this unit produces the same `styleVariables` as before (a snapshot test against today's output).
 
@@ -551,10 +597,12 @@ flowchart LR
 
 **Dependencies:** H2
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Create: `packages/site-blocks/src/brand/catalogue/{fonts,palettes,themes}.json`
+- Create: `packages/site-blocks/src/brand/catalogue/catalogue.lock.json` (a content hash per shipped entry and per face file)
+- Create: `apps/saroh.app/public/site-fonts/` (moved here from H5, because this unit's test reads it: content-named woff2 files for every face in the catalogue — Geist, Bricolage Grotesque, Space Grotesk, Instrument Serif, Literata, Poppins, Hind — and Noto Sans and Noto Serif Devanagari subsets, with `OFL.txt` per family)
 - Create: `packages/site-blocks/src/brand/catalogue.ts` (schema, parse, types, `activeEntries`, `resolveFaces(pairing, overrides)`; names no entry)
 - Modify: `packages/site-blocks/src/index.ts` (exports)
 - Modify: `apps/api.saroh.in/src/modules/sites/sites.service.ts` (the site read serves the active catalogue entries and the site's own, even if retired)
@@ -567,8 +615,10 @@ flowchart LR
 - Palettes: key, label, main colour, mode, hero, CTA and footer grounds and foregrounds, link shade. The starting eight (default 66).
 - Themes: four records, each a palette key and a pairing key (H9 uses them).
 - `retired: true` hides an entry from the pickers; it keeps resolving.
+- The font files ship in this unit, so the test below can pass the day it merges. They are copied into `public/site-fonts`, never referenced from `packages/ui/fonts`, which H1's G7 forbids. File names carry a content hash, so a new cut of a face is a new file.
 - The catalogue test is the gate an entry must pass to be added: unique keys, files and licences present (it reads `apps/saroh.app/public/site-fonts/`), a Devanagari companion per face, palette contrast without adjustment (using H4's maths once it lands; a placeholder ratio check before), themes naming existing entries, and no palette equal to Saroh's own brand colours.
-- The pattern doc says how to add an entry, and that nothing else needs to change.
+- **The lock.** The test also recomputes each shipped entry's hash (its values, and for a face its file names) and compares it with `catalogue.lock.json`. A change to a locked entry fails with "Ship a re-tuned look as a new key and retire this one". A new entry is appended to the lock in the same PR. Retiring sets `retired: true`, which is outside the hash.
+- The pattern doc says how to add an entry, how to re-tune one (new key, retire the old), and that nothing else needs to change.
 
 **Patterns to follow:** `STYLE_ROWS` (options served by the API, not copied in the app); `packages/block-contract` for a shared, parsed source of truth.
 
@@ -577,6 +627,7 @@ flowchart LR
 - Edge case: adding a fixture pairing and a fixture palette in the test makes them appear in the site read with no other change.
 - Edge case: a retired palette is absent from the options but resolves for a site that holds it.
 - Error path: a pairing whose face has no file, a face without a Devanagari companion, a palette below 4.5:1, a duplicate key, or a theme naming a missing entry fails the catalogue test.
+- Error path: changing Terracotta's hero ground, or replacing `literata-400.<hash>.woff2` in place, fails the lock check; adding `terracotta-2` and retiring `terracotta` passes, and a site holding `terracotta` still resolves to the old values.
 
 **Verification:** The catalogue test passes; a grep finds no entry key in code outside the JSON files and tests.
 
@@ -590,7 +641,7 @@ flowchart LR
 
 **Dependencies:** H3
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Create: `packages/site-blocks/src/brand/resolve.ts` (`resolveBrand(brand, catalogue) → { variables, adjusted }`, pure, no server imports)
@@ -629,17 +680,17 @@ flowchart LR
 
 **Dependencies:** H3
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
-- Create: `apps/saroh.app/public/site-fonts/` (woff2 files for every face in the catalogue — Geist, Bricolage Grotesque, Space Grotesk, Instrument Serif, Literata, Poppins, Hind — and Noto Sans and Noto Serif Devanagari subsets, with `OFL.txt` per family)
+- (The files in `apps/saroh.app/public/site-fonts/` ship in H3, whose catalogue test reads them.)
 - Create: `packages/site-blocks/src/site-fonts.tsx` (`SiteFonts`: `@font-face` rules and preloads for a list of face keys, read from the catalogue)
 - Modify: `apps/api.saroh.in/src/modules/sites/sites.service.ts` (the snapshot gains `fonts: string[]`, the resolved face keys)
 - Modify: `apps/saroh.app/lib/publication.ts` (types and the shape check)
 - Test: `packages/site-blocks/src/site-fonts.test.ts`, `apps/saroh.app/lib/publication-fonts.test.ts`
 
 **Approach:**
-- The font files are copied into `public/site-fonts`, never referenced from `packages/ui/fonts`, which G7 forbids.
+- The font files (from H3) are served from `public/site-fonts`, never referenced from `packages/ui/fonts`, which G7 forbids.
 - `font-display: swap`, with metric overrides where measured.
 - `SiteFonts` writes `--site-font-heading` and `--site-font-body` stacks, each ending in its Devanagari companion and the neutral stack. With no brand, it writes nothing and `SiteTheme`'s defaults apply.
 - A snapshot names at most two faces plus their Devanagari companions, so a page never preloads the whole catalogue.
@@ -666,7 +717,7 @@ flowchart LR
 
 **Dependencies:** H4, H5
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/sites/sites.service.ts` (publish: v2 → `resolveBrand` → `styleVariables`, plus `fonts` and `styleVersion`)
@@ -704,7 +755,7 @@ flowchart LR
 
 **Dependencies:** H2
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/sites/brand-style.ts` (`logoMediaId` validated: the business's own media, an image purpose, PNG, JPEG or WebP under 1 MB per DEC-029)
@@ -738,7 +789,7 @@ flowchart LR
 
 **Dependencies:** H6, H7, H10, G2 (plan 007: the top bar and the Page · Add · Brand rail tabs, after G1's split)
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Create: `apps/app.saroh.in/components/sites/brand-panel/{brand-panel,theme-chips,palette-picker,custom-colour,mode-picker,pairing-picker,face-overrides,logo-field,advanced-rows}.tsx`
@@ -757,6 +808,7 @@ flowchart LR
   - Advanced (the v1 rows and spacing);
   - "Go back to the template's look".
 - The pickers render whatever the API serves; a new catalogue entry appears with no change here.
+- The Fonts section reuses H11's pairing picker component, which moves from the Style panel into the Brand tab; it isn't built twice.
 - **Contrast notes:** when `adjusted` is not empty, the panel says so in words ("Links use a darker shade of your colour so they're easy to read"). Colour is never the only signal.
 - **Undo** on a theme, palette or pairing change and on reset: a toast with Undo, using plan 007 G3's toast pattern, not a confirm.
 - **Read-only** without `site:update`: the fields show values but are disabled, with a line saying who can change them.
@@ -788,7 +840,7 @@ flowchart LR
 
 **Dependencies:** H8
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/sites/brand-style.ts` (`suggestTheme(business)` from modules and business type; the template's theme)
@@ -823,7 +875,7 @@ flowchart LR
 
 **Dependencies:** H4
 
-**Phase:** 2
+**Phase:** Brand track (outside round 2)
 
 **Files:**
 - Create: `packages/site-blocks/src/brand/nearest.ts` (`nearestBrand(v1Style, catalogue) → { brand, overrides, closeness }`, pure)
@@ -847,6 +899,49 @@ flowchart LR
 - Integration: for every seeded site, `resolveBrand(nearestBrand(v1))` equals the v1 `styleVariables` for every colour token when Custom is chosen (only type differs).
 
 **Verification:** The dry run reports no site whose saved suggestion would change a colour it didn't mean to; Rye, Pulse and Kavi each open Brand on a suggestion that looks like their live site plus the suggested pairing.
+
+---
+
+### H11. Fonts first: a pairing picker in today's Style panel
+
+**Goal:** Merchants get a choice of font back as early as the Brand track
+can give it, without waiting for palettes, the logo, the Brand panel or the
+editor split.
+
+**Requirements:** R5, R9 (fonts only), R12
+
+**Dependencies:** H2, H3, H5, H6. Not G1 or G2: it lives in today's Style
+panel.
+
+**Phase:** Brand track (outside round 2), its first delivery (new,
+2026-09-27, from the product review)
+
+**Files:**
+- Create: `apps/app.saroh.in/components/sites/pairing-picker.tsx` (each pairing a sample line in its own faces, with a Devanagari sample; "Closest to how your site looked" on the pairing H10's rule names, Lively, even before H10's colour work)
+- Modify: `apps/app.saroh.in/components/sites/style-panel.tsx` (the picker replaces H1's plain-font line; the swatch rows and spacing stay)
+- Modify: `apps/app.saroh.in/lib/sites/{style,actions}.ts` (saving a pairing on a v1 site writes a v2 style that carries the v1 colour rows unchanged as `overrides` and the v1 spacing, with no palette chosen: colours resolve exactly as before)
+- Modify: `apps/api.saroh.in/src/modules/sites/brand-style.ts` (a v2 style with a pairing and v1-carried colours is valid; the palette is optional until H8)
+- Test: `apps/app.saroh.in/lib/sites/pairing-picker.test.ts`, `apps/api.saroh.in/src/modules/sites/brand-style.spec.ts` (a v1 site saved with only a pairing publishes the same colour variables), `e2e/tests/site-brand.spec.ts` (Northwind only)
+
+**Approach:**
+- Picking a pairing changes type only. The colours a site has are carried
+  over byte for byte; no palette is suggested or applied here (that is
+  H8 and H10).
+- The canvas previews the pairing live through `SiteFonts`; the change is an
+  unpublished change until Publish, like any site change.
+- Undo on a pairing change, as a toast.
+- Read-only without `site:update`.
+
+**Test scenarios:**
+- Happy path: on a v1 site, pick Serif, publish → headings in Instrument
+  Serif, body in Literata, and every colour variable identical to before.
+- Edge case: "Closest to how your site looked" marks Lively.
+- Error path: the save fails → a named error, and the canvas returns to the
+  saved type.
+- Integration: H1's e2e still passes (requests go to `/site-fonts/`).
+
+**Verification:** Northwind picks a pairing and publishes; the Style
+panel's plain-font line is gone once the picker is there.
 
 ---
 
@@ -908,13 +1003,17 @@ Both wait for plan 007's module pages (G14–G16) and the editor split (G1).
 
 | Risk | Mitigation |
 |------|------------|
-| H1 makes merchant sites look plainer overnight | Intended (DEC-046; the user chose to ship it now). The neutral stack is tuned (weights, sizes) in the same PR, a release note names it, and H10 offers the pairing closest to the old look. |
+| H1 makes merchant sites look plainer overnight | Intended (DEC-046; the user chose to ship it now). The neutral stack is tuned (weights, sizes) in the same PR; the Style panel line and a release note say so without promising a date; the Brand track delivers fonts first (H11), with the pairing closest to the old look marked. |
+| The neutral font lasts indefinitely, since the Brand track has no date | The user schedules the track; its first delivery is fonts only (H2, H3, H5, H6, H11), which needs no site-editor unit |
+| Re-tuning a catalogue entry restyles live sites | Shipped entries are locked by hash (H3); a new look is a new key, and the old one is retired and keeps rendering |
+| A version restore or "Go back to the template's look" names a retired key | H2 accepts a retired key from a restore or the template's theme |
 | A saved brand changes an existing site's colours unexpectedly | H10: nothing is rewritten; the suggestion keeps the exact hex as Custom when no palette is close, and v1 bands carry as overrides. The dry run checks it. |
 | The catalogues grow into special cases in code | R7 and the catalogue test: no code names an entry, and a grep in H3's verification checks it. |
 | Contrast maths drifts between the API and the app | One module in `packages/site-blocks`, imported by both, with shared fixtures. |
 | Font files bloat the page | Preload only the snapshot's faces; subset Devanagari; `swap`; measure in the four-scene check. |
 | A merchant picks Geist or Bricolage and it looks like a leak | These are the merchant's choice through site tokens and a separate file path. G7 forbids only the Saroh path and Saroh variables. |
-| The Brand panel lands before the editor split | H8 depends on plan 007 G1 and G2; H2–H7, H9's API and H10 do not. |
+| The Brand panel lands before the editor split | H8 depends on plan 007 G1 and G2; H2–H7, H9's API, H10 and H11 do not. |
+| An API rollback can't read a v2 style | H2's read path ships a release before any writer (H11, H8); that release is the rollback boundary |
 | Font licensing | OFL faces only, with licence files shipped beside them; the catalogue test checks each is present. |
 
 ---
@@ -940,6 +1039,6 @@ Both wait for plan 007's module pages (G14–G16) and the editor split (G1).
 - Designs: `Saroh Site Editor.dc.html` (Brand tab, fonts, themes), `Saroh Customer Site.dc.html`, `DESIGN-NOTES.md` (26 Sep sections on the brand and the audit round 2).
 - The user's answers of 2026-09-27: ship the font fix now; several font pairings and several palettes plus a custom colour, extensible as data; existing sites kept as close as possible.
 - Decisions: DEC-046 (this track and the font-leak fix), DEC-029 (logo formats), ADR-002 (immutable publications, versioned contract), ADR-005 (Saroh's own brand), DEC-047.
-- Overview: `docs/plans/2026-09-26-000-round-2-overview.md` (epic H; defaults 65–70, 141–150).
+- Overview: `docs/plans/2026-09-26-000-round-2-overview.md` (epic H; defaults 65–70, 141–150, 155).
 - Related plans: `docs/plans/2026-09-26-007-feat-site-editor-customer-site-plan.md` (G1, G2, G3, G4, G5, G21).
 - Code: `apps/saroh.app/app/layout.tsx`, `packages/site-blocks/src/{site-theme,tailwind-preset,site-chrome}.tsx`, `packages/site-blocks/src/booking-flow/**`, `apps/api.saroh.in/src/modules/sites/site-style.ts`, `scripts/check-blocks.mjs`.
