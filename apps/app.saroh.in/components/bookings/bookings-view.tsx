@@ -132,10 +132,11 @@ export function BookingsView({
             priority: "secondary",
             sortValue: (b) => bookerLabel(b).toLowerCase(),
             cell: (b) =>
-                // A linked contact is a destination; a typed-in name is not.
+                // A linked contact is a destination — their Customer Detail,
+                // as from the peek (E5); a typed-in name is not.
                 b.contact ? (
                     <Link
-                        href={`/contacts/${b.contact.id}`}
+                        href={`/customers/${b.contact.id}`}
                         className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                     >
                         {bookerLabel(b)}

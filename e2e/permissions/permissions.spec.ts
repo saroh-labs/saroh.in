@@ -161,6 +161,34 @@ test("a disabled Website is distinct from a role denial", async ({
     ).toBeVisible();
 });
 
+test("a Reviewer opening Bookings sees the locked card, not an error", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "REVIEWER");
+    // Every route under Bookings, deep links included (E5).
+    for (const path of ["/bookings", "/bookings/all"]) {
+        await page.goto(path);
+        await expect(
+            page.getByRole("heading", {
+                name: "You can't open bookings",
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByText(
+                "Your role is Reviewer, which can see the website but not bookings. An owner or admin can change that in Team.",
+            ),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: "Back to Home", exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: /try again/i }),
+        ).toHaveCount(0);
+    }
+});
+
 test("a denied module explains access instead of saying it is off", async ({
     page,
     context,

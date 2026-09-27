@@ -15,7 +15,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { formatMoney } from "@/lib/format/money";
-import { listAvailability } from "@/lib/services/actions";
+import { listAvailability, readBookingPerson } from "@/lib/services/actions";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
 import type { Block, LocalDate } from "@/lib/services/diary";
@@ -29,6 +29,8 @@ import {
     paidText,
     whoFor,
 } from "@/lib/services/diary";
+import type { PeekPerson } from "@/lib/services/peek";
+import { attentionText, phoneText } from "@/lib/services/peek";
 import type { Slot } from "@/lib/services/service";
 
 import { ClassSeats } from "./class-seats";
@@ -185,6 +187,7 @@ function OneToOne({
     undo: (() => void) | null;
 }) {
     const [moving, setMoving] = useState(false);
+    const person = usePerson(b.contact?.id ?? null);
     const state = bookingState(b);
     const first = whoFor(b).split(" ")[0];
     const price = ctx.money
@@ -196,7 +199,7 @@ function OneToOne({
                 ? `${price} paid`
                 : "Paid"
             : b.paidWith === "DESK"
-              ? "Not yet — pays at the desk"
+              ? "Not yet — pays at the session"
               : paidText(b);
     const open = state === "booked" || state === "pending";
     const actions: ReactNode[] = [];
@@ -296,8 +299,16 @@ function OneToOne({
                     ["Service", b.service.name],
                     ["With", b.staff?.name ?? "Unassigned"],
                     ["Paid", paid],
-                    ["Phone", b.bookerPhone ?? "—"],
+                    [
+                        "Phone",
+                        phoneText({
+                            bookerPhone: b.bookerPhone,
+                            hasContact: b.contact !== null,
+                            person: person ?? undefined,
+                        }),
+                    ],
                     ["Email", b.contact?.email ?? b.bookerEmail ?? "—"],
+                    ...needsAttention(person),
                 ]}
             />
             <Card>
@@ -330,6 +341,36 @@ function OneToOne({
     );
 }
 
+/**
+ * The person behind the booking (their phone and Needs attention), read when
+ * the peek opens. Null while it loads or when it can't be read.
+ */
+function usePerson(contactId: string | null): PeekPerson | null {
+    const [read, setRead] = useState<{
+        id: string;
+        person: PeekPerson | null;
+    } | null>(null);
+    useEffect(() => {
+        if (!contactId) return;
+        let live = true;
+        void readBookingPerson(contactId)
+            .catch(() => null)
+            .then((person) => {
+                if (live) setRead({ id: contactId, person });
+            });
+        return () => {
+            live = false;
+        };
+    }, [contactId]);
+    return read?.id === contactId ? read.person : null;
+}
+
+/** The design's "Needs attention" row, only when there is something. */
+function needsAttention(person: PeekPerson | null): [string, string][] {
+    const text = attentionText(person?.attention ?? null);
+    return text ? [["Needs attention", text]] : [];
+}
+
 function Links({ booking: b }: { booking: DiaryBooking }) {
     const link =
         "flex items-center gap-2 rounded-[11px] border border-border bg-card px-3.5 py-[11px] text-[13px] font-semibold text-foreground hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -338,7 +379,7 @@ function Links({ booking: b }: { booking: DiaryBooking }) {
             {b.contact ? (
                 <Link href={`/customers/${b.contact.id}`} className={link}>
                     <span className="flex-1">
-                        {whoFor(b)} — their bookings and history
+                        Open {whoFor(b).split(" ")[0]}&apos;s page
                     </span>
                     <ArrowRight aria-hidden className="size-4" />
                 </Link>
