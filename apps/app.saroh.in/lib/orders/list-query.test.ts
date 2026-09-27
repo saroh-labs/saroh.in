@@ -23,6 +23,7 @@ describe("readOrdersQuery", () => {
             tab: "open",
             q: "1042",
             storefront: "s1",
+            since: null,
             cursor: null,
             back: [],
         });
@@ -43,6 +44,42 @@ describe("readOrdersQuery", () => {
             "c1",
         ]);
         expect(readOrdersQuery({ back: "c1" }).back).toEqual([]);
+    });
+});
+
+describe("since (Home's Last 24 hours, F6)", () => {
+    const at = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    it("carries the instant to the API and keeps it while paging", () => {
+        const q = readOrdersQuery({ since: at, tab: "open" });
+        expect(q.since).toBe(at);
+        expect(orderListParams(q).since).toBe(at);
+        expect(nextPageHref(q, "c1")).toBe(
+            `/commerce/orders?tab=open&since=${encodeURIComponent(at)}&cursor=c1`,
+        );
+    });
+
+    it("drops it, and the page, for Show all", () => {
+        const q = readOrdersQuery({ since: at, cursor: "c1", tab: "open" });
+        expect(ordersHref(q, { since: null })).toBe(
+            "/commerce/orders?tab=open",
+        );
+    });
+
+    it("reads a malformed or future instant as no filter", () => {
+        expect(readOrdersQuery({ since: "yesterday" }).since).toBeNull();
+        const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        expect(readOrdersQuery({ since: future }).since).toBeNull();
+    });
+
+    it("says an empty window is empty, not that there are no orders", () => {
+        expect(
+            ordersEmptyCopy(readOrdersQuery({ since: at }), null),
+        ).toMatchObject({
+            kind: "since",
+            title: "No orders in the last 24 hours",
+            action: "clear-since",
+        });
     });
 });
 
@@ -102,6 +139,7 @@ describe("orderListParams", () => {
             tab: undefined,
             q: undefined,
             storeId: undefined,
+            since: undefined,
             cursor: undefined,
         });
         expect(
@@ -113,7 +151,13 @@ describe("orderListParams", () => {
                     cursor: "c1",
                 }),
             ),
-        ).toEqual({ tab: "open", q: "1042", storeId: "s1", cursor: "c1" });
+        ).toEqual({
+            tab: "open",
+            q: "1042",
+            storeId: "s1",
+            since: undefined,
+            cursor: "c1",
+        });
     });
 });
 

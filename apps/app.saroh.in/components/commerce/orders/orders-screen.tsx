@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import type { OrderListPage, OrderRow } from "@/lib/orders/business-service";
 import { ordersToCsv } from "@/lib/orders/export";
@@ -124,6 +125,20 @@ export function OrdersScreen({
             />
 
             <OrderTabs query={query} counts={page.counts} />
+
+            {/* From Home's "Last 24 hours" (F6): the list is narrowed, and
+                says so, with the whole list one click away. The count is the
+                API's for the tab in view. */}
+            {query.since ? (
+                <div className="pt-3.5">
+                    <SinceNotice
+                        count={page.counts[query.tab]}
+                        noun={{ one: "order", other: "orders" }}
+                        verb="placed"
+                        clearHref={ordersHref(query, { since: null })}
+                    />
+                </div>
+            ) : null}
 
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
                 <SearchField query={query} go={go} />
@@ -322,6 +337,14 @@ function EmptyOrders({
                     onClick={() => go({ q: "" })}
                 >
                     Clear search
+                </Button>
+            ) : copy.action === "clear-since" ? (
+                <Button
+                    variant="outline"
+                    className="mt-1"
+                    onClick={() => go({ since: null })}
+                >
+                    Show all orders
                 </Button>
             ) : copy.action === "show-all" ? (
                 <Button

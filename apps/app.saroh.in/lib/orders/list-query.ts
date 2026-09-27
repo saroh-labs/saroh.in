@@ -1,3 +1,5 @@
+import { sinceParam } from "@/lib/views/since";
+
 import type { OrderListParams } from "./business-service";
 
 /**
@@ -18,6 +20,12 @@ export interface OrdersQuery {
     tab: OrdersTab;
     q: string;
     storefront: string | null;
+    /**
+     * Only orders placed from this instant on (ISO), from Home's "Last 24
+     * hours" link (F6); null for every order. Answered by the API, so the
+     * rows and the tab counts agree.
+     */
+    since: string | null;
     /** Where the page on screen starts; null on the first page. */
     cursor: string | null;
     /** The cursors of the pages before this one, oldest first. */
@@ -64,6 +72,8 @@ export function readOrdersQuery(params: Params): OrdersQuery {
             "all",
         q: one(params, "q") ?? "",
         storefront: one(params, "storefront") ?? null,
+        // A malformed or future instant is no filter (`sinceParam`).
+        since: sinceParam(params)?.toISOString() ?? null,
         cursor,
         // Only meaningful past the first page.
         back: cursor
@@ -81,7 +91,11 @@ export function ordersHref(
     query: OrdersQuery,
     patch: Partial<OrdersQuery> = {},
 ): string {
-    const relists = "tab" in patch || "q" in patch || "storefront" in patch;
+    const relists =
+        "tab" in patch ||
+        "q" in patch ||
+        "storefront" in patch ||
+        "since" in patch;
     const next: OrdersQuery = {
         ...query,
         ...(relists ? { cursor: null, back: [] } : {}),
@@ -91,6 +105,7 @@ export function ordersHref(
     if (next.tab !== "all") q.set("tab", next.tab);
     if (next.q) q.set("q", next.q);
     if (next.storefront) q.set("storefront", next.storefront);
+    if (next.since) q.set("since", next.since);
     if (next.cursor) {
         q.set("cursor", next.cursor);
         if (next.back.length) q.set("back", next.back.join(","));
@@ -140,16 +155,17 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
         tab: query.tab === "all" ? undefined : query.tab,
         q: query.q || undefined,
         storeId: query.storefront ?? undefined,
+        since: query.since ?? undefined,
         cursor: query.cursor ?? undefined,
     };
 }
 
 /** What an empty list says, and what fills it. */
 export interface OrdersEmptyCopy {
-    kind: "search" | "tab" | "first-run";
+    kind: "search" | "tab" | "since" | "first-run";
     title: string;
     note: string;
-    action: "clear-search" | "show-all" | null;
+    action: "clear-search" | "show-all" | "clear-since" | null;
 }
 
 /**
@@ -184,6 +200,14 @@ export function ordersEmptyCopy(
             title: "No refunds",
             note: "Refunded orders collect here so you can see them apart from the rest.",
             action: "show-all",
+        };
+    }
+    if (query.since) {
+        return {
+            kind: "since",
+            title: "No orders in the last 24 hours",
+            note: "Orders placed since then land here. Every earlier order is still in the full list.",
+            action: "clear-since",
         };
     }
     return {
