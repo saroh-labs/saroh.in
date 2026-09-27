@@ -245,6 +245,26 @@ describe("pickUpItems", () => {
         const [item] = pickUpItems([order({ stage: "READY" })], day, ZONE);
         expect(item.who).toBe("Order #1042 · Ready");
     });
+
+    it("is due when its storefront's Pick-up threshold passes (B17)", () => {
+        const counter = {
+            settings: {
+                pickupLateAfterMinutes: 20,
+                localDeliveryLateAfterMinutes: 1440,
+                shippingLateAfterMinutes: 2880,
+            },
+        };
+        const [item] = pickUpItems([order({ store: counter })], day, ZONE);
+        // Placed 08:15; this counter counts late after 20 minutes.
+        expect(item.time).toBe("08:35");
+        // A storefront without settings waits the default two hours.
+        const [plain] = pickUpItems(
+            [order({ store: { settings: null } })],
+            day,
+            ZONE,
+        );
+        expect(plain.time).toBe("10:15");
+    });
 });
 
 describe("todayScope", () => {
@@ -291,6 +311,13 @@ describe("readToday", () => {
         return {
             booking: { findMany: jest.fn().mockResolvedValue(bookings) },
             order: { findMany: jest.fn().mockResolvedValue(orders) },
+            storeSettings: {
+                aggregate: jest
+                    .fn()
+                    .mockResolvedValue({
+                        _max: { pickupLateAfterMinutes: null },
+                    }),
+            },
             contactAttention: {
                 findMany: jest.fn().mockResolvedValue([]),
                 groupBy: jest.fn().mockResolvedValue([]),
@@ -316,6 +343,23 @@ describe("readToday", () => {
                 lt: new Date("2026-09-18T18:30:00.000Z"),
             },
         });
+    });
+
+    it("reaches back as far as the longest Pick-up wait any storefront sets", async () => {
+        const client = db([]);
+        client.storeSettings.aggregate.mockResolvedValue({
+            _max: { pickupLateAfterMinutes: 24 * 60 },
+        });
+        await readToday(client as never, INPUT, ALL, { now: NOW, zone: ZONE });
+        expect(client.storeSettings.aggregate).toHaveBeenCalledWith({
+            where: { store: { organizationId: "org_1" } },
+            _max: { pickupLateAfterMinutes: true },
+        });
+        const where = client.order.findMany.mock.calls[0][0].where;
+        expect(where.createdAt.gte).toEqual(
+            new Date("2026-09-16T18:30:00.000Z"),
+        );
+        expect(where.fulfilment.in.sort()).toEqual(["COLLECT", "PICKUP"]);
     });
 
     it("puts bookings and pick-ups in one time order", async () => {
@@ -410,6 +454,13 @@ describe("HomeService: the today block", () => {
                 groupBy: jest.fn().mockResolvedValue([]),
             },
             user: empty,
+            storeSettings: {
+                aggregate: jest
+                    .fn()
+                    .mockResolvedValue({
+                        _max: { pickupLateAfterMinutes: null },
+                    }),
+            },
             businessProfile: {
                 findUnique: jest.fn().mockResolvedValue({ timezone: ZONE }),
             },

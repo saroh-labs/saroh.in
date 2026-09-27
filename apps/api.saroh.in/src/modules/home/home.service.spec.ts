@@ -107,6 +107,11 @@ function build(views: View[], fixture: Fixture = {}) {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),
         },
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
+        },
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const stockChecks = { openShort: jest.fn().mockResolvedValue([]) };
@@ -137,6 +142,8 @@ const OPEN_ORDER = {
     total: "1250.50",
     currency: "INR",
     createdAt: new Date("2026-07-20T10:00:00.000Z"),
+    // Its storefront never saved settings: the default thresholds.
+    store: { settings: null },
     customer: {
         firstName: "Vikram",
         lastName: "Shetty",

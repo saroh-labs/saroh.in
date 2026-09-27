@@ -5,9 +5,15 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { BookingEventType } from "../bookings/booking-event-type";
 import { attentionFor } from "../customer-workspace/attention-read";
 import {
-    DEFAULT_LATE_AFTER_MINUTES,
-    fulfilmentTypeOf,
-} from "../orders/order-list-filters";
+    DEFAULT_LATE_THRESHOLDS,
+    storedValuesOf,
+    typeOf,
+} from "../orders/fulfilment";
+import type { LateThresholdColumns } from "../orders/late-thresholds";
+import {
+    LATE_THRESHOLD_SELECT,
+    lateThresholdsOf,
+} from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import type { HomeInput, HomeToday, HomeTodayItem } from "./home-model";
 import { holds, personName } from "./home-model";
@@ -115,6 +121,8 @@ export interface TodayOrderRow {
         lastName: string | null;
         email: string | null;
     } | null;
+    /** Its storefront's late thresholds; absent reads the defaults. */
+    store?: { settings: LateThresholdColumns | null } | null;
 }
 
 const OUTCOME_EVENT: Record<string, string> = {
@@ -233,21 +241,20 @@ const STAGE_WORDS: Record<string, string> = {
     READY: "Ready",
 };
 
-/** Minutes after placing a pick-up is due, by its type's default (DEC-045). */
-function readyAfter(fulfilment: string): number {
-    return DEFAULT_LATE_AFTER_MINUTES[fulfilmentTypeOf(fulfilment)] ?? 120;
+/**
+ * Minutes after placing a pick-up is due: the Pick-up threshold its
+ * storefront sets (B17; DEC-045), the one its Late tag goes by.
+ */
+function readyAfter(row: TodayOrderRow): number {
+    return lateThresholdsOf(row.store?.settings).PICKUP;
 }
-
-/** The longest any order type waits, so the read reaches back far enough. */
-const LONGEST_WAIT_MS =
-    Math.max(120, ...Object.values(DEFAULT_LATE_AFTER_MINUTES)) * 60_000;
 
 /**
  * Open pick-ups due today, each at the time it should be ready: placed, plus
- * its type's wait (the same threshold the Orders list's Late filter reads).
- * Both fulfilment vocabularies read as pick-up (COLLECT and PICKUP) while
- * the enum moves (B2a–B2d). No late tag: that is the order's own `late`,
- * which B2b adds, and Home never works lateness out for itself.
+ * its storefront's Pick-up threshold (the one the Orders list's Late filter
+ * reads). Both fulfilment vocabularies read as pick-up (COLLECT and PICKUP)
+ * while the enum moves (B2a–B2d). No late tag: that is the order's own
+ * `late`, and Home never works lateness out for itself.
  */
 export function pickUpItems(
     rows: readonly TodayOrderRow[],
@@ -256,10 +263,11 @@ export function pickUpItems(
 ): HomeTodayItem[] {
     const items: HomeTodayItem[] = [];
     for (const row of rows) {
-        if (fulfilmentTypeOf(row.fulfilment) !== "PICKUP") continue;
+        // A row without its type (an old fixture) is no pick-up.
+        if (!row.fulfilment || typeOf(row.fulfilment) !== "PICKUP") continue;
         if (row.paymentStatus === "REFUNDED") continue;
         const due = new Date(
-            row.createdAt.getTime() + readyAfter(row.fulfilment) * 60_000,
+            row.createdAt.getTime() + readyAfter(row) * 60_000,
         );
         if (due < day.start || due >= day.end) continue;
         const who = row.customer ? personName(row.customer) : null;
@@ -317,6 +325,53 @@ async function flagsFor(
     );
 }
 
+/**
+ * The open pick-ups that could be due today: placed no earlier than the
+ * longest Pick-up wait any of the business's storefronts sets (B17) before
+ * the day starts. `pickUpItems` keeps the ones due today.
+ */
+async function pickUpRows(
+    db: typeof prisma,
+    organizationId: string,
+    day: { start: Date; end: Date },
+): Promise<TodayOrderRow[]> {
+    const longest = await db.storeSettings.aggregate({
+        where: { store: { organizationId } },
+        _max: { pickupLateAfterMinutes: true },
+    });
+    const wait = Math.max(
+        DEFAULT_LATE_THRESHOLDS.PICKUP,
+        longest._max.pickupLateAfterMinutes ?? 0,
+    );
+    return db.order.findMany({
+        where: {
+            organizationId,
+            status: { in: [...UNFULFILLED_STATUSES] },
+            stage: { in: ["NEW", "PREPARING", "READY"] },
+            fulfilment: { in: storedValuesOf(["PICKUP"]) },
+            createdAt: {
+                gte: new Date(day.start.getTime() - wait * 60_000),
+                lt: day.end,
+            },
+        },
+        orderBy: { createdAt: "asc" },
+        take: TODAY_LIMIT * 2,
+        select: {
+            id: true,
+            orderId: true,
+            storeId: true,
+            createdAt: true,
+            stage: true,
+            fulfilment: true,
+            paymentStatus: true,
+            customer: {
+                select: { firstName: true, lastName: true, email: true },
+            },
+            store: { select: { settings: { select: LATE_THRESHOLD_SELECT } } },
+        },
+    });
+}
+
 /** Read today for one business. Throws on a failed read; Home names it. */
 export async function readToday(
     db: typeof prisma,
@@ -372,37 +427,7 @@ export async function readToday(
               }) as Promise<TodayBookingRow[]>)
             : Promise.resolve([] as TodayBookingRow[]),
         scope.pickUps
-            ? (db.order.findMany({
-                  where: {
-                      organizationId: input.organizationId,
-                      status: { in: [...UNFULFILLED_STATUSES] },
-                      stage: { in: ["NEW", "PREPARING", "READY"] },
-                      // Placed early enough to be due today, whatever its
-                      // type's wait; `pickUpItems` keeps the ones that are.
-                      createdAt: {
-                          gte: new Date(day.start.getTime() - LONGEST_WAIT_MS),
-                          lt: day.end,
-                      },
-                  },
-                  orderBy: { createdAt: "asc" },
-                  take: TODAY_LIMIT * 2,
-                  select: {
-                      id: true,
-                      orderId: true,
-                      storeId: true,
-                      createdAt: true,
-                      stage: true,
-                      fulfilment: true,
-                      paymentStatus: true,
-                      customer: {
-                          select: {
-                              firstName: true,
-                              lastName: true,
-                              email: true,
-                          },
-                      },
-                  },
-              }) as Promise<TodayOrderRow[]>)
+            ? pickUpRows(db, input.organizationId, day)
             : Promise.resolve([] as TodayOrderRow[]),
     ]);
 

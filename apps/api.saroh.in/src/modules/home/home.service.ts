@@ -3,6 +3,10 @@ import { prisma } from "@saroh/database";
 
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import {
+    LATE_THRESHOLD_SELECT,
+    lateThresholdsOf,
+} from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { StockChecksService } from "../stock/stock-checks.service";
 import type {
@@ -544,7 +548,16 @@ export class HomeService {
                 where,
                 orderBy: { createdAt: "asc" },
                 take: EVIDENCE_LIMIT,
-                include: { customer: true },
+                include: {
+                    customer: true,
+                    // Its storefront's late thresholds (B17), so a Late tag
+                    // here is the one Orders shows.
+                    store: {
+                        select: {
+                            settings: { select: LATE_THRESHOLD_SELECT },
+                        },
+                    },
+                },
             }),
         ]);
 
@@ -565,7 +578,13 @@ export class HomeService {
                         : null,
                     currency: view.money ? row.currency : null,
                     href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
-                    ...openOrderWords(row, who, view.now, view.zone),
+                    ...openOrderWords(
+                        row,
+                        who,
+                        view.now,
+                        view.zone,
+                        lateThresholdsOf(row.store.settings),
+                    ),
                 };
             }),
         };

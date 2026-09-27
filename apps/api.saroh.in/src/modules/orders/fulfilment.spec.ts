@@ -3,7 +3,6 @@ import { BadRequestException } from "@nestjs/common";
 import type { FulfilmentType } from "./fulfilment";
 import {
     DEFAULT_LATE_THRESHOLDS,
-    defaultLateThresholds,
     FULFILMENT_RULES,
     FULFILMENT_TYPES,
     fulfilmentView,
@@ -13,6 +12,7 @@ import {
     LATE_STATUSES,
     lateAfterMinutesOf,
     lateOf,
+    lateStoredValues,
     legacyWord,
     movesFor,
     shipsToAddress,
@@ -445,13 +445,13 @@ describe("the late rule (DEC-045, default 16)", () => {
         ).toBe(false);
     });
 
-    it("gives the list's SQL the same defaults and steps, under both vocabularies", () => {
-        expect(Object.fromEntries(defaultLateThresholds())).toEqual({
-            COLLECT: 120,
-            DELIVERY: 1440,
-            PICKUP: 120,
-            LOCAL_DELIVERY: 1440,
-            SHIPPING: 2880,
+    it("gives the list's SQL each stored value's type and the same steps, under both vocabularies", () => {
+        expect(Object.fromEntries(lateStoredValues())).toEqual({
+            COLLECT: "PICKUP",
+            DELIVERY: "LOCAL_DELIVERY",
+            PICKUP: "PICKUP",
+            LOCAL_DELIVERY: "LOCAL_DELIVERY",
+            SHIPPING: "SHIPPING",
         });
         expect(LATE_STAGES).toEqual(["NEW", "PREPARING", "READY"]);
         expect(LATE_STATUSES).toEqual(["PENDING", "PROCESSING"]);

@@ -338,6 +338,11 @@ function shortCheck(over: Partial<StockCheck> = {}): StockCheck {
 
 describe("stockShort", () => {
     const tracking = (on: boolean | null) => ({
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
+        },
         businessProfile: {
             findUnique: jest
                 .fn()
@@ -490,6 +495,11 @@ function home(
                     createdAt: new Date("2026-09-01T00:00:00.000Z"),
                 })),
             ),
+        },
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
         },
         businessProfile: {
             findUnique: jest

@@ -4,11 +4,13 @@ import { DateTime, IANAZone } from "luxon";
 
 import type { ListTab, PaymentStanding } from "./dto";
 import {
-    defaultLateThresholds,
+    DEFAULT_LATE_THRESHOLDS,
     LATE_STAGES,
     LATE_STATUSES,
+    lateStoredValues,
     storedValuesOf,
 } from "./fulfilment";
+import { LATE_THRESHOLD_COLUMNS } from "./late-thresholds";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -31,17 +33,13 @@ export type { ListTab, PaymentStanding } from "./dto";
 export type { FulfilmentType } from "./fulfilment";
 
 /**
- * When an open order counts as late, in minutes from when it was placed, per
- * stored fulfilment value: each type's default from `fulfilment.ts`
- * (default 16: 2 h, 24 h, 48 h), under its legacy word too until B2d. Digital
- * and appointments are never late here: Digital never is, and appointments go
- * by their visits.
- *
- * TODO(B17): the storefront's own thresholds replace these defaults, read
- * through a join on `StoreSettings` in {@link lateSql}.
+ * The join that gives the list's query each order's storefront's settings
+ * row as `ss`, which {@link lateSql} reads the thresholds from (B17). A
+ * function, not a constant, so importing this file builds no SQL.
  */
-export const DEFAULT_LATE_AFTER_MINUTES: Readonly<Record<string, number>> =
-    Object.fromEntries(defaultLateThresholds());
+export function lateSettingsJoin(): Prisma.Sql {
+    return Prisma.sql`LEFT JOIN "StoreSettings" ss ON ss."storeId" = o."storeId"`;
+}
 
 /** The list's filters once the query string is validated (dto.ts). */
 export interface OrderListFilter {
@@ -170,14 +168,17 @@ export function openSql(): Prisma.Sql {
 }
 
 /**
- * Late: an open order not yet handed over, placed longer ago than its type's
- * threshold (DEC-045: the clock starts at placed, paid or not). Never stored;
- * `now` is bound so a page and its counts use one clock.
+ * Late: an open order not yet handed over, placed longer ago than the
+ * threshold its storefront sets for its type (B17; DEC-045: the clock starts
+ * at placed, paid or not). Reads the settings row {@link lateSettingsJoin}
+ * joins, and a storefront without one reads the defaults, as `lateOf` does.
+ * Never stored; `now` is bound so a page and its counts use one clock.
  */
 export function lateSql(now: Date): Prisma.Sql {
-    const whens = Object.entries(DEFAULT_LATE_AFTER_MINUTES).map(
-        ([stored, minutes]) => Prisma.sql`WHEN ${stored} THEN ${minutes}::int`,
-    );
+    const whens = lateStoredValues().map(([stored, type]) => {
+        const column = Prisma.raw(`ss."${LATE_THRESHOLD_COLUMNS[type]}"`);
+        return Prisma.sql`WHEN ${stored} THEN COALESCE(${column}, ${DEFAULT_LATE_THRESHOLDS[type]}::int)`;
+    });
     const threshold = Prisma.sql`(CASE o.fulfilment::text ${Prisma.join(whens, " ")} END)`;
     // The same open-and-not-handed-over lists `lateOf` reads for one order.
     return Prisma.sql`(o.status::text = ANY(${[...LATE_STATUSES]})
