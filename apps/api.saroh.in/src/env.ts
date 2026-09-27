@@ -87,6 +87,34 @@ const envSchema = z.object({
     USER_ACCOUNT: z.string().optional(),
     USER_PASSWORD: z.string().optional(),
 
+    // Sign-in codes for a business's customers on its own site (ADR-011,
+    // round-2 plan A, A2). Every one is optional in the schema so dev and
+    // test boot without them; `site-accounts/site-secrets.ts` checks the two
+    // secrets AT USE and refuses to run on a fixed dev value anywhere but
+    // development and test. Never logged.
+    //
+    // The shared secret that signs `x-saroh-relay` — the visitor's address
+    // and the host saroh.app served. Byte-identical in api and saroh.app.
+    SITE_RELAY_SECRET: z.string().min(32).optional(),
+    // The key the destination email and the code are HMAC'd under, so a
+    // database read reveals neither who asked nor the code.
+    SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // Cloudflare Turnstile, the bot challenge a code needs past a shared
+    // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
+    // would have been), so a customer is never stuck on a widget that can't load.
+    TURNSTILE_SITE_KEY: z.string().optional(),
+    TURNSTILE_SECRET_KEY: z.string().optional(),
+    // The code email's own sending address and stream, apart from workspace
+    // sign-in mail. The SMTP_* set below is the fallback transport.
+    SITE_CODES_EMAIL_FROM: z.string().email().optional(),
+    SITE_CODES_SMTP_HOST: z.string().optional(),
+    SITE_CODES_SMTP_PORT: z.string().optional(),
+    SITE_CODES_SMTP_USER: z.string().optional(),
+    SITE_CODES_SMTP_PASS: z.string().optional(),
+    // Development only, with no SMTP: `log` prints the code (the default),
+    // `fail` makes every send fail, to see the "couldn't send" path and alert.
+    SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+
     // Payments (S5-002 — org merchant credential encryption at rest).
     // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the
     // schema so dev/test can boot without payments configured; the payments

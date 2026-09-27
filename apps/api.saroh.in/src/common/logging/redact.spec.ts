@@ -15,6 +15,15 @@ describe("redactHeaders", () => {
         expect(out["content-type"]).toBe("application/json");
         expect(out["user-agent"]).toBe("jest");
     });
+
+    it("redacts a site's signed relay and a customer's session (ADR-011)", () => {
+        const out = redactHeaders({
+            "x-saroh-relay": "v1.1790000000.MjAzLjAuMTEzLjc.a2F2aQ.sig",
+            "X-Customer-Session": "token",
+        });
+        expect(out["x-saroh-relay"]).toBe(REDACTED);
+        expect(out["X-Customer-Session"]).toBe(REDACTED);
+    });
 });
 
 describe("redactObject", () => {

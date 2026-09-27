@@ -87,6 +87,26 @@ function extractClientMessage(exception: HttpException): {
 }
 
 /**
+ * A 503 the API raised on purpose, with its own words and a reason a client
+ * can branch on in `details` — a site sign-in code that could not be sent,
+ * `{ reason: "unavailable" }` (round-2 plan A, A2). It is ours, not an
+ * internal error, so it keeps its message and details; the code that threw
+ * it has already logged what went wrong.
+ */
+function isDeliberateUnavailable(exception: unknown): boolean {
+    if (!(exception instanceof HttpException)) return false;
+    if (exception.getStatus() !== Number(HttpStatus.SERVICE_UNAVAILABLE)) {
+        return false;
+    }
+    const body = exception.getResponse();
+    return (
+        typeof body === "object" &&
+        typeof (body as { message?: unknown }).message === "string" &&
+        (body as { details?: unknown }).details !== undefined
+    );
+}
+
+/**
  * Global catch-all filter. Converts any thrown error into the standard error
  * envelope, maps Nest `HttpException`s to their status, and collapses anything
  * unexpected into an opaque 500 so stack traces and internal messages never
@@ -110,7 +130,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         let message: string;
         let details: unknown;
 
-        if (isServerError) {
+        if (isServerError && !isDeliberateUnavailable(exception)) {
             // Never surface internals for 5xx — generic envelope only.
             code = "INTERNAL_SERVER_ERROR";
             message = "Internal server error";

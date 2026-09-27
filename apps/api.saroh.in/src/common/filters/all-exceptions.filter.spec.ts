@@ -6,6 +6,7 @@ import {
     HttpStatus,
     InternalServerErrorException,
     NotFoundException,
+    ServiceUnavailableException,
     type ArgumentsHost,
 } from "@nestjs/common";
 import type { Request } from "express";
@@ -171,6 +172,34 @@ describe("AllExceptionsFilter", () => {
         expect(err.statusCode).toBe(500);
         expect(err.message).toBe("Internal server error");
         expect(JSON.stringify(res.body)).not.toContain("db pool");
+    });
+
+    it("keeps the words and reason of a deliberate 503 (a sign-in code that couldn't be sent)", () => {
+        const res = makeResponse();
+        filter.catch(
+            new ServiceUnavailableException({
+                message:
+                    "We couldn't send your code — try again in a few minutes",
+                details: { reason: "unavailable" },
+            }),
+            makeHost(res),
+        );
+        const err = envelope(res);
+        expect(err.statusCode).toBe(503);
+        expect(err.code).toBe("SERVICE_UNAVAILABLE");
+        expect(err.message).toBe(
+            "We couldn't send your code — try again in a few minutes",
+        );
+        expect(err.details).toEqual({ reason: "unavailable" });
+    });
+
+    it("keeps a 503 without a reason generic", () => {
+        const res = makeResponse();
+        filter.catch(
+            new ServiceUnavailableException("upstream pool exhausted"),
+            makeHost(res),
+        );
+        expect(envelope(res).message).toBe("Internal server error");
     });
 
     it("falls back to 'unknown' correlation id when middleware did not run", () => {
