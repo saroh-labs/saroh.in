@@ -36,6 +36,11 @@ function build(rows: (typeof OWED)[], count = rows.length) {
             count: jest.fn().mockResolvedValue(count),
             findMany: jest.fn().mockResolvedValue(rows),
         },
+        // Failed renewals and overdue invoices (F1) read here too: none.
+        invoice: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
     };
     return { service: new HomeService(availability, db as never), db };
 }
