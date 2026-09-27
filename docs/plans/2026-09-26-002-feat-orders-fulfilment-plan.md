@@ -44,9 +44,12 @@ capability model (DEC-039, 2026-09-27) and is phase 2 (B16). Until F18 makes
 `order:read` keeps today's kitchen view without money (DEC-024).
 
 **Phase 1 is one finished flow** (user, 2026-09-27): the list API, the
-fulfilment types, the rows and tabs, their states, and the shipping panel —
-B1, B2a, B2b, B2c, B3, B7 and B10. B17's default late thresholds apply until
-B17 ships. Everything else is phase 2.
+fulfilment types, the rows and tabs, their states, the shipping panel and
+the per-storefront late setting — B1, B2a, B2b, B2c, B3, B7, B10 and B17.
+B17 is in phase 1 because the storefront sets the late rule (user,
+2026-09-27): a café must be able to change the new 2-hour default the day it
+ships. B3 does not depend on B17; the API's default thresholds apply until
+B17's setting exists. Everything else is phase 2.
 
 Invoices (the bill of supply, PDF, sending, the source filter and invoice
 locked states) are plan D's (`2026-09-26-004-feat-payments-plan.md`).
@@ -530,7 +533,8 @@ the design.
     expression over `createdAt` and the storefront's thresholds (the
     defaults until B17), so counts and cursors stay exact.
   - **Needs attention is not in B1.** B15 adds the `attention` field and
-    filter once C1 exists, so no unit ships an `attention: null` stand-in.
+    filter once C1 exists, so no unit ships an `attention: null` stand-in,
+    and B1 does not wait on C1.
 - **Bulk moves are held on the server.** A hold kept only in a browser tab
   loses the moves when the tab closes, and a retry after a lost reply can't
   tell its own moves from someone else's. So:
@@ -744,11 +748,14 @@ flowchart LR
 ```
 
 **Phase 1** (one finished flow: the list, the types, the rows, their states,
-the shipping panel): B1, B2a, B2b, B2c, B3, B7, B10. B2a and B2c go out in
-different releases, and B10 lands with or after B2c. B17's default
-thresholds apply until B17.
+the shipping panel, the late setting): B1, B2a, B2b, B2c, B3, B7, B10, B17 —
+8 units. B2a → B2b → B2c land in that order on the order module, B2a and B2c
+in different releases, and B10 lands with or after B2c. B17 lands after B2b,
+in the same release as B2b or the one after it; until it does, the API's
+default thresholds apply, and nothing else waits on it.
 
-**Phase 2:** B2d, B4, B5, B6, B8, B9, B11, B12, B13, B14, B15, B16, B17.
+**Phase 2:** B2d, B4, B5, B6, B8, B9, B11, B12, B13, B14, B15, B16 — 12 units.
+The plan has 20 units.
 B2d waits one release after B2c and after every list caller is on `v=2`.
 
 ---
@@ -819,7 +826,11 @@ once C1 exists, so there is no stand-in.
   `stepIndex` (B2a), payment standing, the unpaid amount (with `order:read`),
   total (with `order:read`), product names (first two and "+N"), late and
   lateBy (B2b), and age.
-- Abandoned (unpaid online, never promised) orders stay excluded, as today.
+- Abandoned orders stay excluded, as today: an order that is `placedOnline`
+  and UNPAID never appears in rows or counts. `Order.placedOnline` and
+  `Order.paidAt` are added by whichever of B1 and G13 lands first (additive,
+  `placedOnline` defaulting to false), so B1 filters on the column from the
+  start.
 
 **Patterns to follow:** today's `listForOrganization` `kitchenOnly`
 projection; `order-standing.ts`; DEC-024's "money left out by the API".
@@ -1309,8 +1320,8 @@ or undone.
   `dto.ts`, `modules/jobs/job-consumers.spec.ts` (the new type).
 - Create: `apps/app.saroh.in/components/commerce/orders/bulk-bar.tsx`,
   `lib/orders/bulk.ts` (the countdown's display and the per-line wording;
-  the countdown reuses the shared hold-and-undo toast from G3 or F4,
-  whichever lands first, rather than a third timer).
+  the countdown reuses G3's `apps/app.saroh.in/lib/hold-undo.ts`, the one
+  owner of the 10-second hold, rather than a timer of its own).
 - Test: `apps/api.saroh.in/src/modules/orders/order-stage-batch.db.spec.ts`
   (new), `apps/app.saroh.in/lib/orders/bulk.test.ts`,
   `e2e/tests/orders-list.spec.ts`.
@@ -1337,10 +1348,11 @@ or undone.
 - The bar reports partial results in words: "3 marked ready. 1 couldn't be:
   moved by someone else", and after Undo all "2 undone. 1 couldn't be:
   already collected".
-- **No undo once the customer has been told** (A14): a line whose stage
-  message has left is reported "They've already been told" and not undone;
-  when A14 holds its messages for the same ten seconds, Undo all cancels
-  them with the moves.
+- **No undo once the customer has been told** (A14): A14 enqueues its
+  ready and handed-over messages 10 seconds after the stage event, keyed to
+  that event's id, and `undoStage` cancels the pending job. Undo all
+  therefore cancels them with the moves; a line whose message has already
+  left is reported "They've already been told" and not undone.
 - `order:stage` is enough, as for a single move. A batch holds at most 100
   moves.
 
@@ -1692,9 +1704,10 @@ contacts search); C1 (plan C: the allergy clash reads Needs attention); C2
 - Create: `apps/app.saroh.in/components/commerce/new-order/*`
   (`new-order-sheet.tsx`, `lines-step.tsx`, `leaves-step.tsx`,
   `pay-step.tsx`), `lib/orders/new-order.ts` (the pure cash-change helper).
-  The customer step is E4's `components/bookings/customer-picker.tsx`, moved
-  to a shared place if needed, with a Walk-in option B13 adds; no second
-  picker.
+  The customer step is E4's `apps/app.saroh.in/components/customers/customer-picker.tsx`
+  and its `GET organizations/:orgId/contacts/search` (E4 owns both), with
+  the `allowWalkIn` prop B13 turns on; no second picker and no second
+  search.
 - Modify: `apps/app.saroh.in/app/(shell)/commerce/orders/new/page.tsx`,
   retire `components/stores/order-form.tsx` (and
   `stores/[storeId]/orders/new/page.tsx` redirects).
@@ -1732,6 +1745,9 @@ contacts search); C1 (plan C: the allergy clash reads Needs attention); C2
   it while nothing writes a null yet; deploy 2 lets New order write walk-ins.
   Rolling back deploy 2 by tag is safe (deploy 1 reads walk-ins); rolling
   back deploy 1 is safe while no walk-in exists.
+- **A walk-in makes `Order.customerId` nullable.** Plan E is told when
+  deploy 1 lands, since E9's rule that a treatment order needs a customer
+  email could relax then (cross-plan note to E9).
 - The customer step (E4's picker):
   - search by name or phone, recent first (phone search with
     `contact:read`), normalised as C2's `duplicates.ts` does;
@@ -1787,8 +1803,9 @@ contacts search); C1 (plan C: the allergy clash reads Needs attention); C2
 **Requirements:** R16, R3
 
 **Dependencies:** B2c (the appointment types writable); E9 (plan E: an
-order with N bookings); a writable clinic business in the seed (the
-overview's seed unit — Kavi Dental does not exist yet)
+order with N bookings, whose service lines use `OrderItem.serviceId`; a
+service is never a Product); E29 (the Kavi Dental clinic seed, where E9
+puts the appointment orders)
 
 **Phase:** 2 (default 40)
 
@@ -1798,11 +1815,11 @@ overview's seed unit — Kavi Dental does not exist yet)
   E9's link), `order-kitchen.service.ts` (the order reaches DELIVERED when
   the last visit is attended, from the booking status hook E9 provides),
   `components/commerce/order-detail/order-detail.tsx` (no kitchen stepper for
-  appointment types); the seed's appointment orders (moved here from B2,
-  with E9's model), on the clinic business.
+  appointment types). The seed's appointment orders (the former
+  `DENT_ORDERS`) are E9's, on Kavi Dental (E29); B14 adds no seed of its own.
 - Test: `apps/api.saroh.in/src/modules/orders/order-read.spec.ts`,
-  `e2e/tests/order-detail.spec.ts` (a seeded appointment order on a writable
-  clinic business).
+  `e2e/tests/order-detail.spec.ts` (a seeded appointment order on Kavi
+  Dental, E29, in the test run's own database).
 
 **Approach:**
 - Each visit has its number, date, person, "In person · Chair 2" or "Video
@@ -1811,6 +1828,9 @@ overview's seed unit — Kavi Dental does not exist yet)
   DESIGN-NOTES) or "Book visit N", which opens New booking with the service
   and customer filled in.
 - In person ⇄ online goes through B9's change sheet.
+- Money on a treatment comes back only through the order's refund (B9, the
+  one refund path for a treatment); a cancelled visit refunds nothing by
+  itself (default 112).
 
 **Test scenarios:**
 - Happy path: a 3-visit order with visit 1 attended → "Visit 2 · booked 19
@@ -1818,7 +1838,7 @@ overview's seed unit — Kavi Dental does not exist yet)
 - Edge case: marking visit 3 attended completes the order.
 - Error path: marking a future visit attended → refused.
 
-**Verification:** Matches `Saroh Order Detail.dc.html?id=D301`.
+**Verification:** Matches `Saroh Order Detail.dc.html?id=D301` on Kavi Dental (E29), opened read-only; anything that writes is checked by the e2e test on its own seeded database.
 
 ---
 
@@ -1936,7 +1956,7 @@ decided 2026-09-27; DEC-045).
 
 **Dependencies:** B2a (`fulfilmentTypes`), B2b (the late rule)
 
-**Phase:** 2 (re-sliced 2026-09-27; B2b's defaults apply until then)
+**Phase:** 1 (moved back into phase 1, 2026-09-27: the storefront sets the late rule, so the setting ships with it; the API's defaults apply only until this unit lands)
 
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` (`StoreSettings.pickupLateAfterMinutes Int @default(120)`, `localDeliveryLateAfterMinutes Int @default(1440)`, `shippingLateAfterMinutes Int @default(2880)`), with a migration
@@ -2039,14 +2059,14 @@ fulfilment section; `db:verify:replay` passes.
 | A reader compares the raw enum and misreads a new value (the invoice's GST place of supply above all) | Every reader listed under Context goes through `typeOf` / `shipsToAddress`; characterization tests on `order-stage.ts`, `order-invoice.ts` and `lifecycle.ts` |
 | A Local delivery order already with a courier gets stuck at the switch | The legacy HANDED_TO_COURIER → DELIVERED move; a B2c test through the migration |
 | The list's shape changes under an app deployed at a different time | `v=2` beside the bare array for one release; every caller moved in B1's PR |
-| A counter storefront that relied on today's 20-minute wait sees orders go "Late" only after 2 hours, from B2b (phase 1), while the setting (B17) is phase 2 | B17's one-time notice on Orders for storefronts with recent pick-up orders, and the field's help. **Between B2b and B17 there is no way to change it**; shipping B17 in phase 1 with B2b would close the gap (raised with the user, 2026-09-27) |
+| A counter storefront that relied on today's 20-minute wait sees orders go "Late" only after 2 hours, from B2b | B17 is in phase 1 and lands with B2b or in the release after it, so the setting exists the day the new rule does; B17's one-time notice on Orders for storefronts with recent pick-up orders, and the field's help |
 | Bulk moves lost with a closed tab, or a retry double-counting | The hold lives on the server (`OrderStageBatch`), with a client `batchId` as the idempotency key and per-line event ids |
 | An undo after the customer was told | The API refuses it once A14's message for that event has left; A14 holds its messages ten seconds so an early undo cancels them |
 | A walk-in order breaks a reader that assumes a customer | B13 ships readers first, writers a deploy later |
 | The goodwill amount opens a client-sent amount on refunds | Accepted only with no lines and a reason, capped under the order lock; the DTO note is rewritten |
 | Bulk moves deadlock | One transaction per order, never several order locks at once |
 | A pay link paid after cancel | Recorded as owed back (`CAPTURED_NEEDS_REFUND`), as for invoices |
-| B13, B14 and B15 wait on plans C and E | Those units ship behind the prerequisite; phase 1 (B1, B2a–B2c, B3, B7, B10) needs no other plan |
+| B13, B14 and B15 wait on plans C and E | Those units ship behind the prerequisite; phase 1 (B1, B2a–B2c, B3, B7, B10, B17) needs no other plan |
 
 ---
 

@@ -161,10 +161,10 @@ The calendar's first pass (U17) reads one month of items. It shows no money, no 
   - **A visit of a treatment order never refunds on cancel.** A booking with `orderId` keeps its money on the order, and money goes back only through the order's refund (B9, `payment:manage`). This settles the E8/E9 contradiction the review found.
   - **The free-cancel deadline is fixed at booking.** `Booking.freeCancelUntil` is written when the booking is made (its start less the business's `freeCancelHours`, null when there is no free window). A move by staff or the customer (A6) never changes it, and `isLateCancel` reads it when set, falling back to `startAt` for bookings made before the column. Moving a booking a week out can't turn a late cancel into a free refund.
   - A late cancel keeps the deposit and says so. The staff "return the credit" override refunds the deposit only when the caller also holds `payment:manage`; otherwise the deposit is kept and the dialog says who can refund it.
-- **Visits** (default 40): a multi-visit service booked online makes **one order** with fulfilment type Appointment (B2, DEC-045). One order line covers the whole treatment, and visit 1 is booked. Later visits are `Booking` rows linked to the order (`Booking.orderId`, `visitNumber`). The order is paid in full or by deposit. **The treatment is invoiced once for its price** (DEC-023): paid in full, one order invoice; paid by deposit, the deposit invoice at booking and one balance invoice when the balance is paid, both linked to the order. A booking of visit 2 or later is never invoiced on its own.
+- **Visits** (default 40): a multi-visit service booked online makes **one order** with fulfilment type Appointment (B2c, DEC-045). One order line covers the whole treatment, and visit 1 is booked. Later visits are `Booking` rows linked to the order (`Booking.orderId`, `visitNumber`). The order is paid in full or by deposit. **The treatment is invoiced once for its price** (DEC-023): paid in full, one order invoice; paid by deposit, the deposit invoice at booking and one balance invoice when the balance is paid, both linked to the order. A booking of visit 2 or later is never invoiced on its own.
 - **A treatment order's shape** (E9; the review found today's Order can't hold it):
   - **The line bills a Service.** `OrderItem.serviceId String?` (FK to Service, `onDelete: Restrict`; services are soft-deleted, so the row stays) is added, and `OrderItem.productId` becomes nullable. A check constraint `num_nonnulls("productId", "serviceId") = 1` keeps exactly one set. A service line has `stockRow = NONE`, no variant and quantity 1, and its GST comes from the Service's `gstRate` and `sacCode`. Plan B's "service-kind product" is replaced by this: a Service never becomes a Product.
-  - **The storefront.** `Order.storeId` stays required, so numbering (`@@unique([storeId, orderId])`), RLS and every storefront reader keep working. A treatment order goes to the storefront the service's booking site sells from (G8's `Site.storefrontId`), else the business's oldest open storefront. A business with no storefront can't save a service with more than one visit: E10's visits control says "Treatments are sold as orders — add a storefront first" and links Settings › Storefronts. Making storefronts silently was considered and rejected: it adds a channel the merchant never asked for.
+  - **The storefront.** `Order.storeId` stays required, so numbering (`@@unique([storeId, orderId])`), RLS and every storefront reader keep working. A treatment order goes to the storefront the service's booking site sells from (G11's `Site.storefrontId`, read by G8), else the business's oldest open storefront. A business with no storefront can't save a service with more than one visit: E10's visits control says "Treatments are sold as orders — add a storefront first" and links Settings › Storefronts. Making storefronts silently was considered and rejected: it adds a channel the merchant never asked for.
   - **The customer.** `Order.customerId` stays required. The order's store Customer is found or created at that storefront by the booking's email, normalised as C2 does, and linked to the booking's contact with a `CustomerIdentityLink`, as C2's `ensureContactForPaidOrder` does for paid orders. The public booking page always has an email (`bookerEmail` is required). A staff booking of a multi-visit service asks for the customer's email when their contact has none ("A treatment's bill goes to an email"). If plan B's walk-in orders (B13) make `Order.customerId` nullable, this rule can relax; until then it stands.
   - **Readers that must accept a service line** (each reads `item.product` or `item.productId` today). The order serializer gains a line `name` and `kind` (`product` | `service`) so screens don't branch:
     - orders: `serialize.ts`, `order-read.ts`, `order-pricing.ts`, `order-inventory.ts`, `order-kitchen.service.ts`, `order-refunds.ts`, `orders.service.ts`;
@@ -281,7 +281,7 @@ flowchart LR
 
 - **Phase 1 (the re-slice of 2026-09-27): E1, E2, E3, E4, E5, E7, E11, plus E29.** One finished flow: services on their editor, time off and closures, New booking with the shared customer picker, the peek, Where and the intake note, and a real checkout on the booking page. E29, the Kavi Dental seed, is added to phase 1 because E7 is verified on Kavi and the other plans film it.
 - **Phase 2: everything else**, including E14 (pack drafts, now beside E13 and E18), E21 and E28 (with the rest of the calendar), E6, E8–E10 and E12–E27.
-- **Shared files.** The booking flow's steps are touched by H1 (the font fix, first), then E11 (`pay-step`, `paying-card`, `expired-card`), then E7 (`details-step`, `done-card`, `model.ts`). Those three land in that order, not in parallel. In phase 2, E6, E8 and E10 touch `summary.tsx` and `booking-flow.tsx` in that order. `bookings.service.ts` is shared by E1, E7 and, later, E8 and E9. The calendar's `month-grid.tsx` and `day-panel.tsx` are phase 2 only.
+- **Shared files.** The booking flow's steps are touched by H1 (the font fix, first), then E7 (`details-step`, `done-card`, `model.ts`), then E11 (`pay-step`, `paying-card`, `expired-card`), then plan A's A9 (sign-in at the last step). They land in that order, not in parallel, each rebased on the one before (overview, "Shared files"). G18's one change to `booking-flow.tsx` comes after H1 and E7. In phase 2, E6, E8 and E10 touch `summary.tsx` and `booking-flow.tsx` in that order. `bookings.service.ts` is shared by E1, E7 and, later, E8 and E9. The calendar's `month-grid.tsx` and `day-panel.tsx` are phase 2 only.
 
 ---
 
@@ -514,7 +514,7 @@ flowchart LR
 
 **Requirements:** R6
 
-**Dependencies:** E1 (which adds `Booking.locationType`), E29 (verified on Kavi Dental)
+**Dependencies:** E1 (which adds `Booking.locationType`), E29 (verified on Kavi Dental). On the booking flow it lands after H1 and before E11 and A9.
 
 **Phase:** 1
 
@@ -530,6 +530,7 @@ flowchart LR
 - "Anything we should know?" (medicines, allergies, pregnancy, nerves) is optional and at most 1,000 characters.
 - It is stored on the booking as sensitive: it is served only to a caller with the sensitive permission (C1's gate), never in list reads, and redacted from logs.
 - C12 turns it into a Needs attention suggestion.
+- Where and the intake note stay on the details step when A9 replaces the name, email and phone fields with sign-in; A9 rebases on this unit.
 
 **Test scenarios:**
 - Happy path: an Either service booked as Video call records ONLINE and shows the meeting link on confirmation.
@@ -537,7 +538,7 @@ flowchart LR
 - Edge case: a Member reading the booking gets no intake note.
 - Error path: 1,001 characters → 400.
 
-**Verification:** Book Kavi Dental's details step matches the design.
+**Verification:** Book Kavi Dental's details step (E29, opened read-only) matches the design; bookings that write are made on Northwind.
 
 ---
 
@@ -599,7 +600,7 @@ flowchart LR
 
 **Requirements:** R8
 
-**Dependencies:** E1, E8 (the deposit path a treatment can be paid by), B2 (Appointment fulfilment type), E29 (the clinic its seed orders go on); G8 (`Site.storefrontId`, for the storefront rule; without it the oldest open storefront is used)
+**Dependencies:** E1, E8 (the deposit path a treatment can be paid by), B2c (the Appointment types writable), E29 (the clinic its seed orders go on); G11 (`Site.storefrontId`, for the storefront rule; without it the oldest open storefront is used)
 
 **Phase:** 2 (default 40)
 
@@ -689,7 +690,7 @@ flowchart LR
 
 **Requirements:** R9
 
-**Dependencies:** None. It lands after H1 on the booking flow's steps (Phases and sequencing).
+**Dependencies:** None. It lands after H1 and E7 on the booking flow's steps, and before A9 (Phases and sequencing).
 
 **Phase:** 1
 
