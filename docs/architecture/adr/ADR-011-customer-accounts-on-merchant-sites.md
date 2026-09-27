@@ -1,6 +1,6 @@
 # ADR-011 — Customer accounts on merchant sites
 
-**Status:** Accepted — 2026-09-26 (DEC-037); amended 2026-09-27 (email only this round, §6); implementation pending
+**Status:** Accepted — 2026-09-26 (DEC-037); amended 2026-09-27 (email only this round, §6; linking only to a verified contact email, DEC-049; the per-site switch, the signed relay and RLS on customer routes); implementation pending
 **Supersedes in part:** [ADR-008](./ADR-008-operations-staff-gst-kitchen.md) §2 "The public booking page" (the limits on credits online, buying packs online, a waitlist, customer recognition, sign-in and customer messages) and §3 "Not sending email or SMS" (for sign-in codes and for messages sent through a business's own provider)
 **Amends:** DEC-011 (Saroh's own email also sends a site's sign-in codes) · ADR-008 §2 "One read of a customer" (merge, DEC-042)
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-007](./ADR-007-subscriptions-invoices-classes.md) (the Contact is the person) · ADR-009 (merchant sites run on `apps/saroh.app`, and customer-facing server routes call the API) · DEC-027 (client addresses behind proxies)
@@ -33,6 +33,10 @@ Decided with the user on 2026-09-27:
 - **Sign-in is email only.** Phone codes and SMS are out of this round, not
   deferred behind a payer question. Phone sign-in is a later step with its
   own decision (§6).
+- **A first sign-in links to an existing contact only when that contact's
+  email is verified** (DEC-049). Otherwise the customer gets a separate
+  contact and staff are shown the pair to merge.
+- **The merchant turns accounts on, per site.** Saroh never does.
 
 ## 2. Decisions
 
@@ -41,11 +45,12 @@ Decided with the user on 2026-09-27:
 - **`CustomerAccount`** is an organization-owned row: `organizationId`
   (required, RLS `org_isolation`), a required `contactId`, a verified email
   (lower-cased, trimmed) with its `verifiedAt`, a status (`ACTIVE`,
-  `BLOCKED`, `REMOVED`), `createdAt` and `lastSignedInAt`. A verified phone
+  `BLOCKED`, `MERGED`, `REMOVED`), `mergedIntoId`, `linkedAt`, `createdAt`
+  and `lastSignedInAt`. A verified phone
   is not part of this round; it is added with phone sign-in (§6).
 - **A verified email is unique per business**, not across Saroh (a partial
   unique index on `(organizationId, email)` where the account is not
-  removed). The same person
+  removed; a merged account keeps its email reserved). The same person
   at two businesses has two accounts, two sessions and two histories; neither
   business can see that the other exists.
 - **It is not a Saroh user.** Better Auth's `User` is the workspace identity
@@ -60,20 +65,40 @@ Decided with the user on 2026-09-27:
 - One flow for new and returning people: type an email, receive a six-digit
   code, type it. Verifying a code for a destination with no account
   creates one. The response never says whether an account existed.
-- **`CustomerSignInCode`** stores the business, the channel, a keyed hash of
+- **`CustomerSignInCode`** stores the business, a keyed hash of
   the destination, a keyed hash of the code (never the code), `expiresAt`
-  (10 minutes), `attempts` (5, then the code is dead) and `consumedAt`. A new
-  code for the same destination retires the old one.
-- **Limits** — per destination (a resend no sooner than 30 seconds, at most 5
-  codes an hour and 10 a day), per client address (DEC-027's address), and per
-  business, so one site cannot be used to spray codes at numbers. Codes are
-  refused while the business is suspended or closing
-  (`assertOrganizationOpen`).
+  (10 minutes), `attempts` (5, then the code is dead), `consumedAt`, a hash
+  of the visitor's address, and whether the destination was new to the
+  business. A new code for the same destination retires the old one.
+- **The site's server relays the visitor, signed.** Every call to the
+  site-accounts API comes from `apps/saroh.app`'s server, whose own address
+  is not the visitor's. It sends the visitor's address, the host it served
+  and a timestamp, signed with a secret the two apps share. The API refuses
+  a call without a valid signature, so no one can call it directly to skip
+  the site's `Origin` check or choose the address they are counted by.
+- **Limits** — per destination and visitor address (a resend no sooner than
+  30 seconds, at most 5 codes an hour and 10 a day), per destination across
+  addresses (20 a day), per visitor address, and per business, so one site
+  cannot be used to spray codes at addresses. **The per-business hourly
+  ceiling counts only destinations new to the business**, so returning
+  customers are never stopped by it; a daily ceiling on all codes protects
+  the sender, and both start lower for a new business. Past half the hourly
+  ceiling the sheet asks for a bot challenge. **No limit a visitor did not
+  cause stops a booking**: when one refuses a code, the booking page books
+  them as a guest instead. Codes are refused while the business is suspended
+  or closing (`assertOrganizationOpen`).
 - **Email codes go through Saroh's own identity email**, the sender that
   already sends workspace sign-in codes, with the business's name in the
   display name and body ("Your code for Kavi Dental"). This widens DEC-011's
   "Saroh-owned email is identity mail only" to a site's customers' identity
-  mail — still identity, never a business message.
+  mail — still identity, never a business message. The one other identity
+  mail is the notice to the old address when a customer changes their
+  sign-in email.
+- **The business name is cleaned before it is sent**: no control characters,
+  URLs or domain-like text, at most 40 characters, escaped in the body. Site
+  codes go out on their own sending address and stream, separate from
+  workspace sign-in mail, so one merchant's complaints cannot hurt the
+  workspace's delivery.
 - **Email is the only channel this round.** The sign-in sheet has no phone
   field, and the API has no SMS sender or port. A code request names no
   channel; it is an email.
@@ -89,15 +114,36 @@ Decided with the user on 2026-09-27:
   `CustomerSession` with the account, the business, the site, `expiresAt`
   (30 days, sliding on use, 90 days at most), `lastSeenAt` and `revokedAt`.
   Signing out, removing the account, blocking it, a merge that retires it and
-  "sign out everywhere" revoke sessions.
+  "sign out everywhere" revoke sessions. **Changing the sign-in email
+  revokes every other session** of the account.
 - **The browser never calls the API with it.** The site's server routes in
   `apps/saroh.app` read the cookie and call `api.saroh.in` server-to-server
   (ADR-009), sending the token and the host they served. The API resolves the
   host to its Site and Organization first and accepts the session only if it
   belongs to that business — a token from one site is a 401 on another.
+- **Customer routes run under the business's row-level security.** The
+  session guard hands the request a customer context, and the same
+  interceptor that scopes a workspace request scopes a customer request to
+  that business, so a missing filter in a customer query cannot read another
+  business's rows once enforcement is on.
 - State-changing requests from the site go through its own route handlers,
   which check `Origin` against the host; the API's `OriginGuard` stays as it
-  is for the workspace.
+  is for the workspace. The check is mandatory on every such handler: until
+  `saroh.app` is on the Public Suffix List, browsers treat every
+  `*.saroh.app` site as the same site, so `SameSite=Lax` alone does not
+  separate two merchants.
+
+### Accounts are switched on per site, by the merchant
+
+- **Each site has its own switch**, "Let customers sign in on your site",
+  off for every existing site. Only someone who may publish the site can
+  turn it on, and its confirm says what changes for their customers. Saroh
+  never turns it on for a merchant.
+- **It takes effect at once**: the API and the booking page read it live,
+  not from the published snapshot. Turning it off brings guest booking back
+  on the next page load.
+- With it on, the booking page asks for a code at the last step instead of
+  the guest form, except when a code cannot be sent (see Limits).
 - The invoice pay page (`saroh.app/pay/<token>`, ADR-007) stays a token link
   that needs no sign-in.
 
@@ -107,13 +153,31 @@ Decided with the user on 2026-09-27:
   business-wide record of a person (ADR-007). Bookings, subscriptions, packs,
   invoices and notes already hang off the Contact, so the account area reads
   them through it and nothing is copied.
-- **On first sign-in**, the verified email is matched against the
-  business's contacts. **Exactly one contact** with that normalised value and
-  no account → the account is linked to it, and the contact shows "Signs in
-  on your website" with **"This isn't them"**, which unlinks and moves the
-  account to a new contact. **None, or more than one** → a new contact is made,
-  and the ambiguous ones are listed as possible duplicates for the merchant to
-  merge (DEC-042). Saroh never merges on its own.
+- **On first sign-in** (DEC-049). A contact's email is unique in its
+  business, so at most one contact holds the verified email:
+    - **no contact holds it** → a new contact is made with that email,
+      marked verified, and linked;
+    - **the contact holding it has a verified email and no account** → the
+      account is linked to it;
+    - **the contact holding it is unverified, or already has an account under
+      another email** → the account gets a **separate contact**. That contact
+      cannot take the email, so its email field holds a reserved,
+      undeliverable placeholder (the same shape privacy removal uses), and
+      the verified email lives on the account. The pair is suggested to
+      staff to merge (DEC-042). Saroh never merges on its own.
+- **What makes a contact's email verified**: an earlier sign-in code for it,
+  or a confirmation of an online order or booking the contact made with it,
+  accepted by the business's email provider. Staff confirming a merge that
+  keeps the account's email also verifies it. A staff edit of the email, or
+  "This isn't them", clears it. Nothing is verified retroactively, so at
+  launch every existing customer's first sign-in makes a pair for staff to
+  merge. A code proves someone reads the inbox, not that they are the person
+  staff typed that address for; a contact whose address nobody has proven is
+  never opened to whoever signs in with it.
+- **A linked contact shows "Signs in on your website"** with **"This isn't
+  them"**, which moves the account, and everything it made since it was
+  linked, to a new separate contact, revokes its sessions, clears the old
+  contact's verified mark and stops suggesting the pair.
 - **An online order placed while signed in** makes or reuses the storefront's
   `Customer` for that account and links it to the account's Contact as a
   confirmed identity link — verified by the code, so no "possible match" step.
@@ -151,13 +215,21 @@ These replace ADR-008's "no" for the public booking page:
 Merging two contacts (DEC-042) with accounts:
 
 - The surviving contact keeps its account. When the survivor has no account,
-  the other account moves to it; otherwise the other account is retired
-  (`REMOVED`) and its sessions revoked.
+  the other account moves to it; otherwise the other account is retired as
+  **`MERGED`**, pointing at the survivor's account, and its sessions revoked.
+- **A retired account's email still signs in, to the survivor's account.**
+  Its email stays reserved, so a later sign-in with it reaches the merged
+  history instead of making a new contact and a new duplicate. The merge
+  preview names it ("asha@… will sign in to this customer").
+- A reserved placeholder email is never chosen as the survivor's email. When
+  the survivor ends with the account's email, it is marked verified.
 - Two accounts never end up on one contact, and a verified value never ends up
-  on two accounts.
+  on two live accounts.
 
 Removing a customer's details (privacy removal, DEC-042) removes their
-account, revokes every session and deletes pending codes. What must be kept
+account, revokes every session and deletes pending codes. A customer asks
+for it by message or in person; there is no removal request in the account
+area. What must be kept
 for the law — issued invoices and their bill-to — is kept.
 
 ## 3. Options considered
@@ -182,8 +254,15 @@ for the law — issued invoices and their bill-to — is kept.
 - The booking page, the shop and the account area share one session and one
   set of server routes in `apps/saroh.app`.
 - A new table family carries customer personal data: every row has
-  `organizationId` and RLS, codes and tokens are stored hashed, and request
-  logs redact the code, the token and the destination.
+  `organizationId` and RLS, customer routes run in the business's RLS
+  context, codes and tokens are stored hashed, and request logs redact the
+  code, the token, the destination and the visitor's address.
+- A contact may carry a reserved placeholder email until staff merge it, so
+  every reader of a contact's email goes through one helper that treats it
+  as no email, and nothing sends to it.
+- At launch, customers the business already knows appear twice after their
+  first sign-in, until staff merge the pair. That is the price of never
+  opening a record to an unproven address.
 - Merchant copy that says "Saroh doesn't message your customers" changes only
   where a message is really sent — through a connected provider, or into the
   account's thread (`saroh-product.md` "Communications").
