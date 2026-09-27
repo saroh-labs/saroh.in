@@ -70,7 +70,7 @@ test.describe("the site editor on a phone", () => {
         await heroChip(page).click();
         const sheet = page.getByRole("dialog");
         await expect(sheet).toBeVisible();
-        const heading = sheet.getByLabel("Heading");
+        const heading = sheet.getByLabel("Heading", { exact: true });
         const before = await heading.inputValue();
         const after = `${before} (phone)`;
         await heading.fill(after);
@@ -85,7 +85,10 @@ test.describe("the site editor on a phone", () => {
 
         // Put it back, and let autosave send it.
         await heroChip(page).click();
-        await page.getByRole("dialog").getByLabel("Heading").fill(before);
+        await page
+            .getByRole("dialog")
+            .getByLabel("Heading", { exact: true })
+            .fill(before);
         await page.keyboard.press("Escape");
         await expect(page.getByText(before).first()).toBeVisible();
         await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -104,7 +107,26 @@ test.describe("the site editor on a phone", () => {
             height: PHONE.width,
         });
         await expect(page.locator("[data-layout=narrow]")).toBeVisible();
-        await expect(page.getByRole("dialog")).toBeVisible();
+        const sheet = page.getByRole("dialog");
+        await expect(sheet).toBeVisible();
+        await expect(
+            sheet.getByRole("heading", { level: 2, name: "Hero" }),
+        ).toBeVisible();
+        // The modal sheet hides the page from assistive tech, so the chip is
+        // found by its label here rather than its role.
+        await expect(
+            page.locator('button[aria-label^="Hero block,"]').first(),
+        ).toHaveAttribute("aria-pressed", "true");
+        // And the page is drawn beside the rail, not squeezed into the
+        // divider's 1px column (it drew blank there).
+        const block = await page
+            .locator("[data-block-index]")
+            .first()
+            .boundingBox();
+        expect(block?.width ?? 0).toBeGreaterThan(300);
+        await sheet
+            .getByRole("button", { name: "Close the block panel" })
+            .click();
         await expect(heroChip(page)).toHaveAttribute("aria-pressed", "true");
     });
 
