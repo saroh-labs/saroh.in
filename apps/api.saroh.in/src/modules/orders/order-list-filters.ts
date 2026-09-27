@@ -3,7 +3,12 @@ import { Prisma } from "@saroh/database";
 import { DateTime, IANAZone } from "luxon";
 
 import type { ListTab, PaymentStanding } from "./dto";
-import { defaultLateThresholds, storedValuesOf } from "./fulfilment";
+import {
+    defaultLateThresholds,
+    LATE_STAGES,
+    LATE_STATUSES,
+    storedValuesOf,
+} from "./fulfilment";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -174,9 +179,10 @@ export function lateSql(now: Date): Prisma.Sql {
         ([stored, minutes]) => Prisma.sql`WHEN ${stored} THEN ${minutes}::int`,
     );
     const threshold = Prisma.sql`(CASE o.fulfilment::text ${Prisma.join(whens, " ")} END)`;
-    return Prisma.sql`(o.status IN ('PENDING', 'PROCESSING')
+    // The same open-and-not-handed-over lists `lateOf` reads for one order.
+    return Prisma.sql`(o.status::text = ANY(${[...LATE_STATUSES]})
         AND o."paymentStatus" <> 'REFUNDED'
-        AND o.stage::text IN ('NEW', 'PREPARING', 'READY')
+        AND o.stage::text = ANY(${[...LATE_STAGES]})
         AND ${threshold} IS NOT NULL
         AND o."createdAt" < ${ts(now)} - make_interval(mins => ${threshold}))`;
 }

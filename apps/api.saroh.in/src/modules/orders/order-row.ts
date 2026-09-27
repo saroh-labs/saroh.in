@@ -1,6 +1,6 @@
 import { fromMinor, toMoneyString } from "../../common/money";
-import type { FulfilmentView } from "./fulfilment";
-import { fulfilmentView } from "./fulfilment";
+import type { FulfilmentView, LateView } from "./fulfilment";
+import { fulfilmentView, lateOf } from "./fulfilment";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
 import { amountDueCents } from "./order-read";
@@ -16,15 +16,17 @@ import { orderStanding } from "./order-standing";
  * a customer's phone and email only with `contact:read`.
  *
  * B2a adds how it leaves: the legacy word and the type, its `steps` and
- * `stepIndex` (`fulfilment.ts`). B2b adds `late` and `lateBy`, and B15
- * `attention`; neither has a stand-in here.
+ * `stepIndex` (`fulfilment.ts`). B2b adds whether it is late (`late`,
+ * `lateBy`, `lateAfterMinutes`, by the rule in `fulfilment.ts`, the same one
+ * the Late filter runs in SQL) and the courier. B15 adds `attention`, with no
+ * stand-in here.
  */
 
 interface DecimalLike {
     toString(): string;
 }
 
-export interface OrderRowDto extends FulfilmentView {
+export interface OrderRowDto extends FulfilmentView, LateView {
     id: string;
     /** The storefront's own order number, e.g. "1042". */
     orderId: string;
@@ -59,6 +61,9 @@ export interface OrderRowDto extends FulfilmentView {
     productNames: string[];
     /** How many more products there are past those two ("+N"). */
     moreProducts: number;
+    /** Who took it, typed at the handover to a courier; else null. */
+    courierName: string | null;
+    trackingNumber: string | null;
 }
 
 /** What `order-list.ts` loads for each row. */
@@ -73,6 +78,8 @@ export interface RawOrderRow {
     currency: string;
     total: DecimalLike;
     createdAt: Date;
+    courierName: string | null;
+    trackingNumber: string | null;
     store: { id: string; name: string };
     customer: {
         email: string;
@@ -153,6 +160,18 @@ export function serializeOrderRow(
         // The legacy word (COLLECT or DELIVERY until B2d), the type, and
         // the type's steps with where the order stands on them.
         ...fulfilmentView(order.fulfilment, order.stage as OrderStage),
+        // Late by the type's threshold (the defaults until B17), on the
+        // same clock as the page's Late filter.
+        ...lateOf(
+            {
+                fulfilment: order.fulfilment,
+                stage: order.stage,
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                placedAt: order.createdAt,
+            },
+            view.now,
+        ),
         standing: orderStanding(order.status, order.paymentStatus),
         payment: paymentStandingOf(order.paymentStatus, captured, refunded),
         currency: order.currency,
@@ -167,5 +186,7 @@ export function serializeOrderRow(
         itemCount: order.items.length,
         productNames: names.slice(0, 2),
         moreProducts: Math.max(0, names.length - 2),
+        courierName: order.courierName,
+        trackingNumber: order.trackingNumber,
     };
 }

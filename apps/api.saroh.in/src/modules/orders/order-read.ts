@@ -1,6 +1,6 @@
 import { toMoneyString } from "../../common/money";
-import type { FulfilmentView } from "./fulfilment";
-import { fulfilmentView } from "./fulfilment";
+import type { FulfilmentView, LateView } from "./fulfilment";
+import { fulfilmentView, lateOf } from "./fulfilment";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
@@ -118,7 +118,7 @@ export interface OrderMoneyDto {
     owedBack: { id: string; amount: string }[];
 }
 
-export interface OrderReadDto extends FulfilmentView {
+export interface OrderReadDto extends FulfilmentView, LateView {
     id: string;
     orderId: string;
     placedAt: Date;
@@ -151,6 +151,12 @@ export interface OrderReadDto extends FulfilmentView {
     deliveryAddress: DeliveryAddressDto | null;
     notes: string | null;
     trackingUrl: string | null;
+    /**
+     * Who took it and its number, typed at the handover to a courier or
+     * added after it (DEC-045); null until then.
+     */
+    courierName: string | null;
+    trackingNumber: string | null;
     items: OrderLineDto[];
     events: OrderEventDto[];
     /** What the caller may do next, worked out by the API. */
@@ -197,6 +203,8 @@ export interface RawOrderRead {
     total: DecimalLike;
     notes: string | null;
     trackingUrl: string | null;
+    courierName: string | null;
+    trackingNumber: string | null;
     deliveryName: string | null;
     deliveryPhone: string | null;
     deliveryLine1: string | null;
@@ -387,6 +395,18 @@ export function serializeOrderRead(
         // The legacy word and the type, their steps and where it stands
         // (fulfilment.ts); the app draws these and keeps no copy.
         ...fulfilmentView(order.fulfilment, stage),
+        // Late by its type's threshold (the defaults until B17): the rule
+        // the Orders list's Late filter runs, so the two never disagree.
+        ...lateOf(
+            {
+                fulfilment: order.fulfilment,
+                stage: order.stage,
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                placedAt: order.createdAt,
+            },
+            opts.now,
+        ),
         customer: order.customer
             ? {
                   id: order.customer.id,
@@ -402,6 +422,8 @@ export function serializeOrderRead(
         deliveryAddress: hasAddress ? address : null,
         notes: order.notes,
         trackingUrl: order.trackingUrl,
+        courierName: order.courierName,
+        trackingNumber: order.trackingNumber,
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,

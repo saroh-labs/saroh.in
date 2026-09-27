@@ -19,6 +19,8 @@ function raw(over: Partial<RawOrderRow> = {}): RawOrderRow {
         currency: "INR",
         total: { toString: () => "610" },
         createdAt: new Date("2026-09-27T09:15:00.000Z"),
+        courierName: null,
+        trackingNumber: null,
         store: { id: "s1", name: "Rye & Co." },
         customer: {
             email: "asha@example.in",
@@ -64,6 +66,52 @@ describe("serializeOrderRow", () => {
                 email: "asha@example.in",
                 phone: "+91 98765 43210",
             },
+        });
+    });
+
+    it("says whether it is late by its type's threshold, and by how much (B2b)", () => {
+        const view = { money: false, contact: false, now };
+        // Placed 45 minutes ago: a pick-up isn't late for two hours.
+        expect(serializeOrderRow(raw(), view)).toMatchObject({
+            lateAfterMinutes: 120,
+            late: false,
+            lateBy: null,
+        });
+        // Placed three hours ago: late by an hour.
+        expect(
+            serializeOrderRow(
+                raw({ createdAt: new Date("2026-09-27T07:00:00.000Z") }),
+                view,
+            ),
+        ).toMatchObject({ lateAfterMinutes: 120, late: true, lateBy: 60 });
+        // Collected: never late, however long ago.
+        expect(
+            serializeOrderRow(
+                raw({
+                    createdAt: new Date("2026-09-20T07:00:00.000Z"),
+                    stage: "COLLECTED",
+                    status: "DELIVERED",
+                }),
+                view,
+            ),
+        ).toMatchObject({ late: false, lateBy: null });
+    });
+
+    it("carries the courier and tracking number (B2b)", () => {
+        const row = serializeOrderRow(
+            raw({
+                fulfilment: "DELIVERY",
+                stage: "HANDED_TO_COURIER",
+                status: "SHIPPED",
+                courierName: "Delhivery",
+                trackingNumber: "AWB 4411",
+            }),
+            { money: false, contact: false, now },
+        );
+        expect(row).toMatchObject({
+            courierName: "Delhivery",
+            trackingNumber: "AWB 4411",
+            late: false,
         });
     });
 

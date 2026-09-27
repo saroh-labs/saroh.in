@@ -20,6 +20,7 @@ jest.mock("../../env", () => ({
 import {
     BadGatewayException,
     BadRequestException,
+    ConflictException,
     ForbiddenException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -42,6 +43,7 @@ import {
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { listOrderRows } from "./order-list";
 
 const WEBHOOK_SECRET = "whsec_kitchen_test";
 
@@ -116,10 +118,11 @@ beforeAll(async () => {
     };
     // Every paidOrder() holds its units straight on the rows, without the
     // no-oversell guard, and most orders stay open for the whole file, so
-    // the stock must cover all of them (nine orders hold 27 croissants
-    // before the edit test asks for one more).
-    bread = await product("Sourdough", "250.00", 100);
-    pastry = await product("Croissant", "120.00", 100);
+    // the stock must cover all of them (the courier and late specs add a
+    // dozen more orders to the nine that hold 27 croissants before the edit
+    // test asks for one more).
+    bread = await product("Sourdough", "250.00", 200);
+    pastry = await product("Croissant", "120.00", 200);
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
         publicKey: "rzp_public",
@@ -698,6 +701,161 @@ describe("fulfilment types, release 1 (real database)", () => {
             where: { id: edit.eventId ?? "" },
         });
         expect(event.note).toBe("notes changed");
+    });
+
+    it("a Shipping order handed over with Delhivery and a number; the number added later by PATCH", async () => {
+        const order = await storedAs("SHIPPING", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        // A Member hands it over naming only the courier…
+        await kitchen.moveStage(member, order.id, {
+            to: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+        });
+        // …and adds the number once the courier sends it.
+        const edit = await kitchen.edit(member, order.id, {
+            trackingNumber: "AWB 1234 5678",
+        });
+        const read = await kitchen.read(member, order.id);
+        expect(read).toMatchObject({
+            stage: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+            trackingNumber: "AWB 1234 5678",
+            late: false,
+        });
+        expect(read.events.at(-1)).toMatchObject({
+            id: edit.eventId,
+            kind: "EDIT",
+            note: "tracking number AWB 1234 5678",
+        });
+
+        // Still editable once delivered; null clears one.
+        await kitchen.moveStage(member, order.id, { to: "DELIVERED" });
+        await kitchen.edit(owner, order.id, {
+            courierName: "Blue Dart",
+            trackingNumber: null,
+        });
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({ courierName: "Blue Dart", trackingNumber: null });
+    });
+
+    it("after handover a PATCH of any other field is 409, and nothing is written", async () => {
+        const order = await storedAs("DELIVERY", {
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        const events = await prisma.orderEvent.count({
+            where: { orderId: order.id },
+        });
+        for (const dto of [
+            { notes: "Leave at the gate" },
+            { address: ADDRESS },
+            { fulfilment: "COLLECT" as const },
+            { trackingNumber: "AWB1", notes: "Leave at the gate" },
+        ]) {
+            await expect(
+                kitchen.edit(owner, order.id, dto),
+            ).rejects.toBeInstanceOf(ConflictException);
+        }
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({
+            notes: null,
+            trackingNumber: null,
+            fulfilment: "DELIVERY",
+        });
+        expect(
+            await prisma.orderEvent.count({ where: { orderId: order.id } }),
+        ).toBe(events);
+    });
+
+    it("the courier isn't asked of a pick-up, nor of any step but the handover", async () => {
+        const order = await storedAs("COLLECT", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await expect(
+            kitchen.moveStage(member, order.id, {
+                to: "COLLECTED",
+                courierName: "Delhivery",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await kitchen.moveStage(member, order.id, { to: "COLLECTED" });
+        await expect(
+            kitchen.edit(member, order.id, { trackingNumber: "AWB1" }),
+        ).rejects.toThrow("A pick-up order isn't handed to a courier.");
+    });
+});
+
+describe("the late rule (real database, B2b)", () => {
+    const HOUR = 3_600_000;
+
+    /** A paid pick-up placed `hours` ago, at `stage`. */
+    async function placedAgo(
+        hours: number,
+        at: {
+            stage?: "NEW" | "READY" | "COLLECTED";
+            status?: "PENDING" | "PROCESSING" | "DELIVERED";
+            paidAt?: Date;
+        } = {},
+    ) {
+        const order = await paidOrder();
+        await prisma.order.update({
+            where: { id: order.id },
+            data: {
+                createdAt: new Date(Date.now() - hours * HOUR),
+                stage: at.stage ?? "NEW",
+                status: at.status ?? "PENDING",
+                paidAt: at.paidAt ?? null,
+            },
+        });
+        return order;
+    }
+
+    it("a pick-up placed 3 hours ago reads late through the order read and the list", async () => {
+        const order = await placedAgo(3);
+        const read = await kitchen.read(member, order.id);
+        expect(read).toMatchObject({ lateAfterMinutes: 120, late: true });
+        expect(read.lateBy).toBeGreaterThanOrEqual(59);
+
+        const page = await listOrderRows(
+            owner.organizationId,
+            { late: true },
+            { money: true, contact: true },
+        );
+        const row = page.rows.find((r) => r.id === order.id);
+        expect(row).toMatchObject({ late: true, lateAfterMinutes: 120 });
+        // Every row the Late filter keeps says it is late, and no other does.
+        expect(page.rows.every((r) => r.late)).toBe(true);
+        const rest = await listOrderRows(
+            owner.organizationId,
+            { late: false },
+            { money: true, contact: true },
+        );
+        expect(rest.rows.some((r) => r.late)).toBe(false);
+        expect(rest.rows.some((r) => r.id === order.id)).toBe(false);
+    });
+
+    it("the clock starts at placed: placed 3 hours ago and paid 1 hour ago is late", async () => {
+        const order = await placedAgo(3, {
+            paidAt: new Date(Date.now() - HOUR),
+        });
+        expect((await kitchen.read(owner, order.id)).late).toBe(true);
+    });
+
+    it("a pick-up an hour old isn't late; a collected one never is", async () => {
+        const young = await placedAgo(1);
+        expect(await kitchen.read(owner, young.id)).toMatchObject({
+            late: false,
+            lateBy: null,
+        });
+        const collected = await placedAgo(30, {
+            stage: "COLLECTED",
+            status: "DELIVERED",
+        });
+        expect((await kitchen.read(owner, collected.id)).late).toBe(false);
     });
 });
 

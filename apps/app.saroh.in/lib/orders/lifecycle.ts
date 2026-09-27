@@ -83,9 +83,6 @@ export function canCancel(status: OrderStatus): boolean {
 /** How long a Ready step or a refund is held before it is recorded. */
 export const HOLD_MS = 10_000;
 
-/** The counter's target: past this an order has waited too long. */
-export const WAIT_TARGET_MIN = 20;
-
 export const STAGE_LABEL: Record<KitchenStage, string> = {
     NEW: "New",
     PREPARING: "Preparing",
@@ -178,30 +175,52 @@ export function isOpen(order: {
     return order.stage !== flow[flow.length - 1];
 }
 
+/** "16 min", "3 h 42 min", "2 h", "1 day", "2 days". */
+export function durationWords(minutes: number): string {
+    if (minutes < 60) return `${minutes} min`;
+    if (minutes < 24 * 60) {
+        const m = minutes % 60;
+        return `${Math.floor(minutes / 60)} h${m ? ` ${m} min` : ""}`;
+    }
+    const days = Math.floor(minutes / (24 * 60));
+    return days === 1 ? "1 day" : `${days} days`;
+}
+
 /**
- * "Waiting 16 min" — how long an open order has waited since it was placed.
- * The kitchen works oldest-first; past the counter's target it is late.
+ * "Waiting 16 min" — how long an open order has waited since it was placed,
+ * and "Late · 2 h 5 min" once the API says it is late. Late is the API's
+ * (DEC-045): its type's threshold, the storefront's own once B17 lands. The
+ * app keeps no threshold, so an API before B2b never says late here.
  */
 export function waiting(
-    placedAt: string,
+    order: {
+        placedAt: string;
+        late?: boolean;
+        lateAfterMinutes?: number | null;
+        fulfilmentLabel?: string;
+    },
     now: number,
-): { text: string; minutes: number; late: boolean } {
+): {
+    text: string;
+    minutes: number;
+    late: boolean;
+    /** "Pick-up orders count as late after 2 h"; null without a rule. */
+    rule: string | null;
+} {
     const minutes = Math.max(
         0,
-        Math.floor((now - Date.parse(placedAt)) / 60_000),
+        Math.floor((now - Date.parse(order.placedAt)) / 60_000),
     );
-    const text =
-        minutes < 60
-            ? `${minutes} min`
-            : minutes < 24 * 60
-              ? `${Math.floor(minutes / 60)} h ${minutes % 60} min`
-              : Math.floor(minutes / (24 * 60)) === 1
-                ? "1 day"
-                : `${Math.floor(minutes / (24 * 60))} days`;
+    const late = order.late === true;
+    const after = order.lateAfterMinutes;
     return {
-        text: `Waiting ${text}`,
+        text: `${late ? "Late ·" : "Waiting"} ${durationWords(minutes)}`,
         minutes,
-        late: minutes >= WAIT_TARGET_MIN,
+        late,
+        rule:
+            typeof after === "number" && order.fulfilmentLabel
+                ? `${order.fulfilmentLabel} orders count as late after ${durationWords(after)}`
+                : null,
     };
 }
 

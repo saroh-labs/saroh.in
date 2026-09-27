@@ -105,7 +105,7 @@ export function OrderDetail({
     const next: KitchenStage | null =
         can.stage && !unpaid ? (order.next.stages[0] ?? null) : null;
     const open = isOpen(order);
-    const age = open && clock !== null ? waiting(order.placedAt, clock) : null;
+    const age = open && clock !== null ? waiting(order, clock) : null;
     const delivery = goesToAddress(order);
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??

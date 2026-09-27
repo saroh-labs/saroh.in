@@ -2,10 +2,17 @@ import { BadRequestException } from "@nestjs/common";
 
 import type { FulfilmentType } from "./fulfilment";
 import {
+    DEFAULT_LATE_THRESHOLDS,
+    defaultLateThresholds,
     FULFILMENT_RULES,
     FULFILMENT_TYPES,
     fulfilmentView,
+    goesByCourier,
     isHandedOver,
+    LATE_STAGES,
+    LATE_STATUSES,
+    lateAfterMinutesOf,
+    lateOf,
     legacyWord,
     movesFor,
     shipsToAddress,
@@ -283,5 +290,188 @@ describe("a storefront's ways", () => {
         expect(
             storefrontTypesOf(["SHIPPING", "DELIVERY", "DIGITAL", "PICKUP"]),
         ).toEqual(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]);
+    });
+});
+
+describe("the late rule (DEC-045, default 16)", () => {
+    const placedAt = new Date("2026-10-10T09:00:00.000Z");
+    const after = (minutes: number) =>
+        new Date(placedAt.getTime() + minutes * 60_000);
+    const open = {
+        fulfilment: "COLLECT",
+        stage: "NEW",
+        status: "PENDING",
+        paymentStatus: "PAID",
+        placedAt,
+    };
+
+    it("defaults to 2 hours, 24 hours and 48 hours; Digital and appointments have none", () => {
+        expect(DEFAULT_LATE_THRESHOLDS).toEqual({
+            PICKUP: 120,
+            LOCAL_DELIVERY: 1440,
+            SHIPPING: 2880,
+        });
+        expect(FULFILMENT_TYPES.map((t) => lateAfterMinutesOf(t))).toEqual([
+            120,
+            1440,
+            2880,
+            null,
+            null,
+            null,
+        ]);
+    });
+
+    it.each([
+        ["COLLECT", 120],
+        ["PICKUP", 120],
+        ["DELIVERY", 1440],
+        ["LOCAL_DELIVERY", 1440],
+        ["SHIPPING", 2880],
+    ])(
+        "a %s order is late only once past %i minutes",
+        (fulfilment, threshold) => {
+            const at = (m: number) => lateOf({ ...open, fulfilment }, after(m));
+            expect(at(threshold - 1)).toEqual({
+                lateAfterMinutes: threshold,
+                late: false,
+                lateBy: null,
+            });
+            // Exactly at the threshold isn't past it (the list's SQL is `<`).
+            expect(at(threshold).late).toBe(false);
+            expect(at(threshold + 5)).toEqual({
+                lateAfterMinutes: threshold,
+                late: true,
+                lateBy: 5,
+            });
+        },
+    );
+
+    it("says late by at least a minute the moment it is past", () => {
+        const now = new Date(after(120).getTime() + 1_000);
+        expect(lateOf(open, now)).toMatchObject({ late: true, lateBy: 1 });
+    });
+
+    it("counts elapsed time, so the business's zone can't move it", () => {
+        // Placed 23:30 IST, read 01:31 IST the next day: past two hours
+        // across the business's midnight, as it is in UTC.
+        const placed = new Date("2026-10-10T18:00:00.000Z");
+        const now = new Date("2026-10-10T20:01:00.000Z");
+        expect(lateOf({ ...open, placedAt: placed }, now)).toMatchObject({
+            late: true,
+            lateBy: 1,
+        });
+    });
+
+    it("starts the clock at placed: a pay-later order paid an hour ago is late 3 hours after placing", () => {
+        // Nothing reads when it was paid; placed three hours ago is late
+        // for Pick-up by an hour.
+        expect(lateOf(open, after(180))).toMatchObject({
+            late: true,
+            lateBy: 60,
+        });
+        // Not paid yet counts from placed too.
+        expect(
+            lateOf({ ...open, paymentStatus: "UNPAID" }, after(180)).late,
+        ).toBe(true);
+    });
+
+    it("is judged on every step before handover", () => {
+        for (const [stage, status] of [
+            ["NEW", "PENDING"],
+            ["PREPARING", "PROCESSING"],
+            ["READY", "PROCESSING"],
+        ] as const) {
+            expect(lateOf({ ...open, stage, status }, after(121)).late).toBe(
+                true,
+            );
+        }
+    });
+
+    it("never calls an order late once it is handed over, cancelled or refunded", () => {
+        const now = after(10_000);
+        const cases = [
+            { stage: "COLLECTED", status: "DELIVERED" },
+            {
+                fulfilment: "DELIVERY",
+                stage: "HANDED_TO_COURIER",
+                status: "SHIPPED",
+            },
+            {
+                fulfilment: "LOCAL_DELIVERY",
+                stage: "OUT_FOR_DELIVERY",
+                status: "SHIPPED",
+            },
+            { fulfilment: "SHIPPING", stage: "DELIVERED", status: "DELIVERED" },
+            { stage: "NEW", status: "CANCELLED" },
+            { stage: "READY", status: "PROCESSING", paymentStatus: "REFUNDED" },
+        ];
+        for (const c of cases) {
+            expect(lateOf({ ...open, ...c }, now)).toMatchObject({
+                late: false,
+                lateBy: null,
+            });
+        }
+        // The threshold is still the type's, for the screen to say.
+        expect(lateOf({ ...open, ...cases[0] }, now).lateAfterMinutes).toBe(
+            120,
+        );
+    });
+
+    it("never calls a digital order or an appointment late", () => {
+        for (const fulfilment of [
+            "DIGITAL",
+            "APPOINTMENT_IN_PERSON",
+            "APPOINTMENT_ONLINE",
+        ]) {
+            expect(lateOf({ ...open, fulfilment }, after(100_000))).toEqual({
+                lateAfterMinutes: null,
+                late: false,
+                lateBy: null,
+            });
+        }
+    });
+
+    it("reads a storefront's own thresholds when given (B17)", () => {
+        const counter = { ...DEFAULT_LATE_THRESHOLDS, PICKUP: 20 };
+        expect(lateOf(open, after(25), counter)).toEqual({
+            lateAfterMinutes: 20,
+            late: true,
+            lateBy: 5,
+        });
+        const slow = { ...DEFAULT_LATE_THRESHOLDS, SHIPPING: 72 * 60 };
+        expect(
+            lateOf({ ...open, fulfilment: "SHIPPING" }, after(50 * 60), slow)
+                .late,
+        ).toBe(false);
+    });
+
+    it("gives the list's SQL the same defaults and steps, under both vocabularies", () => {
+        expect(Object.fromEntries(defaultLateThresholds())).toEqual({
+            COLLECT: 120,
+            DELIVERY: 1440,
+            PICKUP: 120,
+            LOCAL_DELIVERY: 1440,
+            SHIPPING: 2880,
+        });
+        expect(LATE_STAGES).toEqual(["NEW", "PREPARING", "READY"]);
+        expect(LATE_STATUSES).toEqual(["PENDING", "PROCESSING"]);
+    });
+});
+
+describe("going by courier", () => {
+    it("a shipment and (before the switch) a local delivery do; the rest never", () => {
+        expect(goesByCourier("SHIPPING", "READY")).toBe(true);
+        expect(goesByCourier("DELIVERY", "HANDED_TO_COURIER")).toBe(true);
+        expect(goesByCourier("LOCAL_DELIVERY", "READY")).toBe(true);
+        expect(goesByCourier("LOCAL_DELIVERY", "OUT_FOR_DELIVERY")).toBe(false);
+        for (const stored of [
+            "COLLECT",
+            "PICKUP",
+            "DIGITAL",
+            "APPOINTMENT_IN_PERSON",
+            "APPOINTMENT_ONLINE",
+        ]) {
+            expect(goesByCourier(stored, "NEW")).toBe(false);
+        }
     });
 });

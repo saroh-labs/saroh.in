@@ -161,6 +161,36 @@ environment.
 
 ---
 
+## Beside release 1 · the courier and the late rule (B2b)
+
+Not one of the three releases: it changes no enum value and can ship with
+release 1 or any release after it.
+
+- **Migration** `20261010140000_order_courier_tracking`: `ALTER TABLE "Order"
+ADD COLUMN "courierName" TEXT, ADD COLUMN "trackingNumber" TEXT`. Nullable,
+  no default: a catalogue change under a brief ACCESS EXCLUSIVE lock on
+  `Order`, no rewrite, constant time. The previous image never names either
+  column, so it keeps serving during the migration, and **rollback** is
+  deploying the previous tag (the columns stay, unused).
+- **What changes for callers:**
+    - the order read and the Orders list rows (`v=2`) carry `late`, `lateBy`
+      and `lateAfterMinutes`, from `lateOf` in `fulfilment.ts` — the rule the
+      list's Late filter runs in SQL — and `courierName` and `trackingNumber`;
+    - `POST …/orders/:orderId/stage` to HANDED_TO_COURIER takes
+      `courierName` and `trackingNumber` (optional, trimmed, ≤ 80 characters);
+      any other step refuses them with 400;
+    - `PATCH …/orders/:orderId` takes `courierName`, `trackingNumber` and
+      `trackingUrl` once an order that goes by courier is handed over, with
+      `order:stage`; every other field is refused with 409 from handover on
+      (notes included — they used to stay editable until cancelled).
+- **Deliberate change:** Order Detail's header no longer says an order is
+  late after 20 minutes. It shows the API's `late`: a pick-up is late after
+  2 hours, a local delivery after 24 and a shipment after 48 (default 16),
+  until each storefront sets its own (B17, which should ship with this or in
+  the release after it).
+
+---
+
 ## Release 2 · switch (B2c)
 
 To be filled in by B2c: the backfill migration

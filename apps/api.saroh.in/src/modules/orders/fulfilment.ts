@@ -384,6 +384,19 @@ export function isHandedOver(type: FulfilmentType, stage: OrderStage): boolean {
     return FULFILMENT_RULES[type].handedOver.includes(stage);
 }
 
+/**
+ * Whether the order goes by courier, at the stage it is at: its steps have a
+ * "Handed to courier". A shipment does; so does a local delivery before the
+ * switch release, or one handed over the old way after it. A pick-up, a
+ * digital order and an appointment never do. Its courier's name and tracking
+ * number belong to that step (DEC-045).
+ */
+export function goesByCourier(stored: string, stage: OrderStage): boolean {
+    return stepsFor(typeOf(stored), stage).some(
+        (s) => s.stage === "HANDED_TO_COURIER",
+    );
+}
+
 /** What every order read answers about how it leaves. */
 export interface FulfilmentView {
     /** The legacy word (COLLECT or DELIVERY), until B2d. */
@@ -460,6 +473,105 @@ export function storefrontTypesFrom(settings: {
 export function storedValuesOf(values: readonly string[]): OrderFulfilment[] {
     const types = new Set(values.map(typeOf));
     return ORDER_FULFILMENTS.filter((v) => types.has(typeOf(v)));
+}
+
+/**
+ * When a storefront's orders count as late, in minutes from when each was
+ * placed, per way it offers (default 16; DEC-045). B17 stores these on the
+ * storefront's settings; until then every storefront uses the defaults.
+ */
+export type LateThresholds = Readonly<Record<StorefrontFulfilmentType, number>>;
+
+/** The defaults: 2 hours, 24 hours and 48 hours (default 16). */
+export const DEFAULT_LATE_THRESHOLDS: LateThresholds = {
+    PICKUP: FULFILMENT_RULES.PICKUP.lateAfterMinutes ?? 120,
+    LOCAL_DELIVERY: FULFILMENT_RULES.LOCAL_DELIVERY.lateAfterMinutes ?? 1440,
+    SHIPPING: FULFILMENT_RULES.SHIPPING.lateAfterMinutes ?? 2880,
+};
+
+/**
+ * The statuses and steps at which an order can be late: open (not
+ * delivered, not cancelled) and not yet handed over. The Orders list's SQL
+ * (`lateSql`) reads the same two lists, so a row and the Late filter never
+ * disagree.
+ */
+export const LATE_STATUSES = ["PENDING", "PROCESSING"] as const;
+export const LATE_STAGES = [
+    "NEW",
+    "PREPARING",
+    "READY",
+] as const satisfies readonly OrderStage[];
+
+/**
+ * After how many minutes an order of this type counts as late, under a
+ * storefront's thresholds. Null: never (Digital), or judged by its visits
+ * (appointments).
+ */
+export function lateAfterMinutesOf(
+    type: FulfilmentType,
+    thresholds: LateThresholds = DEFAULT_LATE_THRESHOLDS,
+): number | null {
+    if (FULFILMENT_RULES[type].lateAfterMinutes === null) return null;
+    return thresholds[type as StorefrontFulfilmentType];
+}
+
+/** What every order read says about lateness. */
+export interface LateView {
+    /** The type's threshold at this storefront; null when it is never late. */
+    lateAfterMinutes: number | null;
+    /** Open, not handed over, and placed longer ago than the threshold. */
+    late: boolean;
+    /** Whole minutes past the threshold (at least 1); null when not late. */
+    lateBy: number | null;
+}
+
+/** The facts the late rule reads from an order. */
+export interface LateFacts {
+    /** The stored fulfilment value, in either vocabulary. */
+    fulfilment: string;
+    stage: string;
+    status: string;
+    paymentStatus: string;
+    /** When it was placed: `Order.createdAt`, paid or not (DEC-045). */
+    placedAt: Date;
+}
+
+/**
+ * Whether an order is late, and by how much (DEC-045). The clock starts when
+ * the order was placed, for every order — a pay-later order paid an hour ago
+ * is judged from when it was placed. Only an open order not yet handed over
+ * can be late; Digital never is, and appointments go by their visits.
+ *
+ * Computed at read time and never stored, so a changed threshold re-labels
+ * open orders on the next read. It measures elapsed minutes, which are the
+ * same in every zone: the business's zone (DEC-033) decides how a moment is
+ * shown, not how long ago it was.
+ */
+export function lateOf(
+    order: LateFacts,
+    now: Date,
+    thresholds: LateThresholds = DEFAULT_LATE_THRESHOLDS,
+): LateView {
+    const lateAfterMinutes = lateAfterMinutesOf(
+        typeOf(order.fulfilment),
+        thresholds,
+    );
+    const open =
+        (LATE_STATUSES as readonly string[]).includes(order.status) &&
+        (LATE_STAGES as readonly string[]).includes(order.stage) &&
+        order.paymentStatus !== "REFUNDED";
+    const pastMs =
+        now.getTime() -
+        order.placedAt.getTime() -
+        (lateAfterMinutes ?? 0) * 60_000;
+    // Strictly past the threshold, as the list's SQL (`createdAt < now -
+    // threshold`): an order placed exactly two hours ago isn't late yet.
+    const late = open && lateAfterMinutes !== null && pastMs > 0;
+    return {
+        lateAfterMinutes,
+        late,
+        lateBy: late ? Math.max(1, Math.floor(pastMs / 60_000)) : null,
+    };
 }
 
 /**

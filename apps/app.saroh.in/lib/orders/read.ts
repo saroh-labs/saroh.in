@@ -55,6 +55,19 @@ export interface FulfilmentFields {
     stepIndex: number;
     /** What the printed ticket is called; null when nothing is printed. */
     ticketName: string | null;
+    /**
+     * Whether it is late, worked out by the API from when it was placed and
+     * its type's threshold (DEC-045; the storefront's own from B17). The
+     * app keeps no threshold of its own. Absent from an API before B2b.
+     */
+    late?: boolean;
+    /** Whole minutes past the threshold; null when not late. */
+    lateBy?: number | null;
+    /** The threshold, in minutes; null for a type that is never late. */
+    lateAfterMinutes?: number | null;
+    /** Who took it and their number (B2b); null until given. */
+    courierName?: string | null;
+    trackingNumber?: string | null;
 }
 
 export type RefundStanding = "NONE" | "PARTLY_REFUNDED" | "REFUNDED";

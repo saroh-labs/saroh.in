@@ -39,9 +39,10 @@ export function OrderCrumbs({ number }: { number: string }) {
 }
 
 /**
- * The order's number and status, how long it has waited (Saffron past the
- * counter's 20-minute target), when and where it was placed and how it goes
- * out — and, on the right, the actions the screen passes in.
+ * The order's number and status, how long it has waited ("Late" in words and
+ * Saffron once the API says it is late, by its type's rule), when and where
+ * it was placed and how it goes out — and, on the right, the actions the
+ * screen passes in.
  */
 export function OrderHeading({
     order,
@@ -53,7 +54,7 @@ export function OrderHeading({
     order: OrderRead;
     number: string;
     standing: { label: string; tone: PillTone };
-    age: { text: string; late: boolean } | null;
+    age: { text: string; late: boolean; rule: string | null } | null;
     /** The header's buttons. */
     children: ReactNode;
 }) {
@@ -72,11 +73,7 @@ export function OrderHeading({
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
                     {age ? (
                         <span
-                            title={
-                                age.late
-                                    ? "Past the 20-minute target"
-                                    : "Within the 20-minute target"
-                            }
+                            title={age.rule ?? undefined}
                             className={cn(
                                 "rounded-full border px-2 py-0.5 text-[12px] font-bold tabular-nums",
                                 age.late
