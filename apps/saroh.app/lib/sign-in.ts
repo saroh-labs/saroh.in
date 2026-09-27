@@ -19,10 +19,16 @@ import { siteAccountsFetch } from "./customer-session";
 
 interface ApiError {
     details?: Record<string, unknown>;
+    error?: { details?: Record<string, unknown> };
 }
 
+/**
+ * The reason an answer carries. The API's error envelope puts it at
+ * `error.details` (`AllExceptionsFilter`); a bare `details` is read too.
+ */
 function detailsOf(body: unknown): Record<string, unknown> {
-    const details = (body as ApiError | null)?.details;
+    const b = body as ApiError | null;
+    const details = b?.error?.details ?? b?.details;
     return details && typeof details === "object" ? details : {};
 }
 

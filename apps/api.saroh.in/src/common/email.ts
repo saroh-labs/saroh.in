@@ -6,6 +6,7 @@ import {
     codeSenderName,
     codeSubject,
 } from "../modules/site-accounts/sender-name";
+import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -496,8 +497,12 @@ const siteCodesTransporter = getSiteCodesTransporter();
  * booking that cannot be made: the caller retries and alerts. Nothing here
  * logs the address or the code outside development.
  *
- * With no SMTP, development prints the code (the fake transport), or fails
- * every send when `SITE_CODES_EMAIL_FAKE=fail`; anywhere else nothing left.
+ * With no SMTP, development prints the code (the fake transport) and leaves
+ * it in the temp-directory outbox a local browser test reads
+ * (`site-code-outbox.ts`), or fails every send when
+ * `SITE_CODES_EMAIL_FAKE=fail`. Outside development the fake runs only when
+ * `SITE_CODES_EMAIL_FAKE` names it, and never in production; anywhere else
+ * nothing left.
  */
 export async function sendSiteSignInCodeEmail(
     to: string,
@@ -505,11 +510,13 @@ export async function sendSiteSignInCodeEmail(
 ): Promise<EmailOutcome> {
     const { code, businessName, minutes } = details;
     if (!siteCodesTransporter) {
-        if (env.NODE_ENV === "development") {
+        if (siteCodesFakeAllowed(env.NODE_ENV, env.SITE_CODES_EMAIL_FAKE)) {
             if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
             console.info(
                 `[Site sign-in code] (no SMTP) ${to} for ${businessName}: code ${code}`,
             );
+            // Where a browser test on this machine picks it up (A9).
+            writeSiteCodeOutbox(to, code);
             return "sent";
         }
         return "not-configured";

@@ -1,11 +1,20 @@
 import { Transform } from "class-transformer";
 import {
     IsEmail,
+    IsIn,
+    IsISO8601,
     IsOptional,
     IsString,
     Matches,
     MaxLength,
 } from "class-validator";
+
+import type { BookingLocationType } from "../bookings/dto";
+import {
+    BOOKING_LOCATION_TYPES,
+    INTAKE_NOTE_MESSAGE,
+    MAX_INTAKE_NOTE,
+} from "../bookings/dto";
 
 /**
  * The two bodies site sign-in takes (round-2 plan A, A2). Email is the only
@@ -43,4 +52,54 @@ export class VerifyCodeDto {
     @IsString()
     @Matches(/^\d{6}$/, { message: "Enter the 6-digit code from the email" })
     code!: string;
+}
+
+/**
+ * A booking a signed-in customer makes on the business's booking page (A9).
+ *
+ * There is no email and no phone: the booker is the account's (its verified
+ * email, its contact's name and phone), and the business is the one the
+ * relayed host resolves to. `bookerName` is only a name for a contact that
+ * has none yet. The rest is the booking page's own request, as the anonymous
+ * route takes it (`BookServiceDto`); the price is always the service's.
+ */
+export class AccountBookDto {
+    @IsString()
+    @MaxLength(64)
+    serviceId!: string;
+
+    @IsISO8601()
+    startAt!: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(128)
+    bookerName?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    idempotencyKey?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
+
+    @IsOptional()
+    @IsIn(["NOW", "DESK"])
+    pay?: "NOW" | "DESK";
+
+    @IsOptional()
+    @IsIn(BOOKING_LOCATION_TYPES, {
+        message: "Where has to be in person or online.",
+    })
+    locationType?: BookingLocationType;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
+    intakeNote?: string;
 }

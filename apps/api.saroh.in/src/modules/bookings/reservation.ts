@@ -66,6 +66,62 @@ export interface ReserveBy {
     source: string;
     /** Who made it; `null` when the booker did it themselves. */
     actorUserId: string | null;
+    /**
+     * The customer's site account, when they booked signed in (A9,
+     * ADR-011). Its contact is the booker — never a contact found or made by
+     * the email — the booking names the account, and the same account (or
+     * its contact) can't hold the same session twice.
+     */
+    account?: SignedInBooker;
+}
+
+/** A signed-in customer booking for themselves (A9). */
+export interface SignedInBooker {
+    accountId: string;
+    contactId: string;
+}
+
+/** The 409 for a customer who already holds this very slot (A9). */
+export const ALREADY_BOOKED = "You're already booked for this.";
+
+export function alreadyBooked(): ConflictException {
+    return new ConflictException({
+        message: ALREADY_BOOKED,
+        details: { reason: "already-booked" },
+    });
+}
+
+/**
+ * Whether the account — or the contact it signs in as — already holds this
+ * session of this service: confirmed, or a pay-now hold still running. A
+ * booking cancelled or let go doesn't count.
+ */
+export async function holdsSlotAlready(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    organizationId: string,
+    who: SignedInBooker,
+    serviceId: string,
+    startAt: Date,
+    now: Date = new Date(),
+): Promise<boolean> {
+    const found = await db.booking.findFirst({
+        where: {
+            organizationId,
+            serviceId,
+            startAt,
+            AND: [
+                holdsPlace(now),
+                {
+                    OR: [
+                        { customerAccountId: who.accountId },
+                        { contactId: who.contactId },
+                    ],
+                },
+            ],
+        },
+        select: { id: true },
+    });
+    return found !== null;
 }
 
 /**
@@ -261,21 +317,37 @@ export async function reserveInTx(
     if (person) {
         await assertPersonFreeInTx(tx, person, serviceId, startAt, endAt);
     }
-
-    const contact = await tx.contact.upsert({
-        where: {
-            organizationId_email: { organizationId, email },
-        },
-        update: contactUpdate(input),
-        create: {
+    // The same person twice in one session (A9). Read in the same
+    // serializable transaction, so two tabs racing both can't commit.
+    if (
+        by.account &&
+        (await holdsSlotAlready(
+            tx,
             organizationId,
-            email,
-            firstName: splitName(input.bookerName).first ?? null,
-            lastName: splitName(input.bookerName).last ?? null,
-            phone: input.bookerPhone ?? null,
-            source: by.source,
-        },
-    });
+            by.account,
+            serviceId,
+            startAt,
+        ))
+    ) {
+        throw alreadyBooked();
+    }
+
+    const contact = by.account
+        ? await accountContactInTx(tx, organizationId, by.account, input)
+        : await tx.contact.upsert({
+              where: {
+                  organizationId_email: { organizationId, email },
+              },
+              update: contactUpdate(input),
+              create: {
+                  organizationId,
+                  email,
+                  firstName: splitName(input.bookerName).first ?? null,
+                  lastName: splitName(input.bookerName).last ?? null,
+                  phone: input.bookerPhone ?? null,
+                  source: by.source,
+              },
+          });
 
     const booking = await tx.booking.create({
         data: {
@@ -300,6 +372,7 @@ export async function reserveInTx(
                 input.locationType,
             ),
             intakeNote: intakeNoteOf(input.intakeNote),
+            customerAccountId: by.account?.accountId ?? null,
             ...(person
                 ? {
                       staffId: person.staffId,
@@ -418,6 +491,33 @@ export function buildSnapshot(
             phone: input.bookerPhone ?? null,
         },
     };
+}
+
+/**
+ * The signed-in booker's own contact (A9). A name typed on the booking page
+ * fills a contact that has none; a name the contact already has is kept,
+ * and nothing else about it changes.
+ */
+async function accountContactInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    who: SignedInBooker,
+    input: BookInput,
+): Promise<{ id: string }> {
+    const contact = await tx.contact.findFirst({
+        where: { id: who.contactId, organizationId },
+        select: { id: true, firstName: true, lastName: true },
+    });
+    if (!contact) throw new NotFoundException("Sign in to continue.");
+    const { first, last } = splitName(input.bookerName);
+    if (!contact.firstName?.trim() && !contact.lastName?.trim() && first) {
+        await tx.contact.update({
+            where: { id: contact.id },
+            data: { firstName: first, lastName: last ?? null },
+            select: { id: true },
+        });
+    }
+    return { id: contact.id };
 }
 
 /** Contact fields to update on a repeat booking (only supplied values). */

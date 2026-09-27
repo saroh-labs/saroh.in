@@ -71,6 +71,10 @@ export function DoneCard({
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 {payText}
             </p>
+            {/* Where the booking lives until the account area (A5) shows it. */}
+            <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
+                We&apos;ve saved this to your details with {business}.
+            </p>
             {booking.meetingUrl ? (
                 <p className="text-site-body mt-2 text-[13.5px]">
                     Join online:{" "}

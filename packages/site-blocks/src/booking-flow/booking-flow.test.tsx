@@ -4,12 +4,18 @@ import {
     render,
     screen,
     waitFor,
+    within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SignedInCustomer } from "../account/api";
+import type { SignedInBookRequest } from "./api";
+import { resultOf } from "./api";
+import type { BookingAccount } from "./booking-flow";
 import BookingFlow from "./booking-flow";
 import type { CheckoutOutcome, CheckoutRequest } from "./checkout";
 import type { BookingPageData } from "./model";
+import { isBookResult } from "./model";
 
 /**
  * The provider's window (E11), stood in for: each one the page opens is
@@ -136,6 +142,45 @@ const CLASS_DAYS = {
     ],
 };
 
+const ASHA: SignedInCustomer = { email: "asha@example.in", name: "Asha Rao" };
+
+/**
+ * The site's server actions, stood in for (A9). Booking posts to the fetch
+ * mock at `…/services/<id>/book` and answers as the real action does, so a
+ * test serves it like any other call.
+ */
+function account(over: Partial<BookingAccount> = {}): BookingAccount {
+    return {
+        customer: ASHA,
+        options: {
+            businessName: "Pulse Fitness",
+            phone: "+91 80 4120 8800",
+            challenge: { required: false, siteKey: null },
+        },
+        signIn: {
+            requestCode: vi.fn(() =>
+                Promise.resolve({ ok: true as const, resendAfterSeconds: 30 }),
+            ),
+            verifyCode: vi.fn(() =>
+                Promise.resolve({ ok: true as const, customer: ASHA }),
+            ),
+        },
+        book: async ({ serviceId, ...rest }: SignedInBookRequest) => {
+            const res = await fetch(
+                `${API}/signed-in/services/${serviceId}/book`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ serviceId, ...rest }),
+                },
+            );
+            const body: unknown = await res.json().catch(() => null);
+            return resultOf(res.status, body, isBookResult);
+        },
+        signOut: vi.fn(() => Promise.resolve({ ok: true })),
+        ...over,
+    };
+}
+
 const booked = (over: Record<string, unknown> = {}) => ({
     reference: "bk_1",
     startAt: "2026-09-20T01:30:00.000Z",
@@ -188,18 +233,12 @@ async function chooseOneToOne() {
     fireEvent.click(
         screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
     );
-    fireEvent.change(screen.getByLabelText("Name"), {
-        target: { value: "Asha Rao" },
-    });
-    fireEvent.change(screen.getByLabelText("Email"), {
-        target: { value: "asha@example.in" },
-    });
 }
 
 describe("the booking page (U19)", () => {
     it("says a day is Full or Closed, and opens on the first free one", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
@@ -220,7 +259,7 @@ describe("the booking page (U19)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
@@ -246,12 +285,15 @@ describe("the booking page (U19)", () => {
         >;
         expect(body).toMatchObject({
             startAt: "2026-09-20T01:30:00.000Z",
-            bookerName: "Asha Rao",
-            bookerEmail: "asha@example.in",
+            serviceId: "svc_pt",
             staffId: "staff_karan",
             pay: "DESK",
         });
         expect(body).not.toHaveProperty("amount");
+        // The booker is the account's (A9): no email, phone or name sent.
+        expect(body).not.toHaveProperty("bookerEmail");
+        expect(body).not.toHaveProperty("bookerPhone");
+        expect(body).not.toHaveProperty("bookerName");
         expect(typeof body.idempotencyKey).toBe("string");
     });
 
@@ -282,7 +324,7 @@ describe("the booking page (U19)", () => {
             }
             return json({ state: holdState, holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -329,7 +371,7 @@ describe("the booking page (U19)", () => {
             if (url.endsWith("/payment-intent")) return json({}, 500);
             return json({ state: "RELEASED", holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -359,7 +401,7 @@ describe("the booking page (U19)", () => {
                       409,
                   ),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -392,7 +434,9 @@ describe("the booking page (U19)", () => {
                           201,
                       ),
             );
-            render(<BookingFlow page={PAGE} apiUrl={API} />);
+            render(
+                <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+            );
             await chooseOneToOne();
             fireEvent.click(
                 screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -442,7 +486,7 @@ describe("the booking page (U19)", () => {
             }
             return json({ state: "HELD", holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -515,7 +559,7 @@ describe("the booking page (U19)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(TWO_STARTS) : json({}, 502),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         const keys = () =>
             calls
@@ -560,7 +604,7 @@ describe("the booking page (U19)", () => {
 
     it("lists a class's sessions with places left, and a full one cannot be picked", async () => {
         serve(() => json(CLASS_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
 
         const full = await screen.findByRole("radio", { name: /07:00.*Full/ });
@@ -579,6 +623,7 @@ describe("the booking page (U19)", () => {
             <BookingFlow
                 page={{ ...PAGE, payOnline: false }}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_pt"
             />,
         );
@@ -586,12 +631,6 @@ describe("the booking page (U19)", () => {
         fireEvent.click(
             screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
         );
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
-        fireEvent.change(screen.getByLabelText("Email"), {
-            target: { value: "asha@example.in" },
-        });
         expect(screen.queryByRole("radio", { name: /Pay ₹1,200/ })).toBeNull();
         expect(
             screen.getByRole("button", { name: "Book — pay at the desk" }),
@@ -600,7 +639,13 @@ describe("the booking page (U19)", () => {
 
     it("says booking is not open when Appointments is off", () => {
         serve(() => json({}));
-        render(<BookingFlow page={{ ...PAGE, open: false }} apiUrl={API} />);
+        render(
+            <BookingFlow
+                page={{ ...PAGE, open: false }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         expect(
             screen.getByRole("heading", {
                 name: "Online booking isn't open right now",
@@ -651,12 +696,6 @@ describe("Where and anything we should know (E7)", () => {
             name: "07:00 with Dr Kavitha Rao",
         });
         fireEvent.click(time);
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Rahul Iyer" },
-        });
-        fireEvent.change(screen.getByLabelText("Email"), {
-            target: { value: "rahul@example.in" },
-        });
     }
 
     function bookBody(): Record<string, unknown> {
@@ -680,7 +719,7 @@ describe("Where and anything we should know (E7)", () => {
                       201,
                   ),
         );
-        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
         await chooseAt(/Video consultation/);
 
         const where = screen.getByRole("radiogroup", { name: "Where" });
@@ -703,7 +742,7 @@ describe("Where and anything we should know (E7)", () => {
             screen.getByRole("button", { name: "Book — pay at the desk" }),
         );
 
-        await screen.findByRole("heading", { name: "You're booked, Rahul." });
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(bookBody()).toMatchObject({
             locationType: "ONLINE",
             intakeNote: "I take blood thinners",
@@ -728,7 +767,7 @@ describe("Where and anything we should know (E7)", () => {
                 ? json(KAVI_DAYS)
                 : json(booked({ serviceName: "Cleaning" }), 201),
         );
-        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
         await chooseAt(/Cleaning/);
 
         expect(
@@ -743,7 +782,7 @@ describe("Where and anything we should know (E7)", () => {
             screen.getByRole("button", { name: "Book — pay at the desk" }),
         );
 
-        await screen.findByRole("heading", { name: "You're booked, Rahul." });
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
         const body = bookBody();
         expect(body).not.toHaveProperty("locationType");
         // An empty note isn't sent.
@@ -757,7 +796,7 @@ describe("Where and anything we should know (E7)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         expect(
             screen.queryByRole("radiogroup", { name: "Where" }),
@@ -774,7 +813,7 @@ describe("Where and anything we should know (E7)", () => {
 
     it("caps the note at 1,000 characters", async () => {
         serve(() => json(KAVI_DAYS));
-        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
         await chooseAt(/Cleaning/);
         expect(
             screen.getByLabelText("Anything we should know?"),
@@ -816,7 +855,7 @@ describe("Where and anything we should know (E7)", () => {
                 },
             });
         });
-        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
         await chooseAt(/Video consultation/);
         fireEvent.click(screen.getByRole("radio", { name: "Video call" }));
         vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -832,7 +871,7 @@ describe("Where and anything we should know (E7)", () => {
         });
         await waitFor(() =>
             expect(
-                screen.getByRole("heading", { name: "You're booked, Rahul." }),
+                screen.getByRole("heading", { name: "You're booked, Asha." }),
             ).toBeInTheDocument(),
         );
         expect(screen.getByRole("link", { name: LINK })).toBeInTheDocument();
@@ -872,7 +911,7 @@ describe("UPI and card checkout (E11)", () => {
     }
 
     async function payNow() {
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -898,7 +937,7 @@ describe("UPI and card checkout (E11)", () => {
         serve((url) =>
             url.includes("svc_hiit") ? json(CLASS_DAYS) : json(ONE_DAYS),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
@@ -939,7 +978,6 @@ describe("UPI and card checkout (E11)", () => {
         expect(request.booker).toEqual({
             name: "Asha Rao",
             email: "asha@example.in",
-            phone: undefined,
         });
 
         await answer("paid");
@@ -1082,6 +1120,7 @@ describe("UPI and card checkout (E11)", () => {
             <BookingFlow
                 page={{ ...PAGE, payOnline: false }}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_pt"
             />,
         );
@@ -1090,12 +1129,6 @@ describe("UPI and card checkout (E11)", () => {
                 name: "07:00 with Karan Mehta",
             }),
         );
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
-        fireEvent.change(screen.getByLabelText("Email"), {
-            target: { value: "asha@example.in" },
-        });
         expect(screen.queryByText(/UPI or card/)).toBeNull();
         expect(checkouts.opened).toHaveLength(0);
     });
@@ -1129,6 +1162,7 @@ describe("opening on a time from On today (G18)", () => {
             <BookingFlow
                 page={PAGE}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_pt"
                 initialDate="2026-09-20"
                 initialStart="08:00"
@@ -1144,7 +1178,7 @@ describe("opening on a time from On today (G18)", () => {
             screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
         ).toHaveAttribute("aria-checked", "true");
         // Straight on to who they are.
-        expect(screen.getByLabelText("Name")).toBeInTheDocument();
+        expect(screen.getByText(/Booking as/)).toBeInTheDocument();
         expect(screen.queryByText(/just gone/)).toBeNull();
     });
 
@@ -1154,6 +1188,7 @@ describe("opening on a time from On today (G18)", () => {
             <BookingFlow
                 page={PAGE}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_pt"
                 initialDate="2026-09-20"
                 initialStart="10:15"
@@ -1179,6 +1214,7 @@ describe("opening on a time from On today (G18)", () => {
             <BookingFlow
                 page={PAGE}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_hiit"
                 initialDate="2026-09-20"
                 initialStart="18:30"
@@ -1197,6 +1233,7 @@ describe("opening on a time from On today (G18)", () => {
             <BookingFlow
                 page={PAGE}
                 apiUrl={API}
+                account={account()}
                 initialServiceId="svc_hiit"
                 initialDate="2026-09-20"
                 initialStart="07:00"
@@ -1215,6 +1252,7 @@ describe("opening on a time from On today (G18)", () => {
             <BookingFlow
                 page={PAGE}
                 apiUrl={API}
+                account={account()}
                 initialDate="2026-09-20"
                 initialStart="08:00"
             />,
@@ -1227,5 +1265,460 @@ describe("opening on a time from On today (G18)", () => {
             screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "false");
         expect(screen.queryByText(/just gone/)).toBeNull();
+    });
+});
+
+describe("sign-in at the last step (A9)", () => {
+    const TWO_STARTS = {
+        ...ONE_DAYS,
+        days: [
+            {
+                date: "2026-09-20",
+                open: true,
+                starts: [
+                    {
+                        startAt: "2026-09-20T01:30:00.000Z",
+                        endAt: "2026-09-20T02:30:00.000Z",
+                        staffId: "staff_karan",
+                        staffName: "Karan Mehta",
+                        placesLeft: null,
+                    },
+                    {
+                        startAt: "2026-09-20T02:30:00.000Z",
+                        endAt: "2026-09-20T03:30:00.000Z",
+                        staffId: "staff_karan",
+                        staffName: "Karan Mehta",
+                        placesLeft: null,
+                    },
+                ],
+            },
+        ],
+    };
+
+    const bookCalls = () =>
+        calls
+            .filter((c) => c.url.endsWith("/book"))
+            .map(
+                (c) =>
+                    JSON.parse(c.init?.body as string) as Record<
+                        string,
+                        unknown
+                    >,
+            );
+
+    async function pickSeven() {
+        fireEvent.click(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        );
+        fireEvent.click(
+            await screen.findByRole("radio", {
+                name: "07:00 with Karan Mehta",
+            }),
+        );
+        payAtDesk();
+    }
+
+    /** Paying is asked once they're named. */
+    function payAtDesk() {
+        const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });
+        if (desk) fireEvent.click(desk);
+    }
+
+    async function signInWithCode(email: string) {
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.change(within(sheet).getByLabelText("Email"), {
+            target: { value: email },
+        });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Send code" }),
+        );
+        fireEvent.change(await within(sheet).findByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+    }
+
+    const cannotSend = () => ({
+        requestCode: vi.fn(() =>
+            Promise.resolve({
+                ok: false as const,
+                reason: "unavailable" as const,
+            }),
+        ),
+        verifyCode: vi.fn(),
+    });
+
+    it("a visitor gives a name, signs in at the last step, and is booked straight after the code", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        const verifyCode = vi.fn(() =>
+            Promise.resolve({
+                ok: true as const,
+                customer: { email: "meera@example.in", name: null },
+            }),
+        );
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({
+                    customer: null,
+                    signIn: {
+                        requestCode: vi.fn(() =>
+                            Promise.resolve({
+                                ok: true as const,
+                                resendAfterSeconds: 30,
+                            }),
+                        ),
+                        verifyCode,
+                    },
+                })}
+            />,
+        );
+        await pickSeven();
+        expect(
+            screen.getByText(/You'll confirm your email with a code/),
+        ).toBeInTheDocument();
+        // Nothing is booked, and no sheet, until they've named themselves.
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        expect(screen.getAllByText("Add your name.").length).toBeGreaterThan(0);
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Meera Shah" },
+        });
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        expect(
+            await screen.findByText(
+                "Last step: confirm it's you, then we'll finish. No password.",
+            ),
+        ).toBeInTheDocument();
+        expect(bookCalls()).toHaveLength(0);
+
+        await signInWithCode("meera@example.in");
+
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Meera.",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "We've saved this to your details with Pulse Fitness.",
+            ),
+        ).toBeInTheDocument();
+        expect(verifyCode).toHaveBeenCalledWith("meera@example.in", "123456");
+        const [body] = bookCalls();
+        expect(body).toMatchObject({
+            serviceId: "svc_pt",
+            startAt: "2026-09-20T01:30:00.000Z",
+            bookerName: "Meera Shah",
+            pay: "DESK",
+        });
+        expect(body).not.toHaveProperty("bookerEmail");
+    });
+
+    it("a signed-in customer reads 'Booking as' and books with no code and no details form", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        const requestCode = vi.fn();
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({
+                    signIn: { requestCode, verifyCode: vi.fn() },
+                })}
+            />,
+        );
+        await pickSeven();
+
+        expect(screen.getByText(/Booking as/)).toHaveTextContent(
+            "Booking as Asha Rao · Not you?",
+        );
+        expect(screen.queryByLabelText("Name")).toBeNull();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(requestCode).not.toHaveBeenCalled();
+    });
+
+    it("asks a signed-in account with no name for one, and sends it", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({
+                    customer: { email: "new@example.in", name: null },
+                })}
+            />,
+        );
+        await pickSeven();
+        expect(screen.getByText(/Booking as/)).toHaveTextContent(
+            "Booking as new@example.in",
+        );
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Neha Joshi" },
+        });
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        await screen.findByRole("heading", { name: "You're booked, Neha." });
+        expect(bookCalls()[0]).toMatchObject({ bookerName: "Neha Joshi" });
+    });
+
+    it("never draws a guest details form: no email or phone field, signed in or not", async () => {
+        serve(() => json(ONE_DAYS));
+        const { unmount } = render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null })}
+            />,
+        );
+        await pickSeven();
+        expect(screen.queryByLabelText("Email")).toBeNull();
+        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+        unmount();
+
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await pickSeven();
+        expect(screen.queryByLabelText("Email")).toBeNull();
+        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+    });
+
+    it("'Not you?' signs out, and the last step is signing in again", async () => {
+        serve(() => json(ONE_DAYS));
+        const signOut = vi.fn(() => Promise.resolve({ ok: true }));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ signOut })}
+            />,
+        );
+        await pickSeven();
+
+        fireEvent.click(screen.getByRole("button", { name: "Not you?" }));
+
+        expect(
+            await screen.findByRole("button", { name: "Continue to sign in" }),
+        ).toBeInTheDocument();
+        expect(signOut).toHaveBeenCalledTimes(1);
+        expect(screen.getByLabelText("Name")).toHaveValue("");
+        expect(screen.queryByText(/Booking as/)).toBeNull();
+    });
+
+    it("says so when they already hold this slot, and keeps their choice", async () => {
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(ONE_DAYS)
+                : json(
+                      {
+                          error: {
+                              message: "You're already booked for this.",
+                              details: { reason: "already-booked" },
+                          },
+                      },
+                      409,
+                  ),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await pickSeven();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        expect(
+            await screen.findByText("You're already booked for this."),
+        ).toBeInTheDocument();
+        // Not "the time has gone": the times aren't read again.
+        expect(calls.filter((c) => c.url.endsWith("/days"))).toHaveLength(1);
+        expect(
+            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
+    it("the time goes while they sign in: says so, and chooses the next free one", async () => {
+        let daysRead = 0;
+        serve((url) => {
+            if (url.endsWith("/days")) {
+                daysRead += 1;
+                // Read again after the 409: 07:00 has gone.
+                return json(
+                    daysRead === 1
+                        ? TWO_STARTS
+                        : {
+                              ...TWO_STARTS,
+                              days: [
+                                  {
+                                      ...TWO_STARTS.days[0],
+                                      starts: TWO_STARTS.days[0].starts.slice(
+                                          1,
+                                      ),
+                                  },
+                              ],
+                          },
+                );
+            }
+            return json(
+                { error: { message: "This slot is fully booked" } },
+                409,
+            );
+        });
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null })}
+            />,
+        );
+        await pickSeven();
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Meera Shah" },
+        });
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        await signInWithCode("asha@example.in");
+
+        expect(
+            await screen.findByText(
+                "That time has just gone. We've chosen the next free one: Sun 20 Sep at 08:00.",
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+        ).toHaveAttribute("aria-checked", "true");
+        // Signed in now: booking the next one needs no code.
+        expect(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        ).toBeInTheDocument();
+    });
+
+    it("a code that can't be sent: the sheet says so with the business's phone, and nothing is booked", async () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null, signIn: cannotSend() })}
+            />,
+        );
+        await pickSeven();
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Meera Shah" },
+        });
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.change(within(sheet).getByLabelText("Email"), {
+            target: { value: "meera@example.in" },
+        });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Send code" }),
+        );
+
+        const alert = await within(sheet).findByRole("alert");
+        expect(alert).toHaveTextContent(
+            "We couldn't send your code — try again in a few minutes",
+        );
+        expect(alert).toHaveTextContent(
+            "Or call Pulse Fitness on +91 80 4120 8800",
+        );
+        expect(bookCalls()).toHaveLength(0);
+    });
+
+    it("a business with no public phone: the sentence alone", async () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({
+                    customer: null,
+                    options: {
+                        businessName: "Pulse Fitness",
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: cannotSend(),
+                })}
+            />,
+        );
+        await pickSeven();
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Meera Shah" },
+        });
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.change(within(sheet).getByLabelText("Email"), {
+            target: { value: "meera@example.in" },
+        });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Send code" }),
+        );
+
+        const alert = await within(sheet).findByRole("alert");
+        expect(alert).toHaveTextContent(
+            "We couldn't send your code — try again in a few minutes",
+        );
+        expect(alert).not.toHaveTextContent(/Or call/);
+        expect(bookCalls()).toHaveLength(0);
+    });
+
+    it("a session that ended meanwhile: says so, and asks them to sign in again", async () => {
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(ONE_DAYS)
+                : json(
+                      {
+                          error: {
+                              message: "Sign in to continue.",
+                              details: { reason: "signed-out" },
+                          },
+                      },
+                      401,
+                  ),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await pickSeven();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        expect(
+            await screen.findByText(
+                "Your sign-in has ended. Sign in again to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        ).toBeInTheDocument();
     });
 });

@@ -10,8 +10,9 @@ import {
     Post,
     Query,
 } from "@nestjs/common";
-import { hashClientIp } from "../../common/client-ip";
+import type { Booking } from "@saroh/database";
 
+import { hashClientIp } from "../../common/client-ip";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -133,6 +134,15 @@ export class PublicBookingsController {
     }
 
     /**
+     * The ANONYMOUS booking route (U19): name and email typed on the page.
+     *
+     * Sign-in is always on (A9, ADR-011): the booking page books through
+     * `POST public/site-accounts/bookings` now, and no site code calls this
+     * any more (`apps/saroh.app/lib/no-anonymous-booking.test.ts` pins it).
+     * It keeps serving for the release that moved the page, so a page
+     * loaded before that deploy still books; the next release makes it
+     * answer 410 "Sign in to book". Staff bookings are another route.
+     *
      * Reserve a slot on `:serviceId`. The source IP (from `@Ip()`) is immediately
      * hashed (sha256) and only the hash is ever passed on — the raw IP never
      * leaves this handler.
@@ -161,19 +171,32 @@ export class PublicBookingsController {
             },
             hashClientIp(ip),
         );
-        const state = holdState(booking, new Date());
-        return {
-            ...toPublicBooking(booking),
-            state,
-            // Who it is with, by name, and how it is paid — the booker's own
-            // booking, so nothing here is anyone else's.
-            holdExpiresAt:
-                state === "HELD"
-                    ? (booking.holdExpiresAt?.toISOString() ?? null)
-                    : null,
-            payToken,
-        };
+        return publicBookingResult(booking, payToken);
     }
+}
+
+/**
+ * What a booking answers the booker with: their own booking, where it
+ * stands, and for a pay-now hold the token that pays it. Shared by the
+ * anonymous route and the signed-in one (A9).
+ */
+export function publicBookingResult(
+    booking: Booking,
+    payToken: string | null,
+    now: Date = new Date(),
+): PublicBookingResult {
+    const state = holdState(booking, now);
+    return {
+        ...toPublicBooking(booking),
+        state,
+        // Who it is with, by name, and how it is paid — the booker's own
+        // booking, so nothing here is anyone else's.
+        holdExpiresAt:
+            state === "HELD"
+                ? (booking.holdExpiresAt?.toISOString() ?? null)
+                : null,
+        payToken,
+    };
 }
 
 /**

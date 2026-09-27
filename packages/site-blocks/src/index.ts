@@ -80,10 +80,25 @@ export {
     default as BookingFlow,
     BookingUnavailable,
 } from "./booking-flow/booking-flow";
-export type { BookingFlowProps } from "./booking-flow/booking-flow";
+export type {
+    BookingAccount,
+    BookingFlowProps,
+} from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
-export { isBookingPage } from "./booking-flow/model";
-export type { BookingPageData, BookingService } from "./booking-flow/model";
+export { isBookResult, isBookingPage } from "./booking-flow/model";
+export type {
+    BookResult,
+    BookingPageData,
+    BookingService,
+} from "./booking-flow/model";
+// Booking signed in (A9): the site's server action books, and answers the
+// page in the page's own terms.
+export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
+export type {
+    BookSignedIn,
+    Result as BookingResult,
+    SignedInBookRequest,
+} from "./booking-flow/api";
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.

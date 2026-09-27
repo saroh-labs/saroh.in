@@ -3712,6 +3712,14 @@ model Booking {
   // out of the snapshot. C12 turns it into a Needs attention suggestion.
   intakeNote String?
 
+  // The customer's site account when they booked it signed in (A9,
+  // ADR-011). The contact is still the booker; this says the account made
+  // it, so "This isn't them" (A4) moves it with the account. The migration
+  // declares ON DELETE SET NULL ("customerAccountId") only, so the
+  // organization column stays: Prisma reads it as SetNull.
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId, organizationId], references: [id, organizationId], onDelete: SetNull)
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -3731,6 +3739,8 @@ model Booking {
   @@index([status, holdExpiresAt])
   // The whole-business calendar's month: every booking in a date range.
   @@index([organizationId, startAt])
+  // What an account booked (the double-booking check, and unlinking).
+  @@index([customerAccountId, startAt])
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
@@ -5273,6 +5283,9 @@ model CustomerAccount {
   lastSignedInAt DateTime?
 
   sessions CustomerSession[]
+
+  // Bookings made signed in (A9).
+  bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -47,11 +47,40 @@ export interface UnlinkMover {
     ): Promise<number>;
 }
 
+/** Records the account made on the contact it is leaving, since it linked. */
+function madeByAccount(scope: UnlinkScope) {
+    return {
+        organizationId: scope.organizationId,
+        customerAccountId: scope.accountId,
+        contactId: scope.fromContactId,
+        createdAt: { gte: scope.since },
+    };
+}
+
 /**
- * The records that move with the account. Empty until A9 makes the first
- * signed-in booking; each unit above adds its own, with a db test.
+ * Bookings the customer made signed in (A9). Each one moves whole — past,
+ * coming up, cancelled or held — since the account made it; a booking staff
+ * made for the contact has no account on it and stays.
  */
-export const UNLINK_MOVERS: readonly UnlinkMover[] = [];
+export const BOOKINGS_MOVER: UnlinkMover = {
+    key: "bookings",
+    model: "Booking",
+    noun: ["booking", "bookings"],
+    count: (tx, scope) => tx.booking.count({ where: madeByAccount(scope) }),
+    move: async (tx, scope) =>
+        (
+            await tx.booking.updateMany({
+                where: madeByAccount(scope),
+                data: { contactId: scope.toContactId },
+            })
+        ).count,
+};
+
+/**
+ * The records that move with the account. A9 adds the first, bookings made
+ * signed in; each unit above adds its own, with a db test.
+ */
+export const UNLINK_MOVERS: readonly UnlinkMover[] = [BOOKINGS_MOVER];
 
 /**
  * Models that carry a `customerAccountId` and deliberately stay where they
