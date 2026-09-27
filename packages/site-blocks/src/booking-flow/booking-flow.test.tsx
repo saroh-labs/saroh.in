@@ -1001,6 +1001,9 @@ describe("UPI and card checkout (E11)", () => {
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
         await screen.findByText("Pay with UPI or card in the Razorpay window");
+        // The card can draw before the effect that opens the window runs; on a
+        // slow runner the test answered a window not yet made (CI, #687).
+        await waitFor(() => expect(checkouts.opened.length).toBeGreaterThan(0));
     }
 
     const answer = async (outcome: CheckoutOutcome, nth = 0) => {
@@ -1111,7 +1114,7 @@ describe("UPI and card checkout (E11)", () => {
         ).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-        expect(checkouts.opened).toHaveLength(2);
+        await waitFor(() => expect(checkouts.opened).toHaveLength(2));
         expect(checkouts.opened[1]?.request.handoff.providerIntentId).toBe(
             "order_1",
         );
@@ -1139,7 +1142,7 @@ describe("UPI and card checkout (E11)", () => {
             screen.getByText("The payment window was closed before you paid"),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Pay ₹1,200" }));
-        expect(checkouts.opened).toHaveLength(2);
+        await waitFor(() => expect(checkouts.opened).toHaveLength(2));
         expect(checkouts.opened[0]?.closed).toBe(true);
     });
 
@@ -1152,7 +1155,7 @@ describe("UPI and card checkout (E11)", () => {
             "We couldn't open the payment window. Check your connection and try again.",
         );
         fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-        expect(checkouts.opened).toHaveLength(2);
+        await waitFor(() => expect(checkouts.opened).toHaveLength(2));
     });
 
     it("the hold runs out mid-payment: the window closes and the place is let go", async () => {
