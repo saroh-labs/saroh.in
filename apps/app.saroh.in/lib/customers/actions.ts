@@ -2,6 +2,8 @@
 
 import type { PeekAttention } from "@/lib/services/peek";
 
+import type { UnlinkedPage } from "./list";
+import { getUnlinkedCustomers } from "./list-service";
 import type { CustomerSearch } from "./picker";
 import {
     readCustomerAttention as readCustomerAttentionApi,
@@ -48,4 +50,15 @@ export async function readCustomerAttention(
     contactId: string,
 ): Promise<PeekAttention | null> {
     return readCustomerAttentionApi(contactId);
+}
+
+/**
+ * A page of the paying store customers no contact holds yet, for the
+ * Customers list's review sheet (C4). `null` when it couldn't be read.
+ */
+export async function loadUnlinkedCustomers(
+    store: string | null,
+    page: number,
+): Promise<UnlinkedPage | null> {
+    return getUnlinkedCustomers(store, page);
 }
