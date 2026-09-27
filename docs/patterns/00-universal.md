@@ -161,7 +161,12 @@ with why it stops there:
   note, next steps and leave dialog to `editor-parts.tsx`. A little over;
   what is left shares one component's state.
 
-Split rather than listed: `providers/provider-list.tsx` (435 before; 120
+Split rather than listed: `sites/site-editor.tsx` (2,160 before; 294 now,
+round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
+became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
+what the server last accepted, the save and its autosave share one set of
+state, and the form-id stamping already went to `stamp-form-ids.ts`. And
+`providers/provider-list.tsx` (435 before; 120
 now) along its rows, which went to `provider-row.tsx` (331); and
 `lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
 along its own seam — what a save recorded, the counts a stock line says and
