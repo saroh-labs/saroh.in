@@ -20,10 +20,10 @@ import { StylePanel } from "@/components/sites/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
-type RailTab = "page" | "add" | "brand";
+export type RailTab = "page" | "add" | "brand";
 
 /** The rail's tabs, in the design's order (G2). */
-const RAIL_TABS: readonly { key: RailTab; label: string }[] = [
+export const RAIL_TABS: readonly { key: RailTab; label: string }[] = [
     { key: "page", label: "Page" },
     { key: "add", label: "Add" },
     // Today's Style panel until the Brand panel (plan H) replaces it.
@@ -94,16 +94,10 @@ export function EditorRail({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-    /*
-     * Page · Add · Brand (G2), as the design draws the rail. Brand is the
-     * remembered `style` place, so a reload comes back to it as it did to the
-     * Style panel; Add is the add-block flag, which a reload forgets.
-     */
-    const tab: RailTab = rail === "style" ? "brand" : adding ? "add" : "page";
-    function selectTab(next: RailTab) {
-        setRail(next === "brand" ? "style" : "sections");
-        setAdding(next === "add");
-    }
+    // Page · Add · Brand (G2), as the design draws the rail.
+    const tab = railTabFor(rail, adding);
+    const selectTab = (next: RailTab) =>
+        selectRailTab(next, setRail, setAdding);
 
     return (
         <aside className="flex min-h-0 flex-col">
@@ -179,7 +173,7 @@ export function EditorRail({
                                                 // the surface it would settle on, so
                                                 // the feedback is the outcome arriving
                                                 // early rather than a separate effect.
-                                                "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors",
+                                                "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors coarse:h-11",
                                                 /*
                                                  * The selected row carries a bar
                                                  * on its edge as well as a fill,
@@ -333,6 +327,25 @@ export function EditorRail({
 }
 
 /**
+ * Which of Page · Add · Brand is showing. Brand is the remembered `style`
+ * place, so a reload comes back to it as it did to the Style panel; Add is the
+ * add-block flag, which a reload forgets.
+ */
+export function railTabFor(rail: EditorRailTab, adding: boolean): RailTab {
+    return rail === "style" ? "brand" : adding ? "add" : "page";
+}
+
+/** Show one of Page · Add · Brand: the rail's tabs, and a phone's bar (G4). */
+export function selectRailTab(
+    next: RailTab,
+    setRail: (next: EditorRailTab) => void,
+    setAdding: (adding: boolean) => void,
+): void {
+    setRail(next === "brand" ? "style" : "sections");
+    setAdding(next === "add");
+}
+
+/**
  * The header or footer in the block list (#336): on every page, so it is
  * listed where it sits — first and last — with a lock instead of a grip. It
  * can be selected, never dragged.
@@ -355,7 +368,7 @@ function FixedBlockRow({
                 onClick={onSelect}
                 aria-current={selected ? "true" : undefined}
                 className={cn(
-                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors",
+                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors coarse:h-11",
                     railRowState(selected),
                 )}
             >

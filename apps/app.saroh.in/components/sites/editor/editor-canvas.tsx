@@ -96,6 +96,7 @@ export function EditorCanvas({
     zoomScale,
     previewing,
     setPreviewing,
+    narrow = false,
     siteId,
     pageId,
     address,
@@ -127,6 +128,8 @@ export function EditorCanvas({
     /** Preview: the editing tools are away and the site is usable (G5). */
     previewing: boolean;
     setPreviewing: (on: boolean) => void;
+    /** Below the desk width: the design's tighter padding (G4). */
+    narrow?: boolean;
     /** For the blocks that read live data on the canvas (G8). */
     siteId: string;
     /** The open page, so a link to it in Preview stays here. */
@@ -185,7 +188,7 @@ export function EditorCanvas({
             ref={canvasRef}
             onScroll={onCanvasScroll}
             data-previewing={previewing || undefined}
-            className={`min-h-0 overflow-y-auto bg-background ${previewing ? "p-0" : "p-6"}`}
+            className={`min-h-0 overflow-y-auto bg-background ${previewing ? "p-0" : narrow ? "px-3.5 py-[18px]" : "p-6"}`}
         >
             {/*
              * Someone else saved this page while this editor was open

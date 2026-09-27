@@ -13,6 +13,8 @@ import {
 
 /** The canvas padding (p-6 = 24px each side) is not usable width. */
 export const CANVAS_PADDING = 48;
+/** Narrow, the design pads the canvas 14px a side (G4). */
+export const CANVAS_PADDING_NARROW = 28;
 
 /**
  * How far "Fit" would scale a frame of this device into a canvas this wide.
@@ -67,6 +69,15 @@ export function editorColumns(railWidth: number, panelWidth: number): string {
 }
 
 /**
+ * Narrow (G4), the inspector is a sheet over the page, so only the rail and
+ * the page share the width. The rail keeps its chosen width up to 40% of the
+ * window, and the page takes the rest.
+ */
+export function narrowColumns(railWidth: number): string {
+    return `min(${railWidth}px, 40vw) 1px minmax(0,1fr)`;
+}
+
+/**
  * Everything about how the page is shown rather than what is on it: panel
  * widths, the device, zoom and Fit, Preview, and where the canvas was
  * scrolled to. Moved out of `site-editor.tsx` (#260).
@@ -76,6 +87,7 @@ export function useEditorViewport({
     pageId,
     sectionCount,
     initialScrollTop,
+    narrow = false,
 }: {
     siteId: string;
     /** The open page, for Preview carried across a page switch. */
@@ -84,6 +96,8 @@ export function useEditorViewport({
     sectionCount: number;
     /** Where the canvas was scrolled to last time, restored on mount. */
     initialScrollTop: number;
+    /** Below the desk width, where the canvas is padded less (G4). */
+    narrow?: boolean;
 }) {
     /*
      * Panel widths and device come from the preferences store rather than
@@ -146,7 +160,11 @@ export function useEditorViewport({
                 fitScaleFor(
                     device,
                     el.clientWidth,
-                    previewing ? 0 : CANVAS_PADDING,
+                    previewing
+                        ? 0
+                        : narrow
+                          ? CANVAS_PADDING_NARROW
+                          : CANVAS_PADDING,
                 ),
             );
         };
@@ -154,7 +172,7 @@ export function useEditorViewport({
         const ro = new ResizeObserver(measure);
         ro.observe(el);
         return () => ro.disconnect();
-    }, [device, previewing]);
+    }, [device, previewing, narrow]);
     const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
@@ -209,6 +227,7 @@ export function useEditorViewport({
         switching,
         previewing,
         setPreviewing,
+        narrow,
         canvasRef,
         onCanvasScroll,
     };

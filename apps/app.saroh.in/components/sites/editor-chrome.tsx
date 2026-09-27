@@ -44,7 +44,7 @@ export function EditorTabs<T extends string>({
                     aria-selected={value === tab.key}
                     onClick={() => onSelect(tab.key)}
                     className={cn(
-                        "relative -mb-px flex h-10 items-center gap-1.5 border-b-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                        "relative -mb-px flex h-10 items-center gap-1.5 border-b-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:h-11",
                         value === tab.key
                             ? "border-highlight text-foreground"
                             : "border-transparent text-muted-foreground hover:text-foreground",

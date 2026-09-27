@@ -1175,3 +1175,266 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(button("Publish").disabled).toBe(true);
     });
 });
+
+/*
+ * The narrow layout (round 2, G4). jsdom has no media queries, so the window's
+ * width is played here: `matchMedia` answers `max-width` queries from it, and
+ * a resize tells the editor's listeners, as a browser does on a rotation.
+ */
+describe("SiteEditor narrow and phone (G4)", () => {
+    let width = 1440;
+    const listeners = new Set<() => void>();
+
+    function atWidth(px: number) {
+        width = px;
+        vi.stubGlobal(
+            "matchMedia",
+            vi.fn((query: string) => ({
+                get matches() {
+                    const max = /max-width:\s*([\d.]+)px/.exec(query);
+                    return max ? width <= Number(max[1]) : false;
+                },
+                addEventListener: (_: string, fn: () => void) =>
+                    listeners.add(fn),
+                removeEventListener: (_: string, fn: () => void) =>
+                    listeners.delete(fn),
+            })),
+        );
+    }
+
+    function resizeTo(px: number) {
+        act(() => {
+            width = px;
+            listeners.forEach((fn) => fn());
+        });
+    }
+
+    const sheet = () => $("[role=dialog]");
+    const focused = () =>
+        document.activeElement?.getAttribute("aria-label") ??
+        document.activeElement?.textContent;
+
+    function escape() {
+        act(() => {
+            (document.activeElement ?? document.body).dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+            );
+        });
+    }
+
+    beforeEach(() => listeners.clear());
+
+    it("keeps the rail and gives the page the inspector's column, opening nothing by itself", () => {
+        atWidth(1000);
+        render();
+        expect($("[data-layout]")?.dataset.layout).toBe("narrow");
+        expect($("[aria-label='Resize the block list']")).not.toBeNull();
+        expect($("[aria-label='Resize the inspector']")).toBeNull();
+        // The remembered selection stays outlined; no sheet covers the page.
+        expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
+        expect(sheet()).toBeNull();
+        expect($("aside[aria-label=Inspector]")).toBeNull();
+        // The bar keeps every action, and the whole review has a way in.
+        expect(button("Publish")).toBeTruthy();
+        expect(button("Feedback")).toBeTruthy();
+    });
+
+    it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
+        atWidth(1000);
+        render();
+        click(button(/^Hero block, 2 of 2/));
+
+        const open = sheet();
+        expect(
+            open?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(open?.getAttribute("aria-modal")).toBe("true");
+        expect(button("Move block down").disabled).toBe(true);
+        // Focus starts on Close, at the top of the sheet.
+        expect(focused()).toBe("Close the block panel");
+
+        click(button("Close the block panel"));
+        await wait(0);
+        expect(sheet()).toBeNull();
+        // Still selected, and focus is on its label on the page.
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+        expect(focused()).toBe("Hero block, 2 of 2, selected");
+    });
+
+    it("keeps Tab inside the sheet, and Escape closes it back to the block", async () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        const open = sheet();
+        if (!open) throw new Error("No sheet");
+        const tabbable = Array.from(
+            open.querySelectorAll<HTMLElement>(
+                "button:not([disabled]),input,select,textarea,a[href]",
+            ),
+        );
+        const last = tabbable.at(-1);
+        if (!last) throw new Error("Nothing to tab to");
+        act(() => last.focus());
+        act(() => {
+            last.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+            );
+        });
+        expect(focused()).toBe("Close the block panel");
+
+        escape();
+        await wait(0);
+        expect(sheet()).toBeNull();
+        expect(focused()).toBe("Hero block, 2 of 2, selected");
+    });
+
+    it("edits a block in the sheet, and the page follows", () => {
+        atWidth(1000);
+        render();
+        click(button("Header"));
+        expect(sheet()?.textContent).toContain(
+            "On every page — can't be removed or moved",
+        );
+        type(field("Site name"), "Rye & Co.");
+        expect(canvasHome()?.getAttribute("aria-label")).toBe(
+            "Rye & Co. — home",
+        );
+    });
+
+    it("puts the sheet away on Remove, and Undo brings the block back to it", () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        click(button("Remove"));
+        // A sheet about nothing would be in the way.
+        expect(sheet()).toBeNull();
+        expect(host.textContent).toContain("3 blocks");
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Hero taken off this page",
+            expect.any(Function),
+            { duration: 10_000 },
+        );
+
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("4 blocks");
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+        expect(sheet()?.textContent).toContain("Remove");
+    });
+
+    it("opens the whole site's feedback from the bar", () => {
+        atWidth(1000);
+        render({ initialReview: { ...REVIEW, openNotes: 2 } });
+        click(button(/^Feedback/));
+        const tab = sheet()?.querySelector("[role=tab][aria-selected=true]");
+        expect(tab?.textContent).toContain("Feedback");
+        expect(button(/^Whole site/).textContent).toContain("2");
+    });
+
+    it("puts the sheet away for Preview, and does not bring it back after", () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        expect(sheet()).not.toBeNull();
+        click(button("Preview"));
+        expect(sheet()).toBeNull();
+        expect($("[data-previewing]")).not.toBeNull();
+        // The rail is away and kept mounted, as on a desk (G5).
+        expect($("aside")?.closest("[hidden]")).not.toBeNull();
+        click(button(/^Back to editing/));
+        expect(sheet()).toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+    });
+
+    it("pads the canvas as the design does when narrow", () => {
+        atWidth(1000);
+        render();
+        const canvas = canvasOf(frame());
+        expect(canvas.className).toContain("px-3.5");
+        expect(canvas.className).not.toContain("p-6");
+    });
+
+    it("folds the bar into one menu on a phone, and moves the rail to the foot", () => {
+        atWidth(390);
+        render();
+        expect($("[data-layout]")?.dataset.layout).toBe("phone");
+        // The page switcher and the way out stay; the rest is in the menu.
+        expect(button(/^Page: Home/)).toBeTruthy();
+        expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
+        expect(() => button("Publish")).toThrow();
+        expect($("[role=status]")).toBeNull();
+        expect($("[role=group][aria-label='Preview width']")).toBeNull();
+
+        click(button("Status, view and publish"));
+        expect(document.querySelector("[role=status]")?.textContent).toBe(
+            "Published",
+        );
+        expect(button("Publish").disabled).toBe(false);
+        // No hover on a phone: what Publish does is written out.
+        expect(document.body.textContent).toContain(
+            "Nothing has changed since the last publish",
+        );
+        for (const d of ["desktop", "tablet", "phone"]) {
+            expect(button(`Show at ${d} width`)).toBeTruthy();
+        }
+        expect(button("Share for review")).toBeTruthy();
+
+        // The rail is a bar at the foot, not a column.
+        expect($("[aria-label='Resize the block list']")).toBeNull();
+        expect($("[role=tablist][aria-label='Editor panels']")).toBeNull();
+        const bar = $("nav[aria-label='Edit this page']");
+        expect(
+            Array.from(bar?.querySelectorAll("button") ?? []).map(
+                (b) => b.textContent,
+            ),
+        ).toEqual(["Page", "Add", "Brand", "Feedback"]);
+    });
+
+    it("opens the rail from the foot, and a block chosen there opens its fields", () => {
+        atWidth(390);
+        render();
+        click(button("Page"));
+        expect(sheet()?.textContent).toContain("4 blocks");
+        click(button("Our story"));
+        // One sheet at a time: the rail makes way for the block's fields.
+        expect($$("[role=dialog]")).toHaveLength(1);
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(button("Move block down").disabled).toBe(true);
+    });
+
+    it("adds a block from the foot's Add, and opens it", () => {
+        atWidth(390);
+        render();
+        click(button("Add"));
+        const tile = Array.from(
+            sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
+        ).find((b) => b.textContent.includes("Contact"));
+        if (!tile) throw new Error("No Contact tile");
+        click(tile);
+        expect($$("[data-block-index]")).toHaveLength(3);
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+    });
+
+    it("keeps the selection and the open fields when a phone turns on its side", () => {
+        atWidth(390);
+        render();
+        click(button(/^Hero block, 2 of 2/));
+        expect(sheet()).not.toBeNull();
+
+        resizeTo(844);
+        expect($("[data-layout]")?.dataset.layout).toBe("narrow");
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+
+        // Back on a desk the inspector is a column again, with the block.
+        resizeTo(1440);
+        expect(sheet()).toBeNull();
+        expect($("aside[aria-label=Inspector]")).not.toBeNull();
+        expect(button("Move block down").disabled).toBe(true);
+    });
+});
