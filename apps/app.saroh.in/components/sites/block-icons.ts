@@ -3,6 +3,7 @@ import {
     AlignLeft,
     CalendarClock,
     CircleHelp,
+    Clock,
     Images,
     LayoutList,
     MailQuestion,
@@ -33,4 +34,5 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     testimonials: Quote,
     contact: MapPin,
     servicesList: LayoutList,
+    visitUs: Clock,
 };
