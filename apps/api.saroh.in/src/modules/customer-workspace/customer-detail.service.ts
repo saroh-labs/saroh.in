@@ -23,6 +23,8 @@ import {
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import type { FulfilmentType } from "../orders/fulfilment";
+import { legacyWord, shipsToAddress, typeOf } from "../orders/fulfilment";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { AttentionEntryView } from "./attention-read";
 import { attentionFor, attentionSuggestionsFor } from "./attention-read";
@@ -138,8 +140,10 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
-    /** COLLECT or DELIVERY (U6), and where the kitchen has it. */
+    /** COLLECT or DELIVERY (U6; the legacy word until B2d), and where the kitchen has it. */
     fulfilment: string;
+    /** How it leaves (DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING… */
+    fulfilmentType: FulfilmentType;
     stage: string;
     /** Where a delivery went; null for a collection. */
     delivery: string | null;
@@ -854,22 +858,22 @@ export class CustomerDetailService {
                     variant: i.variant?.title ?? null,
                     quantity: i.quantity,
                 })),
-                fulfilment: o.fulfilment,
+                fulfilment: legacyWord(typeOf(o.fulfilment)),
+                fulfilmentType: typeOf(o.fulfilment),
                 stage: o.stage,
-                delivery:
-                    o.fulfilment === "DELIVERY"
-                        ? [
-                              o.deliveryLine1,
-                              o.deliveryLine2,
-                              o.deliveryCity,
-                              [o.deliveryState, o.deliveryPostalCode]
-                                  .filter(Boolean)
-                                  .join(" "),
-                          ]
-                              .map((part) => part?.trim())
+                delivery: shipsToAddress(typeOf(o.fulfilment))
+                    ? [
+                          o.deliveryLine1,
+                          o.deliveryLine2,
+                          o.deliveryCity,
+                          [o.deliveryState, o.deliveryPostalCode]
                               .filter(Boolean)
-                              .join(", ") || null
-                        : null,
+                              .join(" "),
+                      ]
+                          .map((part) => part?.trim())
+                          .filter(Boolean)
+                          .join(", ") || null
+                    : null,
                 ...(money
                     ? { total: toMoneyString(o.total), currency: o.currency }
                     : {}),

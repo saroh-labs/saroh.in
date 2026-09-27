@@ -44,6 +44,7 @@ import {
     listProductAt,
     publishSeedPost,
     setStockLevel,
+    syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
 
@@ -261,6 +262,8 @@ export async function seed(): Promise<void> {
         actorUserId: user.id,
     });
     await assertHeldStock(prisma, org.id);
+    // Which ways each storefront offers, now its orders exist (B2a).
+    await syncStorefrontFulfilmentTypes(prisma);
     await report(prisma, org.id);
 }
 

@@ -98,6 +98,15 @@ describe("Orders & inventory (dev DB)", () => {
             tax: "5.00",
             shipping: "10.00",
             discount: "2.00",
+            // Shipped below: only an order that goes to an address is
+            // (B2a — the status PATCH no longer turns a pick-up into one).
+            fulfilment: "DELIVERY",
+            address: {
+                line1: "12 Church Street",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560001",
+            },
         });
         orderAId = res.id;
         const order = await orders.get(storeId, orderAId, ownerId);

@@ -687,10 +687,15 @@ export async function checkRye(
                 i."billToEmail" <> c.email
                 OR i."billToName" <> trim(concat_ws(' ', c."firstName", c."lastName"))
                 OR i."sellerGstin" IS NULL
-                OR (o.fulfilment = 'COLLECT' AND i."placeOfSupply" <> i."sellerState")
-                OR (o.fulfilment = 'DELIVERY'
+                -- Both vocabularies (B2a, DEC-045): a local delivery or a
+                -- shipment goes to an address; anything else is supplied
+                -- where the business is.
+                OR (o.fulfilment::text NOT IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                    AND i."placeOfSupply" <> i."sellerState")
+                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
                     AND (o."deliveryState" = 'Karnataka') <> (i."placeOfSupply" = i."sellerState"))
-                OR (o.fulfilment = 'DELIVERY' AND i."billToAddress" IS NULL))`,
+                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                    AND i."billToAddress" IS NULL))`,
     );
     fail(
         "paper outside the RC series, or a credit note outside RCCN",
@@ -826,6 +831,14 @@ export async function checkRye(
             "COLLECTED",
             "HANDED_TO_COURIER",
         ].every((s) => stageCount(s) >= 1),
+        // B2a (DEC-045): the storefront that delivers says it does.
+        "a storefront offering local delivery": await has(prisma.$queryRaw<
+            Row[]
+        >`
+            SELECT COUNT(*) AS n FROM "StoreSettings" s
+            JOIN "Store" st ON st.id = s."storeId"
+            WHERE st."organizationId" = ${orgId}
+              AND 'LOCAL_DELIVERY' = ANY(s."fulfilmentTypes"::text[])`),
         "orders delivered earlier": await has(prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "Order" WHERE "organizationId" = ${orgId}
               AND stage = 'DELIVERED' AND "createdAt" < ${today}::timestamp`),

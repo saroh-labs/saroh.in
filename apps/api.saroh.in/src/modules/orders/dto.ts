@@ -14,13 +14,22 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type { ListTab, PaymentStanding } from "./order-list-filters";
-import {
-    FULFILMENT_FILTER_VALUES,
-    LIST_TABS,
-    PAYMENT_STANDINGS,
-    STAGE_FILTER_VALUES,
-} from "./order-list-filters";
+/** The Orders list's tabs: All · Open · Refunded (default 14). */
+export const LIST_TABS = ["all", "open", "refunded"] as const;
+export type ListTab = (typeof LIST_TABS)[number];
+
+/**
+ * How the money on an order stands, as one word for the row and the filter.
+ * Derived from payments and refunds the way Order Detail's `refundStanding`
+ * is, so the list and the order never disagree (`order-list-filters.ts`).
+ */
+export const PAYMENT_STANDINGS = [
+    "PAID",
+    "UNPAID",
+    "PARTLY_REFUNDED",
+    "REFUNDED",
+] as const;
+export type PaymentStanding = (typeof PAYMENT_STANDINGS)[number];
 
 export const ORDER_STATUSES = [
     "PENDING",
@@ -47,10 +56,40 @@ export const ORDER_STAGES = [
     "COLLECTED",
     "HANDED_TO_COURIER",
     "DELIVERED",
+    // Local delivery's handover and Digital's done step (DEC-045). Written
+    // from release 2 (B2c) on; read from release 1.
+    "OUT_FOR_DELIVERY",
+    "SENT",
 ] as const;
 export type OrderStage = (typeof ORDER_STAGES)[number];
 
-export const ORDER_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
+/**
+ * The six ways an order leaves (DEC-045). Their rules are in
+ * `fulfilment.ts`, which every reader goes through.
+ */
+export const FULFILMENT_TYPES = [
+    "PICKUP",
+    "LOCAL_DELIVERY",
+    "SHIPPING",
+    "DIGITAL",
+    "APPOINTMENT_IN_PERSON",
+    "APPOINTMENT_ONLINE",
+] as const;
+export type FulfilmentType = (typeof FULFILMENT_TYPES)[number];
+
+/**
+ * The words the column held before the six types: COLLECT means PICKUP and
+ * DELIVERY means LOCAL_DELIVERY. Accepted until the contract release (B2d)
+ * drops them, because an app built before B2a still sends them.
+ */
+export const LEGACY_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
+export type LegacyFulfilment = (typeof LEGACY_FULFILMENTS)[number];
+
+/** Every value `Order.fulfilment` can hold, and a client can send, today. */
+export const ORDER_FULFILMENTS = [
+    ...LEGACY_FULFILMENTS,
+    ...FULFILMENT_TYPES,
+] as const;
 export type OrderFulfilment = (typeof ORDER_FULFILMENTS)[number];
 
 const trim = ({ value }: { value: unknown }) =>
@@ -174,9 +213,13 @@ export class CreateOrderDto {
     @MaxLength(32)
     discountCode?: string;
 
-    /** Collected at the counter (the default) or delivered (ADR-008). */
+    /**
+     * How it leaves: picked up (the default) or delivered (ADR-008). Either
+     * vocabulary; until B2c only the two types a legacy word names can be
+     * written (`fulfilment.ts`).
+     */
     @IsOptional()
-    @IsIn(ORDER_FULFILMENTS, { message: "Collect or delivery" })
+    @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
     fulfilment?: OrderFulfilment;
 
     @IsOptional()
@@ -252,7 +295,7 @@ export class EditOrderDto {
     add?: OrderItemInput[];
 
     @IsOptional()
-    @IsIn(ORDER_FULFILMENTS, { message: "Collect or delivery" })
+    @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
     fulfilment?: OrderFulfilment;
 
     /** The delivery address; `null` clears it. */
@@ -318,13 +361,14 @@ export class ListOrdersQuery {
     @IsOptional()
     @Transform(listOf)
     @IsArray()
-    @IsIn(STAGE_FILTER_VALUES, { each: true, message: "Unknown step" })
+    @IsIn(ORDER_STAGES, { each: true, message: "Unknown step" })
     stage?: string[];
 
+    /** The types, or the legacy words (matched as their types until B2d). */
     @IsOptional()
     @Transform(listOf)
     @IsArray()
-    @IsIn(FULFILMENT_FILTER_VALUES, {
+    @IsIn(ORDER_FULFILMENTS, {
         each: true,
         message: "Unknown way of fulfilling an order",
     })

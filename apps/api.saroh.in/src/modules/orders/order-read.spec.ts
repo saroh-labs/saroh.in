@@ -155,6 +155,48 @@ describe("serializeOrderRead", () => {
         ).toEqual(paper);
     });
 
+    it("answers the legacy word and the type, with its steps (B2a)", () => {
+        const read = serializeOrderRead(base, opts(false));
+        expect(read).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "LOCAL_DELIVERY",
+            fulfilmentLabel: "Local delivery",
+            stepIndex: 1,
+            ticketName: "Packing slip",
+        });
+        // Until the switch, a local delivery is handed to a courier.
+        expect(read.steps.map((s) => s.stage)).toEqual([
+            "NEW",
+            "PREPARING",
+            "READY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ]);
+        // A row already in the new names reads the same.
+        const renamed = serializeOrderRead(
+            { ...base, fulfilment: "LOCAL_DELIVERY" },
+            opts(false),
+        );
+        expect(renamed.fulfilment).toBe("DELIVERY");
+        expect(renamed.steps).toEqual(read.steps);
+        expect(
+            serializeOrderRead(
+                {
+                    ...base,
+                    fulfilment: "SHIPPING",
+                    stage: "READY",
+                    status: "PROCESSING",
+                },
+                opts(false),
+            ),
+        ).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "SHIPPING",
+            stepIndex: 2,
+            next: { stages: ["HANDED_TO_COURIER"] },
+        });
+    });
+
     it("carries the address with its state, for delivery and for GST", () => {
         expect(serializeOrderRead(base, opts(false)).deliveryAddress).toEqual(
             expect.objectContaining({

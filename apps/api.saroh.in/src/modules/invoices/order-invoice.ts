@@ -1,3 +1,4 @@
+import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import type { GstLine, GstLineInput, TaxType } from "./gst";
 import {
     allocate,
@@ -101,7 +102,10 @@ const DELIVERY = "Delivery";
 
 /** The order's customer and, for a delivery, where it goes. */
 export function orderBillTo(order: OrderForInvoice): BillTo {
-    const delivered = order.fulfilment === "DELIVERY" && order.deliveryLine1;
+    // A local delivery or a shipment goes to an address (DEC-045); read
+    // through the type, so COLLECT/DELIVERY and the new names agree.
+    const delivered =
+        shipsToAddress(typeOf(order.fulfilment)) && order.deliveryLine1;
     const address = delivered
         ? [
               order.deliveryName,
@@ -164,8 +168,10 @@ export function buildOrderInvoice(
     const pos = profile.registered
         ? placeOfSupply({
               billToState: null,
-              deliveryState:
-                  order.fulfilment === "DELIVERY" ? order.deliveryState : null,
+              // Taxed where it goes, a Shipping order included.
+              deliveryState: shipsToAddress(typeOf(order.fulfilment))
+                  ? order.deliveryState
+                  : null,
               businessState: profile.state,
           })
         : null;

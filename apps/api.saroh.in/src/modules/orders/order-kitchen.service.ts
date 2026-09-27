@@ -27,6 +27,12 @@ import { PaymentsService } from "../payments/payments.service";
 import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto } from "./dto";
 import {
+    FULFILMENT_RULES,
+    shipsToAddress,
+    storedValueFor,
+    typeOf,
+} from "./fulfilment";
+import {
     adjustReservation,
     applyInventoryTransition,
     phaseOf,
@@ -487,7 +493,11 @@ export class OrderKitchenService {
                     toCents(order.discount.toString()),
             );
 
-            const fulfilment = dto.fulfilment ?? order.fulfilment;
+            // Compared as types, so COLLECT and PICKUP are the same order;
+            // a change is stored in what this release may write.
+            const was = typeOf(order.fulfilment);
+            const type = dto.fulfilment ? typeOf(dto.fulfilment) : was;
+            const newStored = type !== was ? storedValueFor(type) : null;
             const address =
                 dto.address === null
                     ? CLEARED_ADDRESS
@@ -508,17 +518,19 @@ export class OrderKitchenService {
                     : dto.address
                       ? true
                       : Boolean(order.deliveryLine1);
-            if (fulfilment === "DELIVERY" && !hasAddress) {
+            if (shipsToAddress(type) && !hasAddress) {
                 throw new BadRequestException({
                     message: "A delivery needs an address.",
                     field: "address",
                 });
             }
-            if (dto.fulfilment && dto.fulfilment !== order.fulfilment) {
+            if (newStored) {
                 changes.push(
-                    dto.fulfilment === "DELIVERY"
+                    type === "LOCAL_DELIVERY"
                         ? "now a delivery"
-                        : "now collected",
+                        : type === "PICKUP"
+                          ? "now collected"
+                          : `now ${FULFILMENT_RULES[type].label.toLowerCase()}`,
                 );
             }
             if (dto.address !== undefined) changes.push("address changed");
@@ -545,10 +557,7 @@ export class OrderKitchenService {
                     {
                         shippingCents: toCents(order.shipping.toString()),
                         discountCents: toCents(order.discount.toString()),
-                        deliveryState:
-                            (dto.fulfilment ?? order.fulfilment) === "DELIVERY"
-                                ? address
-                                : null,
+                        deliveryState: shipsToAddress(type) ? address : null,
                         profile,
                     },
                 );
@@ -564,7 +573,7 @@ export class OrderKitchenService {
                           }
                         : {}),
                     ...(gstCents !== null ? { tax: fromCents(gstCents) } : {}),
-                    ...(dto.fulfilment ? { fulfilment: dto.fulfilment } : {}),
+                    ...(newStored ? { fulfilment: newStored } : {}),
                     ...address,
                     ...(touchesNotes ? { notes: dto.notes ?? null } : {}),
                 },

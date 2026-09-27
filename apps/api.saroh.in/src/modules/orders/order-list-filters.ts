@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import { Prisma } from "@saroh/database";
 import { DateTime, IANAZone } from "luxon";
 
+import type { ListTab, PaymentStanding } from "./dto";
+import { defaultLateThresholds, storedValuesOf } from "./fulfilment";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -13,111 +15,28 @@ import { refundStanding } from "./order-refunds";
  * the cursor stay exact however many orders a business has.
  *
  * Every enum column is compared as TEXT (`o.stage::text`, `o.fulfilment::text`),
- * so a filter may name a value this database does not have yet (the six
- * fulfilment types before B2a's migration, OUT_FOR_DELIVERY and SENT): it
- * matches nothing instead of failing the query.
+ * so a filter may name a value this database does not have yet: it matches
+ * nothing instead of failing the query.
  */
 
-/** The tabs: All · Open · Refunded (default 14). */
-export const LIST_TABS = ["all", "open", "refunded"] as const;
-export type ListTab = (typeof LIST_TABS)[number];
-
-/**
- * How the money on an order stands, as one word for the row and the filter.
- * Derived from payments and refunds the way Order Detail's `refundStanding`
- * is, so the list and the order never disagree.
- */
-export const PAYMENT_STANDINGS = [
-    "PAID",
-    "UNPAID",
-    "PARTLY_REFUNDED",
-    "REFUNDED",
-] as const;
-export type PaymentStanding = (typeof PAYMENT_STANDINGS)[number];
-
-/**
- * The six fulfilment types (DEC-045) and the two stored words they replace.
- *
- * TODO(B2a): `orders/fulfilment.ts` owns the one normaliser (`typeOf`) and the
- * types' default late thresholds. It was not on the branch when B1 was built,
- * so this file carries the smallest piece the list needs; whichever of B1 and
- * B2a merges second points these at `fulfilment.ts` and deletes them here.
- */
-export const FULFILMENT_TYPES = [
-    "PICKUP",
-    "LOCAL_DELIVERY",
-    "SHIPPING",
-    "DIGITAL",
-    "APPOINTMENT_IN_PERSON",
-    "APPOINTMENT_ONLINE",
-] as const;
-export type FulfilmentType = (typeof FULFILMENT_TYPES)[number];
-
-/** Every word the `fulfilment` filter accepts: the types and the legacy two. */
-export const FULFILMENT_FILTER_VALUES = [
-    ...FULFILMENT_TYPES,
-    "COLLECT",
-    "DELIVERY",
-] as const;
-
-const LEGACY_TYPE: Record<string, FulfilmentType> = {
-    COLLECT: "PICKUP",
-    DELIVERY: "LOCAL_DELIVERY",
-};
-
-/** A stored fulfilment as its type: COLLECT is Pick-up, DELIVERY Local delivery. */
-export function fulfilmentTypeOf(stored: string): FulfilmentType {
-    return (
-        LEGACY_TYPE[stored] ??
-        ((FULFILMENT_TYPES as readonly string[]).includes(stored)
-            ? (stored as FulfilmentType)
-            : "PICKUP")
-    );
-}
-
-/**
- * The stored values a `fulfilment` filter matches: each type with its legacy
- * word (until B2d drops the old values), so Pick-up finds COLLECT orders.
- */
-export function storedFulfilments(values: readonly string[]): string[] {
-    const out = new Set<string>();
-    for (const v of values) {
-        const type = fulfilmentTypeOf(v);
-        out.add(type);
-        for (const [legacy, t] of Object.entries(LEGACY_TYPE)) {
-            if (t === type) out.add(legacy);
-        }
-    }
-    return [...out];
-}
-
-/** Every stage the `stage` filter accepts, B2a's two new ones included. */
-export const STAGE_FILTER_VALUES = [
-    "NEW",
-    "PREPARING",
-    "READY",
-    "COLLECTED",
-    "OUT_FOR_DELIVERY",
-    "HANDED_TO_COURIER",
-    "SENT",
-    "DELIVERED",
-] as const;
+// The tabs and payment standings live with the DTO that validates them
+// (dto.ts), so dto.ts never imports this file.
+export { LIST_TABS, PAYMENT_STANDINGS } from "./dto";
+export type { ListTab, PaymentStanding } from "./dto";
+export type { FulfilmentType } from "./fulfilment";
 
 /**
  * When an open order counts as late, in minutes from when it was placed, per
- * stored fulfilment (default 16: 2 h, 24 h, 48 h). Digital and appointments
- * are never late here: Digital never is, and appointments go by their visits.
+ * stored fulfilment value: each type's default from `fulfilment.ts`
+ * (default 16: 2 h, 24 h, 48 h), under its legacy word too until B2d. Digital
+ * and appointments are never late here: Digital never is, and appointments go
+ * by their visits.
  *
  * TODO(B17): the storefront's own thresholds replace these defaults, read
  * through a join on `StoreSettings` in {@link lateSql}.
  */
-export const DEFAULT_LATE_AFTER_MINUTES: Readonly<Record<string, number>> = {
-    COLLECT: 120,
-    PICKUP: 120,
-    DELIVERY: 1440,
-    LOCAL_DELIVERY: 1440,
-    SHIPPING: 2880,
-};
+export const DEFAULT_LATE_AFTER_MINUTES: Readonly<Record<string, number>> =
+    Object.fromEntries(defaultLateThresholds());
 
 /** The list's filters once the query string is validated (dto.ts). */
 export interface OrderListFilter {
@@ -293,7 +212,7 @@ export function orderConditions(
     }
     if (filter.fulfilment?.length) {
         and.push(
-            Prisma.sql`o.fulfilment::text = ANY(${storedFulfilments(filter.fulfilment)})`,
+            Prisma.sql`o.fulfilment::text = ANY(${storedValuesOf(filter.fulfilment)})`,
         );
     }
     if (range.gte) and.push(Prisma.sql`o."createdAt" >= ${ts(range.gte)}`);

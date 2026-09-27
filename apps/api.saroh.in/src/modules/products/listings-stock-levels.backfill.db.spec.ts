@@ -529,7 +529,7 @@ describe("Listings and stock backfill (#510, DB)", () => {
             status: "PROCESSING",
         });
         await orders.updateStatus(hill, openOrderId, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await inventory.get(hill, p.bread, ownerId)).toMatchObject({
             quantity: 6,

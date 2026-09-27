@@ -142,6 +142,8 @@ module.exports = {
         // arithmetic, the order read's money hiding, and the kitchen service
         // with a jest-mocked Prisma.
         "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        // The six fulfilment types and their rules (DEC-045, B2a).
+        "<rootDir>/src/modules/orders/fulfilment.spec.ts",
         "<rootDir>/src/modules/orders/order-refunds.spec.ts",
         "<rootDir>/src/modules/orders/order-read.spec.ts",
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",

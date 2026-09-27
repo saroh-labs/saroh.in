@@ -1,5 +1,6 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
+import type { FulfilmentType } from "@/lib/orders/read";
 import type { Interval } from "@/lib/subscriptions/service";
 
 /**
@@ -48,7 +49,10 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
+    /** The legacy word (COLLECT or DELIVERY) until B2d. */
     fulfilment: string;
+    /** How it leaves (DEC-045); absent only from an API before B2a. */
+    fulfilmentType?: FulfilmentType;
     stage: string;
     delivery: string | null;
     total?: string;

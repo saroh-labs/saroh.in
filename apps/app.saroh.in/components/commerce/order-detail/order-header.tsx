@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { goesToAddress } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
 
 import type { PillTone } from "./parts";
@@ -56,7 +57,7 @@ export function OrderHeading({
     /** The header's buttons. */
     children: ReactNode;
 }) {
-    const delivery = order.fulfilment === "DELIVERY";
+    const delivery = goesToAddress(order);
     return (
         <div className="flex flex-wrap items-start gap-3.5">
             <div className="min-w-0 flex-[1_1_320px]">
