@@ -3,11 +3,8 @@ import { siteCodeEmail } from "../../common/email";
 import { structuredLogger } from "../../common/logging/structured-logger";
 import { maskEmail } from "./account-linking.service";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
-import {
-    codeHashFor,
-    destinationHashFor,
-    hashSessionToken,
-} from "./sign-in-codes.service";
+import { hashSessionToken } from "./sessions.service";
+import { codeHashFor, destinationHashFor } from "./sign-in-codes.service";
 
 /**
  * The parts of site sign-in that need no database (round-2 plan A, A2):

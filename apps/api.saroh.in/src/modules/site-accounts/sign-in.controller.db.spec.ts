@@ -23,9 +23,9 @@ import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { NEW_BUSINESS_CEILINGS } from "./code-limits";
 import { CustomerAccountRepository } from "./customer-account.repository";
 import { RequestCodeDto, VerifyCodeDto } from "./dto";
+import { hashSessionToken, SessionsService } from "./sessions.service";
 import {
     destinationHashFor,
-    hashSessionToken,
     SignInCodesService,
     UNAVAILABLE_MESSAGE,
 } from "./sign-in-codes.service";
@@ -74,6 +74,7 @@ function build(options: { addressLimit?: number } = {}) {
     const challenge = new FakeChallenge();
     const service = new SignInCodesService(
         new AccountLinkingService(new CustomerAccountRepository()),
+        new SessionsService(),
         new SiteCodeDelivery(alerts, sender, [0, 0]),
         challenge,
         alerts,
