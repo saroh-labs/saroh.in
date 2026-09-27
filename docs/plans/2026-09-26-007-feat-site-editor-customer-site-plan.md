@@ -792,7 +792,7 @@ photo case.
 
 ### G8. Bound block: Visit us
 
-**Goal:** A block showing the storefront's address, hours, phone, "Open now ·
+**Goal:** A block showing a place's address, hours, phone, "Open now ·
 closes 9pm" and Get directions, all read live.
 
 **Requirements:** R9, R15
@@ -801,37 +801,59 @@ closes 9pm" and Get directions, all read live.
 **Phase:** 1
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (`Site.storefrontId`,
-  nullable, composite FK to the org's store), plus a migration
 - Modify: `packages/block-contract/src/section-contract.ts` (`visitUs` v1:
-  title, `showMap`, `showHours`)
+  title, `storeId` (a bound id, like `servicesList`'s ids), `showMap`,
+  `showHours`)
 - Create: `packages/site-blocks/src/blocks/visit-us.tsx`,
   `packages/site-blocks/src/lib/opening-hours.ts` (pure: open now, next
   opening, in a time zone)
 - Modify: `apps/api.saroh.in/src/modules/sites/public-sites.controller.ts`
-  (`GET :siteId/visit`, returning address, phone, hours and timezone from the
-  "sells from" storefront and the business profile)
+  (`GET :siteId/visit/:storeId`, returning address, phone, hours and time
+  zone)
+- Create: `apps/api.saroh.in/src/modules/sites/public-visit.service.ts`
+- Modify: `apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts`
+  (the public route)
 - Create: `apps/app.saroh.in/components/sites/section-fields/visit-us.tsx`
 - Test: `packages/site-blocks/src/lib/opening-hours.test.ts`,
-  `blocks.test.tsx`, `apps/api.saroh.in/src/modules/sites/public-visit.spec.ts`
+  `blocks.test.tsx`, `apps/api.saroh.in/src/modules/sites/public-visit.db.spec.ts`
 
 **Approach:**
+- **The place is the block's own, not the site's "sells from" storefront.**
+  An `ONLINE` storefront has no address or hours (`StoreSettings.kind`), so
+  Rye's site, which sells from Online, would show nothing. The block binds
+  one `SHOP` storefront by id. With one, it is chosen for the merchant and
+  named in the panel ("Showing Hill Road"). With several, the panel asks
+  which, as `pickStorefront` does. With none, the panel says "Add a shop
+  with an address in Sell › Storefronts", and the block renders nothing live.
+  So G8 adds no schema. `Site.storefrontId` comes with the shop (G11).
+- The read resolves the Site, and so its organization, first. It then
+  serves the store only if it belongs to that organization, is a `SHOP` and
+  isn't soft-closed. It runs in `runInOrgContext` and is rate-limited per
+  visitor like the other public reads (Key Technical Decisions).
+- Hours are the store's `openingHours`, the same on every storefront
+  (DEC-034). The phone is the business profile's public phone. The time
+  zone is the business's (DEC-033), India when none is set.
+- This is the one public read of the business's place and hours. E6's
+  booking-page header should reuse it and `opening-hours.ts` rather than
+  extend `public-booking-page.ts` with its own copy (cross-plan note to E).
 - `opening-hours.ts` is pure and test-first. It covers DST, overnight hours
-  and a closed day. It takes the business's zone (DEC-033), with India when
-  none is set.
-- The panel says "Hours and address live in Settings › Business" with a link
-  there.
+  and a closed day.
+- The panel says "Address lives on the storefront (Sell › Storefronts);
+  hours in Settings › Hours", with links.
 - Get directions is a maps link built from the address.
-- "Sells from" defaults to the first open storefront with listings, and the
-  picker shows only when there are several.
 
 **Test scenarios:**
 - Happy path: at 18:00 with close at 21:00 → "Open now · closes 9pm".
 - Edge case: Sunday closed, Monday 08:00 → "Closed · opens Mon 8am".
 - Edge case: no hours saved → the hours row is hidden, and the block says
   nothing false.
-- Error path: another business's site id → 404. A soft-closed storefront is
-  never served.
+- Edge case: a business with only an Online storefront → the panel explains,
+  and the live section renders nothing.
+- Error path: another business's site id or store id → 404. A soft-closed
+  or `ONLINE` storefront is never served.
+- Integration: with RLS enforcement on and a role without BYPASSRLS, the
+  read for site A can't see site B's store, even with the app filter
+  removed.
 
 **Verification:** Rye's Visit us matches the design at desk and phone widths.
 
@@ -913,12 +935,24 @@ posts the site owns (ADR-004).
 
 **Goal:** A merchant site lists and shows products sold at its "sells from"
 storefront, with price, variants, photos and Sold out, read through listings.
+The merchant sees, or picks, which storefront that is. `/shop` becomes a
+dedicated route.
 
 **Requirements:** R10
 
-**Dependencies:** G8 (`Site.storefrontId`) · **Phase:** 1
+**Dependencies:** None inside this plan · **Phase:** 2 (re-sliced
+2026-09-27: it ships with the checkout, G13, so no product page goes live
+without a way to order)
 
 **Files:**
+- Modify: `packages/database/prisma/schema.prisma` (`Site.storefrontId`,
+  nullable, composite FK to the organization's store), plus an additive
+  migration
+- Modify: `apps/api.saroh.in/src/modules/sites/sites.service.ts`
+  (`updateSettings` takes `storefrontId` under `site:update`, which must be
+  an open storefront of the same organization; the automatic choice when
+  there is one candidate), `dto.ts`, `site-flags.ts` (the pre-publish flag
+  "Pick which storefront this site sells from")
 - Create: `apps/api.saroh.in/src/modules/products/public-catalogue.controller.ts`,
   `public-catalogue.service.ts` (`GET public/sites/:siteId/products`,
   `…/products/:slug`)
@@ -926,33 +960,83 @@ storefront, with price, variants, photos and Sold out, read through listings.
   `modules/capabilities/module-annotations.spec.ts` (public route, Commerce)
 - Create: `apps/saroh.app/app/[domain]/shop/page.tsx`,
   `app/[domain]/shop/[productSlug]/page.tsx`, `apps/saroh.app/lib/catalogue.ts`
+- Modify: `apps/app.saroh.in/components/sites/site-settings.tsx` (a "Sells
+  from" row: "Your site sells from Online · Change", or the question when
+  unset)
 - Modify: `packages/site-blocks/src/product/product-page.tsx` (a public mode:
-  no staff controls, and an "Add to bag" slot)
+  no staff controls, and an action slot that G13 fills)
 - Test: `apps/api.saroh.in/src/modules/products/public-catalogue.db.spec.ts`,
+  `apps/api.saroh.in/src/modules/sites/site-settings.service.spec.ts`,
   `packages/site-blocks/src/product/product-page.test.tsx`
 
 **Approach:**
+- **Sells from, shown not silent.** When the business has exactly one open
+  storefront with listings, `Site.storefrontId` is set to it. The migration
+  backfills existing sites, and site creation sets it, never a read. The
+  editor's settings
+  say so, with Change. With several, it stays unset. The settings ask
+  "Which storefront does this site sell from?", and the pre-publish check
+  names it. Until it is answered, `/shop`, the Product grid and checkout
+  render nothing live. A storefront that closes or is removed clears the
+  choice, and the flag returns. It is never the "first" storefront by
+  creation order.
+- **`/shop` is a dedicated route at a reserved path** (Key Technical
+  Decisions). It serves only when Commerce is on, the site sells from a
+  storefront and that storefront has at least one listing. Otherwise it
+  404s as today. It draws a product grid of everything sold there. When G15
+  lands, it draws the Shop module page's sections instead, if one is
+  published. It is not added to any menu. The merchant adds the Shop page
+  (G14) or links it by hand.
+- **A free-form page already live at `/shop`** keeps being served by the
+  `/shop` route, as `[slug]` would serve it, until the merchant moves it.
+  `site-flags.ts` flags it with "Change address". This unit hides nothing
+  that is live.
+- `/shop/[productSlug]` is the product page. Product slugs never clash with
+  a sub-route, because nothing else lives under `/shop` (G13's server
+  actions sit in `app/[domain]/shop/actions.ts`, not a `checkout` segment).
 - The API serves only products that are published, not archived and listed
   at the storefront, with the variants sold there (ADR-010).
 - "Can sell" is on hand minus promised, or Sold out by hand for untracked
   products (DEC-032).
 - An explicit allow-list serializer: no cost, no stock numbers, only "Sold
   out", "Only 2 left" (≤ the warning level) or available.
-- The organization is derived from the site. The Commerce module must be on,
-  or the endpoints 404.
+- **Tenant context and limits.** The organization is derived from the site,
+  and the service runs in `runInOrgContext(organizationId)`. The Commerce
+  module must be on, or the endpoints 404. Reads are limited per visitor
+  address with `FixedWindowRateLimiter`: the address is plan A's signed
+  client-address header when saroh.app relays the call, otherwise the
+  caller's own DEC-027 address. The limit is generous enough for browsing
+  and refuses scraping.
+- The product page's action slot is empty until G13, which lands with this
+  unit in phase 2. It then holds Add to bag or "Ask about ordering".
 - The product's page-level "Shown on the website" (round-1 plan) now reads
   true.
 
 **Test scenarios:**
 - Happy path: the listed products show; an unlisted product's slug → 404.
+- Happy path: a business with one open storefront with listings → the
+  settings read "Your site sells from Online", and `/shop` serves.
+- Edge case: two open storefronts with listings → the settings ask which,
+  `/shop` 404s, and the pre-publish check names it; after picking Online,
+  it serves Online's products.
 - Edge case: a variant left out of this storefront isn't offered.
-- Edge case: on hand equal to promised → "Sold out", and Add to bag is off.
-- Error path: another business's product slug via this site → 404.
+- Edge case: on hand equal to promised → "Sold out", and the action is off.
+- Edge case: a free-form page live at `/shop` → still served at `/shop`,
+  and flagged in the editor.
+- Edge case: Commerce off → `/shop` and its product pages 404.
+- Error path: another business's product slug via this site → 404. A
+  `storefrontId` from another business is refused at save.
+- Error path: one visitor address past the limit → 429. A forged
+  client-address header without the signature is limited by the caller's
+  own address.
+- Integration: with RLS enforcement on and a role without BYPASSRLS, site
+  A's catalogue read can't see site B's listings, even with the app filter
+  removed.
 - Integration: the product page renders from the same component the
   workspace Customer view uses.
 
-**Verification:** Rye's Online storefront shows its products on its site.
-`check:blocks` passes.
+**Verification:** Rye's site, set to sell from Online, shows Online's
+products. `check:blocks` passes.
 
 ---
 
@@ -963,7 +1047,8 @@ bound by ids and options.
 
 **Requirements:** R9
 
-**Dependencies:** G11 · **Phase:** 1
+**Dependencies:** G11 · **Phase:** 2 (re-sliced 2026-09-27, with G11 and
+G13)
 
 **Files:**
 - Modify: `packages/block-contract/src/section-contract.ts` (`productGrid` v1:
@@ -971,11 +1056,17 @@ bound by ids and options.
   count, show prices)
 - Create: `packages/site-blocks/src/blocks/product-grid.tsx`,
   `apps/app.saroh.in/components/sites/section-fields/product-grid.tsx`
+- Modify: `apps/api.saroh.in/src/modules/products/public-catalogue.service.ts`
+  (the list read takes a collection id or product ids and a count)
 - Test: `packages/block-contract/src/section-contract.test.ts`,
   `packages/site-blocks/src/blocks.test.tsx`,
   `apps/api.saroh.in/src/modules/sites/publication-renderability.spec.ts`
 
 **Approach:**
+- The grid reads G11's catalogue at the site's sells-from storefront. It
+  runs in the same tenant context and under the same per-visitor limit.
+  With no storefront chosen, the grid renders nothing live, and its panel
+  shows G11's question, not an empty grid.
 - Collections come from DEC-031.
 - A picked product that is later archived or unlisted drops out at view time;
   the editor flags it before publish (the flag engine).
@@ -995,56 +1086,155 @@ bound by ids and options.
 ### G13. Bag and checkout to an order
 
 **Goal:** Visitors add to a bag. At checkout they pick Pick-up or Local
-delivery (or Shipping, where the storefront offers it), sign in, pay online,
-and an order is created at the storefront when the payment succeeds.
+delivery (or Shipping, where the storefront offers it), sign in and pay
+online. The order, created unpaid when checkout starts, becomes a real order
+holding stock when the payment succeeds. Where the site can't take an
+online order, the shop offers "Ask about ordering" instead.
 
 **Requirements:** R11
 
-**Dependencies:** G11, A3 (site session and sign-in sheet), B2 (fulfilment
-types), and the round-1 `reserveOnPayment` · **Phase:** 2
+**Dependencies:** G11, A3 (site session, sign-in sheet and the per-site
+accounts switch A2's options read reports), B2 (fulfilment types), and the
+round-1 `reserveOnPayment` · **Phase:** 2
 
 **Files:**
-- Create: `packages/site-blocks/src/shop/{bag,bag-sheet,checkout-sheet}.tsx`,
+- Modify: `packages/database/prisma/schema.prisma` (`Order.placedOnline
+  Boolean @default(false)` and `Order.paidAt DateTime?`, unless B has added
+  them first; see Cross-plan notes), plus an additive migration
+- Create: `packages/site-blocks/src/shop/{bag,bag-sheet,checkout-sheet,ask-about-ordering}.tsx`,
   `packages/site-blocks/src/shop/bag-store.ts` (browser storage, try/catch)
-- Create: `apps/saroh.app/app/[domain]/shop/checkout/actions.ts`
+- Create: `apps/saroh.app/app/[domain]/shop/actions.ts` (server actions for
+  quote and start. Not under a `shop/checkout` segment, which would shadow
+  a product slugged `checkout`)
 - Create: `apps/api.saroh.in/src/modules/orders/public-checkout.controller.ts`,
-  `public-checkout.service.ts` (quote: re-price from listings; start: create a
-  payment intent for the quote; the success webhook creates the order via
-  `reserveOnPayment`)
+  `public-checkout.service.ts`
+  - `POST public/sites/:siteId/checkout/quote`: prices the bag from
+    listings. It writes nothing and needs no session.
+  - `POST public/sites/:siteId/checkout`: behind `CustomerSessionGuard`,
+    with an idempotency key. It creates the unpaid online order and its
+    intent.
+  - `GET public/sites/:siteId/checkout/options`: whether this site can take
+    an online order now, and what to show if it can't.
+- Modify: `apps/api.saroh.in/src/modules/payments/payments.service.ts` (a
+  `createIntentForOnlineOrder(customer, orderId, key)` beside
+  `createIntentForOrderPublic`. It goes through the same
+  `createIntentInternal`, so the amount comes only from `order.total` and
+  the provider from the storefront's `checkoutProvider`)
 - Modify: `apps/api.saroh.in/src/modules/webhooks/webhooks.service.ts`
-  (checkout intents), `modules/payments/payments.service.ts`
+  (`applySuccess`: for a `placedOnline` order, `reserveOnPayment` before
+  the move to PAID and `ensureOrderInvoice`)
+- Create: a job handler `orders.close-abandoned-checkouts`, registered in
+  `modules/jobs/job-handler.registry.ts` (backend-jobs)
+- Modify: `apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts`
 - Test: `apps/api.saroh.in/src/modules/orders/public-checkout.db.spec.ts`,
+  `apps/api.saroh.in/src/modules/webhooks/webhooks.service.spec.ts`,
   `packages/site-blocks/src/shop/bag-store.test.ts`,
   `e2e/tests/site-shop.spec.ts`
 
 **Approach:**
-- The bag holds ids and quantities only. The quote re-reads prices, the GST
-  rules (DEC-023) and availability from the server, and a client amount is
-  ignored.
-- The customer is asked for a code at the last step ("Last step: confirm it's
-  you", plan A, default 2).
-- The order belongs to the signed-in account's contact and store customer
-  (ADR-011), and its fulfilment type is one every item allows (default 15).
-- If the last unit is lost to a race, the full automatic refund and its copy
-  come from DEC-032.
+- **When the checkout is offered.** The options read says yes only when all
+  of these hold:
+  - plan A's accounts switch is on for this site, read live, not from the
+    snapshot;
+  - the site sells from a storefront (G11);
+  - a payment provider is connected for that storefront;
+  - the storefront isn't paused (`pausedAt`).
+
+  Otherwise there is no bag. The product page's action is **"Ask about
+  ordering"**, which opens the site's enquiry form with the product and
+  variant named in the message, so every site with a shop has a working
+  action. The editor tells the merchant why ("Turn on customer accounts to
+  take orders online" or "Connect payments to take orders online"). Guest
+  checkout is not built.
+- **The bag** holds listing and variant ids and quantities only. The quote
+  re-reads prices, the GST rules (DEC-023), fulfilment types and "can
+  sell" from the server, and ignores any amount from the client. Lines that
+  can't be sold now are shown as such before paying.
+- **Sign-in at the last step** ("Last step: confirm it's you", plan A,
+  default 2). Starting needs the customer session. saroh.app's server
+  action forwards it in `x-customer-session`, with `x-site-host` (plan A's
+  session transport).
+- **Start creates an unpaid online order, following the round-1 pattern:**
+  - In one transaction at the sells-from storefront, the server makes the
+    order: status PENDING, `paymentStatus` UNPAID and `placedOnline`. Each
+    line is priced from its listing, and no line has a `stockRow`, so
+    nothing is held. The order's fulfilment type is one every item allows
+    (default 15, B2's rules), with the delivery fields when it is Local
+    delivery or Shipping. It belongs to the signed-in account's contact and
+    its store customer (ADR-011). The timeline says "by the customer".
+  - Its intent is then made through `createIntentInternal`, as
+    `createIntentForOrder` does. The amount comes only from `order.total`,
+    so a tampered client can't change what is charged.
+  - The idempotency key comes from the checkout sheet, so a double tap or a
+    retry returns the same order and intent, not a second order.
+- **The success webhook** (`applySuccess`), for a `placedOnline` order,
+  calls `reserveOnPayment(tx, { organizationId, orderId, paymentIntentId })`
+  first, in reserve.ts's lock order (the intent, then the order, then the
+  rows).
+  - **HELD:** the order moves to PAID, `paidAt` is set, and
+    `ensureOrderInvoice` issues its invoice (DEC-023). From then on it shows
+    in Orders.
+  - **REFUSED** (the last unit was lost to a race, or the order was already
+    closed): reserve.ts records the PENDING refund.
+    `PaymentsService.sendAutomaticRefund` sends it after commit, with
+    DEC-032's copy ("Sorry, it sold out while you were paying — your money
+    is on its way back"). The refund webhook settles it (DEC-026).
+- **Abandoned checkouts.** An unpaid `placedOnline` order is hidden from
+  Orders, its counts, Home and the customer's account, as B1 says. It holds
+  no stock and takes no invoice number, because the invoice is made on
+  payment. A job closes it after 24 hours (CANCELLED, with an event
+  "Checkout not completed", and no message sent). A payment that arrives
+  later is refused and refunded by `reserveOnPayment`, which never holds
+  for a closed order. Its order number is used, and numbering may have
+  gaps. Order numbers are not the GST series.
+- **Tenant context.** Every checkout endpoint resolves the Site first. It
+  checks that the session's organization and site match the host (plan A's
+  guard), then runs in `runInOrgContext(organizationId)`, as
+  `public-invoices.service.ts` does. The webhook runs in the intent's
+  organization. Public checkout is never module-gated off mid-payment
+  (`module-annotations.spec.ts`).
+- **Limits.** The quote and options reads are limited per visitor address,
+  like G11. Start is limited per address and per customer account: at most
+  3 open unpaid online orders per account, after which it says "You have a
+  checkout open already — finish or wait a few minutes". The address is
+  plan A's signed client-address header when relayed by saroh.app,
+  otherwise the caller's own DEC-027 address.
 - Online payment only (Deferred: pay at pickup).
-- With no payment provider connected, the checkout button says "This shop
-  isn't taking online orders yet" and nothing is created.
 
 **Test scenarios:**
-- Happy path: add 2 items, sign in, pay → one order at the storefront, stock
-  promised, an invoice (DEC-023).
+- Happy path: add 2 items, sign in, pay → one order at the storefront,
+  stock promised, PAID, an invoice (DEC-023), "by the customer" on the
+  timeline.
+- Happy path: start → an unpaid `placedOnline` order exists, holds nothing,
+  and is absent from the Orders list and counts.
 - Edge case: the price changed since adding → the quote shows the new total
   before paying.
-- Edge case: two customers pay for the last unit → one order; the other is
-  refunded automatically.
+- Edge case: two customers pay for the last unit → one order holds; the
+  other is refused and refunded automatically, and is never shown as a
+  paid order.
+- Edge case: start twice with the same idempotency key → one order, one
+  intent.
+- Edge case: a site with accounts off → no bag; the product page shows "Ask
+  about ordering", which opens the enquiry with the product named; the
+  start endpoint refuses (403) even if called directly.
+- Edge case: accounts on but no provider connected, or the storefront
+  paused → "Ask about ordering", and nothing is created.
+- Edge case: an abandoned checkout older than 24 hours → CANCELLED by the
+  job; a payment arriving afterwards → refused and refunded.
 - Error path: a tampered amount or quantity in the request is ignored or
-  refused.
+  refused; the charged amount equals the server's total.
+- Error path: a session from site A used on site B's host → 401.
+- Error path: a fourth open checkout for one account → 429 with the copy
+  above; one address past its limit → 429.
+- Integration: with RLS enforcement on and a role without BYPASSRLS, a
+  checkout on site A can't read site B's listings or customers, even with
+  the app filter removed.
 - Integration (e2e on Northwind): bag → checkout → the order appears in
-  Orders.
+  Orders only after the test provider's success webhook.
 
-**Verification:** The order's timeline says "by the customer". No order exists
-for an abandoned checkout.
+**Verification:** The order's timeline says "by the customer". An abandoned
+checkout never appears in Orders and never holds stock or an invoice
+number.
 
 ---
 
