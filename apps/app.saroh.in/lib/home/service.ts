@@ -8,6 +8,44 @@ import { apiFetch, orgBase } from "@/lib/api/http";
 export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
 
 /**
+ * A Needs-you tag's colour, as the design names them: `bad` for something
+ * already wrong, `due` for something to do soon, `info` for something to
+ * know. The tag's words always say it too.
+ */
+export type HomeTone = "bad" | "due" | "info";
+
+/** What an inline action will do (F4); F3's rows carry none yet. */
+export interface HomeInline {
+    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    label: string;
+    confirm: string;
+    undoable: boolean;
+}
+
+/**
+ * One row of Needs you (F3), flat and already ranked by the API.
+ *
+ * Money travels in minor units beside the words, and `amountIn` says where
+ * it goes: "₹4,800 overdue from Farah Khan" is the title "overdue from Farah
+ * Khan" with `amountIn: "title"`. See `lib/home/needs.ts`.
+ */
+export interface HomeNeed {
+    id: string;
+    code: string;
+    severity: HomeSeverity;
+    title: string;
+    sub: string | null;
+    amountMinor: number | null;
+    currency: string | null;
+    amountIn: "title" | "sub" | null;
+    tag: string | null;
+    tone: HomeTone;
+    href: string;
+    moduleKey?: string;
+    inline?: HomeInline;
+}
+
+/**
  * One concrete row behind an action's count.
  *
  * `currency` is nullable on purpose and the client MUST respect it: a CRM lead
@@ -77,6 +115,10 @@ export interface HomeModel {
     numbers: HomeNumber[];
     /** Empty on a healthy read; non-empty means what is shown is incomplete. */
     unavailable: HomeUnavailable[];
+    /** Needs you, flat and ranked (F3). `actions` stays for one release. */
+    needs: HomeNeed[];
+    /** How many things need doing; a "3 more" row counts as three. */
+    needsTotal: number;
 }
 
 const EMPTY: HomeModel = {
@@ -86,6 +128,8 @@ const EMPTY: HomeModel = {
     upcoming: [],
     numbers: [],
     unavailable: [],
+    needs: [],
+    needsTotal: 0,
 };
 
 export async function getHome(projectId?: string): Promise<HomeModel> {
@@ -96,5 +140,19 @@ export async function getHome(projectId?: string): Promise<HomeModel> {
     if (!res.ok) {
         throw new Error(`GET home failed: ${res.status}`);
     }
-    return (await res.json()) as HomeModel;
+    const model = (await res.json()) as HomeModel;
+    // An API from before F3 sends no `needs`. Say the list couldn't be read,
+    // never "Nothing needs you", while the two deploys cross.
+    if (!Array.isArray(model.needs)) {
+        return {
+            ...model,
+            needs: [],
+            needsTotal: 0,
+            unavailable: [
+                ...model.unavailable,
+                { moduleKey: "HOME", label: "What needs you" },
+            ],
+        };
+    }
+    return model;
 }

@@ -4,6 +4,7 @@ import { Home } from "lucide-react";
 import Link from "next/link";
 
 import { firstRunJobs } from "@/lib/home/first-run";
+import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
@@ -25,8 +26,9 @@ export interface HomeSetup {
  *
  * Three bands, in the order a merchant opening the app actually asks:
  *
- * 1. **Needs you** — the ranked work, each action carrying the rows behind its
- *    count so the decision is made here rather than two clicks later.
+ * 1. **Needs you** — one flat, ranked list, a row per thing to do with a tag
+ *    that says what is wrong (F3), so the decision is made here rather than
+ *    two clicks later.
  * 2. **Coming up** — the schedule on a time axis, grouped by day.
  * 3. **Numbers** — counts that are links into exactly what they count.
  *
@@ -39,12 +41,6 @@ export interface HomeSetup {
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
  * component call `new Date()` would let a slow render disagree with itself.
  */
-/** "Open orders", "Open orders and Schedule", "A, B and C". */
-function formatList(labels: string[]): string {
-    if (labels.length <= 1) return labels[0] ?? "";
-    return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
-}
-
 export function HomeDashboard({
     home,
     modules,
@@ -103,12 +99,12 @@ export function HomeDashboard({
                     {setup ? (
                         <TakeMoneyChecklist {...setup} slot="first" />
                     ) : null}
-                    <div className="min-w-0 space-y-3">
-                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Needs you
-                        </h2>
-                        <NeedsYou actions={home.actions} now={now} />
-                    </div>
+                    <NeedsYou
+                        needs={home.needs}
+                        total={home.needsTotal}
+                        unavailable={home.unavailable}
+                        next={nextLine(home.upcoming, now)}
+                    />
                     {setup ? (
                         <TakeMoneyChecklist {...setup} slot="late" />
                     ) : null}

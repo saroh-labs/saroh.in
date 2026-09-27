@@ -185,7 +185,7 @@ export async function failedRenewals(
 /**
  * What the renewal row says, or null when there is nothing to act on yet.
  * The latest event since the invoice was issued names what happened;
- * without one, a past-due invoice is "Overdue N days" — before autopay no
+ * without one, a past-due invoice is "Late · N days" — before autopay no
  * payment was attempted, so nothing can say it failed.
  */
 export function renewalTag(
@@ -249,23 +249,34 @@ export async function overdueInvoices(
                 contact: {
                     select: { firstName: true, lastName: true, email: true },
                 },
+                // What it was for, on Home's row: "INV-0012 · X-ray · …".
+                lines: {
+                    orderBy: { position: "asc" },
+                    take: 1,
+                    select: { description: true },
+                },
             },
         }),
     ]);
     if (count === 0) return null;
 
-    const evidence: HomeEvidence[] = rows.map((inv) => ({
-        id: inv.id,
-        title: inv.number ?? "Invoice",
-        subtitle: billedTo(inv),
-        at: inv.dueAt?.toISOString() ?? null,
-        amountMinor: toMinor(inv.total),
-        currency: inv.currency,
-        href: `/billing/invoices/${inv.id}`,
-        // Always set: the where asked for a due date before now.
-        tag: inv.dueAt ? overdueTag(inv.dueAt, now) : undefined,
-        tone: "bad",
-    }));
+    const evidence: HomeEvidence[] = rows.map((inv) => {
+        const first =
+            inv.lines.length > 0 ? inv.lines[0].description.trim() : "";
+        return {
+            id: inv.id,
+            title: inv.number ?? "Invoice",
+            subtitle: billedTo(inv),
+            at: inv.dueAt?.toISOString() ?? null,
+            amountMinor: toMinor(inv.total),
+            currency: inv.currency,
+            href: `/billing/invoices/${inv.id}`,
+            // Always set: the where asked for a due date before now.
+            tag: inv.dueAt ? overdueTag(inv.dueAt, now) : undefined,
+            tone: "bad",
+            ...(first ? { detail: first } : {}),
+        };
+    });
 
     return {
         code: "PAYMENTS_OVERDUE_INVOICES",

@@ -120,8 +120,8 @@ export async function sitesNotLive(
         code: "WEBSITE_NOT_LIVE",
         title:
             count === 1
-                ? "Your website isn't live yet"
-                : `${count} of your websites aren't live yet`,
+                ? "Your site isn't live"
+                : `${count} of your sites aren't live`,
         href: count === 1 && evidence[0] ? evidence[0].href : "/sites",
         severity: "SETUP",
         moduleKey: "WEBSITE",
