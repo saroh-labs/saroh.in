@@ -69,7 +69,8 @@ export async function writeRyePhotos(
     }
 }
 
-interface Bought {
+/** A line that can be reviewed, as `writeRyeReviews` reads it. */
+export interface Bought {
     itemId: string;
     orderId: string;
     productId: string;
@@ -123,8 +124,97 @@ export async function writeRyeReviews(
         Prisma.ReviewInvitationCreateManyInput
     >();
     const reviews: Prisma.ProductReviewCreateManyInput[] = [];
+    for (const { slug, k, line: b } of pickRyeReviewers(bought, a)) {
+        const i = P[slug];
+        const p = PRODUCTS[i];
+        const productId = a.productIds[i];
+        const r = REVIEWS[slug][k];
+        const invitationId = ryeId("invitation", b.orderId);
+        const sentAt = new Date(b.doneAt.getTime() + HOUR / 2);
+        if (!invitations.has(b.orderId)) {
+            invitations.set(b.orderId, {
+                id: invitationId,
+                organizationId: a.orgId,
+                orderId: b.orderId,
+                tokenHash: createHash("sha256")
+                    .update(invitationId)
+                    .digest("hex"),
+                toAddress: b.email,
+                expiresAt: new Date(sentAt.getTime() + 30 * DAY),
+                completedAt: null,
+                lastSentAt: sentAt,
+                createdByUserId: a.demoUserId,
+                createdAt: sentAt,
+            });
+        }
+        const reviewedAt = new Date(
+            Math.min(
+                sentAt.getTime() + (5 + ((k * 7) % 40)) * HOUR,
+                a.now.getTime() - 3 * HOUR,
+            ),
+        );
+        reviews.push({
+            id: ryeId("review", i, k),
+            organizationId: a.orgId,
+            storeId: b.storeId,
+            invitationId,
+            orderItemId: b.itemId,
+            productId,
+            customerId: b.customerId,
+            productName: p.name,
+            invitedTo: b.email,
+            rating: r.rating,
+            body: r.body,
+            displayName: `${b.firstName} ${b.lastName.charAt(0)}.`,
+            status: "PUBLISHED",
+            reply: r.reply ?? null,
+            repliedAt: r.reply
+                ? new Date(reviewedAt.getTime() + 2 * HOUR)
+                : null,
+            createdAt: reviewedAt,
+            updatedAt: reviewedAt,
+        });
+    }
+
+    // An invitation is done once every line on its order is reviewed.
+    const orderIds = Array.from(invitations.keys());
+    const lineCounts = await prisma.orderItem.groupBy({
+        by: ["orderId"],
+        where: { orderId: { in: orderIds } },
+        _count: true,
+    });
+    for (const inv of Array.from(invitations.values())) {
+        const mine = reviews.filter((r) => r.invitationId === inv.id);
+        const lines = lineCounts.find((c) => c.orderId === inv.orderId);
+        if (mine.length === lines?._count) {
+            inv.completedAt = mine
+                .map((r) => r.createdAt as Date)
+                .reduce((x, y) => (y > x ? y : x));
+        }
+    }
+    await prisma.reviewInvitation.createMany({
+        data: Array.from(invitations.values()),
+    });
+    await prisma.productReview.createMany({ data: reviews });
+}
+
+/**
+ * Who writes each of REVIEWS (#522), from the lines that can be reviewed —
+ * pure, so a test can run it on the plan for any day. Throws when a product
+ * has more reviews than lines: the order plan tops its buyers up so it
+ * never does.
+ */
+export function pickRyeReviewers(
+    bought: readonly Bought[],
+    a: {
+        productIds: readonly string[];
+        variantIds: readonly (readonly string[])[];
+        shopperKey: (email: string) => string | undefined;
+    },
+): { slug: string; k: number; line: Bought }[] {
+    const out: { slug: string; k: number; line: Bought }[] = [];
     const usedItems = new Set<string>();
-    for (const slug of slugs) {
+    for (const slug of Object.keys(REVIEWS)) {
         const i = P[slug];
         const p = PRODUCTS[i];
         const productId = a.productIds[i];
@@ -183,75 +273,10 @@ export async function writeRyeReviews(
             }
             reviewed.add(b.email);
             usedItems.add(b.itemId);
-
-            const invitationId = ryeId("invitation", b.orderId);
-            const sentAt = new Date(b.doneAt.getTime() + HOUR / 2);
-            if (!invitations.has(b.orderId)) {
-                invitations.set(b.orderId, {
-                    id: invitationId,
-                    organizationId: a.orgId,
-                    orderId: b.orderId,
-                    tokenHash: createHash("sha256")
-                        .update(invitationId)
-                        .digest("hex"),
-                    toAddress: b.email,
-                    expiresAt: new Date(sentAt.getTime() + 30 * DAY),
-                    completedAt: null,
-                    lastSentAt: sentAt,
-                    createdByUserId: a.demoUserId,
-                    createdAt: sentAt,
-                });
-            }
-            const reviewedAt = new Date(
-                Math.min(
-                    sentAt.getTime() + (5 + ((k * 7) % 40)) * HOUR,
-                    a.now.getTime() - 3 * HOUR,
-                ),
-            );
-            reviews.push({
-                id: ryeId("review", i, k),
-                organizationId: a.orgId,
-                storeId: b.storeId,
-                invitationId,
-                orderItemId: b.itemId,
-                productId,
-                customerId: b.customerId,
-                productName: p.name,
-                invitedTo: b.email,
-                rating: r.rating,
-                body: r.body,
-                displayName: `${b.firstName} ${b.lastName.charAt(0)}.`,
-                status: "PUBLISHED",
-                reply: r.reply ?? null,
-                repliedAt: r.reply
-                    ? new Date(reviewedAt.getTime() + 2 * HOUR)
-                    : null,
-                createdAt: reviewedAt,
-                updatedAt: reviewedAt,
-            });
+            out.push({ slug, k, line: b });
         });
     }
-
-    // An invitation is done once every line on its order is reviewed.
-    const orderIds = Array.from(invitations.keys());
-    const lineCounts = await prisma.orderItem.groupBy({
-        by: ["orderId"],
-        where: { orderId: { in: orderIds } },
-        _count: true,
-    });
-    for (const inv of Array.from(invitations.values())) {
-        const mine = reviews.filter((r) => r.invitationId === inv.id);
-        const lines = lineCounts.find((c) => c.orderId === inv.orderId);
-        if (mine.length === lines?._count) {
-            inv.completedAt = mine
-                .map((r) => r.createdAt as Date)
-                .reduce((x, y) => (y > x ? y : x));
-        }
-    }
-    await prisma.reviewInvitation.createMany({
-        data: Array.from(invitations.values()),
-    });
-    await prisma.productReview.createMany({ data: reviews });
+    return out;
 }
 
 /** The last minute of the month three days from now, in Kolkata. */

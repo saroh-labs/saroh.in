@@ -15,6 +15,7 @@ import {
     ryeId,
     unitPaise,
 } from "./bakery-catalogue";
+import { REVIEWS } from "./bakery-product-page";
 import {
     writeRyeDiscounts,
     writeRyePhotos,
@@ -409,6 +410,9 @@ const SHOPPER = Object.fromEntries(
 ) as Record<string, number>;
 const emailOf = (s: { first: string; last: string }) =>
     `${s.first}.${s.last}@example.in`.toLowerCase();
+/** A shopper's key from their email, as a review names its writer. */
+export const ryeShopperKey = (email: string) =>
+    SHOPPERS.find((s) => emailOf(s) === email)?.key;
 
 /** Trade cafés Rye supplies, billed by hand. */
 const CAFES = [
@@ -798,7 +802,7 @@ export async function seedBakery(
         productIds,
         variantIds,
         demoUserId,
-        shopperKey: (email) => SHOPPERS.find((s) => emailOf(s) === email)?.key,
+        shopperKey: ryeShopperKey,
     });
     await writeRyeDiscounts(prisma, { orgId, now, productIds });
     // Sold out by hand this morning, on a loaf that counts no stock.
@@ -1017,7 +1021,7 @@ interface OrderPlan {
     };
 }
 
-interface PlanInput {
+export interface PlanInput {
     now: Date;
     orgId: string;
     stores: Record<StoreKey, string>;
@@ -1074,21 +1078,21 @@ function planOrders(input: PlanInput): OrderPlan[] {
     const t = todayClock(now);
     const staff = () => (rng.chance(0.7) ? nisha : owner);
 
-    const collectPath = (placed: Date, by: () => string) => {
-        const a = addMinutes(placed, rng.int(10, 50));
-        const b = addMinutes(a, rng.int(30, 80));
-        const c = addMinutes(b, rng.int(20, 240));
+    const collectPath = (placed: Date, by: () => string, r: Rng = rng) => {
+        const a = addMinutes(placed, r.int(10, 50));
+        const b = addMinutes(a, r.int(30, 80));
+        const c = addMinutes(b, r.int(20, 240));
         return [
             { to: "PREPARING" as const, at: a, by: by() },
             { to: "READY" as const, at: b, by: by() },
             { to: "COLLECTED" as const, at: c, by: by() },
         ];
     };
-    const deliverPath = (placed: Date, by: () => string) => {
-        const a = addMinutes(placed, rng.int(10, 50));
-        const b = addMinutes(a, rng.int(30, 80));
-        const c = addMinutes(b, rng.int(15, 60));
-        const d = addMinutes(c, rng.int(90, 300));
+    const deliverPath = (placed: Date, by: () => string, r: Rng = rng) => {
+        const a = addMinutes(placed, r.int(10, 50));
+        const b = addMinutes(a, r.int(30, 80));
+        const c = addMinutes(b, r.int(15, 60));
+        const d = addMinutes(c, r.int(90, 300));
         return [
             { to: "PREPARING" as const, at: a, by: by() },
             { to: "READY" as const, at: b, by: by() },
@@ -1463,6 +1467,55 @@ function planOrders(input: PlanInput): OrderPlan[] {
             [["PREPARING", hhmm(9, 0), nisha]],
         ),
     );
+    // Reviews come only from people whose order was done over a day ago
+    // (#522), and how many such lines the history holds shifts with the
+    // weekday it starts on and the hour the seed runs. So every reviewed
+    // product gets at least as many as it has reviews, on any day: short of
+    // that, a reviewer who hasn't bought it yet buys one, a week or more
+    // back — before the stock log starts — on a random stream of its own,
+    // so the rest of the plan is the same either way.
+    const topUpRng = rngFor("orders", "reviews");
+    const topUpStaff = () => (topUpRng.chance(0.7) ? nisha : owner);
+    const reviewable = orders.filter((o) => canReview(o, now));
+    let extra = 0;
+    for (const [slug, specs] of Object.entries(REVIEWS)) {
+        const product = P[slug];
+        const buyers = reviewable.flatMap((o) =>
+            o.lines.filter((l) => l.product === product).map(() => o.shopper),
+        );
+        const short = specs.length - buyers.length;
+        if (short <= 0) continue;
+        const reviewers = Array.from(new Set(specs.map((r) => SHOPPER[r.who])));
+        const queue = [
+            ...reviewers.filter((s) => !buyers.includes(s)),
+            ...reviewers.filter((s) => buyers.includes(s)),
+        ];
+        for (let k = 0; k < short; k++) {
+            const shopper = queue[k % queue.length];
+            const far = SHOPPERS[shopper].address.state !== "Karnataka";
+            const placedAt = istAt(
+                now,
+                -(7 + ((2 * extra++) % 28)),
+                topUpRng.int(8 * 60, 12 * 60),
+            );
+            orders.push({
+                shopper,
+                placedAt,
+                fulfilment: far ? "DELIVERY" : "COLLECT",
+                lines: [
+                    {
+                        product,
+                        qty: slug === "cinnamon-bun" ? topUpRng.int(2, 6) : 1,
+                    },
+                ],
+                pay: far ? "ONLINE" : "RECORDED",
+                moves: far
+                    ? deliverPath(placedAt, topUpStaff, topUpRng)
+                    : collectPath(placedAt, topUpStaff, topUpRng),
+            });
+        }
+    }
+
     return orders.sort(
         (a, b) =>
             a.placedAt.getTime() - b.placedAt.getTime() ||
@@ -1470,8 +1523,34 @@ function planOrders(input: PlanInput): OrderPlan[] {
     );
 }
 
+/** An order's last touch: its latest step, edit payment or refund. */
+function lastTouchOf(o: OrderPlan): Date {
+    return [
+        o.placedAt,
+        ...o.moves.map((m) => m.at),
+        ...(o.edit ? [o.edit.paidAt] : []),
+        ...(o.refund ? [o.refund.at] : []),
+    ].reduce((a, b) => (b > a ? b : a));
+}
+
+/**
+ * Whether an order's lines can be reviewed at `now`: paid, shipped or
+ * delivered, last touched over a day ago — `writeRyeReviews`' query, on the
+ * plan.
+ */
+function canReview(o: OrderPlan, now: Date): boolean {
+    const last = o.moves[o.moves.length - 1] as
+        OrderPlan["moves"][number] | undefined;
+    const status = last ? STATUS_OF[last.to] : undefined;
+    return (
+        o.pay !== "FAILED" &&
+        (status === "SHIPPED" || status === "DELIVERED") &&
+        lastTouchOf(o).getTime() < now.getTime() - DAY
+    );
+}
+
 /** A document before it is numbered. */
-interface DocSpec {
+export interface DocSpec {
     id: string;
     kind: "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
     status: "DRAFT" | "ISSUED" | "PAID";
@@ -1502,7 +1581,7 @@ interface DocSpec {
     createdByUserId: string | null;
 }
 
-interface World {
+export interface World {
     customers: Prisma.CustomerCreateManyInput[];
     contacts: Prisma.ContactCreateManyInput[];
     orders: Prisma.OrderCreateManyInput[];
@@ -1544,7 +1623,7 @@ function counterPayment(rng: Rng): {
     };
 }
 
-function planWorld(input: PlanInput): World {
+export function planWorld(input: PlanInput): World {
     const { now, orgId, demoUserId: owner } = input;
     const storeId = input.stores.H;
     const w: Omit<World, "stock"> = {
@@ -1629,12 +1708,7 @@ function planWorld(input: PlanInput): World {
         const last = o.moves[o.moves.length - 1] as
             OrderPlan["moves"][number] | undefined;
         const stage: Stage = last?.to ?? "NEW";
-        const lastTouch = [
-            o.placedAt,
-            ...o.moves.map((m) => m.at),
-            ...(o.edit ? [o.edit.paidAt] : []),
-            ...(o.refund ? [o.refund.at] : []),
-        ].reduce((a, b) => (b > a ? b : a));
+        const lastTouch = lastTouchOf(o);
 
         w.orders.push({
             id: orderId,
@@ -1736,6 +1810,9 @@ function planWorld(input: PlanInput): World {
 
         // The money: online on a Razorpay intent; at the counter, recorded.
         const intentId = sid("intent", n);
+        // Paid a minute after it was placed — or, just after midnight, when
+        // today's board is all at midnight, at now.
+        const settledAt = earliest(addMinutes(o.placedAt, 1), now);
         const paymentRef = `pay_${hex(payRng, 14)}`;
         if (o.pay !== "RECORDED") {
             const failed = o.pay === "FAILED";
@@ -1749,7 +1826,7 @@ function planWorld(input: PlanInput): World {
                 currency: CURRENCY,
                 status: failed ? "FAILED" : "SUCCEEDED",
                 createdAt: o.placedAt,
-                updatedAt: addMinutes(o.placedAt, 1),
+                updatedAt: settledAt,
             });
             w.attempts.push({
                 id: sid("attempt", n),
@@ -1761,7 +1838,7 @@ function planWorld(input: PlanInput): World {
                 rawResponse: failed
                     ? { error: "BAD_REQUEST_ERROR", reason: "payment_failed" }
                     : undefined,
-                createdAt: addMinutes(o.placedAt, 1),
+                createdAt: settledAt,
             });
         }
         if (o.pay === "FAILED") {
@@ -1770,8 +1847,7 @@ function planWorld(input: PlanInput): World {
         }
 
         // The order's invoice: written when it was paid, as it was placed.
-        const paidAt =
-            o.pay === "ONLINE" ? addMinutes(o.placedAt, 1) : o.placedAt;
+        const paidAt = o.pay === "ONLINE" ? settledAt : o.placedAt;
         const invoiceId = sid("invoice", "order", n);
         const billTo = {
             name: `${shopper.first} ${shopper.last}`,

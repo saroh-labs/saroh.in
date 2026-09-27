@@ -117,7 +117,10 @@ interface Context {
     demoUserId: string;
 }
 
-export async function seedShowcase(): Promise<void> {
+export async function seedShowcase(
+    /** The clock to seed at (`--now=<ISO>`), to prove a date works; else now. */
+    clock: Date = new Date(),
+): Promise<void> {
     const target = assertDatabaseTarget();
     console.log(`[showcase] target: ${target.database} on ${target.host}`);
 
@@ -125,7 +128,11 @@ export async function seedShowcase(): Promise<void> {
     // Rounded down to the half hour: a re-run inside it writes identical rows.
     // Half past and on the hour are both boundaries in Kolkata (UTC+5:30), so
     // a renewal due at local midnight is on the same side of both clocks.
-    const now = new Date(Math.floor(Date.now() / 1_800_000) * 1_800_000);
+    const now = new Date(Math.floor(clock.getTime() / 1_800_000) * 1_800_000);
+    if (Number.isNaN(now.getTime())) {
+        throw new Error("--now is not a date: pass an ISO time");
+    }
+    console.log(`[showcase] now: ${now.toISOString()}`);
     const started = Date.now();
     const jobsBefore = await countJobs(prisma);
 
