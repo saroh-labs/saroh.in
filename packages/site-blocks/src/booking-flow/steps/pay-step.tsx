@@ -2,7 +2,12 @@ import { card } from "../styles";
 import { PayOption } from "./pay-option";
 import { StepHead } from "./step-head";
 
-/** Step 4: how they pay — now online, or at the desk. */
+/**
+ * Step 4: how they pay — now, through the business's own provider (UPI or
+ * card, E11), or at the desk. Pay now is offered only when the business has
+ * a provider connected. The words are the designs': a class is "for this
+ * class", an appointment is paid "now" (Pulse Fitness, Kavi Dental).
+ */
 export function PayStep({
     canPayNow,
     pay,
@@ -23,8 +28,12 @@ export function PayStep({
                 {canPayNow ? (
                     <PayOption
                         on={pay === "NOW"}
-                        label={`Pay ${price} for this ${isClass ? "class" : "session"}`}
-                        sub="UPI or card — your place is confirmed straight away"
+                        label={
+                            isClass
+                                ? `Pay ${price} for this class`
+                                : `Pay ${price} now`
+                        }
+                        sub={`UPI or card — your ${isClass ? "place" : "appointment"} is confirmed straight away`}
                         onPick={() => onPick("NOW")}
                     />
                 ) : null}

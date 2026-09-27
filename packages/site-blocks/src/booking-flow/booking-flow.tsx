@@ -272,7 +272,11 @@ export default function BookingFlow({
                     if (result.status === 404) {
                         setPhase((p) =>
                             p.kind === "paying" && p.token === payingToken
-                                ? { kind: "expired", when: p.when }
+                                ? {
+                                      kind: "expired",
+                                      when: p.when,
+                                      checkoutPaid: p.checkoutPaid,
+                                  }
                                 : p,
                         );
                     }
@@ -303,7 +307,11 @@ export default function BookingFlow({
                         };
                     }
                     if (state === "RELEASED" || state === "CANCELLED") {
-                        return { kind: "expired", when: p.when };
+                        return {
+                            kind: "expired",
+                            when: p.when,
+                            checkoutPaid: p.checkoutPaid,
+                        };
                     }
                     return p;
                 });
@@ -542,13 +550,28 @@ export default function BookingFlow({
                             zone={zone}
                             headingRef={headingRef}
                             serviceName={service?.name ?? ""}
+                            business={page.businessName}
+                            booker={{
+                                name: name.trim(),
+                                email: email.trim(),
+                                phone: phoneNo.trim() || undefined,
+                            }}
                             busy={leaving}
                             onDesk={() => void leaveHold("desk")}
                             onBack={() => void leaveHold("choose")}
+                            onPaid={() =>
+                                setPhase((p) =>
+                                    p.kind === "paying"
+                                        ? { ...p, checkoutPaid: true }
+                                        : p,
+                                )
+                            }
                         />
                     ) : phase.kind === "expired" ? (
                         <ExpiredCard
                             when={phase.when}
+                            business={page.businessName}
+                            checkoutPaid={phase.checkoutPaid}
                             headingRef={headingRef}
                             onAgain={backToChoosing}
                         />

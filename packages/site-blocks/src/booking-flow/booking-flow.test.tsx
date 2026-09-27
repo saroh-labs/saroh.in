@@ -8,7 +8,36 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BookingFlow from "./booking-flow";
+import type { CheckoutOutcome, CheckoutRequest } from "./checkout";
 import type { BookingPageData } from "./model";
+
+/**
+ * The provider's window (E11), stood in for: each one the page opens is
+ * recorded with what it was opened with, and answers when a test says.
+ */
+const checkouts = vi.hoisted(() => ({
+    opened: [] as {
+        request: CheckoutRequest;
+        answer: (outcome: CheckoutOutcome) => void;
+        closed: boolean;
+    }[],
+}));
+vi.mock("./checkout", () => ({
+    openProviderCheckout: (request: CheckoutRequest) => {
+        let answer: (outcome: CheckoutOutcome) => void = () => undefined;
+        const outcome = new Promise<CheckoutOutcome>((resolve) => {
+            answer = resolve;
+        });
+        const made = { request, answer, closed: false };
+        checkouts.opened.push(made);
+        return {
+            outcome,
+            close: () => {
+                made.closed = true;
+            },
+        };
+    },
+}));
 
 /**
  * The booking page's flow in jsdom (U19): what it asks the API, what it
@@ -141,6 +170,7 @@ function serve(handler: Handler) {
 
 const realFetch = globalThis.fetch;
 beforeEach(() => {
+    checkouts.opened = [];
     window.matchMedia = vi.fn(() => ({
         matches: false,
         addEventListener: vi.fn(),
@@ -264,7 +294,7 @@ describe("the booking page (U19)", () => {
                 name: "Pay ₹1,200 to confirm your place",
             }),
         ).toBeInTheDocument();
-        await screen.findByText("Razorpay checkout opens here");
+        await screen.findByText("Pay with UPI or card in the Razorpay window");
         const intent = calls.find((c) => c.url.endsWith("/payment-intent"));
         expect(intent?.url).toBe(`${API}/public/invoices/tok_1/payment-intent`);
         expect(JSON.parse(intent?.init?.body as string)).not.toHaveProperty(
@@ -562,9 +592,7 @@ describe("the booking page (U19)", () => {
         fireEvent.change(screen.getByLabelText("Email"), {
             target: { value: "asha@example.in" },
         });
-        expect(
-            screen.queryByRole("radio", { name: /Pay ₹1,200 for/ }),
-        ).toBeNull();
+        expect(screen.queryByRole("radio", { name: /Pay ₹1,200/ })).toBeNull();
         expect(
             screen.getByRole("button", { name: "Book — pay at the desk" }),
         ).toBeInTheDocument();
@@ -795,7 +823,7 @@ describe("Where and anything we should know (E7)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Razorpay checkout opens here");
+        await screen.findByText("Pay with UPI or card in the Razorpay window");
         expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
 
         holdState = "CONFIRMED";
@@ -808,5 +836,267 @@ describe("Where and anything we should know (E7)", () => {
             ).toBeInTheDocument(),
         );
         expect(screen.getByRole("link", { name: LINK })).toBeInTheDocument();
+    });
+});
+
+describe("UPI and card checkout (E11)", () => {
+    const HANDOFF = {
+        paymentIntentId: "pi_1",
+        provider: "RAZORPAY",
+        providerIntentId: "order_1",
+        amountCents: 120_000,
+        currency: "INR",
+        publicKey: "rzp_live_public",
+        clientParams: { razorpayOrderId: "order_1" },
+    };
+
+    /** A pay-now hold whose state the test moves; the hold's own API. */
+    function servePayNow() {
+        const hold = { state: "HELD" };
+        serve((url) => {
+            if (url.endsWith("/days")) return json(ONE_DAYS);
+            if (url.endsWith("/book")) {
+                return json(
+                    booked({
+                        state: "HELD",
+                        holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                        payToken: "tok_1",
+                    }),
+                    201,
+                );
+            }
+            if (url.endsWith("/payment-intent")) return json(HANDOFF);
+            return json({ state: hold.state, holdExpiresAt: null });
+        });
+        return hold;
+    }
+
+    async function payNow() {
+        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        await chooseOneToOne();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+        );
+        await screen.findByText("Pay with UPI or card in the Razorpay window");
+    }
+
+    const answer = async (outcome: CheckoutOutcome, nth = 0) => {
+        await act(async () => {
+            checkouts.opened[nth]?.answer(outcome);
+            await Promise.resolve();
+        });
+    };
+
+    const poll = async () => {
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(4_500);
+        });
+    };
+
+    it("offers UPI or card in the designs' words: an appointment now, a class for the class", async () => {
+        serve((url) =>
+            url.includes("svc_hiit") ? json(CLASS_DAYS) : json(ONE_DAYS),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        await chooseOneToOne();
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay ₹1,200 now UPI or card — your appointment is confirmed straight away",
+            }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay at the desk Held for you; pay when you arrive",
+            }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
+        fireEvent.click(
+            await screen.findByRole("radio", { name: /18:30.*2 places left/ }),
+        );
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay ₹500 for this class UPI or card — your place is confirmed straight away",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("pays: opens the provider on the hold's order, says Paying… and confirms when the webhook does", async () => {
+        const hold = servePayNow();
+        await payNow();
+
+        expect(checkouts.opened).toHaveLength(1);
+        const { request } = checkouts.opened[0];
+        expect(request.handoff).toMatchObject({
+            provider: "RAZORPAY",
+            providerIntentId: "order_1",
+            publicKey: "rzp_live_public",
+            amountCents: 120_000,
+        });
+        expect(request.business).toBe("Pulse Fitness");
+        expect(request.description).toMatch(/^Personal training · /);
+        expect(request.booker).toEqual({
+            name: "Asha Rao",
+            email: "asha@example.in",
+            phone: undefined,
+        });
+
+        await answer("paid");
+        expect(screen.getByText("Paying…")).toBeInTheDocument();
+        expect(
+            screen.getByText(/Razorpay is confirming your payment/),
+        ).toBeInTheDocument();
+        // Paid, so letting the hold go is no longer offered.
+        expect(
+            screen.queryByRole("button", {
+                name: "Cancel and pick another time",
+            }),
+        ).toBeNull();
+
+        // Still held: the page waits for the webhook, never guesses.
+        await poll();
+        expect(screen.getByText("Paying…")).toBeInTheDocument();
+
+        hold.state = "CONFIRMED";
+        await poll();
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "You're booked, Asha." }),
+            ).toBeInTheDocument(),
+        );
+        expect(screen.getByText("Paid ₹1,200 online.")).toBeInTheDocument();
+        expect(
+            calls.filter((c) => c.url.endsWith("/payment-intent")),
+        ).toHaveLength(1);
+    });
+
+    it("the provider refuses: says so, keeps the hold, and tries again on the same payment", async () => {
+        const hold = servePayNow();
+        await payNow();
+        await answer("failed");
+
+        expect(screen.getByRole("alert")).toHaveTextContent(
+            "The payment didn't go through — try again.",
+        );
+        expect(calls.some((c) => c.url.endsWith("/release"))).toBe(false);
+        expect(
+            screen.getByRole("heading", {
+                name: "Pay ₹1,200 to confirm your place",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Book it to pay at the desk" }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(checkouts.opened).toHaveLength(2);
+        expect(checkouts.opened[1]?.request.handoff.providerIntentId).toBe(
+            "order_1",
+        );
+        expect(
+            calls.filter((c) => c.url.endsWith("/payment-intent")),
+        ).toHaveLength(1);
+        expect(screen.queryByRole("alert")).toBeNull();
+
+        await answer("paid", 1);
+        hold.state = "CONFIRMED";
+        await poll();
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "You're booked, Asha." }),
+            ).toBeInTheDocument(),
+        );
+    });
+
+    it("the window is closed before paying: it can be opened again", async () => {
+        servePayNow();
+        await payNow();
+        await answer("closed");
+
+        expect(
+            screen.getByText("The payment window was closed before you paid"),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Pay ₹1,200" }));
+        expect(checkouts.opened).toHaveLength(2);
+        expect(checkouts.opened[0]?.closed).toBe(true);
+    });
+
+    it("the window can't open: says so, and offers another try", async () => {
+        servePayNow();
+        await payNow();
+        await answer("unavailable");
+
+        expect(screen.getByRole("alert")).toHaveTextContent(
+            "We couldn't open the payment window. Check your connection and try again.",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(checkouts.opened).toHaveLength(2);
+    });
+
+    it("the hold runs out mid-payment: the window closes and the place is let go", async () => {
+        const hold = servePayNow();
+        await payNow();
+
+        hold.state = "RELEASED";
+        await poll();
+        expect(
+            await screen.findByRole("heading", {
+                name: "The time held for you ran out",
+            }),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Nothing was charged\./)).toBeInTheDocument();
+        expect(checkouts.opened[0]?.closed).toBe(true);
+        // A late answer from the window changes nothing.
+        await answer("paid");
+        expect(
+            screen.getByRole("heading", {
+                name: "The time held for you ran out",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("the hold runs out after the window took the money: never says nothing was charged", async () => {
+        const hold = servePayNow();
+        await payNow();
+        await answer("paid");
+
+        hold.state = "RELEASED";
+        await poll();
+        expect(
+            await screen.findByRole("heading", {
+                name: "The time held for you ran out",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /before your payment was confirmed\. If money left your account, get in touch with Pulse Fitness and they can refund it\./,
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Nothing was charged/)).toBeNull();
+    });
+
+    it("no provider connected: Pay now isn't offered and no window opens", async () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={{ ...PAGE, payOnline: false }}
+                apiUrl={API}
+                initialServiceId="svc_pt"
+            />,
+        );
+        fireEvent.click(
+            await screen.findByRole("radio", {
+                name: "07:00 with Karan Mehta",
+            }),
+        );
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Asha Rao" },
+        });
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "asha@example.in" },
+        });
+        expect(screen.queryByText(/UPI or card/)).toBeNull();
+        expect(checkouts.opened).toHaveLength(0);
     });
 });
