@@ -13,6 +13,7 @@ import type { ModuleAvailabilityService } from "../capabilities/module-availabil
 import { AllergensService } from "../catalogue/allergens.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { StoresService } from "../stores/stores.service";
+import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
@@ -35,6 +36,7 @@ const stores = new StoresService(new FeatureFlagService());
 const allergens = new AllergensService();
 const details = new CustomerDetailService(availability);
 const notes = new ContactNotesService();
+const attention = new ContactAttentionService();
 const workspace = new CustomerWorkspaceService(availability);
 
 describe("Customer detail (DB)", () => {
@@ -137,6 +139,9 @@ describe("Customer detail (DB)", () => {
 
     afterAll(async () => {
         const orgIds = [ctx.organizationId, otherOrgId];
+        await prisma.contactAttention.deleteMany({
+            where: { organizationId: { in: orgIds } },
+        });
         await prisma.contactNote.deleteMany({
             where: { organizationId: { in: orgIds } },
         });
@@ -203,7 +208,17 @@ describe("Customer detail (DB)", () => {
             "Nuts is in 1 customer note — take it off them first.",
         );
 
+        // The note put Nuts on Needs attention too (C1); that entry holds
+        // the allergen on the list until it is taken off as well.
         await notes.remove(ctx, contactId, note.id);
+        await expect(
+            allergens.remove(ctx.organizationId, nuts.id),
+        ).rejects.toThrow(
+            "Nuts is on 1 customer's Needs attention — take it off first.",
+        );
+        const [entry] = (await attention.list(ctx, contactId)).entries;
+        expect(entry).toMatchObject({ kind: "ALLERGY", label: "Nuts" });
+        await attention.remove(ctx, contactId, entry.id);
         await expect(
             allergens.remove(ctx.organizationId, nuts.id),
         ).resolves.toEqual({ id: nuts.id, name: "Nuts" });

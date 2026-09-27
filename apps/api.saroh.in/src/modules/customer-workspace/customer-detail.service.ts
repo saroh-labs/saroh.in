@@ -24,6 +24,8 @@ import {
     OWED_WHERE,
 } from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { AttentionEntryView } from "./attention-read";
+import { attentionFor, attentionSuggestionsFor } from "./attention-read";
 import type { ContactNoteView } from "./contact-notes.service";
 import {
     allergenChoices,
@@ -65,6 +67,7 @@ import {
 /** A source of the read, as the merchant would name it when it is missing. */
 export type DetailSource =
     | "notes"
+    | "attention"
     | "linkedCustomers"
     | "possibleMatches"
     | "orders"
@@ -82,6 +85,7 @@ export interface DetailUnavailable {
 
 const LABELS: Record<DetailSource, string> = {
     notes: "Notes",
+    attention: "Needs attention",
     linkedCustomers: "Linked store customers",
     possibleMatches: "Possible matches",
     orders: "Orders",
@@ -307,6 +311,17 @@ export interface CustomerDetail {
      * note's `matchAllergens` instead, which cross storefronts.
      */
     allergens: { id: string; name: string }[] | null;
+    /**
+     * Needs attention (DEC-040, C1), as this viewer may see it: sensitive
+     * entries are left out, and counted, for a role without the sensitive
+     * permission. Suggestions come only to someone who can add them.
+     */
+    attention: {
+        from: "contact";
+        entries: AttentionEntryView[];
+        hiddenSensitiveCount: number;
+        suggestions?: AttentionEntryView[];
+    } | null;
     linkedCustomers?: LinkedCustomer[] | null;
     possibleMatches?: PossibleMatch[] | null;
     orders?: { from: "linked-customers"; rows: DetailOrder[] } | null;
@@ -466,6 +481,7 @@ export class CustomerDetailService {
 
         const [
             notes,
+            attention,
             possibleMatches,
             orders,
             bookings,
@@ -480,6 +496,18 @@ export class CustomerDetailService {
                     loadContactNotes(this.db, organizationId, contactId),
                     allergenChoices(this.db, organizationId),
                 ]),
+            ),
+            attempt("attention", () =>
+                Promise.all([
+                    attentionFor(ctx, [contactId], this.db),
+                    attentionSuggestionsFor(ctx, contactId, this.db),
+                ]).then(([read, suggestions]) => ({
+                    from: "contact" as const,
+                    entries: read.get(contactId)?.entries ?? [],
+                    hiddenSensitiveCount:
+                        read.get(contactId)?.hiddenSensitiveCount ?? 0,
+                    ...(suggestions === undefined ? {} : { suggestions }),
+                })),
             ),
             links === undefined
                 ? skip
@@ -605,6 +633,7 @@ export class CustomerDetailService {
                       }
                     : null,
             allergens: noteRows ? notedAllergens(noteRows) : null,
+            attention,
             ...(links === undefined ? {} : { linkedCustomers: links }),
             ...(possibleMatches === undefined ? {} : { possibleMatches }),
             ...(orders === undefined
