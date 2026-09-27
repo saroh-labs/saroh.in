@@ -154,6 +154,8 @@ export class PublicBookingsController {
                 idempotencyKey: dto.idempotencyKey,
                 staffId: dto.staffId,
                 pay: dto.pay,
+                locationType: dto.locationType,
+                intakeNote: dto.intakeNote,
             },
             hashClientIp(ip),
         );

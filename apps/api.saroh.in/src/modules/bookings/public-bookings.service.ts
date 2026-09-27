@@ -21,6 +21,7 @@ import {
     releaseHoldInTx,
     renewHoldTokenInTx,
 } from "./booking-hold";
+import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import {
     bookingWindowRefusal,
     loadBookingRules,
@@ -291,6 +292,10 @@ export class PublicBookingsService {
             bookingPage: true,
         });
         await assertOrganizationOpen(service.organizationId);
+        // Where and the note are checked before anything is held (E7): an
+        // answer to Where the service can't give, or a note past its length.
+        const place = bookingLocation(service.locationType, input.locationType);
+        intakeNoteOf(input.intakeNote);
 
         // 2. Validate the requested instant is a real, aligned slot start —
         //    with a person when somebody takes the service (U3) — and
@@ -344,7 +349,7 @@ export class PublicBookingsService {
         //    only to the same booker: a key alone does not hand over someone
         //    else's booking (or its meeting link).
         const existing = await bookingByKey(serviceId, input);
-        if (existing) return this.replay(existing, input, now);
+        if (existing) return this.replay(existing, input, place, now);
 
         // 5. Who it is with (U3) — after the replay, so a retried request is
         //    not refused by the person its own first attempt booked.
@@ -362,7 +367,7 @@ export class PublicBookingsService {
             );
         } catch (err) {
             const twin = await bookingByKey(serviceId, input);
-            if (twin) return this.replay(twin, input, now);
+            if (twin) return this.replay(twin, input, place, now);
             throw err;
         }
         if (input.pay === "DESK") person.paidWith = "DESK";
@@ -415,14 +420,15 @@ export class PublicBookingsService {
         );
         // An idempotency race replays the winner, which made its own token.
         if (made.bookingId !== booking.id) {
-            return this.replay(booking, input, now);
+            return this.replay(booking, input, place, now);
         }
         return { booking, payToken: made.payToken };
     }
 
     /**
      * An idempotent replay, to the same booker for the same booking only: the
-     * same email, time, person (when one was asked for) and way of paying.
+     * same email, time, person (when one was asked for), way of paying and
+     * place (when Where was answered, E7).
      * A retry that changed any of them is not the request that booked — the
      * page would show the new time over the old booking. A hold still inside
      * its time gets a fresh pay token (only the first one's hash was kept).
@@ -430,6 +436,7 @@ export class PublicBookingsService {
     private async replay(
         existing: Booking,
         input: BookInput,
+        place: string | null,
         now: Date = new Date(),
     ): Promise<{ booking: Booking; payToken: string | null }> {
         const paidAs =
@@ -444,7 +451,9 @@ export class PublicBookingsService {
             existing.startAt.getTime() !== new Date(input.startAt).getTime() ||
             (input.staffId !== undefined &&
                 existing.staffId !== input.staffId) ||
-            (input.pay !== undefined && paidAs !== input.pay)
+            (input.pay !== undefined && paidAs !== input.pay) ||
+            (input.locationType !== undefined &&
+                existing.locationType !== place)
         ) {
             throw new ConflictException(
                 "That booking was already made. Refresh the page and book again.",

@@ -1,8 +1,13 @@
+import type { BookingWhere } from "../model";
 import { card } from "../styles";
 import { Field } from "./field";
 import { StepHead } from "./step-head";
+import { WhereAndNote } from "./where-and-note";
 
-/** Step 3: who they are. */
+/**
+ * Step 3: who they are, then where (for a service offered either way) and
+ * anything the team should know (E7).
+ */
 export function DetailsStep({
     ids,
     business,
@@ -15,6 +20,11 @@ export function DetailsStep({
     onName,
     onEmail,
     onPhone,
+    asksWhere,
+    where,
+    note,
+    onWhere,
+    onNote,
 }: {
     /** The flow's `useId()`, so each field's id is its own. */
     ids: string;
@@ -28,6 +38,11 @@ export function DetailsStep({
     onName: (value: string) => void;
     onEmail: (value: string) => void;
     onPhone: (value: string) => void;
+    asksWhere: boolean;
+    where: BookingWhere;
+    note: string;
+    onWhere: (where: BookingWhere) => void;
+    onNote: (note: string) => void;
 }) {
     return (
         <div className={card}>
@@ -77,6 +92,15 @@ export function DetailsStep({
                         ? phoneError
                         : null
                 }
+            />
+            <WhereAndNote
+                ids={ids}
+                business={business}
+                asksWhere={asksWhere}
+                where={where}
+                note={note}
+                onWhere={onWhere}
+                onNote={onNote}
             />
         </div>
     );

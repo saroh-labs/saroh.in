@@ -22,7 +22,9 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { payLinkUrl } from "../invoices/pay-link-url";
-import type { BookingDetail, BookingsCalendar } from "./bookings.service";
+import type { WithoutIntakeNote } from "./booking-intake";
+import { withoutIntakeNote } from "./booking-intake";
+import type { BookingDetailView, BookingsCalendar } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
@@ -167,7 +169,7 @@ export class BookingsController {
     listServiceBookings(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
-    ): Promise<Booking[]> {
+    ): Promise<WithoutIntakeNote<Booking>[]> {
         return this.bookings.listBookings(ctx, serviceId);
     }
 
@@ -178,8 +180,12 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
         @Body() dto: BookByHandDto,
-    ): Promise<Booking> {
-        return this.bookings.bookByHand(ctx, serviceId, dto);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        // A booking's note is sensitive (E7): an answer that changes a
+        // booking never carries it; only the detail read does, gated.
+        return this.bookings
+            .bookByHand(ctx, serviceId, dto)
+            .then(withoutIntakeNote);
     }
 
     /**
@@ -192,7 +198,7 @@ export class BookingsController {
     getBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
-    ): Promise<BookingDetail> {
+    ): Promise<BookingDetailView> {
         return this.bookings.getBooking(ctx, bookingId);
     }
 
@@ -205,8 +211,10 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Body() dto: RescheduleBookingDto,
-    ): Promise<Booking> {
-        return this.bookings.rescheduleBooking(ctx, bookingId, dto);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .rescheduleBooking(ctx, bookingId, dto)
+            .then(withoutIntakeNote);
     }
 
     /**
@@ -220,8 +228,10 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Body() dto: RecordOutcomeDto,
-    ): Promise<Booking> {
-        return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .recordOutcome(ctx, bookingId, dto.outcome)
+            .then(withoutIntakeNote);
     }
 
     /**
@@ -249,9 +259,11 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
-    ): Promise<Booking> {
-        return this.bookings.cancelBooking(ctx, bookingId, undefined, {
-            returnCredit: returnCredit === "true",
-        });
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .cancelBooking(ctx, bookingId, undefined, {
+                returnCredit: returnCredit === "true",
+            })
+            .then(withoutIntakeNote);
     }
 }

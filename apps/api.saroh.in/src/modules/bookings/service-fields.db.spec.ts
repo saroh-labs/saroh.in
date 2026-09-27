@@ -112,8 +112,8 @@ describe("service fields (E1, real database)", () => {
 
         const page = await publicBookings.publicBookingPage(siteId);
         const shown = page.services.find((s) => s.id === made.id);
-        // Either books as in person until the page asks Where (E7).
-        expect(shown).toMatchObject({ online: false });
+        // Either isn't online-only; the page asks Where for it (E7).
+        expect(shown).toMatchObject({ online: false, where: "EITHER" });
         const [listItem] = await publicBookings.publicServices([made.id]);
         for (const pub of [shown, listItem]) {
             expect(pub).toBeDefined();

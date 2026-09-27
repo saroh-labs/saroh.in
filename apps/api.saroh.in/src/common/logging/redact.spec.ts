@@ -61,6 +61,15 @@ describe("redactObject", () => {
         expect(out.items[1].sku).toBe("ok");
     });
 
+    it("redacts a booking page's intake note (E7)", () => {
+        const out = redactObject({
+            bookerName: "Asha",
+            intakeNote: "I take blood thinners",
+        }) as Record<string, unknown>;
+        expect(out.intakeNote).toBe(REDACTED);
+        expect(out.bookerName).toBe("Asha");
+    });
+
     it("passes primitives through untouched", () => {
         expect(redactObject("hello")).toBe("hello");
         expect(redactObject(42)).toBe(42);

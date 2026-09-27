@@ -3695,6 +3695,12 @@ model Booking {
   // A booking-page note waiting to become Needs attention (C1, C12).
   attentionSuggestions ContactAttention[]
 
+  // The booking page's "Anything we should know?" (E7): at most 1,000
+  // characters, CHECKed. Sensitive: served only to someone who may see
+  // sensitive Needs attention, never in a list read, kept out of logs and
+  // out of the snapshot. C12 turns it into a Needs attention suggestion.
+  intakeNote String?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])

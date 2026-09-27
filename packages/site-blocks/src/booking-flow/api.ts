@@ -1,4 +1,4 @@
-import type { BookingDays, BookResult, HoldView } from "./model";
+import type { BookingDays, BookingWhere, BookResult, HoldView } from "./model";
 import { isBookingDays, isBookResult, isHoldView } from "./model";
 
 /**
@@ -86,6 +86,10 @@ export interface BookRequest {
     idempotencyKey: string;
     staffId?: string;
     pay: "NOW" | "DESK";
+    /** The answer to Where, for a service offered either way (E7). */
+    locationType?: BookingWhere;
+    /** "Anything we should know?" (E7), when they wrote something. */
+    intakeNote?: string;
 }
 
 /** Book it. No amount is ever sent: the price is the service's, on the server. */

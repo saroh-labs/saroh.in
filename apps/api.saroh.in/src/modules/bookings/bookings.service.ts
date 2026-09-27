@@ -25,6 +25,8 @@ import {
     lockBookingInTx,
     releaseHoldInTx,
 } from "./booking-hold";
+import type { WithoutIntakeNote } from "./booking-intake";
+import { intakeNoteFor } from "./booking-intake";
 import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
 import { isLateCancel, loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
@@ -92,6 +94,13 @@ const bookingDetailInclude = {
 export type BookingDetail = Prisma.BookingGetPayload<{
     include: typeof bookingDetailInclude;
 }>;
+
+/**
+ * One booking as staff read it: with the booker's intake note (E7) only for
+ * someone who may see sensitive Needs attention (`intakeNoteFor`).
+ */
+export type BookingDetailView =
+    BookingDetail | WithoutIntakeNote<BookingDetail>;
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -495,6 +504,9 @@ export class BookingsService {
                 organizationId: ctx.organizationId,
                 ...(serviceId ? { serviceId } : {}),
             },
+            // A list never carries the booker's note (E7): it is sensitive,
+            // and read one booking at a time behind its gate.
+            omit: { intakeNote: true },
             orderBy: { startAt: "desc" },
             include: {
                 contact: {
@@ -753,13 +765,15 @@ export class BookingsService {
     async getBooking(
         ctx: OrganizationContext,
         bookingId: string,
-    ): Promise<BookingDetail> {
+    ): Promise<BookingDetailView> {
         authorize(ctx, "booking:read");
         await this.requireOwnedBooking(ctx, bookingId);
-        return prisma.booking.findUniqueOrThrow({
+        const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: bookingId },
             include: bookingDetailInclude,
         });
+        // The booker's note (E7) only behind C1's sensitive gate.
+        return intakeNoteFor(ctx, booking);
     }
 
     /**

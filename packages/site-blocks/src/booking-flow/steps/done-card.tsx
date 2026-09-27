@@ -8,12 +8,18 @@ export function DoneCard({
     phase,
     headingRef,
     business,
+    where,
     rules,
     onAgain,
 }: {
     phase: Extract<Phase, { kind: "done" }>;
     headingRef: React.RefObject<HTMLHeadingElement | null>;
     business: string;
+    /**
+     * Where it happens — "At Kavi Dental" or "Video call" (E7) — or null
+     * for a business that only ever meets in person.
+     */
+    where: string | null;
     rules: BookingPageData["rules"];
     onAgain: () => void;
 }) {
@@ -24,7 +30,9 @@ export function DoneCard({
             title: `${booking.serviceName} · ${business}`,
             startAt: booking.startAt,
             endAt: booking.endAt,
-            description: changeText(business, rules),
+            description: booking.meetingUrl
+                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules)}`
+                : changeText(business, rules),
         });
         const url = URL.createObjectURL(
             new Blob([ics], { type: "text/calendar;charset=utf-8" }),
@@ -56,7 +64,9 @@ export function DoneCard({
                 You&apos;re booked{phase.first ? `, ${phase.first}` : ""}.
             </h2>
             <p className="text-site-fg text-[15px] leading-[1.55] opacity-90">
-                {booking.serviceName} · {phase.when}
+                {[booking.serviceName, where, phase.when]
+                    .filter(Boolean)
+                    .join(" · ")}
             </p>
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 {payText}
