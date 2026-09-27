@@ -19,6 +19,7 @@ import {
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
+import type { LocationType } from "./dto";
 import { loadBookableService } from "./reservation";
 import {
     businessTimezone,
@@ -87,7 +88,13 @@ export interface PublicBookingPage {
         capacity: number;
         priceCents: number | null;
         currency: string | null;
+        /** Online only. A service offered either way is not (see `where`). */
         online: boolean;
+        /**
+         * Where it happens: IN_PERSON, ONLINE, or EITHER — the booker
+         * chooses, and the page asks Where (E7).
+         */
+        where: LocationType;
         /** Who takes it, by display name. */
         staff: string[];
     }[];
@@ -293,8 +300,13 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
-            // EITHER books as in person until the page asks Where (E7).
             online: svc.locationType === "ONLINE",
+            // The page asks Where for EITHER (E7); anything unknown reads
+            // as in person, which asks nothing and shows no link.
+            where:
+                svc.locationType === "ONLINE" || svc.locationType === "EITHER"
+                    ? svc.locationType
+                    : "IN_PERSON",
             staff: svc.staffServices
                 .map((row) => row.staff.name)
                 .sort((a, b) => a.localeCompare(b)),
@@ -363,9 +375,11 @@ export async function takesOnlinePayment(
 
 /**
  * What a public booking answers with (ADR-007): the booker's own booking and
- * nothing else — never the row, which carries the organization, the contact
- * and the IP hash. Read from the booking's frozen snapshot, so the first
- * answer and an idempotent replay are the same shape and the same link.
+ * nothing else — never the row, which carries the organization, the contact,
+ * the IP hash and the booker's own note (E7). Read from the booking's frozen
+ * snapshot, so the first answer and an idempotent replay are the same shape
+ * and the same link. Where it happens is the booking's own answer when it
+ * has one (a service offered either way, E7), else the service's.
  */
 export interface PublicBooking {
     reference: string;
@@ -382,6 +396,7 @@ export function toPublicBooking(booking: {
     endAt: Date;
     snapshot: unknown;
     status?: string;
+    locationType?: string | null;
 }): PublicBooking {
     const service = (
         booking.snapshot as {
@@ -392,7 +407,9 @@ export function toPublicBooking(booking: {
             };
         } | null
     )?.service;
-    const online = service?.locationType === "ONLINE";
+    const online = booking.locationType
+        ? booking.locationType === "ONLINE"
+        : service?.locationType === "ONLINE";
     return {
         reference: booking.id,
         startAt: booking.startAt.toISOString(),
@@ -407,7 +424,7 @@ export function toPublicBooking(booking: {
         meetingUrl:
             online &&
             booking.status === "CONFIRMED" &&
-            typeof service.meetingUrl === "string"
+            typeof service?.meetingUrl === "string"
                 ? service.meetingUrl
                 : null,
     };

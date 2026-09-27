@@ -24,8 +24,9 @@ export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 /**
  * Where a service happens (ADR-007). ONLINE carries a meeting link that the
  * person who booked is shown; IN_PERSON has none. EITHER (E1) lets the
- * customer choose per booking, so it carries the link too; until the booking
- * page asks Where (E7), an EITHER service books as in person.
+ * customer choose per booking, so it carries the link too. The booking page
+ * asks Where (E7) and the answer goes on the booking; a booking that says
+ * nothing is in person.
  */
 export const LOCATION_TYPES = ["IN_PERSON", "ONLINE", "EITHER"] as const;
 export type LocationType = (typeof LOCATION_TYPES)[number];
@@ -51,6 +52,15 @@ export type DepositMode = (typeof DEPOSIT_MODES)[number];
 export const MAX_SERVICE_VISITS = 12;
 
 const VISITS_MESSAGE = `Visits has to be between 1 and ${MAX_SERVICE_VISITS}.`;
+
+/**
+ * The longest "Anything we should know?" the booking page keeps (E7,
+ * default 110). The database CHECKs it too.
+ */
+export const MAX_INTAKE_NOTE = 1000;
+
+export const INTAKE_NOTE_MESSAGE =
+    "Keep the note to 1,000 characters or fewer.";
 
 /**
  * How an appointment went (#241). Declared here beside the other closed sets
@@ -379,6 +389,27 @@ export class BookServiceDto {
     @IsOptional()
     @IsIn(["NOW", "DESK"])
     pay?: "NOW" | "DESK";
+
+    /**
+     * Where it happens, for a service offered either way (E7): the booker's
+     * answer to Where. Absent: in person. For any other service it may only
+     * say what the service says.
+     */
+    @IsOptional()
+    @IsIn(BOOKING_LOCATION_TYPES, {
+        message: "Where has to be in person or online.",
+    })
+    locationType?: BookingLocationType;
+
+    /**
+     * "Anything we should know?" (E7): optional, at most 1,000 characters.
+     * Sensitive — kept on the booking, never in its snapshot or a log.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
+    intakeNote?: string;
 }
 
 /**

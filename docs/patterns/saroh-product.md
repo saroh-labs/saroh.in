@@ -116,6 +116,12 @@ pattern files refer back here.
 - **Adopted** — The booker and the merchant hear about a new or moved booking.
   Not true yet: `booking.notify` has no handler (`backend-jobs.md`, known gaps).
   Don't write copy that promises a confirmation message.
+- **Current** — The booking page asks Where only for a service offered
+  either way, and records the answer on the booking (`Booking.locationType`);
+  the meeting link shows only on an online booking. "Anything we should
+  know?" is kept on the booking as a sensitive note (E7, default 110): only
+  someone who may see sensitive Needs attention reads it, one booking at a
+  time — never in a list, the snapshot, a job or a log.
 - **Current** — A booking made by hand follows the booking page's rules: a
   real open slot, the same serializable capacity check, and its history names
   who on the team made it (#384).

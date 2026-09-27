@@ -12,8 +12,9 @@ import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace } from "./booking-hold";
+import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { courseSeatsHeld } from "./course-seats";
-import type { PaidWith } from "./dto";
+import type { BookingLocationType, PaidWith } from "./dto";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -36,6 +37,16 @@ export interface BookInput {
      * pay on the day. Absent — the one-service booking block — books as before.
      */
     pay?: "NOW" | "DESK";
+    /**
+     * Where, for a service offered either way (E7). Absent: in person. See
+     * {@link bookingLocation}.
+     */
+    locationType?: BookingLocationType;
+    /**
+     * "Anything we should know?" (E7). Kept on the booking only — never in
+     * its snapshot, its job payload or a log.
+     */
+    intakeNote?: string;
 }
 
 /** Who a booking is with and how it is paid, for {@link reserveInTx}. */
@@ -283,6 +294,12 @@ export async function reserveInTx(
             bookerPhone: input.bookerPhone ?? null,
             idempotencyKey: input.idempotencyKey ?? null,
             courseEnrollmentId: course?.enrollmentId ?? null,
+            // Where it happens and what the booker told the team (E7).
+            locationType: bookingLocation(
+                service.locationType,
+                input.locationType,
+            ),
+            intakeNote: intakeNoteOf(input.intakeNote),
             ...(person
                 ? {
                       staffId: person.staffId,

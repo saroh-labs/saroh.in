@@ -45,6 +45,9 @@ export const SENSITIVE_FIELDS = new Set<string>([
     "cvv",
     "cvc",
     "ssn",
+    // What a booker tells the team on the booking page (E7): medicines,
+    // allergies, pregnancy. Sensitive, so never logged.
+    "intakenote",
 ]);
 
 /** Cap recursion so a hostile/cyclic-ish payload can't blow the stack. */

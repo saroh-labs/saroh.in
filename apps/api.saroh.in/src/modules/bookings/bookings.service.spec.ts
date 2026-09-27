@@ -1438,7 +1438,7 @@ describe("service fields: visits, Either, deposit, booking page (E1)", () => {
             });
         });
 
-        it("books as in person until the page asks Where (E7): no link on the booking", async () => {
+        it("books as in person when the booker doesn't say where (E7): no link on the booking", async () => {
             wireBookHappyPath();
             serviceFindUnique.mockResolvedValue({
                 ...SERVICE,
@@ -1461,7 +1461,7 @@ describe("service fields: visits, Either, deposit, booking page (E1)", () => {
                 "iphash",
             );
             expect(bookingCreate.mock.calls[0][0].data.locationType).toBe(
-                undefined,
+                "IN_PERSON",
             );
             const { toPublicBooking } = await import("./public-booking-page");
             expect(toPublicBooking(booking)).toMatchObject({
