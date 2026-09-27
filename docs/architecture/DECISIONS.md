@@ -437,12 +437,19 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-045 Orders carry a fulfilment type, shipping records the courier and tracking number, and each storefront sets when its orders are late
 
-**Status: Accepted — 2026-09-26; amended 2026-09-27 (late rule per storefront)** — round-2 plan B · amends [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) "The kitchen stage sits under the order status" (collect or delivery)
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (late rule per storefront; how the enum migrates, see the notes)** — round-2 plan B · amends [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) "The kitchen stage sits under the order status" (collect or delivery)
 
 - Context: today an order is Collect or Delivery, with a typed tracking link. The Orders designs have Pick-up, Local delivery, Shipping, Digital, and Appointment in person or online, each with its own steps and late rule.
 - Decision: **an order has one of six fulfilment types**: Pick-up, Local delivery, Shipping, Digital, Appointment (in person) and Appointment (online). Each has its own steps under the order status, its own "late" rule and the stages it may use. **Shipping records the courier's name and the tracking number**, with an optional link. **Saroh does not book couriers**, so "Book pickup" is dropped. How an order is fulfilled can change until it is handed over. **When an order counts as late is a storefront setting** (2026-09-27): one threshold per fulfilment type the storefront offers — Pick-up, Local delivery and Shipping — measured from when the order was placed, in hours with minutes allowed for a counter. The defaults are 2 hours, 24 hours and 48 hours; a café-like storefront may set 20 minutes. Digital is never late, and an appointment is judged by its visits. The API computes "late" from the order's storefront's setting.
 - Consequences: Collect becomes Pick-up and Delivery becomes Local delivery, and the existing stages stay. An appointment order is fulfilled by its visits (bookings).
 - Migration: widen the fulfilment enum and add courier and tracking-number columns; existing orders keep their meaning. Three late thresholds on the storefront's settings, defaulting to 2, 24 and 48 hours for every storefront, existing ones included.
+- Amendment notes (2026-09-27, plan B deepened after review; the decision above stands):
+    - **The enum changes by expand and contract, not by renaming values in place.** Release 1 adds the new values beside COLLECT and DELIVERY, reads both and still writes today's; release 2 moves existing rows to PICKUP and LOCAL_DELIVERY and writes only the new values; release 3 drops COLLECT and DELIVERY. Each release keeps the API that is still serving during its migration working, keeps the separately deployed app working, and can be rolled back by deploying the previous tag. The steps are in plan B (B2a, B2c, B2d) and a rollout checklist in `docs/architecture/`.
+    - **A Local delivery order already handed to a courier** on the day of the switch keeps its stage and moves on to Delivered.
+    - **"Placed" means the order's `createdAt`**, and the late clock starts there for every order, online and pay-later ones included.
+    - **Which types a storefront offers** is one setting on the storefront (Pick-up, Local delivery, Shipping). Digital and the appointment types follow the product.
+    - **Changing how an order is fulfilled takes a delivery amount typed by staff.** There is no delivery fee per storefront yet; the shop's checkout brings one later.
+    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email.
 
 ## DEC-046 Brand and fonts are their own track, and Saroh's fonts stop reaching merchant sites now
 
