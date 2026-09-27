@@ -64,6 +64,14 @@ export interface RegisteredAddress {
     stateName: string | null;
 }
 
+/** The checklist's facts (`OrganizationSettings.setup`). */
+export interface SetupFacts {
+    products: number;
+    services: number;
+    sites: number;
+    sitesNotLive: number;
+}
+
 export interface OrganizationSettings {
     id: string;
     name: string;
@@ -71,6 +79,13 @@ export interface OrganizationSettings {
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
+    /**
+     * What the take-money checklist ticks, counted by the API: products and
+     * services not archived, websites, and those with nothing published now.
+     * Absent from an API older than it; the checklist then reads the
+     * modules' readiness as before.
+     */
+    setup?: SetupFacts;
     /** Absent only from an API older than GST (U5). */
     tax?: TaxSettings;
     /** Absent only from an API older than the registered address. */

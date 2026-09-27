@@ -1,5 +1,8 @@
 import type { ModuleView } from "@/lib/modules/schema";
-import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import type {
+    OrganizationSettings,
+    SetupFacts,
+} from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
@@ -177,8 +180,16 @@ function tax(
  * A first product or service. Done once either list has one; it applies only
  * while something that lists them is on, and what it asks for follows what
  * is on.
+ *
+ * Done is the API's count when it sends one (H-5): Commerce's readiness is
+ * satisfied by a storefront alone, so reading it ticked "first product" for
+ * a business with a storefront and nothing in it. An older API sends no
+ * count, and the blockers are read as before.
  */
-function catalogue(modules: readonly ModuleView[]): Check | null {
+function catalogue(
+    modules: readonly ModuleView[],
+    facts: SetupFacts | undefined,
+): Check | null {
     const sells = on(modules, "COMMERCE");
     const books = on(modules, "APPOINTMENTS");
     if (!sells && !books) return null;
@@ -186,9 +197,16 @@ function catalogue(modules: readonly ModuleView[]): Check | null {
         modules
             .find((m) => m.key === key)
             ?.blockers.some((b) => b.code === code) ?? false;
-    const hasProduct = sells && !blocked("COMMERCE", "COMMERCE_NO_CATALOG");
+    const hasProduct =
+        sells &&
+        (facts
+            ? facts.products > 0
+            : !blocked("COMMERCE", "COMMERCE_NO_CATALOG"));
     const hasService =
-        books && !blocked("APPOINTMENTS", "APPOINTMENTS_NO_SERVICE");
+        books &&
+        (facts
+            ? facts.services > 0
+            : !blocked("APPOINTMENTS", "APPOINTMENTS_NO_SERVICE"));
     const left = !hasProduct && !hasService;
 
     if (books && !sells) {
@@ -220,7 +238,17 @@ function catalogue(modules: readonly ModuleView[]): Check | null {
     };
 }
 
-function site(modules: readonly ModuleView[]): Check | null {
+/**
+ * Publishing the site. Done is the API's fact when it sends one (H-6): a
+ * site exists and none is without something published now — the same fact
+ * Home's "Your site isn't live" reads. Readiness counts any publication
+ * ever made, so a site taken down still ticked it. An older API sends no
+ * fact, and the blockers are read as before.
+ */
+function site(
+    modules: readonly ModuleView[],
+    facts: SetupFacts | undefined,
+): Check | null {
     // The website is off: nothing to publish, so the step does not apply.
     if (!on(modules, "WEBSITE")) return null;
     const blocker = modules
@@ -230,14 +258,19 @@ function site(modules: readonly ModuleView[]): Check | null {
                 b.code === "WEBSITE_NO_PUBLICATION" ||
                 b.code === "WEBSITE_NO_SITE",
         );
+    const left = facts
+        ? facts.sites === 0 || facts.sitesNotLive > 0
+        : blocker !== undefined;
     return {
         key: "site",
         label: "Publish your site",
         why: "Nobody can find you until it's live.",
         cta: "Publish site",
-        href: blocker?.actionHref ?? "/sites",
+        href:
+            blocker?.actionHref ??
+            (facts?.sites === 0 ? "/sites/new" : "/sites"),
         broken: false,
-        left: blocker !== undefined,
+        left,
     };
 }
 
@@ -257,7 +290,7 @@ export function readyChecklist({
 }: {
     settings: Pick<
         OrganizationSettings,
-        "tax" | "profile" | "registeredAddress"
+        "tax" | "profile" | "registeredAddress" | "setup"
     >;
     modules: readonly ModuleView[] | null;
 }): ReadyChecklist {
@@ -266,8 +299,8 @@ export function readyChecklist({
         // Absent from an API older than the registered address: unknown.
         settings.registeredAddress ? address(settings.registeredAddress) : null,
         tax(settings),
-        modules ? catalogue(modules) : null,
-        modules ? site(modules) : null,
+        modules ? catalogue(modules, settings.setup) : null,
+        modules ? site(modules, settings.setup) : null,
     ].filter((c): c is Check => c !== null);
 
     const steps: ReadyStep[] = checks.map(({ left, ...item }) => ({
