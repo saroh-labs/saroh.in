@@ -1,12 +1,45 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { OrgRole } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
-import type { OrgAction } from "../organizations/organization-actions";
-import { can } from "../organizations/organization-policy";
+import { StockChecksService } from "../stock/stock-checks.service";
+import type {
+    HomeAction,
+    HomeBooking,
+    HomeEvidence,
+    HomeInput,
+    HomeModel,
+    HomeNumber,
+    HomeSeverity,
+    HomeUnavailable,
+} from "./home-model";
+import { EVIDENCE_LIMIT, holds, personName } from "./home-model";
+import { failedRenewals, overdueInvoices } from "./home-money-sources";
+import { sitesNotLive, stockShort } from "./home-site-stock-sources";
+
+export type {
+    HomeAction,
+    HomeBooking,
+    HomeEvidence,
+    HomeInput,
+    HomeModel,
+    HomeNumber,
+    HomeSeverity,
+    HomeTone,
+    HomeUnavailable,
+} from "./home-model";
+
+const SEVERITY_RANK: Record<HomeSeverity, number> = {
+    ATTENTION: 0,
+    OVERDUE: 1,
+    SETUP: 2,
+    SUGGESTION: 3,
+};
+
+/** How far ahead the schedule band looks. */
+const UPCOMING_LIMIT = 8;
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -36,149 +69,6 @@ import { can } from "../organizations/organization-policy";
  * capped ({@link EVIDENCE_LIMIT}) and always ordered oldest-first: the thing
  * that has waited longest is the thing most likely to be a problem.
  */
-export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
-
-const SEVERITY_RANK: Record<HomeSeverity, number> = {
-    ATTENTION: 0,
-    OVERDUE: 1,
-    SETUP: 2,
-    SUGGESTION: 3,
-};
-
-/**
- * How many rows of evidence an action carries. Five is what fits on Home
- * without turning it into the list screen it links to; `count` still reports the
- * true total, so "5 of 23" is expressible and nothing is silently hidden.
- */
-const EVIDENCE_LIMIT = 5;
-
-/** How far ahead the schedule band looks. */
-const UPCOMING_LIMIT = 8;
-
-/**
- * One concrete row behind an action's count.
- *
- * `amountMinor` is in MINOR units and `currency` may be null, because the two
- * sources disagree and pretending otherwise would print wrong money: an Order
- * stores a Decimal with an explicit currency, while a CRM Lead stores a bare
- * integer with no currency at all. A null currency means "this number has no
- * stated currency" and the client must render it without a symbol — not guess
- * one from the locale.
- */
-export interface HomeEvidence {
-    id: string;
-    /** The thing itself — a lead's title, an order's number. */
-    title: string;
-    /** Who it concerns, when known. */
-    subtitle: string | null;
-    /** ISO instant this row is measured from: due date, or placed date. */
-    at: string | null;
-    amountMinor: number | null;
-    currency: string | null;
-    href: string;
-}
-
-export interface HomeAction {
-    code: string;
-    title: string;
-    href: string;
-    severity: HomeSeverity;
-    moduleKey?: string;
-    /** The true total behind the action, which may exceed `evidence.length`. */
-    count?: number;
-    evidence?: HomeEvidence[];
-}
-
-/**
- * A booking on the schedule band.
- *
- * `timezone` travels with every row rather than being resolved here: a booking
- * is stored in absolute UTC plus the zone the booker saw, and an Organization
- * has no single timezone to fold them into. Deciding server-side what counts as
- * "today" would be wrong for any merchant whose bookers are not in their zone,
- * so the client groups by each booking's own day.
- */
-export interface HomeBooking {
-    id: string;
-    startAt: string;
-    endAt: string;
-    timezone: string;
-    serviceName: string;
-    who: string | null;
-    status: string;
-    href: string;
-}
-
-/**
- * A count that is a destination.
- *
- * Every number on Home links to the exact rows it counts — `href` carries the
- * filter, not just the screen. A tile that states "12 open leads" and lands on
- * an unfiltered list has made the merchant do the filtering twice.
- */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
-}
-
-/**
- * A part of Home that could not be read.
- *
- * The difference between "you have no open orders" and "we could not find out
- * whether you have open orders" is the whole of PRODUCT_STRATEGY §30, and the
- * client cannot render a difference the API does not express.
- */
-export interface HomeUnavailable {
-    /** Module key the failed source belongs to, e.g. `COMMERCE`. */
-    moduleKey: string;
-    /** What the merchant would call it, e.g. "Open orders". */
-    label: string;
-}
-
-export interface HomeModel {
-    actions: HomeAction[];
-    primaryAction: HomeAction | null;
-    hasAnyModule: boolean;
-    /** Confirmed bookings from now forward; the client groups them by day. */
-    upcoming: HomeBooking[];
-    numbers: HomeNumber[];
-    /**
-     * Sources that failed. Empty on a healthy read. Non-empty means what is
-     * shown is INCOMPLETE, and Home must say so rather than presenting the
-     * subset as the whole picture (§30).
-     */
-    unavailable: HomeUnavailable[];
-}
-
-export interface HomeInput {
-    organizationId: string;
-    organizationRole: OrgRole;
-    /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
-    organizationActions?: ReadonlySet<OrgAction>;
-    projectId?: string;
-}
-
-/** A person's display name from optional name parts, falling back to email. */
-function personName(person: {
-    firstName?: string | null;
-    lastName?: string | null;
-    email?: string | null;
-}): string | null {
-    const full = [person.firstName, person.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-    if (full) return full;
-    // NOT `?? null`: an email of "" is not nullish, so `??` would return the
-    // empty string and the caller would render a blank line where it expects
-    // either a name or a deliberate absence.
-    const email = person.email?.trim();
-    return email !== undefined && email.length > 0 ? email : null;
-}
-
 @Injectable()
 export class HomeService {
     private readonly logger = new Logger(HomeService.name);
@@ -186,6 +76,9 @@ export class HomeService {
     constructor(
         private readonly availability: ModuleAvailabilityService,
         @Optional() private readonly db: typeof prisma = prisma,
+        // Optional so a spec can build Home without the stock module; the
+        // app always injects it, and without it the stock row is not read.
+        @Optional() private readonly stockChecks?: StockChecksService,
     ) {}
 
     /**
@@ -283,9 +176,7 @@ export class HomeService {
         // Reaching CRM is not reading leads: since DEC-020 a Member reaches the
         // module for contacts and holds no `lead:read`, so the two lead bands
         // below ask for the action rather than the module.
-        const canReadLeads = input.organizationActions
-            ? input.organizationActions.has("lead:read")
-            : can(input.organizationRole, "lead:read");
+        const canReadLeads = holds(input, "lead:read");
         const numbers: HomeNumber[] = [];
         let upcoming: HomeBooking[] = [];
 
@@ -408,9 +299,7 @@ export class HomeService {
         // Shown wherever Payments is available — a business that has since
         // disconnected its provider still owes the refund — and only to
         // people who can read invoices.
-        const canReadInvoices = input.organizationActions
-            ? input.organizationActions.has("invoice:read")
-            : can(input.organizationRole, "invoice:read");
+        const canReadInvoices = holds(input, "invoice:read");
         if (available.has("PAYMENTS") && canReadInvoices) {
             const owed = await this.attempt(
                 { moduleKey: "PAYMENTS", label: "Payments to refund" },
@@ -434,6 +323,75 @@ export class HomeService {
                     count: owed.count,
                     evidence: owed.evidence,
                 });
+            }
+        }
+
+        // Renewals that haven't been paid, and invoices past due (F1). Like
+        // refunds owed, they show wherever Payments is available: the money
+        // is owed whether or not a provider is connected today. Each asks
+        // for its own read, so a role holding one sees only that one.
+        if (available.has("PAYMENTS") && holds(input, "subscription:read")) {
+            const renewals = await this.attempt(
+                { moduleKey: "PAYMENTS", label: "Failed renewals" },
+                () =>
+                    failedRenewals(
+                        this.db,
+                        input.organizationId,
+                        now,
+                        canReadInvoices,
+                    ),
+                null,
+                unavailable,
+            );
+            if (renewals) actions.push(renewals);
+        }
+        if (available.has("PAYMENTS") && canReadInvoices) {
+            const overdue = await this.attempt(
+                { moduleKey: "PAYMENTS", label: "Overdue invoices" },
+                () => overdueInvoices(this.db, input.organizationId, now),
+                null,
+                unavailable,
+            );
+            if (overdue) actions.push(overdue);
+        }
+
+        // Shelves short for open orders (F1): the Stock screen's own checks.
+        const stockChecks = this.stockChecks;
+        if (
+            available.has("COMMERCE") &&
+            holds(input, "store:read") &&
+            stockChecks
+        ) {
+            const short = await this.attempt(
+                { moduleKey: "COMMERCE", label: "Stock" },
+                () => stockShort(this.db, stockChecks, input.organizationId),
+                null,
+                unavailable,
+            );
+            if (short) actions.push(short);
+        }
+
+        // Websites that aren't live (F1). Not for a Reviewer: they are asked
+        // to look at named sites, and their Home is its own view (F9).
+        if (
+            available.has("WEBSITE") &&
+            holds(input, "site:read") &&
+            input.organizationRole !== "REVIEWER"
+        ) {
+            const notLive = await this.attempt(
+                { moduleKey: "WEBSITE", label: "Website" },
+                () => sitesNotLive(this.db, input.organizationId),
+                null,
+                unavailable,
+            );
+            if (notLive) {
+                // It names the sites, so readiness's general "Publish your
+                // site to go live" would say the same thing twice.
+                const setup = actions.findIndex(
+                    (a) => a.code === "WEBSITE_SETUP",
+                );
+                if (setup >= 0) actions.splice(setup, 1);
+                actions.push(notLive);
             }
         }
 
