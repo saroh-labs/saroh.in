@@ -3,7 +3,9 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
+import { pauseEndedWhere, refusedPauseIds } from "./pause-until";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import type { RenewOutcome } from "./subscriptions.service";
 import { SubscriptionsService } from "./subscriptions.service";
 
 export { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
@@ -36,6 +38,11 @@ export const RENEW_ROUNDS = 25;
  * Businesses with Payments switched off are skipped until it is back on —
  * disabling a module stops new activity (ADR-003) — except that a
  * subscription set to end still ends, paused or not.
+ *
+ * A pause with an end date (D8) is picked up on that date and resumed, as a
+ * manual resume would. A resume that would restart billing with Payments off
+ * is refused and left paused (`pause-until.ts`), and once refused it is not
+ * fetched again until Payments is back on.
  */
 @Injectable()
 export class SubscriptionRenewHandler {
@@ -71,22 +78,27 @@ export class SubscriptionRenewHandler {
      */
     async renewDue(now: Date): Promise<boolean> {
         const seen: string[] = [];
-        const counts = {
+        // Pauses already refused for Payments being off would sort first
+        // every time and change nothing, so they sit out (review S-4).
+        const refused = await refusedPauseIds(prisma, now);
+        const counts: Record<RenewOutcome | "failed", number> = {
             renewed: 0,
             advanced: 0,
             uncharged: 0,
             ended: 0,
             skipped: 0,
+            resumed: 0,
+            refused: 0,
             failed: 0,
         };
         let more = true;
         for (let round = 0; round < RENEW_ROUNDS && more; round += 1) {
             const due = await prisma.customerSubscription.findMany({
                 where: {
-                    currentPeriodEnd: { lte: now },
                     ...(seen.length > 0 ? { id: { notIn: [...seen] } } : {}),
                     OR: [
                         {
+                            currentPeriodEnd: { lte: now },
                             status: "ACTIVE",
                             organization: {
                                 organizationModules: {
@@ -97,9 +109,13 @@ export class SubscriptionRenewHandler {
                         // Ending bills nothing, so it goes ahead with Payments
                         // off, and for a paused one set to end.
                         {
+                            currentPeriodEnd: { lte: now },
                             status: { in: ["ACTIVE", "PAUSED"] },
                             cancelAtPeriodEnd: true,
                         },
+                        // A pause whose end date has come resumes (D8) —
+                        // with Payments off too, which may refuse it once.
+                        pauseEndedWhere(now, refused),
                     ],
                 },
                 orderBy: { currentPeriodEnd: "asc" },

@@ -16,6 +16,7 @@ import {
     FALLBACK_TIMEZONE,
 } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
     invoiceStanding,
@@ -23,13 +24,20 @@ import {
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import type { FulfilmentType } from "../orders/fulfilment";
+import { legacyWord, shipsToAddress, typeOf } from "../orders/fulfilment";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { SiteAccountView } from "../site-accounts/account-unlink.service";
+import { toSiteAccountView } from "../site-accounts/account-unlink.service";
+import type { AttentionEntryView } from "./attention-read";
+import { attentionFor, attentionSuggestionsFor } from "./attention-read";
 import type { ContactNoteView } from "./contact-notes.service";
 import {
     allergenChoices,
     loadContactNotes,
     notedAllergens,
 } from "./contact-notes.service";
+import { normaliseEmail } from "./duplicates";
 
 /**
  * One read of a customer (U8, R17), rooted on the CRM contact — the record
@@ -65,6 +73,7 @@ import {
 /** A source of the read, as the merchant would name it when it is missing. */
 export type DetailSource =
     | "notes"
+    | "attention"
     | "linkedCustomers"
     | "possibleMatches"
     | "orders"
@@ -82,6 +91,7 @@ export interface DetailUnavailable {
 
 const LABELS: Record<DetailSource, string> = {
     notes: "Notes",
+    attention: "Needs attention",
     linkedCustomers: "Linked store customers",
     possibleMatches: "Possible matches",
     orders: "Orders",
@@ -134,8 +144,10 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
-    /** COLLECT or DELIVERY (U6), and where the kitchen has it. */
+    /** COLLECT or DELIVERY (U6; the legacy word until B2d), and where the kitchen has it. */
     fulfilment: string;
+    /** How it leaves (DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING… */
+    fulfilmentType: FulfilmentType;
     stage: string;
     /** Where a delivery went; null for a collection. */
     delivery: string | null;
@@ -285,12 +297,22 @@ export interface CustomerDetail {
         name: string;
         firstName: string | null;
         lastName: string | null;
+        /**
+         * The email to show: never a reserved placeholder. A site account's
+         * separate contact shows the account's email; empty when there is
+         * none to show (`contact-email.ts`).
+         */
         email: string;
         phone: string | null;
         company: string | null;
         source: string | null;
         createdAt: string;
     };
+    /**
+     * The customer's account on the business's site (A4): "Signs in on your
+     * website as ‹email›". Null when they don't sign in.
+     */
+    siteAccount: SiteAccountView | null;
     /** Whether money figures were included for this viewer. */
     money: boolean;
     /** The business's zone, for the dates the screen writes out. */
@@ -307,6 +329,17 @@ export interface CustomerDetail {
      * note's `matchAllergens` instead, which cross storefronts.
      */
     allergens: { id: string; name: string }[] | null;
+    /**
+     * Needs attention (DEC-040, C1), as this viewer may see it: sensitive
+     * entries are left out, and counted, for a role without the sensitive
+     * permission. Suggestions come only to someone who can add them.
+     */
+    attention: {
+        from: "contact";
+        entries: AttentionEntryView[];
+        hiddenSensitiveCount: number;
+        suggestions?: AttentionEntryView[];
+    } | null;
     linkedCustomers?: LinkedCustomer[] | null;
     possibleMatches?: PossibleMatch[] | null;
     orders?: { from: "linked-customers"; rows: DetailOrder[] } | null;
@@ -419,9 +452,26 @@ export class CustomerDetailService {
                 company: true,
                 source: true,
                 createdAt: true,
+                // The one that signs in; a merged or removed one does not.
+                customerAccounts: {
+                    where: { status: { in: ["ACTIVE", "BLOCKED"] } },
+                    select: {
+                        email: true,
+                        status: true,
+                        linkedAt: true,
+                        lastSignedInAt: true,
+                    },
+                    take: 1,
+                },
             },
         });
         if (!contact) throw new NotFoundException("Contact not found");
+        const account =
+            contact.customerAccounts.length > 0
+                ? contact.customerAccounts[0]
+                : null;
+        const shownEmail =
+            contactEmailForDisplay(contact.email, account?.email) ?? "";
 
         // NOT guarded either, as on Home: availability decides which blocks
         // may exist at all, and guessing could show a module that is off.
@@ -466,6 +516,7 @@ export class CustomerDetailService {
 
         const [
             notes,
+            attention,
             possibleMatches,
             orders,
             bookings,
@@ -480,6 +531,18 @@ export class CustomerDetailService {
                     loadContactNotes(this.db, organizationId, contactId),
                     allergenChoices(this.db, organizationId),
                 ]),
+            ),
+            attempt("attention", () =>
+                Promise.all([
+                    attentionFor(ctx, [contactId], this.db),
+                    attentionSuggestionsFor(ctx, contactId, this.db),
+                ]).then(([read, suggestions]) => ({
+                    from: "contact" as const,
+                    entries: read.get(contactId)?.entries ?? [],
+                    hiddenSensitiveCount:
+                        read.get(contactId)?.hiddenSensitiveCount ?? 0,
+                    ...(suggestions === undefined ? {} : { suggestions }),
+                })),
             ),
             links === undefined
                 ? skip
@@ -584,15 +647,16 @@ export class CustomerDetailService {
         return {
             contact: {
                 id: contact.id,
-                name: personName(contact),
+                name: personName({ ...contact, email: shownEmail }),
                 firstName: contact.firstName,
                 lastName: contact.lastName,
-                email: contact.email,
+                email: shownEmail,
                 phone: contact.phone,
                 company: contact.company,
                 source: contact.source,
                 createdAt: contact.createdAt.toISOString(),
             },
+            siteAccount: account ? toSiteAccountView(account, contact) : null,
             money,
             timezone,
             stats,
@@ -605,6 +669,7 @@ export class CustomerDetailService {
                       }
                     : null,
             allergens: noteRows ? notedAllergens(noteRows) : null,
+            attention,
             ...(links === undefined ? {} : { linkedCustomers: links }),
             ...(possibleMatches === undefined ? {} : { possibleMatches }),
             ...(orders === undefined
@@ -726,10 +791,13 @@ export class CustomerDetailService {
         email: string,
         linkedIds: string[],
     ): Promise<PossibleMatch[]> {
+        // A reserved placeholder is no email and matches nobody (C2).
+        const normalised = normaliseEmail(email);
+        if (!normalised) return [];
         const rows = await this.db.customer.findMany({
             where: {
                 organizationId,
-                email: { equals: email.trim(), mode: "insensitive" },
+                email: { equals: normalised, mode: "insensitive" },
                 ...(linkedIds.length > 0 ? { id: { notIn: linkedIds } } : {}),
             },
             orderBy: { createdAt: "asc" },
@@ -825,22 +893,22 @@ export class CustomerDetailService {
                     variant: i.variant?.title ?? null,
                     quantity: i.quantity,
                 })),
-                fulfilment: o.fulfilment,
+                fulfilment: legacyWord(typeOf(o.fulfilment)),
+                fulfilmentType: typeOf(o.fulfilment),
                 stage: o.stage,
-                delivery:
-                    o.fulfilment === "DELIVERY"
-                        ? [
-                              o.deliveryLine1,
-                              o.deliveryLine2,
-                              o.deliveryCity,
-                              [o.deliveryState, o.deliveryPostalCode]
-                                  .filter(Boolean)
-                                  .join(" "),
-                          ]
-                              .map((part) => part?.trim())
+                delivery: shipsToAddress(typeOf(o.fulfilment))
+                    ? [
+                          o.deliveryLine1,
+                          o.deliveryLine2,
+                          o.deliveryCity,
+                          [o.deliveryState, o.deliveryPostalCode]
                               .filter(Boolean)
-                              .join(", ") || null
-                        : null,
+                              .join(" "),
+                      ]
+                          .map((part) => part?.trim())
+                          .filter(Boolean)
+                          .join(", ") || null
+                    : null,
                 ...(money
                     ? { total: toMoneyString(o.total), currency: o.currency }
                     : {}),

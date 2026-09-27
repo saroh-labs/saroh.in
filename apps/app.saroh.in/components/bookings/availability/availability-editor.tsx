@@ -1,10 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
-import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,6 +11,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type {
     AvailabilityDraft,
     KeptBooking,
+    NewOff,
     SaveOp,
 } from "@/lib/services/availability-rules";
 import {
@@ -22,42 +21,64 @@ import {
     weeklyHours,
 } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
+import { clock, dayLabel } from "@/lib/services/diary";
 import {
-    addDays,
-    clock,
-    dayLabel,
-    localDateOf,
-    localMinuteOf,
-    zonedInstant,
-} from "@/lib/services/diary";
-import {
+    addClosure,
     addExtraHours,
     addTimeOff,
+    removeClosures,
     removeExtraHours,
-    removeTimeOff,
+    removeTimeOffMany,
     replaceStaffHours,
     updateBookingRules,
 } from "@/lib/staff/actions";
+import type { TimeOffInput } from "@/lib/staff/service";
+import type { OffLine } from "@/lib/staff/time-off";
 import type {
     BookingBrief,
     BookingRules,
+    Closure,
     StaffView,
-    TimeOff,
 } from "@/lib/staff/types";
 
 import { AddPersonDialog } from "./add-person-dialog";
+import { OffRow, TimeOffCard } from "./time-off-card";
 import { WeeklyHours } from "./weekly-hours";
 
-/** "Wed 16 Sep · all day", or "Wed 16 Sep · 17:00–21:00". */
-export function timeOffWhen(t: TimeOff, timezone: string): string {
-    const from = localDateOf(t.startAt, timezone);
-    if (t.allDay) {
-        const last = localDateOf(new Date(Date.parse(t.endAt) - 1), timezone);
-        return last === from
-            ? `${dayLabel(from)} · all day`
-            : `${dayLabel(from)} – ${dayLabel(last)} · all day`;
+/** A new line of time off as the API takes it. */
+function rangeOf(off: NewOff): TimeOffInput {
+    return {
+        fromDate: off.fromDate,
+        toDate: off.toDate,
+        ...(off.startMinute !== null && off.endMinute !== null
+            ? { startMinute: off.startMinute, endMinute: off.endMinute }
+            : {}),
+        reason: off.reason || undefined,
+    };
+}
+
+/**
+ * A removed line as the API takes it back, for Undo: one part-day row of a
+ * person's goes back exactly as it was; anything else as its range.
+ */
+function rangeOfLine(line: OffLine, closed: boolean): TimeOffInput {
+    const row = line.rows[0];
+    if (!closed && !line.allDay && line.rows.length === 1) {
+        return {
+            startAt: row.startAt,
+            endAt: row.endAt,
+            reason: row.reason ?? undefined,
+        };
     }
-    return `${dayLabel(from)} · ${clock(localMinuteOf(t.startAt, timezone))}–${clock(localMinuteOf(t.endAt, timezone))}`;
+    return rangeOf({
+        key: "",
+        staffId: null,
+        fromDate: line.fromDate,
+        toDate: line.toDate,
+        startMinute: line.startMinute,
+        endMinute: line.endMinute,
+        reason: line.reason ?? "",
+    });
 }
 
 const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
@@ -72,6 +93,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
  */
 export function AvailabilityEditor({
     staff,
+    closures,
     rules,
     timezone,
     today,
@@ -81,6 +103,8 @@ export function AvailabilityEditor({
     canEdit,
 }: {
     staff: StaffView[];
+    /** When the whole business is closed (E3). */
+    closures: Closure[];
     rules: BookingRules;
     timezone: string;
     today: LocalDate;
@@ -97,13 +121,11 @@ export function AvailabilityEditor({
     const [who, setWho] = useState(people[0]?.id ?? "");
     const [draft, setDraft] = useState<AvailabilityDraft | null>(null);
     const [saving, setSaving] = useState(false);
-    const [offDate, setOffDate] = useState(addDays(today, 1));
-    const [offWhy, setOffWhy] = useState("");
     const [adding, setAdding] = useState(false);
 
     const base = draftFrom(staff, rules);
     const d = draft ?? base;
-    const ops = saveOps(staff, rules, d);
+    const ops = saveOps(staff, rules, d, closures, timezone);
     const dirty = ops.length > 0;
     const me = people.find((p) => p.id === who) ?? people.at(0);
     const edit = (fn: (x: AvailabilityDraft) => void) => {
@@ -115,40 +137,55 @@ export function AvailabilityEditor({
     async function save() {
         if (!dirty || saving) return;
         setSaving(true);
-        const done: { op: SaveOp; addedId?: string }[] = [];
+        const done: { op: SaveOp; addedIds?: string[] }[] = [];
         const outside: BookingBrief[] = [];
+        const covered = new Set<string>();
+        // Ids already there, so an add's new rows can be told apart for Undo.
+        const known = new Set([
+            ...closures.map((c) => c.id),
+            ...staff.flatMap((p) => p.timeOff.map((t) => t.id)),
+        ]);
         let failed: string | null = null;
         for (const op of ops) {
             const res =
                 op.kind === "hours"
                     ? await replaceStaffHours(op.staffId, op.hours)
                     : op.kind === "addOff"
-                      ? await addTimeOff(op.staffId, {
-                            fromDate: op.date,
-                            reason: op.reason || undefined,
-                        })
+                      ? op.off.staffId
+                          ? await addTimeOff(op.off.staffId, rangeOf(op.off))
+                          : await addClosure({
+                                ...rangeOf(op.off),
+                                fromDate: op.off.fromDate,
+                            })
                       : op.kind === "removeOff"
-                        ? await removeTimeOff(op.staffId, op.before.id)
-                        : op.kind === "removeExtra"
-                          ? await removeExtraHours(op.staffId, op.before.id)
-                          : await updateBookingRules(op.rules);
+                        ? await removeTimeOffMany(op.staffId, op.before.ids)
+                        : op.kind === "removeClosure"
+                          ? await removeClosures(op.before.ids)
+                          : op.kind === "removeExtra"
+                            ? await removeExtraHours(op.staffId, op.before.id)
+                            : await updateBookingRules(op.rules);
             if (!res.ok) {
                 failed = res.error;
                 break;
             }
-            let addedId: string | undefined;
+            let addedIds: string[] | undefined;
             if (op.kind === "hours") {
                 outside.push(
                     ...(res.data as { outside: BookingBrief[] }).outside,
                 );
             }
             if (op.kind === "addOff") {
-                const at = zonedInstant(op.date, 0, timezone).getTime();
-                addedId = (res.data as { staff: StaffView }).staff.timeOff.find(
-                    (t) => Date.parse(t.startAt) === at,
-                )?.id;
+                const data = res.data as {
+                    staff?: StaffView;
+                    closures?: Closure[];
+                    affected: BookingBrief[];
+                };
+                const rows = data.staff?.timeOff ?? data.closures ?? [];
+                addedIds = rows.map((r) => r.id).filter((x) => !known.has(x));
+                for (const x of addedIds) known.add(x);
+                for (const b of data.affected) covered.add(b.id);
             }
-            done.push({ op, addedId });
+            done.push({ op, addedIds });
         }
         setSaving(false);
         router.refresh();
@@ -173,47 +210,42 @@ export function AvailabilityEditor({
                 "They stay booked. Move them from the calendar if you need to.",
             );
         }
+        if (covered.size) {
+            showWarning(
+                `${covered.size} ${covered.size === 1 ? "booking falls" : "bookings fall"} in the time off`,
+                "They stay booked. Move or cancel them from the calendar.",
+            );
+        }
     }
 
-    async function undo(done: { op: SaveOp; addedId?: string }[]) {
-        for (const { op, addedId } of [...done].reverse()) {
+    async function undo(done: { op: SaveOp; addedIds?: string[] }[]) {
+        for (const { op, addedIds } of [...done].reverse()) {
             const res =
                 op.kind === "hours"
                     ? await replaceStaffHours(op.staffId, op.before)
                     : op.kind === "addOff"
-                      ? addedId
-                          ? await removeTimeOff(op.staffId, addedId)
-                          : null
+                      ? !addedIds?.length
+                          ? null
+                          : op.off.staffId
+                            ? await removeTimeOffMany(op.off.staffId, addedIds)
+                            : await removeClosures(addedIds)
                       : op.kind === "removeOff"
                         ? await addTimeOff(
                               op.staffId,
-                              op.before.allDay
-                                  ? {
-                                        fromDate: localDateOf(
-                                            op.before.startAt,
-                                            timezone,
-                                        ),
-                                        toDate: localDateOf(
-                                            new Date(
-                                                Date.parse(op.before.endAt) - 1,
-                                            ),
-                                            timezone,
-                                        ),
-                                        reason: op.before.reason ?? undefined,
-                                    }
-                                  : {
-                                        startAt: op.before.startAt,
-                                        endAt: op.before.endAt,
-                                        reason: op.before.reason ?? undefined,
-                                    },
+                              rangeOfLine(op.before, false),
                           )
-                        : op.kind === "removeExtra"
-                          ? await addExtraHours(op.staffId, {
-                                date: op.before.date.slice(0, 10),
-                                startMinute: op.before.startMinute,
-                                endMinute: op.before.endMinute,
+                        : op.kind === "removeClosure"
+                          ? await addClosure({
+                                ...rangeOfLine(op.before, true),
+                                fromDate: op.before.fromDate,
                             })
-                          : await updateBookingRules(op.before);
+                          : op.kind === "removeExtra"
+                            ? await addExtraHours(op.staffId, {
+                                  date: op.before.date.slice(0, 10),
+                                  startMinute: op.before.startMinute,
+                                  endMinute: op.before.endMinute,
+                              })
+                            : await updateBookingRules(op.before);
             if (res && !res.ok) {
                 showError(res.error, "Undo stopped part of the way.");
                 return;
@@ -254,18 +286,9 @@ export function AvailabilityEditor({
     }
 
     const hours = d.hours[me.id] ?? [];
-    // Time off that is over is history, not something to manage.
-    const offMine = me.timeOff.filter(
-        (t) =>
-            !d.offRemoved.includes(t.id) &&
-            localDateOf(new Date(Date.parse(t.endAt) - 1), timezone) >= today,
-    );
-    const offNew = d.offAdded.filter((o) => o.staffId === me.id);
     const extraMine = me.extraHours.filter(
         (x) => !d.extraRemoved.includes(x.id),
     );
-    const offDays = Array.from({ length: 21 }, (_, i) => addDays(today, i));
-    const taken = bookedOn?.[`${me.id}|${offDate}`] ?? 0;
 
     return (
         <>
@@ -346,102 +369,36 @@ export function AvailabilityEditor({
                     }
                 />
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
-                    <section aria-labelledby="time-off" className={card}>
-                        <h2 id="time-off" className={cn(cardTitle, "mb-2")}>
-                            Time off
-                        </h2>
-                        <ul>
-                            {offMine.map((t) => (
-                                <OffRow
-                                    key={t.id}
-                                    when={timeOffWhen(t, timezone)}
-                                    why={t.reason ?? "No reason given"}
-                                    canEdit={canEdit}
-                                    onRemove={() =>
-                                        edit((x) => {
-                                            x.offRemoved.push(t.id);
-                                        })
-                                    }
-                                />
-                            ))}
-                            {offNew.map((o) => (
-                                <OffRow
-                                    key={o.key}
-                                    when={`${dayLabel(o.date)} · all day`}
-                                    why={`${o.reason === "" ? "No reason given" : o.reason} · not saved yet`}
-                                    canEdit={canEdit}
-                                    onRemove={() =>
-                                        edit((x) => {
-                                            x.offAdded = x.offAdded.filter(
-                                                (y) => y.key !== o.key,
-                                            );
-                                        })
-                                    }
-                                />
-                            ))}
-                        </ul>
-                        {!offMine.length && !offNew.length ? (
-                            <p className="text-[12.5px] text-muted-foreground">
-                                None booked.
-                            </p>
-                        ) : null}
-                        {canEdit ? (
-                            <>
-                                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                                    <OptionSelect
-                                        aria-label="Day off"
-                                        value={offDate}
-                                        onValueChange={setOffDate}
-                                        className="h-8 w-auto rounded-[8px] text-[12.5px]"
-                                        options={offDays.map((v) => ({
-                                            value: v,
-                                            label: dayLabel(v),
-                                        }))}
-                                    />
-                                    <Input
-                                        aria-label="Reason (team only)"
-                                        placeholder="Reason — team only"
-                                        value={offWhy}
-                                        onChange={(e) =>
-                                            setOffWhy(e.target.value)
-                                        }
-                                        className="h-8 min-w-0 flex-[1_1_120px] rounded-[8px] text-[12.5px]"
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                                        onClick={() => {
-                                            edit((x) => {
-                                                x.offAdded.push({
-                                                    key: `${me.id}${offDate}${x.offAdded.length}`,
-                                                    staffId: me.id,
-                                                    date: offDate,
-                                                    reason: offWhy.trim(),
-                                                });
-                                            });
-                                            setOffWhy("");
-                                        }}
-                                    >
-                                        Add day off
-                                    </Button>
-                                </div>
-                                <p
-                                    className={cn(
-                                        "mt-[7px] text-[11.5px]",
-                                        taken
-                                            ? "text-brand-subtle-foreground"
-                                            : "text-muted-foreground",
-                                    )}
-                                >
-                                    {bookedOn === null
-                                        ? "Bookings that day couldn't be checked."
-                                        : taken
-                                          ? `${taken} already booked that day — ${taken === 1 ? "it's" : "they're"} kept; move or cancel ${taken === 1 ? "it" : "them"} from the calendar.`
-                                          : "Nothing booked that day."}
-                                </p>
-                            </>
-                        ) : null}
-                    </section>
+                    <TimeOffCard
+                        key={me.id}
+                        me={me}
+                        closures={closures}
+                        timezone={timezone}
+                        today={today}
+                        canEdit={canEdit}
+                        offAdded={d.offAdded}
+                        offRemoved={d.offRemoved}
+                        onAdd={(off) =>
+                            edit((x) => {
+                                x.offAdded.push({
+                                    ...off,
+                                    key: `${off.staffId ?? "all"}${off.fromDate}${x.offAdded.length}`,
+                                });
+                            })
+                        }
+                        onRemoveSaved={(ids) =>
+                            edit((x) => {
+                                x.offRemoved.push(...ids);
+                            })
+                        }
+                        onRemoveNew={(key) =>
+                            edit((x) => {
+                                x.offAdded = x.offAdded.filter(
+                                    (y) => y.key !== key,
+                                );
+                            })
+                        }
+                    />
 
                     <section aria-labelledby="extra-hours" className={card}>
                         <h2 id="extra-hours" className={cn(cardTitle, "mb-1")}>
@@ -559,51 +516,5 @@ export function AvailabilityEditor({
                 onAdded={(id) => setWho(id)}
             />
         </>
-    );
-}
-
-function OffRow({
-    when,
-    why,
-    warn = false,
-    canEdit,
-    onRemove,
-    removeLabel = "Remove this time off",
-}: {
-    when: string;
-    why: string | null;
-    warn?: boolean;
-    canEdit: boolean;
-    onRemove: () => void;
-    removeLabel?: string;
-}) {
-    return (
-        <li className="flex items-center gap-2 border-t border-border/60 py-[7px]">
-            <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold">{when}</div>
-                {why ? (
-                    <div
-                        className={cn(
-                            "text-[12px]",
-                            warn
-                                ? "text-brand-subtle-foreground"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {why}
-                    </div>
-                ) : null}
-            </div>
-            {canEdit ? (
-                <button
-                    type="button"
-                    aria-label={removeLabel}
-                    onClick={onRemove}
-                    className="grid size-8 place-items-center rounded-[7px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:size-11"
-                >
-                    <X aria-hidden className="size-4" />
-                </button>
-            ) : null}
-        </li>
     );
 }

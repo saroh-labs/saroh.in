@@ -22,6 +22,7 @@ import {
     longPrice,
     money,
     olderPrice,
+    pausedText,
     sortCharges,
     TAB_LABEL,
     TAB_TONE,
@@ -160,7 +161,7 @@ function Body({
                   ? `Was due ${dayText(sub.failedCharge.dueAt, tz, now)} · not paid yet`
                   : "Not paid yet"
               : tab === "paused"
-                ? `Paused${sub.pausedAt ? ` since ${dayText(sub.pausedAt, tz, now)}` : ""}. Nothing is charged while paused.`
+                ? `${pausedText(sub, now)}. Nothing is charged while paused.`
                 : `Ended${sub.cancelledAt ? ` ${dayText(sub.cancelledAt, tz, now)}` : ""}. Nothing more is charged.`;
     const upcoming = collectionRows(sub, now).slice(0, 3);
     const mine = charges.state === "ok" ? (charges.data[sub.id] ?? []) : [];

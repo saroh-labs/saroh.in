@@ -6,12 +6,10 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
-import { listCommsProviders } from "@/lib/providers/service";
 import { requireSession } from "@/lib/session";
-import { readyChecklist } from "@/lib/settings/ready";
+import { loadReadyChecklist } from "@/lib/settings/ready-service";
 import { listStorefrontHours } from "@/lib/stores/storefronts";
 
 /**
@@ -24,8 +22,9 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  * role denial reaches forbidden.tsx; an unavailable API reaches error.tsx.
  *
  * Above the tabs, for someone who may change things, "Ready to take
- * payments": what is left to set up (`readyChecklist`). Its extra reads are
- * best-effort — one that fails drops its step, never the page.
+ * payments": what is left to set up (`loadReadyChecklist`, the same list as
+ * Home's). Its extra read is best-effort — one that fails drops its steps,
+ * never the page.
  */
 export const metadata = { title: "Business" };
 
@@ -47,17 +46,9 @@ export default async function OrganizationSettingsPage() {
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const canEdit = may("org:update");
 
-    const [modules, messaging] =
-        settings && canEdit
-            ? await Promise.all([
-                  listModules().catch(() => null),
-                  // Asked only of someone the API lets read it: a refusal
-                  // there would render this whole page as forbidden.
-                  may("comms:manage")
-                      ? listCommsProviders().catch(() => null)
-                      : Promise.resolve(null),
-              ])
-            : [null, null];
+    // The same steps and count as Home's "Get ready to take money".
+    const ready =
+        settings && canEdit ? await loadReadyChecklist(settings) : null;
 
     return (
         <SettingsPanel
@@ -71,15 +62,7 @@ export default async function OrganizationSettingsPage() {
                                 : "Only owners and admins can change this."
                         }
                     />
-                    {settings && canEdit ? (
-                        <ReadyChecklist
-                            list={readyChecklist({
-                                settings,
-                                modules,
-                                messaging,
-                            })}
-                        />
-                    ) : null}
+                    {ready ? <ReadyChecklist list={ready} /> : null}
                 </>
             }
         >

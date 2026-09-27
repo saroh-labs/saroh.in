@@ -15,7 +15,11 @@
 export { PageSections, default as SectionRenderer } from "./section-renderer";
 export type { Section } from "./section-renderer";
 
-export { BlockFixturePreview, SAMPLE_SERVICES } from "./block-fixture-preview";
+export {
+    BlockFixturePreview,
+    SAMPLE_SERVICES,
+    SAMPLE_VISIT,
+} from "./block-fixture-preview";
 export { default as BookingSection } from "./blocks/booking";
 export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
@@ -25,10 +29,34 @@ export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
+export {
+    default as OnTodayHero,
+    isPublicToday,
+    todayHref,
+} from "./blocks/on-today";
+export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
+export {
+    default as VisitUsSection,
+    directionsHref,
+    isPublicVisit,
+} from "./blocks/visit-us";
+export type { PublicVisit } from "./blocks/visit-us";
+
+// The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
+// the booking page's header (E6) all say it through this.
+export {
+    FALLBACK_TIME_ZONE,
+    clockText,
+    isOpeningWeek,
+    openState,
+    openStateText,
+    weekSummary,
+} from "./lib/opening-hours";
+export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.
@@ -52,13 +80,43 @@ export {
     default as BookingFlow,
     BookingUnavailable,
 } from "./booking-flow/booking-flow";
-export type { BookingFlowProps } from "./booking-flow/booking-flow";
-export { isBookingPage } from "./booking-flow/model";
-export type { BookingPageData, BookingService } from "./booking-flow/model";
+export type {
+    BookingAccount,
+    BookingFlowProps,
+} from "./booking-flow/booking-flow";
+export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
+export { isBookResult, isBookingPage } from "./booking-flow/model";
+export type {
+    BookResult,
+    BookingPageData,
+    BookingService,
+} from "./booking-flow/model";
+// Booking signed in (A9): the site's server action books, and answers the
+// page in the page's own terms.
+export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
+export type {
+    BookSignedIn,
+    Result as BookingResult,
+    SignedInBookRequest,
+} from "./booking-flow/api";
+
+// Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
+// The site's server actions arrive as `api`; the sheet never calls the API.
+export { UNAVAILABLE_TEXT, callLine, retryText } from "./account/api";
+export type {
+    CodeRequestResult,
+    SignInApi,
+    SignInOptions,
+    SignedInCustomer,
+    VerifyResult,
+} from "./account/api";
+export { SignInSheet } from "./account/sign-in-sheet";
+export type { SignInSheetProps } from "./account/sign-in-sheet";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader } from "./site-chrome";
+export { SiteFooter, SiteHeader, footerLine } from "./site-chrome";
 export type { SiteFooterContent } from "./site-chrome";
+export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

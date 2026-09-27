@@ -453,6 +453,35 @@ describe("the booking page (real database)", () => {
             await prisma.invoice.count({ where: { bookingId: a.booking.id } }),
         ).toBe(1);
     });
+
+    it("gives one slot to one of eight people booking at once, and tells the rest it is taken (#106)", async () => {
+        // The outcome every loser must get. Under real concurrency (the load
+        // smoke, scripts/load-smoke.mjs) some losers used to get a 500: the
+        // pg driver adapter reported the conflict with no P2034 code
+        // (common/prisma-errors.ts). One test process rarely loses the race
+        // that way, so this pins the outcome rather than reproducing the race.
+        const at = nextMonday(6, 4);
+        const results = await Promise.allSettled(
+            Array.from({ length: 8 }, (_, i) =>
+                publicBookings.bookOnline(
+                    oneToOne,
+                    booker(`race-${i}@example.in`, "DESK", at),
+                    `ip_race_${i}`,
+                ),
+            ),
+        );
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        for (const r of results) {
+            if (r.status === "rejected") {
+                expect(r.reason).toBeInstanceOf(ConflictException);
+            }
+        }
+        expect(
+            await prisma.booking.count({
+                where: { serviceId: oneToOne, startAt: at },
+            }),
+        ).toBe(1);
+    });
 });
 
 describe("a hold's lifecycle under the team and the webhook (#508, real database)", () => {
@@ -547,6 +576,44 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
             where: { providerRef: "pay_after_cancel" },
         });
         expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
+    });
+
+    it("a pay link paid after its booking was cancelled is owed back, not paid (K-1)", async () => {
+        const { booking } = await publicBookings.bookOnline(
+            gym,
+            booker("link-cancel@example.in", "DESK", nextMonday(10)),
+            "ip_1",
+        );
+        const { token } = await bookings.payLink(team, booking.id, new Date());
+        // The customer opens the link and starts paying...
+        const intent = await publicInvoices.createIntent(token, {});
+        // ...and the booking is cancelled before the money lands.
+        await bookings.cancelBooking(team, booking.id);
+
+        await paid(intent.providerIntentId, "pay_link_after_cancel");
+
+        const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+            where: { providerRef: "pay_link_after_cancel" },
+        });
+        expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
+        expect(attempt.rawResponse).toEqual({
+            invoiceStatus: "CANCELLED_BOOKING",
+        });
+        await expect(
+            prisma.paymentIntent.findUniqueOrThrow({
+                where: { id: attempt.paymentIntentId },
+            }),
+        ).resolves.toMatchObject({ status: "SUCCEEDED" });
+        // Still unpaid on paper, for the business to void; the booking
+        // stays cancelled and never reads as paid online.
+        await expect(
+            prisma.invoice.findFirstOrThrow({
+                where: { bookingId: booking.id },
+            }),
+        ).resolves.toMatchObject({ status: "ISSUED", paidAt: null });
+        await expect(
+            prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }),
+        ).resolves.toMatchObject({ status: "CANCELLED", paidWith: "DESK" });
     });
 
     it("two cancels at once cancel it once", async () => {
@@ -668,6 +735,179 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
                 expect(invoice.status).toBe("PAID");
                 expect(attempt.status).toBe("CAPTURED");
             }
+        }
+    });
+});
+
+describe("Where and the intake note (E7, real database)", () => {
+    let consult: string;
+
+    beforeAll(async () => {
+        // A clinic's video consultation: at the clinic or by video, Mondays
+        // 10:00–12:00 UTC, nobody in particular.
+        consult = (
+            await bookings.createService(owner, {
+                name: "Video consultation",
+                durationMinutes: 30,
+                timezone: "UTC",
+                priceCents: 50_000,
+                currency: "INR",
+                locationType: "EITHER",
+                meetingUrl: "https://meet.example.com/kavi",
+            })
+        ).id;
+        await prisma.availabilityRule.create({
+            data: {
+                organizationId: owner.organizationId,
+                serviceId: consult,
+                dayOfWeek: MONDAY,
+                startMinute: 10 * 60,
+                endMinute: 12 * 60,
+            },
+        });
+    });
+
+    it("tells the page the service is offered either way", async () => {
+        const page = await publicBookings.publicBookingPage(siteId);
+        expect(page.services.find((s) => s.id === consult)).toMatchObject({
+            online: false,
+            where: "EITHER",
+        });
+        expect(page.services.find((s) => s.id === oneToOne)?.where).toBe(
+            "IN_PERSON",
+        );
+    });
+
+    it("records a Video call as ONLINE and shows the link on the confirmation", async () => {
+        const { booking } = await publicBookings.bookOnline(
+            consult,
+            {
+                ...booker("video@example.in", "DESK", nextMonday(10, 3)),
+                locationType: "ONLINE",
+                intakeNote: "  I take blood thinners  ",
+            },
+            "ip_e7",
+        );
+        const row = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(row).toMatchObject({
+            status: "CONFIRMED",
+            locationType: "ONLINE",
+            intakeNote: "I take blood thinners",
+        });
+        expect(JSON.stringify(row.snapshot)).not.toContain("blood");
+        const { toPublicBooking } = await import("./public-booking-page");
+        expect(toPublicBooking(booking)).toMatchObject({
+            online: true,
+            meetingUrl: "https://meet.example.com/kavi",
+        });
+    });
+
+    it("pays now for a Video call: the link shows once the payment confirms it", async () => {
+        const { booking, payToken } = await publicBookings.bookOnline(
+            consult,
+            {
+                ...booker("paid-video@example.in", "NOW", nextMonday(11, 3)),
+                locationType: "ONLINE",
+            },
+            "ip_e7",
+        );
+        const token = payToken ?? "";
+        const held = await publicBookings.publicHold(token, "ip_e7");
+        expect(held.booking).toMatchObject({ online: true, meetingUrl: null });
+
+        const intent = await publicInvoices.createIntent(token, {
+            idempotencyKey: "tab-e7",
+            amount: 1,
+        });
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: "pay_e7",
+        });
+        const confirmed = await publicBookings.publicHold(token, "ip_e7");
+        expect(confirmed.state).toBe("CONFIRMED");
+        expect(confirmed.booking).toMatchObject({
+            online: true,
+            meetingUrl: "https://meet.example.com/kavi",
+        });
+        expect(booking.id).toBe(confirmed.booking.reference);
+    });
+
+    it("books an Either service in person when the booker didn't say, with no link", async () => {
+        const { booking } = await publicBookings.bookOnline(
+            consult,
+            booker("clinic@example.in", "DESK", nextMonday(10, 4)),
+            "ip_e7",
+        );
+        expect(booking.locationType).toBe("IN_PERSON");
+        const { toPublicBooking } = await import("./public-booking-page");
+        expect(toPublicBooking(booking)).toMatchObject({
+            online: false,
+            meetingUrl: null,
+        });
+    });
+
+    it("never asks an In person service where: Online is refused, and nothing is held", async () => {
+        const at = nextMonday(8, 3);
+        await expect(
+            publicBookings.bookOnline(
+                oneToOne,
+                {
+                    ...booker("wrong-place@example.in", "DESK", at),
+                    locationType: "ONLINE",
+                },
+                "ip_e7",
+            ),
+        ).rejects.toThrow("This is only offered in person.");
+        expect(
+            await prisma.booking.count({
+                where: { bookerEmail: "wrong-place@example.in" },
+            }),
+        ).toBe(0);
+    });
+
+    // The migration's CHECK backs this up; this suite builds its schema with
+    // `db push`, which has no CHECKs, so the replay check covers that one.
+    it("refuses a note of 1,001 characters, and books nothing", async () => {
+        await expect(
+            publicBookings.bookOnline(
+                consult,
+                {
+                    ...booker("long@example.in", "DESK", nextMonday(11, 4)),
+                    intakeNote: "a".repeat(1001),
+                },
+                "ip_e7",
+            ),
+        ).rejects.toThrow("Keep the note to 1,000 characters or fewer.");
+        expect(
+            await prisma.booking.count({
+                where: { bookerEmail: "long@example.in" },
+            }),
+        ).toBe(0);
+    });
+
+    it("serves the note only to someone who may see sensitive notes, and never in a list", async () => {
+        const row = await prisma.booking.findFirstOrThrow({
+            where: { bookerEmail: "video@example.in" },
+            select: { id: true },
+        });
+        const asOwner = await bookings.getBooking(owner, row.id);
+        expect(asOwner).toMatchObject({ intakeNote: "I take blood thinners" });
+
+        const member: OrganizationContext = { ...owner, role: "MEMBER" };
+        const asMember = await bookings.getBooking(member, row.id);
+        expect(asMember.id).toBe(row.id);
+        expect("intakeNote" in asMember).toBe(false);
+        expect(JSON.stringify(asMember)).not.toContain("blood");
+
+        for (const who of [owner, member]) {
+            const listed = await bookings.listBookings(who, consult);
+            expect(listed.length).toBeGreaterThan(0);
+            expect(JSON.stringify(listed)).not.toContain("blood");
+            expect(listed.every((b) => !("intakeNote" in b))).toBe(true);
         }
     });
 });

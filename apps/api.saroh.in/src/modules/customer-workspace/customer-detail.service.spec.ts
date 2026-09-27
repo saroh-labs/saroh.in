@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { reservedAccountEmail } from "../contacts/contact-email";
 import type { OrgAction } from "../organizations/organization-actions";
 import { CustomerDetailService } from "./customer-detail.service";
 
@@ -126,6 +127,31 @@ const ALL_ON: Views = ["CRM", "COMMERCE", "APPOINTMENTS", "PAYMENTS"].map(
     (key) => ({ key, readiness: "ACTIVE" }),
 );
 
+const ATTENTION_NUTS = {
+    id: "att_nuts",
+    contactId: "c1",
+    kind: "ALLERGY",
+    label: "Nuts",
+    detail: null,
+    sensitive: false,
+    source: "STAFF",
+    status: "ACTIVE",
+    bookingId: null,
+    createdByUserId: "user_1",
+    confirmedByUserId: null,
+    createdAt: PAST,
+    updatedAt: PAST,
+    allergen: { id: "alg_nuts", name: "Nuts" },
+};
+const ATTENTION_MEDICAL = {
+    ...ATTENTION_NUTS,
+    id: "att_med",
+    kind: "MEDICAL",
+    label: "Blood thinners",
+    sensitive: true,
+    allergen: null,
+};
+
 function make(views: Views = ALL_ON) {
     const db = {
         contact: {
@@ -138,6 +164,7 @@ function make(views: Views = ALL_ON) {
                 company: null,
                 source: null,
                 createdAt: LONG_AGO,
+                customerAccounts: [],
             }),
         },
         contactNote: {
@@ -151,6 +178,26 @@ function make(views: Views = ALL_ON) {
                     allergens: [{ allergen: { id: "alg_nuts", name: "Nuts" } }],
                 },
             ]),
+        },
+        // Needs attention (C1): one Allergy entry and one Medical; the
+        // query's own filter decides which come back to the viewer.
+        contactAttention: {
+            findMany: jest
+                .fn()
+                .mockImplementation(({ where }) =>
+                    Promise.resolve(
+                        where.status === "SUGGESTED"
+                            ? []
+                            : [ATTENTION_NUTS, ATTENTION_MEDICAL].filter(
+                                  (e) =>
+                                      where.sensitive === undefined ||
+                                      e.sensitive === where.sensitive,
+                              ),
+                    ),
+                ),
+            groupBy: jest
+                .fn()
+                .mockResolvedValue([{ contactId: "c1", _count: { _all: 1 } }]),
         },
         customerIdentityLink: {
             findMany: jest.fn().mockResolvedValue([LINK]),
@@ -523,6 +570,43 @@ describe("CustomerDetailService", () => {
         expect(detail.stats.classesLeft?.total).toBe(6);
     });
 
+    it("carries Needs attention: sensitive entries only for who may read them (C1)", async () => {
+        const { svc } = make();
+
+        const owner = await svc.detail(OWNER, "c1");
+        expect(owner.attention?.from).toBe("contact");
+        expect(owner.attention?.entries.map((e) => e.label)).toEqual([
+            "Nuts",
+            "Blood thinners",
+        ]);
+        expect(owner.attention?.hiddenSensitiveCount).toBe(0);
+        expect(owner.attention?.entries[0]).toMatchObject({
+            kind: "ALLERGY",
+            addedBy: "Nisha",
+            allergen: { id: "alg_nuts", name: "Nuts" },
+        });
+        // The Owner can add suggestions: none are waiting.
+        expect(owner.attention?.suggestions).toEqual([]);
+
+        const member = await svc.detail(MEMBER, "c1");
+        expect(member.attention?.entries.map((e) => e.label)).toEqual(["Nuts"]);
+        expect(member.attention?.hiddenSensitiveCount).toBe(1);
+        expect(JSON.stringify(member)).not.toContain("Blood thinners");
+        expect(member.attention).not.toHaveProperty("suggestions");
+    });
+
+    it("names Needs attention when it can't be read, and returns the rest", async () => {
+        const { svc, db } = make();
+        db.contactAttention.findMany.mockRejectedValue(new Error("boom"));
+
+        const detail = await svc.detail(OWNER, "c1");
+        expect(detail.attention).toBeNull();
+        expect(detail.unavailable).toEqual([
+            { source: "attention", label: "Needs attention" },
+        ]);
+        expect(detail.notes?.rows).toHaveLength(1);
+    });
+
     it("gives a Member no money and no billing blocks", async () => {
         const { svc, db } = make();
 
@@ -690,5 +774,91 @@ describe("CustomerDetailService", () => {
         await expect(
             svc.detail({ ...OWNER, role: "REVIEWER" }, "c1"),
         ).rejects.toThrow(/contact:read/);
+    });
+});
+
+describe("CustomerDetailService: the site account (A4)", () => {
+    const LINKED = new Date("2026-09-20T10:00:00Z");
+    const account = {
+        email: "asha@example.com",
+        status: "ACTIVE",
+        linkedAt: LINKED,
+        lastSignedInAt: LINKED,
+    };
+
+    it("is null for someone who doesn't sign in", async () => {
+        const { svc } = make();
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.siteAccount).toBeNull();
+        expect(detail.contact.email).toBe("asha@example.com");
+    });
+
+    it("shows the account on a linked contact, and offers This isn't them", async () => {
+        const { svc, db } = make();
+        const contact: unknown = await db.contact.findFirst();
+        db.contact.findFirst.mockResolvedValue({
+            ...(contact as object),
+            customerAccounts: [account],
+        });
+
+        const detail = await svc.detail(OWNER, "c1");
+
+        expect(detail.siteAccount).toEqual({
+            email: "asha@example.com",
+            status: "ACTIVE",
+            linkedAt: LINKED.toISOString(),
+            lastSignedInAt: LINKED.toISOString(),
+            canUnlink: true,
+        });
+        // Only accounts that sign in are read: merged and removed are not.
+        expect(
+            db.contact.findFirst.mock.calls.at(-1)[0].select.customerAccounts
+                .where,
+        ).toEqual({ status: { in: ["ACTIVE", "BLOCKED"] } });
+    });
+
+    it("shows a separate contact's account email, never the placeholder, and names them by it", async () => {
+        const { svc, db } = make();
+        db.contact.findFirst.mockResolvedValue({
+            id: "c_sep",
+            firstName: null,
+            lastName: null,
+            email: reservedAccountEmail("c_sep"),
+            phone: null,
+            company: null,
+            source: "site-account",
+            createdAt: LONG_AGO,
+            customerAccounts: [{ ...account, email: "farah@example.in" }],
+        });
+
+        const detail = await svc.detail(OWNER, "c_sep");
+
+        expect(detail.contact.email).toBe("farah@example.in");
+        expect(detail.contact.name).toBe("farah@example.in");
+        expect(JSON.stringify(detail)).not.toContain("account.invalid");
+        // The sign-in made this contact: there is nobody to part it from.
+        expect(detail.siteAccount?.canUnlink).toBe(false);
+    });
+
+    it("shows no email at all for a placeholder with no account", async () => {
+        const { svc, db } = make();
+        db.contact.findFirst.mockResolvedValue({
+            id: "c_gone",
+            firstName: "Ravi",
+            lastName: null,
+            email: reservedAccountEmail("c_gone"),
+            phone: null,
+            company: null,
+            source: "site-account",
+            createdAt: LONG_AGO,
+            customerAccounts: [],
+        });
+
+        const detail = await svc.detail(OWNER, "c_gone");
+
+        expect(detail.contact.email).toBe("");
+        expect(detail.siteAccount).toBeNull();
     });
 });

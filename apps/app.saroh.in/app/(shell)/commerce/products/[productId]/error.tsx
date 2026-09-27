@@ -8,6 +8,7 @@ import {
     ProductPageState,
     stateAction,
 } from "@/components/commerce/product-page/page-state";
+import { reportError } from "@saroh/ui/lib/report-error";
 
 /**
  * The product page's own boundary (#522): the product couldn't be read.
@@ -23,8 +24,7 @@ export default function ProductError({
     reset: () => void;
 }) {
     useEffect(() => {
-        // TODO(#103): forward to an error tracker once one exists.
-        console.error(error);
+        reportError(error, { boundary: "app/product", digest: error.digest });
     }, [error]);
 
     return (

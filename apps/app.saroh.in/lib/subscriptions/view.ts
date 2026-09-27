@@ -52,6 +52,14 @@ export function tabFromQuery(value: string | undefined): ListTab {
         : "active";
 }
 
+/** The screen's tabs: the four lists, then Plans (D3). */
+export type ScreenTab = ListTab | "plans";
+
+/** `?tab=plans` opens Plans; anything else is a list tab. */
+export function screenTabFromQuery(value: string | undefined): ScreenTab {
+    return value === "plans" ? "plans" : tabFromQuery(value);
+}
+
 export function money(amount: string | number, currency: string): string {
     return formatMoneyMajor(amount, currency) ?? String(amount);
 }
@@ -165,6 +173,65 @@ export function failWhy(
         : `Renewal of ${amount} isn't paid — past due`;
 }
 
+/**
+ * A paused one, in a few words: "Paused until 17 Oct" when it resumes on
+ * its own (D8), "Pause ended 17 Oct" once that day has come and it is
+ * still paused, else "Paused since 5 Sep".
+ */
+export function pausedText(
+    sub: Pick<Subscription, "pausedAt" | "pausedUntil" | "timezone">,
+    now: Date,
+): string {
+    if (sub.pausedUntil) {
+        const day = dayText(sub.pausedUntil, sub.timezone, now);
+        return pauseHasEnded(sub, now)
+            ? `Pause ended ${day}`
+            : `Paused until ${day}`;
+    }
+    return sub.pausedAt
+        ? `Paused since ${dayText(sub.pausedAt, sub.timezone, now)}`
+        : "Paused";
+}
+
+/** Paused with an end date that has come: the job hasn't resumed it yet. */
+function pauseHasEnded(
+    sub: Pick<Subscription, "pausedUntil">,
+    now: Date,
+): boolean {
+    return (
+        sub.pausedUntil !== null &&
+        new Date(sub.pausedUntil).getTime() <= now.getTime()
+    );
+}
+
+/**
+ * The detail's sentence about a pause. Once its end date has come and it
+ * is still paused, it says why (review S-2): one that ended inside its
+ * paid period only waits for the hourly check; one that outlasted it
+ * restarts with a new invoice at the next hourly check, which needs
+ * Payments on — the job leaves it paused while Payments is off. The detail
+ * doesn't know which, so the line is true either way (re-review 6).
+ */
+function pausedLine(
+    sub: Pick<
+        Subscription,
+        "pausedAt" | "pausedUntil" | "timezone" | "currentPeriodEnd"
+    >,
+    now: Date,
+): string {
+    if (!sub.pausedUntil) return `${pausedText(sub, now)}.`;
+    const day = dayText(sub.pausedUntil, sub.timezone, now);
+    if (!pauseHasEnded(sub, now)) {
+        return `Paused until ${day} · resumes on its own.`;
+    }
+    const extendsPeriod =
+        new Date(sub.pausedUntil).getTime() <=
+        new Date(sub.currentPeriodEnd).getTime();
+    return extendsPeriod
+        ? `Pause ended ${day} · resumes at the next hourly check.`
+        : `Pause ended ${day} · restarts with a new invoice at the next hourly check, or once Payments is on if it's off.`;
+}
+
 /** A row's line under the status: when it next charges, or why it stopped. */
 export function rowWhen(
     sub: Subscription,
@@ -182,12 +249,7 @@ export function rowWhen(
         };
     }
     if (tab === "paused") {
-        return {
-            text: sub.pausedAt
-                ? `Paused since ${dayText(sub.pausedAt, tz, now)}`
-                : "Paused",
-            danger: false,
-        };
+        return { text: pausedText(sub, now), danger: false };
     }
     if (sub.startsAt) {
         return {
@@ -221,6 +283,42 @@ export function initials(name: string): string {
         .map((w) => w[0].toUpperCase())
         .join("")
         .slice(0, 2);
+}
+
+// — Plans (D1) —————————————————————————————————————————————————
+
+/** "8 classes a month", or "Unlimited classes" when the plan has no cap. */
+export function classesText(classesPerMonth: number | null): string {
+    if (!classesPerMonth) return "Unlimited classes";
+    return `${classesPerMonth} ${classesPerMonth === 1 ? "class" : "classes"} a month`;
+}
+
+function people(n: number): string {
+    return `${n} ${n === 1 ? "person" : "people"}`;
+}
+
+/**
+ * Who pays what, as Plan Detail says it: "12 people · current price" and
+ * "₹1,500 / month", then each older price the API lists.
+ */
+export function payRows(
+    plan: Pick<Plan, "byPrice">,
+): { label: string; amount: string; older: boolean }[] {
+    return plan.byPrice.map((b) => ({
+        label: `${people(b.count)} · ${b.current ? "current price" : "older price"}`,
+        amount: longPrice(b.price, b.currency, b.interval),
+        older: !b.current,
+    }));
+}
+
+/** A plan card's notes: "3 still on ₹1,200 — they keep it". */
+export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
+    return plan.byPrice
+        .filter((b) => !b.current)
+        .map(
+            (b) =>
+                `${b.count} still on ${money(b.price, b.currency)} — they keep it`,
+        );
 }
 
 /**
@@ -276,7 +374,7 @@ export function headline(
             pill,
             big: "—",
             when: "",
-            line: `Paused${sub.pausedAt ? ` since ${d(sub.pausedAt)}` : ""}. Nothing is charged while paused.`,
+            line: `${pausedLine(sub, now)} Nothing is charged while paused.`,
         };
     }
     if (tab === "cancelled") {
@@ -458,69 +556,6 @@ export function gstNote(
 }
 
 // — Changes ————————————————————————————————————————————————————
-
-export interface ChangeRow {
-    what: string;
-    when: string;
-}
-
-/**
- * What has changed on it, from the facts it keeps — there is no change log
- * yet, so each line is something the subscription itself records, newest
- * first. A change without a moment of its own (a booked plan change) says
- * when it takes effect instead.
- */
-export function changeRows(sub: Subscription, now: Date): ChangeRow[] {
-    const tz = sub.timezone;
-    const rows: { at: string; row: ChangeRow }[] = [];
-    if (sub.pendingPlan) {
-        rows.push({
-            at: "9999",
-            row: {
-                what: `Switching to ${sub.pendingPlan.name} (${money(sub.pendingPlan.price, sub.pendingPlan.currency)})`,
-                when: `From ${dayText(sub.pendingPlan.from, tz, now)}`,
-            },
-        });
-    }
-    for (const c of sub.collection?.upcoming ?? []) {
-        if (!c.skipped) continue;
-        rows.push({
-            at: "9998",
-            row: {
-                what: `Skipping ${dayText(c.date, tz, now, true)}`,
-                when: "Nothing is collected that day",
-            },
-        });
-    }
-    if (sub.cancelledAt) {
-        rows.push({
-            at: sub.cancelledAt,
-            row: { what: "Cancelled", when: dayText(sub.cancelledAt, tz, now) },
-        });
-    } else if (sub.endsAt) {
-        rows.push({
-            at: "9997",
-            row: {
-                what: "Set to end with its period",
-                when: `Ends ${dayText(sub.endsAt, tz, now)}`,
-            },
-        });
-    }
-    if (sub.pausedAt && sub.status === "PAUSED") {
-        rows.push({
-            at: sub.pausedAt,
-            row: { what: "Paused", when: dayText(sub.pausedAt, tz, now) },
-        });
-    }
-    rows.push({
-        at: sub.startedAt,
-        row: {
-            what: `Started on ${sub.plan.name} at ${money(sub.price, sub.currency)}`,
-            when: dayText(sub.startedAt, tz, now),
-        },
-    });
-    return rows.sort((a, b) => b.at.localeCompare(a.at)).map((r) => r.row);
-}
 
 // — Renewals ———————————————————————————————————————————————————
 

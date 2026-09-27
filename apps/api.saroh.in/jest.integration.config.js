@@ -11,6 +11,22 @@
  *
  * @type {import('jest').Config}
  */
+/**
+ * RLS mode (`TEST_RLS=on`, test/rls-mode.ts) runs as a DML-only NOBYPASSRLS
+ * role. These specs rebuild an old schema with DDL (ALTER TABLE, CREATE INDEX)
+ * to test one-off backfills; only the migration owner may do that, and the
+ * backfills run as the owner too. They run in the normal suite.
+ */
+const rlsMode = ["1", "on", "true"].includes(
+    (process.env.TEST_RLS ?? "").trim().toLowerCase(),
+);
+const OWNER_DDL_SPECS = rlsMode
+    ? [
+          "<rootDir>/src/modules/products/listings-stock-levels.backfill.db.spec.ts",
+          "<rootDir>/src/modules/catalogue/catalogue-settings.backfill.db.spec.ts",
+      ]
+    : [];
+
 module.exports = {
     preset: "ts-jest",
     // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
@@ -91,11 +107,20 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        // D1: a plan's monthly figure and who pays what.
+        "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
+        // D2: mocked Prisma; the real rows are in subscriptions.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
+        // D9: mocked Prisma; the real rows are in subscription-events.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
+        // D8: pure, with a mocked transaction; the real rows are in subscriptions.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
         "<rootDir>/src/modules/staff/staff.service.spec.ts",
         "<rootDir>/src/modules/staff/hours.spec.ts",
+        ...OWNER_DDL_SPECS,
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

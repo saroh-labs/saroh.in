@@ -101,5 +101,21 @@ audit that blocks on critical advisories; plus integration tests,
   It does not go through the automatic push-to-deploy. Rollback is
   restoring the snapshot. The same file records how long each migration takes
   and which table locks it holds.
+- **Current** — **An enum value is changed by expand and contract, never
+  renamed in place.** The order fulfilment types (DEC-045, plan B) ship in
+  three releases — add the values (in a migration of their own; Postgres
+  can't use a value in the transaction that adds it) while still writing the
+  old ones, then switch writes and backfill, then drop the old values — each
+  rolled back by deploying the previous tag. The ordered checklist, each
+  migration's locks and timing, and each release's rollback are in
+  `docs/architecture/ORDER_FULFILMENT_ROLLOUT.md` (B2a writes it; B2c and
+  B2d keep it up).
+- **Current** — **Round 2's Phase 1 release** (customer sign-in on merchant
+  sites, Needs attention, a contact for every paying customer, and order
+  fulfilment release 1) is `docs/architecture/ROUND_2_PHASE_1_ROLLOUT.md`:
+  check the PostgreSQL version and the site sign-in secrets before deploy;
+  back up, migrate, deploy the API and wait for `/health/ready`, then
+  saroh.app, then the other frontends; run the C1 and C2 backfills after;
+  roll saroh.app back together with the API.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

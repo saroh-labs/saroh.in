@@ -22,6 +22,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     testimonials: "Testimonials",
     contact: "Contact",
     servicesList: "Services",
+    visitUs: "Visit us",
 };
 
 /**
@@ -44,6 +45,8 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     testimonials: "Quotes from customers, with their names.",
     contact: "Your address, opening hours, phone, email and WhatsApp.",
     servicesList: "Your services with duration and price, always up to date.",
+    visitUs:
+        "Your shop's address, hours and Open now, with directions, always up to date.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -108,6 +111,7 @@ export const SECTION_ORDER: SectionType[] = [
     "testimonials",
     "contact",
     "servicesList",
+    "visitUs",
 ];
 
 /** A sensible empty section for the chosen type (contract v1). */

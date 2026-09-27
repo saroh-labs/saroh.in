@@ -241,7 +241,16 @@ const imageSchema = z.object({
 // Section content schemas (per type + version)
 // ---------------------------------------------------------------------------
 
-/** hero v1 — a headline block with optional CTA + image. */
+/**
+ * hero v1 — a headline block with optional CTA + image.
+ *
+ * `onToday` (G18) sets "On today" beside the headline: the next classes with
+ * places and the next free appointment times, and whether the business is
+ * open now. A switch, not content — the times are read live from the booking
+ * page's own availability, never stored here. Optional, so it extends v1
+ * (and v2, which extends v1) in place, as `paddingOverride` did: every
+ * existing hero validates and renders exactly as before.
+ */
 const heroV1 = z.object({
     variant,
     padding: paddingOverride,
@@ -249,6 +258,7 @@ const heroV1 = z.object({
     subheading: z.string().optional(),
     cta: ctaSchema.optional(),
     image: imageSchema.optional(),
+    onToday: z.boolean().optional(),
 });
 
 /**
@@ -473,6 +483,35 @@ const servicesListV1 = z.object({
     cta: ctaSchemaV2.optional(),
 });
 
+/**
+ * visitUs v1 — where a place is and when it is open, read live (G8).
+ *
+ * A bound block like `servicesList`: it stores WHICH place and how to show
+ * it, never the address, the hours or the phone. Those are read when the page
+ * is viewed (`GET public/sites/:siteId/visit/:storeId`), so a changed address
+ * or a new week of hours is right without a republish, and the block can never
+ * disagree with the storefront.
+ *
+ * `storeId` names one `SHOP` storefront — a place with an address and hours.
+ * It is the block's own and NOT the site's "sells from" storefront, because a
+ * site that sells from an `ONLINE` storefront still has a shop to visit.
+ * Optional, like `booking.serviceId`: a just-added block has none until the
+ * editor picks one, and the live site then renders nothing rather than a
+ * card with no place in it.
+ *
+ * `showMap` is the Get directions link (a maps search for the address, not an
+ * embedded map); `showHours` the week and "Open now". Both default to on, so
+ * ABSENT means shown.
+ */
+const visitUsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    storeId: z.string().min(1).optional(),
+    showMap: z.boolean().optional(),
+    showHours: z.boolean().optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -570,6 +609,7 @@ export const SECTION_TYPES = [
     "testimonials",
     "contact",
     "servicesList",
+    "visitUs",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -687,6 +727,13 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         schema: bookingV1,
         // All values are plain text — nothing here is authored HTML.
+        sanitizedFields: [],
+    },
+    [key("visitUs", 1)]: {
+        type: "visitUs",
+        version: 1,
+        // A title, an id and two switches; the place is read from the API live.
+        schema: visitUsV1,
         sanitizedFields: [],
     },
 };

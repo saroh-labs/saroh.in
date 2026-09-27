@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
+import { SinceNotice } from "@/components/shared/since-notice";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { Invoice } from "@/lib/invoices/service";
@@ -21,11 +22,13 @@ import {
     INVOICE_TABS,
     invoicePill,
     owedSummary,
+    paidSinceRows,
     sourceLine,
     whenLine,
     withCorrectionsUnder,
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
+import { withoutSince } from "@/lib/views/since";
 
 /** The business's GST standing, for the line under the title. */
 export interface InvoiceBusinessTax {
@@ -59,6 +62,8 @@ export function InvoicesScreen({
     businessName,
     tax,
     initialTab,
+    paidSince = null,
+    paidSinceInvoices = null,
 }: {
     businessName: string;
     invoices: Invoice[];
@@ -68,6 +73,17 @@ export function InvoicesScreen({
     /** Null when the business's tax settings could not be read. */
     tax: InvoiceBusinessTax | null;
     initialTab: InvoiceTab;
+    /**
+     * From Home's "Last 24 hours" (`?since=`, F6): only the invoices paid
+     * from then on — the money Home added up, a credit note never.
+     */
+    paidSince?: Date | null;
+    /**
+     * The API's own read of those (`?paidSince=`, H-7), which finds an old
+     * invoice paid today; null when it couldn't answer, and the list on
+     * hand is filtered instead.
+     */
+    paidSinceInvoices?: Invoice[] | null;
 }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -86,7 +102,9 @@ export function InvoicesScreen({
     }
 
     const { owed, overdue, overdueCount } = owedSummary(invoices);
-    const rows = withCorrectionsUnder(invoices);
+    const rows = withCorrectionsUnder(
+        paidSinceRows(invoices, paidSinceInvoices, paidSince),
+    );
     const shown = rows.filter((i) => {
         if (inTab(i, tab)) return true;
         // A correction follows its invoice into whichever tab shows it.
@@ -172,6 +190,19 @@ export function InvoicesScreen({
             </div>
 
             <div className="flex flex-col pb-[26px] pt-4">
+                {paidSince ? (
+                    <div className="mb-3.5">
+                        <SinceNotice
+                            count={shown.length}
+                            noun={{ one: "invoice", other: "invoices" }}
+                            verb="paid"
+                            clearHref={withoutSince(
+                                pathname,
+                                Object.fromEntries(params.entries()),
+                            )}
+                        />
+                    </div>
+                ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
                     <div
                         role="alert"

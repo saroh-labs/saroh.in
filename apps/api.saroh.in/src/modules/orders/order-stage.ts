@@ -1,6 +1,19 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
-import type { OrderFulfilment, OrderStage, OrderStatus } from "./dto";
+import type {
+    FulfilmentType,
+    OrderFulfilment,
+    OrderStage,
+    OrderStatus,
+} from "./dto";
+import type { StageMove } from "./fulfilment";
+import {
+    FULFILMENT_RULES,
+    FULFILMENT_TYPES,
+    movesFor,
+    typeOf,
+    WRITES_NEW_FULFILMENT_VALUES,
+} from "./fulfilment";
 import { assertStatusTransition } from "./order-state";
 
 /**
@@ -9,19 +22,24 @@ import { assertStatusTransition } from "./order-state";
  *
  * Pure, like `order-state.ts`: no Nest DI, no Prisma. The service loads the
  * order under its row lock, asks this module what a move means, and writes
- * exactly that. Every rule about which kitchen step may follow which lives
- * here and nowhere else.
+ * exactly that. Which steps each type of order takes, and the status each
+ * step is, live in `fulfilment.ts` (DEC-045); this module applies them.
  *
- *   NEW ──► PREPARING ──► READY ──► COLLECTED                (collection)
- *                               └─► HANDED_TO_COURIER ──► DELIVERED (delivery)
+ *   Pick-up         NEW ─► PREPARING ─► READY ─► COLLECTED
+ *   Local delivery                       READY ─► OUT_FOR_DELIVERY ─► DELIVERED
+ *                   (until B2c's switch:  READY ─► HANDED_TO_COURIER ─► DELIVERED)
+ *   Shipping                             READY ─► HANDED_TO_COURIER ─► DELIVERED
+ *   Digital         NEW (paid) ─► SENT
+ *   Appointments    no kitchen steps: their visits finish them
  *
  * Each move is also a status move (or none):
  *
  *   NEW → PREPARING               PENDING    → PROCESSING
  *   PREPARING → READY             PROCESSING   (unchanged)
  *   READY → COLLECTED             PROCESSING → DELIVERED   (ADR-008's one widening)
- *   READY → HANDED_TO_COURIER     PROCESSING → SHIPPED
- *   HANDED_TO_COURIER → DELIVERED SHIPPED    → DELIVERED
+ *   READY → handed over           PROCESSING → SHIPPED
+ *   handed over → DELIVERED       SHIPPED    → DELIVERED
+ *   NEW → SENT (Digital)          PENDING    → DELIVERED   (the kitchen's own)
  *
  * Nothing moves backwards except an Undo of the LAST step, by its event,
  * within {@link UNDO_WINDOW_MS}. The status table stays forward-only; an
@@ -32,6 +50,7 @@ import { assertStatusTransition } from "./order-state";
 // module and dto.ts never import each other.
 export { ORDER_FULFILMENTS, ORDER_STAGES } from "./dto";
 export type { OrderFulfilment, OrderStage } from "./dto";
+export type { StageMove } from "./fulfilment";
 
 /**
  * How long a kitchen step can be undone: ten minutes.
@@ -44,51 +63,16 @@ export type { OrderFulfilment, OrderStage } from "./dto";
  */
 export const UNDO_WINDOW_MS = 10 * 60 * 1000;
 
-export interface StageMove {
-    from: OrderStage;
-    to: OrderStage;
-    fromStatus: OrderStatus;
-    toStatus: OrderStatus;
-    /** A move that only one kind of order makes. */
-    only?: OrderFulfilment;
-}
-
-/** Every legal forward move. Terminal stages have none. */
-export const STAGE_MOVES: readonly StageMove[] = [
-    {
-        from: "NEW",
-        to: "PREPARING",
-        fromStatus: "PENDING",
-        toStatus: "PROCESSING",
-    },
-    {
-        from: "PREPARING",
-        to: "READY",
-        fromStatus: "PROCESSING",
-        toStatus: "PROCESSING",
-    },
-    {
-        from: "READY",
-        to: "COLLECTED",
-        fromStatus: "PROCESSING",
-        toStatus: "DELIVERED",
-        only: "COLLECT",
-    },
-    {
-        from: "READY",
-        to: "HANDED_TO_COURIER",
-        fromStatus: "PROCESSING",
-        toStatus: "SHIPPED",
-        only: "DELIVERY",
-    },
-    {
-        from: "HANDED_TO_COURIER",
-        to: "DELIVERED",
-        fromStatus: "SHIPPED",
-        toStatus: "DELIVERED",
-        only: "DELIVERY",
-    },
-];
+/**
+ * Every legal forward move, per type, as this release makes them. Terminal
+ * stages have none; appointments have none at all.
+ */
+export const STAGE_MOVES: Readonly<
+    Record<FulfilmentType, readonly StageMove[]>
+> = Object.fromEntries(FULFILMENT_TYPES.map((t) => [t, movesFor(t)])) as Record<
+    FulfilmentType,
+    readonly StageMove[]
+>;
 
 const STAGE_WORDS: Record<OrderStage, string> = {
     NEW: "new",
@@ -97,6 +81,8 @@ const STAGE_WORDS: Record<OrderStage, string> = {
     COLLECTED: "collected",
     HANDED_TO_COURIER: "handed to the courier",
     DELIVERED: "delivered",
+    OUT_FOR_DELIVERY: "out for delivery",
+    SENT: "sent",
 };
 
 /** What the service knows about an order when it asks for a move. */
@@ -104,6 +90,7 @@ export interface StageSubject {
     stage: OrderStage;
     status: string;
     paymentStatus: string;
+    /** As stored: either vocabulary (read through `typeOf`). */
     fulfilment: OrderFulfilment;
 }
 
@@ -114,19 +101,21 @@ export interface StageSubject {
  */
 export function nextStages(order: StageSubject): OrderStage[] {
     if (order.status === "CANCELLED") return [];
-    return STAGE_MOVES.filter(
-        (m) =>
-            m.from === order.stage &&
-            m.fromStatus === order.status &&
-            (!m.only || m.only === order.fulfilment) &&
-            (m.to !== "PREPARING" || order.paymentStatus === "PAID"),
-    ).map((m) => m.to);
+    return STAGE_MOVES[typeOf(order.fulfilment)]
+        .filter(
+            (m) =>
+                m.from === order.stage &&
+                m.fromStatus === order.status &&
+                (m.from !== "NEW" || order.paymentStatus === "PAID"),
+        )
+        .map((m) => m.to);
 }
 
 /**
- * Work out a forward move, or refuse it. Throws 400 for a move the flow does
- * not have, and 409 when the order's own state forbids it now (cancelled,
- * unpaid, out of step with its status). Returns the move to write.
+ * Work out a forward move, or refuse it. Throws 400 for a move the order's
+ * type does not have, and 409 when the order's own state forbids it now
+ * (cancelled, unpaid, out of step with its status). Returns the move to
+ * write.
  */
 export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
     if (order.status === "CANCELLED") {
@@ -135,22 +124,19 @@ export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
             field: "stage",
         });
     }
-    const move = STAGE_MOVES.find((m) => m.from === order.stage && m.to === to);
-    if (!move) {
-        throw new BadRequestException({
-            message: `An order that is ${STAGE_WORDS[order.stage]} cannot become ${STAGE_WORDS[to]}.`,
-            field: "stage",
-        });
-    }
-    if (move.only && move.only !== order.fulfilment) {
+    const type = typeOf(order.fulfilment);
+    const rule = FULFILMENT_RULES[type];
+    if (rule.visits) {
         throw new BadRequestException({
             message:
-                move.only === "COLLECT"
-                    ? "This order is for delivery, so it is handed to a courier, not collected."
-                    : "This order is collected at the counter, so it is not handed to a courier.",
+                "An appointment moves on by its visits, not by kitchen steps.",
             field: "stage",
         });
     }
+    const move = STAGE_MOVES[type].find(
+        (m) => m.from === order.stage && m.to === to,
+    );
+    if (!move) throw new BadRequestException(wrongMove(type, order.stage, to));
     if (order.status !== move.fromStatus) {
         // A stage and a status that disagree — an order moved by the old
         // status PATCH. Refused rather than guessed at.
@@ -159,17 +145,48 @@ export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
             field: "stage",
         });
     }
-    if (move.to === "PREPARING" && order.paymentStatus !== "PAID") {
+    // The first step out of New needs the money: nothing is made, or sent,
+    // for an order nobody paid for.
+    if (move.from === "NEW" && order.paymentStatus !== "PAID") {
         throw new ConflictException({
             message:
-                "This order is not paid yet, so it cannot start preparing. Take the payment first.",
+                move.to === "PREPARING"
+                    ? "This order is not paid yet, so it cannot start preparing. Take the payment first."
+                    : "This order is not paid yet, so it cannot be sent. Take the payment first.",
             field: "paymentStatus",
         });
     }
-    if (move.fromStatus !== move.toStatus) {
+    if (move.fromStatus !== move.toStatus && !move.direct) {
         assertStatusTransition(move.fromStatus, move.toStatus);
     }
     return move;
+}
+
+/** Why a move isn't this order's, in the words today's screen knows. */
+function wrongMove(
+    type: FulfilmentType,
+    stage: OrderStage,
+    to: OrderStage,
+): { message: string; field: string } {
+    const courier = to === "HANDED_TO_COURIER" || to === "OUT_FOR_DELIVERY";
+    if (to === "COLLECTED" && type !== "PICKUP" && stage === "READY") {
+        return {
+            message:
+                "This order is for delivery, so it is handed to a courier, not collected.",
+            field: "stage",
+        };
+    }
+    if (courier && type === "PICKUP" && stage === "READY") {
+        return {
+            message:
+                "This order is collected at the counter, so it is not handed to a courier.",
+            field: "stage",
+        };
+    }
+    return {
+        message: `An order that is ${STAGE_WORDS[stage]} cannot become ${STAGE_WORDS[to]}.`,
+        field: "stage",
+    };
 }
 
 /** A recorded step, as far as undoing it needs to know. */
@@ -253,33 +270,66 @@ export function canEditItems(order: {
     );
 }
 
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /**
  * The kitchen step a status change made OUTSIDE the kitchen flow implies —
  * the store-scoped status PATCH that predates stages. Keeps the two in step
  * so the next kitchen move is not refused as out of step. A cancel leaves
  * the stage where it was.
+ *
+ * It never changes how the order is fulfilled (it used to turn anything
+ * SHIPPED into a delivery). A status the order's type has no step for is
+ * refused with 409 and a sentence, before anything is written.
  */
 export function stageForStatus(
     status: OrderStatus,
     current: { stage: OrderStage; fulfilment: OrderFulfilment },
-): { stage: OrderStage; fulfilment: OrderFulfilment } {
+    writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
+): { stage: OrderStage } {
+    const type = typeOf(current.fulfilment);
+    const rule = FULFILMENT_RULES[type];
     switch (status) {
         case "PENDING":
-            return { stage: "NEW", fulfilment: current.fulfilment };
-        case "PROCESSING":
+            return { stage: "NEW" };
+        case "PROCESSING": {
+            // A type with no Preparing step (Digital, appointments) stays
+            // where it is.
+            if (!rule.steps.some((s) => s.stage === "PREPARING")) {
+                return { stage: current.stage };
+            }
             return {
                 stage: current.stage === "READY" ? "READY" : "PREPARING",
-                fulfilment: current.fulfilment,
             };
-        case "SHIPPED":
-            return { stage: "HANDED_TO_COURIER", fulfilment: "DELIVERY" };
-        case "DELIVERED":
-            return current.fulfilment === "COLLECT" &&
-                current.stage !== "HANDED_TO_COURIER"
-                ? { stage: "COLLECTED", fulfilment: "COLLECT" }
-                : { stage: "DELIVERED", fulfilment: "DELIVERY" };
+        }
+        case "SHIPPED": {
+            if (type === "SHIPPING") return { stage: "HANDED_TO_COURIER" };
+            if (type === "LOCAL_DELIVERY") {
+                // Already with a courier the old way, it stays there.
+                return {
+                    stage:
+                        current.stage === "HANDED_TO_COURIER" || !writesNew
+                            ? "HANDED_TO_COURIER"
+                            : "OUT_FOR_DELIVERY",
+                };
+            }
+            throw new ConflictException({
+                message: `${capital(rule.noun)} isn't shipped. Change how it's fulfilled first.`,
+                field: "status",
+            });
+        }
+        case "DELIVERED": {
+            if (rule.visits) {
+                throw new ConflictException({
+                    message:
+                        "An appointment is finished by its visits, not marked delivered.",
+                    field: "status",
+                });
+            }
+            return { stage: rule.done };
+        }
         case "CANCELLED":
         default:
-            return current;
+            return { stage: current.stage };
     }
 }

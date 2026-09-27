@@ -389,12 +389,16 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+import "reflect-metadata";
+
 import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
@@ -402,8 +406,17 @@ import {
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import type { PaymentsService } from "../payments/payments.service";
+import { EditOrderDto, MoveStageDto } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { UNDO_WINDOW_MS } from "./order-stage";
+
+/** The fields the global ValidationPipe would refuse in `body`. */
+async function refused<T extends object>(
+    cls: new () => T,
+    body: unknown,
+): Promise<string[]> {
+    return (await validate(plainToInstance(cls, body))).map((e) => e.property);
+}
 
 const as = (
     role: OrganizationContext["role"],
@@ -442,6 +455,8 @@ function reset(over: Record<string, unknown> = {}) {
         paidCents: 36000,
         notes: "No sesame",
         trackingUrl: null,
+        courierName: null,
+        trackingNumber: null,
         deliveryName: null,
         deliveryPhone: null,
         deliveryLine1: null,
@@ -786,6 +801,137 @@ describe("editing before preparing", () => {
         // Refused before anything is read or written.
         expect(mockDb.order.total).toBe("360.00");
         expect(mockDb.inventory.reserved).toBe(3);
+    });
+});
+
+describe("the courier and tracking number (B2b, DEC-045)", () => {
+    const withCourier = () =>
+        reset({
+            fulfilment: "DELIVERY",
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+            deliveryLine1: "12 MG Road",
+            deliveryCity: "Bengaluru",
+            deliveryState: "Karnataka",
+            deliveryPostalCode: "560001",
+        });
+
+    it("the DTOs trim them, take up to 80 characters and refuse more", async () => {
+        const body = plainToInstance(MoveStageDto, {
+            to: "HANDED_TO_COURIER",
+            courierName: "  Delhivery ",
+            trackingNumber: "   ",
+        });
+        expect(await validate(body)).toEqual([]);
+        expect(body.courierName).toBe("Delhivery");
+        // Blank is no number, not an empty one.
+        expect(body.trackingNumber).toBeNull();
+
+        const long = "x".repeat(81);
+        expect(
+            await refused(MoveStageDto, {
+                to: "HANDED_TO_COURIER",
+                courierName: long,
+                trackingNumber: long,
+            }),
+        ).toEqual(["courierName", "trackingNumber"]);
+        expect(
+            await refused(EditOrderDto, {
+                courierName: "x".repeat(80),
+                trackingNumber: long,
+                trackingUrl: "not a link",
+            }),
+        ).toEqual(["trackingNumber", "trackingUrl"]);
+    });
+
+    it("go with the handover: a Member hands over with them", async () => {
+        reset({
+            fulfilment: "DELIVERY",
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+            trackingNumber: "AWB4411",
+        });
+        expect(mockDb.order).toMatchObject({
+            stage: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+            trackingNumber: "AWB4411",
+        });
+    });
+
+    it("are refused on any other step, and nothing moves", async () => {
+        await expect(
+            kitchen.moveStage(OWNER, "order_1", {
+                to: "PREPARING",
+                trackingNumber: "AWB4411",
+            }),
+        ).rejects.toThrow(
+            "A tracking number goes with handing the order to a courier.",
+        );
+        expect(mockDb.order).toMatchObject({
+            stage: "NEW",
+            trackingNumber: null,
+        });
+    });
+
+    it("a Member adds the number after handover (order:stage), as a step on the timeline", async () => {
+        withCourier();
+        const edit = await kitchen.edit(MEMBER, "order_1", {
+            trackingNumber: "AWB4411",
+        });
+        expect(mockDb.order).toMatchObject({
+            trackingNumber: "AWB4411",
+            courierName: null,
+        });
+        expect(edit).toMatchObject({ differenceCents: 0, settleCents: 0 });
+        const event = mockDb.events.find((e) => e.id === edit.eventId);
+        expect(event).toMatchObject({
+            kind: "EDIT",
+            note: "tracking number AWB4411",
+            fromStage: "HANDED_TO_COURIER",
+            toStage: "HANDED_TO_COURIER",
+        });
+    });
+
+    it("a Member still can't change anything else", async () => {
+        withCourier();
+        await expect(
+            kitchen.edit(MEMBER, "order_1", {
+                trackingNumber: "AWB4411",
+                notes: "Leave at the gate",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(mockDb.order.trackingNumber).toBeNull();
+    });
+
+    it("after handover every other field is refused with 409", async () => {
+        withCourier();
+        for (const dto of [
+            { notes: "Leave at the gate" },
+            { lines: [{ itemId: "li_1", quantity: 4 }] },
+            { fulfilment: "COLLECT" as const },
+            { address: null },
+        ]) {
+            await expect(kitchen.edit(OWNER, "order_1", dto)).rejects.toThrow(
+                "This order has been handed over, so only its courier and tracking number can change.",
+            );
+        }
+        expect(mockDb.order.notes).toBe("No sesame");
+        expect(mockDb.events).toHaveLength(0);
+    });
+
+    it("a pick-up never has a courier, and one not handed over takes them with the handover", async () => {
+        await expect(
+            kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
+        ).rejects.toThrow("A pick-up order isn't handed to a courier.");
+        reset({ fulfilment: "DELIVERY", stage: "READY", status: "PROCESSING" });
+        await expect(
+            kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(mockDb.order.courierName).toBeNull();
     });
 });
 

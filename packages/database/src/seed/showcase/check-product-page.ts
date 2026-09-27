@@ -24,6 +24,8 @@ type Row = Record<string, unknown>;
 export async function checkRyeProductPage(
     prisma: Db,
     orgId: string,
+    /** The seed's now: what it wrote is never later, and the codes apply at it. */
+    seedNow: Date,
 ): Promise<{ counts: RyeProductPageCounts; failures: string[] }> {
     const failures: string[] = [];
     const fail = (what: string, rows: Row[]) => {
@@ -36,7 +38,7 @@ export async function checkRyeProductPage(
     const expect = (what: string, ok: boolean) => {
         if (!ok) failures.push(what);
     };
-    const now = new Date().toISOString();
+    const now = seedNow.toISOString();
     const productId = (slug: string) => ryeId("product", P[slug]);
 
     // The loaf, as the design has it.

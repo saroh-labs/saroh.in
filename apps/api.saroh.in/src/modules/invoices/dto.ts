@@ -181,6 +181,15 @@ export class ListInvoicesQueryDto {
     @IsOptional()
     @IsString()
     subscriptionId?: string;
+
+    /**
+     * Only invoices paid from this instant on, credit notes never (ISO):
+     * Home's "Last 24 hours" money, filtered here rather than over the
+     * capped newest page, where an older invoice paid today is missing.
+     */
+    @IsOptional()
+    @IsISO8601({ strict: true })
+    paidSince?: string;
 }
 
 /** Whose unpaid invoices to add up: a person, or one subscription. */

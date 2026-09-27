@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { Subscription, SubscriptionCharge } from "./service";
+import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
-    changeRows,
     chargeRow,
+    classesText,
     collectionRows,
     dayText,
     gstNote,
@@ -11,9 +11,13 @@ import {
     listTab,
     monthlyTotal,
     olderPrice,
+    olderPriceNotes,
+    pausedText,
+    payRows,
     paysBy,
     ranLine,
     rowWhen,
+    screenTabFromQuery,
     tabFromQuery,
 } from "./view";
 
@@ -35,6 +39,7 @@ const sub = (over: Partial<Subscription> = {}): Subscription => ({
     startsAt: null,
     endsAt: null,
     pausedAt: null,
+    pausedUntil: null,
     cancelledAt: null,
     overdue: false,
     overdueCount: 0,
@@ -91,6 +96,14 @@ describe("listTab", () => {
         expect(tabFromQuery("paused")).toBe("paused");
         expect(tabFromQuery("plans")).toBe("active");
         expect(tabFromQuery(undefined)).toBe("active");
+    });
+
+    it("opens Plans from ?tab=plans, and a list tab otherwise (D3)", () => {
+        expect(screenTabFromQuery("plans")).toBe("plans");
+        expect(screenTabFromQuery("failed")).toBe("failed");
+        expect(screenTabFromQuery("overdue")).toBe("failed");
+        expect(screenTabFromQuery("Plans")).toBe("active");
+        expect(screenTabFromQuery(undefined)).toBe("active");
     });
 });
 
@@ -150,6 +163,53 @@ describe("olderPrice", () => {
         const plans = [{ id: "p1", price: "1400.00", currency: "INR" }];
         expect(olderPrice(sub(), plans)).toEqual({ listPrice: "1400.00" });
         expect(olderPrice(sub({ price: "1400.00" }), plans)).toBeNull();
+    });
+});
+
+describe("a plan's words (D1)", () => {
+    const byPrice: Plan["byPrice"] = [
+        {
+            price: "1500.00",
+            currency: "INR",
+            interval: "MONTH",
+            count: 12,
+            current: true,
+        },
+        {
+            price: "1200.00",
+            currency: "INR",
+            interval: "MONTH",
+            count: 1,
+            current: false,
+        },
+    ];
+
+    it("says classes a month, or unlimited", () => {
+        expect(classesText(8)).toBe("8 classes a month");
+        expect(classesText(1)).toBe("1 class a month");
+        expect(classesText(null)).toBe("Unlimited classes");
+    });
+
+    it("lists who pays what, current price first", () => {
+        expect(payRows({ byPrice })).toEqual([
+            {
+                label: "12 people · current price",
+                amount: "₹1,500 / month",
+                older: false,
+            },
+            {
+                label: "1 person · older price",
+                amount: "₹1,200 / month",
+                older: true,
+            },
+        ]);
+        expect(payRows({ byPrice: [] })).toEqual([]);
+    });
+
+    it("notes only the older prices on a card", () => {
+        expect(olderPriceNotes({ byPrice })).toEqual([
+            "1 still on ₹1,200 — they keep it",
+        ]);
     });
 });
 
@@ -222,29 +282,6 @@ describe("charges", () => {
     });
 });
 
-describe("changeRows", () => {
-    it("lists what the subscription records, newest first", () => {
-        const rows = changeRows(
-            sub({
-                pendingPlan: {
-                    id: "p2",
-                    name: "Sourdough fortnightly",
-                    price: "700.00",
-                    currency: "INR",
-                    interval: "MONTH",
-                    from: "2026-09-30T18:30:00.000Z",
-                },
-            }),
-            NOW,
-        );
-        expect(rows.map((r) => r.what)).toEqual([
-            "Switching to Sourdough fortnightly (₹700)",
-            "Started on Sourdough weekly at ₹1,200",
-        ]);
-        expect(rows[0].when).toBe("From 1 Oct");
-    });
-});
-
 describe("ranLine", () => {
     it("says when renewals last ran, in the business's day", () => {
         expect(
@@ -285,6 +322,61 @@ describe("ranLine", () => {
 describe("dayText", () => {
     it("adds the year only when it is not this one", () => {
         expect(dayText("2027-01-02", TZ, NOW, true)).toBe("Sat 2 Jan 2027");
+    });
+});
+
+describe("a pause with an end date (D8)", () => {
+    // Paused 18 Sep for 4 weeks: resumes 16 Oct, Kolkata midnight.
+    const paused = sub({
+        status: "PAUSED",
+        nextRenewalAt: null,
+        pausedAt: "2026-09-18T06:00:00.000Z",
+        pausedUntil: "2026-10-15T18:30:00.000Z",
+    });
+
+    it("says the day it resumes on its own, in its zone", () => {
+        expect(headline(paused, null, NOW)).toEqual({
+            pill: { tone: "accent", label: "Paused" },
+            big: "—",
+            when: "",
+            line: "Paused until 16 Oct · resumes on its own. Nothing is charged while paused.",
+        });
+        expect(rowWhen(paused, NOW)).toEqual({
+            text: "Paused until 16 Oct",
+            danger: false,
+        });
+        expect(pausedText(paused, NOW)).toBe("Paused until 16 Oct");
+    });
+
+    it("says since when for a pause until someone resumes it", () => {
+        const open = { ...paused, pausedUntil: null };
+        expect(headline(open, null, NOW).line).toBe(
+            "Paused since 18 Sep. Nothing is charged while paused.",
+        );
+        expect(pausedText({ ...open, pausedAt: null }, NOW)).toBe("Paused");
+    });
+
+    describe("once its end date has come and it is still paused (review S-2)", () => {
+        const later = new Date("2026-10-16T09:00:00Z");
+
+        it("says it outlasted the paid period and waits for Payments, not that it resumes on its own", () => {
+            // Paid to 1 Oct, so resuming starts a new period with its invoice.
+            expect(headline(paused, null, later).line).toBe(
+                "Pause ended 16 Oct · restarts with a new invoice at the next hourly check, or once Payments is on if it's off. Nothing is charged while paused.",
+            );
+            expect(pausedText(paused, later)).toBe("Pause ended 16 Oct");
+            expect(rowWhen(paused, later).text).toBe("Pause ended 16 Oct");
+        });
+
+        it("says one that ended inside its paid period only waits for the next check", () => {
+            const inside = {
+                ...paused,
+                currentPeriodEnd: "2026-10-31T18:30:00.000Z",
+            };
+            expect(headline(inside, null, later).line).toBe(
+                "Pause ended 16 Oct · resumes at the next hourly check. Nothing is charged while paused.",
+            );
+        });
     });
 });
 

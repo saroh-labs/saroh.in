@@ -2,6 +2,7 @@
 
 **Status:** Accepted — 2026-09-22 (DEC-019)
 **Amended by:** [ADR-008](./ADR-008-operations-staff-gst-kitchen.md) (2026-09-23, DEC-023) — every order is invoiced; a GST-registered business credits an issued invoice instead of voiding it; GST tax invoices
+**Amended by:** DEC-038 (2026-09-26): autopay, card-on-file and per-session charges come from the business's own payment provider (mandates and provider subscriptions), and a pay link stays the fallback. See the note under "Subscriptions — invoiced each period".
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-003](./ADR-003-organization-modules.md) (modules) · [ADR-006](./ADR-006-one-storefront-one-website.md) (one storefront, one website) · DEC-010 (merchant payments run on the business's own providers)
 
 ---
@@ -67,6 +68,19 @@ business pays Saroh). To keep the two apart in code and in conversation:
   current period runs out. Pausing skips renewals until resumed.
 - No card-on-file, no auto-debit. Mandates (UPI AutoPay, e-NACH) are a later
   decision with provider approval behind it.
+
+    > **Amended 2026-09-26 (DEC-038):** that later decision is made. Autopay,
+    > a saved card or a UPI mandate, and charges per session come from the
+    > provider the business connects (Razorpay first, others through the same
+    > port), using **the provider's own mandates and subscriptions**. Saroh
+    > keeps the provider's references, never card or bank details, and charges
+    > only against a mandate the customer set up. Each period is **still
+    > invoiced**, and a successful mandate charge pays that invoice. A business
+    > with no provider, or a customer with no mandate or a failed one, gets the
+    > invoice and a pay link as before. "Retry" on a failed renewal retries the
+    > mandate when there is one and sends a pay link otherwise. Plan:
+    > [2026-09-26-004-feat-payments-plan.md](../../plans/2026-09-26-004-feat-payments-plan.md).
+
 - **With Payments off, subscribing someone is refused** (a 409 that says to
   turn Payments on), and so is resuming a pause past its paid period. A
   subscription is only its invoices, so one without them would be a list that
@@ -227,7 +241,8 @@ credit. The balance is **derived** from purchases minus live redemptions.
 
 - Not GST tax invoices (no GSTIN, HSN/SAC or CGST/SGST/IGST split). Revisit
   when a business needs to file with them. _Revisited in ADR-008._
-- Not automatic charging.
+- Not automatic charging. _Amended 2026-09-26 (DEC-038): automatic charging
+  runs on the business's own provider's mandates._
 - Not a replacement for store orders and receipts. _ADR-008 invoices every
   order; the order stays the ledger._
 - Not hotel stays: bookings stay timed slots within a day.

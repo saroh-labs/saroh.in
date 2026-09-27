@@ -3,6 +3,11 @@ import { forwardRef, Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import {
+    ClosuresController,
+    TimeOffPreviewController,
+} from "./closures.controller";
+import { ClosuresService } from "./closures.service";
 import { BookingRulesController, StaffController } from "./staff.controller";
 import { StaffService } from "./staff.service";
 
@@ -13,8 +18,13 @@ import { StaffService } from "./staff.service";
  */
 @Module({
     imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
-    controllers: [StaffController, BookingRulesController],
-    providers: [StaffService, OrganizationGuard],
-    exports: [StaffService],
+    controllers: [
+        StaffController,
+        BookingRulesController,
+        ClosuresController,
+        TimeOffPreviewController,
+    ],
+    providers: [StaffService, ClosuresService, OrganizationGuard],
+    exports: [StaffService, ClosuresService],
 })
 export class StaffModule {}

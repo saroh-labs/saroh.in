@@ -31,15 +31,42 @@ import type {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
     ListPlansQueryDto,
+    ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
+    PauseSubscriptionDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
 } from "./dto";
+import type { PauseEnded } from "./pause-until";
+import {
+    pausedEventData,
+    pauseEnd,
+    pauseHasEnded,
+    resumeWhenDue,
+} from "./pause-until";
 import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
+import type { PlanEventsPage } from "./plan-events";
+import { listPlanEvents, planActor } from "./plan-events";
+import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
+import type { PlanView } from "./plans";
+import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import type {
+    EventPlanRef,
+    SubscriptionEventLog,
+    SubscriptionEventsPage,
+} from "./subscription-events";
+import {
+    collectionChanges,
+    JOB,
+    listSubscriptionEvents,
+    subscriptionActor,
+    subscriptionEventLog,
+} from "./subscription-events";
 
 type Tx = Prisma.TransactionClient;
 
@@ -92,19 +119,6 @@ function notFound(what: string, field?: string): never {
     );
 }
 
-export interface PlanView {
-    id: string;
-    name: string;
-    description: string | null;
-    price: string;
-    currency: string;
-    interval: Interval;
-    status: string;
-    /** People on it now — active or paused. */
-    subscriberCount: number;
-    createdAt: string;
-}
-
 export interface SubscriptionView {
     id: string;
     status: string;
@@ -123,6 +137,8 @@ export interface SubscriptionView {
     /** When it stops, if it was cancelled to run out at period end. */
     endsAt: string | null;
     pausedAt: string | null;
+    /** When a pause resumes on its own (D8); null while it runs until resumed. */
+    pausedUntil: string | null;
     cancelledAt: string | null;
     /** Derived from its invoices, never stored: any issued one past due. */
     overdue: boolean;
@@ -181,6 +197,17 @@ export interface SubscriptionView {
     createdAt: string;
 }
 
+/** What the renewal job did to one subscription, for its run's log. */
+export type RenewOutcome =
+    | "renewed"
+    | "advanced"
+    | "uncharged"
+    | "ended"
+    | "skipped"
+    // A pause with an end date (D8): resumed, or left paused with Payments off.
+    | "resumed"
+    | "refused";
+
 /** When the renewal job last looked, and what it did today (ADR-007). */
 export interface RenewalsView {
     /** The last run that finished, or null if none has yet. */
@@ -214,6 +241,7 @@ const SUBSCRIPTION_SELECT = {
     collectionWeekday: true,
     collectionNote: true,
     pendingPlanId: true,
+    pausedUntil: true,
     pendingPlan: {
         select: {
             id: true,
@@ -278,28 +306,15 @@ export class SubscriptionsService {
         query: ListPlansQueryDto,
     ): Promise<PlanView[]> {
         authorize(ctx, "subscription:read");
-        const rows = await prisma.subscriptionPlan.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                ...(query.status ? { status: query.status } : {}),
-            },
-            orderBy: [{ status: "asc" }, { createdAt: "asc" }],
-            include: {
-                _count: {
-                    select: {
-                        subscriptions: {
-                            where: { status: { in: ["ACTIVE", "PAUSED"] } },
-                        },
-                    },
-                },
-            },
-        });
-        return rows.map((r) => this.planView(r));
+        return planViews(
+            ctx.organizationId,
+            query.status ? { status: query.status } : {},
+        );
     }
 
     async getPlan(ctx: OrganizationContext, id: string): Promise<PlanView> {
         authorize(ctx, "subscription:read");
-        return this.readPlan(ctx.organizationId, id);
+        return readPlan(ctx.organizationId, id);
     }
 
     async createPlan(
@@ -307,22 +322,8 @@ export class SubscriptionsService {
         dto: PlanInputDto,
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        if (!dto.name) fieldError("Give the plan a name", "name");
-        if (!dto.price) fieldError("Set a price", "price");
-        if (!dto.currency) fieldError("Choose a currency", "currency");
-        if (!dto.interval) fieldError("Choose how often it renews", "interval");
-        const created = await prisma.subscriptionPlan.create({
-            data: {
-                organizationId: ctx.organizationId,
-                name: dto.name,
-                description: dto.description ?? null,
-                price: fromCents(toCents(dto.price)),
-                currency: dto.currency,
-                interval: dto.interval,
-            },
-            select: { id: true },
-        });
-        return this.readPlan(ctx.organizationId, created.id);
+        const id = await createPlanRow(ctx.organizationId, planActor(ctx), dto);
+        return readPlan(ctx.organizationId, id);
     }
 
     async updatePlan(
@@ -331,41 +332,29 @@ export class SubscriptionsService {
         dto: PlanInputDto,
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        await this.readPlan(ctx.organizationId, id);
-        await prisma.subscriptionPlan.updateMany({
-            where: { id, organizationId: ctx.organizationId },
-            data: {
-                ...(dto.name !== undefined ? { name: dto.name } : {}),
-                ...(dto.description !== undefined
-                    ? { description: dto.description }
-                    : {}),
-                ...(dto.price !== undefined
-                    ? { price: fromCents(toCents(dto.price)) }
-                    : {}),
-                ...(dto.currency !== undefined
-                    ? { currency: dto.currency }
-                    : {}),
-                ...(dto.interval !== undefined
-                    ? { interval: dto.interval }
-                    : {}),
-            },
-        });
-        return this.readPlan(ctx.organizationId, id);
+        await updatePlanRow(ctx.organizationId, planActor(ctx), id, dto);
+        return readPlan(ctx.organizationId, id);
     }
 
-    /** Archived plans take no new sign-ups; everyone on them carries on. */
+    /** Archive a plan, or sell it again (`plan-writes.ts` says the rules). */
     async setPlanStatus(
         ctx: OrganizationContext,
         id: string,
         status: "ACTIVE" | "ARCHIVED",
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        await this.readPlan(ctx.organizationId, id);
-        await prisma.subscriptionPlan.updateMany({
-            where: { id, organizationId: ctx.organizationId },
-            data: { status },
-        });
-        return this.readPlan(ctx.organizationId, id);
+        await setPlanStatusRow(ctx.organizationId, planActor(ctx), id, status);
+        return readPlan(ctx.organizationId, id);
+    }
+
+    /** A plan's history, newest first (D2). */
+    async planEvents(
+        ctx: OrganizationContext,
+        id: string,
+        query: ListPlanEventsQueryDto,
+    ): Promise<PlanEventsPage> {
+        authorize(ctx, "subscription:read");
+        return listPlanEvents(ctx.organizationId, id, query);
     }
 
     // — Subscriptions —————————————————————————————————————————————
@@ -403,6 +392,19 @@ export class SubscriptionsService {
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
         authorize(ctx, "subscription:read");
         return this.read(ctx, id);
+    }
+
+    /** What was done to it and by whom, newest first (D9). */
+    async events(
+        ctx: OrganizationContext,
+        id: string,
+        query: ListSubscriptionEventsQueryDto,
+    ): Promise<SubscriptionEventsPage> {
+        authorize(ctx, "subscription:read");
+        return listSubscriptionEvents(ctx.organizationId, id, {
+            ...query,
+            showInvoices: allows(ctx, "invoice:read"),
+        });
     }
 
     /**
@@ -493,8 +495,9 @@ export class SubscriptionsService {
                     },
                     select: { id: true },
                 });
+                let invoiceId: string | null = null;
                 if (!startsLater) {
-                    await this.invoicePeriod(tx, {
+                    invoiceId = await this.invoicePeriod(tx, {
                         organizationId,
                         subscriptionId: created.id,
                         contactId: contact.id,
@@ -506,6 +509,20 @@ export class SubscriptionsService {
                         createdByUserId: ctx.userId,
                     });
                 }
+                await subscriptionEventLog(
+                    tx,
+                    organizationId,
+                    created.id,
+                    subscriptionActor(ctx),
+                )("SUBSCRIBED", {
+                    invoiceId,
+                    data: {
+                        plan: planRef({ ...plan, price }),
+                        startsAt: startsLater
+                            ? period.start.toISOString()
+                            : null,
+                    },
+                });
                 return created.id;
             })
             .catch((err: unknown) => {
@@ -518,10 +535,14 @@ export class SubscriptionsService {
         return this.read(ctx, id);
     }
 
-    /** Stop renewing until resumed. The period already invoiced is kept. */
+    /**
+     * Stop renewing until resumed, or until an end date when it resumes on
+     * its own (D8). The period already invoiced is kept.
+     */
     async pause(
         ctx: OrganizationContext,
         id: string,
+        dto: PauseSubscriptionDto = {},
     ): Promise<SubscriptionView> {
         authorize(ctx, "subscription:write");
         await prisma.$transaction(async (tx) => {
@@ -533,21 +554,26 @@ export class SubscriptionsService {
                         : "A cancelled subscription cannot be paused.",
                 );
             }
+            const now = new Date();
+            const pausedUntil = pauseEnd(dto, now, sub.timezone);
             await tx.customerSubscription.update({
                 where: { id },
-                data: { status: "PAUSED", pausedAt: new Date() },
+                data: { status: "PAUSED", pausedAt: now, pausedUntil },
+            });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("PAUSED", {
+                data: pausedEventData(pausedUntil),
             });
         });
         return this.read(ctx, id);
     }
 
     /**
-     * Carry on after a pause.
-     *
-     * Paused inside a period already invoiced: that period's end moves later
-     * by the whole days paused, and the renewal day moves with it. An undo
-     * within the same day therefore changes nothing. Paused past the end of
-     * that period: a new period starts today, with its invoice.
+     * Carry on after a pause, by hand. The job's resume at a pause's end
+     * date (D8) runs the same code: see {@link resumeLocked}.
      */
     async resume(
         ctx: OrganizationContext,
@@ -559,97 +585,143 @@ export class SubscriptionsService {
             if (sub.status !== "PAUSED" || !sub.pausedAt) {
                 throw new ConflictException("This subscription is not paused.");
             }
-            const now = new Date();
+            await this.resumeLocked(tx, sub, this.log(tx, ctx, id), {
+                now: new Date(),
+                createdByUserId: ctx.userId,
+            });
+        });
+        return this.read(ctx, id);
+    }
 
-            if (now < sub.currentPeriodEnd) {
-                // Calendar days in its own zone, so a pause across a clock
-                // change is not a day short.
-                const days = Math.floor(
+    /**
+     * Resume a paused subscription whose row lock the caller holds.
+     *
+     * Paused inside a period already invoiced: that period's end moves later
+     * by the whole days paused, and the renewal day moves with it. An undo
+     * within the same day therefore changes nothing. Paused past the end of
+     * that period: a new period starts today, with its invoice.
+     *
+     * A resume by hand decides from now. A pause's end date (D8) passes
+     * `ended`, which decides from the dates instead, so a late run lands
+     * where an on-time one would: `days` is how many calendar days the
+     * pause took, `extends` whether its end came on or before the period's
+     * end, and `on` the day a restart's new period starts.
+     */
+    private async resumeLocked(
+        tx: Tx,
+        sub: SubscriptionRow,
+        log: SubscriptionEventLog,
+        opts: {
+            now: Date;
+            createdByUserId: string | null;
+            ended?: PauseEnded;
+        },
+    ): Promise<void> {
+        const { id } = sub;
+        const { now, ended } = opts;
+        const pausedAt = sub.pausedAt ?? now;
+        // A resume, by hand or on its own, ends the pause and its end date.
+        const resumed = { pausedAt: null, pausedUntil: null };
+
+        if (ended ? ended.extends : now < sub.currentPeriodEnd) {
+            // Calendar days in its own zone, so a pause across a clock
+            // change is not a day short.
+            const days =
+                ended?.days ??
+                Math.floor(
                     DateTime.fromJSDate(now, { zone: sub.timezone }).diff(
-                        DateTime.fromJSDate(sub.pausedAt, {
+                        DateTime.fromJSDate(pausedAt, {
                             zone: sub.timezone,
                         }),
                         "days",
                     ).days,
                 );
-                const end =
-                    days > 0
-                        ? DateTime.fromJSDate(sub.currentPeriodEnd, {
-                              zone: sub.timezone,
-                          })
-                              .plus({ days })
-                              .toJSDate()
-                        : sub.currentPeriodEnd;
-                await tx.customerSubscription.update({
-                    where: { id },
-                    data: {
-                        status: "ACTIVE",
-                        pausedAt: null,
-                        currentPeriodEnd: end,
-                        // The chain now runs from the new end, so the
-                        // renewal after it keeps the same day.
-                        ...(days > 0 ? { anchorAt: end } : {}),
-                    },
-                });
-                return;
-            }
-
-            // Set to end with that period: it has ended, and nothing more
-            // is billed.
-            if (sub.cancelAtPeriodEnd) {
-                await tx.customerSubscription.update({
-                    where: { id },
-                    data: {
-                        status: "CANCELLED",
-                        pausedAt: null,
-                        cancelledAt: sub.currentPeriodEnd,
-                        cancelAtPeriodEnd: false,
-                    },
-                });
-                return;
-            }
-
-            await assertPaymentsOn(
-                tx,
-                ctx.organizationId,
-                "restart a subscription past its paid period",
-            );
-            // A new period starts today: that is the next renewal, so a plan
-            // change booked for it takes effect here.
-            const terms = await this.nextTerms(tx, sub);
-            const anchor = DateTime.fromJSDate(now, { zone: sub.timezone })
-                .startOf("day")
-                .toJSDate();
-            const period = periodContaining(
-                anchor,
-                terms.interval,
-                sub.timezone,
-                now,
-            );
+            const end =
+                days > 0
+                    ? DateTime.fromJSDate(sub.currentPeriodEnd, {
+                          zone: sub.timezone,
+                      })
+                          .plus({ days })
+                          .toJSDate()
+                    : sub.currentPeriodEnd;
             await tx.customerSubscription.update({
                 where: { id },
                 data: {
                     status: "ACTIVE",
-                    pausedAt: null,
-                    anchorAt: anchor,
-                    currentPeriodStart: period.start,
-                    currentPeriodEnd: period.end,
-                    ...this.termsData(sub, terms),
+                    ...resumed,
+                    currentPeriodEnd: end,
+                    // The chain now runs from the new end, so the
+                    // renewal after it keeps the same day.
+                    ...(days > 0 ? { anchorAt: end } : {}),
                 },
             });
-            await this.invoicePeriod(tx, {
-                organizationId: ctx.organizationId,
-                subscriptionId: id,
-                contactId: sub.contactId,
-                planName: terms.planName,
-                price: terms.price,
-                currency: terms.currency,
-                timezone: sub.timezone,
-                period,
-                createdByUserId: ctx.userId,
+            await log("RESUMED", {
+                data: { extendedDays: Math.max(days, 0) },
             });
+            return;
+        }
+
+        // Set to end with that period: it has ended, and nothing more
+        // is billed.
+        if (sub.cancelAtPeriodEnd) {
+            await tx.customerSubscription.update({
+                where: { id },
+                data: {
+                    status: "CANCELLED",
+                    ...resumed,
+                    cancelledAt: sub.currentPeriodEnd,
+                    cancelAtPeriodEnd: false,
+                },
+            });
+            await log("ENDED", {
+                data: { at: sub.currentPeriodEnd.toISOString() },
+            });
+            return;
+        }
+
+        await assertPaymentsOn(
+            tx,
+            sub.organizationId,
+            "restart a subscription past its paid period",
+        );
+        // A new period starts today: that is the next renewal, so a plan
+        // change booked for it takes effect here.
+        const terms = await this.nextTerms(tx, sub);
+        const anchor = DateTime.fromJSDate(ended?.on ?? now, {
+            zone: sub.timezone,
+        })
+            .startOf("day")
+            .toJSDate();
+        const period = periodContaining(
+            anchor,
+            terms.interval,
+            sub.timezone,
+            now,
+        );
+        await tx.customerSubscription.update({
+            where: { id },
+            data: {
+                status: "ACTIVE",
+                ...resumed,
+                anchorAt: anchor,
+                currentPeriodStart: period.start,
+                currentPeriodEnd: period.end,
+                ...this.termsData(sub, terms),
+            },
         });
-        return this.read(ctx, id);
+        await this.logPlanChanged(log, sub, terms);
+        const invoiceId = await this.invoicePeriod(tx, {
+            organizationId: sub.organizationId,
+            subscriptionId: id,
+            contactId: sub.contactId,
+            planName: terms.planName,
+            price: terms.price,
+            currency: terms.currency,
+            timezone: sub.timezone,
+            period,
+            createdByUserId: opts.createdByUserId,
+        });
+        await log("RESUMED", { invoiceId, data: { restarted: true } });
     }
 
     async cancel(
@@ -677,12 +749,20 @@ export class SubscriptionsService {
                         pendingPlanId: null,
                     },
                 });
+                await this.log(tx, ctx, id)("CANCELLED");
                 return;
             }
             // A booked plan change is kept, so Keep (the undo) restores it.
             await tx.customerSubscription.update({
                 where: { id },
                 data: { cancelAtPeriodEnd: true },
+            });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("CANCEL_SCHEDULED", {
+                data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
         });
         return this.read(ctx, id);
@@ -705,6 +785,7 @@ export class SubscriptionsService {
                 where: { id },
                 data: { cancelAtPeriodEnd: false },
             });
+            await this.log(tx, ctx, id)("KEPT");
         });
         return this.read(ctx, id);
     }
@@ -740,19 +821,31 @@ export class SubscriptionsService {
                     },
                 });
             }
+            const note =
+                dto.weekday === null
+                    ? null
+                    : dto.note !== undefined
+                      ? orNull(dto.note)
+                      : sub.collectionNote;
             await tx.customerSubscription.update({
                 where: { id },
                 data: {
                     collectionWeekday: dto.weekday,
-                    ...(dto.weekday === null
-                        ? { collectionNote: null }
-                        : dto.note !== undefined
-                          ? { collectionNote: orNull(dto.note) }
-                          : {}),
+                    ...(note !== sub.collectionNote
+                        ? { collectionNote: note }
+                        : {}),
                 },
             });
+            const log = this.log(tx, ctx, id);
+            const changes = collectionChanges(
+                { weekday: sub.collectionWeekday, note: sub.collectionNote },
+                { weekday: dto.weekday, note },
+            );
+            if (Object.keys(changes).length > 0) {
+                await log("COLLECTION_CHANGED", { data: changes });
+            }
             if (dto.weekday !== sub.collectionWeekday) {
-                await this.chargeIfUncharged(tx, ctx, {
+                await this.chargeIfUncharged(tx, ctx, log, {
                     ...sub,
                     collectionWeekday: dto.weekday,
                 });
@@ -821,6 +914,13 @@ export class SubscriptionsService {
                         createdByUserId: ctx.userId,
                     },
                 });
+                await this.log(
+                    tx,
+                    ctx,
+                    id,
+                )("COLLECTION_SKIPPED", {
+                    data: { date },
+                });
             })
             .catch((err: unknown) => {
                 if ((err as { code?: string }).code === "P2002") {
@@ -861,6 +961,8 @@ export class SubscriptionsService {
                 dateConflict("That collection has passed");
             }
             await tx.subscriptionSkip.delete({ where: { id: skip.id } });
+            const log = this.log(tx, ctx, id);
+            await log("COLLECTION_UNSKIPPED", { data: { date } });
             const inPeriod =
                 sub.collectionWeekday !== null &&
                 collectionDates(
@@ -871,7 +973,7 @@ export class SubscriptionsService {
                     sub.collectionWeekday,
                     sub.timezone,
                 ).includes(date);
-            if (inPeriod) await this.chargeIfUncharged(tx, ctx, sub);
+            if (inPeriod) await this.chargeIfUncharged(tx, ctx, log, sub);
         });
         return this.read(ctx, id);
     }
@@ -901,7 +1003,14 @@ export class SubscriptionsService {
             }
             const plan = await tx.subscriptionPlan.findFirst({
                 where: { id: dto.planId, organizationId: ctx.organizationId },
-                select: { id: true, name: true, status: true },
+                select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                    price: true,
+                    currency: true,
+                    interval: true,
+                },
             });
             if (!plan) notFound("Plan", "planId");
             if (plan.status !== "ACTIVE") {
@@ -927,6 +1036,17 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: plan.id },
             });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("PLAN_CHANGE_BOOKED", {
+                data: {
+                    to: planRef(plan),
+                    from: sub.currentPeriodEnd.toISOString(),
+                    replaced: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
+                },
+            });
         });
         return this.read(ctx, id);
     }
@@ -948,6 +1068,15 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: null },
             });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("PLAN_CHANGE_CANCELLED", {
+                data: {
+                    plan: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
+                },
+            });
         });
         return this.read(ctx, id);
     }
@@ -963,20 +1092,29 @@ export class SubscriptionsService {
         id: string,
     ): Promise<{ invoiceId: string; token: string }> {
         authorize(ctx, "subscription:write");
-        const row = await prisma.customerSubscription.findFirst({
-            where: { id, organizationId: ctx.organizationId },
-            select: SUBSCRIPTION_SELECT,
-        });
-        if (!row) notFound("Subscription");
-        const invoices = await this.invoicesFor(ctx.organizationId, [id]);
-        const failed = failedCharge(row, invoices.get(id), new Date());
-        if (!failed) {
-            throw new ConflictException(
-                "The latest charge is not overdue, so there is nothing to retry.",
+        // One transaction under the subscription's lock: the link and its
+        // RETRIED commit together, and a refused link records nothing.
+        return prisma.$transaction(async (tx) => {
+            const row = await this.lock(tx, ctx.organizationId, id);
+            const invoices = await this.invoicesFor(
+                ctx.organizationId,
+                [id],
+                tx,
             );
-        }
-        const { token } = await this.invoices.createPayLink(ctx, failed.id);
-        return { invoiceId: failed.id, token };
+            const failed = failedCharge(row, invoices.get(id), new Date());
+            if (!failed) {
+                throw new ConflictException(
+                    "The latest charge is not overdue, so there is nothing to retry.",
+                );
+            }
+            const { token } = await this.invoices.createPayLinkInTx(
+                tx,
+                ctx,
+                failed.id,
+            );
+            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
+            return { invoiceId: failed.id, token };
+        });
     }
 
     /**
@@ -1035,16 +1173,23 @@ export class SubscriptionsService {
      * Returns what it did, for the job's log. A period that already has a
      * live invoice is advanced without issuing another.
      */
-    async renewOne(
-        id: string,
-        now: Date,
-    ): Promise<"renewed" | "advanced" | "uncharged" | "ended" | "skipped"> {
+    async renewOne(id: string, now: Date): Promise<RenewOutcome> {
         return prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} FOR UPDATE`;
             const sub = await tx.customerSubscription.findUnique({
                 where: { id },
                 select: SUBSCRIPTION_SELECT,
             });
+            // A pause whose end date has come resumes (D8).
+            if (sub && pauseHasEnded(sub, now)) {
+                return resumeWhenDue(tx, sub, now, (log, ended) =>
+                    this.resumeLocked(tx, sub, log, {
+                        now,
+                        createdByUserId: null,
+                        ended,
+                    }),
+                );
+            }
             // A paused subscription only ends — when it was set to.
             const ends = sub?.status === "PAUSED" && sub.cancelAtPeriodEnd;
             if (
@@ -1054,6 +1199,7 @@ export class SubscriptionsService {
             ) {
                 return "skipped";
             }
+            const log = subscriptionEventLog(tx, sub.organizationId, id, JOB);
             if (sub.cancelAtPeriodEnd) {
                 await tx.customerSubscription.update({
                     where: { id },
@@ -1063,6 +1209,9 @@ export class SubscriptionsService {
                         cancelledAt: sub.currentPeriodEnd,
                         cancelAtPeriodEnd: false,
                     },
+                });
+                await log("ENDED", {
+                    data: { at: sub.currentPeriodEnd.toISOString() },
                 });
                 return "ended";
             }
@@ -1089,6 +1238,21 @@ export class SubscriptionsService {
                     ...this.termsData(sub, terms),
                 },
             });
+            await this.logPlanChanged(log, sub, terms);
+            // Once per period: a redelivered run finds it renewed, under the
+            // lock, and skips it above.
+            const renewed = (
+                invoiceId: string | null,
+                uncharged = false,
+            ): Promise<void> =>
+                log("RENEWED", {
+                    invoiceId,
+                    data: {
+                        periodStart: period.start.toISOString(),
+                        periodEnd: period.end.toISOString(),
+                        ...(uncharged ? { uncharged: true } : {}),
+                    },
+                });
             const live = await tx.invoice.findFirst({
                 where: {
                     subscriptionId: id,
@@ -1097,10 +1261,16 @@ export class SubscriptionsService {
                 },
                 select: { id: true },
             });
-            if (live) return "advanced";
-            if (await this.allSkipped(tx, sub, period)) return "uncharged";
+            if (live) {
+                await renewed(live.id);
+                return "advanced";
+            }
+            if (await this.allSkipped(tx, sub, period)) {
+                await renewed(null, true);
+                return "uncharged";
+            }
 
-            await this.invoicePeriod(tx, {
+            const invoiceId = await this.invoicePeriod(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 contactId: sub.contactId,
@@ -1111,6 +1281,7 @@ export class SubscriptionsService {
                 period,
                 createdByUserId: null,
             });
+            await renewed(invoiceId);
             return "renewed";
         });
     }
@@ -1206,6 +1377,7 @@ export class SubscriptionsService {
     private async chargeIfUncharged(
         tx: Tx,
         ctx: OrganizationContext,
+        log: SubscriptionEventLog,
         sub: SubscriptionRow,
     ): Promise<void> {
         const period = {
@@ -1248,7 +1420,7 @@ export class SubscriptionsService {
             select: { id: true },
         });
         if (any || !(await paymentsOn(tx, ctx.organizationId))) return;
-        await this.invoicePeriod(tx, {
+        const invoiceId = await this.invoicePeriod(tx, {
             organizationId: ctx.organizationId,
             subscriptionId: sub.id,
             contactId: sub.contactId,
@@ -1258,6 +1430,13 @@ export class SubscriptionsService {
             timezone: sub.timezone,
             period,
             createdByUserId: ctx.userId,
+        });
+        await log("INVOICED", {
+            invoiceId,
+            data: {
+                periodStart: period.start.toISOString(),
+                periodEnd: period.end.toISOString(),
+            },
         });
     }
 
@@ -1333,8 +1512,8 @@ export class SubscriptionsService {
             period: Period;
             createdByUserId: string | null;
         },
-    ): Promise<void> {
-        await this.invoices.issueInTx(tx, input.organizationId, {
+    ): Promise<string> {
+        const issued = await this.invoices.issueInTx(tx, input.organizationId, {
             contactId: input.contactId,
             currency: input.currency,
             lines: [
@@ -1349,6 +1528,46 @@ export class SubscriptionsService {
             periodStart: input.period.start,
             periodEnd: input.period.end,
             createdByUserId: input.createdByUserId,
+        });
+        return issued.id;
+    }
+
+    /** This subscription's log in this transaction, as the person acting (D9). */
+    private log(
+        tx: Tx,
+        ctx: OrganizationContext,
+        id: string,
+    ): SubscriptionEventLog {
+        return subscriptionEventLog(
+            tx,
+            ctx.organizationId,
+            id,
+            subscriptionActor(ctx),
+        );
+    }
+
+    /** A booked plan change taking effect is its own event. */
+    private async logPlanChanged(
+        log: SubscriptionEventLog,
+        sub: SubscriptionRow,
+        terms: Terms,
+    ): Promise<void> {
+        if (terms.planId === sub.planId) return;
+        await log("PLAN_CHANGED", {
+            data: {
+                from: planRef({
+                    id: sub.planId,
+                    name: sub.plan.name,
+                    price: sub.price,
+                    currency: sub.currency,
+                    interval: sub.interval,
+                }),
+                to: planRef({
+                    ...terms,
+                    id: terms.planId,
+                    name: terms.planName,
+                }),
+            },
         });
     }
 
@@ -1387,26 +1606,6 @@ export class SubscriptionsService {
         );
     }
 
-    private async readPlan(
-        organizationId: string,
-        id: string,
-    ): Promise<PlanView> {
-        const row = await prisma.subscriptionPlan.findFirst({
-            where: { id, organizationId },
-            include: {
-                _count: {
-                    select: {
-                        subscriptions: {
-                            where: { status: { in: ["ACTIVE", "PAUSED"] } },
-                        },
-                    },
-                },
-            },
-        });
-        if (!row) notFound("Plan");
-        return this.planView(row);
-    }
-
     /**
      * Each subscription's issued and paid invoices in one read: the unpaid
      * ones, oldest first, and the latest of them all.
@@ -1414,10 +1613,11 @@ export class SubscriptionsService {
     private async invoicesFor(
         organizationId: string,
         subscriptionIds: string[],
+        db: Tx = prisma,
     ): Promise<Map<string, SubscriptionInvoices>> {
         const byId = new Map<string, SubscriptionInvoices>();
         if (subscriptionIds.length === 0) return byId;
-        const rows: InvoiceRowLite[] = await prisma.invoice.findMany({
+        const rows: InvoiceRowLite[] = await db.invoice.findMany({
             where: {
                 organizationId,
                 status: { in: ["ISSUED", "PAID"] },
@@ -1487,6 +1687,10 @@ export class SubscriptionsService {
                     ? row.currentPeriodEnd.toISOString()
                     : null,
             pausedAt: row.pausedAt?.toISOString() ?? null,
+            pausedUntil:
+                row.status === "PAUSED"
+                    ? (row.pausedUntil?.toISOString() ?? null)
+                    : null,
             cancelledAt: row.cancelledAt?.toISOString() ?? null,
             overdue: pastDue > 0,
             overdueCount: pastDue,
@@ -1572,30 +1776,6 @@ export class SubscriptionsService {
                     : [],
         };
     }
-
-    private planView(row: {
-        id: string;
-        name: string;
-        description: string | null;
-        price: { toString(): string };
-        currency: string;
-        interval: string;
-        status: string;
-        createdAt: Date;
-        _count: { subscriptions: number };
-    }): PlanView {
-        return {
-            id: row.id,
-            name: row.name,
-            description: row.description,
-            price: toMoneyString(row.price),
-            currency: row.currency,
-            interval: row.interval as Interval,
-            status: row.status,
-            subscriberCount: row._count.subscriptions,
-            createdAt: row.createdAt.toISOString(),
-        };
-    }
 }
 
 /**
@@ -1611,6 +1791,23 @@ function failedCharge(
     const latest = invoices?.latest ?? null;
     if (row.status === "CANCELLED" || !latest) return null;
     return isPastDue(latest, now) ? latest : null;
+}
+
+/** A plan as an event names it, money as the wire says it. */
+function planRef(p: {
+    id: string;
+    name: string;
+    price: { toString(): string };
+    currency: string;
+    interval: string;
+}): EventPlanRef {
+    return {
+        id: p.id,
+        name: p.name,
+        price: toMoneyString(p.price),
+        currency: p.currency,
+        interval: p.interval,
+    };
 }
 
 /** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */

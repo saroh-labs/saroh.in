@@ -99,14 +99,18 @@ src/
 - **Success is bare JSON** — no success envelope.
 - **Errors are thrown Nest exceptions.** `AllExceptionsFilter` shapes every one
   as `{ error: { code, message, statusCode, correlationId, details? } }` and
-  keeps 5xx messages generic.
+  keeps 5xx messages generic. The one exception is a deliberate 503 thrown
+  with `{ message, details }` (a site sign-in code that could not be sent,
+  `reason: "unavailable"`): its words and reason reach the client.
 
 ## Cross-cutting — **Current**
 
 - `OrgRlsInterceptor` runs the request inside the organization's RLS context;
   `LoggingInterceptor` writes one line per request.
 - `OriginGuard` rejects a state-changing request whose `Origin` (or `Referer`) is
-  not a trusted origin — CSRF defence on top of the `SameSite` cookie.
+  not a trusted origin, or that carries neither (#50). This is CSRF defence on
+  top of the `SameSite` cookie. `/public/*`, `/api/auth/*` and `/health` are
+  exempt.
 - Retry-safe writes use `IdempotencyService`: the same key with the same request
   fingerprint replays the original response; the same key with a different
   request is a 409.

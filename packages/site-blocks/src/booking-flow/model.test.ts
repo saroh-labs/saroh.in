@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BookingDay, BookingService } from "./model";
 import {
+    asksWhere,
     buildIcs,
     changeText,
     dateText,
@@ -12,13 +13,17 @@ import {
     isBookingDays,
     isBookingPage,
     isBookResult,
+    isHoldView,
     looksLikeEmail,
     orList,
     phoneProblem,
     placesText,
     rulesText,
     serviceLine,
+    serviceWhere,
     timeIn,
+    whereLabel,
+    whereText,
 } from "./model";
 
 const ZONE = "Asia/Kolkata";
@@ -226,5 +231,81 @@ describe("what the API answers, narrowed (#264)", () => {
         };
         expect(isBookResult(ok)).toBe(true);
         expect(isBookResult({ ...ok, state: "PAID" })).toBe(false);
+    });
+});
+
+describe("Where (E7)", () => {
+    const page = {
+        businessName: "Kavi Dental",
+        open: true,
+        timezone: ZONE,
+        payOnline: false,
+        rules: {
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+        },
+    };
+
+    it("reads where a service happens, from an API with or without it", () => {
+        expect(serviceWhere(service({ where: "EITHER" }))).toBe("EITHER");
+        expect(serviceWhere(service({ online: true }))).toBe("ONLINE");
+        expect(serviceWhere(service())).toBe("IN_PERSON");
+        expect(
+            isBookingPage({ ...page, services: [service({ where: "EITHER" })] }),
+        ).toBe(true);
+        expect(isBookingPage({ ...page, services: [service()] })).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [{ ...service(), where: "HOME_VISIT" }],
+            }),
+        ).toBe(false);
+    });
+
+    it("asks only for a service offered either way", () => {
+        expect(asksWhere(service({ where: "EITHER" }))).toBe(true);
+        expect(asksWhere(service({ where: "ONLINE", online: true }))).toBe(
+            false,
+        );
+        expect(asksWhere(service({ where: "IN_PERSON" }))).toBe(false);
+        expect(asksWhere(null)).toBe(false);
+    });
+
+    it("names the two answers", () => {
+        expect(whereLabel("IN_PERSON", "Kavi Dental")).toBe("At Kavi Dental");
+        expect(whereLabel("ONLINE", "Kavi Dental")).toBe("Video call");
+    });
+
+    it("says where a booking happens only for a business that also works online", () => {
+        const either = service({ where: "EITHER" });
+        const clinic = service({ where: "IN_PERSON" });
+        const both = [either, clinic];
+        expect(whereText(either, { online: true }, both, "Kavi Dental")).toBe(
+            "Video call",
+        );
+        expect(whereText(either, { online: false }, both, "Kavi Dental")).toBe(
+            "At Kavi Dental",
+        );
+        expect(whereText(clinic, { online: false }, both, "Kavi Dental")).toBe(
+            "At Kavi Dental",
+        );
+        expect(
+            whereText(clinic, { online: false }, [clinic], "Pulse Fitness"),
+        ).toBeNull();
+    });
+
+    it("narrows a hold's answer, with or without its booking", () => {
+        const hold = { state: "CONFIRMED", holdExpiresAt: null };
+        expect(isHoldView(hold)).toBe(true);
+        expect(
+            isHoldView({
+                ...hold,
+                booking: { online: true, meetingUrl: "https://meet.x/y" },
+            }),
+        ).toBe(true);
+        expect(
+            isHoldView({ ...hold, booking: { online: "yes", meetingUrl: null } }),
+        ).toBe(false);
     });
 });

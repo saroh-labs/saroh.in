@@ -1,5 +1,6 @@
 import { clock } from "@/lib/calendar/layers";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { goesToAddress } from "@/lib/orders/lifecycle";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
 import type {
@@ -233,6 +234,8 @@ const STAGE: Record<string, string> = {
     COLLECTED: "Collected",
     HANDED_TO_COURIER: "With courier",
     DELIVERED: "Delivered",
+    OUT_FOR_DELIVERY: "Out for delivery",
+    SENT: "Sent",
 };
 
 /** What an order's row calls it: the kitchen stage, or Cancelled. */
@@ -377,7 +380,7 @@ export function favourites(rows: DetailOrder[]): Favourite[] {
 /** "How they get orders", from how each one went. */
 export function howTheyGet(rows: DetailOrder[]): string {
     if (!rows.length) return "No orders yet.";
-    const collected = rows.filter((o) => o.fulfilment !== "DELIVERY");
+    const collected = rows.filter((o) => !goesToAddress(o));
     const where = mostCommon(collected.map((o) => o.via.storefront.name));
     if (collected.length === rows.length) {
         // "Rye & Co." ends the sentence itself.

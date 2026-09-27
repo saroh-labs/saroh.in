@@ -16,6 +16,21 @@
   requests through the RLS-aware `prisma` proxy; enforcement is switched by
   `RLS_ENFORCEMENT`, and rollout state is in
   `docs/architecture/RLS_ROLLOUT_AND_OPS.md`. Application filters stay mandatory.
+- **Current** — **Every new table gets the `org_isolation` policy in its own
+  migration** (ENABLE, FORCE, the empty-string-safe predicate; through the
+  parent for a child table with no `organizationId`), or an entry in
+  `NOT_TENANT_OWNED` with the reason it isn't business-owned.
+  `packages/database/src/rls-coverage.test.ts` fails otherwise (#53). Sixteen
+  tables slipped through before that test existed.
+- **Current** — **Inside an org context, `$transaction([...])` takes only
+  operations made through `prisma` in that same context.** Under
+  `RLS_ENFORCEMENT` they are lazy and run in one GUC'd transaction; a promise
+  from anywhere else is refused. `TEST_RLS=on` runs the integration suite the
+  way enforcement will (#53).
+- **Current** — **Read a lost serializable race with `isSerializationFailure()`**
+  (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
+  never `code === "P2034"`. Through the pg driver adapter it can arrive with no
+  code, and the booker got a 500 instead of "fully booked" (#106).
 - **Current** — **Publications are immutable,** and the public renderer reads only
   them (ADR-002). No draft table is ever on the public read path.
   **A public write that depends on what the site shows reads the publication
@@ -131,6 +146,19 @@
   a business goes in the audit stream (the full report, read with
   `audit:read`) plus one notice in the Owner/Admin inbox, so it is seen
   without a banner to build and dismiss.
+
+- **Current** — **A contact's email can be a reserved placeholder; read it
+  through `contacts/contact-email.ts`** (DEC-049, round-2 A1).
+  `Contact.email` is required and unique per business, so a contact that
+  must not hold a real address carries `account+<id>@account.invalid` (a
+  site account's separate contact), `merged+<id>@removed.invalid` (a merge's
+  retired contact) or `removed+<id>@removed.invalid` (privacy removal). Build
+  them only with that module's `reserved*Email`, test with
+  `isReservedContactEmail`, and show `contactEmailForDisplay`, which gives
+  the linked account's email or nothing. Never send to, pair on or show a
+  placeholder. A site account (`CustomerAccount`, ADR-011) is live in every
+  status but REMOVED: a MERGED one keeps its email reserved in the partial
+  unique index.
 
 ## Money — **Current**
 

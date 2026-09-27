@@ -6,11 +6,7 @@ import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
-import type {
-    ChangeRow,
-    ChargeRow,
-    CollectionRow,
-} from "@/lib/subscriptions/view";
+import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 
 import { Pill } from "../pill";
 
@@ -247,27 +243,6 @@ export function PlanCard({
             <div className="mt-2 text-[12px] text-muted-foreground">
                 {paysBy}
             </div>
-        </section>
-    );
-}
-
-export function ChangesCard({ rows }: { rows: ChangeRow[] }) {
-    return (
-        <section
-            aria-labelledby="changes-title"
-            className={cn(CARD, "px-4 py-[13px]")}
-        >
-            <h2 id="changes-title" className={cn(TITLE, "mb-2")}>
-                Changes
-            </h2>
-            {rows.map((c, i) => (
-                <div key={i} className="py-1.5">
-                    <div className="text-[13px] font-semibold">{c.what}</div>
-                    <div className="text-[12px] text-muted-foreground">
-                        {c.when}
-                    </div>
-                </div>
-            ))}
         </section>
     );
 }

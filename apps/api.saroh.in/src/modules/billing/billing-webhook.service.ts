@@ -86,7 +86,7 @@ export class BillingWebhookService {
             throw new BadRequestException("Malformed webhook body");
         }
 
-        const event = provider.parseWebhook(payload);
+        const event = provider.parseWebhook(payload, headers);
 
         // Resolve the org (denormalized id on the inbox) from the subscription
         // this event concerns — before the idempotency guard. Read-only.

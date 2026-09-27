@@ -1,8 +1,10 @@
+import type { OffLine } from "@/lib/staff/time-off";
+import { offLines } from "@/lib/staff/time-off";
 import type {
     BookingRules,
+    Closure,
     ExtraHours,
     StaffView,
-    TimeOff,
     WeeklyRange,
 } from "@/lib/staff/types";
 
@@ -119,18 +121,27 @@ export function outsideHours(
     );
 }
 
-/** A day off added in the editor, not yet saved. */
-export interface NewDayOff {
+/**
+ * Time off added in the editor, not yet saved (E3): a range of days, all
+ * day or the same hours on each, for one person or — `staffId` null — the
+ * whole business closed.
+ */
+export interface NewOff {
     key: string;
-    staffId: string;
-    date: string;
+    staffId: string | null;
+    fromDate: string;
+    toDate: string;
+    /** Part of each day; both null for all day. */
+    startMinute: number | null;
+    endMinute: number | null;
     reason: string;
 }
 
 /** Everything the editor can change, held until "Save hours". */
 export interface AvailabilityDraft {
     hours: Record<string, WeeklyRange[]>;
-    offAdded: NewDayOff[];
+    offAdded: NewOff[];
+    /** Rows of time off or closure taken away — a line's rows together. */
     offRemoved: string[];
     extraRemoved: string[];
     rules: BookingRules;
@@ -166,8 +177,9 @@ export type SaveOp =
           hours: WeeklyRange[];
           before: WeeklyRange[];
       }
-    | { kind: "addOff"; staffId: string; date: string; reason: string }
-    | { kind: "removeOff"; staffId: string; before: TimeOff }
+    | { kind: "addOff"; off: NewOff }
+    | { kind: "removeOff"; staffId: string; before: OffLine }
+    | { kind: "removeClosure"; before: OffLine }
     | { kind: "removeExtra"; staffId: string; before: ExtraHours }
     | { kind: "rules"; rules: BookingRules; before: BookingRules };
 
@@ -179,13 +191,23 @@ function sameRules(a: BookingRules, b: BookingRules): boolean {
     );
 }
 
-/** The writes that make the saved state the draft; empty when unchanged. */
+/**
+ * The writes that make the saved state the draft; empty when unchanged. A
+ * line of time off or closure is removed whole, in one write.
+ */
 export function saveOps(
     staff: readonly StaffView[],
     rules: BookingRules,
     draft: AvailabilityDraft,
+    closures: readonly Closure[] = [],
+    timeZone = "UTC",
 ): SaveOp[] {
     const ops: SaveOp[] = [];
+    const removed = (line: OffLine) =>
+        line.ids.some((id) => draft.offRemoved.includes(id));
+    for (const line of offLines(closures, timeZone, true)) {
+        if (removed(line)) ops.push({ kind: "removeClosure", before: line });
+    }
     for (const p of staff) {
         const next = draft.hours[p.id] as WeeklyRange[] | undefined;
         if (next && !sameHours(next, p.hours)) {
@@ -196,9 +218,9 @@ export function saveOps(
                 before: p.hours,
             });
         }
-        for (const t of p.timeOff) {
-            if (draft.offRemoved.includes(t.id)) {
-                ops.push({ kind: "removeOff", staffId: p.id, before: t });
+        for (const line of offLines(p.timeOff, timeZone, false)) {
+            if (removed(line)) {
+                ops.push({ kind: "removeOff", staffId: p.id, before: line });
             }
         }
         for (const x of p.extraHours) {
@@ -207,14 +229,7 @@ export function saveOps(
             }
         }
     }
-    for (const o of draft.offAdded) {
-        ops.push({
-            kind: "addOff",
-            staffId: o.staffId,
-            date: o.date,
-            reason: o.reason,
-        });
-    }
+    for (const off of draft.offAdded) ops.push({ kind: "addOff", off });
     if (!sameRules(rules, draft.rules)) {
         ops.push({ kind: "rules", rules: draft.rules, before: rules });
     }

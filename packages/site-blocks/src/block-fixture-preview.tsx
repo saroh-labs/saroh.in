@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import type {
     RenderedBooking,
     RenderedServicesList,
+    RenderedVisitUs,
     SectionType,
 } from "@saroh/block-contract";
 import { blockFixture } from "@saroh/block-contract";
@@ -13,6 +14,8 @@ import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
+import type { PublicVisit } from "./blocks/visit-us";
+import VisitUsSection from "./blocks/visit-us";
 import SectionRenderer from "./section-renderer";
 
 /**
@@ -47,6 +50,29 @@ export const SAMPLE_SERVICES: PublicService[] = [
         currency: null,
     },
 ];
+
+/**
+ * A place for previewing `visitUs` where there is no real one: the catalog and
+ * the Add-section picker (G8). The contact fixture's reserved number and
+ * address, so a preview never shows a real business's.
+ */
+export const SAMPLE_VISIT: PublicVisit = {
+    source: "storefront",
+    storeId: "fixture-shop",
+    name: "Riverside",
+    address: "Unit 4, Riverside Trade Park\nLeeds LS10 1AB",
+    phone: "+44 113 496 0000",
+    hours: [
+        { day: "MON", open: "07:30", close: "17:00", closed: false },
+        { day: "TUE", open: "07:30", close: "17:00", closed: false },
+        { day: "WED", open: "07:30", close: "17:00", closed: false },
+        { day: "THU", open: "07:30", close: "17:00", closed: false },
+        { day: "FRI", open: "07:30", close: "17:00", closed: false },
+        { day: "SAT", open: "08:00", close: "12:00", closed: false },
+        { day: "SUN", open: "08:00", close: "12:00", closed: true },
+    ],
+    timezone: "Europe/London",
+};
 
 /**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
@@ -123,6 +149,12 @@ const LIVE_DATA_PREVIEWS: Partial<
         <ServicesListSection
             content={content as RenderedServicesList}
             services={SAMPLE_SERVICES}
+        />
+    ),
+    visitUs: (content) => (
+        <VisitUsSection
+            content={content as RenderedVisitUs}
+            visit={SAMPLE_VISIT}
         />
     ),
 };

@@ -70,7 +70,11 @@ const PRODUCT = {
     storeId: "store_1",
     name: "Sourdough loaf",
     slug: "sourdough-loaf",
-    description: "<p>Baked each morning.</p><ul><li>Long ferment</li></ul>",
+    // Spelled as Tiptap writes it, so the Editor has nothing to rewrite on
+    // open and makes no transaction — the case that left the description an
+    // empty box, because only a transaction woke its toolbar.
+    description:
+        "<p>Baked each morning.</p><ul><li><p>Long ferment</p></li></ul>",
     image: null,
     categoryId: null,
     category: null,
@@ -242,6 +246,15 @@ createServer((req, res) => {
             ],
             meta: { organizationId: "org_1" },
         });
+    // The Orders list (B7): a business with none yet, or a read that failed.
+    if (path.endsWith("/orders"))
+        return scenario === "orders-failure"
+            ? reply(500, { error: "fixture" })
+            : reply(200, {
+                  rows: [],
+                  counts: { all: 0, open: 0, refunded: 0 },
+                  nextCursor: null,
+              });
     if (path.endsWith("/settings"))
         return reply(scenario === "failure" ? 500 : 403, { error: "fixture" });
     if (path.endsWith("/sites/site_1"))

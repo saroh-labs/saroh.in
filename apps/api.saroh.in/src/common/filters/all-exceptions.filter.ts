@@ -4,9 +4,9 @@ import type { Request, Response } from "express";
 
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
 import { logHttpRequestOnce } from "../logging/http-request-log";
-import { redactHeaders, redactUrl } from "../logging/redact";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
-import { structuredLogger } from "../logging/structured-logger";
+import { reportError } from "../observability/report-error";
+import type { OrganizationContext } from "../types/organization-context";
 
 /**
  * Error-envelope contract (S0-007)
@@ -44,7 +44,9 @@ interface ErrorEnvelope {
 }
 
 type MaybeCorrelated = Request &
-    Partial<Pick<CorrelatedRequest, "correlationId" | "startTime">>;
+    Partial<Pick<CorrelatedRequest, "correlationId" | "startTime">> & {
+        organizationContext?: OrganizationContext;
+    };
 
 function statusToCode(status: number): string {
     const name: unknown = (HttpStatus as Record<number, unknown>)[status];
@@ -87,6 +89,26 @@ function extractClientMessage(exception: HttpException): {
 }
 
 /**
+ * A 503 the API raised on purpose, with its own words and a reason a client
+ * can branch on in `details` — a site sign-in code that could not be sent,
+ * `{ reason: "unavailable" }` (round-2 plan A, A2). It is ours, not an
+ * internal error, so it keeps its message and details; the code that threw
+ * it has already logged what went wrong.
+ */
+function isDeliberateUnavailable(exception: unknown): boolean {
+    if (!(exception instanceof HttpException)) return false;
+    if (exception.getStatus() !== Number(HttpStatus.SERVICE_UNAVAILABLE)) {
+        return false;
+    }
+    const body = exception.getResponse();
+    return (
+        typeof body === "object" &&
+        typeof (body as { message?: unknown }).message === "string" &&
+        (body as { details?: unknown }).details !== undefined
+    );
+}
+
+/**
  * Global catch-all filter. Converts any thrown error into the standard error
  * envelope, maps Nest `HttpException`s to their status, and collapses anything
  * unexpected into an opaque 500 so stack traces and internal messages never
@@ -110,25 +132,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
         let message: string;
         let details: unknown;
 
-        if (isServerError) {
+        if (isServerError && !isDeliberateUnavailable(exception)) {
             // Never surface internals for 5xx — generic envelope only.
             code = "INTERNAL_SERVER_ERROR";
             message = "Internal server error";
-            structuredLogger.error("unhandled_exception", {
+            // Logs it, and forwards it to the error tracker once one is
+            // installed (#103).
+            reportError(exception, {
                 correlationId,
-                method: req.method,
-                path: redactUrl(req.originalUrl),
                 statusCode,
-                errorName:
-                    exception instanceof Error
-                        ? exception.name
-                        : typeof exception,
-                errorMessage:
-                    exception instanceof Error
-                        ? exception.message
-                        : String(exception),
-                stack: exception instanceof Error ? exception.stack : undefined,
-                headers: redactHeaders(req.headers),
+                method: req.method,
+                url: req.originalUrl,
+                headers: req.headers,
+                organizationId: req.organizationContext?.organizationId,
             });
         } else {
             code = statusToCode(statusCode);

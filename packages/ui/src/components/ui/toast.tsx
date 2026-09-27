@@ -40,13 +40,15 @@ export function showError(message: string, description?: string) {
  * `duration` is for a screen whose Undo window is a rule of its own — Order
  * Detail holds a kitchen step or a refund for ten seconds (ADR-008), and the
  * toast offering its Undo must last exactly that long, not the default.
+ *
+ * Returns the toast's id, for `dismissToast` when the window closes early.
  */
 export function showUndo(
     message: string,
     onUndo: () => void,
     options: { duration?: number; description?: string } = {},
-) {
-    toast(message, {
+): ToastId {
+    return toast(message, {
         description: options.description,
         duration: options.duration ?? 8000,
         action: { label: "Undo", onClick: onUndo },
@@ -60,6 +62,19 @@ export function showUndo(
  */
 export function dismissToasts() {
     toast.dismiss();
+}
+
+/** Which toast, as `showUndo` returned it. */
+export type ToastId = string | number;
+
+/**
+ * Clear one toast. For an Undo whose window closed before its toast did —
+ * the thing it would undo has since changed, or the screen was left — so a
+ * button that would do nothing is not left on screen. Unlike
+ * `dismissToasts()`, an error toast beside it stays.
+ */
+export function dismissToast(id: ToastId) {
+    toast.dismiss(id);
 }
 
 /** Something completed, but not the way the user asked for. */

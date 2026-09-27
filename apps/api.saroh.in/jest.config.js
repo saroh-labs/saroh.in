@@ -106,6 +106,7 @@ module.exports = {
         // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and
         // the move-stage atomic STAGE_CHANGED activity. Never touch a DB.
         "<rootDir>/src/modules/contacts/**/*.spec.ts",
+        "<rootDir>/src/modules/site-accounts/**/*.spec.ts",
         // #120 customer workspace: identity-link safety (never by name, org-
         // scoped) + module-gated timeline, with a jest-mocked Prisma.
         "<rootDir>/src/modules/customer-workspace/**/*.spec.ts",
@@ -141,6 +142,8 @@ module.exports = {
         // arithmetic, the order read's money hiding, and the kitchen service
         // with a jest-mocked Prisma.
         "<rootDir>/src/modules/orders/order-stage.spec.ts",
+        // The six fulfilment types and their rules (DEC-045, B2a).
+        "<rootDir>/src/modules/orders/fulfilment.spec.ts",
         "<rootDir>/src/modules/orders/order-refunds.spec.ts",
         "<rootDir>/src/modules/orders/order-read.spec.ts",
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
@@ -186,6 +189,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/serialize.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
+        // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
+        // runs against Postgres in order-list.db.spec.ts.
+        "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
+        "<rootDir>/src/modules/orders/order-row.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -215,6 +222,14 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/collections.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        // D1: a plan's monthly figure and who pays what.
+        "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
+        // D2: what a plan change records, and reading its history.
+        "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
+        // D9: what a subscription action records, and reading its log.
+        "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
+        // D8: a pause's end date, and the job's resume on it.
+        "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

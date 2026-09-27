@@ -69,7 +69,7 @@ There is no general job queue, event bus, provider registry, observability layer
 
 Better Auth is the only authentication runtime found in application/package source. No NextAuth import or route remains. The migration is functionally farther along than README claims; remaining NextAuth references are documentation (`packages/auth/README.md`, developer docs and historical plans).
 
-Cross-subdomain behavior is configured only for production using `.saroh.in`. Trusted origins are explicit. Mutating API and middleware requests reject an untrusted `Origin`/`Referer` when present. Full session validation is server-side. Missing origin headers are accepted, so sensitive cookie-authenticated mutations should additionally rely on Better Auth CSRF behavior and explicit integration tests.
+Cross-subdomain behavior is configured only for production using `.saroh.in`. Trusted origins are explicit. Mutating API and middleware requests reject an untrusted `Origin`/`Referer` when present. Full session validation is server-side. Missing origin headers were accepted when this was written; since #50 (2026-09-26) the API refuses a write with neither `Origin` nor `Referer`, and the frontends' server-side calls send their own origin.
 
 ## Tenant and authorization state
 

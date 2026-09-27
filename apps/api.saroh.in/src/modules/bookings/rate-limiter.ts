@@ -58,4 +58,14 @@ export class FixedWindowRateLimiter {
         window.count += 1;
         return true;
     }
+
+    /**
+     * Seconds until `key`'s window resets, for a 429 that says when to try
+     * again (site sign-in codes, A2). At least 1; 1 for an unknown key.
+     */
+    retryAfterSeconds(key: string, now: number = Date.now()): number {
+        const window = this.windows.get(key);
+        if (!window) return 1;
+        return Math.max(1, Math.ceil((window.resetAt - now) / 1000));
+    }
 }

@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
+    ArrayMinSize,
     IsArray,
     IsIn,
     IsInt,
@@ -124,8 +125,9 @@ export class ReplaceStaffHoursDto {
 
 /**
  * Time off: whole days (`fromDate`, and `toDate` for more than one — local
- * to the business) or a stretch of time (`startAt`–`endAt`). The reason is
- * for the team only.
+ * to the business), the same hours on each of those days (`startMinute`–
+ * `endMinute` with the dates, E3), or a stretch of time (`startAt`–`endAt`).
+ * The reason is for the team only.
  */
 export class AddTimeOffDto {
     @IsOptional()
@@ -135,6 +137,19 @@ export class AddTimeOffDto {
     @IsOptional()
     @Matches(DATE, { message: "toDate must be YYYY-MM-DD" })
     toDate?: string;
+
+    /** Part of each day, from local midnight; with `endMinute`. */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(1439)
+    startMinute?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1440)
+    endMinute?: number;
 
     @IsOptional()
     @IsISO8601()
@@ -149,6 +164,60 @@ export class AddTimeOffDto {
     @IsString()
     @MaxLength(280)
     reason?: string;
+}
+
+/** Several rows of time off or closure taken away together — one line. */
+export class RemoveOffDto {
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(400)
+    @IsString({ each: true })
+    ids!: string[];
+}
+
+/**
+ * A range of the business's local days, all day or the same hours on each
+ * (E3) — what a closure is, and what a preview of time off reads.
+ */
+export class OffRangeDto {
+    @Matches(DATE, { message: "fromDate must be YYYY-MM-DD" })
+    fromDate!: string;
+
+    @IsOptional()
+    @Matches(DATE, { message: "toDate must be YYYY-MM-DD" })
+    toDate?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(1439)
+    startMinute?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1440)
+    endMinute?: number;
+}
+
+/** The whole business closed (E3). The reason is for the team only. */
+export class AddClosureDto extends OffRangeDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(280)
+    reason?: string;
+}
+
+/**
+ * What time off would cover, before it is saved: one person's bookings, or
+ * — with no `staffId` — the whole business's, for a closure.
+ */
+export class PreviewOffDto extends OffRangeDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    staffId?: string;
 }
 
 /** Hours on one date on top of the weekly ones — a closed day opened. */

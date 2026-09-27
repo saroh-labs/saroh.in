@@ -136,6 +136,7 @@ export class CashfreeBillingProvider implements BillingProvider {
     parseWebhook(payload: unknown): ParsedBillingEvent {
         const body = (payload ?? {}) as {
             type?: string;
+            event_time?: string;
             data?: {
                 subscription_id?: string;
                 cf_subscription_id?: string | number;
@@ -151,7 +152,15 @@ export class CashfreeBillingProvider implements BillingProvider {
 
         return {
             type,
-            providerEventId: `${type}:${providerSubscriptionId ?? "unknown"}`,
+            // One delivery per event time and status. `type:subscription`
+            // alone was the same for every status change of a subscription,
+            // so each after the first was dropped (PAY-04).
+            providerEventId: [
+                type,
+                providerSubscriptionId ?? "unknown",
+                body.event_time ?? "unknown",
+                body.data?.subscription_status ?? "",
+            ].join(":"),
             providerSubscriptionId,
             status: outcomeFor(type, body.data?.subscription_status),
         };

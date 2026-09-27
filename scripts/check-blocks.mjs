@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Gates G2 and G6 (#252) — the two rules that keep merchant sites merchant-
- * coloured, and keep there being exactly one renderer.
+ * Gates G2, G6 (#252) and G7 (H1) — the rules that keep merchant sites in the
+ * merchant's own colours and type, and keep there being exactly one renderer.
  *
  * G2  No Saroh design token may be drawn by a site block.
  * G6  No component outside packages/site-blocks may draw the --site-* layer.
+ * G7  No Saroh typeface in a site block, and no font loaded into saroh.app.
  *
  * Both encode failures this repository has already had, which is the only
  * reason they are worth a script:
@@ -232,6 +233,47 @@ for (const root of SEARCH_ROOTS) {
                 `G6  ${rel}  draws the --site-* layer outside packages/site-blocks. There is one renderer (#252); a second one drifts, and #189 is what that costs.`,
             );
         }
+    }
+}
+
+// ---- G7: no Saroh typeface on a merchant's site (H1) -----------------------
+/**
+ * The type half of G2. G2 matches colour utilities only, so the booking flow
+ * set its headings in Saroh's `font-display` and `saroh.app` loaded Geist and
+ * Bricolage Grotesque for every request: a dental clinic's booking page wore
+ * Saroh's typography and nothing noticed.
+ *
+ * (a) A block writing `font-sans`, `font-display` or `font-mono` is drawing
+ *     text in a Saroh face — all three resolve to Saroh's `--font-*` through
+ *     `tooling/tailwind-config`. Blocks use `font-site-heading` and
+ *     `font-site-body`.
+ * (b) `apps/saroh.app` serves merchant sites, so it loads no face from
+ *     `packages/ui/fonts` and imports no `next/font` at all. When merchants
+ *     choose fonts, they are served from the app's own site-font files.
+ */
+const SAROH_FONT_UTILITY_RE = /\bfont-(?:sans|display|mono)\b(?![\w-])/g;
+const SAROH_FONT_LOAD_RE =
+    /packages\/ui\/fonts|from\s+["']next\/font(?:\/[\w-]+)?["']/g;
+
+for await (const file of walk(BLOCKS)) {
+    const rel = relative(ROOT, file);
+    const source = code(await readFile(file, "utf8"));
+    for (const match of source.matchAll(SAROH_FONT_UTILITY_RE)) {
+        const line = source.slice(0, match.index).split("\n").length;
+        failures.push(
+            `G7  ${rel}:${line}  "${match[0]}" sets a merchant's text in Saroh's own typeface. Use font-site-heading or font-site-body (H1).`,
+        );
+    }
+}
+
+for await (const file of walk(join(ROOT, "apps/saroh.app"))) {
+    const rel = relative(ROOT, file);
+    const source = code(await readFile(file, "utf8"));
+    for (const match of source.matchAll(SAROH_FONT_LOAD_RE)) {
+        const line = source.slice(0, match.index).split("\n").length;
+        failures.push(
+            `G7  ${rel}:${line}  loads a font into saroh.app ("${match[0]}"). Merchant sites never load Saroh's faces; their text is the --site-font-* layer (H1).`,
+        );
     }
 }
 

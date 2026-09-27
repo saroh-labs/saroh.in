@@ -90,10 +90,49 @@ describe("RazorpayBillingProvider.verifyWebhook", () => {
         });
         expect(event).toEqual({
             type: "subscription.halted",
-            providerEventId: "subscription.halted:sub_x",
+            providerEventId: "subscription.halted:sub_x:unknown",
             providerSubscriptionId: "sub_x",
             status: "PAST_DUE",
         });
+    });
+
+    it("gives each delivery its own event id, so next month's charge is not a duplicate (PAY-04)", () => {
+        const provider = new RazorpayBillingProvider();
+        const charged = (created_at: number, id?: string) =>
+            provider.parseWebhook(
+                {
+                    event: "subscription.charged",
+                    created_at,
+                    payload: { subscription: { entity: { id: "sub_x" } } },
+                },
+                id ? { "x-razorpay-event-id": id } : {},
+            ).providerEventId;
+
+        // Razorpay's delivery id when it sends one; the same id twice is
+        // still one event.
+        expect(charged(1, "evt_A")).toBe("evt_A");
+        expect(charged(2, "evt_A")).toBe("evt_A");
+        // Without it, the event's own time tells two charges apart.
+        expect(charged(1_790_000_000)).not.toBe(charged(1_792_600_000));
+    });
+});
+
+describe("CashfreeBillingProvider.parseWebhook (PAY-04)", () => {
+    it("tells two status changes of one subscription apart", () => {
+        const provider = new CashfreeBillingProvider();
+        const id = (event_time: string, subscription_status: string) =>
+            provider.parseWebhook({
+                type: "SUBSCRIPTION_STATUS_WEBHOOK",
+                event_time,
+                data: { cf_subscription_id: 7, subscription_status },
+            }).providerEventId;
+        expect(id("2026-10-01T00:00:00Z", "ON_HOLD")).not.toBe(
+            id("2026-10-03T00:00:00Z", "ACTIVE"),
+        );
+        // A redelivery of the same event is still a duplicate.
+        expect(id("2026-10-01T00:00:00Z", "ON_HOLD")).toBe(
+            id("2026-10-01T00:00:00Z", "ON_HOLD"),
+        );
     });
 });
 

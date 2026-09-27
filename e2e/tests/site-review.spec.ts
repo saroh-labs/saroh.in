@@ -199,8 +199,20 @@ test.describe("a shared preview link", () => {
         await page.getByRole("link", { name: "Open editor" }).click();
         await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
 
-        // Review lives in the inspector's Feedback tab since #340.
-        await page.getByRole("tab", { name: /^Feedback/ }).click();
+        // Review lives in the inspector's Feedback tab since #340. On a
+        // phone (G4) the inspector is a sheet, opened on Feedback from the
+        // bar at the foot of the screen.
+        if ((page.viewportSize()?.width ?? 1440) < 760) {
+            await page
+                .getByRole("navigation", { name: "Edit this page" })
+                .getByRole("button", { name: /^Feedback/ })
+                .click();
+            await expect(
+                page.getByRole("tab", { name: /^Feedback/ }),
+            ).toHaveAttribute("aria-selected", "true");
+        } else {
+            await page.getByRole("tab", { name: /^Feedback/ }).click();
+        }
         // With a block selected, Feedback opens on that block; preview links
         // are part of the whole site's review.
         await page.getByRole("radio", { name: /^Whole site/ }).click();

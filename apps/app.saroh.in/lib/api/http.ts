@@ -1,3 +1,4 @@
+import { requestOrigin } from "@saroh/auth/origins";
 import { cookies, headers } from "next/headers";
 import { forbidden } from "next/navigation";
 import { cache } from "react";
@@ -85,13 +86,17 @@ export async function apiFetch(
     path: string,
     init?: RequestInit,
 ): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
+    const incoming = await headers();
+    const cookie = incoming.get("cookie") ?? "";
+    // The API refuses a write with no Origin (#50); say where this came from.
+    const origin = requestOrigin(incoming);
     const activeOrgId = await getActiveOrgId();
     return fetch(`${API_URL}${path}`, {
         ...init,
         headers: {
             "content-type": "application/json",
             cookie,
+            ...(origin ? { origin } : {}),
             ...(activeOrgId ? { "x-organization-id": activeOrgId } : {}),
             ...(init?.headers ?? {}),
         },

@@ -107,7 +107,7 @@ export function OneToOne({
             ) : (
                 <div className="border-site-border mt-[18px] border-t pt-4">
                     <div className="flex flex-wrap items-baseline gap-2">
-                        <h3 className="font-display text-site-fg text-base font-semibold tracking-[-0.01em]">
+                        <h3 className="font-site-heading text-site-fg text-base font-semibold tracking-[-0.01em]">
                             {dayHeading(day.date)}
                         </h3>
                         <span className="text-site-muted text-[12.5px]">

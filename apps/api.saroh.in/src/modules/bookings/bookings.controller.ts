@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -12,7 +13,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
-import type { Booking, Service } from "@saroh/database";
+import type { Booking } from "@saroh/database";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -20,7 +21,10 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import type { BookingDetail, BookingsCalendar } from "./bookings.service";
+import { payLinkUrl } from "../invoices/pay-link-url";
+import type { WithoutIntakeNote } from "./booking-intake";
+import { withoutIntakeNote } from "./booking-intake";
+import type { BookingDetailView, BookingsCalendar } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
@@ -32,6 +36,7 @@ import {
     RescheduleBookingDto,
     UpdateServiceDto,
 } from "./dto";
+import type { ServiceView } from "./service-fields";
 
 /**
  * Authorized bookable-Service + availability + booking management for an
@@ -57,12 +62,14 @@ export class BookingsController {
     createService(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: CreateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.createService(ctx, dto);
     }
 
     @Get()
-    listServices(@OrgContext() ctx: OrganizationContext): Promise<Service[]> {
+    listServices(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<ServiceView[]> {
         return this.bookings.listServices(ctx);
     }
 
@@ -84,7 +91,7 @@ export class BookingsController {
     getService(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.getService(ctx, serviceId);
     }
 
@@ -93,7 +100,7 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
         @Body() dto: UpdateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.updateService(ctx, serviceId, dto);
     }
 
@@ -162,7 +169,7 @@ export class BookingsController {
     listServiceBookings(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
-    ): Promise<Booking[]> {
+    ): Promise<WithoutIntakeNote<Booking>[]> {
         return this.bookings.listBookings(ctx, serviceId);
     }
 
@@ -173,8 +180,12 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
         @Body() dto: BookByHandDto,
-    ): Promise<Booking> {
-        return this.bookings.bookByHand(ctx, serviceId, dto);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        // A booking's note is sensitive (E7): an answer that changes a
+        // booking never carries it; only the detail read does, gated.
+        return this.bookings
+            .bookByHand(ctx, serviceId, dto)
+            .then(withoutIntakeNote);
     }
 
     /**
@@ -187,7 +198,7 @@ export class BookingsController {
     getBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
-    ): Promise<BookingDetail> {
+    ): Promise<BookingDetailView> {
         return this.bookings.getBooking(ctx, bookingId);
     }
 
@@ -200,8 +211,10 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Body() dto: RescheduleBookingDto,
-    ): Promise<Booking> {
-        return this.bookings.rescheduleBooking(ctx, bookingId, dto);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .rescheduleBooking(ctx, bookingId, dto)
+            .then(withoutIntakeNote);
     }
 
     /**
@@ -215,8 +228,26 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Body() dto: RecordOutcomeDto,
-    ): Promise<Booking> {
-        return this.bookings.recordOutcome(ctx, bookingId, dto.outcome);
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .recordOutcome(ctx, bookingId, dto.outcome)
+            .then(withoutIntakeNote);
+    }
+
+    /**
+     * "Send a pay link" (E4): issue the booking's invoice and answer with
+     * its pay link — once: only its hash is kept, so asking again makes a
+     * new link and retires the old one. Saroh sends nothing itself yet.
+     */
+    @Post("bookings/:bookingId/pay-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async payLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+    ): Promise<{ url: string }> {
+        const { token } = await this.bookings.payLink(ctx, bookingId);
+        return { url: payLinkUrl(token) };
     }
 
     /**
@@ -228,9 +259,11 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
-    ): Promise<Booking> {
-        return this.bookings.cancelBooking(ctx, bookingId, undefined, {
-            returnCredit: returnCredit === "true",
-        });
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .cancelBooking(ctx, bookingId, undefined, {
+                returnCredit: returnCredit === "true",
+            })
+            .then(withoutIntakeNote);
     }
 }

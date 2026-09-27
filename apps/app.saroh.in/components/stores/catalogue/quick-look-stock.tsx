@@ -92,7 +92,7 @@ export function StockBlock({
                             <select
                                 value={addAt ?? ""}
                                 onChange={(e) => setAddAt(e.target.value)}
-                                className="h-[30px] rounded-[7px] border border-border bg-card px-2 text-[12.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                                className="h-[30px] rounded-[7px] border border-border bg-card py-0 pl-2 pr-8 text-[12.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
                             >
                                 {where.map((p) => (
                                     <option key={p.storeId} value={p.storeId}>

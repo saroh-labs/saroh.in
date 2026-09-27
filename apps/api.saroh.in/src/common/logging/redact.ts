@@ -14,6 +14,10 @@ export const SENSITIVE_HEADERS = new Set<string>([
     "set-cookie",
     "x-api-key",
     "x-auth-token",
+    // A merchant site's signed relay carries the visitor's address, and the
+    // customer session header is the session itself (ADR-011, plan A).
+    "x-saroh-relay",
+    "x-customer-session",
 ]);
 
 /** Body/field names (normalised) whose values must never be logged. */
@@ -41,6 +45,9 @@ export const SENSITIVE_FIELDS = new Set<string>([
     "cvv",
     "cvc",
     "ssn",
+    // What a booker tells the team on the booking page (E7): medicines,
+    // allergies, pregnancy. Sensitive, so never logged.
+    "intakenote",
 ]);
 
 /** Cap recursion so a hostile/cyclic-ish payload can't blow the stack. */

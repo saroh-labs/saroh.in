@@ -26,7 +26,10 @@ pattern files refer back here.
   ATTENTION, then OVERDUE, then SETUP, then SUGGESTION — computed in
   `apps/api.saroh.in/src/modules/home` and rendered through
   `lib/home/service.ts`. The most consequential thing goes first; not a
-  dashboard of equal tiles.
+  dashboard of equal tiles. **Needs you** (round 2, F3) draws it flat: one
+  row per thing to do, ranked by what has gone wrong — late, then blocked,
+  then due, then setting up (`home-needs.ts`) — each with a tag whose words
+  say what its tone colours. Suggestions stay off it.
 - **Current** — A source that fails to load degrades into a named notice; it
   never becomes a zero or a false "nothing to do"
   (`.agents/skills/saroh-product-states/SKILL.md`).
@@ -74,13 +77,35 @@ pattern files refer back here.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
-- **Current** — **One customer record behind an order and a booking is not true
-  yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
-  linking it to a `Contact` is manual
-  (`components/customers/identity-link-dialog.tsx`). Do not claim unification in
-  UI, marketing or docs until auto-linking ships (§14, `PRODUCT.md`).
+- **Current** (round 2, C2–C4) — **Customers is one list for the business,
+  keyed on the `Contact`.** Sell → Customers reads `GET
+organizations/:org/customers`: everyone who has paid (an order through a
+  linked store customer, a paid invoice, a subscription or a pack) or signs
+  in on the business's site. A store `Customer` is still kept per storefront;
+  a paying one gets a contact made and linked by the backfill and at their
+  next payment (link reason `BACKFILL` or `PAYMENT`) — **unless a contact
+  already holds their email**. Then nothing is linked on its own (#120): the
+  list names them ("12 paying customers aren't linked to a contact yet ·
+  Review") and a person links them from the review sheet. So say "one list of
+  customers", never that every order and booking is already one record:
+  someone added by hand, or who ordered and hasn't paid, is in Contacts or on
+  their storefront record, not in this list, and the list says so (§14,
+  `PRODUCT.md`).
 - **Adopted** — Never silently merge uncertain identities: normalise email and
   phone, and keep links reversible and auditable (§14).
+- **Adopted** (2026-09-26, DEC-041, DEC-042) — **Customers is everyone who
+  pays or signs in on the business's site**, and the list is keyed on the
+  Contact. Leads, Pipeline and Contacts (the CRM) stay as they are. A merchant
+  may **merge** two customers; Saroh suggests merges and never makes one. A
+  person's details can be **removed for privacy**; their orders and issued
+  invoices stay, with what was printed on them.
+- **Adopted** (2026-09-26, DEC-040) — **Needs attention is one list per
+  customer** (Allergy, Medical, Access, Other). A sensitive entry reaches only
+  a role with the sensitive permission, and the API leaves it out for everyone
+  else.
+- **Adopted** (2026-09-26, ADR-011, DEC-037) — **A business's customers sign
+  in on its own site** with a one-time code, with one account per business,
+  never a Saroh-wide identity.
 - **Current** — Merchant payments run on the Organization's own providers —
   Razorpay and Cashfree first — kept apart from Saroh's billing (DEC-010).
 - **Current** — **Deleting a contact, a lead or a customer is permanent, so it
@@ -100,6 +125,12 @@ pattern files refer back here.
 - **Adopted** — The booker and the merchant hear about a new or moved booking.
   Not true yet: `booking.notify` has no handler (`backend-jobs.md`, known gaps).
   Don't write copy that promises a confirmation message.
+- **Current** — The booking page asks Where only for a service offered
+  either way, and records the answer on the booking (`Booking.locationType`);
+  the meeting link shows only on an online booking. "Anything we should
+  know?" is kept on the booking as a sensitive note (E7, default 110): only
+  someone who may see sensitive Needs attention reads it, one booking at a
+  time — never in a list, the snapshot, a job or a log.
 - **Current** — A booking made by hand follows the booking page's rules: a
   real open slot, the same serializable capacity check, and its history names
   who on the team made it (#384).
@@ -112,6 +143,9 @@ pattern files refer back here.
 - **Current** — Saroh records and invoices; it does not charge a card on file
   and does not send the invoice. Copy says so: "Nothing is charged and nobody is
   contacted", "Saroh doesn't send this. Print it and hand it over."
+  **Adopted** (2026-09-26, DEC-038): autopay will run on the business's own
+  provider's mandates, with a pay link as the fallback. The copy above stays
+  true for every subscription without a mandate.
 - **Current** — **Mention an invoice only when Payments is on.** With Payments
   off, subscribing is refused, and a pack or course is recorded with the price
   paid and no invoice — so no copy may promise one. The API says which
@@ -150,6 +184,11 @@ pattern files refer back here.
   Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
+- **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,
+  booking or invoice always goes into their account on the business's site.
+  It goes out by email, SMS or WhatsApp only through the business's connected
+  provider. Saroh's own email sends a site's sign-in codes and nothing else.
+  Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
 
 ## Analytics
 

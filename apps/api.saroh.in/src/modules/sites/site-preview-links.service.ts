@@ -62,6 +62,12 @@ export function hashPreviewToken(token: string): string {
 export interface PreviewView {
     snapshot: SiteSnapshot;
     site: { name: string };
+    /**
+     * The site's id, as a live site's read carries it (#232), so the
+     * preview's live blocks — Visit us (G8) — read the same place the live
+     * site will. An id, not content: nothing of the draft rides on it.
+     */
+    siteId: string;
     expiresAt: Date;
 }
 
@@ -290,6 +296,7 @@ export class SitePreviewLinksService {
         return {
             snapshot: this.sites.buildSnapshot(site, new Date()),
             site: { name: site.name },
+            siteId: link.siteId,
             expiresAt: link.expiresAt,
         };
     }

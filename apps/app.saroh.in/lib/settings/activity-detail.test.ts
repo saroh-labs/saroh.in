@@ -180,6 +180,44 @@ describe("activityDetail — what changed", () => {
         ]);
     });
 
+    it("tells a storefront's ways and late thresholds as they were and became (B17)", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "storefront.fulfilment.update",
+                    metadata: {
+                        fields: ["fulfilmentTypes", "pickupLateAfterMinutes"],
+                        storefront: "Counter",
+                        changes: [
+                            {
+                                field: "fulfilmentTypes",
+                                before: "Shipping",
+                                after: "Pick-up, Shipping",
+                            },
+                            {
+                                field: "pickupLateAfterMinutes",
+                                before: "2 hours",
+                                after: "20 minutes",
+                            },
+                        ],
+                    },
+                }),
+                KOLKATA,
+            ).changes,
+        ).toEqual([
+            {
+                label: "How orders leave, Counter",
+                before: "Shipping",
+                after: "Pick-up, Shipping",
+            },
+            {
+                label: "Pick-up late after, Counter",
+                before: "2 hours",
+                after: "20 minutes",
+            },
+        ]);
+    });
+
     it("tells a storefront's hours, a module, a plan and a role", () => {
         const rows = (e: Partial<AuditEventRow>) =>
             activityDetail(event(e), KOLKATA).changes;

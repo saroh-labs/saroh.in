@@ -5,6 +5,8 @@
  * them and a unit test can pin every edge.
  */
 
+import type { ShelfNeed } from "../stock/stock-words";
+
 export type StockWord = "IN_STOCK" | "LOW" | "SOLD_OUT";
 
 export interface StockRow {
@@ -75,6 +77,30 @@ export function stockTotals(
                 ? Math.max(0, productRow.quantity - productRow.reserved)
                 : 0),
         lowCount: lines.filter((l) => l.word !== "IN_STOCK").length,
+    };
+}
+
+/**
+ * The Stock tab's badge (#523): how many of the product's lines — each
+ * variant, or the product counted as a whole — need someone, across every
+ * open storefront. `short` is lines short for orders somewhere; `low` is
+ * lines that need someone at all (short, sold out, or at the warning
+ * level), judged per shelf where it is sold, as Stock's "Needs you" does.
+ * It rides on the page's one read so the badge says the same on every
+ * tab, not only on those that load the levels.
+ */
+export interface StockNeeds {
+    short: number;
+    low: number;
+}
+
+export function stockNeeds(
+    lines: readonly { cells: readonly { need: ShelfNeed | null }[] }[],
+): StockNeeds {
+    return {
+        short: lines.filter((l) => l.cells.some((c) => c.need === "short"))
+            .length,
+        low: lines.filter((l) => l.cells.some((c) => c.need !== null)).length,
     };
 }
 

@@ -8,6 +8,8 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { allergenKey, allergensByName } from "./allergen-match";
+import { ensureAllergyEntries } from "./attention-allergy";
 import type { ContactNoteDto } from "./dto";
 
 /**
@@ -25,6 +27,9 @@ import type { ContactNoteDto } from "./dto";
  * until the #529 backfill has merged them a business can still hold two rows
  * of one name; so when a note is read, each named allergen is widened to
  * every allergen of the same name in the business (`matchAllergens`).
+ *
+ * A note's allergens are also put on the person's Needs attention list as
+ * Allergy entries (C1, for one release): see `attention-allergy.ts`.
  *
  * Reading needs `contact:read` — a Member at the counter must see an allergy.
  * Writing needs `contact:write` (Owner/Admin today).
@@ -99,9 +104,6 @@ export async function loadContactNotes(
     );
 }
 
-/** An allergen's name as lists are compared: "peanuts " is "Peanuts". */
-const allergenKey = (name: string) => name.trim().toLowerCase();
-
 /**
  * Widen each note's allergens to every allergen of the same name in the
  * business, so matching stays by id (ADR-008) and covers rows of one name
@@ -113,16 +115,7 @@ async function withMatches(
     notes: ContactNoteView[],
 ): Promise<ContactNoteView[]> {
     if (!notes.some((n) => n.allergens.length > 0)) return notes;
-    const rows = await db.storeAllergen.findMany({
-        where: { organizationId },
-        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: { id: true, name: true },
-    });
-    const byName = new Map<string, { id: string; name: string }[]>();
-    for (const r of rows) {
-        const key = allergenKey(r.name);
-        byName.set(key, [...(byName.get(key) ?? []), r]);
-    }
+    const byName = await allergensByName(db, organizationId);
     return notes.map((n) => {
         const matches = new Map<string, { id: string; name: string }>();
         for (const a of n.allergens) {
@@ -235,6 +228,13 @@ export class ContactNotesService {
                     organizationId: ctx.organizationId,
                 })),
             });
+            // Also on Needs attention, for one release (C1).
+            await ensureAllergyEntries(tx, {
+                organizationId: ctx.organizationId,
+                contactId,
+                userId: ctx.userId,
+                allergenIds,
+            });
             await this.audit(tx, ctx, "contact.note.created", note.id, {
                 contactId,
                 allergens: allergenIds.length,
@@ -273,6 +273,15 @@ export class ContactNotesService {
                         allergenId,
                         organizationId: ctx.organizationId,
                     })),
+                });
+                // Only the allergens this edit adds: one the note already
+                // named and the team took off Needs attention stays off.
+                const had = new Set(current.allergens.map((a) => a.id));
+                await ensureAllergyEntries(tx, {
+                    organizationId: ctx.organizationId,
+                    contactId,
+                    userId: ctx.userId,
+                    allergenIds: allergenIds.filter((id) => !had.has(id)),
                 });
             }
             await this.audit(tx, ctx, "contact.note.updated", noteId, {

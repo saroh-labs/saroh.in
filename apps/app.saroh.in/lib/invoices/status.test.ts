@@ -8,6 +8,7 @@ import {
     invoiceStatus,
     isOwed,
     owedSummary,
+    paidSinceRows,
     sourceLabel,
     sourceLine,
     spacedCode,
@@ -377,6 +378,40 @@ describe("withCorrectionsUnder", () => {
             related: { id: "gone", number: "X" },
         });
         expect(withCorrectionsUnder([note]).map((r) => r.id)).toEqual(["n"]);
+    });
+});
+
+describe("paidSinceRows", () => {
+    const since = new Date("2026-09-21T10:00:00Z");
+    const inv = (id: string, over: Record<string, unknown> = {}) => ({
+        id,
+        kind: "INVOICE" as const,
+        paidAt: day("2026-09-22"),
+        ...over,
+    });
+
+    it("shows the API's own paid-since rows, finding one past the capped page (H-7)", () => {
+        // Made months ago, paid this morning: not on the newest page.
+        const old = inv("inv_old");
+        expect(
+            paidSinceRows([inv("inv_new")], [old, inv("inv_new")], since).map(
+                (i) => i.id,
+            ),
+        ).toEqual(["inv_old", "inv_new"]);
+    });
+
+    it("filters what is on hand when the API couldn't answer, never a credit note", () => {
+        const onHand = [
+            inv("paid"),
+            inv("earlier", { paidAt: day("2026-09-01") }),
+            inv("unpaid", { paidAt: null }),
+            inv("cn", { kind: "CREDIT_NOTE" }),
+        ];
+        expect(paidSinceRows(onHand, null, since).map((i) => i.id)).toEqual([
+            "paid",
+        ]);
+        // No window: every invoice on hand.
+        expect(paidSinceRows(onHand, null, null)).toBe(onHand);
     });
 });
 

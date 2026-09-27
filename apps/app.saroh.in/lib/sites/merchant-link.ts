@@ -33,3 +33,55 @@ export function merchantLinkUrl(
         return null;
     }
 }
+
+/** Where a link clicked in the editor's Preview goes (G5). */
+export type PreviewLinkTarget<P> =
+    { kind: "page"; page: P } | { kind: "anchor"; id: string } | null;
+
+/** "/about/" and "/about" are the same page; "" is home. */
+function samePath(a: string, b: string): boolean {
+    const norm = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+    return norm(a || "/") === norm(b || "/");
+}
+
+/** The base a relative link is read against; no real site is ever here. */
+const NOWHERE = "preview.invalid";
+
+/**
+ * In Preview the canvas is the site, so a link to one of its pages opens that
+ * page in the editor rather than a tab (G5).
+ *
+ * - "#menu" → an anchor on the page being shown.
+ * - "/about", "about", "/about/?x#y" → the page at /about, when there is one
+ *   among `pages` (pass the pages publish will write, not hidden ones).
+ * - "https://<the site's own address>/about" → the same.
+ * - Anything else — another site, "mailto:", "/book", a hidden page — → null,
+ *   and the caller opens it the way `merchantLinkUrl` says.
+ */
+export function previewLinkTarget<P extends { path: string }>(
+    href: string | null | undefined,
+    pages: P[],
+    siteAddress: string | null | undefined,
+): PreviewLinkTarget<P> {
+    const raw = href?.trim();
+    if (!raw) return null;
+    if (raw.startsWith("#")) {
+        const id = raw.slice(1);
+        return id ? { kind: "anchor", id } : null;
+    }
+    let url: URL;
+    try {
+        url = new URL(raw, `https://${NOWHERE}/`);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    const own = siteAddress
+        ?.replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase();
+    const host = url.host.toLowerCase();
+    if (host !== NOWHERE && (!own || host !== own)) return null;
+    const page = pages.find((p) => samePath(p.path, url.pathname));
+    return page ? { kind: "page", page } : null;
+}

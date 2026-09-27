@@ -142,7 +142,9 @@ export async function checkShowcase(
     );
 
     // Each invoice's dates and fields agree with its status. An order's
-    // paper and every correction are never due: the order is the ledger.
+    // paper and every correction are never due: the order is the ledger. A
+    // booking paid on the booking page is due the moment it is issued, and
+    // paid then (`confirmHoldInTx`).
     fail(
         "invoices whose status and dates disagree",
         await prisma.$queryRaw<Row[]>`
@@ -161,11 +163,13 @@ export async function checkShowcase(
                 AND (status = 'DRAFT' OR (number IS NOT NULL AND "issuedAt" <= ${at}::timestamp
                     AND "billToName" IS NOT NULL
                     AND ("dueAt" > "issuedAt" OR ("dueAt" IS NULL
-                        AND ("orderId" IS NOT NULL OR kind <> 'INVOICE')))))
+                        AND ("orderId" IS NOT NULL OR kind <> 'INVOICE'))
+                        OR (source = 'BOOKING' AND "dueAt" = "issuedAt"))))
             )`,
     );
 
     // What an invoice is for: the row it links to, for that person and price.
+    // A booking's is billed to its booker at the price it was booked at.
     // An order's invoice bills the order as placed: with its supplementary
     // invoices (less any credit note that was not a refund) it comes to the
     // order's total. A correction names an invoice of the same order.
@@ -177,6 +181,7 @@ export async function checkShowcase(
             LEFT JOIN "CourseEnrollment" ce ON ce.id = i."courseEnrollmentId"
             LEFT JOIN "PackPurchase" pp ON pp.id = i."packPurchaseId"
             LEFT JOIN "Order" o ON o.id = i."orderId"
+            LEFT JOIN "Booking" bk ON bk.id = i."bookingId"
             LEFT JOIN "Invoice" r ON r.id = i."relatedInvoiceId"
             LEFT JOIN LATERAL (
                 SELECT COALESCE(SUM(c.total) FILTER (WHERE c.kind = 'SUPPLEMENTARY'), 0) AS up,
@@ -202,6 +207,12 @@ export async function checkShowcase(
                         AND i.total = pp.price
                         AND i."subscriptionId" IS NULL AND i."courseEnrollmentId" IS NULL
                     WHEN 'MANUAL' THEN i."subscriptionId" IS NULL AND i."orderId" IS NULL
+                        AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
+                        AND i."bookingId" IS NULL
+                    WHEN 'BOOKING' THEN bk."organizationId" = i."organizationId"
+                        AND bk."contactId" = i."contactId"
+                        AND i.total * 100 = (bk.snapshot->'service'->>'priceCents')::numeric
+                        AND i."orderId" IS NULL AND i."subscriptionId" IS NULL
                         AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
                     WHEN 'ORDER' THEN o."organizationId" = i."organizationId"
                         AND i."subscriptionId" IS NULL AND i."courseEnrollmentId" IS NULL
@@ -238,6 +249,19 @@ export async function checkShowcase(
             )
             SELECT id, capacity, confirmed::int, held::int FROM load
             WHERE confirmed + held > capacity`,
+    );
+
+    // Closures (E3): the slot engine offers nothing inside one, so no
+    // booking made after a closure was put up stands inside it. One made
+    // before keeps its place, as the product keeps it.
+    fail(
+        "bookings made during a closure after it was put up",
+        await prisma.$queryRaw<Row[]>`
+            SELECT b.id, c.id AS closure FROM "Booking" b
+            JOIN "BusinessClosure" c ON c."organizationId" = b."organizationId"
+                AND c."startAt" < b."endAt" AND b."startAt" < c."endAt"
+            WHERE b."organizationId" = ANY(${orgs}) AND b.status <> 'CANCELLED'
+              AND b."createdAt" > c."createdAt"`,
     );
 
     // Courses: people on it within its seats, its seats within the service.
@@ -465,13 +489,14 @@ export async function checkShowcase(
     );
     // The Stock screen's "Last change" reads the newest entry and who made
     // it: an entry is never later than now, and only one Saroh wrote itself
-    // (Track stock turned off, …) is by nobody.
+    // (Track stock turned off, …) is by nobody. Northwind's base seed writes
+    // on the wall clock, the showcase at its own now: the later of the two.
     fail(
         "stock entries dated in the future, or made by nobody",
         await prisma.$queryRaw<Row[]>`
             SELECT id, "organizationId", "createdAt", "actorUserId" FROM "StockEntry"
             WHERE "organizationId" = ANY(${orgs})
-              AND ("createdAt" > ${new Date().toISOString()}::timestamptz AT TIME ZONE 'UTC'
+              AND ("createdAt" > ${new Date(Math.max(Date.now(), now.getTime())).toISOString()}::timestamptz AT TIME ZONE 'UTC'
                    OR ("actorUserId" IS NULL AND "system" IS NULL))`,
     );
 
@@ -686,10 +711,15 @@ export async function checkRye(
                 i."billToEmail" <> c.email
                 OR i."billToName" <> trim(concat_ws(' ', c."firstName", c."lastName"))
                 OR i."sellerGstin" IS NULL
-                OR (o.fulfilment = 'COLLECT' AND i."placeOfSupply" <> i."sellerState")
-                OR (o.fulfilment = 'DELIVERY'
+                -- Both vocabularies (B2a, DEC-045): a local delivery or a
+                -- shipment goes to an address; anything else is supplied
+                -- where the business is.
+                OR (o.fulfilment::text NOT IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                    AND i."placeOfSupply" <> i."sellerState")
+                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
                     AND (o."deliveryState" = 'Karnataka') <> (i."placeOfSupply" = i."sellerState"))
-                OR (o.fulfilment = 'DELIVERY' AND i."billToAddress" IS NULL))`,
+                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                    AND i."billToAddress" IS NULL))`,
     );
     fail(
         "paper outside the RC series, or a credit note outside RCCN",
@@ -825,6 +855,14 @@ export async function checkRye(
             "COLLECTED",
             "HANDED_TO_COURIER",
         ].every((s) => stageCount(s) >= 1),
+        // B2a (DEC-045): the storefront that delivers says it does.
+        "a storefront offering local delivery": await has(prisma.$queryRaw<
+            Row[]
+        >`
+            SELECT COUNT(*) AS n FROM "StoreSettings" s
+            JOIN "Store" st ON st.id = s."storeId"
+            WHERE st."organizationId" = ${orgId}
+              AND 'LOCAL_DELIVERY' = ANY(s."fulfilmentTypes"::text[])`),
         "orders delivered earlier": await has(prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "Order" WHERE "organizationId" = ${orgId}
               AND stage = 'DELIVERED' AND "createdAt" < ${today}::timestamp`),
@@ -889,7 +927,7 @@ export async function checkRye(
     const stock = await checkRyeStock(prisma, orgId);
     failures.push(...stock.failures);
     // The Product Detail and Editor films' details, reviews and codes (#522).
-    const page = await checkRyeProductPage(prisma, orgId);
+    const page = await checkRyeProductPage(prisma, orgId, now);
     failures.push(...page.failures);
 
     if (failures.length > 0) {

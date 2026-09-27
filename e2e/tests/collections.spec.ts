@@ -20,7 +20,8 @@ import { demoUser, urls } from "../playwright.config";
 const ORG = "seed_org";
 const STORE = "seed_store";
 const NW: Storefront = { organizationId: ORG, storeId: STORE };
-const headers = { "x-organization-id": ORG };
+// The API refuses a write with no Origin (#50).
+const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const orgApi = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 
 async function signIn(page: Page) {
@@ -166,9 +167,23 @@ test.describe("Collections", () => {
             // Untick the hand-picked one here; the page follows.
             await edit.getByRole("checkbox", { name: picked }).click();
             await edit.getByRole("button", { name: "Save" }).click();
+            await expect(page.getByText("Collections saved.")).toBeVisible();
             await expect(
-                page.getByText(`${first}'s collections saved.`),
+                page.getByRole("tabpanel").getByText(picked, { exact: true }),
+            ).toHaveCount(0);
+
+            // Undo puts it back in the hand-picked one.
+            await page.getByRole("button", { name: "Undo" }).last().click();
+            await expect(
+                page.getByRole("tabpanel").getByText(picked, { exact: true }),
             ).toBeVisible();
+
+            // Out of it again, for the rest of the run.
+            await page
+                .getByRole("button", { name: "Edit collections" })
+                .click();
+            await edit.getByRole("checkbox", { name: picked }).click();
+            await edit.getByRole("button", { name: "Save" }).click();
             await expect(
                 page.getByRole("tabpanel").getByText(picked, { exact: true }),
             ).toHaveCount(0);

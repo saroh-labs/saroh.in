@@ -20,6 +20,8 @@
  *
  *   pnpm --filter @saroh/database db:seed
  *   pnpm --filter @saroh/database db:seed:showcase   # + five businesses for the film
+ *   pnpm --filter @saroh/database db:seed:showcase -- --now=2027-01-01T09:00:00+05:30
+ *                                                    # the showcase as seeded at another time
  *   pnpm --filter @saroh/database db:seed:reset      # removes both
  *
  * The target database is checked before any write — see `database-target.ts`.
@@ -49,7 +51,10 @@ async function main() {
     // The showcase is layered on the base seed, never instead of it.
     if (process.argv.includes("--showcase")) {
         const { seedShowcase } = await import("./seed/showcase/run");
-        await seedShowcase();
+        const at = process.argv
+            .find((arg) => arg.startsWith("--now="))
+            ?.slice("--now=".length);
+        await seedShowcase(at ? new Date(at) : undefined);
     }
 }
 

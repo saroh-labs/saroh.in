@@ -18,6 +18,7 @@ type Sub = Pick<
     | "startsAt"
     | "endsAt"
     | "pausedAt"
+    | "pausedUntil"
     | "cancelledAt"
     | "overdue"
     | "overdueCount"
@@ -66,6 +67,8 @@ export function nextLine(sub: Sub): string {
         return sub.cancelledAt ? `Ended ${day(sub.cancelledAt, tz)}` : "Ended";
     }
     if (sub.status === "PAUSED") {
+        // A pause with an end date resumes on its own that day (D8).
+        if (sub.pausedUntil) return `Paused until ${day(sub.pausedUntil, tz)}`;
         return sub.pausedAt
             ? `Paused since ${day(sub.pausedAt, tz)}`
             : "Paused";

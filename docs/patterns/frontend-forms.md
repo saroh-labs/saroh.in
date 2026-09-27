@@ -9,7 +9,7 @@
 
 **Current** — React Hook Form, `zodResolver`, and the `@saroh/ui/form`
 primitives (`Form`, `FormField`, `FormItem`, `FormLabel`, `FormMessage`), made
-the standard in #109. Eleven forms in `app.saroh.in` use it, plus the `saroh.in`
+the standard in #109. Nine forms in `app.saroh.in` use it, plus the `saroh.in`
 waitlist; `components/stores/product-form.tsx` is the reference for a single
 form.
 
@@ -21,6 +21,13 @@ thing it must fix. The shell turns those into the section's chip, border and
 save bar, the header's hint, the jump dots, Save all and the leave dialog.
 Section patches send only their own fields; the API judges the whole product
 after the patch.
+
+**Current** — **A short editor saves once** (E2): the Service Editor
+(`components/services/service-editor/`) has one Save in its sticky header,
+as its design draws. The page holds one draft; its rules, the problems
+strip, what Save sends and the leave dialog's section names are pure
+functions in `lib/services/service-editor.ts`, tested with vitest. It
+replaced the service dialog and the two react-hook-form service forms.
 
 ## Rules
 
@@ -51,7 +58,7 @@ after the patch.
 
 - **Current** — **Money stays a string** from input to API
   (`price: values.price.trim()`). The API computes in cents.
-- **Current** — **Disable submit while the action runs.** All eleven forms and
+- **Current** — **Disable submit while the action runs.** All nine forms and
   the waitlist do.
 - **Adopted** — **Every field has a visible label; a placeholder is never the
   label** (13 §5). Not measured.

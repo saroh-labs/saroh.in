@@ -1,18 +1,37 @@
 import { describe, expect, it } from "vitest";
 
-import type { BusinessOrder } from "@/lib/orders/business-service";
+import type { OrderRow } from "@/lib/orders/business-service";
 import { ordersToCsv } from "@/lib/orders/export";
 
-const order: BusinessOrder = {
+const order: OrderRow = {
     id: "o1",
     orderId: "ORD-001",
     standing: "UNFULFILLED",
     total: "4071.00",
+    unpaidAmount: "0.00",
     currency: "INR",
     placedAt: "2026-09-11T06:30:00.000Z",
+    ageMinutes: 45,
     itemCount: 2,
     store: { id: "s1", name: "Northwind, Whitefield" },
     customer: { id: "c1", name: 'Ananya "AR" Rao', email: "a@example.com" },
+    status: "PENDING",
+    paymentStatus: "PAID",
+    stage: "NEW",
+    fulfilment: "COLLECT",
+    fulfilmentType: "PICKUP",
+    fulfilmentLabel: "Pick-up",
+    steps: [
+        { stage: "NEW", label: "New" },
+        { stage: "PREPARING", label: "Preparing" },
+        { stage: "READY", label: "Ready" },
+        { stage: "COLLECTED", label: "Collected" },
+    ],
+    stepIndex: 0,
+    ticketName: "Order ticket",
+    payment: "PAID",
+    productNames: ["Sourdough", "Croissant"],
+    moreProducts: 0,
 };
 
 describe("ordersToCsv", () => {

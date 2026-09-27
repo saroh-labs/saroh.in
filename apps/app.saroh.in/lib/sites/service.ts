@@ -162,6 +162,18 @@ export interface ServicesListContent {
     cta?: CtaValue;
 }
 
+/**
+ * `visitUs` — which shop's address and hours to show (G8). The place itself is
+ * read live by the site, never stored here. Both switches read as on when
+ * absent.
+ */
+export interface VisitUsContent {
+    title?: string;
+    storeId?: string;
+    showMap?: boolean;
+    showHours?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -199,6 +211,10 @@ export interface BookingContent {
     serviceId?: string;
     title?: string;
     description?: string;
+    /**
+     * Not drawn since A9 and not edited: booking finishes on the booking
+     * page. Kept because stored sections may still carry them.
+     */
     submitLabel?: string;
     successMessage?: string;
 }
@@ -216,6 +232,7 @@ export interface SectionContentByType {
     testimonials: TestimonialsContent;
     contact: ContactContent;
     servicesList: ServicesListContent;
+    visitUs: VisitUsContent;
 }
 
 /**
@@ -419,6 +436,11 @@ export interface SiteDetail extends SiteSummary {
  * someone else changed.
  */
 export interface SiteSettingsInput {
+    /**
+     * The name in the site's header (G6). Never null or blank: the API
+     * refuses both, because a site always has a name.
+     */
+    name?: string;
     seoTitle?: string | null;
     seoDescription?: string | null;
     socialImageUrl?: string | null;

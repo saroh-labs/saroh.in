@@ -319,7 +319,7 @@ describe("the seeds' hold (holdOpenLines)", () => {
         expect(await shelf(r.tape)).toEqual({ onHand: 3, promised: 0 });
 
         await orders.updateStatus(hill, `${prefix}processing`, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await shelf(r.mailer)).toEqual({ onHand: 14, promised: 1 });
         expect(await shelf(r.cartonS)).toEqual({ onHand: 5, promised: 0 });
@@ -455,7 +455,7 @@ describe("the repair (reconcileHeldStock)", () => {
         });
         expect(await shelf(r.rope)).toEqual({ onHand: 10, promised: 2 });
         await orders.updateStatus(hill, `${p}c`, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await shelf(r.rope)).toEqual({ onHand: 8, promised: 0 });
     });

@@ -203,6 +203,68 @@ describe("OrdersService.create — delivery", () => {
     });
 });
 
+// B2a, the expand release: either vocabulary in, only today's values stored.
+describe("OrdersService.create — fulfilment types (DEC-045, release 1)", () => {
+    const ADDRESS = {
+        line1: "12 Church Street",
+        city: "Bengaluru",
+        state: "Karnataka",
+        postalCode: "560001",
+    };
+
+    it("stores a PICKUP order as COLLECT, and an order with no type as COLLECT", async () => {
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "PICKUP",
+        });
+        expect(createData()).toMatchObject({ fulfilment: "COLLECT" });
+        await makeService().create("st_1", "u_1", DTO);
+        expect(db.order!.create!.mock.calls[1][0].data).toMatchObject({
+            fulfilment: "COLLECT",
+        });
+    });
+
+    it("stores a LOCAL_DELIVERY order as DELIVERY, with the address rule", async () => {
+        const err = await makeService()
+            .create("st_1", "u_1", { ...DTO, fulfilment: "LOCAL_DELIVERY" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "LOCAL_DELIVERY",
+            address: ADDRESS,
+        });
+        expect(createData()).toMatchObject({
+            fulfilment: "DELIVERY",
+            deliveryState: "Karnataka",
+        });
+    });
+
+    it.each([
+        "SHIPPING",
+        "DIGITAL",
+        "APPOINTMENT_IN_PERSON",
+        "APPOINTMENT_ONLINE",
+    ] as const)(
+        "refuses %s until the switch release (400), creating nothing",
+        async (fulfilment) => {
+            const err = await makeService()
+                .create("st_1", "u_1", {
+                    ...DTO,
+                    fulfilment,
+                    address: ADDRESS,
+                })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect((err as BadRequestException).getResponse()).toMatchObject({
+                message: expect.stringMatching(/isn't available yet\.$/),
+                field: "fulfilment",
+            });
+            expect(db.order!.create).not.toHaveBeenCalled();
+        },
+    );
+});
+
 describe("OrdersService.create — discount codes", () => {
     it("takes off what the API works out and records the redemption with its rule", async () => {
         await makeService().create("st_1", "u_1", {

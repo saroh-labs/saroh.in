@@ -2,6 +2,7 @@ import { PartialNotice } from "@saroh/ui/data-state";
 
 import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { PageContainer } from "@/components/shared/page-container";
+import { SinceNotice } from "@/components/shared/since-notice";
 import { CatalogueScreen } from "@/components/stores/catalogue-screen";
 import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
@@ -25,6 +26,7 @@ import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
+import { isSince, sinceParam } from "@/lib/views/since";
 
 /**
  * Sell → Products: the business's catalogue, across every storefront
@@ -134,13 +136,37 @@ export default async function CataloguePage({
             : [];
         const review =
             typeof params.review === "string" ? params.review : undefined;
+        // From Home's "Last 24 hours" (F6): the reviews left since then.
+        const since = sinceParam(params);
+        const shown = (reviews ?? []).filter((r) =>
+            isSince(r.createdAt, since),
+        );
         return (
             <PageContainer width="full">
                 <ReviewsView
-                    reviews={reviews ?? []}
+                    reviews={shown}
                     invitable={invitable}
                     canWrite={canWriteReviews}
-                    tabs={tabs}
+                    tabs={
+                        since ? (
+                            <>
+                                {tabs}
+                                <div className="mt-4">
+                                    <SinceNotice
+                                        count={shown.length}
+                                        noun={{
+                                            one: "review",
+                                            other: "reviews",
+                                        }}
+                                        verb="left"
+                                        clearHref="/commerce/products?tab=reviews"
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            tabs
+                        )
+                    }
                     initialReviewId={review}
                 />
             </PageContainer>

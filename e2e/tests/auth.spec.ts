@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
+/** Home's title is its greeting (F6): "Good morning, Priya", "Welcome, …". */
+const HOME_GREETING = /^(Good (morning|afternoon|evening)|Welcome|Hello)\b/;
+
 /**
  * The auth cases from #50 / S1-008, which the backlog records as
  * "manual-verified only" (B6).
@@ -43,7 +46,7 @@ test.describe("cross-origin session", () => {
 
         await expect(page).toHaveURL(new RegExp(`^${urls.APP_URL}/?$`));
         await expect(
-            page.getByRole("heading", { name: "Home", level: 1 }),
+            page.getByRole("heading", { name: HOME_GREETING, level: 1 }),
         ).toBeVisible();
     });
 
@@ -95,7 +98,7 @@ test.describe("cross-origin session", () => {
         // Opened by id: with no business chosen, `/` is the chooser.
         await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
         await expect(
-            page.getByRole("heading", { name: "Home", level: 1 }),
+            page.getByRole("heading", { name: HOME_GREETING, level: 1 }),
         ).toBeVisible();
 
         await page.getByRole("button", { name: "Your account" }).click();
@@ -137,6 +140,37 @@ test.describe("CSRF origin checks", () => {
         });
 
         expect(response.status()).toBe(403);
+    });
+
+    /**
+     * #50: a signed-in mutation that carries NO Origin (and no Referer) is
+     * refused as well. That is the request a stripped or non-browser client
+     * sends with a victim's cookie; a real browser always names its origin.
+     *
+     * Sent with the page's own request context, so the session cookie goes
+     * with it and only the missing Origin can explain a refusal. The body is
+     * deliberately invalid: had the guard let it through, validation would
+     * answer 400 and nothing would be written.
+     */
+    test("the API refuses a signed-in mutation with no Origin", async ({
+        page,
+    }) => {
+        await signIn(page);
+
+        // The session is good: the same context reads fine.
+        const read = await page.request.get(`${urls.API_URL}/organizations`);
+        expect(read.status()).toBe(200);
+
+        const response = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND_ORG}/saved-views`,
+            {
+                headers: { "content-type": "application/json" },
+                data: {},
+                failOnStatusCode: false,
+            },
+        );
+        expect(response.status()).toBe(403);
+        expect(await response.text()).toContain("Missing request origin");
     });
 
     test("an unauthenticated mutation is refused even from a trusted origin", async ({

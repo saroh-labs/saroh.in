@@ -87,11 +87,13 @@ export function FirstRunJobs({
                 id="first-run-title"
                 className="mb-[5px] font-display text-[21px] font-semibold tracking-[-0.025em]"
             >
-                What do you want to do first?
+                What will you do first?
             </h2>
+            {/* The design's words. After a pick, Home leads with "Get ready
+                to take money" for the steps that pick needs (F8). */}
             <p className="mb-3.5 max-w-[62ch] text-pretty text-[12.5px] leading-[1.55] text-neutral-600 dark:text-neutral-400">
-                Pick one and it appears in the sidebar. You are not committing
-                to anything — add or drop these whenever.
+                Pick one to start. It adds its own rows to the sidebar, and you
+                can add the others whenever.
             </p>
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(232px,100%),1fr))] gap-3">

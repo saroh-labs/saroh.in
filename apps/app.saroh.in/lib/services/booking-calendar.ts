@@ -81,6 +81,22 @@ export interface BookingsCalendar {
     diaries: PersonDiary[];
 }
 
+/**
+ * Whether the business runs classes (E5): a service with more than one place,
+ * or a class on the calendar (one whose service has since changed). The
+ * legend shows Class only then, and otherwise calls a one-to-one an
+ * appointment — there is nothing to tell it apart from.
+ */
+export function runsClasses(
+    services: readonly { capacity: number }[],
+    calendar: Pick<BookingsCalendar, "diaries">,
+): boolean {
+    return (
+        services.some((s) => s.capacity > 1) ||
+        calendar.diaries.some((d) => d.classes.length > 0)
+    );
+}
+
 /** Every booking in a calendar read, flat and by slot — the register's rows. */
 export function flattenCalendar(calendar: BookingsCalendar): DiaryBooking[] {
     return calendar.diaries

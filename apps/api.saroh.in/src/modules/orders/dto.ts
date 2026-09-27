@@ -4,6 +4,7 @@ import {
     IsArray,
     IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     IsUrl,
@@ -13,6 +14,23 @@ import {
     MinLength,
     ValidateNested,
 } from "class-validator";
+
+/** The Orders list's tabs: All · Open · Refunded (default 14). */
+export const LIST_TABS = ["all", "open", "refunded"] as const;
+export type ListTab = (typeof LIST_TABS)[number];
+
+/**
+ * How the money on an order stands, as one word for the row and the filter.
+ * Derived from payments and refunds the way Order Detail's `refundStanding`
+ * is, so the list and the order never disagree (`order-list-filters.ts`).
+ */
+export const PAYMENT_STANDINGS = [
+    "PAID",
+    "UNPAID",
+    "PARTLY_REFUNDED",
+    "REFUNDED",
+] as const;
+export type PaymentStanding = (typeof PAYMENT_STANDINGS)[number];
 
 export const ORDER_STATUSES = [
     "PENDING",
@@ -39,10 +57,40 @@ export const ORDER_STAGES = [
     "COLLECTED",
     "HANDED_TO_COURIER",
     "DELIVERED",
+    // Local delivery's handover and Digital's done step (DEC-045). Written
+    // from release 2 (B2c) on; read from release 1.
+    "OUT_FOR_DELIVERY",
+    "SENT",
 ] as const;
 export type OrderStage = (typeof ORDER_STAGES)[number];
 
-export const ORDER_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
+/**
+ * The six ways an order leaves (DEC-045). Their rules are in
+ * `fulfilment.ts`, which every reader goes through.
+ */
+export const FULFILMENT_TYPES = [
+    "PICKUP",
+    "LOCAL_DELIVERY",
+    "SHIPPING",
+    "DIGITAL",
+    "APPOINTMENT_IN_PERSON",
+    "APPOINTMENT_ONLINE",
+] as const;
+export type FulfilmentType = (typeof FULFILMENT_TYPES)[number];
+
+/**
+ * The words the column held before the six types: COLLECT means PICKUP and
+ * DELIVERY means LOCAL_DELIVERY. Accepted until the contract release (B2d)
+ * drops them, because an app built before B2a still sends them.
+ */
+export const LEGACY_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
+export type LegacyFulfilment = (typeof LEGACY_FULFILMENTS)[number];
+
+/** Every value `Order.fulfilment` can hold, and a client can send, today. */
+export const ORDER_FULFILMENTS = [
+    ...LEGACY_FULFILMENTS,
+    ...FULFILMENT_TYPES,
+] as const;
 export type OrderFulfilment = (typeof ORDER_FULFILMENTS)[number];
 
 const trim = ({ value }: { value: unknown }) =>
@@ -55,6 +103,9 @@ const blankToNull = ({ value }: { value: unknown }) => {
 const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 const MONEY_MSG = "Must be a number with up to 2 decimals";
 const CURRENCY_RE = /^[A-Z]{3}$/;
+
+/** The most a courier's name or a tracking number may run to (DEC-045). */
+export const COURIER_FIELD_MAX = 80;
 
 /** Where a delivery order goes (ADR-008). Every part is plain text. */
 export class DeliveryAddressInput {
@@ -166,9 +217,13 @@ export class CreateOrderDto {
     @MaxLength(32)
     discountCode?: string;
 
-    /** Collected at the counter (the default) or delivered (ADR-008). */
+    /**
+     * How it leaves: picked up (the default) or delivered (ADR-008). Either
+     * vocabulary; until B2c only the two types a legacy word names can be
+     * written (`fulfilment.ts`).
+     */
     @IsOptional()
-    @IsIn(ORDER_FULFILMENTS, { message: "Collect or delivery" })
+    @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
     fulfilment?: OrderFulfilment;
 
     @IsOptional()
@@ -197,6 +252,24 @@ export class MoveStageDto {
     )
     @MaxLength(500)
     trackingUrl?: string;
+
+    /** Who took it — only on the handover to a courier; optional. */
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the courier's name to 80 characters",
+    })
+    courierName?: string | null;
+
+    /** The courier's number for it — only on that handover; optional. */
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the tracking number to 80 characters",
+    })
+    trackingNumber?: string | null;
 
     @IsOptional()
     @Transform(blankToNull)
@@ -228,7 +301,11 @@ export class OrderLineChangeInput {
 /**
  * Change an order before anyone starts on it (`order:write`, ADR-008): its
  * lines, its fulfilment and address, and its notes. Lines, fulfilment and
- * address only while it is New; notes at any time until it is cancelled.
+ * address only while it is New; notes until it is handed over or cancelled.
+ *
+ * The courier's name, the tracking number and the tracking link go with the
+ * handover to a courier (DEC-045): they are the only fields that change
+ * after it, and `order:stage` is enough for them. `null` clears one.
  */
 export class EditOrderDto {
     @IsOptional()
@@ -244,7 +321,7 @@ export class EditOrderDto {
     add?: OrderItemInput[];
 
     @IsOptional()
-    @IsIn(ORDER_FULFILMENTS, { message: "Collect or delivery" })
+    @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
     fulfilment?: OrderFulfilment;
 
     /** The delivery address; `null` clears it. */
@@ -258,6 +335,31 @@ export class EditOrderDto {
     @IsString()
     @MaxLength(1000)
     notes?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the courier's name to 80 characters",
+    })
+    courierName?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsString()
+    @MaxLength(COURIER_FIELD_MAX, {
+        message: "Keep the tracking number to 80 characters",
+    })
+    trackingNumber?: string | null;
+
+    @IsOptional()
+    @Transform(blankToNull)
+    @IsUrl(
+        { protocols: ["http", "https"], require_protocol: true },
+        { message: "The tracking link must be a web address" },
+    )
+    @MaxLength(500)
+    trackingUrl?: string | null;
 }
 
 export class UpdateOrderDto {
@@ -270,4 +372,121 @@ export class UpdateOrderDto {
     @IsString()
     @IsIn(PAYMENT_STATUSES, { message: "Unknown payment status" })
     paymentStatus?: PaymentStatus;
+}
+
+/** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */
+const listOf = ({ value }: { value: unknown }) => {
+    if (value === undefined || value === null || value === "") return undefined;
+    const parts = (Array.isArray(value) ? value : [value])
+        .flatMap((v: unknown) => (typeof v === "string" ? v.split(",") : [v]))
+        .map((v: unknown) =>
+            typeof v === "string" ? v.trim().toUpperCase() : v,
+        )
+        .filter((v: unknown) => v !== "");
+    return parts.length ? parts : undefined;
+};
+const blankToUndefined = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const t = value.trim();
+    return t === "" ? undefined : t;
+};
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `GET organizations/:org/orders` (plan B, B1). Without `v=2` only `storeId`
+ * is read and the route answers today's bare array; with it, every filter
+ * applies and the answer is `{ rows, counts, nextCursor }`.
+ */
+export class ListOrdersQuery {
+    @IsOptional()
+    @IsIn(["1", "2"], { message: "Unknown list version" })
+    v?: "1" | "2";
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(LIST_TABS, { message: "Unknown tab" })
+    tab?: ListTab;
+
+    @IsOptional()
+    @Transform(listOf)
+    @IsArray()
+    @IsIn(ORDER_STAGES, { each: true, message: "Unknown step" })
+    stage?: string[];
+
+    /** The types, or the legacy words (matched as their types until B2d). */
+    @IsOptional()
+    @Transform(listOf)
+    @IsArray()
+    @IsIn(ORDER_FULFILMENTS, {
+        each: true,
+        message: "Unknown way of fulfilling an order",
+    })
+    fulfilment?: string[];
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toUpperCase() : value,
+    )
+    @IsIn(PAYMENT_STANDINGS, { message: "Unknown payment standing" })
+    payment?: PaymentStanding;
+
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    productId?: string;
+
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    customerId?: string;
+
+    // Blank means every storefront: an empty string would filter on a
+    // storefront that cannot exist and return nothing.
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    storeId?: string;
+
+    /** Text, as a query string is: "true" or "false". */
+    @IsOptional()
+    @IsIn(["true", "false"], { message: "late is true or false" })
+    late?: "true" | "false";
+
+    /** A calendar day in the business's zone. */
+    @IsOptional()
+    @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
+    from?: string;
+
+    /** A calendar day in the business's zone, included. */
+    @IsOptional()
+    @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
+    to?: string;
+
+    /**
+     * An instant: only orders placed from it on (Home's "Last 24 hours",
+     * round 2 F6). Narrows the rows and every tab count alike.
+     */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsISO8601({ strict: true }, { message: "since is an ISO date and time" })
+    since?: string;
+
+    /** An order number or a customer's name; phone or email with `contact:read`. */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(100)
+    q?: string;
+
+    /** The last row's id from the page before. */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    cursor?: string;
 }

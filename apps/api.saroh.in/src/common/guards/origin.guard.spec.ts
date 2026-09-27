@@ -99,12 +99,34 @@ describe("OriginGuard (B3 CSRF origin check)", () => {
         ).toBe(true);
     });
 
-    it("ALLOWS a missing Origin+Referer (server-to-server frontend fetch)", () => {
-        expect(
+    it("REJECTS an unsafe request with neither Origin nor Referer (#50)", () => {
+        for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+            expect(() =>
+                guard.canActivate(
+                    ctx({ method, path: "/organizations/o1/leads" }),
+                ),
+            ).toThrow("Missing request origin");
+        }
+        // An empty header is as good as none.
+        expect(() =>
             guard.canActivate(
-                ctx({ method: "POST", path: "/organizations/o1/leads" }),
+                ctx({
+                    method: "POST",
+                    path: "/organizations/o1/leads",
+                    headers: { origin: " ", referer: "" },
+                }),
             ),
-        ).toBe(true);
+        ).toThrow(ForbiddenException);
+    });
+
+    it("still exempts a missing Origin on public, auth and health routes", () => {
+        for (const path of [
+            "/public/forms/f1/submissions",
+            "/api/auth/sign-in/email",
+            "/health/ready",
+        ]) {
+            expect(guard.canActivate(ctx({ method: "POST", path }))).toBe(true);
+        }
     });
 
     // ---- public + auth routes are exempt ---------------------------------

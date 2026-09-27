@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError, showUndo } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -18,7 +18,8 @@ import type { ProductPlacement } from "@/lib/products/overview-rules";
  * every collection, ticked where the product is in it. A hand-picked one
  * takes it or lets it go; an automatic one is locked and says why — it
  * follows the product's category. Saving puts it in exactly the ticked
- * hand-picked ones; the API refuses a full one and says so.
+ * hand-picked ones; the API refuses a full one and says so. Undo puts the
+ * hand-picked set back as it was.
  */
 export function ProductCollectionsSheet({
     open,
@@ -48,6 +49,8 @@ export function ProductCollectionsSheet({
     const dirty = !sameList(pickedIds(start, all), pickedIds(rows, all));
 
     async function save() {
+        // The hand-picked set as it was, for Undo to put back.
+        const previous = pickedIds(start, all);
         setSaving(true);
         const res = await saveProductCollections(
             productId,
@@ -58,9 +61,18 @@ export function ProductCollectionsSheet({
             showError("Its collections weren't saved.", res.error);
             return;
         }
-        showSuccess(`${productName}'s collections saved.`);
         onOpenChange(false);
         router.refresh();
+        showUndo("Collections saved.", () => {
+            void saveProductCollections(productId, previous).then((undo) => {
+                if (!undo.ok)
+                    showError(
+                        "Couldn't undo. The saved collections stay.",
+                        undo.error,
+                    );
+                router.refresh();
+            });
+        });
     }
 
     return (

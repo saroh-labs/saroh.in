@@ -1,6 +1,7 @@
 import { listTemplates } from "@saroh/templates";
 
 import { PublicSitesController } from "./public-sites.controller";
+import type { PublicVisitService } from "./public-visit.service";
 import type { SitePreviewLinksService } from "./site-preview-links.service";
 import type { SitesService } from "./sites.service";
 
@@ -16,6 +17,7 @@ describe("GET /public/sites/templates", () => {
     const controller = new PublicSitesController(
         {} as unknown as SitesService,
         {} as unknown as SitePreviewLinksService,
+        {} as unknown as PublicVisitService,
     );
 
     it("returns every registered template", () => {

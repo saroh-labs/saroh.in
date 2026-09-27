@@ -37,9 +37,14 @@
 
 ## Not in place yet
 
-- **No error tracker.** Seven `TODO(#103)` markers wait for one. When it lands,
-  forward from every `error.tsx` and from `AllExceptionsFilter`, upload source
-  maps, and exclude internal traffic.
+- **No error tracker yet, but the seam is in** (#103). `AllExceptionsFilter`
+  calls `reportError()` (`src/common/observability/report-error.ts`), and every
+  frontend boundary calls `reportError()` from `@saroh/ui/lib/report-error`.
+  Both log only until a tracker is installed. `ERROR_TRACKING_DSN` is the API's
+  switch, off by default. What may be sent, the recommendation, and the
+  decisions left are in `docs/architecture/ERROR_TRACKING_AND_UPTIME.md`.
+- **No uptime monitor** on `/health/ready`, and no log-based alerting. Same
+  document.
 - **No post-deploy watch list.** Start one in a runbook: error rate before and
   after, readiness, job backlog and the age of the oldest unclaimed job, and the
   two job signals above.

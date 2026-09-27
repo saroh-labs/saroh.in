@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
+import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
+import { orderLockedText, ordersAccess } from "@/lib/orders/access";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -27,6 +29,10 @@ export const metadata = { title: "Order" };
  * customer's allergy notes (the contact's detail read, U8 — only for a
  * customer confirmed as a contact), the provider's payment attempts (money
  * roles), and the review invitation (`order:read`).
+ *
+ * Someone holding neither `order:read` nor `order:stage` gets the design's
+ * locked card before the order is read (B7), rather than the generic denial
+ * its 403 would bring.
  */
 export default async function OrderPage({
     params,
@@ -38,6 +44,9 @@ export default async function OrderPage({
         params,
         resolveActiveOrganization(),
     ]);
+    if (organization && !ordersAccess(organization).open) {
+        return <OrderLocked text={orderLockedText(organization)} />;
+    }
     const order = await getOrderRead(orderId);
     if (!order) notFound();
 

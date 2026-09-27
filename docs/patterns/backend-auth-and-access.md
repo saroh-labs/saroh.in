@@ -105,7 +105,12 @@ what the API allows.
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
-  rejects an untrusted `Origin` on POST, PUT, PATCH and DELETE.
+  rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
+  POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the
+  API sends `origin: requestOrigin(await headers())`** (`@saroh/auth/origins`),
+  as `apiFetch` and `adminFetch` do. A new server-side client that forgets it
+  gets a 403 on every write. So does a Playwright test that writes through
+  `request`: put `origin: urls.APP_URL` in its headers.
 - **Current** — **Frontend session reads keep "signed out" and "could not check"
   apart.** Edge middleware checks cookie presence only
   (`@saroh/auth/middleware`); Server Components use `requireSession()`, and only
@@ -148,6 +153,35 @@ what the API allows.
   `OrganizationGuard` refuses writes and the public enquiry, booking and
   payment paths refuse outright; reads still pass and the site stays up, so its
   people can see what happened and take their data.
+- **Adopted** (2026-09-26, ADR-011) — **A business's customers are not
+  users.** A customer account on a merchant site is a per-business
+  `CustomerAccount` linked to a Contact, never a Better Auth `User`. Its
+  session is a host-only `__Host-` cookie on the site's own host, never on
+  `.saroh.app`. The site's server routes send the token to the API, and the API
+  accepts it only for the business that host resolves to. A workspace session
+  never signs anyone in on a merchant site.
+- **Current** (round-2 plan A, A2) — **Site-account routes are
+  server-to-server only.** Every `public/site-accounts/*` route sits behind
+  `SiteRelayGuard` (`modules/site-accounts/site-relay.ts`): saroh.app signs
+  the visitor's address, the host it served and the time with
+  `SITE_RELAY_SECRET`, and anything unsigned, forged or older than 60
+  seconds is a 401. The business comes from that host, and limits count the
+  relayed address, never the caller's.
+- **Current** (round-2 plan A, A3) — **A signed-in customer route sits
+  behind `CustomerSessionGuard`** (`modules/site-accounts/customer-session.guard.ts`)
+  and takes the customer from `@CurrentCustomer()`. The guard checks the
+  relay, then the `x-customer-session` token against a live session of an
+  ACTIVE account on that very site (another business's site, or another site
+  of the same business, is a 401). It sets `request.customerContext`, never
+  `organizationContext`, so no staff check can mistake a customer for a
+  member; `OrgRlsInterceptor` reads its `organizationId`, so the route runs
+  under that business's RLS. In saroh.app, every call to these routes goes
+  through `lib/customer-session.ts` (`siteAccountsFetch`, `accountFetch`),
+  and every state-changing action calls `siteOrigin()` (`lib/origin.ts`)
+  first — `lib/origin.test.ts` fails when one doesn't.
+- **Adopted** (2026-09-26, DEC-039) — **New staff permissions wait for the
+  matrix review** (`docs/plans/2026-09-26-permission-matrix.md`). Until then,
+  build against today's actions.
 - **Adopted** — **Write business rules down.** Plan limits, role actions and what
   a disabled module preserves belong in the ADRs and runbooks
   (`docs/architecture/runbooks/MODULE_ROLLOUT.md`), not only in code.

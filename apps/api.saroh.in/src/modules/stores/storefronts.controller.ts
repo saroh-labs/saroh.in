@@ -6,6 +6,7 @@ import {
     HttpCode,
     Param,
     Patch,
+    Post,
     UseGuards,
 } from "@nestjs/common";
 
@@ -15,9 +16,17 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { UpdateStorefrontDto } from "./storefronts.dto";
 import { StorefrontsService } from "./storefronts.service";
+
+/**
+ * Whoever reads Orders — the whole order (`order:read`) or the kitchen's
+ * view of it (`order:stage`) — sees the notice Orders shows.
+ */
+function readsOrders(ctx: OrganizationContext): void {
+    if (!allows(ctx, "order:read")) authorize(ctx, "order:stage");
+}
 
 /**
  * Sell → Storefronts: every storefront in the business, and its settings.
@@ -45,6 +54,34 @@ export class StorefrontsController {
     allowance(@OrgContext() ctx: OrganizationContext) {
         authorize(ctx, "store:read");
         return this.storefronts.allowance(ctx.organizationId);
+    }
+
+    /**
+     * The storefronts Orders should tell about the new Pick-up default
+     * (B17's one-time notice), and whether this person may change it. For
+     * anyone who reads Orders; the setting itself stays `store:write`.
+     */
+    @Get("late-rule-notices")
+    async lateRuleNotices(@OrgContext() ctx: OrganizationContext) {
+        readsOrders(ctx);
+        return {
+            notices: await this.storefronts.lateRuleNotices(ctx.organizationId),
+            canChange: allows(ctx, "store:write"),
+        };
+    }
+
+    /** Dismiss the notice for one storefront, for everyone who works there. */
+    @Post(":storeId/late-rule-notice/dismiss")
+    @HttpCode(204)
+    async dismissLateRuleNotice(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("storeId") storeId: string,
+    ): Promise<void> {
+        readsOrders(ctx);
+        await this.storefronts.dismissLateRuleNotice(
+            ctx.organizationId,
+            storeId,
+        );
     }
 
     @Get(":storeId")

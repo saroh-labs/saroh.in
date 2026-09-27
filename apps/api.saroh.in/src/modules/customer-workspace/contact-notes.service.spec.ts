@@ -50,12 +50,26 @@ function make() {
         storeAllergen: {
             count: jest.fn().mockResolvedValue(1),
             // Three storefronts: two spell Nuts their own way, one has Sesame.
-            findMany: jest.fn().mockResolvedValue([
-                { id: "alg_nuts", name: "Nuts" },
-                { id: "alg_sesame", name: "Sesame" },
-                { id: "alg_nuts_stall", name: " nuts " },
-                { id: "alg_nuts_popup", name: "NUTS" },
-            ]),
+            findMany: jest
+                .fn()
+                .mockImplementation(
+                    ({ where }: { where: { id?: { in: string[] } } }) =>
+                        Promise.resolve(
+                            [
+                                { id: "alg_nuts", name: "Nuts" },
+                                { id: "alg_sesame", name: "Sesame" },
+                                { id: "alg_nuts_stall", name: " nuts " },
+                                { id: "alg_nuts_popup", name: "NUTS" },
+                            ].filter(
+                                (r) => !where.id || where.id.in.includes(r.id),
+                            ),
+                        ),
+                ),
+        },
+        // Needs attention (C1): the person has no Allergy entry yet.
+        contactAttention: {
+            findMany: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         user: {
             findMany: jest
@@ -101,6 +115,89 @@ describe("ContactNotesService", () => {
         expect(audit.action).toBe("contact.note.created");
         expect(JSON.stringify(audit)).not.toContain("nut allergy");
         expect(note.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
+    });
+
+    it("puts a note's allergens on Needs attention too, once per name (C1)", async () => {
+        const { svc, db } = make();
+        db.storeAllergen.count.mockResolvedValue(3);
+
+        await svc.create(OWNER, "c1", {
+            body: "Nut allergy",
+            allergenIds: ["alg_nuts", "alg_nuts_stall", "alg_sesame"],
+        });
+
+        expect(db.contactAttention.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    organizationId: "org_1",
+                    contactId: "c1",
+                    kind: "ALLERGY",
+                    label: "Nuts",
+                    allergenId: "alg_nuts",
+                    sensitive: false,
+                    source: "STAFF",
+                    status: "ACTIVE",
+                    createdByUserId: "user_1",
+                }),
+                expect.objectContaining({
+                    label: "Sesame",
+                    allergenId: "alg_sesame",
+                }),
+            ],
+        });
+    });
+
+    it("adds no second entry for an allergy already on Needs attention", async () => {
+        const { svc, db } = make();
+        db.contactAttention.findMany.mockResolvedValue([
+            { label: "Nuts", allergen: { name: "NUTS" } },
+        ]);
+
+        await svc.create(OWNER, "c1", { allergenIds: ["alg_nuts"] });
+
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
+    });
+
+    it("leaves Needs attention alone when an update doesn't name allergens", async () => {
+        const { svc, db } = make();
+
+        await svc.update(OWNER, "c1", "note_1", { body: "Now oat milk" });
+
+        expect(db.contactAttention.findMany).not.toHaveBeenCalled();
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
+    });
+
+    it("doesn't bring back an Allergy entry the team removed when the note is edited (review C-6)", async () => {
+        const { svc, db } = make();
+        // The note already names Nuts; the team removed its entry, so
+        // Needs attention has no live Allergy entry for it.
+        db.storeAllergen.count.mockResolvedValue(2);
+
+        await svc.update(OWNER, "c1", "note_1", {
+            body: "Nut allergy, and sesame",
+            allergenIds: ["alg_nuts", "alg_sesame"],
+        });
+
+        // Only the allergen the edit adds goes on Needs attention.
+        expect(db.contactAttention.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    label: "Sesame",
+                    allergenId: "alg_sesame",
+                }),
+            ],
+        });
+    });
+
+    it("adds nothing to Needs attention when an edit keeps the same allergens (review C-6)", async () => {
+        const { svc, db } = make();
+
+        await svc.update(OWNER, "c1", "note_1", {
+            body: "Nut allergy — severe",
+            allergenIds: ["alg_nuts"],
+        });
+
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
     });
 
     it("refuses an allergen that is not on the organization's list", async () => {

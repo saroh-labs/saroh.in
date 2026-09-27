@@ -40,6 +40,34 @@ export const siteColors = {
 } as const;
 
 /**
+ * The neutral system stack a merchant's text is set in until they choose fonts
+ * of their own (H1). `Noto Sans Devanagari` is named so a Hindi line finds a
+ * real Devanagari face where the device has one.
+ *
+ * Deliberately NOT Saroh's faces. `saroh.app` used to load Geist and Bricolage
+ * Grotesque on every request, and the booking flow set its headings in Saroh's
+ * `font-display`, so a dental clinic's booking page wore Saroh's typography.
+ * Gate G7 in `scripts/check-blocks.mjs` keeps them out.
+ */
+export const SITE_FONT_STACK =
+    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+
+/**
+ * The merchant's type: `font-site-heading` and `font-site-body`, resolving to
+ * the `--site-font-*` properties {@link SiteTheme} sets per publication.
+ *
+ * Each carries the neutral stack as its `var()` fallback, so a surface drawn
+ * without `SiteTheme` above it — the renderer's bare apex, the root error
+ * boundary before it mounts one — still gets a real face. Without a fallback an
+ * unset variable makes the whole `font-family` declaration invalid, and the
+ * text drops to the browser's default serif.
+ */
+export const siteFontFamily = {
+    "site-heading": [`var(--site-font-heading, ${SITE_FONT_STACK})`],
+    "site-body": [`var(--site-font-body, ${SITE_FONT_STACK})`],
+};
+
+/**
  * Merge into an app's Tailwind config to render site blocks in it.
  *
  * Also add this package's source to the app's `content` globs, or every class
@@ -48,7 +76,9 @@ export const siteColors = {
  */
 export const siteBlocksPreset = {
     content: [],
-    theme: { extend: { colors: { site: siteColors } } },
+    theme: {
+        extend: { colors: { site: siteColors }, fontFamily: siteFontFamily },
+    },
 } satisfies Partial<Config>;
 
 export default siteBlocksPreset;

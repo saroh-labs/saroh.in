@@ -19,6 +19,7 @@ import {
     hashPassword,
     id,
     publishSeedPost,
+    syncStorefrontFulfilmentTypes,
     utcDay,
     writeSite,
 } from "../helpers";
@@ -36,6 +37,9 @@ import {
 import { checkBoutique, seedBoutique } from "./boutique";
 import type { RyeCounts } from "./check";
 import { checkRye, checkShowcase } from "./check";
+import type { KaviCounts } from "./clinic";
+import { checkKavi, KAVI, seedClinic } from "./clinic";
+import { KAVI_DESK } from "./clinic-data";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -117,7 +121,10 @@ interface Context {
     demoUserId: string;
 }
 
-export async function seedShowcase(): Promise<void> {
+export async function seedShowcase(
+    /** The clock to seed at (`--now=<ISO>`), to prove a date works; else now. */
+    clock: Date = new Date(),
+): Promise<void> {
     const target = assertDatabaseTarget();
     console.log(`[showcase] target: ${target.database} on ${target.host}`);
 
@@ -125,7 +132,11 @@ export async function seedShowcase(): Promise<void> {
     // Rounded down to the half hour: a re-run inside it writes identical rows.
     // Half past and on the hour are both boundaries in Kolkata (UTC+5:30), so
     // a renewal due at local midnight is on the same side of both clocks.
-    const now = new Date(Math.floor(Date.now() / 1_800_000) * 1_800_000);
+    const now = new Date(Math.floor(clock.getTime() / 1_800_000) * 1_800_000);
+    if (Number.isNaN(now.getTime())) {
+        throw new Error("--now is not a date: pass an ISO time");
+    }
+    console.log(`[showcase] now: ${now.toISOString()}`);
     const started = Date.now();
     const jobsBefore = await countJobs(prisma);
 
@@ -181,6 +192,16 @@ export async function seedShowcase(): Promise<void> {
             }),
         }),
     );
+    // The dental clinic the round-2 bookings screens are verified and filmed
+    // in (E29). Divya Kamath works its desk as a Member.
+    businesses.push(
+        await seedClinic({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -192,6 +213,11 @@ export async function seedShowcase(): Promise<void> {
     // Every shelf the showcase set opens its stock log (#513), counted by
     // each business's owner at the seed's (past) now.
     await balanceStockLog(prisma, { at: now });
+    // Which ways each storefront offers, now its orders exist (B2a).
+    await syncStorefrontFulfilmentTypes(
+        prisma,
+        businesses.map((b) => b.id),
+    );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
@@ -199,6 +225,7 @@ export async function seedShowcase(): Promise<void> {
         ? await checkPulse(prisma, pulse.id, now)
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
+    const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -212,6 +239,8 @@ export async function seedShowcase(): Promise<void> {
     }
     console.log("[showcase] Rye & Co., as its films need it:");
     console.table(ryeCounts);
+    console.log("[showcase] Kavi Dental, as its films need it:");
+    console.table(kaviCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

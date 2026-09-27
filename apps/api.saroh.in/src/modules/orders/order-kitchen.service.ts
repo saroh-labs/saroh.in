@@ -25,7 +25,16 @@ import {
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
 import { returnableUnits } from "../stock/reserve";
-import type { EditOrderDto, MoveStageDto } from "./dto";
+import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
+import {
+    FULFILMENT_RULES,
+    goesByCourier,
+    isHandedOver,
+    shipsToAddress,
+    storedValueFor,
+    typeOf,
+} from "./fulfilment";
+import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
 import {
     adjustReservation,
     applyInventoryTransition,
@@ -111,6 +120,8 @@ export class OrderKitchenService {
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
+            // Its storefront's late thresholds (B17), as the list reads them.
+            lateThresholds: lateThresholdsOf(order.store.settings),
             // The refund sheet's "Put N back in stock" (a money reader's).
             ...(money
                 ? { returnable: await returnableUnits(prisma, order.id) }
@@ -141,12 +152,16 @@ export class OrderKitchenService {
                 },
                 dto.to,
             );
-            if (dto.trackingUrl && move.to !== "HANDED_TO_COURIER") {
-                throw new BadRequestException({
-                    message:
-                        "A tracking link goes with handing the order to a courier.",
-                    field: "trackingUrl",
-                });
+            // The courier's details belong to the handover to one (DEC-045):
+            // all optional there, and refused on any other step.
+            if (move.to !== "HANDED_TO_COURIER") {
+                const stray = COURIER_FIELDS.find((f) => dto[f]);
+                if (stray) {
+                    throw new BadRequestException({
+                        message: `${COURIER_FIELD_WORDS[stray]} goes with handing the order to a courier.`,
+                        field: stray,
+                    });
+                }
             }
             await applyInventoryTransition(
                 tx,
@@ -162,6 +177,12 @@ export class OrderKitchenService {
                     status: move.toStatus,
                     ...(dto.trackingUrl
                         ? { trackingUrl: dto.trackingUrl }
+                        : {}),
+                    ...(dto.courierName
+                        ? { courierName: dto.courierName }
+                        : {}),
+                    ...(dto.trackingNumber
+                        ? { trackingNumber: dto.trackingNumber }
                         : {}),
                 },
             });
@@ -299,13 +320,19 @@ export class OrderKitchenService {
         } | null;
         moneyError: string | null;
     }> {
-        authorize(ctx, "order:write");
         const touchesItems =
             (dto.lines?.length ?? 0) > 0 || (dto.add?.length ?? 0) > 0;
         const touchesDelivery =
             dto.fulfilment !== undefined || dto.address !== undefined;
         const touchesNotes = dto.notes !== undefined;
-        if (!touchesItems && !touchesDelivery && !touchesNotes) {
+        const touchesOrder = touchesItems || touchesDelivery || touchesNotes;
+        const courier = COURIER_FIELDS.filter((f) => dto[f] !== undefined);
+        // The courier's details belong to the handover step, so whoever
+        // moves orders may record them (`order:stage`, matrix §2); the rest
+        // of an edit is `order:write`'s.
+        if (touchesOrder || courier.length === 0) authorize(ctx, "order:write");
+        if (courier.length > 0) authorize(ctx, "order:stage");
+        if (!touchesOrder && courier.length === 0) {
             throw new BadRequestException("Nothing to change");
         }
         // A repeated itemId would apply its delta twice against the same
@@ -335,6 +362,30 @@ export class OrderKitchenService {
                     message: "This order was cancelled, so it cannot change.",
                     field: "status",
                 });
+            }
+            // From its handover on, an order is what left (DEC-045): only
+            // the courier's details can still be filled in.
+            const handedOver = isHandedOver(
+                typeOf(order.fulfilment),
+                order.stage,
+            );
+            if (handedOver && touchesOrder) {
+                throw new ConflictException({
+                    message:
+                        "This order has been handed over, so only its courier and tracking number can change.",
+                    field: touchesItems
+                        ? "lines"
+                        : dto.fulfilment !== undefined
+                          ? "fulfilment"
+                          : dto.address !== undefined
+                            ? "address"
+                            : "notes",
+                });
+            }
+            if (courier.length > 0) {
+                // Neither check can pass with an order field beside them:
+                // those need the order before handover, these after it.
+                return saveCourier(tx, ctx, order, dto, courier, handedOver);
             }
             if (
                 (touchesItems || touchesDelivery) &&
@@ -487,7 +538,11 @@ export class OrderKitchenService {
                     toCents(order.discount.toString()),
             );
 
-            const fulfilment = dto.fulfilment ?? order.fulfilment;
+            // Compared as types, so COLLECT and PICKUP are the same order;
+            // a change is stored in what this release may write.
+            const was = typeOf(order.fulfilment);
+            const type = dto.fulfilment ? typeOf(dto.fulfilment) : was;
+            const newStored = type !== was ? storedValueFor(type) : null;
             const address =
                 dto.address === null
                     ? CLEARED_ADDRESS
@@ -508,17 +563,19 @@ export class OrderKitchenService {
                     : dto.address
                       ? true
                       : Boolean(order.deliveryLine1);
-            if (fulfilment === "DELIVERY" && !hasAddress) {
+            if (shipsToAddress(type) && !hasAddress) {
                 throw new BadRequestException({
                     message: "A delivery needs an address.",
                     field: "address",
                 });
             }
-            if (dto.fulfilment && dto.fulfilment !== order.fulfilment) {
+            if (newStored) {
                 changes.push(
-                    dto.fulfilment === "DELIVERY"
+                    type === "LOCAL_DELIVERY"
                         ? "now a delivery"
-                        : "now collected",
+                        : type === "PICKUP"
+                          ? "now collected"
+                          : `now ${FULFILMENT_RULES[type].label.toLowerCase()}`,
                 );
             }
             if (dto.address !== undefined) changes.push("address changed");
@@ -545,10 +602,7 @@ export class OrderKitchenService {
                     {
                         shippingCents: toCents(order.shipping.toString()),
                         discountCents: toCents(order.discount.toString()),
-                        deliveryState:
-                            (dto.fulfilment ?? order.fulfilment) === "DELIVERY"
-                                ? address
-                                : null,
+                        deliveryState: shipsToAddress(type) ? address : null,
                         profile,
                     },
                 );
@@ -564,7 +618,7 @@ export class OrderKitchenService {
                           }
                         : {}),
                     ...(gstCents !== null ? { tax: fromCents(gstCents) } : {}),
-                    ...(dto.fulfilment ? { fulfilment: dto.fulfilment } : {}),
+                    ...(newStored ? { fulfilment: newStored } : {}),
                     ...address,
                     ...(touchesNotes ? { notes: dto.notes ?? null } : {}),
                 },
@@ -708,6 +762,94 @@ export class OrderKitchenService {
     }
 }
 
+/** The courier's details: typed at the handover, or added after it. */
+const COURIER_FIELDS = [
+    "courierName",
+    "trackingNumber",
+    "trackingUrl",
+] as const;
+type CourierField = (typeof COURIER_FIELDS)[number];
+
+const COURIER_FIELD_WORDS: Record<CourierField, string> = {
+    courierName: "A courier's name",
+    trackingNumber: "A tracking number",
+    trackingUrl: "A tracking link",
+};
+
+/**
+ * Record the courier's name, number or link on an order handed to a courier
+ * (DEC-045), under the lock the edit took. A pick-up, a digital order or an
+ * appointment never goes by courier; one not handed over yet takes them with
+ * the handover. The change is a step on the timeline, like any edit.
+ */
+async function saveCourier(
+    tx: Prisma.TransactionClient,
+    ctx: OrganizationContext,
+    order: { id: string; fulfilment: string; stage: OrderStage },
+    dto: EditOrderDto,
+    fields: readonly CourierField[],
+    handedOver: boolean,
+): Promise<{
+    id: string;
+    eventId: string;
+    differenceCents: number;
+    settleCents: number;
+}> {
+    const field = fields[0];
+    if (!goesByCourier(order.fulfilment, order.stage)) {
+        const noun = FULFILMENT_RULES[typeOf(order.fulfilment)].noun;
+        throw new ConflictException({
+            message: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} isn't handed to a courier.`,
+            field,
+        });
+    }
+    if (!handedOver) {
+        throw new ConflictException({
+            message:
+                "The courier and tracking number are added when the order is handed to the courier.",
+            field,
+        });
+    }
+    const data: Partial<Record<CourierField, string | null>> = {};
+    const said: string[] = [];
+    for (const f of fields) {
+        const value = dto[f] ?? null;
+        data[f] = value;
+        const what =
+            f === "courierName"
+                ? "courier"
+                : f === "trackingNumber"
+                  ? "tracking number"
+                  : "tracking link";
+        said.push(
+            value === null
+                ? `${what} removed`
+                : f === "trackingUrl"
+                  ? `${what} changed`
+                  : `${what} ${value}`,
+        );
+    }
+    await tx.order.update({ where: { id: order.id }, data });
+    const event = await tx.orderEvent.create({
+        data: {
+            organizationId: ctx.organizationId,
+            orderId: order.id,
+            kind: "EDIT",
+            actorUserId: ctx.userId,
+            fromStage: order.stage,
+            toStage: order.stage,
+            note: said.join("; "),
+        },
+        select: { id: true },
+    });
+    return {
+        id: order.id,
+        eventId: event.id,
+        differenceCents: 0,
+        settleCents: 0,
+    };
+}
+
 const CLEARED_ADDRESS = {
     deliveryName: null,
     deliveryPhone: null,
@@ -720,7 +862,13 @@ const CLEARED_ADDRESS = {
 
 /** What Order Detail reads — see order-read.ts. */
 const READ_INCLUDE = {
-    store: { select: { id: true, name: true } },
+    store: {
+        select: {
+            id: true,
+            name: true,
+            settings: { select: LATE_THRESHOLD_SELECT },
+        },
+    },
     customer: {
         select: {
             id: true,

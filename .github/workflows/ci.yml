@@ -1,11 +1,16 @@
 name: CI
 
 # Gates every PR (and pushes to the long-lived branches) on the same checks a
-# developer runs locally: install → prisma generate → lint → typecheck → unit
-# tests → build → integration tests. See ticket S0-002.
+# developer runs locally: lint, typecheck, unit tests, build, integration tests
+# (plain and under RLS), the migration replay and the browser suites. See
+# ticket S0-002. The independent gates run as parallel jobs and the slow suites
+# are sharded, and a run checks only what its change can reach (the `changes`
+# job); `ci` and `browser-e2e` gather them under the check names the
+# branch rules and the PR page already use. Shared setup is
+# .github/actions/setup.
 #
 # NOTE FOR REPO ADMINS: this workflow only *runs* the gates. To make them
-# blocking, mark the `ci` job as a REQUIRED status check in the branch
+# blocking, mark the `ci` and `browser-e2e` jobs as REQUIRED status checks in the branch
 # protection rules for `main` and `development` (Settings → Branches). That
 # cannot be configured from a workflow file.
 
@@ -14,6 +19,11 @@ on:
     branches: [main, development]
   push:
     branches: [main, development]
+  # Everything, regardless of what changed: by hand from the Actions tab, and
+  # weekly as a safety net for anything the path rules below might miss.
+  workflow_dispatch:
+  schedule:
+    - cron: "30 20 * * 0" # Sunday 20:30 UTC (Monday 02:00 IST)
 
 # Least privilege: the gates only read the checked-out tree. No job needs to
 # write to the repo, packages, or deployments, so we grant read-only at the top
@@ -21,17 +31,86 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded runs for the same ref (e.g. a force-push or a new commit on
-# an open PR) so CI does not pile up on stale commits.
+# Cancel superseded runs on an open PR (a new commit or a force-push) so CI does
+# not pile up on stale commits. Never on main or development: each push there
+# is checked against the commit before it, so a cancelled run would leave that
+# push's own changes unchecked.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ci:
-    name: Lint, typecheck, test & build
-    runs-on: ubuntu-latest
+  # The gates used to run as one job, one step after another: lint, typecheck,
+  # unit tests, build, then the integration suite twice (plain and under RLS),
+  # about 18 minutes end to end. They are independent, so they now run side by
+  # side: static checks, unit tests and the build each in their own job, and
+  # the integration suite split into 4 shards per mode, each against its own
+  # Postgres.
+  # `ci` at the end waits for all of them and keeps the old check's name, so a
+  # branch rule that requires "Lint, typecheck, test & build" still means
+  # every one of these passed.
 
+  # What this change touches, so a run checks only what it can reach. The
+  # base is the PR's merge base, or on a push the commit the branch pointed
+  # at before it (a merged PR is then exactly that PR's diff):
+  #   - a change to CI, the root manifests, the lockfile or tooling/ runs
+  #     everything (it can affect any package);
+  #   - otherwise each gate runs when a path it depends on changed, and lint,
+  #     typecheck, unit tests and build cover only the packages that changed
+  #     plus everything that depends on them (turbo's `...[base]` filter).
+  # A manual or scheduled run, a new branch, or a push whose previous commit
+  # is gone (a force-push) checks everything.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.scan.outputs.full }}
+      code: ${{ steps.scan.outputs.code }}
+      api: ${{ steps.scan.outputs.api }}
+      db: ${{ steps.scan.outputs.db }}
+      e2e: ${{ steps.scan.outputs.e2e }}
+      base: ${{ steps.scan.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scan
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # Written to the step's outputs only; nothing is printed to the log.
+          put() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
+          everything() { for k in full code api db e2e; do put "$k" true; done; put base ""; exit 0; }
+          case "$EVENT" in
+            pull_request) base=$(git merge-base "$PR_BASE" HEAD) ;;
+            push)
+              # All zeros on a new branch; missing after a force-push.
+              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ] \
+                || ! git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then everything; fi
+              base="$PUSH_BEFORE" ;;
+            *) everything ;;
+          esac
+          put base "$base"
+          files=$(git diff --name-only "$base" HEAD)
+          has() { printf '%s\n' "$files" | grep -qE "$1"; }
+          if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
+            everything
+          fi
+          put full false
+          # Anything but docs and Markdown counts as code.
+          if printf '%s\n' "$files" | grep -vqE '^(docs/|.*\.md$)'; then put code true; else put code false; fi
+          if has '^(apps/api\.saroh\.in/|packages/)'; then put api true; else put api false; fi
+          if has '^packages/database/'; then put db true; else put db false; fi
+          if has '^(apps/|packages/|e2e/|scripts/)'; then put e2e true; else put e2e false; fi
+
+  static:
+    name: Lint, typecheck and repo checks
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Placeholder build/runtime env. The apps validate env at build time via the
     # S0-006 typed env modules; SKIP_ENV_VALIDATION short-circuits that zod check
     # (t3-env's recommended CI/Docker pattern) so no build/test step can fail on a
@@ -41,13 +120,13 @@ jobs:
     # DATABASE_URL is deliberately a DIFFERENT database name ("saroh_ci_dummy")
     # from the integration TEST_DATABASE_URL ("saroh_test") so the S0-003
     # non-test-DB guard (which rejects TEST_DATABASE_URL == DATABASE_URL, by
-    # string or by host+db) is satisfied. Nothing ever connects to this URL:
-    # prisma generate needs no connection, and the integration globalSetup
-    # overrides DATABASE_URL with the test URL before it pushes the schema.
+    # string or by host+db) is satisfied. Nothing ever connects to this URL.
     env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
-      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -57,53 +136,22 @@ jobs:
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
-
-    # Postgres for the integration tests. The test DB name contains "test" so
-    # it passes the S0-003 guard; plain TCP on 5432, no SSL.
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: saroh_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v4
         with:
-          version: 9.9.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
+          turbo-cache: static
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # One turbo run, so lint and typecheck share the task graph and run in
+      # parallel across packages. Package-boundary enforcement (frontends must
+      # not import Prisma directly) is part of `lint` via the shared nextjs
+      # ESLint config.
+      - name: Lint and typecheck
+        run: pnpm turbo run lint typecheck $AFFECTED
 
-      # Generate the Prisma client before anything typechecks, builds, or runs
-      # tests against @saroh/database.
-      - name: Prisma generate
-        run: pnpm --filter @saroh/database generate
-
-      - name: Lint
-        run: pnpm run lint
-
-      # Package-boundary enforcement (frontends must not import Prisma directly)
-      # is part of `lint` via the shared nextjs ESLint config. This step adds
-      # circular-dependency detection across all workspaces.
+      # Circular-dependency detection across all workspaces.
       - name: Circular dependency check
         run: pnpm run check:cycles
 
@@ -114,44 +162,92 @@ jobs:
         run: pnpm run check:routes
 
       # Merchant sites render off the --site-* layer only, and there is exactly
-      # one renderer — gates G2 and G6 (#252). The script existed and no job ran
-      # it, so a block painted in Saroh's palette, or a second renderer drifting
-      # from the first the way #189 did, would have merged green.
+      # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate
         run: pnpm run check:blocks
 
-      - name: Typecheck
-        run: pnpm run typecheck
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      BETTER_AUTH_URL: http://localhost:3333
+      APP_URL: http://localhost:3003
+      CORS_ORIGIN: http://localhost:3000
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          turbo-cache: unit
 
-      # Block only on CRITICAL advisories. The tree currently carries ~36 "high"
-      # advisories, almost all transitive dev tooling (e.g. ws DoS via
-      # react-email > socket.io in @saroh/emails) with no upstream fix yet;
-      # hard-failing on "high" would rot CI. Highs/moderates are triaged in the
-      # dependency-refresh pass, not blocked here.
+      # The api's specs import its workspace packages (auth, block-contract,
+      # …) as built; the single job used to have them from typecheck.
+      - name: Build what the api imports
+        if: needs.changes.outputs.api == 'true'
+        run: pnpm turbo run build --filter=@saroh/api^...
+
       - name: Unit tests (api, no database)
+        if: needs.changes.outputs.api == 'true'
         run: pnpm --filter @saroh/api test:unit
 
-      # Everything else with a `test` script: seven packages and the workspace
-      # app (#287). They existed and never ran — vitest suites in
-      # block-contract, object-storage, auth, ui, database, site-blocks and
-      # templates, none of them reachable from any CI step, so a red one would
-      # have gone unnoticed until somebody ran it by hand.
-      #
-      # `@saroh/api` is excluded: its bare `test` script is `jest`, which picks
-      # up the integration specs that need a database. Its unit suite runs
-      # above, and its int suite in its own job with the Postgres service.
+      # Everything else with a `test` script: the packages and the workspace
+      # app (#287). `@saroh/api` is excluded: its bare `test` script is `jest`,
+      # which picks up the integration specs that need a database.
       - name: Unit tests (packages and the app)
-        run: pnpm run test
+        run: pnpm turbo run test --filter='!@saroh/api' $AFFECTED
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    env:
+      # On a PR, only the packages the change touched and their dependents.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && format('--filter=...[{0}]', needs.changes.outputs.base) || '' }}
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      BETTER_AUTH_URL: http://localhost:3333
+      APP_URL: http://localhost:3003
+      CORS_ORIGIN: http://localhost:3000
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          turbo-cache: build
+          next-cache: "true"
 
       - name: Build
-        run: pnpm run build
+        run: pnpm turbo run build $AFFECTED
 
-      # Last, and tolerant of the registry being unreachable: the audit endpoint
-      # timed out from the runner on two consecutive runs in one morning, and
-      # because this step used to sit before the tests and the build, a network
-      # blip hid whether the branch even compiled. A CRITICAL FINDING still
-      # fails the job; failing to reach the registry is retried, then reported
-      # as a warning so the next run tries again.
+      # Tolerant of the registry being unreachable: the audit endpoint timed
+      # out from the runner on two consecutive runs in one morning. A CRITICAL
+      # FINDING still fails the job; failing to reach the registry is retried,
+      # then reported as a warning so the next run tries again. Highs and
+      # moderates (mostly transitive dev tooling) are triaged in the
+      # dependency-refresh pass, not blocked here.
       - name: Dependency audit (critical only)
         run: |
           for attempt in 1 2 3; do
@@ -168,13 +264,89 @@ jobs:
           done
           echo "::warning::Dependency audit skipped: registry unreachable after 3 attempts"
 
-      # Integration tests need the Postgres service. The globalSetup runs
-      # `pnpm exec prisma db push` in packages/database, which relies on the
-      # Prisma client generated above and on pnpm being on PATH (both true here).
-      - name: Integration tests (api, Postgres)
+  # The integration suite runs serially (maxWorkers 1: the between-suite
+  # TRUNCATE is only race-free on one connection), so the way to make it
+  # faster is to split the specs across jobs, each with its own Postgres.
+  # Every spec still runs, in both modes:
+  #   plain — the schema from `prisma db push`, the service's own connection;
+  #   rls   — the way production runs once RLS is switched on (#53): the
+  #           schema from the migrations (where the policies live), a
+  #           NOBYPASSRLS role with DML rights only, RLS_ENFORCEMENT=on, and
+  #           every service call made inside its RLS context
+  #           (apps/api.saroh.in/test/rls-mode.ts).
+  integration:
+    name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [plain, rls]
+        shard: [1, 2, 3, 4]
+    env:
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      BETTER_AUTH_URL: http://localhost:3333
+      APP_URL: http://localhost:3003
+      CORS_ORIGIN: http://localhost:3000
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
+      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
+      TEST_RLS: ${{ matrix.mode == 'rls' && 'on' || '' }}
+    # The test DB name contains "test" so it passes the S0-003 guard.
+    services:
+      postgres:
+        image: postgres:16
         env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
-        run: pnpm --filter @saroh/api test:int
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saroh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      # No Turbo cache: the suite runs through jest directly. The globalSetup
+      # runs `prisma db push` in packages/database, which needs the client
+      # generated here and pnpm on PATH.
+      - uses: ./.github/actions/setup
+
+      # The api's workspace dependencies (auth, block-contract, …) are consumed
+      # built, as `pnpm run build` would leave them.
+      - name: Build what the api imports
+        run: pnpm turbo run build --filter=@saroh/api^...
+
+      - name: Integration tests
+        working-directory: apps/api.saroh.in
+        run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/4
+
+  # Keeps the name branch rules and the PR page already know, and passes only
+  # when every job above passed. A skipped or cancelled job counts as a fail.
+  ci:
+    name: Lint, typecheck, test & build
+    runs-on: ubuntu-latest
+    needs: [changes, static, unit, build, integration]
+    if: always()
+    steps:
+      # A job skipped because the change can't reach it is fine; one that
+      # failed or was cancelled is not, and neither is `changes` itself not
+      # succeeding (its skip would otherwise wave everything through).
+      - name: Every gate that ran passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          [ "$CHANGES" = "success" ] && [ "$FAILED" != "true" ]
 
   # The migration history is not exercised anywhere else in this workflow: the
   # integration suite builds its database with `prisma db push`, which reads
@@ -188,6 +360,8 @@ jobs:
   migration-replay:
     name: Migration replay from empty
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
 
     # Its own throwaway database, created empty by the image. The name is not in
     # the S0-003 guard's allow-list on purpose, so the step names it explicitly
@@ -208,22 +382,10 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 9.9.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          prisma: "false"
 
       - name: Replay migrations and check for drift
         env:
@@ -247,9 +409,19 @@ jobs:
   # no portless proxy on a runner, so the URLs are passed in explicitly and the
   # trusted-origin list is set to match. That list is exactly why the local
   # names exist — see docs/architecture/LOCAL_DEV.md.
-  browser-e2e:
-    name: Browser E2E (seeded stack)
+  # Split four ways by spec file, each shard with its own Postgres and its
+  # own freshly seeded stack, so the specs still run one at a time against
+  # data only they touch (the config keeps workers: 1). About 9.5 minutes of
+  # tests become about 2.5 per shard.
+  browser-e2e-shard:
+    name: Browser E2E (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     services:
       postgres:
@@ -276,7 +448,7 @@ jobs:
       # Nest binds a random port. It only looks fine locally because
       # `apps/api.saroh.in/.env` sets PORT and a runner has no .env at all.
       PORT: 3333
-      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted
       # list defaults to the *.saroh.in production origins, so a return-to on
@@ -302,24 +474,26 @@ jobs:
       # The site-review flow takes the token out of that address and opens it
       # against this origin instead.
       E2E_RENDERER_URL: http://localhost:3005
+      # Site sign-in (round-2 A9): every booking page asks for an emailed
+      # code at the last step. The built apps have no development fallback
+      # for the relay and code secrets, so the stack gets throwaway ones (the
+      # relay one is also what the sign-in spec signs its API calls with).
+      # With no SMTP, the fake code transport leaves each code where the
+      # browser tests read it (`e2e/tests/site-codes.ts`); it never runs in
+      # production.
+      SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
+      SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
+      SITE_CODES_EMAIL_FAKE: log
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v4
+      # The Turbo cache lets an unchanged app's build replay instead of
+      # rebuilding in every shard.
+      - uses: ./.github/actions/setup
         with:
-          version: 9.9.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          turbo-cache: e2e
+          next-cache: "true"
+          playwright: "true"
 
       # Migrations, not `db push`: this stack is the one place CI exercises the
       # app end to end, so it is built the way a real environment is.
@@ -343,9 +517,6 @@ jobs:
 
       - name: Build the apps under test
         run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application --filter=sites
-
-      - name: Install Playwright browser
-        run: pnpm --filter @saroh/e2e install:browsers
 
       # Started detached and polled, rather than trusting a fixed sleep: a cold
       # Next server on a runner is not reliably up in any particular number of
@@ -386,25 +557,26 @@ jobs:
             return 1
           }
 
-          # `tail -n 50`, not `tail -50`: the obsolete form is rejected in this
-          # context, so the first version of this dump failed silently and a
-          # failed run reported nothing about WHY the stack did not start.
+          # On a failed start the servers' logs go up as an artifact (below)
+          # rather than into this public build log.
           # The renderer serves tenants by hostname and a runner has none, so
           # it is polled on a preview token instead; a 404 there is the app
           # answering, which is what "up" means for it.
-          if ! wait_for api http://localhost:3333/health \
-            || ! wait_for accounts http://localhost:3000/login \
-            || ! wait_for app http://localhost:3003/ \
-            || ! wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'; then
-            echo "----- api -----";      tail -n 50 /tmp/api.log      || true
-            echo "----- accounts -----"; tail -n 50 /tmp/accounts.log || true
-            echo "----- app -----";      tail -n 50 /tmp/app.log      || true
-            echo "----- renderer -----"; tail -n 50 /tmp/renderer.log || true
-            exit 1
-          fi
+          wait_for api http://localhost:3333/health
+          wait_for accounts http://localhost:3000/login
+          wait_for app http://localhost:3003/
+          wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'
+
+      - name: Upload the servers' logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-logs-shard-${{ matrix.shard }}
+          path: /tmp/*.log
+          retention-days: 3
 
       - name: Run browser tests
-        run: pnpm --filter @saroh/e2e test:e2e
+        run: pnpm --filter @saroh/e2e exec playwright test --shard=${{ matrix.shard }}/4
 
       # The trace and screenshots are the whole point of a failed browser run:
       # without them a red build says "something looked wrong" and nothing else.
@@ -412,11 +584,26 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: |
             e2e/test-results/
             e2e/playwright-report/
           retention-days: 7
+  # The old check's name, passing only when every shard passed.
+  browser-e2e:
+    name: Browser E2E (seeded stack)
+    runs-on: ubuntu-latest
+    needs: [changes, browser-e2e-shard]
+    if: always()
+    steps:
+      - name: Every shard that ran passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          SHARDS: ${{ needs.browser-e2e-shard.result }}
+        run: |
+          [ "$CHANGES" = "success" ] || exit 1
+          case "$SHARDS" in success|skipped) ;; *) exit 1 ;; esac
+
   # The permission-denied states, rendered by a PRODUCTION build (#287).
   #
   # It existed and never ran. `e2e/permissions.config.ts` and its suite shipped
@@ -431,6 +618,8 @@ jobs:
   permissions-e2e:
     name: Permission states (production build)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
 
     env:
       # Bare ports: a runner has no portless, so the config's `.localhost`
@@ -440,25 +629,11 @@ jobs:
       PERMISSIONS_API_URL: http://localhost:3334
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 9.9.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browser
-        run: pnpm --filter @saroh/e2e install:browsers
+          prisma: "false"
+          playwright: "true"
 
       # Playwright's own webServer builds and starts both servers, and tears
       # them down afterwards — there is no stack to poll for here.

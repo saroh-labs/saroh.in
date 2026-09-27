@@ -24,8 +24,11 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
     ListPlansQueryDto,
+    ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
+    PauseSubscriptionDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -55,6 +58,16 @@ export class SubscriptionPlansController {
     @Get(":planId")
     get(@OrgContext() ctx: OrganizationContext, @Param("planId") id: string) {
         return this.subscriptions.getPlan(ctx, id);
+    }
+
+    /** The plan's history, newest first, a page at a time (D2). */
+    @Get(":planId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Query() query: ListPlanEventsQueryDto,
+    ) {
+        return this.subscriptions.planEvents(ctx, id, query);
     }
 
     @Post()
@@ -121,6 +134,16 @@ export class SubscriptionsController {
         return this.subscriptions.get(ctx, id);
     }
 
+    /** What was done to it and by whom, newest first, a page at a time (D9). */
+    @Get(":subscriptionId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Query() query: ListSubscriptionEventsQueryDto,
+    ) {
+        return this.subscriptions.events(ctx, id, query);
+    }
+
     /** Subscribe a contact; answers with the subscription and issues its first invoice. */
     @Post()
     @HttpCode(201)
@@ -136,8 +159,9 @@ export class SubscriptionsController {
     pause(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
+        @Body() dto: PauseSubscriptionDto,
     ) {
-        return this.subscriptions.pause(ctx, id);
+        return this.subscriptions.pause(ctx, id, dto);
     }
 
     @Post(":subscriptionId/resume")

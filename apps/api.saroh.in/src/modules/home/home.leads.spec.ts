@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { HomeService } from "./home.service";
@@ -41,7 +42,10 @@ function build() {
             findMany: jest.fn().mockResolvedValue([OVERDUE]),
         },
     };
-    return { service: new HomeService(availability, db as never), db };
+    return {
+        service: new HomeService(availability, quietLastDay(db) as never),
+        db,
+    };
 }
 
 const MEMBER = {

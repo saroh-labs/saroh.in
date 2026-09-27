@@ -37,6 +37,8 @@ const base: RawOrderRead = {
     total: "400.00",
     notes: null,
     trackingUrl: null,
+    courierName: null,
+    trackingNumber: null,
     deliveryName: null,
     deliveryPhone: null,
     deliveryLine1: "12 MG Road",
@@ -153,6 +155,103 @@ describe("serializeOrderRead", () => {
             serializeOrderRead(withPaper, { ...opts(true), invoiceRead: true })
                 .invoices,
         ).toEqual(paper);
+    });
+
+    it("answers the legacy word and the type, with its steps (B2a)", () => {
+        const read = serializeOrderRead(base, opts(false));
+        expect(read).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "LOCAL_DELIVERY",
+            fulfilmentLabel: "Local delivery",
+            stepIndex: 1,
+            ticketName: "Packing slip",
+        });
+        // Until the switch, a local delivery is handed to a courier.
+        expect(read.steps.map((s) => s.stage)).toEqual([
+            "NEW",
+            "PREPARING",
+            "READY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ]);
+        // A row already in the new names reads the same.
+        const renamed = serializeOrderRead(
+            { ...base, fulfilment: "LOCAL_DELIVERY" },
+            opts(false),
+        );
+        expect(renamed.fulfilment).toBe("DELIVERY");
+        expect(renamed.steps).toEqual(read.steps);
+        expect(
+            serializeOrderRead(
+                {
+                    ...base,
+                    fulfilment: "SHIPPING",
+                    stage: "READY",
+                    status: "PROCESSING",
+                },
+                opts(false),
+            ),
+        ).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "SHIPPING",
+            stepIndex: 2,
+            next: { stages: ["HANDED_TO_COURIER"] },
+        });
+    });
+
+    it("says whether it is late by its type's threshold, from when it was placed (B2b)", () => {
+        const hours = (h: number) => ({
+            ...opts(false),
+            now: new Date(at.getTime() + h * 3_600_000),
+        });
+        // A local delivery gets 24 hours.
+        expect(serializeOrderRead(base, hours(23))).toMatchObject({
+            lateAfterMinutes: 1440,
+            late: false,
+            lateBy: null,
+        });
+        expect(serializeOrderRead(base, hours(26))).toMatchObject({
+            lateAfterMinutes: 1440,
+            late: true,
+            lateBy: 120,
+        });
+        // A pick-up two hours; once collected it is never late.
+        const pickup = { ...base, fulfilment: "COLLECT" };
+        expect(serializeOrderRead(pickup, hours(3))).toMatchObject({
+            lateAfterMinutes: 120,
+            late: true,
+            lateBy: 60,
+        });
+        expect(
+            serializeOrderRead(
+                { ...pickup, stage: "COLLECTED", status: "DELIVERED" },
+                hours(3),
+            ),
+        ).toMatchObject({ late: false, lateBy: null });
+    });
+
+    it("carries the courier and tracking number (B2b)", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                stage: "HANDED_TO_COURIER",
+                status: "SHIPPED",
+                courierName: "Delhivery",
+                trackingNumber: "AWB 4411",
+                trackingUrl: "https://track.example/AWB4411",
+            },
+            opts(false),
+        );
+        expect(read).toMatchObject({
+            courierName: "Delhivery",
+            trackingNumber: "AWB 4411",
+            trackingUrl: "https://track.example/AWB4411",
+            late: false,
+        });
+        expect(serializeOrderRead(base, opts(false))).toMatchObject({
+            courierName: null,
+            trackingNumber: null,
+        });
     });
 
     it("carries the address with its state, for delivery and for GST", () => {

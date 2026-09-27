@@ -202,6 +202,30 @@ describe("activityLine — values a save recorded (#509)", () => {
         );
     });
 
+    it("says when a storefront's orders count as late, or how they leave (B17)", () => {
+        expect(
+            said({
+                action: "storefront.fulfilment.update",
+                targetType: "storefront",
+                targetId: "st_1",
+                metadata: {
+                    fields: ["pickupLateAfterMinutes"],
+                    storefront: "Counter",
+                    changes: [],
+                },
+            }),
+        ).toBe(
+            "Sanjay changed when orders count as late at Counter → Storefronts",
+        );
+        expect(
+            said({
+                action: "storefront.fulfilment.update",
+                targetType: "storefront",
+                metadata: { fields: ["fulfilmentTypes"], changes: [] },
+            }),
+        ).toBe("Sanjay changed how orders leave → Storefronts");
+    });
+
     it("says opening hours, modules and plans", () => {
         expect(
             said({

@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { HomeService } from "./home.service";
 
@@ -93,8 +94,35 @@ function build(views: View[], fixture: Fixture = {}) {
         contact: {
             count: jest.fn().mockResolvedValue(fixture.contactCount ?? 0),
         },
+        // Round 2 F1's sources, empty: nothing overdue, owed, short or
+        // unpublished, so every existing expectation reads as it did.
+        invoice: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        paymentIntent: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        site: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
+        },
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        // D8's paused-subscriptions source: Payments on, so it has nothing.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    return new HomeService(availability, db as never);
+    const stockChecks = { openShort: jest.fn().mockResolvedValue([]) };
+    return new HomeService(
+        availability,
+        quietLastDay(db) as never,
+        stockChecks as never,
+    );
 }
 
 const INPUT = { organizationId: "org_1", organizationRole: "OWNER" as const };
@@ -121,6 +149,8 @@ const OPEN_ORDER = {
     total: "1250.50",
     currency: "INR",
     createdAt: new Date("2026-07-20T10:00:00.000Z"),
+    // Its storefront never saved settings: the default thresholds.
+    store: { settings: null },
     customer: {
         firstName: "Vikram",
         lastName: "Shetty",
@@ -184,8 +214,10 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
     it("still returns the parts that answered when open orders fail", async () => {
         const home = await buildWithFailure("order").build(INPUT);
 
+        // Today reads orders for its pick-ups, so it is named too (F5).
         expect(home.unavailable).toEqual([
             { moduleKey: "COMMERCE", label: "Open orders" },
+            { moduleKey: "APPOINTMENTS", label: "Today" },
         ]);
         // The schedule survived, which is the whole point.
         expect(home.upcoming).toHaveLength(1);
@@ -196,8 +228,11 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
 
         expect(home.unavailable).toEqual([
             { moduleKey: "APPOINTMENTS", label: "Schedule" },
+            { moduleKey: "APPOINTMENTS", label: "Today" },
         ]);
         expect(home.upcoming).toEqual([]);
+        // Today failed with it: never shown as an empty day.
+        expect(home.today).toBeNull();
     });
 
     // The distinction §30 exists for: a failed source must never be reported
@@ -217,6 +252,35 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
             INPUT,
         );
 
+        expect(home.unavailable).toEqual([]);
+    });
+
+    it("reads the sources at once, not one after another (H-4)", async () => {
+        const service = build(ACTIVE_ALL, { orders: [OPEN_ORDER] });
+        const db = (
+            service as unknown as {
+                db: Record<string, { count: jest.Mock }>;
+            }
+        ).db;
+        // Open orders answer only once the schedule — a later source — has
+        // been asked for. Read in turn, open orders would wait on a read
+        // that is never made; read at once, both are in flight together.
+        let scheduleAsked!: () => void;
+        const asked = new Promise<void>((resolve) => (scheduleAsked = resolve));
+        db.booking.count.mockImplementation(() => {
+            scheduleAsked();
+            return Promise.resolve(1);
+        });
+        db.order.count.mockImplementation(async () => {
+            await asked;
+            return 1;
+        });
+        const home = await Promise.race([
+            service.build(INPUT),
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("read in turn")), 1000),
+            ),
+        ]);
         expect(home.unavailable).toEqual([]);
     });
 });

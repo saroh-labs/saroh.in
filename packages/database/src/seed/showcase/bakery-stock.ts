@@ -711,9 +711,17 @@ export function planStock(a: {
                 }
             }
             // This morning: bake what the day needs, or throw out what it doesn't.
+            // Just after midnight today's clock has no room yet, and every
+            // step of today shares the bake's instant: the rank orders them.
             const bakeAt = a.today(6 * 60 + 30);
             const later = list
-                .filter((e) => e.qty !== null && e.at > bakeAt)
+                .filter(
+                    (e) =>
+                        e.qty !== null &&
+                        (e.at > bakeAt ||
+                            (e.at.getTime() === bakeAt.getTime() &&
+                                e.rank > 2)),
+                )
                 .reduce((sum, e) => sum + (e.qty ?? 0), 0);
             list.push({
                 at: bakeAt,
@@ -744,7 +752,9 @@ export function planStock(a: {
                 );
             }
             entries.push({
-                id: ryeId("stockentry", s.key, n++),
+                // Padded, so entries at one instant (all of today, just after
+                // midnight) read back by (createdAt, id) in the order they ran.
+                id: ryeId("stockentry", s.key, String(n++).padStart(3, "0")),
                 organizationId: a.orgId,
                 stockLevelId: a.shelfIds.get(s.key) ?? "",
                 storeId: a.stores[s.store],

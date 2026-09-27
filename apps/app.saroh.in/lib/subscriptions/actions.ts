@@ -4,15 +4,16 @@ import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
-import type { PlanInput, SubscribeInput } from "./service";
+import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may, and what a subscription may become. */
 
 function refresh() {
-    // "layout", so each subscription's own page is refreshed with the list.
+    // "layout", so each subscription's and each plan's own page is refreshed
+    // with the list and its Plans tab.
     revalidatePath("/billing/subscriptions", "layout");
-    revalidatePath("/billing/plans");
+    revalidatePath("/billing/plans", "layout");
     revalidatePath("/billing/invoices");
 }
 
@@ -25,8 +26,8 @@ async function then<T extends { ok: boolean }>(res: Promise<T>): Promise<T> {
 export async function subscribe(input: SubscribeInput) {
     return then(api.subscribe(input));
 }
-export async function pauseSubscription(id: string) {
-    return then(api.pauseSubscription(id));
+export async function pauseSubscription(id: string, choice: PauseChoice) {
+    return then(api.pauseSubscription(id, choice));
 }
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));
@@ -78,12 +79,29 @@ export async function cancelPlanChange(id: string) {
     return then(api.cancelPlanChange(id));
 }
 
+/** The next page of a subscription's Changes, older than `cursor` (D9). */
+export async function loadSubscriptionEvents(id: string, cursor: string) {
+    return api.listSubscriptionEvents(id, cursor);
+}
+
 export async function createPlan(input: PlanInput) {
     return then(api.createPlan(input));
 }
 export async function updatePlan(id: string, input: PlanInput) {
     return then(api.updatePlan(id, input));
 }
+/**
+ * Archive, or sell again. The Plans tab's Undo calls it with the opposite,
+ * so one action serves both ways (D3).
+ */
 export async function setPlanArchived(id: string, archived: boolean) {
     return then(api.setPlanArchived(id, archived));
+}
+
+/**
+ * An older page of a plan's history, for History's "Show earlier" (D4). A
+ * read, so nothing is refreshed; a failure is said where the button was.
+ */
+export async function loadPlanEvents(planId: string, cursor: string) {
+    return api.listPlanEvents(planId, cursor);
 }

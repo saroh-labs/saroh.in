@@ -52,17 +52,20 @@ async function signIn(page: Page, who = demoUser) {
  * latest order is today's, which is the one the seed writes the case into.
  */
 async function priyaOrderToday(page: Page): Promise<string> {
+    // The list's v2 shape (plan B, B1): asked by customer, newest first.
     const res = await page.request.get(
-        `${urls.API_URL}/organizations/${RYE}/orders`,
-        { headers: { "x-organization-id": RYE } },
+        `${urls.API_URL}/organizations/${RYE}/orders?v=2&customerId=${PRIYA}`,
+        { headers: { "x-organization-id": RYE, origin: urls.APP_URL } },
     );
     expect(res.ok()).toBe(true);
-    const orders = (await res.json()) as {
-        id: string;
-        placedAt: string;
-        customer: { id: string } | null;
-    }[];
-    const latest = orders
+    const { rows } = (await res.json()) as {
+        rows: {
+            id: string;
+            placedAt: string;
+            customer: { id: string } | null;
+        }[];
+    };
+    const latest = rows
         .filter((o) => o.customer?.id === PRIYA)
         .sort((a, b) => Date.parse(b.placedAt) - Date.parse(a.placedAt))[0];
     expect(latest, "Priya has an order in the Rye & Co. seed").toBeDefined();
@@ -75,7 +78,7 @@ const shown = (page: Page, text: string | RegExp) =>
 
 /** A paid, collected-at-the-counter order to walk through the kitchen. */
 async function freshOrder(page: Page): Promise<string> {
-    const headers = { "x-organization-id": NORTHWIND };
+    const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
     const made = await page.request.post(
         `${urls.API_URL}/stores/${NW_STORE}/orders`,
         {

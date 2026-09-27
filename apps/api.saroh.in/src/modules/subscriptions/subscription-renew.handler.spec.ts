@@ -7,6 +7,7 @@ jest.mock("@saroh/database", () => {
         prisma: {
             customerSubscription: { findMany: jest.fn() },
             job: { create: jest.fn(), count: jest.fn() },
+            $queryRaw: jest.fn(),
         },
     };
 });
@@ -25,6 +26,7 @@ import type { SubscriptionsService } from "./subscriptions.service";
 const findMany = prisma.customerSubscription.findMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
+const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 
 const renewOne = jest.fn();
 const handler = new SubscriptionRenewHandler({
@@ -44,6 +46,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers({ now: new Date("2026-10-01T02:00:00Z") });
     findMany.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([]);
     jobCreate.mockResolvedValue({});
     renewOne.mockResolvedValue("renewed");
 });
@@ -51,14 +54,15 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("subscription.renew", () => {
-    it("asks for due subscriptions with Payments on, and any set to end", async () => {
+    it("asks for due subscriptions with Payments on, any set to end, and pauses that have ended", async () => {
+        const now = new Date("2026-10-01T02:00:00Z");
         await handler.handle(JOB);
         expect(findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
-                    currentPeriodEnd: { lte: new Date("2026-10-01T02:00:00Z") },
                     OR: [
                         {
+                            currentPeriodEnd: { lte: now },
                             status: "ACTIVE",
                             organization: {
                                 organizationModules: {
@@ -70,9 +74,12 @@ describe("subscription.renew", () => {
                             },
                         },
                         {
+                            currentPeriodEnd: { lte: now },
                             status: { in: ["ACTIVE", "PAUSED"] },
                             cancelAtPeriodEnd: true,
                         },
+                        // D8: a pause whose end date has come.
+                        { status: "PAUSED", pausedUntil: { lte: now } },
                     ],
                 },
                 take: RENEW_BATCH,
@@ -118,6 +125,38 @@ describe("subscription.renew", () => {
             expect.stringContaining('"renewed":1,"advanced":0,"uncharged":1'),
         );
         log.mockRestore();
+    });
+
+    it("counts pauses it resumed, and ones Payments being off kept paused (D8)", async () => {
+        findMany.mockResolvedValue([
+            { id: "sub_1", organizationId: "org_1" },
+            { id: "sub_2", organizationId: "org_2" },
+        ]);
+        renewOne
+            .mockResolvedValueOnce("resumed")
+            .mockResolvedValueOnce("refused");
+        const log = jest
+            .spyOn(Logger.prototype, "log")
+            .mockImplementation(() => undefined);
+
+        await handler.handle(JOB);
+        expect(log).toHaveBeenCalledWith(
+            expect.stringContaining('"resumed":1,"refused":1'),
+        );
+        log.mockRestore();
+    });
+
+    it("leaves out pauses already refused for Payments being off (review S-4)", async () => {
+        const now = new Date("2026-10-01T02:00:00Z");
+        queryRaw.mockResolvedValue([{ id: "parked_1" }, { id: "parked_2" }]);
+        await handler.handle(JOB);
+        expect(queryRaw).toHaveBeenCalledTimes(1);
+        const ors = findMany.mock.calls[0]![0].where.OR;
+        expect(ors[2]).toEqual({
+            status: "PAUSED",
+            pausedUntil: { lte: now },
+            id: { notIn: ["parked_1", "parked_2"] },
+        });
     });
 
     it("schedules the next run an hour on", async () => {

@@ -44,6 +44,7 @@ import {
     listProductAt,
     publishSeedPost,
     setStockLevel,
+    syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
 
@@ -261,6 +262,11 @@ export async function seed(): Promise<void> {
         actorUserId: user.id,
     });
     await assertHeldStock(prisma, org.id);
+    // Which ways each storefront offers, now its orders exist (B2a).
+    await syncStorefrontFulfilmentTypes(prisma, [
+        org.id,
+        ...Object.values(sideOrgIds),
+    ]);
     await report(prisma, org.id);
 }
 
@@ -1360,6 +1366,19 @@ export async function deleteSeeded(
             prisma.contactNoteAllergen.deleteMany({
                 where: { noteId: { startsWith: prefix } },
             }),
+        // Needs attention (C1): a seeded contact's entries, and any entry
+        // naming a seeded allergen, whatever made it (the backfill's rows
+        // don't carry the prefix).
+        () =>
+            prisma.contactAttention.deleteMany({
+                where: {
+                    OR: [
+                        { id: { startsWith: prefix } },
+                        { contactId: { startsWith: prefix } },
+                        { allergenId: { startsWith: prefix } },
+                    ],
+                },
+            }),
         () => prisma.subscriptionSkip.deleteMany({ where }),
         // Stock and where a product is sold (#510), before the variants and
         // products they hang off. Inventory and VariantInventory are no longer
@@ -1419,6 +1438,8 @@ export async function deleteSeeded(
         () => prisma.staffExtraHours.deleteMany({ where }),
         () => prisma.staffMember.deleteMany({ where }),
         () => prisma.bookingRules.deleteMany({ where }),
+        // Business closures (E3), written with seeded ids.
+        () => prisma.businessClosure.deleteMany({ where }),
         () => prisma.courseEnrollment.deleteMany({ where }),
         () => prisma.courseSession.deleteMany({ where }),
         () => prisma.course.deleteMany({ where }),

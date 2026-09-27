@@ -1,6 +1,6 @@
 "use server";
 
-import type { BookingRules, WeeklyRange } from "./service";
+import type { BookingRules, OffRangeInput, WeeklyRange } from "./service";
 import * as staff from "./service";
 
 /**
@@ -44,6 +44,22 @@ export async function addTimeOff(staffId: string, input: staff.TimeOffInput) {
 
 export async function removeTimeOff(staffId: string, timeOffId: string) {
     return staff.removeTimeOff(staffId, timeOffId);
+}
+
+export async function removeTimeOffMany(staffId: string, ids: string[]) {
+    return staff.removeTimeOffMany(staffId, ids);
+}
+
+export async function addClosure(input: OffRangeInput & { reason?: string }) {
+    return staff.addClosure(input);
+}
+
+export async function removeClosures(ids: string[]) {
+    return staff.removeClosures(ids);
+}
+
+export async function previewOff(input: OffRangeInput & { staffId?: string }) {
+    return staff.previewOff(input);
 }
 
 export async function updateBookingRules(input: Partial<BookingRules>) {

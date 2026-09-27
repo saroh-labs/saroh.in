@@ -124,6 +124,21 @@ export function untrackedShort(places: readonly SoldOutPlace[]): string {
     return `Not tracked — ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
 }
 
+/**
+ * The product page's Details row for an untracked product: "Not tracked ·
+ * always available", or — agreeing with the Stock card beside it — "Not
+ * tracked · sold out, marked by hand" ("… sold out at Online, marked by
+ * hand" when only some storefronts are).
+ */
+export function untrackedDetail(places: readonly SoldOutPlace[]): string {
+    const line = untrackedLine(places);
+    if (line === "Available on the shop.") {
+        return "Not tracked · always available";
+    }
+    const said = line.replace(" — marked by hand", ", marked by hand");
+    return `Not tracked · ${said.charAt(0).toLowerCase()}${said.slice(1)}`;
+}
+
 /** The action's label for one storefront. */
 export function soldOutAction(soldOut: boolean): string {
     return soldOut ? "Mark available" : "Mark sold out";

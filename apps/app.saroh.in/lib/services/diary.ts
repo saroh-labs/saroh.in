@@ -606,7 +606,7 @@ export function paidText(b: DiaryBooking): string {
         case "PAID":
             return "Paid";
         case "DESK":
-            return "Pays at the desk";
+            return "Pays at the session";
         default:
             return "Not recorded";
     }
@@ -619,7 +619,7 @@ export function blockTitle(block: Block): string {
         : block.session.service.name;
 }
 
-/** "Personal training · pays at the desk", or "11 of 16 · Vikram". */
+/** "Personal training · pays at the session", or "11 of 16 · Vikram". */
 export function blockLine(block: Block, withTeacher = true): string {
     if (block.kind === "class") {
         const places = `${liveSeats(block.session).length} of ${block.session.capacity}`;
@@ -630,7 +630,7 @@ export function blockLine(block: Block, withTeacher = true): string {
     const b = block.booking;
     const pay =
         b.paidWith === "DESK" && block.state === "booked"
-            ? " · pays at the desk"
+            ? " · pays at the session"
             : b.paidWith === "PACK"
               ? " · pack"
               : b.paidWith === "MEMBERSHIP"

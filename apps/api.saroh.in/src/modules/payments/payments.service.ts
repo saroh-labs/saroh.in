@@ -1683,11 +1683,28 @@ export class PaymentsService {
                 organizationId: true,
                 total: true,
                 currency: true,
+                status: true,
+                paymentStatus: true,
                 store: { select: { settings: { select: { pausedAt: true } } } },
             },
         });
         if (!order?.organizationId) {
             throw new NotFoundException("Order not found");
+        }
+        // Only an order still owed money takes a payment (PAY-03). A second
+        // tab or a revisited checkout used to open a fresh intent for the full
+        // total on an order already PAID, whose capture then went unflagged,
+        // or REFUNDED, whose capture failed to apply. Either way the customer
+        // was charged. A difference after an edit is charged from the
+        // business's side (createDifferenceIntent), not here.
+        if (order.status === "CANCELLED") {
+            throw new ConflictException("This order was cancelled.");
+        }
+        if (
+            order.paymentStatus !== "UNPAID" &&
+            order.paymentStatus !== "FAILED"
+        ) {
+            throw new ConflictException("This order is already paid.");
         }
         // A paused storefront takes no payments (Sell → Storefronts → Closing
         // up). Refused here, on the buyer's path, so no intent is ever
@@ -1698,7 +1715,12 @@ export class PaymentsService {
                 "This storefront is paused and is not taking payments.",
             );
         }
-        const { store: _store, ...payable } = order;
+        const {
+            store: _store,
+            status: _status,
+            paymentStatus: _paymentStatus,
+            ...payable
+        } = order;
         return { ...payable, organizationId: order.organizationId };
     }
 }

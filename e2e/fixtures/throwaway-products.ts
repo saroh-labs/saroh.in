@@ -27,6 +27,8 @@ const api = (at: Storefront, path: string) =>
     `${urls.API_URL}/stores/${at.storeId}/products${path}`;
 const headers = (at: Storefront) => ({
     "x-organization-id": at.organizationId,
+    // The API refuses a write with no Origin (#50).
+    origin: urls.APP_URL,
 });
 
 /** The name a product with a stock history is set aside under. */

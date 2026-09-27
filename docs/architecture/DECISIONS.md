@@ -120,6 +120,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Implementation note (2026-09-11): built as one `CommsProvider` port with per-channel adapters (`email.provider.ts`, `whatsapp.provider.ts`) selected by a factory, rather than separate `EmailProvider` and `WhatsAppProvider` ports.
 - Consequences: sender cost, reputation and compliance stay with each Organization while users can preview/test templates before provider setup. The test-send path requires strict recipient, rate-limit and labeling controls.
 - Migration: retain the identity email sender, add the restricted self-test flow, then add Organization provider connections and business delivery records.
+- Amended 2026-09-26 by [DEC-037](#dec-037-a-businesss-customers-sign-in-on-its-own-site-with-a-code-one-account-per-business): **Saroh's identity email also sends the sign-in codes for a business's customer accounts**, in the business's name. That is still identity mail. Every other message to a business's customers goes through the business's own provider, as before.
 
 ## DEC-012 Analytics event model
 
@@ -200,6 +201,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **Organization-owned subscription plans, customer subscriptions, invoices, courses and class packs**, on the Contact, with no storefront needed. Invoices are simple (DRAFT → ISSUED → PAID or VOID; overdue derived; numbered per business on the caller's transaction). Subscriptions bill forward only, per period, from a self-rescheduling renewal job; no card on file. Courses are their own module (depends on Appointments); packs sit under Appointments; subscriptions and invoices under Payments, which keeps working without a connected provider (readiness opt-out). With Payments off nothing new is invoiced. Race safety comes from row locks plus Serializable, which the RLS proxy now preserves.
 - Consequences: Billing (`/billing/…`), Courses (`/courses`) and Class packs appear in the workspace; contact deletion takes a person's holdings with it and cancels their future course and pack bookings; the booking capacity count includes seats an open course still holds.
 - Migration: `20260922120000_subscriptions_invoices_classes` (tables, partial indexes, RLS) and `20260922190000_one_live_subscription_per_person`; rollout flag `MODULE_COURSES` must be added in each environment.
+- Amended 2026-09-26 by [DEC-038](#dec-038-autopay-card-on-file-and-per-session-charges-run-on-the-businesss-own-payment-provider): **autopay and card-on-file come from the business's own payment provider** (mandates and provider subscriptions). Each period is still invoiced, and a pay link stays the fallback.
 
 ## DEC-020 A Member sees the diary and the people on it
 
@@ -354,4 +356,175 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: Settings → Providers had a row per kind of service (Payments, Email, WhatsApp), so a business could not see which provider it used for each, nor one it had disconnected.
 - Decision: **a row per provider, not per kind**: the ones the business has connected first — a disconnected one included, since it is still theirs and says so — then the ones it could connect next, each with Connect — only what the API can connect (Razorpay, Cashfree, Resend, SendGrid, SMTP relay, Meta, Twilio). Domains are not a provider and keep a row of their own below. A row shows only codes the API sends as public (a checkout's public key, a sending address, a hostname), never a credential.
 - Consequences: a list the page could not read is named in a notice rather than shown as "nothing connected". Each storefront still picks its own payment provider under Sell.
+- Migration: none.
+
+## DEC-037 A business's customers sign in on its own site, with an email code, one account per business
+
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (email only; linking per DEC-049; sign-in always on for every site, no guest booking)** — see [ADR-011](./adr/ADR-011-customer-accounts-on-merchant-sites.md) · supersedes in part [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) §2 "The public booking page" and §3 "Not sending email or SMS" · amends DEC-011 · round-2 plan A
+
+- Context: the Customer Site and booking-page designs give a business's customers an account: their bookings, orders with tracking, plan, packs and messages. ADR-008 kept the booking page anonymous because Saroh could not check who was asking. So there were no credits online, no packs bought online, no waitlist, no recognition, no sign-in and no customer messages.
+- Options: one Saroh-wide customer identity; Better Auth users with a customer role; a separate customer account per business.
+- Decision: **people who sign in on a merchant's site are that business's customers**. Each has a **`CustomerAccount` per business**, never shared across Saroh and never a Better Auth `User`, linked to exactly one Contact. **Sign-in is a one-time code by email**, sent through Saroh's identity email in the business's name. **Phone codes and SMS are out of this round** (2026-09-27). **The session is a host-only cookie on the site's own host.** The site's server routes read it and call the API with it, and the API accepts it only for the business that host belongs to. A signed-in customer may **spend class credits and buy packs online, join a class waitlist, be recognised, and message the business**. Messages about their own orders, bookings and invoices always reach them in their account. Outside the account they go by email only, through the business's own connected email provider (DEC-011), to the verified email.
+- Consequences: ADR-008's list of what the booking page may not do is lifted for signed-in customers. A first sign-in links to an existing contact **only when that contact's email is verified** (DEC-049); otherwise the customer gets a separate contact and the pair is suggested to staff. It never merges silently. Copy may promise a message only where one is really sent. A customer asks for their details to be removed by message or in person; there is no removal request in the account area (2026-09-27).
+- Closed 2026-09-27: **email only for now.** The question of who pays for SMS is not answered, because SMS is not in this round. Phone sign-in, SMS codes and messages to a verified phone come later, as their own decision (ADR-011 §6).
+- Migration: new tables `CustomerAccount`, `CustomerSignInCode` and `CustomerSession` (organization-owned, RLS), plus the messaging tables in plan A. No site column: nothing is switched per site.
+- Amended 2026-09-27 (user), replacing an earlier per-site switch: **sign-in is always on for every merchant site. There are no guest users**: no guest booking, no guest checkout, no guest fallback, and no switch for the merchant. When a code can't be sent, the customer sees "We couldn't send your code — try again in a few minutes" with the business's phone number, and the booking is not taken. So the code email is critical: it has its own sending stream, is retried, and every failure alerts Saroh. No rate limit may refuse a real customer because of what someone else did: past a shared ceiling the answer is a bot challenge or a short wait, never a refusal, and a customer's own limit says when to try again. When plan A ships (A9), every site moves to sign-in at once, after a release note and a notice to merchants; the anonymous booking route closes a release later.
+
+## DEC-038 Autopay, card-on-file and per-session charges run on the business's own payment provider
+
+**Status: Accepted — 2026-09-26** — amends [ADR-007](./adr/ADR-007-subscriptions-invoices-classes.md) ("No card-on-file, no auto-debit") and DEC-019 · round-2 plan D
+
+- Context: the Plan Editor, Subscription Detail, Home ("Retry") and the customer site ("UPI Autopay for plans", "saved methods") assume a renewal can charge the customer without a link. ADR-007 invoiced each period and left mandates for later.
+- Decision: **autopay (a saved card or a UPI mandate) and charges per session come from the provider the business connects**. Razorpay comes first, and Cashfree or another provider goes through the same port, **using the provider's own mandates and subscriptions**. Saroh stores the provider's customer, mandate and token references, never card or bank details. It never charges without a mandate the customer set up. **Each period is still invoiced** (DEC-023), and a successful mandate charge pays that invoice. **A pay link stays the fallback**: with no provider, no mandate, or a failed or cancelled mandate, the invoice goes out with a pay link as today.
+- Consequences: "Retry" on a failed renewal retries the mandate charge when there is one, and sends a pay link otherwise. The provider port gains mandate set-up, charge, cancel and status calls, and the webhook inbox gains their events. Copy says "UPI Autopay or card" only where the business's provider supports it and the customer has set one up.
+- Migration: a mandate table (organization-owned, RLS) and a subscription's link to it; nothing changes for subscriptions without one.
+- Amended 2026-09-27 (plan D deepened after the security review): **a mandate belongs to exactly one subscription** (`PaymentMandate.subscriptionId` is required) and pays only that subscription's renewal invoices this round. **It ends with its subscription** (D20): every move to cancelled, a privacy removal of the contact (C11) and a merge that retires the contact (C9) cancel it at the provider first, under DEC-026's rule for an unsure answer, and an unconfirmed cancel is never charged again. A mandate is never moved to another person or reused; per-session charging for Courses will be its own record.
+
+## DEC-039 Staff permissions are capabilities granted to people; the built-in roles are default bundles
+
+**Status: Accepted — 2026-09-26; reworked 2026-09-27 (the capability model)** — [docs/plans/2026-09-26-permission-matrix.md](../plans/2026-09-26-permission-matrix.md) · supersedes in part DEC-024 (the money-free kitchen view for Members) and DEC-020 ("Members see no money" as a rule)
+
+- Context: the designs gate by permission: `customer:read/contact/sensitive/merge/remove`, `order:create/fulfil/edit/refund/export`, `pack:sell`, `booking:settings`, and a Member who sees no money. The first version of the matrix (2026-09-26) set these against the four roles and hid money from Members screen by screen. The user answered on 2026-09-27: what someone sees depends on the permissions they are given, not only on their role; someone who can read orders sees every detail of an order.
+- Decision: **permissions are capabilities, granted to a person through their role or directly as extra permissions.** **A capability shows everything within its scope**: `order:read` shows the whole order, money included, and **there is no separate money redaction by role**. A screen that gathers several scopes shows each part to whoever holds that part's read. **Owner, Admin, Member and Reviewer are default bundles**; a business can change them or make its own role. **A capability is split only where a business would plausibly grant one without the other**, and the matrix gives each split its reason (`order:read` / `order:stage` / `order:create` / `order:edit` / `order:refund` / `order:export`, `contact:read` / `customer:sensitive` / `customer:merge` / `customer:remove`, `booking:write`, `pack:sell`). Splits whose only purpose was hiding money or contact details from Members are dropped (`customer:contact`, the money-free kitchen view). A write implies its read, and an old umbrella implies its new parts, so saved roles keep what they could do. The matrix answers the first version's eleven questions; **four product choices stay with the user**: the Member default bundle, whether sensitive notes are their own capability, which role templates ship, and whether a new Member bundle reaches existing businesses.
+- Consequences: B16, C13, E26 and F11 are no longer blocked and move to phase 2, with F17 (extra permissions per person). F18 applies the Member bundle, makes `order:stage` imply `order:read` and drops the money-free kitchen view; it waits on the open choices. Until F18 ships, the shipped Member stands (DEC-024), and a Reviewer sees only the sites they were invited to (DEC-006).
+- Migration: none for the new keys (roles store lists; implied holds keep saved roles whole). F17 adds a per-person grants list on the membership.
+- Amended 2026-09-27 (doc review of the round-2 plans):
+    - **Granting is bounded by reach, for every actor.** Nobody grants a capability they don't hold, changes their own extra permissions, or changes a role or a person that can do more than they can. Today's role editor has no such check (`OrganizationRolesService.create`/`update`); F19 closes it before the high-value keys land, and F17 applies the same rule to extras.
+    - **Autopay actions belong to `subscription:write`** (send a set-up link, cancel autopay, retry). A mandate belongs to one subscription and ends with it. `payment:manage` keeps connecting providers and refunding invoices.
+    - **A pay link is a bearer credential, not order data.** `order:read` shows whether one is live, never the link; making a new one needs `order:create` or `order:edit`.
+    - **`order:stage` implying `order:read` reaches every role that moves orders**, frozen or saved rows included, whatever Q4 answers. F18 lists those roles to owners before it applies.
+    - Storefront people join the team in a narrow "Storefront team" role, not Member (DEC-048, amended).
+
+## DEC-040 Needs attention is one field on the customer, and sensitive entries need their own permission
+
+**Status: Accepted — 2026-09-26** — round-2 plans C, B, E, F and A
+
+- Context: today allergies are structured note allergens (ADR-008), shown in Order Detail's allergy banner. A clinic needs medical notes and access needs on the same record, and a front desk that must not read them.
+- Decision: **each customer has one Needs attention list**. Each entry has:
+    - a kind (Allergy, Medical, Access or Other), a short label and optional detail;
+    - a sensitive flag, on by default for Medical;
+    - where it came from (staff, the booking page's "Anything we should know?", or the customer), and who added it and when.
+
+    **Sensitive entries go only to someone holding the sensitive capability** (DEC-039). The API leaves them out; the screen does not just hide them. The same list shows on Customers, Customer Detail, Orders and Order Detail (the kitchen view included), Bookings, Home and the booking page's intake. Allergy entries keep their structured allergen, so the allergy banner still matches exactly.
+
+- Consequences: existing allergen notes become Allergy entries. A note from the booking page arrives as a suggestion that staff confirm ("Add to Needs attention" or "Nothing to add"). It never goes straight onto the record.
+- Migration: a `ContactAttention` table (organization-owned, RLS) and a backfill from `ContactNoteAllergen`.
+
+## DEC-041 CRM stays as it is; Customers is everyone who pays or signs in
+
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (link reasons, unlinked customers named)** — round-2 plan C · amends `saroh-product.md` "Selling, customers and identity"
+
+- Context: the Customers design is one list for the whole business: "Only people who have paid are customers; everyone else lives in People". Today `/commerce/customers` merges store customers per storefront on the client, and Leads, Pipeline and Contacts are the CRM.
+- Decision: **Leads, Pipeline and Contacts stay as they are.** **The new Customers list replaces the storefront customers list** and is keyed on the Contact. A customer is a contact who has paid (for an order, an invoice, a subscription or a pack) **or who has signed in on the business's site** (DEC-037). One organization-level API serves the list.
+- Consequences: `/commerce/customers` becomes the business-wide list, and the old per-storefront customer pages redirect to the contact. A paying store customer with no linked contact gets a new contact, linked to them, when the list is backfilled or when they next pay. Where the business already has a contact with that email (email is unique per business), no second contact is made. The pair is suggested for the merchant to link or merge, and is never linked automatically.
+- Migration: a backfill that makes and links a contact for every paying store customer without one.
+- Amended 2026-09-27: **a link records why it was made.** `CustomerIdentityLink.linkedByUserId` becomes nullable and a `reason` is added (`MANUAL`, `BACKFILL`, `PAYMENT`, `SITE_ACCOUNT`; existing links read `MANUAL`), because the backfill, a payment and a customer's own sign-in make links no staff member made. **The new list names the paying customers it can't show yet**: those left unlinked because a contact already holds their email are counted in a notice with a review sheet, so the list never shows fewer customers than the one it replaces. A contact made for a site sign-in whose email didn't match a verified contact (DEC-037, 2026-09-27) is a customer and is suggested as a duplicate. Duplicate pairs are computed, not stored, and a stored "Dismiss" waits for a later round.
+
+## DEC-042 Duplicate customers are merged, and a customer's details can be removed
+
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (tombstones, the account on a merge, what removal reaches)** — round-2 plan C · supersedes in part [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) §2 "One read of a customer" ("records are never merged")
+
+- Context: #120 links a store customer to a contact. The design merges two customers and removes a person's details for privacy; the build offers a link and a hard delete instead.
+- Decision: **a merchant can merge two customers.** The surviving contact keeps every order, note, booking, subscription, pack, invoice, message and Needs attention entry of the other. Orders and invoices keep the contact details they were placed with. The merge is recorded on both timelines and in Activity. Saroh suggests likely duplicates but never merges on its own. **Privacy removal anonymises the person**: their name, phone, email, address, notes, Needs attention, messages and site account go. Their orders and issued invoices stay, with what was printed on them, because the law needs the paper.
+- Consequences: a hard delete stays only for a contact with no orders or invoices (today's rule, #384). Linking (#120) stays for a store customer whose contact is known; merging is for two contacts.
+- Migration: none for the rule; the merge and the removal are services.
+- Amended 2026-09-27, merge: **the merged contact is kept as a tombstone** that points at the survivor, holding ids only, never deleted, so a payment webhook, a job or a sign-in that still carries its id lands on the survivor instead of failing after money was taken. The merchant picks the survivor's **name, email and phone**, as in the design. Message threads, waitlist places and autopay mandates move with the person. Consent keeps the newer answer per channel, but an opt-out is never lost and a yes survives only with the address it was given for. The site account follows ADR-011; **the merge names the account that will see the combined record, and waits for the merchant to confirm that email is theirs**, so a merge cannot quietly hand someone's history to another person's sign-in. Merge and removal have their own capabilities (`customer:merge`, `customer:remove`) from the day they ship.
+- Amended 2026-09-27, removal: privacy removal also reaches **the storefront customer records and links, the delivery recipient on their orders, message recipients, waitlist places, autopay mandates (cancelled at the provider first) and their reviews' names**. Issued invoices keep their bill-to, and orders keep their lines, amounts and GST place of supply. **Leads and form entries are left as they are**, since the CRM stays as it is (DEC-041). There is no customer-side "Remove my details": a privacy request reaches staff by message or in person, and staff use privacy removal.
+
+## DEC-043 Plans and packs keep unpublished changes on the server, edited in one editor shell
+
+**Status: Accepted — 2026-09-26** — round-2 plans D and E
+
+- Context: the Plan Editor and Pack Editor autosave. They show "Publish" for a new record and "Publish changes" for a live one, and offer Discard and Delete draft. A live plan's price or classes must not change under its members while someone is still typing.
+- Decision: **a plan or a pack can be a Draft**, which is never offered on the site or at the desk. **A live one can carry one set of unpublished changes, stored on the server** beside it. Publish changes applies them in one step, and Discard throws them away. Both editors share **one editor shell** in the workspace: autosave, the publish banner, Publish, Publish changes, Discard, Delete draft, and a warning before leaving with unsaved work. Courses can use it later.
+- Consequences: sales, subscribe and the site read only the published record. Publishing a price change keeps existing members on the price they bought at (ADR-007).
+- Migration: a `DRAFT` status on plans and packs, and a pending-changes column on each.
+
+## DEC-044 Courses wait for a later round; class packs go ahead
+
+**Status: Accepted — 2026-09-26** — round-2 overview, "Later"
+
+- Decision: **the Courses, Course Detail and Course Editor designs are not planned in this round.** Courses as built (ADR-007) keep working. **Class packs are in: Packs, Pack Detail and Pack Editor.** Nothing in this round removes or rewires a course feature. Shared pieces (the editor shell, per-session charging, the waitlist) are built so courses can use them later.
+- Amended 2026-09-27: the shared pieces built this round are **the editor shell, the waitlist, and a mandate port shaped for per-session charges**. Per-session charging itself is not built: mandates pay subscription renewals only this round (plan D), and a per-session mandate will be its own record when Courses return.
+
+## DEC-045 Orders carry a fulfilment type, shipping records the courier and tracking number, and each storefront sets when its orders are late
+
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (late rule per storefront; how the enum migrates, see the notes)** — round-2 plan B · amends [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) "The kitchen stage sits under the order status" (collect or delivery)
+
+- Context: today an order is Collect or Delivery, with a typed tracking link. The Orders designs have Pick-up, Local delivery, Shipping, Digital, and Appointment in person or online, each with its own steps and late rule.
+- Decision: **an order has one of six fulfilment types**: Pick-up, Local delivery, Shipping, Digital, Appointment (in person) and Appointment (online). Each has its own steps under the order status, its own "late" rule and the stages it may use. **Shipping records the courier's name and the tracking number**, with an optional link. **Saroh does not book couriers**, so "Book pickup" is dropped. How an order is fulfilled can change until it is handed over. **When an order counts as late is a storefront setting** (2026-09-27): one threshold per fulfilment type the storefront offers — Pick-up, Local delivery and Shipping — measured from when the order was placed, in hours with minutes allowed for a counter. The defaults are 2 hours, 24 hours and 48 hours; a café-like storefront may set 20 minutes. Digital is never late, and an appointment is judged by its visits. The API computes "late" from the order's storefront's setting.
+- Consequences: Collect becomes Pick-up and Delivery becomes Local delivery, and the existing stages stay. An appointment order is fulfilled by its visits (bookings).
+- Migration: widen the fulfilment enum and add courier and tracking-number columns; existing orders keep their meaning. Three late thresholds on the storefront's settings, defaulting to 2, 24 and 48 hours for every storefront, existing ones included.
+- Amendment notes (2026-09-27, plan B deepened after review; the decision above stands):
+    - **The enum changes by expand and contract, not by renaming values in place.** Release 1 adds the new values beside COLLECT and DELIVERY, reads both and still writes today's; release 2 moves existing rows to PICKUP and LOCAL_DELIVERY and writes only the new values; release 3 drops COLLECT and DELIVERY. Each release keeps the API that is still serving during its migration working, keeps the separately deployed app working, and can be rolled back by deploying the previous tag. The steps are in plan B (B2a, B2c, B2d) and a rollout checklist in `docs/architecture/`.
+    - **A Local delivery order already handed to a courier** on the day of the switch keeps its stage and moves on to Delivered.
+    - **"Placed" means the order's `createdAt`**, and the late clock starts there for every order, online and pay-later ones included.
+    - **Which types a storefront offers** is one setting on the storefront (Pick-up, Local delivery, Shipping). Digital and the appointment types follow the product.
+    - **Changing how an order is fulfilled takes a delivery amount typed by staff.** There is no delivery fee per storefront yet; the shop's checkout brings one later.
+    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email.
+    - **An appointment order's shape** is set by [DEC-050](#dec-050-a-treatment-is-one-order-whose-line-bills-a-service).
+
+## DEC-046 Brand and fonts are their own track, and Saroh's fonts stop reaching merchant sites now
+
+**Status: Accepted — 2026-09-26; amended 2026-09-27 (ship the fix now; font and palette catalogues)** — round-2 plans G and H
+
+- Context: the Site Editor and Customer Site designs add a brand (any colour, backgrounds, heading and body fonts, a logo and automatic contrast), module pages, Hindi and more. Separately, `apps/saroh.app` loads Saroh's Geist and Bricolage Grotesque for every merchant site, and the booking flow styles its headings with `font-display`. That puts Saroh's brand on a merchant's page, which the `--site-*` rule forbids.
+- Decision: **the font leak is a bug, fixed in the first phase and shipped now**: merchant pages load no Saroh font, and the booking flow uses the site's own type tokens, set to a neutral system stack. **Brand v2** (the brand API and panel, a logo and contrast) **is its own design-system epic**, and it gives the merchant **choice, not one fixed brand** (2026-09-27): **a font catalogue** of curated pairings (a heading face and a body face, each with Devanagari coverage) and **a palette catalogue** of ready-made colour palettes, **plus a custom colour**. Both catalogues are **data, not code**: a new pairing or palette is a catalogue entry, and no code names an entry. Everything resolves into the site's own `--site-*` tokens, never Saroh's. **The site editor keeps free-form pages and adds module pages beside them.** **Hindi is a later step** of its own.
+- Consequences: **the fix changes every live site on the day it ships**: its text moves to the neutral stack and stays there until its merchant picks a font pairing; its colours do not change. An existing site is never restyled on its own. When its merchant first opens Brand, it is offered the nearest palette (or its own accent as a custom colour) and the pairing closest to its old type, and nothing changes until they save. A retired catalogue entry leaves the pickers and keeps rendering for the sites that use it.
+- Migration: none for the fix.
+- Amended 2026-09-27 (the round re-sliced):
+    - **Only the font-leak fix (H1) is in round 2.** Brand v2 (H2–H10), a new font-pairing picker (H11) and the new-site setup that needs the themes (plan 007's G21) are **the Brand track**, with its own schedule, outside round 2's phases and unit count.
+    - **The track delivers fonts first**: the contract, the catalogues, per-site fonts, the renderer and a pairing picker in today's Style panel (H2, H3, H5, H6, H11), before palettes, the logo and the Brand panel. Until then every site stays on the neutral stack. H1 says so in the Style panel ("Your site's text now uses a plain system font. Font choices aren't available yet.") and in the release note, and neither promises a date.
+    - **A shipped catalogue entry is never edited**, only retired: its values and font files are pinned by hash, and a re-tuned look ships as a new key. A version restore or the template's theme may still name a retired key.
+
+## DEC-047 Publishing while a page is in review stays allowed
+
+**Status: Accepted — 2026-09-26** — keeps #278 · round-2 plan G
+
+- Decision: **the bypass wins.** Someone with `site:publish` can still publish a page that is out for review, and the bypass is recorded as it is today (#278). The design's block on publishing during review is dropped.
+
+## DEC-048 A storefront's people are on the business's team
+
+**Status: Accepted — 2026-09-26** — round-2 plan F · amends the Team design note "Team is business-scoped"
+
+- Context: a storefront has a "People who work on it" roster (`StoreMembers`: Admin, Manager, Editor, Viewer). The Team design says a role is held in a business and there is no second roster.
+- Decision: **the storefront roster stays**, and **adding someone to a storefront also adds them to the business's team**. There is one roster underneath, and the storefront role is a narrower grant on top of it. Team Roles otherwise stays as it is, except that **the empty "Extra permissions" column is hidden** until something fills it.
+- Consequences: inviting someone to a storefront needs the permission to invite them to the team. Removing someone from the team removes their storefront roles.
+- Migration: a backfill that gives every storefront member without a business membership one, as a Member.
+- Amended 2026-09-27 (security and product review of plan F): **not as a Member.** A Member holds every customer's contact details and the whole diary, and after F18 whole orders with money, so a Viewer of one shop would gain the business's customer list overnight without anyone choosing it. Someone who joins through a storefront, and everyone the backfill adds, gets a business membership in a narrow **"Storefront team"** role: an ordinary custom role holding the org, team, module, media, storefront and review reads, and nothing about customers, bookings, orders or money. What they do inside their storefront still comes from their storefront role. An existing business role is never lowered or replaced. **The owner is told**: an Activity entry per person, and a one-time Team notice listing the people added, each with Change role, so any widening is on purpose.
+
+## DEC-049 A site account links to an existing contact only when that contact's email is verified
+
+**Status: Accepted — 2026-09-27** — amends DEC-037 and [ADR-011](./adr/ADR-011-customer-accounts-on-merchant-sites.md) "An account is a Contact" · round-2 plan A (A4)
+
+- Context: DEC-037 linked a first sign-in to the one contact with the same email. A contact's email is typed by staff, imported, or entered by anyone in today's anonymous booking page or a form, so nobody has proven it. Whoever reads a mistyped, shared or recycled inbox would have opened that contact's bookings, invoices, plan and, at a clinic, treatment history. And because a contact's email is required and unique per business, the old "zero or several matches → a new contact with that email" branch could not be built.
+- Decision: **a site account links to an existing contact only when that contact's email is verified.** Verified means it was proven before: by an earlier sign-in code for it, or by a confirmation of an online order or booking the contact made with it, sent to that address through the business's email provider. Staff confirming a merge that keeps the account's email also verifies it; a staff edit of the email, or "This isn't them", clears it. Otherwise the online customer gets a **separate contact**, and the pair is suggested for staff to merge (DEC-042). **The verified email lives on the account; the separate contact cannot take it** (the email is unique per business), so its email field holds a reserved, undeliverable placeholder (`account+<contactId>@account.invalid`, from the same family a merge's tombstone and privacy removal use, all built and recognised by one helper plan A owns), until staff merge the two. A new email that no contact holds makes a contact with that email, verified.
+- Consequences: at launch no contact is verified, so every customer the business already knows appears twice after their first sign-in until staff merge the pair. Every reader of a contact's email treats the placeholder as no email and nothing sends to it. A merged-away account keeps its row and its email reserved (status MERGED); a correct code for that email opens no session and answers "This email now signs in as ‹masked survivor email›", so a merge cannot recreate the duplicate.
+- Migration: `Contact.emailVerifiedAt` and how it was verified (nullable, nothing backfilled).
+
+## DEC-050 A treatment is one order whose line bills a Service
+
+**Status: Accepted — 2026-09-27** — amends [DEC-045](#dec-045-orders-carry-a-fulfilment-type-shipping-records-the-courier-and-tracking-number-and-each-storefront-sets-when-its-orders-are-late) ("an appointment order is fulfilled by its visits") · round-2 plan E (E9), plan B (B14)
+
+- Context: a multi-visit treatment is one order of type Appointment with a booking per visit (default 40). Today's order line must name a Product, an order needs a storefront and a store customer, and plan B had proposed a "service-kind product". Review found none of this fitted a treatment booked on the booking page.
+- Decision: **a service is never a Product.** An order line bills either a product or a service (`OrderItem.serviceId`, with exactly one of the two set); a service line holds no stock, has quantity 1 and takes its GST from the service. **The order goes to the storefront the booking site sells from**, else the business's oldest open storefront; a business with no storefront can't make a multi-visit service. **The order's store customer is found or made by the booking's email** and linked to the booking's contact. The treatment is invoiced once for its price (DEC-023): one order invoice when paid in full, or the deposit invoice and one balance invoice. A later visit is never invoiced on its own.
+- Consequences: every reader of an order line accepts a service line (serializers, invoices and GST, stock, discounts, reviews, refunds). Money on a treatment comes back only through the order's refund; a cancelled visit refunds nothing by itself. If walk-in orders make the store customer optional, the email rule can relax.
+- Migration: `OrderItem.serviceId` (nullable) with `productId` made nullable and a check that exactly one is set; additive.
+
+## DEC-051 A booking's deposit is refunded once, against a free-cancel deadline fixed at booking
+
+**Status: Accepted — 2026-09-27** — builds on [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md) (pay now at booking) and DEC-026 · round-2 plan E (E8), plan A (A6)
+
+- Context: deposits (None, 25%, 50% or Full, default 39) ride the pay-now path. Review found two holes: a staff cancel and a customer cancel racing each other could refund twice, and moving a booking a week out could turn a late cancel into a free one.
+- Decision: **the free-cancel deadline is fixed when the booking is made** (`Booking.freeCancelUntil`, its start less the business's free-cancel hours). No move, by staff or by the customer, changes it. **A free cancel refunds a stand-alone booking's deposit once**: the cancel and one pending refund are written together under the booking's lock, keyed per booking, and the provider is called after commit (DEC-026). A late cancel keeps the deposit. Staff can return it only with `payment:manage`. A visit of a treatment never refunds on its own (DEC-050).
+- Consequences: a customer can't move a booking inside the late window from their account; they call the business. Bookings made before the column are judged by their start.
+- Migration: `Booking.freeCancelUntil` (nullable), written for new bookings.
+
+## DEC-052 Half-hour starts only for services of 30 minutes or more
+
+**Status: Accepted — 2026-09-27** — narrows round-2 default 41 · amends ADR-008's slot step · round-2 plan E (E6)
+
+- Context: default 41 offered booking-page starts on the hour and half hour for every business. For a service shorter than 30 minutes that would remove starts a business offers today (a 20-minute check-up offers :00, :20 and :40).
+- Decision: **a service of 30 minutes or more offers a start every half hour** from each availability window's start; **a shorter service keeps stepping by its own length.** No service loses a start it offers today, and the clock is never forced (a window from 09:15 steps 09:15, 09:45).
+- Consequences: staff New booking and the site's "On today" read the same starts as the booking page. Capacity and overlap checks count buffers explicitly, since the step no longer carries them.
 - Migration: none.

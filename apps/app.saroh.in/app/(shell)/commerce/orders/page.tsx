@@ -1,22 +1,36 @@
+import { redirect } from "next/navigation";
+
+import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
+import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
+import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
-import { OrdersScreen } from "@/components/stores/orders-screen";
-import { listBusinessOrders } from "@/lib/orders/business-service";
+import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
+import { listOrderRows } from "@/lib/orders/business-service";
+import {
+    orderListParams,
+    ordersHref,
+    readOrdersQuery,
+} from "@/lib/orders/list-query";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
 /**
- * Sell → Orders: every order in the business.
+ * Sell → Orders: every order in the business, a page at a time (plan B, B3).
  *
- * ONE read, unlike Customers next door, which fans out per storefront because
- * customers are stored per storefront. Orders carry their organization, so the
- * API can answer across storefronts in a single query — and that is also what
- * makes the count the rail badges and this list the same fact rather than two
- * numbers that have to be kept in step.
+ * ONE read for the list, unlike Customers next door, which fans out per
+ * storefront because customers are stored per storefront. Orders carry their
+ * organization, so the API answers across storefronts in a single query and
+ * sends the tab counts with the page — which is also what makes the count
+ * the rail badges and this list the same fact.
  *
- * `?view=` is read here rather than in the screen: `useSearchParams` would
- * force the whole screen into a Suspense boundary for a value needed once, on
- * first render.
+ * The address is the list's state (`list-query.ts`): the tab, the search, the
+ * storefront and the page. A link from before B3 (`?view=unfulfilled`) still
+ * lands on the tab it meant.
+ *
+ * Someone holding neither `order:read` nor `order:stage` gets the locked card
+ * before anything is read (B7). The list read failing is the page failing
+ * (`error.tsx`, "Couldn't load orders") — never an empty list.
  */
 export const metadata = { title: "Orders" };
 
@@ -26,26 +40,72 @@ export default async function OrdersPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [orders, stores, { view }, organization] = await Promise.all([
-        listBusinessOrders(),
-        listBusinessStores(),
+    const [params, organization] = await Promise.all([
         searchParams,
         resolveActiveOrganization(),
     ]);
-    // A Member reaches the list through `order:stage` alone (DEC-024) and
-    // gets the kitchen's view of it.
-    const fullRead = organization?.actions
-        ? organization.actions.includes("order:read")
-        : organization?.role !== "MEMBER";
+    const access = ordersAccess(organization);
+    const businessName = organization?.name ?? "the business";
+    if (organization && !access.open) {
+        return (
+            <PageContainer width="full">
+                <OrdersLocked
+                    {...ordersLockedCopy(organization, businessName)}
+                />
+            </PageContainer>
+        );
+    }
+
+    const query = readOrdersQuery(params);
+    const storesRead = listBusinessStores();
+    const [page, stores, openByStore] = await Promise.all([
+        listOrderRows(orderListParams(query)),
+        storesRead,
+        // Counted beside the page, not after it.
+        storesRead.then((all) =>
+            all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
+        ),
+    ]);
+    // A page past the end, or a cursor from a list that has since changed
+    // (an order the API can't find answers as an empty page): start again at
+    // the first page rather than show an empty one.
+    if (query.cursor && page.rows.length === 0) {
+        redirect(ordersHref(query, { cursor: null, back: [] }));
+    }
 
     return (
         <PageContainer width="full">
+            {/* B17: storefronts still on the 2-hour Pick-up default. */}
+            <LateRuleNotice />
             <OrdersScreen
-                orders={orders}
+                query={query}
+                page={page}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                initialFilterId={typeof view === "string" ? view : undefined}
-                kitchen={!fullRead}
+                openByStore={openByStore}
+                businessName={businessName}
+                // A Member reaches the list through `order:stage` alone
+                // (DEC-024) and gets the kitchen's view of it.
+                kitchen={!access.money}
             />
         </PageContainer>
     );
+}
+
+/**
+ * How many orders are open at each storefront, for the storefront menu —
+ * the API's Open count under that storefront. Null if any couldn't be
+ * counted: the menu then shows no counts rather than a wrong 0.
+ */
+async function openOrdersByStore(
+    storeIds: string[],
+): Promise<Record<string, number> | null> {
+    const counted = await Promise.allSettled(
+        storeIds.map((storeId) => listOrderRows({ storeId, tab: "open" })),
+    );
+    const out: Record<string, number> = {};
+    for (const [i, result] of Array.from(counted.entries())) {
+        if (result.status !== "fulfilled") return null;
+        out[storeIds[i]] = result.value.counts.open;
+    }
+    return out;
 }
