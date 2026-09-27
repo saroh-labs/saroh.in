@@ -7,6 +7,7 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 import { Transform } from "class-transformer";
@@ -158,12 +159,19 @@ export class CustomerWorkspaceController {
         return this.workspace.timeline(ctx, contactId);
     }
 
+    /**
+     * Store customers to link, and with `?include=contacts` other contacts
+     * who are likely the same person (C2). Each item says its `kind`.
+     */
     @Get(":contactId/suggestions")
     suggestions(
         @OrgContext() ctx: OrganizationContext,
         @Param("contactId") contactId: string,
+        @Query("include") include?: string,
     ) {
-        return this.workspace.suggestLinks(ctx, contactId);
+        return this.workspace.suggestLinks(ctx, contactId, {
+            includeContacts: include === "contacts",
+        });
     }
 
     @Post(":contactId/links")

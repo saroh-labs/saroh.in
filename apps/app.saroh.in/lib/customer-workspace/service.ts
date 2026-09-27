@@ -7,7 +7,8 @@ import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
  * *connects* a person's CRM + commerce records without merging them; links are
  * explicit and reversible, and only exact email/phone produce a suggestion.
  */
-export type TimelineEventType = "LEAD" | "BOOKING" | "ORDER" | "MESSAGE";
+export type TimelineEventType =
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -16,7 +17,12 @@ export interface TimelineEvent {
     moduleKey: string;
 }
 
+/**
+ * A store customer to link. The API also suggests other contacts to merge
+ * (`?include=contacts`, C2); this screen doesn't ask for them yet.
+ */
 export interface IdentitySuggestion {
+    kind: "customer";
     customerId: string;
     name: string;
     email: string;
