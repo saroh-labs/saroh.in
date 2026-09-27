@@ -10,6 +10,8 @@
  * without moving this would have let them drift apart again the same way.
  */
 
+import { SITE_FONT_STACK } from "./tailwind-preset";
+
 /**
  * Per-publication theme (#189).
  *
@@ -95,6 +97,13 @@ export function SiteTheme({
                 --site-grid-gap: 14px;
                 --site-radius: 2px;
                 --site-heading-scale: 1;
+                /* The merchant's type (H1). Every publication, old and new,
+                   is set in the neutral system stack until its merchant
+                   chooses fonts: no publication carries a font variable yet,
+                   so these are what every site renders with. Never one of
+                   Saroh's own faces (gate G7). */
+                --site-font-heading: ${SITE_FONT_STACK};
+                --site-font-body: ${SITE_FONT_STACK};
             }
 ${
     custom === null
