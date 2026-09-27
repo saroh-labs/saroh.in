@@ -93,8 +93,24 @@ function build(views: View[], fixture: Fixture = {}) {
         contact: {
             count: jest.fn().mockResolvedValue(fixture.contactCount ?? 0),
         },
+        // Round 2 F1's sources, empty: nothing overdue, owed, short or
+        // unpublished, so every existing expectation reads as it did.
+        invoice: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        paymentIntent: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        site: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
-    return new HomeService(availability, db as never);
+    const stockChecks = { openShort: jest.fn().mockResolvedValue([]) };
+    return new HomeService(availability, db as never, stockChecks as never);
 }
 
 const INPUT = { organizationId: "org_1", organizationRole: "OWNER" as const };

@@ -21,9 +21,28 @@ export interface Plan {
     currency: string;
     interval: Interval;
     status: "ACTIVE" | "ARCHIVED";
+    /** A membership's classes a month. Null: as many as they like. */
+    classesPerMonth: number | null;
     /** People on it now — active or paused. */
     subscriberCount: number;
+    /** Who pays what: the people on it, by the terms they bought at. */
+    byPrice: PlanPriceRow[];
+    /** The plan's price as a month's worth ("1000.00" for ₹12,000 a year). */
+    monthly: string;
+    /** What its running (not paused) members pay in a month, in its currency. */
+    monthlyFromMembers: string;
     createdAt: string;
+}
+
+/** One price people on a plan pay, and how many pay it. */
+export interface PlanPriceRow {
+    price: string;
+    currency: string;
+    interval: Interval;
+    /** Active or paused, on these terms. */
+    count: number;
+    /** The terms it sells at now; any other row is an older price. */
+    current: boolean;
 }
 
 export interface Subscription {
@@ -147,6 +166,8 @@ export interface PlanInput {
     price?: string;
     currency?: string;
     interval?: Interval;
+    /** 1–60; null is as many as they like. */
+    classesPerMonth?: number | null;
 }
 
 export interface SubscribeInput {

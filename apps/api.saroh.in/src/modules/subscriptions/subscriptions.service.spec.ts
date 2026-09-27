@@ -6,6 +6,7 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
         $queryRaw: jest.fn(),
+        $executeRaw: jest.fn(),
         customerSubscription: {
             create: jest.fn(),
             update: jest.fn(),
@@ -13,7 +14,11 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
             count: jest.fn(),
         },
-        subscriptionPlan: { findFirst: jest.fn() },
+        subscriptionPlan: {
+            findFirst: jest.fn(),
+            create: jest.fn(),
+            updateMany: jest.fn(),
+        },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -39,6 +44,7 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn(),
                 findMany: jest.fn(),
                 count: jest.fn(),
+                groupBy: jest.fn(),
             },
             invoice: { findMany: jest.fn(), count: jest.fn() },
             subscriptionSkip: { findMany: jest.fn() },
@@ -140,6 +146,10 @@ beforeEach(() => {
         ...PLAN,
         _count: { subscriptions: 0 },
     });
+    db.subscriptionPlan!.findMany!.mockResolvedValue([
+        { ...PLAN, classesPerMonth: null },
+    ]);
+    db.customerSubscription!.groupBy!.mockResolvedValue([]);
     db.businessProfile!.findUnique!.mockResolvedValue({ timezone: "UTC" });
     db.customerSubscription!.findFirst!.mockResolvedValue(sub());
     db.invoice!.findMany!.mockResolvedValue([]);
@@ -779,11 +789,248 @@ describe("plans", () => {
     });
 
     it("archives a plan for new sign-ups only", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            name: PLAN.name,
+            status: "ACTIVE",
+        });
         await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
-        expect(db.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
+        expect(tx.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
             where: { id: "plan_1", organizationId: "org_1" },
             data: { status: "ARCHIVED" },
         });
+    });
+});
+
+// — D1: classes, who pays what, a monthly figure, one name ——————————————
+
+describe("a plan's read (D1)", () => {
+    it("returns its classes a month, who pays what and its monthly figure", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([
+            { ...PLAN, price: decimal("1500"), classesPerMonth: 8 },
+        ]);
+        db.customerSubscription!.groupBy!.mockResolvedValue([
+            {
+                planId: "plan_1",
+                price: decimal("1500"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "ACTIVE",
+                _count: { _all: 12 },
+            },
+            {
+                planId: "plan_1",
+                price: decimal("1200"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "ACTIVE",
+                _count: { _all: 3 },
+            },
+        ]);
+        const plan = await service.getPlan(owner, "plan_1");
+        expect(plan).toMatchObject({
+            classesPerMonth: 8,
+            subscriberCount: 15,
+            monthly: "1500.00",
+            monthlyFromMembers: "21600.00",
+            byPrice: [
+                { price: "1500.00", count: 12, current: true },
+                { price: "1200.00", count: 3, current: false },
+            ],
+        });
+    });
+
+    it("counts every plan's subscribers in one grouped query, live ones only", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([
+            { ...PLAN, classesPerMonth: null },
+            { ...PLAN, id: "plan_2", name: "Annual", classesPerMonth: null },
+        ]);
+        db.customerSubscription!.groupBy!.mockResolvedValue([
+            {
+                planId: "plan_2",
+                price: decimal("1200"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "PAUSED",
+                _count: { _all: 2 },
+            },
+        ]);
+        const plans = await service.listPlans(owner, {});
+        expect(db.customerSubscription!.groupBy).toHaveBeenCalledTimes(1);
+        expect(db.customerSubscription!.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    planId: { in: ["plan_1", "plan_2"] },
+                    status: { in: ["ACTIVE", "PAUSED"] },
+                },
+            }),
+        );
+        expect(plans.map((p) => p.subscriberCount)).toEqual([0, 2]);
+    });
+
+    it("asks nothing more when there are no plans", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        expect(await service.listPlans(owner, {})).toEqual([]);
+        expect(db.customerSubscription!.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("answers another business's plan with a 404", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        await expect(service.getPlan(owner, "plan_x")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(db.subscriptionPlan!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "plan_x", organizationId: "org_1" },
+            }),
+        );
+    });
+
+    it("is refused to a Member", async () => {
+        await expect(service.getPlan(member, "plan_1")).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        await expect(service.listPlans(member, {})).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+    });
+});
+
+describe("a plan's name and classes (D1)", () => {
+    const WHOLE = {
+        name: "Monthly",
+        price: "1500",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+    /** The clash lookup is the findFirst that asks by name. */
+    function clashWith(other: { id: string; name: string } | null) {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? other
+                        : { name: PLAN.name, status: "ACTIVE" },
+                ),
+        );
+    }
+
+    beforeEach(() => {
+        clashWith(null);
+        tx.subscriptionPlan!.create!.mockResolvedValue({ id: "plan_1" });
+    });
+
+    it("saves classes a month on create", async () => {
+        await service.createPlan(owner, { ...WHOLE, classesPerMonth: 8 });
+        expect(tx.subscriptionPlan!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ classesPerMonth: 8 }),
+            }),
+        );
+    });
+
+    it("leaves classes unlimited when not given", async () => {
+        await service.createPlan(owner, WHOLE);
+        expect(
+            tx.subscriptionPlan!.create!.mock.calls[0]![0].data.classesPerMonth,
+        ).toBeNull();
+    });
+
+    it("changes classes a month, or clears them with null", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
+        expect(tx.subscriptionPlan!.updateMany!.mock.calls[0]![0].data).toEqual(
+            { classesPerMonth: 12 },
+        );
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: null });
+        expect(tx.subscriptionPlan!.updateMany!.mock.calls[1]![0].data).toEqual(
+            { classesPerMonth: null },
+        );
+    });
+
+    it("refuses a name another live plan has, ignoring case, naming it", async () => {
+        clashWith({ id: "plan_9", name: "monthly" });
+        const refused = service.createPlan(owner, WHOLE);
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toMatchObject({
+            response: {
+                message: expect.stringContaining("monthly"),
+                details: { field: "name", planId: "plan_9" },
+            },
+        });
+        expect(tx.subscriptionPlan!.create).not.toHaveBeenCalled();
+    });
+
+    it("looks for the clash among plans that aren't archived, case-insensitively", async () => {
+        await service.createPlan(owner, WHOLE);
+        const byName = tx.subscriptionPlan!.findFirst!.mock.calls.find(
+            ([a]) => a.where.name,
+        )![0];
+        expect(byName.where).toEqual({
+            organizationId: "org_1",
+            status: { not: "ARCHIVED" },
+            name: { equals: "Monthly", mode: "insensitive" },
+        });
+    });
+
+    it("checks under the business's plan-name lock, taken first", async () => {
+        await service.createPlan(owner, WHOLE);
+        expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.subscriptionPlan!.findFirst!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("lets a plan keep its own name on a rename", async () => {
+        await service.updatePlan(owner, "plan_1", { name: "Monthly" });
+        const byName = tx.subscriptionPlan!.findFirst!.mock.calls.find(
+            ([a]) => a.where.name,
+        )![0];
+        expect(byName.where.id).toEqual({ not: "plan_1" });
+    });
+
+    it("refuses a rename onto another live plan's name", async () => {
+        clashWith({ id: "plan_9", name: "Annual" });
+        await expect(
+            service.updatePlan(owner, "plan_1", { name: "annual" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("takes no lock and checks no name when the name isn't changing", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1600" });
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+        expect(tx.subscriptionPlan!.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses to sell an archived plan again while its name is taken", async () => {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? { id: "plan_9", name: "Monthly membership" }
+                        : { name: PLAN.name, status: "ARCHIVED" },
+                ),
+        );
+        await expect(
+            service.setPlanStatus(owner, "plan_1", "ACTIVE"),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("answers another business's plan with a 404 on change", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.updatePlan(owner, "plan_x", { name: "Monthly" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.setPlanStatus(owner, "plan_x", "ARCHIVED"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("is refused to a Member", async () => {
+        await expect(service.createPlan(member, WHOLE)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
     });
 });
 

@@ -120,7 +120,9 @@ export class PublicBookingsService {
         staffId?: string,
         now: Date = new Date(),
     ): Promise<AvailableSlot[]> {
-        const { service, rules } = await loadBookableService(serviceId);
+        const { service, rules } = await loadBookableService(serviceId, {
+            bookingPage: true,
+        });
         const { from, to } = parseRange(fromISO, toISO);
         const [slots, bookingRules] = await Promise.all([
             openSlots(service, rules, from, to, staffId),
@@ -136,7 +138,9 @@ export class PublicBookingsService {
      * (U3): a display name and an opaque id per person, nothing else.
      */
     async publicServiceStaff(serviceId: string): Promise<PublicStaff[]> {
-        await loadBookableService(serviceId);
+        await loadBookableService(serviceId, {
+            bookingPage: true,
+        });
         const people = await serviceStaff(prisma, serviceId);
         return people.map(({ id, name }) => ({ id, name }));
     }
@@ -282,7 +286,9 @@ export class PublicBookingsService {
         now: Date = new Date(),
     ): Promise<{ booking: Booking; payToken: string | null }> {
         // 1. Load the Service. Org is derived from HERE, never the client.
-        const { service, rules } = await loadBookableService(serviceId);
+        const { service, rules } = await loadBookableService(serviceId, {
+            bookingPage: true,
+        });
         await assertOrganizationOpen(service.organizationId);
 
         // 2. Validate the requested instant is a real, aligned slot start —

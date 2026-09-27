@@ -12,7 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
-import type { Booking, Service } from "@saroh/database";
+import type { Booking } from "@saroh/database";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -32,6 +32,7 @@ import {
     RescheduleBookingDto,
     UpdateServiceDto,
 } from "./dto";
+import type { ServiceView } from "./service-fields";
 
 /**
  * Authorized bookable-Service + availability + booking management for an
@@ -57,12 +58,14 @@ export class BookingsController {
     createService(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: CreateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.createService(ctx, dto);
     }
 
     @Get()
-    listServices(@OrgContext() ctx: OrganizationContext): Promise<Service[]> {
+    listServices(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<ServiceView[]> {
         return this.bookings.listServices(ctx);
     }
 
@@ -84,7 +87,7 @@ export class BookingsController {
     getService(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.getService(ctx, serviceId);
     }
 
@@ -93,7 +96,7 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
         @Body() dto: UpdateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         return this.bookings.updateService(ctx, serviceId, dto);
     }
 

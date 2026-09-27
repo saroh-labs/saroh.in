@@ -120,6 +120,9 @@ function service(over: Record<string, unknown> = {}) {
         deletedAt: null,
         locationType: "IN_PERSON",
         meetingUrl: null,
+        visits: 1,
+        depositMode: "NONE",
+        showOnBookingPage: true,
         availabilityRules: WEEKDAYS,
         ...over,
     };
@@ -537,6 +540,8 @@ describe("the booking page's read (U19)", () => {
         expect(db.service.findMany.mock.calls[0][0].where).toMatchObject({
             organizationId: "org_1",
             status: "ACTIVE",
+            // A service hidden from the booking page is left out (E1).
+            showOnBookingPage: true,
             OR: [{ siteId: null }, { siteId: "site_1" }],
         });
         expect(JSON.stringify(page)).not.toMatch(/org_1/);

@@ -44,6 +44,37 @@ describe("what a plan accepts", () => {
         );
     });
 
+    it("takes classes a month from 1 to 60, or null for unlimited", async () => {
+        for (const classesPerMonth of [1, 8, 60, null]) {
+            expect(await refused(PlanInputDto, { classesPerMonth })).toEqual(
+                [],
+            );
+        }
+    });
+
+    it("refuses classes a month outside 1–60, a fraction, or text", async () => {
+        for (const classesPerMonth of [0, -1, 61, 2.5, "8"]) {
+            expect(await refused(PlanInputDto, { classesPerMonth })).toContain(
+                "classesPerMonth",
+            );
+        }
+    });
+
+    it("says why classes a month is refused, in the editor's words", async () => {
+        const [tooMany] = await validate(
+            plainToInstance(PlanInputDto, { classesPerMonth: 61 }),
+        );
+        expect(Object.values(tooMany!.constraints!)).toContain(
+            "60 a month is the most",
+        );
+    });
+
+    it("trims a name, so ' Monthly ' is 'Monthly'", () => {
+        expect(plainToInstance(PlanInputDto, { name: " Monthly " }).name).toBe(
+            "Monthly",
+        );
+    });
+
     it("upper-cases the currency", () => {
         expect(
             plainToInstance(PlanInputDto, { currency: "inr" }).currency,

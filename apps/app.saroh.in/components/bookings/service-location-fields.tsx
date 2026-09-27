@@ -15,10 +15,16 @@ import { z } from "zod";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type { LocationType } from "@/lib/services/service";
+import { needsMeetingLink } from "@/lib/services/service-editor";
 
-/** The two fields both service forms add to their schema. */
+/**
+ * The two fields both service forms add to their schema. EITHER is accepted
+ * so a service made Either elsewhere (the API, a seed) keeps it and its link
+ * through a save here; these forms offer only In person and Online, since
+ * the booking page doesn't ask Where until E7.
+ */
 export const locationFields = {
-    locationType: z.enum(["IN_PERSON", "ONLINE"]),
+    locationType: z.enum(["IN_PERSON", "ONLINE", "EITHER"]),
     meetingUrl: z.string().trim().max(500),
 };
 
@@ -40,7 +46,7 @@ function isHttps(link: string): boolean {
  * the same, and this says it first, on the field.
  */
 export function checkLocation(values: LocationValues, ctx: z.RefinementCtx) {
-    if (values.locationType !== "ONLINE") return;
+    if (!needsMeetingLink(values.locationType)) return;
     const link = values.meetingUrl.trim();
     if (!link) {
         ctx.addIssue({
@@ -65,8 +71,11 @@ export function locationPayload(values: LocationValues): {
     locationType: LocationType;
     meetingUrl: string | null;
 } {
-    return values.locationType === "ONLINE"
-        ? { locationType: "ONLINE", meetingUrl: values.meetingUrl.trim() }
+    return needsMeetingLink(values.locationType)
+        ? {
+              locationType: values.locationType,
+              meetingUrl: values.meetingUrl.trim(),
+          }
         : { locationType: "IN_PERSON", meetingUrl: null };
 }
 
@@ -127,7 +136,7 @@ export function ServiceLocationFields({
                     </FormItem>
                 )}
             />
-            {online === "ONLINE" ? (
+            {needsMeetingLink(online) ? (
                 <FormField
                     control={form.control}
                     name="meetingUrl"

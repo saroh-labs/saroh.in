@@ -14,6 +14,14 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { ListTab, PaymentStanding } from "./order-list-filters";
+import {
+    FULFILMENT_FILTER_VALUES,
+    LIST_TABS,
+    PAYMENT_STANDINGS,
+    STAGE_FILTER_VALUES,
+} from "./order-list-filters";
+
 export const ORDER_STATUSES = [
     "PENDING",
     "PROCESSING",
@@ -304,4 +312,111 @@ export class UpdateOrderDto {
     @IsString()
     @IsIn(PAYMENT_STATUSES, { message: "Unknown payment status" })
     paymentStatus?: PaymentStatus;
+}
+
+/** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */
+const listOf = ({ value }: { value: unknown }) => {
+    if (value === undefined || value === null || value === "") return undefined;
+    const parts = (Array.isArray(value) ? value : [value])
+        .flatMap((v: unknown) => (typeof v === "string" ? v.split(",") : [v]))
+        .map((v: unknown) =>
+            typeof v === "string" ? v.trim().toUpperCase() : v,
+        )
+        .filter((v: unknown) => v !== "");
+    return parts.length ? parts : undefined;
+};
+const blankToUndefined = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const t = value.trim();
+    return t === "" ? undefined : t;
+};
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `GET organizations/:org/orders` (plan B, B1). Without `v=2` only `storeId`
+ * is read and the route answers today's bare array; with it, every filter
+ * applies and the answer is `{ rows, counts, nextCursor }`.
+ */
+export class ListOrdersQuery {
+    @IsOptional()
+    @IsIn(["1", "2"], { message: "Unknown list version" })
+    v?: "1" | "2";
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(LIST_TABS, { message: "Unknown tab" })
+    tab?: ListTab;
+
+    @IsOptional()
+    @Transform(listOf)
+    @IsArray()
+    @IsIn(STAGE_FILTER_VALUES, { each: true, message: "Unknown step" })
+    stage?: string[];
+
+    @IsOptional()
+    @Transform(listOf)
+    @IsArray()
+    @IsIn(FULFILMENT_FILTER_VALUES, {
+        each: true,
+        message: "Unknown way of fulfilling an order",
+    })
+    fulfilment?: string[];
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toUpperCase() : value,
+    )
+    @IsIn(PAYMENT_STANDINGS, { message: "Unknown payment standing" })
+    payment?: PaymentStanding;
+
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    productId?: string;
+
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    customerId?: string;
+
+    // Blank means every storefront: an empty string would filter on a
+    // storefront that cannot exist and return nothing.
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    storeId?: string;
+
+    /** Text, as a query string is: "true" or "false". */
+    @IsOptional()
+    @IsIn(["true", "false"], { message: "late is true or false" })
+    late?: "true" | "false";
+
+    /** A calendar day in the business's zone. */
+    @IsOptional()
+    @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
+    from?: string;
+
+    /** A calendar day in the business's zone, included. */
+    @IsOptional()
+    @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
+    to?: string;
+
+    /** An order number or a customer's name; phone or email with `contact:read`. */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(100)
+    q?: string;
+
+    /** The last row's id from the page before. */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    cursor?: string;
 }

@@ -120,6 +120,9 @@ const SERVICE = {
     timezone: "UTC",
     status: "ACTIVE",
     deletedAt: null,
+    visits: 1,
+    depositMode: "NONE",
+    showOnBookingPage: true,
 };
 
 // Mon 2026-07-20 09:00–10:00 UTC — the one rule that makes START a valid slot.
@@ -639,6 +642,8 @@ describe("PublicBookingsService.publicServices — the website's services list (
             id: { in: ["a"] },
             deletedAt: null,
             status: "ACTIVE",
+            // A service hidden from the booking page is left out (E1).
+            showOnBookingPage: true,
             organization: {
                 organizationModules: {
                     none: {

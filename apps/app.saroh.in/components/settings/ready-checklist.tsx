@@ -9,7 +9,8 @@ import type { ReadyChecklist as Checklist } from "@/lib/settings/ready";
  * Business listing what is left, a bar for how far along the business is,
  * and a button per step to the place that does it. Nothing renders once
  * nothing is left — the page already says the rest. The steps and the count
- * come from `readyChecklist`.
+ * come from `readyChecklist`, the same list as Home's "Get ready to take
+ * money" (F8), so the two always agree.
  */
 export function ReadyChecklist({ list }: { list: Checklist }) {
     if (list.left.length === 0 || list.total === 0) return null;
@@ -53,8 +54,11 @@ export function ReadyChecklist({ list }: { list: Checklist }) {
                                 item.broken ? "bg-destructive" : "bg-highlight",
                             )}
                         />
-                        <span className="min-w-0 flex-[1_1_220px]">
-                            {item.label}
+                        <span className="grid min-w-0 flex-[1_1_220px] gap-px">
+                            <span>{item.label}</span>
+                            <span className="text-pretty text-[12.5px] leading-[1.45] text-foreground/80">
+                                {item.why}
+                            </span>
                         </span>
                         <Button asChild variant="outline" size="sm">
                             <Link href={item.href}>{item.cta}</Link>

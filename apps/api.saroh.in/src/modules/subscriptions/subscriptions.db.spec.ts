@@ -440,3 +440,169 @@ describe("collections, skips and plan changes (real database)", () => {
         ).rejects.toThrow(/archived/);
     });
 });
+
+describe("a plan's figures and name (D1, real database)", () => {
+    const MONTHLY = {
+        name: "Monthly",
+        price: "1200",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+
+    async function peopleIn(
+        ctx: OrganizationContext,
+        n: number,
+        tag: string,
+    ): Promise<string[]> {
+        const ids: string[] = [];
+        for (let i = 0; i < n; i += 1) {
+            const c = await prisma.contact.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    email: `${tag}-${i}@example.com`,
+                },
+            });
+            ids.push(c.id);
+        }
+        return ids;
+    }
+
+    it("lists who pays what from one grouped read: 12 at ₹1,500 and 3 at the older ₹1,200", async () => {
+        const gym = await makeOrg("plans-by-price");
+        const plan = await service.createPlan(gym, {
+            ...MONTHLY,
+            classesPerMonth: 8,
+        });
+        for (const contactId of await peopleIn(gym, 3, "older")) {
+            await service.subscribe(gym, { contactId, planId: plan.id });
+        }
+        await service.updatePlan(gym, plan.id, { price: "1500" });
+        const newer = await peopleIn(gym, 12, "newer");
+        for (const contactId of newer) {
+            await service.subscribe(gym, { contactId, planId: plan.id });
+        }
+        // A cancelled member is not on it; a paused one still is.
+        const gone = await service.subscribe(gym, {
+            contactId: (await peopleIn(gym, 1, "gone"))[0]!,
+            planId: plan.id,
+        });
+        await service.cancel(gym, gone.id, { when: "now" });
+        const [paused] = await prisma.customerSubscription.findMany({
+            where: { contactId: newer[0] },
+        });
+        await service.pause(gym, paused!.id);
+
+        const read = await service.getPlan(gym, plan.id);
+        expect(read.classesPerMonth).toBe(8);
+        expect(read.subscriberCount).toBe(15);
+        expect(read.monthly).toBe("1500.00");
+        expect(read.byPrice).toEqual([
+            {
+                price: "1500.00",
+                currency: "INR",
+                interval: "MONTH",
+                count: 12,
+                current: true,
+            },
+            {
+                price: "1200.00",
+                currency: "INR",
+                interval: "MONTH",
+                count: 3,
+                current: false,
+            },
+        ]);
+        // 11 running at ₹1,500 and 3 at ₹1,200; the paused one brings nothing.
+        expect(read.monthlyFromMembers).toBe("20100.00");
+        const [listed] = await service.listPlans(gym, {});
+        expect(listed).toEqual(read);
+    });
+
+    it("says a yearly and a weekly plan as a month's worth", async () => {
+        const shop = await makeOrg("plans-monthly");
+        const yearly = await service.createPlan(shop, {
+            ...MONTHLY,
+            name: "Annual",
+            price: "12000",
+            interval: "YEAR",
+        });
+        const weekly = await service.createPlan(shop, {
+            ...MONTHLY,
+            name: "Weekly",
+            price: "350",
+            interval: "WEEK",
+        });
+        expect(yearly.monthly).toBe("1000.00");
+        expect(weekly.monthly).toBe("1516.67");
+        expect(weekly.classesPerMonth).toBeNull();
+    });
+
+    it("refuses 'Monthly' beside a live 'monthly', and frees the name once archived", async () => {
+        const studio = await makeOrg("plans-names");
+        const first = await service.createPlan(studio, {
+            ...MONTHLY,
+            name: "monthly",
+        });
+        await expect(service.createPlan(studio, MONTHLY)).rejects.toMatchObject(
+            {
+                status: 409,
+                response: { details: { field: "name", planId: first.id } },
+            },
+        );
+
+        await service.setPlanStatus(studio, first.id, "ARCHIVED");
+        const second = await service.createPlan(studio, MONTHLY);
+        expect(second.name).toBe("Monthly");
+
+        // The archived one can't be sold again while its name is taken…
+        await expect(
+            service.setPlanStatus(studio, first.id, "ACTIVE"),
+        ).rejects.toMatchObject({ status: 409 });
+        // …nor can a live plan be renamed onto it.
+        const other = await service.createPlan(studio, {
+            ...MONTHLY,
+            name: "Annual",
+        });
+        await expect(
+            service.updatePlan(studio, other.id, { name: "MONTHLY" }),
+        ).rejects.toMatchObject({ status: 409 });
+        // A plan keeps its own name, in any case.
+        const renamed = await service.updatePlan(studio, other.id, {
+            name: "annual",
+        });
+        expect(renamed.name).toBe("annual");
+    });
+
+    it("lets one of three same-named creates at once through", async () => {
+        const rush = await makeOrg("plans-race");
+        const outcomes = await Promise.allSettled([
+            service.createPlan(rush, { ...MONTHLY, name: "Drop-in" }),
+            service.createPlan(rush, { ...MONTHLY, name: "drop-in" }),
+            service.createPlan(rush, { ...MONTHLY, name: "DROP-IN" }),
+        ]);
+        expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(
+            1,
+        );
+        expect(
+            await prisma.subscriptionPlan.count({
+                where: { organizationId: rush.organizationId },
+            }),
+        ).toBe(1);
+    });
+
+    it("keeps names per business, and answers another business's plan with a 404", async () => {
+        const a = await makeOrg("plans-a");
+        const b = await makeOrg("plans-b");
+        const mine = await service.createPlan(a, MONTHLY);
+        await expect(service.createPlan(b, MONTHLY)).resolves.toBeDefined();
+        await expect(service.getPlan(b, mine.id)).rejects.toMatchObject({
+            status: 404,
+        });
+        await expect(
+            service.updatePlan(b, mine.id, { classesPerMonth: 4 }),
+        ).rejects.toMatchObject({ status: 404 });
+        await expect(
+            service.setPlanStatus(b, mine.id, "ARCHIVED"),
+        ).rejects.toMatchObject({ status: 404 });
+    });
+});
