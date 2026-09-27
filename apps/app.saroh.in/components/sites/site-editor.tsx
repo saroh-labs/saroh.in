@@ -22,13 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    useSyncExternalStore,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddBlockPanel } from "@/components/sites/add-block-panel";
@@ -52,6 +46,10 @@ import {
     sectionTitle,
     ZOOMS,
 } from "@/components/sites/editor-constants";
+import {
+    activeSection,
+    useEditorSelection,
+} from "@/components/sites/editor/use-editor-selection";
 import {
     editorColumns,
     useEditorViewport,
@@ -92,16 +90,12 @@ import {
     insertPosition,
 } from "@/lib/sites/editor-positions";
 import {
-    getPlace,
     PANEL_DEFAULT,
     PANEL_MAX,
     PANEL_MIN,
-    placeOnServer,
     RAIL_DEFAULT,
     RAIL_MAX,
     RAIL_MIN,
-    setPlace,
-    subscribe,
 } from "@/lib/sites/editor-prefs";
 import type { EditorStatusTone } from "@/lib/sites/editor-status";
 import { editorStatus } from "@/lib/sites/editor-status";
@@ -333,28 +327,19 @@ export function SiteEditor({
     }
 
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
-    /*
-     * The place (selection, rail and inspector tabs, scroll) comes from the
-     * preferences store rather than component state: it belongs to the
-     * browser, outlives this mount, and the server has no business guessing
-     * it. `useSyncExternalStore` renders the server snapshot (the defaults)
-     * during hydration and swaps to the stored values before paint.
-     */
-
-    // The section count is what makes a remembered index meaningful, so it is
-    // bound into both snapshots rather than read inside the store.
     const initialCount = initialSections.length;
-    // Held stable because useSyncExternalStore compares snapshots by identity.
-    const serverPlace = useMemo(
-        () => placeOnServer(initialCount),
-        [initialCount],
-    );
-    const place = useSyncExternalStore(
-        subscribe,
-        () => getPlace(siteId, initialCount),
-        () => serverPlace,
-    );
-    const { selectedIndex, rail, inspector } = place;
+    const {
+        place,
+        selectedIndex,
+        selectedChrome,
+        rail,
+        inspector,
+        setSelectedIndex,
+        selectChrome,
+        setRail,
+        setInspector,
+        selectedIndexNow,
+    } = useEditorSelection({ siteId, sectionCount: initialCount });
 
     const {
         railWidth,
@@ -378,23 +363,6 @@ export function SiteEditor({
         sectionCount: initialCount,
         initialScrollTop: place.scrollTop,
     });
-
-    // Writing through the store is what makes the choice survive a reload.
-    /*
-     * The header or footer, when one of those is selected instead of a block
-     * (#336). Remembered with the place, so a reload comes back to it.
-     */
-    const selectedChrome = place.chrome;
-    const setSelectedIndex = (next: number | null) =>
-        setPlace(siteId, initialCount, { selectedIndex: next, chrome: null });
-    const selectChrome = (part: "header" | "footer") => {
-        setPlace(siteId, initialCount, { selectedIndex: null, chrome: part });
-        setInspector("block");
-    };
-    const setRail = (next: "sections" | "style") =>
-        setPlace(siteId, initialCount, { rail: next });
-    const setInspector = (next: "block" | "feedback") =>
-        setPlace(siteId, initialCount, { inspector: next });
 
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -531,10 +499,7 @@ export function SiteEditor({
               : empty;
         // Read at call time, not from this render: two quick adds must land
         // in the order they were clicked.
-        const at = insertPosition(
-            getPlace(siteId, initialCount).selectedIndex,
-            sectionCount.current,
-        );
+        const at = insertPosition(selectedIndexNow(), sectionCount.current);
         sectionCount.current += 1;
         setSections((prev) => [
             ...prev.slice(0, at),
@@ -964,16 +929,7 @@ export function SiteEditor({
         setSelectedIndex(index);
     }
 
-    /*
-     * The selected section AND its index together, so nothing downstream has to
-     * assert that the index is still valid. Removing a section can leave the
-     * index past the end, and carrying the pair makes that a single check here
-     * rather than a non-null assertion at every use.
-     */
-    const active =
-        selectedIndex !== null && selectedIndex < sections.length
-            ? { index: selectedIndex, section: sections[selectedIndex] }
-            : null;
+    const active = activeSection(selectedIndex, sections);
 
     /*
      * Flags for the page currently open, indexed by section. The server sends
