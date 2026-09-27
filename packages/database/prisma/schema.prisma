@@ -2384,11 +2384,28 @@ model CustomerIdentityLink {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  linkedByUserId String
+  // The team member who linked them, for a MANUAL link only. A link the
+  // backfill, a payment or a site sign-in made has none (C2, DEC-041).
+  linkedByUserId String?
   createdAt      DateTime @default(now())
+
+  // Why the link exists (C2, DEC-041). Links from before C2 read MANUAL.
+  reason CustomerLinkReason @default(MANUAL)
 
   @@unique([contactId, customerId])
   @@index([organizationId])
+}
+
+/// Why a store customer is linked to a contact (C2, DEC-041).
+enum CustomerLinkReason {
+  // A team member linked them (#120); `linkedByUserId` says who.
+  MANUAL
+  // The backfill that gave every paying store customer a contact.
+  BACKFILL
+  // Their order was paid (`ensureContactForPaidOrder`).
+  PAYMENT
+  // They placed the order signed in on the business's site (A4, G13).
+  SITE_ACCOUNT
 }
 
 // ContactNote: what the team has written down about a person (U8, ADR-008).
