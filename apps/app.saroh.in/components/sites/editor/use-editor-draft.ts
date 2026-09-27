@@ -2,6 +2,10 @@ import { blockExample } from "@saroh/block-contract";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+    newFormIds,
+    stampFormIds,
+} from "@/components/sites/editor/stamp-form-ids";
 import { emptySection } from "@/components/sites/empty-section";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
@@ -243,51 +247,11 @@ export function useEditorDraft({
             failedJson.current = JSON.stringify(sections);
             return;
         }
-        /*
-         * Stamp ONLY the new formIds onto what is on screen now (#281). This
-         * used to replace the whole list with the copy taken before the sync,
-         * so anything typed while the form request was in flight was lost.
-         *
-         * A section is matched by identity first, meaning it is unchanged since
-         * the save began. Failing that, it is matched by position, for an
-         * enquiry section still waiting for its first formId. That way a section
-         * edited mid-save still gets its id, instead of creating a second Form
-         * on the next autosave.
-         */
-        const newFormIds = synced.sections.flatMap((next, index) => {
-            const before = sections[index];
-            return next.type === "enquiry" &&
-                before.type === "enquiry" &&
-                next.content.formId &&
-                next.content.formId !== before.content.formId
-                ? [{ index, before, formId: next.content.formId }]
-                : [];
-        });
-        if (newFormIds.length > 0) {
+        // Stamp ONLY the new formIds onto what is on screen now (#281).
+        const found = newFormIds(sections, synced.sections);
+        if (found.length > 0) {
             setSections((current) =>
-                current.map((section, index) => {
-                    if (section.type !== "enquiry" || section.content.formId) {
-                        return section;
-                    }
-                    // By position only while the list is the same length
-                    // as when the save began: a block added in the middle
-                    // since would shift every position after it, and hand
-                    // another block's Form to its neighbour (review).
-                    const hit =
-                        newFormIds.find((n) => n.before === section) ??
-                        (current.length === sections.length
-                            ? newFormIds.find((n) => n.index === index)
-                            : undefined);
-                    return hit
-                        ? {
-                              ...section,
-                              content: {
-                                  ...section.content,
-                                  formId: hit.formId,
-                              },
-                          }
-                        : section;
-                }),
+                stampFormIds(current, found, sections.length),
             );
         }
 
