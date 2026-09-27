@@ -219,8 +219,10 @@ export function DraftPreview({
     const header = chrome ? (
         <SiteHeader name={chrome.name} navigation={chrome.navigation} />
     ) : null;
-    const footer = chrome?.footer ? (
-        <SiteFooter footer={chrome.footer} />
+    // Always drawn, as on the live site: the footer ends in "Runs on Saroh"
+    // (G17), and with nothing written its line is the site's name.
+    const footer = chrome ? (
+        <SiteFooter footer={chrome.footer} name={chrome.name} />
     ) : null;
 
     return (

@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { BookingPageData } from "@saroh/site-blocks";
 import { isBookingPage } from "@saroh/site-blocks";
 
@@ -16,8 +18,13 @@ export type BookingPageLookup =
  * cached — a service paused a minute ago must not be offered. A 404 is a site
  * with nothing published; anything else going wrong is "unavailable", which
  * the page says in words rather than as a 404.
+ *
+ * `cache` shares one read within ONE request, not across requests: the site
+ * header asks whether to offer "Book" (G17) and `/book` then draws the same
+ * page, so a visitor on `/book` costs one read, not two. The next request
+ * reads again.
  */
-export async function getBookingPage(
+export const getBookingPage = cache(async function getBookingPage(
     siteId: string,
 ): Promise<BookingPageLookup> {
     let res: Response;
@@ -35,4 +42,4 @@ export async function getBookingPage(
     return isBookingPage(body)
         ? { ok: true, page: body }
         : { ok: false, reason: "unavailable" };
-}
+});

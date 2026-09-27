@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
-import { getPublicationForHost, shareImages } from "@/lib/publication";
+import { getBookingPage } from "@/lib/booking-page";
+import { headerAction } from "@/lib/header-action";
+import {
+    getPublicationForHost,
+    getSiteForHost,
+    shareImages,
+} from "@/lib/publication";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
@@ -91,11 +97,22 @@ export default async function SiteLayout({
     children: React.ReactNode;
 }) {
     const { domain } = await params;
-    const snapshot = await getPublicationForHost(domain);
+    const resolved = await getSiteForHost(domain);
 
-    if (!snapshot) {
+    if (!resolved) {
         notFound();
     }
+    const { snapshot, siteId } = resolved;
+
+    /*
+     * The header's main button (G17) follows what the business offers now,
+     * not what was published: a merchant who turns Appointments off loses
+     * "Book" at once. `/book` reads the same page, once per request.
+     */
+    const action = headerAction({
+        booking: siteId ? await getBookingPage(siteId) : null,
+        shopServes: false,
+    });
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
@@ -103,11 +120,15 @@ export default async function SiteLayout({
             <SiteHeader
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}
+                action={action}
             />
 
             <div>{children}</div>
 
-            <SiteFooter footer={snapshot.site.footer} />
+            <SiteFooter
+                footer={snapshot.site.footer}
+                name={snapshot.site.name}
+            />
         </div>
     );
 }
