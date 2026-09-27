@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { AdminAuditInput } from "../admin/admin-audit.service";
@@ -160,16 +160,43 @@ export class FeatureFlagService {
                 select: { enabled: true },
             });
 
-            // An override references its flag's row, and a flag that was
-            // never set globally has none (a fresh database), so the override
-            // would fail its foreign key. Register the flag dark first: the
-            // global default an unseeded flag already resolves to, so nothing
-            // changes for any other organization.
-            await tx.featureFlag.upsert({
-                where: { key },
-                create: { key, enabledByDefault: false },
-                update: {},
+            // The override references the organization, so an unknown id
+            // would fail its foreign key and answer 500.
+            const organization = await tx.organization.findUnique({
+                where: { id: organizationId },
+                select: { id: true },
             });
+            if (!organization) {
+                throw new NotFoundException(
+                    `Organization "${organizationId}" not found`,
+                );
+            }
+
+            // It references its flag's row too, and a flag never set
+            // globally has none (a fresh database). Register the flag dark
+            // first: the value an unconfigured flag already resolves to, so
+            // no other organization changes. It is a write like any other,
+            // so it is audited: the history shows when the global default
+            // came to exist and why.
+            const flag = await tx.featureFlag.findUnique({
+                where: { key },
+                select: { key: true },
+            });
+            if (!flag) {
+                await tx.featureFlag.create({
+                    data: { key, enabledByDefault: false },
+                });
+                await tx.featureFlagAudit.create({
+                    data: {
+                        flagKey: key,
+                        organizationId: null,
+                        previousValue: null,
+                        newValue: false,
+                        actorUserId,
+                        reason: "Registered off for everyone by the first organization override",
+                    },
+                });
+            }
 
             await tx.featureFlagOverride.upsert({
                 where: {
