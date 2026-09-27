@@ -318,6 +318,16 @@ describe("the canvas in Preview", () => {
     });
 });
 
+describe("the merchant's type (review G-5)", () => {
+    it("sets the page in the site's body face, editing and in Preview", () => {
+        for (const previewing of [false, true]) {
+            render({ previewing });
+            const scope = $(".site-preview-scope");
+            expect(scope?.classList.contains("font-site-body")).toBe(true);
+        }
+    });
+});
+
 describe("one renderer", () => {
     it("draws Preview and the editing canvas through the live site's PageSections", () => {
         render({ previewing: false });
