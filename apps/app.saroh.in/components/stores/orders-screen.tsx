@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Download, Plus, Store } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -102,6 +103,7 @@ export function OrdersScreen({
     stores,
     initialFilterId,
     kitchen = false,
+    notice = null,
 }: {
     orders: OrderRow[];
     stores: { id: string; name: string }[];
@@ -113,6 +115,8 @@ export function OrdersScreen({
      * is not theirs to do.
      */
     kitchen?: boolean;
+    /** Under the title: that the list is narrowed, and how to widen it. */
+    notice?: ReactNode;
 }) {
     const [storeId, setStoreId] = useState<string | null>(null);
     const many = stores.length > 1;
@@ -230,6 +234,8 @@ export function OrdersScreen({
                     ) : undefined
                 }
             />
+
+            {notice ? <div className="mt-4">{notice}</div> : null}
 
             <DataView
                 viewId="orders"

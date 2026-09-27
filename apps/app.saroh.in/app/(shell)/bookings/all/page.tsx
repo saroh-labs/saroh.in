@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookingsView } from "@/components/bookings/bookings-view";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
 import { listContacts } from "@/lib/contacts/service";
 import { contactName } from "@/lib/crm/format";
@@ -12,6 +13,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
+import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
 /**
  * Every booking as one list (S4-003) — the register the calendar replaced as
@@ -40,8 +42,8 @@ export default async function BookingsPage({
 }) {
     await requireSession();
 
-    const [upcoming, params, services, contacts, organization] =
-        await Promise.all([
+    const [every, params, services, contacts, organization] = await Promise.all(
+        [
             listBookingsWithPast(),
             searchParams,
             listServices().catch(() => []),
@@ -49,7 +51,17 @@ export default async function BookingsPage({
             // a name and email instead of offering people you know.
             listContacts().catch(() => []),
             resolveActiveOrganization(),
-        ]);
+        ],
+    );
+
+    // From Home's "Last 24 hours" (F6): the confirmed bookings made since
+    // then, as Home counted them.
+    const since = sinceParam(params);
+    const upcoming = since
+        ? every.filter(
+              (b) => b.status === "CONFIRMED" && isSince(b.createdAt, since),
+          )
+        : every;
 
     return (
         <PageContainer width="wide">
@@ -94,7 +106,15 @@ export default async function BookingsPage({
                     </>
                 }
             />
-            <div className="mt-6">
+            <div className="mt-6 space-y-4">
+                {since ? (
+                    <SinceNotice
+                        count={upcoming.length}
+                        noun={{ one: "booking", other: "bookings" }}
+                        verb="made"
+                        clearHref={withoutSince("/bookings/all", params)}
+                    />
+                ) : null}
                 <BookingsView
                     bookings={upcoming}
                     initialView={viewParam(params)}

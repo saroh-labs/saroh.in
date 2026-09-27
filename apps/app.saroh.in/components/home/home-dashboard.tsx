@@ -11,7 +11,6 @@ import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
-import { NumbersBand } from "./numbers-band";
 import { TakeMoneyChecklist } from "./take-money-checklist";
 import { Today } from "./today";
 
@@ -24,19 +23,19 @@ export interface HomeSetup {
 /**
  * Home as a dashboard rather than a menu (#119, redesign step 3).
  *
- * Three bands, in the order a merchant opening the app actually asks:
+ * Two bands, in the order a merchant opening the app actually asks:
  *
  * 1. **Needs you** — one flat, ranked list, a row per thing to do with a tag
  *    that says what is wrong (F3), so the decision is made here rather than
  *    two clicks later.
  * 2. **Today** — the business's day in time order, with who has arrived
  *    (F5). Days after today are the calendar's.
- * 3. **Numbers** — counts that are links into exactly what they count.
  *
- * Numbers sit LAST, not first. The dashboard convention is a row of stat tiles
- * across the top, but a merchant opening this page has a question — "what needs
- * me?" — and answering it with a wall of counts puts the least actionable thing
- * in the most valuable space. The work leads; the totals are reference.
+ * The counts that used to close the page as a band of tiles folded into the
+ * header's "Last 24 hours" (F6, `home-header.tsx`): what changed since
+ * yesterday, each a link to its rows. The standing totals they showed are the
+ * work itself now — open orders are Needs you's rows, today's bookings are
+ * Today's — and the rest are a click away in the rail.
  *
  * `now` is captured once and threaded down so every relative time on the page
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
@@ -111,15 +110,6 @@ export function HomeDashboard({
                     ) : null}
                 </div>
             </div>
-
-            {home.numbers.length > 0 ? (
-                <div className="space-y-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Your numbers
-                    </h2>
-                    <NumbersBand numbers={home.numbers} />
-                </div>
-            ) : null}
         </div>
     );
 }

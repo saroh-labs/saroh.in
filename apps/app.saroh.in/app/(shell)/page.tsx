@@ -1,9 +1,9 @@
-import { PageHeader } from "@saroh/ui/page-header";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { HomeSetup } from "@/components/home/home-dashboard";
 import { HomeDashboard } from "@/components/home/home-dashboard";
+import { HomeHeader } from "@/components/home/home-header";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
@@ -24,7 +24,7 @@ import { loadReadyChecklist } from "@/lib/settings/ready-service";
  * Global chrome (brand, switchers, nav) lives in AppHeader via the root layout.
  */
 export default async function Home() {
-    await requireSession();
+    const session = await requireSession();
 
     // Zero-org funnel: a signed-in user with no organization onboards first.
     const organizations = await listOrganizations();
@@ -57,11 +57,14 @@ export default async function Home() {
         // the old reading measure — the schedule column needs room to sit
         // beside the work instead of below it.
         <PageContainer width="full">
-            <PageHeader
-                title="Home"
-                description="What needs you, what's coming up, and where everything stands."
+            {/* The greeting is the page's title (F6): who, when, and the
+                last 24 hours, then the work. */}
+            <HomeHeader
+                lastDay={home.lastDay}
+                name={session.user.name}
+                businessName={business?.name ?? "This business"}
             />
-            <div className="mt-6">
+            <div className="mt-5">
                 <HomeDashboard
                     home={home}
                     modules={modules}
