@@ -188,9 +188,12 @@ export class StockChecksService {
             seesPeople: false,
             seesOrders: false,
         };
+        // Only the short shelves, filtered in SQL: Home reads this on every
+        // navigation, so it must not scan every shelf and sum every open
+        // order line the way the Stock screen's full read does (H-4).
         const open = await this.unresolved(
             organizationId,
-            this.shelfChecks(reader),
+            this.shelfChecks(reader, { shortOnly: true }),
         );
         return open
             .filter((c) => c.kind === "SHORT")
@@ -230,12 +233,28 @@ export class StockChecksService {
         return [...shelves, ...counts, ...sales];
     }
 
-    /** SHORT and PROMISED_MISMATCH: each shelf against its open lines. */
-    private async shelfChecks(reader: StockReader): Promise<Found[]> {
+    /**
+     * SHORT and PROMISED_MISMATCH: each shelf against its open lines. With
+     * `shortOnly`, only the shelves short in SQL — promised above what is on
+     * hand (and above zero, as `shortBy` reads a shelf below zero) — and no
+     * sum of the open lines, which only PROMISED_MISMATCH needs.
+     */
+    private async shelfChecks(
+        reader: StockReader,
+        opts: { shortOnly?: boolean } = {},
+    ): Promise<Found[]> {
         const { organizationId } = reader;
+        const short = opts.shortOnly
+            ? {
+                  AND: [
+                      { promised: { gt: prisma.stockLevel.fields.onHand } },
+                      { promised: { gt: 0 } },
+                  ],
+              }
+            : {};
         const [rows, held] = await Promise.all([
             prisma.stockLevel.findMany({
-                where: { organizationId, store: { deletedAt: null } },
+                where: { organizationId, store: { deletedAt: null }, ...short },
                 select: {
                     id: true,
                     storeId: true,
@@ -250,20 +269,22 @@ export class StockChecksService {
                 },
                 orderBy: { id: "asc" },
             }),
-            prisma.orderItem.groupBy({
-                by: ["stockLevelId"],
-                where: {
-                    stockLevelId: { not: null },
-                    order: {
-                        organizationId,
-                        status: { in: [...RESERVING_STATUSES] },
-                    },
-                },
-                _sum: { heldQuantity: true },
-                orderBy: { stockLevelId: "asc" },
-            }),
+            opts.shortOnly
+                ? Promise.resolve([])
+                : prisma.orderItem.groupBy({
+                      by: ["stockLevelId"],
+                      where: {
+                          stockLevelId: { not: null },
+                          order: {
+                              organizationId,
+                              status: { in: [...RESERVING_STATUSES] },
+                          },
+                      },
+                      _sum: { heldQuantity: true },
+                      orderBy: { stockLevelId: "asc" },
+                  }),
         ]);
-        const heldBy = new Map(
+        const heldBy = new Map<string | null, number>(
             held.map((h) => [h.stockLevelId, h._sum.heldQuantity ?? 0]),
         );
         const out: Found[] = [];
@@ -296,6 +317,7 @@ export class StockChecksService {
                     fingerprint: `${row.onHand}:${row.promised}`,
                 });
             }
+            if (opts.shortOnly) continue;
             const holds = heldBy.get(row.id) ?? 0;
             if (holds !== row.promised) {
                 out.push({
