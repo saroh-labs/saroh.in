@@ -1490,6 +1490,13 @@ model Order {
   // until then, and for every order before G13.
   paidAt       DateTime?
 
+  // Who took it and its number, typed by staff when the order is handed to
+  // a courier, or added after (plan B, B2b; DEC-045). Saroh never books a
+  // courier. Trimmed, at most 80 characters; `trackingUrl` stays the
+  // optional link.
+  courierName    String?
+  trackingNumber String?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])

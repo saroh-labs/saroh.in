@@ -1017,6 +1017,8 @@ interface OrderPlan {
     moves: { to: Stage; at: Date; by: string }[];
     notes?: string;
     trackingUrl?: string;
+    /** Who took it and their number, typed at the handover (B2b). */
+    courier?: { name: string; number: string };
     /** Units added to a line while it was New, the difference paid online. */
     edit?: { line: number; from: number; at: Date; paidAt: Date; by: string };
     /** Units of one line refunded after it was delivered. */
@@ -1333,6 +1335,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
                 ],
                 pay: "ONLINE",
                 trackingUrl: "https://track.example.in/delivery/RC4402518736",
+                courier: { name: "Delhivery", number: "RC4402518736" },
             },
             [
                 ["PREPARING", hhmm(7, 0), nisha],
@@ -1743,6 +1746,8 @@ export function planWorld(input: PlanInput): World {
             deliveryPostalCode: delivery ? shopper.address.zip : null,
             notes: o.notes ?? null,
             trackingUrl: o.trackingUrl ?? null,
+            courierName: o.courier?.name ?? null,
+            trackingNumber: o.courier?.number ?? null,
             createdAt: o.placedAt,
             updatedAt: lastTouch,
         });
