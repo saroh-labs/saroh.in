@@ -5,7 +5,10 @@ import { unfinishedPhrase } from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { getSiteFlags, publishSite } from "@/lib/sites/actions";
 import type { SiteChangeKind } from "@/lib/sites/pending";
-import { describePendingChanges } from "@/lib/sites/pending";
+import {
+    describePendingChanges,
+    shortPendingChanges,
+} from "@/lib/sites/pending";
 import type { SiteFlags } from "@/lib/sites/service";
 
 /** What the draft must say before the pre-publish check may open. */
@@ -104,6 +107,21 @@ export function usePublish({
         pendingChanges,
         pendingSiteChanges,
     );
+    /** The same, in the pill's words: "2 blocks, footer" (G2). */
+    const pendingShort = shortPendingChanges(
+        pendingChanges,
+        pendingSiteChanges,
+    );
+    /*
+     * Whether the server's count is here at all (G2). Null is how a site that
+     * has never published says "nothing to compare with", so on a published
+     * site a null count means the read or the save that carries it came back
+     * without one. The bar then says it couldn't check, never "Published".
+     */
+    const pendingKnown =
+        neverPublished ||
+        pendingChanges !== null ||
+        pendingSiteChanges !== null;
 
     /**
      * A save recounted what publishing would change; take its answer rather
@@ -200,6 +218,8 @@ export function usePublish({
         siteFlags,
         refreshFlags,
         pendingSummary,
+        pendingShort,
+        pendingKnown,
         recordSaved,
         markStylePending,
         checking,

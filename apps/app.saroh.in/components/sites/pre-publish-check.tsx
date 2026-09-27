@@ -69,6 +69,24 @@ const APPROVAL_LINE: Record<
     },
 };
 
+/**
+ * What publishing puts live, in one sentence (G2). A site that has never
+ * published goes live whole; a missing count is said, not guessed; and
+ * publishing with nothing changed still makes a new version.
+ */
+export function goesLive(
+    neverPublished: boolean,
+    pendingKnown: boolean,
+    pendingSummary: string | null,
+): string {
+    if (neverPublished) return "Publishing puts the whole site live.";
+    if (!pendingKnown) {
+        return "We couldn't check what's changed. Publishing puts the site live as it is now.";
+    }
+    if (pendingSummary) return `Publishing puts live: ${pendingSummary}.`;
+    return "Nothing has changed since the last publish. Publishing again makes a new version that matches the live one.";
+}
+
 export function PrePublishCheck({
     siteName,
     pages,
@@ -76,6 +94,8 @@ export function PrePublishCheck({
     awaitingNavigation,
     publishing,
     neverPublished,
+    pendingSummary,
+    pendingKnown,
     review,
     onPublish,
     onClose,
@@ -88,6 +108,13 @@ export function PrePublishCheck({
     publishing: boolean;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
+    /**
+     * What publishing would change, as the server counted it: "2 sections
+     * and the footer". Null when nothing is waiting (G2).
+     */
+    pendingSummary: string | null;
+    /** Whether that count arrived; false says so rather than guess (G2). */
+    pendingKnown: boolean;
     /** "Approval also shows as a line in the pre-publish check" (spec §2). */
     review: ReviewState;
     onPublish: () => void;
@@ -167,6 +194,13 @@ export function PrePublishCheck({
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-2xl px-6 py-8">
+                    {/*
+                     * What pressing Publish puts live (G2), said before it
+                     * does it. The same count the bar's pill reads.
+                     */}
+                    <p className="mb-6 text-sm">
+                        {goesLive(neverPublished, pendingKnown, pendingSummary)}
+                    </p>
                     {/*
                      * The approval, where the spec puts it: this is the last
                      * look before going live, and whether someone has signed

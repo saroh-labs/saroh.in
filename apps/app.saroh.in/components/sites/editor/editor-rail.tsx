@@ -20,11 +20,21 @@ import { StylePanel } from "@/components/sites/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
+type RailTab = "page" | "add" | "brand";
+
+/** The rail's tabs, in the design's order (G2). */
+const RAIL_TABS: readonly { key: RailTab; label: string }[] = [
+    { key: "page", label: "Page" },
+    { key: "add", label: "Add" },
+    // Today's Style panel until the Brand panel (plan H) replaces it.
+    { key: "brand", label: "Brand" },
+];
+
 /**
- * The left column: this page's blocks, in order (#340), or the Add block
- * tab, or the Style panel. The fields are on the right now, so this column is
- * only ever a list — the page as the merchant reads it, top to bottom. Moved
- * out of `site-editor.tsx` unchanged (#260).
+ * The left column: this page's blocks, in order (#340), the blocks to add, or
+ * the site's look, under the tabs Page · Add · Brand (G2). The fields are on
+ * the right now, so this column is only ever a list — the page as the
+ * merchant reads it, top to bottom. Moved out of `site-editor.tsx` (#260).
  */
 export function EditorRail({
     rail,
@@ -84,28 +94,35 @@ export function EditorRail({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
 
+    /*
+     * Page · Add · Brand (G2), as the design draws the rail. Brand is the
+     * remembered `style` place, so a reload comes back to it as it did to the
+     * Style panel; Add is the add-block flag, which a reload forgets.
+     */
+    const tab: RailTab = rail === "style" ? "brand" : adding ? "add" : "page";
+    function selectTab(next: RailTab) {
+        setRail(next === "brand" ? "style" : "sections");
+        setAdding(next === "add");
+    }
+
     return (
         <aside className="flex min-h-0 flex-col">
-            {rail === "style" ? (
+            <EditorTabs
+                label="Editor panels"
+                tabs={RAIL_TABS}
+                value={tab}
+                onSelect={selectTab}
+            />
+            {tab === "brand" ? (
                 <StylePanel
                     style={style}
                     options={styleOptions}
                     onChange={setStyle}
                     onReset={resetStyle}
-                    onBack={() => setRail("sections")}
                     saving={styleSaving}
                 />
             ) : (
                 <>
-                    <EditorTabs
-                        label="Page"
-                        tabs={[
-                            { key: "sections", label: "This page" },
-                            { key: "add", label: "Add block" },
-                        ]}
-                        value={adding ? "add" : "sections"}
-                        onSelect={(tab) => setAdding(tab === "add")}
-                    />
                     {adding ? (
                         <AddBlockPanel
                             onBrowse={() => setBrowsing(true)}

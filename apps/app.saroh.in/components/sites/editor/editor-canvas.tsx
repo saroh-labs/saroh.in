@@ -73,6 +73,7 @@ export function EditorCanvas({
     device,
     switching,
     zoomScale,
+    siteId,
     address,
     sections,
     pages,
@@ -96,6 +97,8 @@ export function EditorCanvas({
     /** Briefly dimmed while a device switch animates. */
     switching: boolean;
     zoomScale: number;
+    /** For the blocks that read live data on the canvas (G8). */
+    siteId: string;
     address?: string | null;
     sections: Section[];
     pages: SitePage[];
@@ -217,6 +220,7 @@ export function EditorCanvas({
                         ) : null}
                     </div>
                     <DraftPreview
+                        siteId={siteId}
                         siteAddress={address}
                         sections={sections}
                         pages={pages}
@@ -250,6 +254,7 @@ export function EditorCanvas({
 export function FullScreenPreview({
     setFullScreen,
     device,
+    siteId,
     address,
     sections,
     pages,
@@ -259,6 +264,7 @@ export function FullScreenPreview({
 }: {
     setFullScreen: (open: boolean) => void;
     device: Device;
+    siteId: string;
     address?: string | null;
     sections: Section[];
     pages: SitePage[];
@@ -280,6 +286,7 @@ export function FullScreenPreview({
                 style={{ maxWidth: DEVICE_WIDTH[device] }}
             >
                 <DraftPreview
+                    siteId={siteId}
                     siteAddress={address}
                     sections={sections}
                     pages={pages}
