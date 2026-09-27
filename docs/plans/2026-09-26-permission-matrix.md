@@ -76,7 +76,7 @@ Rules that hold whatever is chosen in §9:
 
 | Capability | Scope: what it shows or lets you do | Status | Implies | Used by |
 |---|---|---|---|---|
-| `contact:read` | See customers and contacts: the Customers list, Customer Detail, name, phone, email, address, notes, non-sensitive Needs attention, "Signs in on your website"; search by phone or email | exists; relabel "See customers and contacts" (design `customer:read`) | — | Customers, Customer Detail, Contacts, Orders and Bookings customer cards |
+| `contact:read` | See customers and contacts: the Customers list, Customer Detail, name, phone, email, address, notes, non-sensitive Needs attention, "Signs in on your website"; search by name, phone or email, including the shared customer picker's `GET contacts/search` (E4, reused by B13's New order) | exists; relabel "See customers and contacts" (design `customer:read`) | — | Customers, Customer Detail, Contacts, Orders and Bookings customer cards, New booking and New order customer search |
 | `contact:write` | Edit a person: details, notes, email and address, Needs attention, confirm a booking-page note, "This isn't them"; the hard delete of a contact with no orders or invoices (DEC-042) | exists; relabel "Edit customers and contacts" (design `customer:write`) | `contact:read` | Customer Detail edit sheet, Needs attention |
 | `customer:sensitive` | See Medical and other sensitive Needs attention entries and booking-page intake notes | new (Q2) | — | everywhere Needs attention shows |
 | `customer:merge` | Merge two customers | new | — | Customer Detail ⋯, duplicates |
@@ -87,8 +87,8 @@ Rules that hold whatever is chosen in §9:
 | Capability | Scope | Status | Implies | Used by |
 |---|---|---|---|---|
 | `order:read` | Orders list, quick view, Order Detail and a customer's Orders tab — the whole order, money included, and whether a pay link is live (never the link: §1 rule 2) | exists | — | Orders, Order Detail, Customer Detail |
-| `order:stage` | Move an order through its steps, undo the last step, print the ticket, bulk moves, record the courier and tracking number | exists; relabel "Move orders through their steps and print" (design `order:fulfil`) | `order:read` (F18) | Orders, Order Detail, Home Today |
-| `order:create` | Take a new order (New order, walk-in), and make its pay link (shown once) | new; today `order:write` | `order:read` | New order v2 |
+| `order:stage` | Move an order through its steps, undo the last step, print the ticket, record the courier and tracking number; **bulk moves: hold, Send now, cancel the hold and Undo all** (B6) | exists; relabel "Move orders through their steps and print" (design `order:fulfil`) | `order:read` (F18) | Orders, Order Detail, Home Today |
+| `order:create` | Take a new order (New order, walk-in), and make its pay link (shown once); "New pay link" on an order, which stops the old one | new; today `order:write` | `order:read` | New order v2, row menu "New pay link" |
 | `order:edit` | Change items, address or how it's fulfilled until handover; make a new pay link, which stops the old one ("New pay link", never "Copy") | new; today `order:write` | `order:read` | Order Detail Edit, Change how it's fulfilled, row menu |
 | `order:refund` | Refund and cancel (a cancel is a full refund) | new; today `payment:manage` | `order:read` | Order Detail refund and cancel, row menu |
 | `order:export` | Export orders to CSV | new; today `order:read` | `order:read` | Orders Export |
@@ -100,6 +100,7 @@ Rules that hold whatever is chosen in §9:
 |---|---|---|---|---|
 | `booking:read` | Bookings and the diary: who, when, the service, its price, deposit and how it was paid | exists | — | Bookings, Calendar, Home Today |
 | `booking:write` | Book, check in, mark no-show, move, cancel | exists | `booking:read` | New booking, peek, Home Today |
+| `booking:write` **and** `invoice:write` | Send a booking's pay link from New booking (the booking invoice's own pay link, ADR-007; E4). Both are needed because the link belongs to the invoice | exists (a pair, no new key) | — | New booking |
 | `service:read` | See services | exists | — | Services |
 | `service:write` | Change services, working hours, time off, closures, booking rules; "Also sell" | exists; relabel "Change services, hours, time off and booking rules" (design `booking:settings`) | `service:read` | Service Editor, Availability, time off |
 | `pack:read` | Class packs, who holds one, balances, sales and prices | exists | — | Packs, Pack Detail |
@@ -112,8 +113,9 @@ Rules that hold whatever is chosen in §9:
 | Capability | Scope | Status | Implies | Used by |
 |---|---|---|---|---|
 | `payment:read` | Money in and out: takings, fees, refunds paid, the Calendar's in, out and due, Home's This week takings (design `payments:read`) | exists | — | Calendar money, Home This week, Payments |
-| `payment:manage` | Connect providers (and so whether autopay is possible at all), refund invoices | exists | `order:refund` | Providers |
+| `payment:manage` | Connect providers (and so whether autopay is possible at all), refund invoices; **refund a deposit on a late cancel** (the staff "return the credit" override, E8; without it the deposit is kept and the dialog says who can refund it) | exists | `order:refund` | Providers, the cancel dialog's deposit override |
 | `subscription:read` / `subscription:write` | Subscriptions, renewals, plans and their figures, and a subscription's autopay (the mandate card) / subscribe, pause, cancel; create, edit and publish plans; **autopay: send a set-up link, cancel autopay, retry a renewal** | exists | write → read | Subscriptions, Subscription Detail, Plan Detail, Plan Editor |
+| `invoice:read` / `invoice:write` | Invoices and their amounts / issue, send, credit and void | exists | write → read | Invoices, Invoice Detail |
 
 **Mandate actions have one owner, `subscription:write`** (decided
 2026-09-27; plan D says the same). A mandate belongs to one subscription and
@@ -121,7 +123,6 @@ ends with it (plan D, D20), so whoever can cancel the subscription already
 ends its autopay; gating "Cancel autopay" on another key would let someone
 end the subscription but not its autopay. `payment:manage` keeps what is
 business-wide.
-| `invoice:read` / `invoice:write` | Invoices and their amounts / issue, send, credit and void | exists | write → read | Invoices, Invoice Detail |
 
 ### Products and stock (settled in round 1)
 
