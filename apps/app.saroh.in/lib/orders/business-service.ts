@@ -140,9 +140,11 @@ export async function listOrderRows(
 /**
  * Every matching row, following the cursor to the end.
  *
- * For the screens that still filter and search what they hold (Orders until
- * B3 pages it, a customer's orders). Stops at `maxPages` pages rather than
- * reading forever; `complete` says whether it reached the end.
+ * For what needs every row rather than a page: a customer's orders, and the
+ * Orders list's Export (`list-actions.ts`). The Orders list itself reads one
+ * page at a time (`list-query.ts` holds its address). Stops at `maxPages`
+ * pages rather than reading forever; `complete` says whether it reached the
+ * end.
  */
 export async function listAllOrderRows(
     params: Omit<OrderListParams, "cursor"> = {},
