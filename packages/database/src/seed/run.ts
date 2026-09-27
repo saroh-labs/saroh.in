@@ -473,6 +473,28 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
 
 // --- Commerce -----------------------------------------------------------
 
+/** Where Northwind's local deliveries and shipments go. */
+const NORTHWIND_DELIVERY_ADDRESS = {
+    deliveryName: "Receiving desk",
+    deliveryPhone: "+91 80 4100 2200",
+    deliveryLine1: "Plot 14, EPIP Zone",
+    deliveryLine2: "Whitefield",
+    deliveryCity: "Bengaluru",
+    deliveryState: "Karnataka",
+    deliveryPostalCode: "560066",
+} as const;
+
+/** A pick-up or a digital order goes to no address. */
+const NO_DELIVERY_ADDRESS = {
+    deliveryName: null,
+    deliveryPhone: null,
+    deliveryLine1: null,
+    deliveryLine2: null,
+    deliveryCity: null,
+    deliveryState: null,
+    deliveryPostalCode: null,
+} as const;
+
 async function seedCommerce(
     prisma: Db,
     orgId: string,
@@ -668,9 +690,26 @@ async function seedCommerce(
         const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
         const tax = Math.round(subtotal * 0.18 * 100) / 100;
 
+        // A local delivery and a shipment go to the customer's address;
+        // a re-seed puts every order back on its type and step.
+        const address =
+            o.fulfilment === "LOCAL_DELIVERY" || o.fulfilment === "SHIPPING"
+                ? NORTHWIND_DELIVERY_ADDRESS
+                : NO_DELIVERY_ADDRESS;
+        const how = {
+            fulfilment: o.fulfilment,
+            stage: o.stage,
+            courierName: o.courier?.name ?? null,
+            trackingNumber: o.courier?.number ?? null,
+            ...address,
+        };
         await prisma.order.upsert({
             where: { id: id("order", i) },
-            update: { status: o.status, paymentStatus: o.paymentStatus },
+            update: {
+                status: o.status,
+                paymentStatus: o.paymentStatus,
+                ...how,
+            },
             create: {
                 id: id("order", i),
                 storeId: store.id,
@@ -683,6 +722,7 @@ async function seedCommerce(
                 currency: CURRENCY,
                 status: o.status,
                 paymentStatus: o.paymentStatus,
+                ...how,
                 createdAt: at(now, o.dayOffset, 12),
                 items: {
                     create: lines.map((l, n) => ({

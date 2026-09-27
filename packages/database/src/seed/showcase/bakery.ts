@@ -983,6 +983,7 @@ type Stage =
     | "PREPARING"
     | "READY"
     | "COLLECTED"
+    | "OUT_FOR_DELIVERY"
     | "HANDED_TO_COURIER"
     | "DELIVERED";
 
@@ -991,9 +992,17 @@ const STATUS_OF: Record<Stage, string> = {
     PREPARING: "PROCESSING",
     READY: "PROCESSING",
     COLLECTED: "DELIVERED",
+    OUT_FOR_DELIVERY: "SHIPPED",
     HANDED_TO_COURIER: "SHIPPED",
     DELIVERED: "DELIVERED",
 };
+
+/**
+ * How an order leaves, in the types' own names (B2c, DEC-045): collected at
+ * the counter, taken out by the bakery's own rider in Karnataka, or sent by
+ * courier out of the state and from the website's shop.
+ */
+type Fulfilment = "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING";
 
 interface OrderLine {
     product: number;
@@ -1007,7 +1016,7 @@ interface OrderPlan {
     placedAt: Date;
     /** The storefront it was placed at; default Hill Road. */
     store?: StoreKey;
-    fulfilment: "COLLECT" | "DELIVERY";
+    fulfilment: Fulfilment;
     /** Final quantities (after any edit). */
     lines: OrderLine[];
     /** Fulfilled without taking it off the shelf ("Sale not taken", #514). */
@@ -1098,15 +1107,26 @@ function planOrders(input: PlanInput): OrderPlan[] {
             { to: "COLLECTED" as const, at: c, by: by() },
         ];
     };
-    const deliverPath = (placed: Date, by: () => string, r: Rng = rng) => {
+    // A local delivery goes out with the bakery's rider; a shipment is
+    // handed to a courier. The same draws either way, so the plan is too.
+    const deliverPath = (
+        placed: Date,
+        by: () => string,
+        r: Rng = rng,
+        fulfilment: Fulfilment = "SHIPPING",
+    ) => {
         const a = addMinutes(placed, r.int(10, 50));
         const b = addMinutes(a, r.int(30, 80));
         const c = addMinutes(b, r.int(15, 60));
         const d = addMinutes(c, r.int(90, 300));
+        const handover: Stage =
+            fulfilment === "LOCAL_DELIVERY"
+                ? "OUT_FOR_DELIVERY"
+                : "HANDED_TO_COURIER";
         return [
             { to: "PREPARING" as const, at: a, by: by() },
             { to: "READY" as const, at: b, by: by() },
-            { to: "HANDED_TO_COURIER" as const, at: c, by: by() },
+            { to: handover, at: c, by: by() },
             { to: "DELIVERED" as const, at: d, by: by() },
         ];
     };
@@ -1132,9 +1152,15 @@ function planOrders(input: PlanInput): OrderPlan[] {
         for (let k = 0; k < count; k++) {
             const shopper = rng.weighted(regulars, (x) => x.w).i;
             const far = SHOPPERS[shopper].address.state !== "Karnataka";
-            const fulfilment = far || rng.chance(0.3) ? "DELIVERY" : "COLLECT";
+            // Out of the state by courier; in it, sometimes by the rider.
+            const delivers = far || rng.chance(0.3);
+            const fulfilment: Fulfilment = far
+                ? "SHIPPING"
+                : delivers
+                  ? "LOCAL_DELIVERY"
+                  : "PICKUP";
             const pool =
-                fulfilment === "COLLECT"
+                fulfilment === "PICKUP"
                     ? history.map((_, i) => i)
                     : breadAndPastry.map((x) => x.i);
             const n = rng.weighted([1, 2, 3], (x) =>
@@ -1159,12 +1185,12 @@ function planOrders(input: PlanInput): OrderPlan[] {
                             : rng.int(1, 2),
                 })),
                 pay:
-                    fulfilment === "DELIVERY" || rng.chance(0.5)
+                    fulfilment !== "PICKUP" || rng.chance(0.5)
                         ? "ONLINE"
                         : "RECORDED",
                 moves:
-                    fulfilment === "DELIVERY"
-                        ? deliverPath(placedAt, staff)
+                    fulfilment !== "PICKUP"
+                        ? deliverPath(placedAt, staff, rng, fulfilment)
                         : collectPath(placedAt, staff),
             });
         }
@@ -1175,7 +1201,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.elena,
         placedAt: elenaAt,
-        fulfilment: "DELIVERY",
+        fulfilment: "SHIPPING",
         lines: [
             { product: P["sourdough-loaf"], qty: 1 },
             { product: P["almond-croissant"], qty: 2 },
@@ -1188,7 +1214,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.yuki,
         placedAt: yukiAt,
-        fulfilment: "DELIVERY",
+        fulfilment: "SHIPPING",
         lines: [
             { product: P["rye-caraway-loaf"], qty: 1 },
             { product: P["cinnamon-bun"], qty: 4 },
@@ -1202,7 +1228,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.sana,
         placedAt: sanaAt,
-        fulfilment: "DELIVERY",
+        fulfilment: "SHIPPING",
         lines: [
             { product: P["sourdough-loaf"], qty: 1 },
             { product: P["almond-croissant"], qty: 2 },
@@ -1224,7 +1250,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.aditya,
         placedAt: adityaAt,
-        fulfilment: "DELIVERY",
+        fulfilment: "SHIPPING",
         lines: [{ product: P["cinnamon-bun"], variant: 1, qty: 3 }],
         pay: "ONLINE",
         moves: [{ to: "PREPARING", at: addMinutes(adityaAt, 35), by: nisha }],
@@ -1235,7 +1261,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.dev,
         placedAt: devAt,
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         lines: [{ product: P["sourdough-loaf"], qty: 1 }],
         pay: "RECORDED",
         moves: collectPath(devAt, staff),
@@ -1246,7 +1272,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
     orders.push({
         shopper: SHOPPER.sanjay,
         placedAt: sanjayAt,
-        fulfilment: "DELIVERY",
+        fulfilment: "SHIPPING",
         lines: [{ product: P["house-blend-beans-250g"], qty: 2 }],
         pay: "ONLINE",
         moves: deliverPath(sanjayAt, staff),
@@ -1263,7 +1289,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             shopper,
             placedAt: at,
             store: "O",
-            fulfilment: "DELIVERY",
+            fulfilment: "SHIPPING",
             lines,
             pay: "ONLINE",
             moves: deliverPath(at, staff),
@@ -1296,7 +1322,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(6, 50),
             {
                 shopper: SHOPPER.nikhil,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [
                     { product: P["flat-white"], qty: 2 },
                     { product: P["butter-croissant"], qty: 2 },
@@ -1313,7 +1339,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(6, 58),
             {
                 shopper: SHOPPER.tara,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [{ product: P["seeded-multigrain-loaf"], qty: 1 }],
                 pay: "ONLINE",
             },
@@ -1328,7 +1354,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(6, 10),
             {
                 shopper: SHOPPER.ishaan,
-                fulfilment: "DELIVERY",
+                fulfilment: "SHIPPING",
                 lines: [
                     { product: P["sourdough-loaf"], qty: 1 },
                     { product: P["cinnamon-bun"], qty: 4 },
@@ -1348,7 +1374,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(7, 35),
             {
                 shopper: SHOPPER.dev,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [
                     { product: P["seeded-multigrain-loaf"], qty: 1 },
                     { product: P.cappuccino, qty: 1 },
@@ -1364,7 +1390,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(8, 20),
             {
                 shopper: SHOPPER.sana,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [
                     { product: P.baguette, qty: 2 },
                     { product: P["cold-brew"], qty: 1 },
@@ -1382,7 +1408,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(6, 10) + 5,
             {
                 shopper: SHOPPER.arjun,
-                fulfilment: "DELIVERY",
+                fulfilment: "LOCAL_DELIVERY",
                 lines: [{ product: P["cinnamon-bun"], qty: 3 }],
                 pay: "ONLINE",
             },
@@ -1393,7 +1419,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
                 hhmm(8, 45),
                 {
                     shopper: SHOPPER.meera,
-                    fulfilment: "COLLECT",
+                    fulfilment: "PICKUP",
                     lines: [
                         { product: P["sourdough-loaf"], qty: 1 },
                         { product: P["butter-croissant"], qty: 3 },
@@ -1415,7 +1441,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(9, 14),
             {
                 shopper: SHOPPER.priya,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [
                     { product: P["sourdough-loaf"], qty: 2 },
                     { product: P["almond-croissant"], qty: 1 },
@@ -1429,7 +1455,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(10, 48),
             {
                 shopper: SHOPPER.kavya,
-                fulfilment: "DELIVERY",
+                fulfilment: "LOCAL_DELIVERY",
                 lines: [{ product: P["sourdough-loaf"], qty: 1 }],
                 pay: "ONLINE",
             },
@@ -1439,7 +1465,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             hhmm(11, 5),
             {
                 shopper: SHOPPER.anjali,
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 lines: [
                     { product: P["pain-au-chocolat"], qty: 2 },
                     { product: P["flat-white"], qty: 2 },
@@ -1454,7 +1480,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             {
                 shopper: SHOPPER.tara,
                 store: "O",
-                fulfilment: "DELIVERY",
+                fulfilment: "SHIPPING",
                 lines: [{ product: P["sourdough-loaf"], variant: 1, qty: 1 }],
                 pay: "ONLINE",
             },
@@ -1465,7 +1491,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             {
                 shopper: SHOPPER.nikhil,
                 store: "O",
-                fulfilment: "DELIVERY",
+                fulfilment: "SHIPPING",
                 lines: [
                     {
                         product: P["house-blend-beans-250g"],
@@ -1512,7 +1538,7 @@ function planOrders(input: PlanInput): OrderPlan[] {
             orders.push({
                 shopper,
                 placedAt,
-                fulfilment: far ? "DELIVERY" : "COLLECT",
+                fulfilment: far ? "SHIPPING" : "PICKUP",
                 lines: [
                     {
                         product,
@@ -1674,7 +1700,7 @@ export function planWorld(input: PlanInput): World {
         const store = o.store ?? "H";
         const firsts = store === "H" ? firstOrder : firstOnline;
         if (!firsts.has(o.shopper)) firsts.set(o.shopper, o.placedAt);
-        const delivery = o.fulfilment === "DELIVERY";
+        const delivery = o.fulfilment !== "PICKUP";
         const shippingPaise = delivery ? DELIVERY_PAISE : 0;
         const inter = delivery && shopper.address.state !== "Karnataka";
         const pos = delivery ? STATE_CODES[shopper.address.state] : GST.state;
@@ -1751,9 +1777,13 @@ export function planWorld(input: PlanInput): World {
             createdAt: o.placedAt,
             updatedAt: lastTouch,
         });
-        // Where it left the shelf: collected, or handed to the courier.
+        // Where it left the shelf: collected, out with the rider, or handed
+        // to the courier.
         const out = o.moves.find(
-            (m) => m.to === "COLLECTED" || m.to === "HANDED_TO_COURIER",
+            (m) =>
+                m.to === "COLLECTED" ||
+                m.to === "OUT_FOR_DELIVERY" ||
+                m.to === "HANDED_TO_COURIER",
         );
         const open =
             STATUS_OF[stage] === "PENDING" || STATUS_OF[stage] === "PROCESSING";
