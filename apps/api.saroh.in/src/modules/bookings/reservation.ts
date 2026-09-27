@@ -11,7 +11,7 @@ import type { ActivationEvents } from "../analytics/activation-events";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
-import { holdsPlace } from "./booking-hold";
+import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { courseSeatsHeld } from "./course-seats";
 import type { BookingLocationType, PaidWith } from "./dto";
@@ -94,7 +94,8 @@ export function alreadyBooked(): ConflictException {
 /**
  * Whether the account — or the contact it signs in as — already holds this
  * session of this service: confirmed, or a pay-now hold still running. A
- * booking cancelled or let go doesn't count.
+ * booking cancelled or let go doesn't count, and nor does the account's own
+ * unpaid hold: booking again lets that go ({@link reserveInTx}, K-2).
  */
 export async function holdsSlotAlready(
     db: Pick<Prisma.TransactionClient, "booking">,
@@ -117,11 +118,46 @@ export async function holdsSlotAlready(
                         { contactId: who.contactId },
                     ],
                 },
+                // Spelled out: a NOT over a nullable column would drop a
+                // guest's hold on the same contact (NULL account) too.
+                {
+                    OR: [
+                        { status: { not: "PENDING" } },
+                        { customerAccountId: null },
+                        { customerAccountId: { not: who.accountId } },
+                    ],
+                },
             ],
         },
         select: { id: true },
     });
     return found !== null;
+}
+
+/**
+ * The account's own live, unpaid hold on this session, if any — the one a
+ * new booking of it lets go (K-2).
+ */
+export async function ownHoldOn(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    organizationId: string,
+    accountId: string,
+    serviceId: string,
+    startAt: Date,
+    now: Date = new Date(),
+): Promise<string | null> {
+    const hold = await db.booking.findFirst({
+        where: {
+            organizationId,
+            serviceId,
+            startAt,
+            customerAccountId: accountId,
+            status: "PENDING",
+            holdExpiresAt: { gt: now },
+        },
+        select: { id: true },
+    });
+    return hold?.id ?? null;
 }
 
 /**
@@ -288,6 +324,21 @@ export async function reserveInTx(
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
 
+    // A signed-in customer booking a session they hold themselves, unpaid
+    // (a pay-now they left, now at the desk or trying again): that hold is
+    // let go here, so it neither fills the slot nor answers "already
+    // booked" (K-2). Only this account's own PENDING hold; a confirmed
+    // booking, or anyone else's, still stands.
+    if (by.account) {
+        await releaseOwnHoldInTx(
+            tx,
+            organizationId,
+            by.account.accountId,
+            serviceId,
+            startAt,
+        );
+    }
+
     // Authoritative capacity gate — re-counted INSIDE the tx. A
     // one-to-one somebody takes is capacity per person (U3), checked
     // below; everything else counts the service's seats as before.
@@ -418,6 +469,31 @@ export async function reserveInTx(
     });
 
     return booking;
+}
+
+/**
+ * Let go of the account's own live, unpaid hold on this session, on the
+ * reservation's transaction ({@link releaseHoldInTx}, which re-reads it
+ * under its locks: a hold paid a moment ago stays, and is then "already
+ * booked").
+ */
+async function releaseOwnHoldInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    accountId: string,
+    serviceId: string,
+    startAt: Date,
+): Promise<void> {
+    const now = new Date();
+    const hold = await ownHoldOn(
+        tx,
+        organizationId,
+        accountId,
+        serviceId,
+        startAt,
+        now,
+    );
+    if (hold) await releaseHoldInTx(tx, hold, now);
 }
 
 /**

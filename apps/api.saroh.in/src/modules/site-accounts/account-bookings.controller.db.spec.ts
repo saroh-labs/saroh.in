@@ -455,6 +455,90 @@ describe("booking signed in on the business's site", () => {
         ).toBe(1);
     });
 
+    /** A live, unpaid pay-now hold on the account's contact (U19). */
+    function holdFor(
+        biz: Business,
+        contactId: string,
+        at: Date,
+        customerAccountId: string | null,
+    ) {
+        return prisma.booking.create({
+            data: {
+                organizationId: biz.organizationId,
+                serviceId: biz.oneToOne,
+                contactId,
+                customerAccountId,
+                startAt: at,
+                endAt: new Date(at.getTime() + 3_600_000),
+                timezone: "UTC",
+                snapshot: {},
+                status: "PENDING",
+                holdExpiresAt: new Date(Date.now() + 10 * 60_000),
+            },
+        });
+    }
+
+    it("booking again over their own unpaid hold lets the hold go and books it (K-2)", async () => {
+        const biz = await business();
+        const { token, account } = await signIn(biz.host);
+        const at = nextMonday(6);
+        const hold = await holdFor(biz, account.contactId, at, account.id);
+
+        // A one-to-one of one place: the hold would otherwise fill it.
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: at.toISOString(),
+        });
+
+        expect(res.status).toBe(201);
+        expect(res.body).toMatchObject({ state: "CONFIRMED" });
+        await expect(
+            prisma.booking.findUniqueOrThrow({ where: { id: hold.id } }),
+        ).resolves.toMatchObject({ status: "CANCELLED" });
+        expect(
+            await prisma.booking.count({
+                where: { serviceId: biz.oneToOne, status: "CONFIRMED" },
+            }),
+        ).toBe(1);
+    });
+
+    it("a hold on their contact made without the account still reads as already booked (K-2)", async () => {
+        const biz = await business();
+        const { token, account } = await signIn(biz.host);
+        const at = nextMonday(7);
+        const hold = await holdFor(biz, account.contactId, at, null);
+
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: at.toISOString(),
+        });
+
+        expect(res.status).toBe(409);
+        expect(errorOf(res.body).details?.reason).toBe("already-booked");
+        await expect(
+            prisma.booking.findUniqueOrThrow({ where: { id: hold.id } }),
+        ).resolves.toMatchObject({ status: "PENDING" });
+    });
+
+    it("someone else's unpaid hold is left alone: the time is gone (K-2)", async () => {
+        const biz = await business();
+        const a = await signIn(biz.host);
+        const b = await signIn(biz.host);
+        const at = nextMonday(8);
+        const hold = await holdFor(biz, a.account.contactId, at, a.account.id);
+
+        const res = await book(biz, b.token, {
+            serviceId: biz.oneToOne,
+            startAt: at.toISOString(),
+        });
+
+        expect(res.status).toBe(409);
+        expect(errorOf(res.body).details?.reason).not.toBe("already-booked");
+        await expect(
+            prisma.booking.findUniqueOrThrow({ where: { id: hold.id } }),
+        ).resolves.toMatchObject({ status: "PENDING" });
+    });
+
     it("a slot someone else took is the time gone, not 'already booked'", async () => {
         const biz = await business();
         const a = await signIn(biz.host);

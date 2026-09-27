@@ -1,8 +1,8 @@
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { Interval } from "../bookings/availability";
 import { overlaps } from "../bookings/availability";
-import { spanBounds } from "./off-range";
 
 /** The most kept bookings a save lists; more than this is a different talk. */
 export const MAX_LISTED = 200;
@@ -19,26 +19,34 @@ export interface BookingBrief {
 
 /**
  * Confirmed bookings still to come, soonest first — one person's, or the
- * whole business's when `staffId` is null — narrowed to `within` when given.
+ * whole business's when `staffId` is null — narrowed to those overlapping
+ * any of `spans` when given (in the query, so a busy stretch outside the
+ * spans can't crowd out the ones in them).
  */
 export async function upcomingBookings(
     organizationId: string,
     staffId: string | null,
     now: Date,
-    within?: { from: Date; to: Date },
+    spans?: Interval[],
 ): Promise<BookingBrief[]> {
+    const where: Prisma.BookingWhereInput = {
+        organizationId,
+        ...(staffId ? { staffId } : {}),
+        status: "CONFIRMED",
+        endAt: { gt: now },
+        ...(spans
+            ? {
+                  OR: spans.map((s) => ({
+                      startAt: { lt: s.endAt },
+                      endAt: { gt: s.startAt },
+                  })),
+              }
+            : {}),
+    };
     const rows = await prisma.booking.findMany({
-        where: {
-            organizationId,
-            ...(staffId ? { staffId } : {}),
-            status: "CONFIRMED",
-            endAt: {
-                gt: within && within.from > now ? within.from : now,
-            },
-            ...(within ? { startAt: { lt: within.to } } : {}),
-        },
+        where,
         orderBy: { startAt: "asc" },
-        take: MAX_LISTED * 5,
+        take: spans ? MAX_LISTED : MAX_LISTED * 5,
         select: {
             id: true,
             startAt: true,
@@ -76,15 +84,8 @@ export async function bookingsInSpans(
     spans: Interval[],
     now: Date,
 ): Promise<BookingBrief[]> {
-    const bounds = spanBounds(spans);
-    if (!bounds) return [];
-    const upcoming = await upcomingBookings(
-        organizationId,
-        staffId,
-        now,
-        bounds,
-    );
-    return upcoming
-        .filter((b) => spans.some((s) => overlaps(b, s)))
-        .slice(0, MAX_LISTED);
+    if (spans.length === 0) return [];
+    const inSpans = await upcomingBookings(organizationId, staffId, now, spans);
+    // The query already narrowed them; kept as the rule it states.
+    return inSpans.filter((b) => spans.some((s) => overlaps(b, s)));
 }

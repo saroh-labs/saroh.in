@@ -89,6 +89,16 @@ describe("HomeService refunds owed on invoices", () => {
         });
     });
 
+    it("says a booking's pay link was paid after the booking was cancelled (K-1)", async () => {
+        const { service } = build([
+            { ...OWED, invoice: { ...OWED.invoice, status: "ISSUED" } },
+        ]);
+        const home = await service.build(OWNER);
+        expect(home.primaryAction?.evidence?.[0]?.subtitle).toBe(
+            "Asha Rao · Paid online after its booking was cancelled",
+        );
+    });
+
     it("points at the invoice list when there are several", async () => {
         const { service } = build([OWED], 3);
         const home = await service.build(OWNER);

@@ -57,6 +57,7 @@ import {
     bookingByKey,
     holdsSlotAlready,
     loadBookableService,
+    ownHoldOn,
     reserve,
 } from "./reservation";
 import { serviceStaff } from "./staff-availability";
@@ -398,6 +399,18 @@ export class PublicBookingsService {
         ) {
             throw alreadyBooked();
         }
+        // Their own unpaid hold on it is let go by this booking (K-2), so
+        // its person isn't busy with it.
+        const ownHold = account
+            ? await ownHoldOn(
+                  prisma,
+                  service.organizationId,
+                  account.accountId,
+                  serviceId,
+                  startAt,
+                  now,
+              )
+            : null;
 
         // 5. Who it is with (U3) — after the replay, so a retried request is
         //    not refused by the person its own first attempt booked.
@@ -412,6 +425,7 @@ export class PublicBookingsService {
                 startAt,
                 input.staffId,
                 "public",
+                ownHold ?? undefined,
             );
         } catch (err) {
             const twin = await bookingByKey(serviceId, input);

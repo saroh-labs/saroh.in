@@ -578,6 +578,44 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
         expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
     });
 
+    it("a pay link paid after its booking was cancelled is owed back, not paid (K-1)", async () => {
+        const { booking } = await publicBookings.bookOnline(
+            gym,
+            booker("link-cancel@example.in", "DESK", nextMonday(10)),
+            "ip_1",
+        );
+        const { token } = await bookings.payLink(team, booking.id, new Date());
+        // The customer opens the link and starts paying...
+        const intent = await publicInvoices.createIntent(token, {});
+        // ...and the booking is cancelled before the money lands.
+        await bookings.cancelBooking(team, booking.id);
+
+        await paid(intent.providerIntentId, "pay_link_after_cancel");
+
+        const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+            where: { providerRef: "pay_link_after_cancel" },
+        });
+        expect(attempt.status).toBe("CAPTURED_NEEDS_REFUND");
+        expect(attempt.rawResponse).toEqual({
+            invoiceStatus: "CANCELLED_BOOKING",
+        });
+        await expect(
+            prisma.paymentIntent.findUniqueOrThrow({
+                where: { id: attempt.paymentIntentId },
+            }),
+        ).resolves.toMatchObject({ status: "SUCCEEDED" });
+        // Still unpaid on paper, for the business to void; the booking
+        // stays cancelled and never reads as paid online.
+        await expect(
+            prisma.invoice.findFirstOrThrow({
+                where: { bookingId: booking.id },
+            }),
+        ).resolves.toMatchObject({ status: "ISSUED", paidAt: null });
+        await expect(
+            prisma.booking.findUniqueOrThrow({ where: { id: booking.id } }),
+        ).resolves.toMatchObject({ status: "CANCELLED", paidWith: "DESK" });
+    });
+
     it("two cancels at once cancel it once", async () => {
         const confirmed = await publicBookings.bookOnline(
             gym,
@@ -735,9 +773,9 @@ describe("Where and the intake note (E7, real database)", () => {
             online: false,
             where: "EITHER",
         });
-        expect(
-            page.services.find((s) => s.id === oneToOne)?.where,
-        ).toBe("IN_PERSON");
+        expect(page.services.find((s) => s.id === oneToOne)?.where).toBe(
+            "IN_PERSON",
+        );
     });
 
     it("records a Video call as ONLINE and shows the link on the confirmation", async () => {

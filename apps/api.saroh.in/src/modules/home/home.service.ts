@@ -659,7 +659,11 @@ export class HomeService {
             const after =
                 row.invoice.status === "VOID"
                     ? "Paid online after it was voided"
-                    : "Paid online after it was already paid";
+                    : row.invoice.status === "ISSUED"
+                      ? // Still unpaid on paper: a booking's pay link paid
+                        // after the booking was cancelled (K-1).
+                        "Paid online after its booking was cancelled"
+                      : "Paid online after it was already paid";
             evidence.push({
                 id: row.id,
                 title: row.invoice.number ?? "Invoice",

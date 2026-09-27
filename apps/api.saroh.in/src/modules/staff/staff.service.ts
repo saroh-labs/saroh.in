@@ -8,11 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import {
-    overlaps,
-    withinIntervals,
-    workingIntervals,
-} from "../bookings/availability";
+import { withinIntervals, workingIntervals } from "../bookings/availability";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { loadBookingRules } from "../bookings/booking-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
@@ -36,7 +32,7 @@ import {
     weeklyMinutes,
 } from "./hours";
 import type { BookingBrief } from "./off-bookings";
-import { MAX_LISTED, upcomingBookings } from "./off-bookings";
+import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
 
@@ -494,9 +490,12 @@ export class StaffService {
                 createdByUserId: ctx.userId,
             })),
         });
-        const affected = (
-            await upcomingBookings(ctx.organizationId, person.id, now)
-        ).filter((b) => spans.some((span) => overlaps(b, span)));
+        const affected = await bookingsInSpans(
+            ctx.organizationId,
+            person.id,
+            spans,
+            now,
+        );
         return { staff: await this.read(ctx, person.id, now), affected };
     }
 
