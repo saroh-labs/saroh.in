@@ -60,10 +60,13 @@ export interface ReserveBy {
  * Load an ACTIVE, non-deleted bookable service + its rules, or throw
  * (404/410). A service whose organization switched Appointments off is 410
  * like an archived one: the booking would otherwise land behind a module
- * the merchant can no longer open.
+ * the merchant can no longer open. `bookingPage` is the public booking page's
+ * read: a service the merchant hid from it (E1) is 410 there too, while
+ * staff still book it.
  */
 export async function loadBookableService(
     serviceId: string,
+    { bookingPage = false }: { bookingPage?: boolean } = {},
 ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
     const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -74,6 +77,9 @@ export async function loadBookableService(
     }
     if (service.status !== "ACTIVE") {
         throw new GoneException("This service is not accepting bookings");
+    }
+    if (bookingPage && !service.showOnBookingPage) {
+        throw new GoneException("This service isn't booked online");
     }
     if (!(await appointmentsOpen(service.organizationId))) {
         throw new GoneException(

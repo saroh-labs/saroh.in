@@ -23,10 +23,34 @@ export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 
 /**
  * Where a service happens (ADR-007). ONLINE carries a meeting link that the
- * person who booked is shown; IN_PERSON has none.
+ * person who booked is shown; IN_PERSON has none. EITHER (E1) lets the
+ * customer choose per booking, so it carries the link too; until the booking
+ * page asks Where (E7), an EITHER service books as in person.
  */
-export const LOCATION_TYPES = ["IN_PERSON", "ONLINE"] as const;
+export const LOCATION_TYPES = ["IN_PERSON", "ONLINE", "EITHER"] as const;
 export type LocationType = (typeof LOCATION_TYPES)[number];
+
+/** Where one booking happens (`Booking.locationType`): never EITHER. */
+export const BOOKING_LOCATION_TYPES = ["IN_PERSON", "ONLINE"] as const;
+export type BookingLocationType = (typeof BOOKING_LOCATION_TYPES)[number];
+
+/**
+ * What is paid at booking (E1), as a share of the service's price. Worked
+ * out on the server from `priceCents`, never sent by the client. Nothing
+ * takes it at booking until E8.
+ */
+export const DEPOSIT_MODES = [
+    "NONE",
+    "PERCENT_25",
+    "PERCENT_50",
+    "FULL",
+] as const;
+export type DepositMode = (typeof DEPOSIT_MODES)[number];
+
+/** How many visits one booking of a service can be (a treatment). */
+export const MAX_SERVICE_VISITS = 12;
+
+const VISITS_MESSAGE = `Visits has to be between 1 and ${MAX_SERVICE_VISITS}.`;
 
 /**
  * How an appointment went (#241). Declared here beside the other closed sets
@@ -136,6 +160,29 @@ export class CreateServiceDto {
     @IsString()
     @MaxLength(500)
     meetingUrl?: string | null;
+
+    /**
+     * How many visits one booking of it is, 1 to 12 (E1). Stored now;
+     * honoured from E9/E10.
+     */
+    @IsOptional()
+    @IsInt({ message: VISITS_MESSAGE })
+    @Min(1, { message: VISITS_MESSAGE })
+    @Max(MAX_SERVICE_VISITS, { message: VISITS_MESSAGE })
+    visits?: number;
+
+    /**
+     * What is paid at booking (E1): only on a priced service, checked in the
+     * service. Stored now; taken from E8.
+     */
+    @IsOptional()
+    @IsIn(DEPOSIT_MODES)
+    depositMode?: DepositMode;
+
+    /** Whether the booking page and services lists offer it (E1). */
+    @IsOptional()
+    @IsBoolean()
+    showOnBookingPage?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -224,6 +271,29 @@ export class UpdateServiceDto {
     @IsString()
     @MaxLength(500)
     meetingUrl?: string | null;
+
+    /**
+     * How many visits one booking of it is, 1 to 12 (E1). Stored now;
+     * honoured from E9/E10.
+     */
+    @IsOptional()
+    @IsInt({ message: VISITS_MESSAGE })
+    @Min(1, { message: VISITS_MESSAGE })
+    @Max(MAX_SERVICE_VISITS, { message: VISITS_MESSAGE })
+    visits?: number;
+
+    /**
+     * What is paid at booking (E1): only on a priced service, checked in the
+     * service. Stored now; taken from E8.
+     */
+    @IsOptional()
+    @IsIn(DEPOSIT_MODES)
+    depositMode?: DepositMode;
+
+    /** Whether the booking page and services lists offer it (E1). */
+    @IsOptional()
+    @IsBoolean()
+    showOnBookingPage?: boolean;
 }
 
 /**

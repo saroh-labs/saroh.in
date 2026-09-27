@@ -4,6 +4,7 @@ import type { ServiceDraft } from "./service-editor";
 import {
     changeNote,
     fromMinor,
+    needsMeetingLink,
     serviceRefusal,
     toMinor,
 } from "./service-editor";
@@ -69,5 +70,13 @@ describe("changeNote", () => {
     it("says nothing when nothing that matters changed", () => {
         expect(changeNote(before, draft({ name: "PT" }), 3)).toBe("");
         expect(changeNote(null, draft(), 3)).toBe("");
+    });
+});
+
+describe("needsMeetingLink", () => {
+    it("asks for the link online, and for Either, which may be online", () => {
+        expect(needsMeetingLink("ONLINE")).toBe(true);
+        expect(needsMeetingLink("EITHER")).toBe(true);
+        expect(needsMeetingLink("IN_PERSON")).toBe(false);
     });
 });

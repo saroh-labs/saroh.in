@@ -4,7 +4,17 @@
  * already made. Pure, so the dialog and its tests agree.
  */
 
+import type { LocationType } from "./service";
+
 export type ServiceKind = "one" | "class";
+
+/**
+ * Whether a service needs its meeting link: when it happens online, or the
+ * customer may choose online (Either). The API refuses it without one.
+ */
+export function needsMeetingLink(where: LocationType): boolean {
+    return where !== "IN_PERSON";
+}
 
 /** The dialog's fields, as typed. */
 export interface ServiceDraft {

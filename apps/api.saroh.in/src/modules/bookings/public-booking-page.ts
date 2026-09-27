@@ -101,7 +101,9 @@ export async function publicDays(
     serviceId: string,
     now: Date = new Date(),
 ): Promise<PublicDays> {
-    const { service, rules } = await loadBookableService(serviceId);
+    const { service, rules } = await loadBookableService(serviceId, {
+        bookingPage: true,
+    });
     const [bookingRules, zone, staffing] = await Promise.all([
         loadBookingRules(prisma, service.organizationId),
         businessTimezone(prisma, service.organizationId),
@@ -232,6 +234,8 @@ export async function publicBookingPage(
                       organizationId,
                       deletedAt: null,
                       status: "ACTIVE",
+                      // The merchant's "Show on booking page" (E1).
+                      showOnBookingPage: true,
                       OR: [{ siteId: null }, { siteId }],
                   },
                   orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -270,6 +274,7 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
+            // EITHER books as in person until the page asks Where (E7).
             online: svc.locationType === "ONLINE",
             staff: svc.staffServices
                 .map((row) => row.staff.name)
@@ -286,6 +291,7 @@ export async function publicBookingPage(
  * Read live, not frozen at publish, so a changed price or a deleted service
  * is right on the next page view. Filtered to what may be offered:
  * - not deleted, and ACTIVE (an archived service is not on offer);
+ * - shown on the booking page (E1): a hidden service is booked by staff;
  * - its Organization has not DISABLED Appointments. A missing module row
  *   counts as on: enforcement is still dark (#117) and the backfill may not
  *   have written one, and hiding a merchant's services over an absent row
@@ -301,6 +307,7 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             id: { in: ids },
             deletedAt: null,
             status: "ACTIVE",
+            showOnBookingPage: true,
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             organization: APPOINTMENTS_OPEN,

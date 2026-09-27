@@ -49,6 +49,8 @@ import {
     reserve,
     reserveInTx,
 } from "./reservation";
+import type { ServiceView } from "./service-fields";
+import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
 import { useMembershipInTx } from "./use-membership";
 
@@ -183,7 +185,7 @@ export class BookingsService {
     async createService(
         ctx: OrganizationContext,
         dto: CreateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:write");
 
         this.assertValidTimezone(dto.timezone);
@@ -194,8 +196,10 @@ export class BookingsService {
             dto.locationType ?? "IN_PERSON",
             dto.meetingUrl ?? null,
         );
+        const depositMode = dto.depositMode ?? "NONE";
+        assertDepositPriced(dto.priceCents ?? null, depositMode);
 
-        return prisma.service.create({
+        const created = await prisma.service.create({
             data: {
                 organizationId: ctx.organizationId,
                 siteId: dto.siteId ?? null,
@@ -212,26 +216,31 @@ export class BookingsService {
                 timezone: dto.timezone,
                 ...location,
                 status: "ACTIVE",
+                visits: dto.visits ?? 1,
+                depositMode,
+                showOnBookingPage: dto.showOnBookingPage ?? true,
             },
         });
+        return toServiceView(created);
     }
 
     /** List the org's services, newest first (excludes soft-deleted). `service:read`. */
-    async listServices(ctx: OrganizationContext): Promise<Service[]> {
+    async listServices(ctx: OrganizationContext): Promise<ServiceView[]> {
         authorize(ctx, "service:read");
-        return prisma.service.findMany({
+        const services = await prisma.service.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
         });
+        return services.map(toServiceView);
     }
 
     /** Get one owned service. `service:read`; cross-tenant/missing → 404. */
     async getService(
         ctx: OrganizationContext,
         serviceId: string,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:read");
-        return this.requireOwnedService(ctx, serviceId);
+        return toServiceView(await this.requireOwnedService(ctx, serviceId));
     }
 
     /**
@@ -242,7 +251,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
         dto: UpdateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
@@ -301,8 +310,28 @@ export class BookingsService {
                 ),
             );
         }
+        if (dto.visits !== undefined) data.visits = dto.visits;
+        if (dto.showOnBookingPage !== undefined) {
+            data.showOnBookingPage = dto.showOnBookingPage;
+        }
+        if (dto.depositMode !== undefined || dto.priceCents !== undefined) {
+            // Checked as the service will be: a price cleared under a deposit
+            // is refused as surely as a deposit set on no price. (A null
+            // price in the body clears it, so `??` would read it wrongly.)
+            let priceAfter = service.priceCents;
+            if (dto.priceCents !== undefined) priceAfter = dto.priceCents;
+            assertDepositPriced(
+                priceAfter,
+                dto.depositMode ?? service.depositMode,
+            );
+            if (dto.depositMode !== undefined) {
+                data.depositMode = dto.depositMode;
+            }
+        }
 
-        return prisma.service.update({ where: { id: service.id }, data });
+        return toServiceView(
+            await prisma.service.update({ where: { id: service.id }, data }),
+        );
     }
 
     /**
@@ -1239,10 +1268,11 @@ export class BookingsService {
 }
 
 /**
- * Where a service happens, checked as a pair. An online service needs an
- * https link — it is shown to everyone who books, so nothing that could run
- * script or send them somewhere unencrypted. Going back to in person drops
- * the link rather than leaving a credential lying in the row.
+ * Where a service happens, checked as a pair. An online service — or one the
+ * customer may take online (EITHER) — needs an https link: it is shown to
+ * everyone who books online, so nothing that could run script or send them
+ * somewhere unencrypted. Going back to in person drops the link rather than
+ * leaving a credential lying in the row.
  */
 export function resolveLocation(
     locationType: LocationType,
@@ -1253,7 +1283,10 @@ export function resolveLocation(
     }
     if (!meetingUrl) {
         throw new BadRequestException({
-            message: "An online service needs a meeting link",
+            message:
+                locationType === "EITHER"
+                    ? "A service people can take online needs a meeting link"
+                    : "An online service needs a meeting link",
             details: { field: "meetingUrl" },
         });
     }
