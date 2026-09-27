@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
+import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
+import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
 import { listOrderRows } from "@/lib/orders/business-service";
 import {
     orderListParams,
@@ -25,6 +27,10 @@ import { listBusinessStores } from "@/lib/stores/service";
  * The address is the list's state (`list-query.ts`): the tab, the search, the
  * storefront and the page. A link from before B3 (`?view=unfulfilled`) still
  * lands on the tab it meant.
+ *
+ * Someone holding neither `order:read` nor `order:stage` gets the locked card
+ * before anything is read (B7). The list read failing is the page failing
+ * (`error.tsx`, "Couldn't load orders") — never an empty list.
  */
 export const metadata = { title: "Orders" };
 
@@ -34,12 +40,27 @@ export default async function OrdersPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const query = readOrdersQuery(await searchParams);
+    const [params, organization] = await Promise.all([
+        searchParams,
+        resolveActiveOrganization(),
+    ]);
+    const access = ordersAccess(organization);
+    const businessName = organization?.name ?? "the business";
+    if (organization && !access.open) {
+        return (
+            <PageContainer width="full">
+                <OrdersLocked
+                    {...ordersLockedCopy(organization, businessName)}
+                />
+            </PageContainer>
+        );
+    }
+
+    const query = readOrdersQuery(params);
     const storesRead = listBusinessStores();
-    const [page, stores, organization, openByStore] = await Promise.all([
+    const [page, stores, openByStore] = await Promise.all([
         listOrderRows(orderListParams(query)),
         storesRead,
-        resolveActiveOrganization(),
         // Counted beside the page, not after it.
         storesRead.then((all) =>
             all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
@@ -51,11 +72,6 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
-    // A Member reaches the list through `order:stage` alone (DEC-024) and
-    // gets the kitchen's view of it.
-    const fullRead = organization?.actions
-        ? organization.actions.includes("order:read")
-        : organization?.role !== "MEMBER";
 
     return (
         <PageContainer width="full">
@@ -66,8 +82,10 @@ export default async function OrdersPage({
                 page={page}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 openByStore={openByStore}
-                businessName={organization?.name ?? "the business"}
-                kitchen={!fullRead}
+                businessName={businessName}
+                // A Member reaches the list through `order:stage` alone
+                // (DEC-024) and gets the kitchen's view of it.
+                kitchen={!access.money}
             />
         </PageContainer>
     );

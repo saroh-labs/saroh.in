@@ -114,6 +114,37 @@ test.describe("orders list", () => {
         );
     });
 
+    test("a search that finds nothing is empty for the search, not failed", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const q = "no-such-order-b7";
+        await page.goto(`/commerce/orders?q=${q}`);
+        await expect(
+            page.getByRole("heading", { name: `No orders match “${q}”` }),
+        ).toBeVisible();
+        // Not the failed state, and not a business with no orders.
+        await expect(page.getByText("Couldn't load orders")).toHaveCount(0);
+        await expect(page.getByText("No orders yet")).toHaveCount(0);
+        await page.getByRole("button", { name: "Clear search" }).click();
+        await expect(page).not.toHaveURL(/q=/);
+    });
+
+    test("an empty tab says what would land there", async ({ page }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const refunded = await list(page, NORTHWIND, "&tab=refunded");
+        test.skip(refunded.rows.length > 0, "Northwind has refunds here.");
+
+        await page.goto("/commerce/orders?tab=refunded");
+        await expect(
+            page.getByRole("heading", { name: "No refunds", exact: true }),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "View all orders" }).click();
+        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+    });
+
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
