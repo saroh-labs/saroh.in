@@ -100,6 +100,9 @@ export class ListPlanEventsQueryDto {
     limit?: number;
 }
 
+/** A page of a subscription's log (D9): the same paging as a plan's. */
+export class ListSubscriptionEventsQueryDto extends ListPlanEventsQueryDto {}
+
 export class SubscribeDto {
     @IsString()
     contactId!: string;

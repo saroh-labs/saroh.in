@@ -223,6 +223,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
         // D2: what a plan change records, and reading its history.
         "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
+        // D9: what a subscription action records, and reading its log.
+        "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

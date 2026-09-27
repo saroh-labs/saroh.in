@@ -55,6 +55,8 @@ function moneyDb(opts: {
         return Promise.resolve(latest);
     });
     return {
+        // D9's log: no RENEWAL_FAILED or MANDATE_LIMIT_LOW before autopay.
+        subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest

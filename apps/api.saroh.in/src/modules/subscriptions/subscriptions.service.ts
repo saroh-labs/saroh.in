@@ -33,6 +33,7 @@ import type {
     CollectionScheduleDto,
     ListPlanEventsQueryDto,
     ListPlansQueryDto,
+    ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
     SkipCollectionDto,
@@ -46,6 +47,18 @@ import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import type {
+    EventPlanRef,
+    SubscriptionEventLog,
+    SubscriptionEventsPage,
+} from "./subscription-events";
+import {
+    collectionChanges,
+    JOB,
+    listSubscriptionEvents,
+    subscriptionActor,
+    subscriptionEventLog,
+} from "./subscription-events";
 
 type Tx = Prisma.TransactionClient;
 
@@ -359,6 +372,19 @@ export class SubscriptionsService {
         return this.read(ctx, id);
     }
 
+    /** What was done to it and by whom, newest first (D9). */
+    async events(
+        ctx: OrganizationContext,
+        id: string,
+        query: ListSubscriptionEventsQueryDto,
+    ): Promise<SubscriptionEventsPage> {
+        authorize(ctx, "subscription:read");
+        return listSubscriptionEvents(ctx.organizationId, id, {
+            ...query,
+            showInvoices: allows(ctx, "invoice:read"),
+        });
+    }
+
     /**
      * Put a person on a plan. The current period is the one holding today on
      * the chain that starts at the start date, and only that period is
@@ -447,8 +473,9 @@ export class SubscriptionsService {
                     },
                     select: { id: true },
                 });
+                let invoiceId: string | null = null;
                 if (!startsLater) {
-                    await this.invoicePeriod(tx, {
+                    invoiceId = await this.invoicePeriod(tx, {
                         organizationId,
                         subscriptionId: created.id,
                         contactId: contact.id,
@@ -460,6 +487,20 @@ export class SubscriptionsService {
                         createdByUserId: ctx.userId,
                     });
                 }
+                await subscriptionEventLog(
+                    tx,
+                    organizationId,
+                    created.id,
+                    subscriptionActor(ctx),
+                )("SUBSCRIBED", {
+                    invoiceId,
+                    data: {
+                        plan: planRef({ ...plan, price }),
+                        startsAt: startsLater
+                            ? period.start.toISOString()
+                            : null,
+                    },
+                });
                 return created.id;
             })
             .catch((err: unknown) => {
@@ -491,6 +532,7 @@ export class SubscriptionsService {
                 where: { id },
                 data: { status: "PAUSED", pausedAt: new Date() },
             });
+            await this.log(tx, ctx, id)("PAUSED");
         });
         return this.read(ctx, id);
     }
@@ -513,6 +555,7 @@ export class SubscriptionsService {
             if (sub.status !== "PAUSED" || !sub.pausedAt) {
                 throw new ConflictException("This subscription is not paused.");
             }
+            const log = this.log(tx, ctx, id);
             const now = new Date();
 
             if (now < sub.currentPeriodEnd) {
@@ -545,6 +588,9 @@ export class SubscriptionsService {
                         ...(days > 0 ? { anchorAt: end } : {}),
                     },
                 });
+                await log("RESUMED", {
+                    data: { extendedDays: Math.max(days, 0) },
+                });
                 return;
             }
 
@@ -559,6 +605,9 @@ export class SubscriptionsService {
                         cancelledAt: sub.currentPeriodEnd,
                         cancelAtPeriodEnd: false,
                     },
+                });
+                await log("ENDED", {
+                    data: { at: sub.currentPeriodEnd.toISOString() },
                 });
                 return;
             }
@@ -591,7 +640,8 @@ export class SubscriptionsService {
                     ...this.termsData(sub, terms),
                 },
             });
-            await this.invoicePeriod(tx, {
+            await this.logPlanChanged(log, sub, terms);
+            const invoiceId = await this.invoicePeriod(tx, {
                 organizationId: ctx.organizationId,
                 subscriptionId: id,
                 contactId: sub.contactId,
@@ -602,6 +652,7 @@ export class SubscriptionsService {
                 period,
                 createdByUserId: ctx.userId,
             });
+            await log("RESUMED", { invoiceId, data: { restarted: true } });
         });
         return this.read(ctx, id);
     }
@@ -631,12 +682,20 @@ export class SubscriptionsService {
                         pendingPlanId: null,
                     },
                 });
+                await this.log(tx, ctx, id)("CANCELLED");
                 return;
             }
             // A booked plan change is kept, so Keep (the undo) restores it.
             await tx.customerSubscription.update({
                 where: { id },
                 data: { cancelAtPeriodEnd: true },
+            });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("CANCEL_SCHEDULED", {
+                data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
         });
         return this.read(ctx, id);
@@ -659,6 +718,7 @@ export class SubscriptionsService {
                 where: { id },
                 data: { cancelAtPeriodEnd: false },
             });
+            await this.log(tx, ctx, id)("KEPT");
         });
         return this.read(ctx, id);
     }
@@ -694,19 +754,31 @@ export class SubscriptionsService {
                     },
                 });
             }
+            const note =
+                dto.weekday === null
+                    ? null
+                    : dto.note !== undefined
+                      ? orNull(dto.note)
+                      : sub.collectionNote;
             await tx.customerSubscription.update({
                 where: { id },
                 data: {
                     collectionWeekday: dto.weekday,
-                    ...(dto.weekday === null
-                        ? { collectionNote: null }
-                        : dto.note !== undefined
-                          ? { collectionNote: orNull(dto.note) }
-                          : {}),
+                    ...(note !== sub.collectionNote
+                        ? { collectionNote: note }
+                        : {}),
                 },
             });
+            const log = this.log(tx, ctx, id);
+            const changes = collectionChanges(
+                { weekday: sub.collectionWeekday, note: sub.collectionNote },
+                { weekday: dto.weekday, note },
+            );
+            if (Object.keys(changes).length > 0) {
+                await log("COLLECTION_CHANGED", { data: changes });
+            }
             if (dto.weekday !== sub.collectionWeekday) {
-                await this.chargeIfUncharged(tx, ctx, {
+                await this.chargeIfUncharged(tx, ctx, log, {
                     ...sub,
                     collectionWeekday: dto.weekday,
                 });
@@ -775,6 +847,13 @@ export class SubscriptionsService {
                         createdByUserId: ctx.userId,
                     },
                 });
+                await this.log(
+                    tx,
+                    ctx,
+                    id,
+                )("COLLECTION_SKIPPED", {
+                    data: { date },
+                });
             })
             .catch((err: unknown) => {
                 if ((err as { code?: string }).code === "P2002") {
@@ -815,6 +894,8 @@ export class SubscriptionsService {
                 dateConflict("That collection has passed");
             }
             await tx.subscriptionSkip.delete({ where: { id: skip.id } });
+            const log = this.log(tx, ctx, id);
+            await log("COLLECTION_UNSKIPPED", { data: { date } });
             const inPeriod =
                 sub.collectionWeekday !== null &&
                 collectionDates(
@@ -825,7 +906,7 @@ export class SubscriptionsService {
                     sub.collectionWeekday,
                     sub.timezone,
                 ).includes(date);
-            if (inPeriod) await this.chargeIfUncharged(tx, ctx, sub);
+            if (inPeriod) await this.chargeIfUncharged(tx, ctx, log, sub);
         });
         return this.read(ctx, id);
     }
@@ -855,7 +936,14 @@ export class SubscriptionsService {
             }
             const plan = await tx.subscriptionPlan.findFirst({
                 where: { id: dto.planId, organizationId: ctx.organizationId },
-                select: { id: true, name: true, status: true },
+                select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                    price: true,
+                    currency: true,
+                    interval: true,
+                },
             });
             if (!plan) notFound("Plan", "planId");
             if (plan.status !== "ACTIVE") {
@@ -881,6 +969,17 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: plan.id },
             });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("PLAN_CHANGE_BOOKED", {
+                data: {
+                    to: planRef(plan),
+                    from: sub.currentPeriodEnd.toISOString(),
+                    replaced: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
+                },
+            });
         });
         return this.read(ctx, id);
     }
@@ -901,6 +1000,15 @@ export class SubscriptionsService {
             await tx.customerSubscription.update({
                 where: { id },
                 data: { pendingPlanId: null },
+            });
+            await this.log(
+                tx,
+                ctx,
+                id,
+            )("PLAN_CHANGE_CANCELLED", {
+                data: {
+                    plan: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
+                },
             });
         });
         return this.read(ctx, id);
@@ -930,6 +1038,11 @@ export class SubscriptionsService {
             );
         }
         const { token } = await this.invoices.createPayLink(ctx, failed.id);
+        // The link is the invoice's own write, so this is recorded once it
+        // is made; a refused link records nothing.
+        await prisma.$transaction(async (tx) => {
+            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
+        });
         return { invoiceId: failed.id, token };
     }
 
@@ -1008,6 +1121,7 @@ export class SubscriptionsService {
             ) {
                 return "skipped";
             }
+            const log = subscriptionEventLog(tx, sub.organizationId, id, JOB);
             if (sub.cancelAtPeriodEnd) {
                 await tx.customerSubscription.update({
                     where: { id },
@@ -1017,6 +1131,9 @@ export class SubscriptionsService {
                         cancelledAt: sub.currentPeriodEnd,
                         cancelAtPeriodEnd: false,
                     },
+                });
+                await log("ENDED", {
+                    data: { at: sub.currentPeriodEnd.toISOString() },
                 });
                 return "ended";
             }
@@ -1043,6 +1160,21 @@ export class SubscriptionsService {
                     ...this.termsData(sub, terms),
                 },
             });
+            await this.logPlanChanged(log, sub, terms);
+            // Once per period: a redelivered run finds it renewed, under the
+            // lock, and skips it above.
+            const renewed = (
+                invoiceId: string | null,
+                uncharged = false,
+            ): Promise<void> =>
+                log("RENEWED", {
+                    invoiceId,
+                    data: {
+                        periodStart: period.start.toISOString(),
+                        periodEnd: period.end.toISOString(),
+                        ...(uncharged ? { uncharged: true } : {}),
+                    },
+                });
             const live = await tx.invoice.findFirst({
                 where: {
                     subscriptionId: id,
@@ -1051,10 +1183,16 @@ export class SubscriptionsService {
                 },
                 select: { id: true },
             });
-            if (live) return "advanced";
-            if (await this.allSkipped(tx, sub, period)) return "uncharged";
+            if (live) {
+                await renewed(live.id);
+                return "advanced";
+            }
+            if (await this.allSkipped(tx, sub, period)) {
+                await renewed(null, true);
+                return "uncharged";
+            }
 
-            await this.invoicePeriod(tx, {
+            const invoiceId = await this.invoicePeriod(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 contactId: sub.contactId,
@@ -1065,6 +1203,7 @@ export class SubscriptionsService {
                 period,
                 createdByUserId: null,
             });
+            await renewed(invoiceId);
             return "renewed";
         });
     }
@@ -1160,6 +1299,7 @@ export class SubscriptionsService {
     private async chargeIfUncharged(
         tx: Tx,
         ctx: OrganizationContext,
+        log: SubscriptionEventLog,
         sub: SubscriptionRow,
     ): Promise<void> {
         const period = {
@@ -1202,7 +1342,7 @@ export class SubscriptionsService {
             select: { id: true },
         });
         if (any || !(await paymentsOn(tx, ctx.organizationId))) return;
-        await this.invoicePeriod(tx, {
+        const invoiceId = await this.invoicePeriod(tx, {
             organizationId: ctx.organizationId,
             subscriptionId: sub.id,
             contactId: sub.contactId,
@@ -1212,6 +1352,13 @@ export class SubscriptionsService {
             timezone: sub.timezone,
             period,
             createdByUserId: ctx.userId,
+        });
+        await log("INVOICED", {
+            invoiceId,
+            data: {
+                periodStart: period.start.toISOString(),
+                periodEnd: period.end.toISOString(),
+            },
         });
     }
 
@@ -1287,8 +1434,8 @@ export class SubscriptionsService {
             period: Period;
             createdByUserId: string | null;
         },
-    ): Promise<void> {
-        await this.invoices.issueInTx(tx, input.organizationId, {
+    ): Promise<string> {
+        const issued = await this.invoices.issueInTx(tx, input.organizationId, {
             contactId: input.contactId,
             currency: input.currency,
             lines: [
@@ -1303,6 +1450,46 @@ export class SubscriptionsService {
             periodStart: input.period.start,
             periodEnd: input.period.end,
             createdByUserId: input.createdByUserId,
+        });
+        return issued.id;
+    }
+
+    /** This subscription's log in this transaction, as the person acting (D9). */
+    private log(
+        tx: Tx,
+        ctx: OrganizationContext,
+        id: string,
+    ): SubscriptionEventLog {
+        return subscriptionEventLog(
+            tx,
+            ctx.organizationId,
+            id,
+            subscriptionActor(ctx),
+        );
+    }
+
+    /** A booked plan change taking effect is its own event. */
+    private async logPlanChanged(
+        log: SubscriptionEventLog,
+        sub: SubscriptionRow,
+        terms: Terms,
+    ): Promise<void> {
+        if (terms.planId === sub.planId) return;
+        await log("PLAN_CHANGED", {
+            data: {
+                from: planRef({
+                    id: sub.planId,
+                    name: sub.plan.name,
+                    price: sub.price,
+                    currency: sub.currency,
+                    interval: sub.interval,
+                }),
+                to: planRef({
+                    ...terms,
+                    id: terms.planId,
+                    name: terms.planName,
+                }),
+            },
         });
     }
 
@@ -1521,6 +1708,23 @@ function failedCharge(
     const latest = invoices?.latest ?? null;
     if (row.status === "CANCELLED" || !latest) return null;
     return isPastDue(latest, now) ? latest : null;
+}
+
+/** A plan as an event names it, money as the wire says it. */
+function planRef(p: {
+    id: string;
+    name: string;
+    price: { toString(): string };
+    currency: string;
+    interval: string;
+}): EventPlanRef {
+    return {
+        id: p.id,
+        name: p.name,
+        price: toMoneyString(p.price),
+        currency: p.currency,
+        interval: p.interval,
+    };
 }
 
 /** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */

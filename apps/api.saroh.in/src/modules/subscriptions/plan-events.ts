@@ -4,8 +4,9 @@ import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { PLAN_EVENTS_PAGE_MAX } from "./dto";
+import type { EventActor, EventActorView } from "./event-actors";
+import { actorFromContext, actorView, teamNames } from "./event-actors";
 
 /**
  * A plan's history (plan 2026-09-26-004, D2): one event for every change,
@@ -139,22 +140,14 @@ export function editKind(changes: PlanChanges): PlanEventKind | null {
     return kinds.size === 1 ? [...kinds][0] : "UPDATED";
 }
 
-export interface PlanActor {
-    actorKind: PlanActorKind;
-    actorUserId: string | null;
-}
+export type PlanActor = EventActor<PlanActorKind>;
 
 /**
- * Who a request's change is recorded as. A Saroh operator acts through a
- * `platform-operator` context and is recorded as OPERATOR, which the read
- * shows as Saroh support, never by name (DEC-035).
+ * Who a request's change is recorded as: a team member, or a Saroh operator
+ * shown as Saroh support (DEC-035; `event-actors.ts`).
  */
 export function planActor(ctx: OrganizationContext): PlanActor {
-    return {
-        actorKind:
-            ctx.roleKey === PLATFORM_OPERATOR_ROLE_KEY ? "OPERATOR" : "TEAM",
-        actorUserId: ctx.userId,
-    };
+    return actorFromContext(ctx);
 }
 
 /** Write one event. Called inside the change's own transaction. */
@@ -205,16 +198,8 @@ export interface PlanEventView {
     id: string;
     kind: PlanEventKind;
     changes: PlanChanges;
-    actor: {
-        kind: PlanActorKind;
-        /** Null for Saroh support and the job, whose ids aren't shown. */
-        userId: string | null;
-        /**
-         * The team member's name as it is now, "Saroh support" for an
-         * operator, "Saroh" for the job; null for someone with no name.
-         */
-        name: string | null;
-    };
+    /** Who made it, named as `event-actors.ts` says. */
+    actor: EventActorView<PlanActorKind>;
     createdAt: string;
 }
 
@@ -293,21 +278,7 @@ export async function listPlanEvents(
     const hasMore = rows.length > take;
     const page = hasMore ? rows.slice(0, take) : rows;
 
-    const teamIds = [
-        ...new Set(
-            page.flatMap((e) =>
-                e.actorKind === "TEAM" && e.actorUserId ? [e.actorUserId] : [],
-            ),
-        ),
-    ];
-    const users =
-        teamIds.length > 0
-            ? await prisma.user.findMany({
-                  where: { id: { in: teamIds } },
-                  select: { id: true, name: true },
-              })
-            : [];
-    const names = new Map(users.map((u) => [u.id, u.name]));
+    const names = await teamNames(page);
 
     return {
         events: page.map((e) => ({
@@ -323,23 +294,5 @@ export async function listPlanEvents(
         })),
         nextCursor: hasMore ? page[page.length - 1].id : null,
         earlierUnrecorded: !created,
-    };
-}
-
-function actorView(
-    kind: PlanActorKind,
-    userId: string | null,
-    names: ReadonlyMap<string, string | null>,
-): PlanEventView["actor"] {
-    // An operator's own id would tell the business which of Saroh's staff it
-    // was, and tie their changes together across businesses (DEC-035).
-    if (kind === "OPERATOR") {
-        return { kind, userId: null, name: "Saroh support" };
-    }
-    if (kind === "JOB") return { kind, userId: null, name: "Saroh" };
-    return {
-        kind,
-        userId,
-        name: userId ? (names.get(userId) ?? null) : null,
     };
 }
