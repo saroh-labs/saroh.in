@@ -1,6 +1,6 @@
 import { InvoicesScreen } from "@/components/invoices/invoices-screen";
 import { PageContainer } from "@/components/shared/page-container";
-import { listInvoices } from "@/lib/invoices/service";
+import { listInvoices, listInvoicesPaidSince } from "@/lib/invoices/service";
 import { tabFromView } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -19,17 +19,17 @@ export default async function InvoicesPage({
     searchParams: Promise<{ view?: string; since?: string }>;
 }) {
     await requireSession();
-    const [
-        { rows: invoices, truncated },
-        organization,
-        business,
-        { view, since },
-    ] = await Promise.all([
-        listInvoices(),
-        resolveActiveOrganization(),
-        getInvoiceBusiness(),
-        searchParams,
-    ]);
+    const { view, since } = await searchParams;
+    const paidSince = sinceParam({ since });
+    const [{ rows: invoices, truncated }, organization, business, paid] =
+        await Promise.all([
+            listInvoices(),
+            resolveActiveOrganization(),
+            getInvoiceBusiness(),
+            // Asked of the API (H-7): an old invoice paid today is past the
+            // newest page `listInvoices` reads.
+            paidSince ? listInvoicesPaidSince(paidSince) : null,
+        ]);
     const canWrite = organization?.actions
         ? organization.actions.includes("invoice:write")
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
@@ -51,7 +51,8 @@ export default async function InvoicesPage({
                 }
                 initialTab={tabFromView(view)}
                 // From Home's "Last 24 hours" (F6): the invoices paid since.
-                paidSince={sinceParam({ since })}
+                paidSince={paidSince}
+                paidSinceInvoices={paid}
             />
         </PageContainer>
     );

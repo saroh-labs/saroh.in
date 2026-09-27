@@ -1,7 +1,7 @@
 import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { NOT_A_BOOKING_HOLD } from "../invoices/invoice-state";
+import { paidSinceFilter } from "../invoices/invoice-state";
 import type { HomeInput, HomeLastDay, HomeSinceItem } from "./home-model";
 import { holds } from "./home-model";
 import { businessDay } from "./home-today";
@@ -98,17 +98,13 @@ export const SINCE_PATHS = {
     PAYMENTS: "/billing/invoices",
 } as const;
 
-/** The paid invoices the money figure adds up — each rupee once. */
+/**
+ * The paid invoices the money figure adds up — each rupee once. The
+ * Invoices list's `?paidSince=` reads the same, so its link opens exactly
+ * the invoices counted.
+ */
 export function paidSinceWhere(organizationId: string, since: Date) {
-    return {
-        organizationId,
-        // An order's own invoice is stamped paid with the order (ADR-008),
-        // and every order has one, so the invoices alone count each rupee
-        // once: adding orders too would count an order's money twice.
-        paidAt: { gte: since },
-        kind: { not: "CREDIT_NOTE" },
-        ...NOT_A_BOOKING_HOLD,
-    };
+    return { organizationId, ...paidSinceFilter(since) };
 }
 
 /**

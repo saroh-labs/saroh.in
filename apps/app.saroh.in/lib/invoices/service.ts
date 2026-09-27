@@ -206,6 +206,25 @@ export async function listInvoices(): Promise<CappedList<Invoice>> {
     return withLive(newest ?? [], issued ?? [], overdue ?? []);
 }
 
+/**
+ * The invoices paid from `since` on, credit notes never — Home's "Last 24
+ * hours" money, filtered by the API (H-7) rather than over the capped
+ * newest page, where an invoice made months ago and paid this morning is
+ * missing. Null when the API can't answer it (one from before `paidSince`
+ * refuses the unknown parameter): the screen then filters what it has.
+ */
+export async function listInvoicesPaidSince(
+    since: Date,
+): Promise<Invoice[] | null> {
+    const base = await orgBase();
+    if (!base) return [];
+    const res = await apiFetch(
+        `${base}/invoices?paidSince=${encodeURIComponent(since.toISOString())}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Invoice[];
+}
+
 /** One contact's invoices, newest first: the Connected panel's "N more". */
 export async function listInvoicesFor(contactId: string): Promise<Invoice[]> {
     const base = await orgBase();

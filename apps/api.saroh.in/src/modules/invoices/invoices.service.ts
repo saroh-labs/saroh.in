@@ -26,6 +26,7 @@ import {
     isPastDue,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
+    paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
@@ -132,6 +133,9 @@ export class InvoicesService {
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.subscriptionId
                     ? { subscriptionId: query.subscriptionId }
+                    : {}),
+                ...(query.paidSince
+                    ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
             },
             orderBy: { createdAt: "desc" },
