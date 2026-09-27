@@ -10,6 +10,10 @@ import {
 import { CancelSubscriptionDto } from "../modules/billing/dto";
 import { CreateServiceDto, UpdateServiceDto } from "../modules/bookings/dto";
 import { CreatePostDto, UpdatePostDto } from "../modules/content/dto";
+import {
+    CreateAttentionDto,
+    UpdateAttentionDto,
+} from "../modules/customer-workspace/dto";
 import { CreateFormDto } from "../modules/forms/dto";
 import { validationPipeOptions } from "./validation";
 
@@ -107,6 +111,18 @@ const BOOLEAN_FIELDS: {
         dto: UpdatePostDto,
         field: "featured",
         rest: { title: "Cutting packaging costs", slug: "cutting-costs" },
+    },
+    {
+        what: "whether a Needs attention entry is sensitive",
+        dto: CreateAttentionDto,
+        field: "sensitive",
+        rest: { kind: "MEDICAL", label: "Blood thinners" },
+    },
+    {
+        what: "whether a Needs attention entry stays sensitive",
+        dto: UpdateAttentionDto,
+        field: "sensitive",
+        rest: {},
     },
     {
         what: "whether a platform feature flag is on",
