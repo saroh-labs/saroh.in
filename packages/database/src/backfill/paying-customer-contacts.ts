@@ -187,6 +187,9 @@ const PAID_STATUSES = ["PAID", "REFUNDED"];
  */
 export const BACKFILL_BATCH_SIZE = 50;
 
+/** Each batch's transaction: a minute to run, ten seconds to get a connection. */
+const BATCH_TRANSACTION = { timeout: 60_000, maxWait: 10_000 } as const;
+
 /**
  * Every paying store customer without a link, per business, a small batch
  * per transaction. Idempotent: a second run finds the ones it made linked,
@@ -248,6 +251,8 @@ export async function backfillPayingCustomerContacts(
             });
             if (batch.length === 0) break;
             after = batch[batch.length - 1];
+            // Up to `batchSize` customers' links in one transaction: Prisma's
+            // 5-second default aborts every run on a slow connection.
             const outcomes = await prisma.$transaction(async (tx) => {
                 const out: PayingLinkOutcome[] = [];
                 for (const { id } of batch) {
@@ -264,7 +269,7 @@ export async function backfillPayingCustomerContacts(
                     );
                 }
                 return out;
-            });
+            }, BATCH_TRANSACTION);
             seen += outcomes.length;
             report.unlinked += outcomes.length;
             for (const o of outcomes) {
