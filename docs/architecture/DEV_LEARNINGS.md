@@ -644,3 +644,20 @@ Prisma's lazy promises, and would not have been atomic anyway.
 in one GUC'd transaction. `TEST_RLS=on` runs the whole integration suite under
 enforcement, so the next one shows up in CI.
 **Category**: RLS · rule in `docs/patterns/backend-data-and-money.md`
+
+## Database — the Customers list took four seconds on 5,000 test customers (C3)
+
+**Problem**: The first page of the Customers list, seeded with 5,000
+customers and 10,000 orders by `createMany`, took over four seconds in its
+integration spec; the same query with real data was expected in tens of
+milliseconds.
+**Root cause**: Postgres had no statistics for tables filled a moment
+before, so it guessed about ten rows per table and nested loops: the
+per-contact order aggregate was joined 5,000 × 5,000 times (12.5 million
+join-filter checks). Autovacuum's analyse would have fixed it minutes later
+in a real database, but a spec reads straight after its bulk load.
+**Fix**: The scale spec runs `ANALYZE` after seeding, as autovacuum would,
+and then answers in about 90ms (`customers-list.db.spec.ts`). Any timing
+spec over bulk-inserted rows needs the same, or it measures the planner's
+guess rather than the query.
+**Category**: database · tests · `apps/api.saroh.in/src/modules/customer-workspace/customers-list.db.spec.ts`
