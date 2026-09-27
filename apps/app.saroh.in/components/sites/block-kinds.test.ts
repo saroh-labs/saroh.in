@@ -18,6 +18,6 @@ describe("the Add block groups", () => {
         expect(business).toEqual(
             SECTION_ORDER.filter((t) => BOUND_BLOCKS[t] !== null),
         );
-        expect(business).toEqual(["booking", "servicesList"]);
+        expect(business).toEqual(["booking", "servicesList", "visitUs"]);
     });
 });

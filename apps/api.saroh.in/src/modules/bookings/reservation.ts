@@ -11,9 +11,10 @@ import type { ActivationEvents } from "../analytics/activation-events";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
-import { holdsPlace } from "./booking-hold";
+import { holdsPlace, releaseHoldInTx } from "./booking-hold";
+import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { courseSeatsHeld } from "./course-seats";
-import type { PaidWith } from "./dto";
+import type { BookingLocationType, PaidWith } from "./dto";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -36,6 +37,16 @@ export interface BookInput {
      * pay on the day. Absent — the one-service booking block — books as before.
      */
     pay?: "NOW" | "DESK";
+    /**
+     * Where, for a service offered either way (E7). Absent: in person. See
+     * {@link bookingLocation}.
+     */
+    locationType?: BookingLocationType;
+    /**
+     * "Anything we should know?" (E7). Kept on the booking only — never in
+     * its snapshot, its job payload or a log.
+     */
+    intakeNote?: string;
 }
 
 /** Who a booking is with and how it is paid, for {@link reserveInTx}. */
@@ -55,16 +66,111 @@ export interface ReserveBy {
     source: string;
     /** Who made it; `null` when the booker did it themselves. */
     actorUserId: string | null;
+    /**
+     * The customer's site account, when they booked signed in (A9,
+     * ADR-011). Its contact is the booker — never a contact found or made by
+     * the email — the booking names the account, and the same account (or
+     * its contact) can't hold the same session twice.
+     */
+    account?: SignedInBooker;
+}
+
+/** A signed-in customer booking for themselves (A9). */
+export interface SignedInBooker {
+    accountId: string;
+    contactId: string;
+}
+
+/** The 409 for a customer who already holds this very slot (A9). */
+export const ALREADY_BOOKED = "You're already booked for this.";
+
+export function alreadyBooked(): ConflictException {
+    return new ConflictException({
+        message: ALREADY_BOOKED,
+        details: { reason: "already-booked" },
+    });
+}
+
+/**
+ * Whether the account — or the contact it signs in as — already holds this
+ * session of this service: confirmed, or a pay-now hold still running. A
+ * booking cancelled or let go doesn't count, and nor does the account's own
+ * unpaid hold: booking again lets that go ({@link reserveInTx}, K-2).
+ */
+export async function holdsSlotAlready(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    organizationId: string,
+    who: SignedInBooker,
+    serviceId: string,
+    startAt: Date,
+    now: Date = new Date(),
+): Promise<boolean> {
+    const found = await db.booking.findFirst({
+        where: {
+            organizationId,
+            serviceId,
+            startAt,
+            AND: [
+                holdsPlace(now),
+                {
+                    OR: [
+                        { customerAccountId: who.accountId },
+                        { contactId: who.contactId },
+                    ],
+                },
+                // Spelled out: a NOT over a nullable column would drop a
+                // guest's hold on the same contact (NULL account) too.
+                {
+                    OR: [
+                        { status: { not: "PENDING" } },
+                        { customerAccountId: null },
+                        { customerAccountId: { not: who.accountId } },
+                    ],
+                },
+            ],
+        },
+        select: { id: true },
+    });
+    return found !== null;
+}
+
+/**
+ * The account's own live, unpaid hold on this session, if any — the one a
+ * new booking of it lets go (K-2).
+ */
+export async function ownHoldOn(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    organizationId: string,
+    accountId: string,
+    serviceId: string,
+    startAt: Date,
+    now: Date = new Date(),
+): Promise<string | null> {
+    const hold = await db.booking.findFirst({
+        where: {
+            organizationId,
+            serviceId,
+            startAt,
+            customerAccountId: accountId,
+            status: "PENDING",
+            holdExpiresAt: { gt: now },
+        },
+        select: { id: true },
+    });
+    return hold?.id ?? null;
 }
 
 /**
  * Load an ACTIVE, non-deleted bookable service + its rules, or throw
  * (404/410). A service whose organization switched Appointments off is 410
  * like an archived one: the booking would otherwise land behind a module
- * the merchant can no longer open.
+ * the merchant can no longer open. `bookingPage` is the public booking page's
+ * read: a service the merchant hid from it (E1) is 410 there too, while
+ * staff still book it.
  */
 export async function loadBookableService(
     serviceId: string,
+    { bookingPage = false }: { bookingPage?: boolean } = {},
 ): Promise<{ service: Service; rules: AvailabilityRuleWindow[] }> {
     const service = await prisma.service.findUnique({
         where: { id: serviceId },
@@ -75,6 +181,9 @@ export async function loadBookableService(
     }
     if (service.status !== "ACTIVE") {
         throw new GoneException("This service is not accepting bookings");
+    }
+    if (bookingPage && !service.showOnBookingPage) {
+        throw new GoneException("This service isn't booked online");
     }
     if (!(await appointmentsOpen(service.organizationId))) {
         throw new GoneException(
@@ -215,6 +324,21 @@ export async function reserveInTx(
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
 
+    // A signed-in customer booking a session they hold themselves, unpaid
+    // (a pay-now they left, now at the desk or trying again): that hold is
+    // let go here, so it neither fills the slot nor answers "already
+    // booked" (K-2). Only this account's own PENDING hold; a confirmed
+    // booking, or anyone else's, still stands.
+    if (by.account) {
+        await releaseOwnHoldInTx(
+            tx,
+            organizationId,
+            by.account.accountId,
+            serviceId,
+            startAt,
+        );
+    }
+
     // Authoritative capacity gate — re-counted INSIDE the tx. A
     // one-to-one somebody takes is capacity per person (U3), checked
     // below; everything else counts the service's seats as before.
@@ -244,21 +368,37 @@ export async function reserveInTx(
     if (person) {
         await assertPersonFreeInTx(tx, person, serviceId, startAt, endAt);
     }
-
-    const contact = await tx.contact.upsert({
-        where: {
-            organizationId_email: { organizationId, email },
-        },
-        update: contactUpdate(input),
-        create: {
+    // The same person twice in one session (A9). Read in the same
+    // serializable transaction, so two tabs racing both can't commit.
+    if (
+        by.account &&
+        (await holdsSlotAlready(
+            tx,
             organizationId,
-            email,
-            firstName: splitName(input.bookerName).first ?? null,
-            lastName: splitName(input.bookerName).last ?? null,
-            phone: input.bookerPhone ?? null,
-            source: by.source,
-        },
-    });
+            by.account,
+            serviceId,
+            startAt,
+        ))
+    ) {
+        throw alreadyBooked();
+    }
+
+    const contact = by.account
+        ? await accountContactInTx(tx, organizationId, by.account, input)
+        : await tx.contact.upsert({
+              where: {
+                  organizationId_email: { organizationId, email },
+              },
+              update: contactUpdate(input),
+              create: {
+                  organizationId,
+                  email,
+                  firstName: splitName(input.bookerName).first ?? null,
+                  lastName: splitName(input.bookerName).last ?? null,
+                  phone: input.bookerPhone ?? null,
+                  source: by.source,
+              },
+          });
 
     const booking = await tx.booking.create({
         data: {
@@ -277,6 +417,13 @@ export async function reserveInTx(
             bookerPhone: input.bookerPhone ?? null,
             idempotencyKey: input.idempotencyKey ?? null,
             courseEnrollmentId: course?.enrollmentId ?? null,
+            // Where it happens and what the booker told the team (E7).
+            locationType: bookingLocation(
+                service.locationType,
+                input.locationType,
+            ),
+            intakeNote: intakeNoteOf(input.intakeNote),
+            customerAccountId: by.account?.accountId ?? null,
             ...(person
                 ? {
                       staffId: person.staffId,
@@ -322,6 +469,31 @@ export async function reserveInTx(
     });
 
     return booking;
+}
+
+/**
+ * Let go of the account's own live, unpaid hold on this session, on the
+ * reservation's transaction ({@link releaseHoldInTx}, which re-reads it
+ * under its locks: a hold paid a moment ago stays, and is then "already
+ * booked").
+ */
+async function releaseOwnHoldInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    accountId: string,
+    serviceId: string,
+    startAt: Date,
+): Promise<void> {
+    const now = new Date();
+    const hold = await ownHoldOn(
+        tx,
+        organizationId,
+        accountId,
+        serviceId,
+        startAt,
+        now,
+    );
+    if (hold) await releaseHoldInTx(tx, hold, now);
 }
 
 /**
@@ -395,6 +567,33 @@ export function buildSnapshot(
             phone: input.bookerPhone ?? null,
         },
     };
+}
+
+/**
+ * The signed-in booker's own contact (A9). A name typed on the booking page
+ * fills a contact that has none; a name the contact already has is kept,
+ * and nothing else about it changes.
+ */
+async function accountContactInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    who: SignedInBooker,
+    input: BookInput,
+): Promise<{ id: string }> {
+    const contact = await tx.contact.findFirst({
+        where: { id: who.contactId, organizationId },
+        select: { id: true, firstName: true, lastName: true },
+    });
+    if (!contact) throw new NotFoundException("Sign in to continue.");
+    const { first, last } = splitName(input.bookerName);
+    if (!contact.firstName?.trim() && !contact.lastName?.trim() && first) {
+        await tx.contact.update({
+            where: { id: contact.id },
+            data: { firstName: first, lastName: last ?? null },
+            select: { id: true },
+        });
+    }
+    return { id: contact.id };
 }
 
 /** Contact fields to update on a repeat booking (only supplied values). */

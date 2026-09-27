@@ -266,6 +266,83 @@ test.describe("touch targets", () => {
     });
 });
 
+test.describe("Home's Needs you (F3)", () => {
+    test("leads the page, and every row is a thumb's height on a phone", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page);
+        await page.goto("/");
+
+        const needs = page.getByRole("region", { name: "Needs you" });
+        await expect(needs).toBeVisible();
+
+        // One of three states, never an empty box: rows, "Nothing needs
+        // you." with every source read, or what couldn't be checked.
+        const rows = needs.getByRole("listitem");
+        const said = needs.getByText(
+            /^(Nothing needs you\.|Nothing else we could check needs you\.)$/,
+        );
+        expect((await rows.count()) + (await said.count())).toBeGreaterThan(0);
+
+        // At most twelve rows before "See all N" (default 121).
+        expect(await rows.count()).toBeLessThanOrEqual(12);
+
+        if (testInfo.project.name !== "phone") return;
+
+        // On a phone the list comes before Today (F5).
+        const today = page.getByRole("region", { name: "Today" });
+        if ((await today.count()) > 0) {
+            const [n, s] = await Promise.all([
+                needs.boundingBox(),
+                today.boundingBox(),
+            ]);
+            if (n && s) expect(n.y).toBeLessThan(s.y);
+        }
+
+        const short = await rows
+            .getByRole("link")
+            .evaluateAll((links) =>
+                links
+                    .map((a) => Math.round(a.getBoundingClientRect().height))
+                    .filter((h) => h > 2 && h < 44),
+            );
+        expect(short).toEqual([]);
+    });
+});
+
+test.describe("Home's Today (F5)", () => {
+    test("lists the day in time order, each row a thumb's height", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/");
+
+        const today = page.getByRole("region", { name: "Today" });
+        // Only for a business that takes bookings or pick-ups.
+        test.skip((await today.count()) === 0, "No Today column here");
+
+        const rows = today.getByRole("listitem");
+        const times = await rows.evaluateAll((items) =>
+            items
+                .map((li) => (li.firstElementChild?.textContent ?? "").trim())
+                .filter((t) => /^\d\d:\d\d$/.test(t)),
+        );
+        expect(times).toEqual([...times].sort());
+
+        const short = await rows.evaluateAll((items) =>
+            items
+                .map((li) => Math.round(li.getBoundingClientRect().height))
+                .filter((h) => h < 44),
+        );
+        expect(short).toEqual([]);
+
+        const overflow = await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth,
+        );
+        expect(overflow).toBe(false);
+    });
+});
+
 test.describe("dark is a surface, not an inversion", () => {
     test("the workspace paints its own background in dark", async ({
         page,

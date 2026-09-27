@@ -4,48 +4,55 @@ import { Home } from "lucide-react";
 import Link from "next/link";
 
 import { firstRunJobs } from "@/lib/home/first-run";
+import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import type { ModuleView } from "@/lib/modules/schema";
+import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
-import { NumbersBand } from "./numbers-band";
-import { Schedule } from "./schedule";
+import { TakeMoneyChecklist } from "./take-money-checklist";
+import { Today } from "./today";
+
+/** "Get ready to take money", for someone who may change the business. */
+export interface HomeSetup {
+    list: ReadyChecklist;
+    businessId: string;
+}
 
 /**
  * Home as a dashboard rather than a menu (#119, redesign step 3).
  *
- * Three bands, in the order a merchant opening the app actually asks:
+ * Two bands, in the order a merchant opening the app actually asks:
  *
- * 1. **Needs you** — the ranked work, each action carrying the rows behind its
- *    count so the decision is made here rather than two clicks later.
- * 2. **Coming up** — the schedule on a time axis, grouped by day.
- * 3. **Numbers** — counts that are links into exactly what they count.
+ * 1. **Needs you** — one flat, ranked list, a row per thing to do with a tag
+ *    that says what is wrong (F3), so the decision is made here rather than
+ *    two clicks later.
+ * 2. **Today** — the business's day in time order, with who has arrived
+ *    (F5). Days after today are the calendar's.
  *
- * Numbers sit LAST, not first. The dashboard convention is a row of stat tiles
- * across the top, but a merchant opening this page has a question — "what needs
- * me?" — and answering it with a wall of counts puts the least actionable thing
- * in the most valuable space. The work leads; the totals are reference.
+ * The counts that used to close the page as a band of tiles folded into the
+ * header's "Last 24 hours" (F6, `home-header.tsx`): what changed since
+ * yesterday, each a link to its rows. The standing totals they showed are the
+ * work itself now — open orders are Needs you's rows, today's bookings are
+ * Today's — and the rest are a click away in the rail.
  *
  * `now` is captured once and threaded down so every relative time on the page
  * ("3 days overdue", "Today") is measured from the same instant. Letting each
  * component call `new Date()` would let a slow render disagree with itself.
  */
-/** "Open orders", "Open orders and Schedule", "A, B and C". */
-function formatList(labels: string[]): string {
-    if (labels.length <= 1) return labels[0] ?? "";
-    return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
-}
-
 export function HomeDashboard({
     home,
     modules,
     businessName,
+    setup = null,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
     modules: ModuleView[] | null;
     businessName: string;
+    /** Null for someone who may not change the business (`org:update`). */
+    setup?: HomeSetup | null;
 }) {
     // Nothing on yet: ask what the business wants to do, on Home itself,
     // rather than an empty dashboard whose every band says "nothing yet".
@@ -54,10 +61,6 @@ export function HomeDashboard({
     }
 
     const now = new Date();
-    // The schedule band is Appointments-only; the API sends nothing for a
-    // merchant without it, and an empty "Coming up" panel would advertise a
-    // capability they have not turned on.
-    const showSchedule = home.upcoming.length > 0;
 
     return (
         <div className="space-y-6">
@@ -73,42 +76,40 @@ export function HomeDashboard({
                 </PartialNotice>
             ) : null}
 
-            <div
-                className={
-                    showSchedule
-                        ? "grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
-                        : ""
-                }
-            >
-                {/* `min-w-0` is required, not tidiness: a grid item defaults
+            {/* The design's row: the work column, and beside it This week
+                (F7) once it lands; it wraps under on a narrow screen. */}
+            <div className="flex flex-wrap items-start gap-5">
+                {/* `min-w-0` is required, not tidiness: a flex item defaults
                     to `min-width: auto`, so this column refused to shrink below
                     its content's min-content width and pushed the whole page
                     into a horizontal scroll at 320px (#178, §18). */}
-                <div className="min-w-0 space-y-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Needs you
-                    </h2>
-                    <NeedsYou actions={home.actions} now={now} />
+                <div className="grid min-w-0 flex-[1_1_520px] content-start gap-5">
+                    {/* "Get ready to take money" leads while fewer than half
+                        its steps are done, and moves to the foot of the
+                        column once more are; each slot draws only when it's
+                        the checklist's place (F8). */}
+                    {setup ? (
+                        <TakeMoneyChecklist {...setup} slot="first" />
+                    ) : null}
+                    <NeedsYou
+                        needs={home.needs}
+                        total={home.needsTotal}
+                        unavailable={home.unavailable}
+                        next={nextLine(home.upcoming, now)}
+                    />
+                    {/* Under Needs you, as the design stacks them: the work
+                        first, then the day it happens in. The API sends no
+                        block to someone who reads neither bookings nor
+                        orders, so the column never advertises a module
+                        that is off. */}
+                    {home.today ? (
+                        <Today today={home.today} now={now.toISOString()} />
+                    ) : null}
+                    {setup ? (
+                        <TakeMoneyChecklist {...setup} slot="late" />
+                    ) : null}
                 </div>
-
-                {showSchedule ? (
-                    <div className="min-w-0 space-y-3">
-                        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Schedule
-                        </h2>
-                        <Schedule bookings={home.upcoming} now={now} />
-                    </div>
-                ) : null}
             </div>
-
-            {home.numbers.length > 0 ? (
-                <div className="space-y-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Your numbers
-                    </h2>
-                    <NumbersBand numbers={home.numbers} />
-                </div>
-            ) : null}
         </div>
     );
 }

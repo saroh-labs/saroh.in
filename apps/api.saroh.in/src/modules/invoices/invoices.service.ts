@@ -26,6 +26,7 @@ import {
     isPastDue,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
+    paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
@@ -133,6 +134,9 @@ export class InvoicesService {
                 ...(query.subscriptionId
                     ? { subscriptionId: query.subscriptionId }
                     : {}),
+                ...(query.paidSince
+                    ? paidSinceFilter(new Date(query.paidSince))
+                    : {}),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
@@ -168,8 +172,29 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<{ token: string }> {
+        return this.payLink(prisma, ctx, id);
+    }
+
+    /**
+     * {@link createPayLink} on the caller's transaction, so what the caller
+     * records about the new link commits or rolls back with it, under the
+     * caller's lock — a subscription's RETRIED, say.
+     */
+    async createPayLinkInTx(
+        tx: Tx,
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<{ token: string }> {
+        return this.payLink(tx, ctx, id);
+    }
+
+    private async payLink(
+        db: Tx,
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<{ token: string }> {
         authorize(ctx, "invoice:write");
-        const current = await this.read(ctx.organizationId, id);
+        const current = await this.read(ctx.organizationId, id, db);
         this.assertOwnPaper(current, "given a pay link");
         if (current.status !== "ISSUED") {
             throw new ConflictException(
@@ -178,7 +203,7 @@ export class InvoicesService {
                     : this.notIssued(current.status, "paid"),
             );
         }
-        const connected = await prisma.merchantPaymentProvider.count({
+        const connected = await db.merchantPaymentProvider.count({
             where: { organizationId: ctx.organizationId, status: "CONNECTED" },
         });
         if (connected === 0) {
@@ -187,7 +212,7 @@ export class InvoicesService {
             );
         }
         const { token, tokenHash } = mintPayToken();
-        const { count } = await prisma.invoice.updateMany({
+        const { count } = await db.invoice.updateMany({
             where: {
                 id,
                 organizationId: ctx.organizationId,
@@ -719,8 +744,9 @@ export class InvoicesService {
     private async read(
         organizationId: string,
         id: string,
+        db: Tx = prisma,
     ): Promise<InvoiceViewModel> {
-        const row = await prisma.invoice.findFirst({
+        const row = await db.invoice.findFirst({
             where: { id, organizationId },
             select: INVOICE_DETAIL_SELECT,
         });

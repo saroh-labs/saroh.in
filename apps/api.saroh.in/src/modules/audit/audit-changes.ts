@@ -44,6 +44,11 @@ export const VALUE_FIELDS = [
     "registeredAddress",
     "logo",
     "openingHours",
+    // A storefront's ways and when its orders count as late (B17), as words.
+    "fulfilmentTypes",
+    "pickupLateAfterMinutes",
+    "localDeliveryLateAfterMinutes",
+    "shippingLateAfterMinutes",
 ] as const;
 
 /**

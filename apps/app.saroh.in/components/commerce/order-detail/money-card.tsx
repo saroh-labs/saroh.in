@@ -27,7 +27,7 @@ const KIND_LABEL: Record<string, string> = {
  */
 export function MoneyCard({
     money,
-    fulfilment,
+    delivery,
     paymentStatus,
     refundStanding,
     invoices,
@@ -37,7 +37,8 @@ export function MoneyCard({
     busy = false,
 }: {
     money: OrderReadMoney;
-    fulfilment: OrderRead["fulfilment"];
+    /** It goes to an address (a local delivery or a shipment). */
+    delivery: boolean;
     paymentStatus: OrderRead["paymentStatus"];
     refundStanding: OrderRead["refundStanding"];
     invoices: OrderRead["invoices"];
@@ -51,7 +52,7 @@ export function MoneyCard({
     const rows: [string, string][] = [
         ["Items", format(n(money.subtotal))],
         [
-            fulfilment === "DELIVERY" ? "Delivery" : "Collection",
+            delivery ? "Delivery" : "Collection",
             n(money.shipping) > 0 ? format(n(money.shipping)) : "Free",
         ],
     ];

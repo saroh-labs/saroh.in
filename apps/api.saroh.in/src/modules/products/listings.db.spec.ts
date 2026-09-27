@@ -339,7 +339,7 @@ describe("Listings and StockLevel per storefront (DB)", () => {
             status: "PROCESSING",
         });
         await orders.updateStatus(online, atOnline.id, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await variantShelf(online, blue.id)).toEqual({
             onHand: 0,

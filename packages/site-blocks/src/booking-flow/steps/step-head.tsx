@@ -7,7 +7,7 @@ export function StepHead({ n, title }: { n: number; title: string }) {
             >
                 {n}
             </span>
-            <h2 className="font-display text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
+            <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
                 {title}
             </h2>
         </div>

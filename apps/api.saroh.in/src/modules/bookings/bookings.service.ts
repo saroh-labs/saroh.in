@@ -25,12 +25,16 @@ import {
     lockBookingInTx,
     releaseHoldInTx,
 } from "./booking-hold";
+import type { WithoutIntakeNote } from "./booking-intake";
+import { intakeNoteFor } from "./booking-intake";
+import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
 import { isLateCancel, loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
     loadStaffing,
     openSlots,
     parseRange,
+    refuseIfClosed,
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
@@ -50,6 +54,8 @@ import {
     reserve,
     reserveInTx,
 } from "./reservation";
+import type { ServiceView } from "./service-fields";
+import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
 import { useMembershipInTx } from "./use-membership";
 
@@ -88,6 +94,13 @@ const bookingDetailInclude = {
 export type BookingDetail = Prisma.BookingGetPayload<{
     include: typeof bookingDetailInclude;
 }>;
+
+/**
+ * One booking as staff read it: with the booker's intake note (E7) only for
+ * someone who may see sensitive Needs attention (`intakeNoteFor`).
+ */
+export type BookingDetailView =
+    BookingDetail | WithoutIntakeNote<BookingDetail>;
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -184,7 +197,7 @@ export class BookingsService {
     async createService(
         ctx: OrganizationContext,
         dto: CreateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:write");
 
         this.assertValidTimezone(dto.timezone);
@@ -195,8 +208,10 @@ export class BookingsService {
             dto.locationType ?? "IN_PERSON",
             dto.meetingUrl ?? null,
         );
+        const depositMode = dto.depositMode ?? "NONE";
+        assertDepositPriced(dto.priceCents ?? null, depositMode);
 
-        return prisma.service.create({
+        const created = await prisma.service.create({
             data: {
                 organizationId: ctx.organizationId,
                 siteId: dto.siteId ?? null,
@@ -213,26 +228,31 @@ export class BookingsService {
                 timezone: dto.timezone,
                 ...location,
                 status: "ACTIVE",
+                visits: dto.visits ?? 1,
+                depositMode,
+                showOnBookingPage: dto.showOnBookingPage ?? true,
             },
         });
+        return toServiceView(created);
     }
 
     /** List the org's services, newest first (excludes soft-deleted). `service:read`. */
-    async listServices(ctx: OrganizationContext): Promise<Service[]> {
+    async listServices(ctx: OrganizationContext): Promise<ServiceView[]> {
         authorize(ctx, "service:read");
-        return prisma.service.findMany({
+        const services = await prisma.service.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
         });
+        return services.map(toServiceView);
     }
 
     /** Get one owned service. `service:read`; cross-tenant/missing → 404. */
     async getService(
         ctx: OrganizationContext,
         serviceId: string,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:read");
-        return this.requireOwnedService(ctx, serviceId);
+        return toServiceView(await this.requireOwnedService(ctx, serviceId));
     }
 
     /**
@@ -243,7 +263,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
         dto: UpdateServiceDto,
-    ): Promise<Service> {
+    ): Promise<ServiceView> {
         authorize(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
@@ -302,8 +322,28 @@ export class BookingsService {
                 ),
             );
         }
+        if (dto.visits !== undefined) data.visits = dto.visits;
+        if (dto.showOnBookingPage !== undefined) {
+            data.showOnBookingPage = dto.showOnBookingPage;
+        }
+        if (dto.depositMode !== undefined || dto.priceCents !== undefined) {
+            // Checked as the service will be: a price cleared under a deposit
+            // is refused as surely as a deposit set on no price. (A null
+            // price in the body clears it, so `??` would read it wrongly.)
+            let priceAfter = service.priceCents;
+            if (dto.priceCents !== undefined) priceAfter = dto.priceCents;
+            assertDepositPriced(
+                priceAfter,
+                dto.depositMode ?? service.depositMode,
+            );
+            if (dto.depositMode !== undefined) {
+                data.depositMode = dto.depositMode;
+            }
+        }
 
-        return prisma.service.update({ where: { id: service.id }, data });
+        return toServiceView(
+            await prisma.service.update({ where: { id: service.id }, data }),
+        );
     }
 
     /**
@@ -464,6 +504,9 @@ export class BookingsService {
                 organizationId: ctx.organizationId,
                 ...(serviceId ? { serviceId } : {}),
             },
+            // A list never carries the booker's note (E7): it is sensitive,
+            // and read one booking at a time behind its gate.
+            omit: { intakeNote: true },
             orderBy: { startAt: "desc" },
             include: {
                 contact: {
@@ -621,6 +664,8 @@ export class BookingsService {
             // A class paid for with a pack goes back to it (ADR-007) —
             // unless it was cancelled too late to (U3).
             if (!late) await reversePackInTx(tx, booking.id);
+            // A pay link sent for it (E4) stops working with the place.
+            await retirePayLinkInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -720,13 +765,15 @@ export class BookingsService {
     async getBooking(
         ctx: OrganizationContext,
         bookingId: string,
-    ): Promise<BookingDetail> {
+    ): Promise<BookingDetailView> {
         authorize(ctx, "booking:read");
         await this.requireOwnedBooking(ctx, bookingId);
-        return prisma.booking.findUniqueOrThrow({
+        const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: bookingId },
             include: bookingDetailInclude,
         });
+        // The booker's note (E7) only behind C1's sensitive gate.
+        return intakeNoteFor(ctx, booking);
     }
 
     /**
@@ -799,6 +846,11 @@ export class BookingsService {
                 "This service is archived, so its bookings cannot be moved. Make it active again first, or cancel the booking.",
             );
         }
+        await refuseIfClosed(
+            service.organizationId,
+            startAt,
+            new Date(startAt.getTime() + service.durationMinutes * 60_000),
+        );
         const rules = await prisma.availabilityRule.findMany({
             where: { serviceId: service.id },
         });
@@ -1026,6 +1078,10 @@ export class BookingsService {
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");
         }
+        const endAt = new Date(
+            startAt.getTime() + service.durationMinutes * 60_000,
+        );
+        await refuseIfClosed(ctx.organizationId, startAt, endAt);
         const staffing = await loadStaffing(service);
         if (
             !staffing.perPerson &&
@@ -1035,9 +1091,6 @@ export class BookingsService {
                 "That time is not an open slot for this service",
             );
         }
-        const endAt = new Date(
-            startAt.getTime() + service.durationMinutes * 60_000,
-        );
 
         let booker: BookInput;
         if (dto.contactId) {
@@ -1058,15 +1111,39 @@ export class BookingsService {
                 bookerPhone: contact.phone ?? undefined,
             };
         } else if (dto.bookerEmail) {
-            booker = {
-                startAt: dto.startAt,
-                bookerEmail: dto.bookerEmail,
-                // A field left blank is not given, rather than "".
-                bookerName: dto.bookerName?.trim() ? dto.bookerName : undefined,
-                bookerPhone: dto.bookerPhone?.trim()
-                    ? dto.bookerPhone
-                    : undefined,
-            };
+            // An email that is already someone's picks that someone (E4),
+            // as they stand: booking them never renames them or forks a
+            // second contact.
+            const known = await prisma.contact.findUnique({
+                where: {
+                    organizationId_email: {
+                        organizationId: ctx.organizationId,
+                        email: dto.bookerEmail.trim().toLowerCase(),
+                    },
+                },
+            });
+            booker = known
+                ? {
+                      startAt: dto.startAt,
+                      bookerEmail: known.email,
+                      bookerName:
+                          [known.firstName, known.lastName]
+                              .filter(Boolean)
+                              .join(" ")
+                              .trim() || undefined,
+                      bookerPhone: known.phone ?? undefined,
+                  }
+                : {
+                      startAt: dto.startAt,
+                      bookerEmail: dto.bookerEmail,
+                      // A field left blank is not given, rather than "".
+                      bookerName: dto.bookerName?.trim()
+                          ? dto.bookerName
+                          : undefined,
+                      bookerPhone: dto.bookerPhone?.trim()
+                          ? dto.bookerPhone
+                          : undefined,
+                  };
         } else {
             throw new BadRequestException({
                 message: "Choose someone from your contacts, or give an email.",
@@ -1144,6 +1221,39 @@ export class BookingsService {
                     : null,
             },
         );
+    }
+
+    /**
+     * "Send a pay link" for a booking (E4): issue its invoice and hand back
+     * the link to copy (`booking-pay-link.ts`). It issues an invoice, so it
+     * needs `invoice:write` as well as `booking:write`. Another business's
+     * booking is a 404; a cancelled, unpriced or already paid one a 409.
+     */
+    async payLink(
+        ctx: OrganizationContext,
+        bookingId: string,
+        now: Date = new Date(),
+    ): Promise<{ token: string }> {
+        authorize(ctx, "booking:write");
+        authorize(ctx, "invoice:write");
+        await this.requireOwnedBooking(ctx, bookingId);
+        const connected = await prisma.merchantPaymentProvider.count({
+            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+        });
+        if (connected === 0) {
+            throw new ConflictException(
+                "Connect a payment provider to take payment online.",
+            );
+        }
+        const { token } = await prisma.$transaction((tx) =>
+            bookingPayLinkInTx(tx, {
+                organizationId: ctx.organizationId,
+                bookingId,
+                actorUserId: ctx.userId,
+                now,
+            }),
+        );
+        return { token };
     }
 
     /**
@@ -1240,10 +1350,11 @@ export class BookingsService {
 }
 
 /**
- * Where a service happens, checked as a pair. An online service needs an
- * https link — it is shown to everyone who books, so nothing that could run
- * script or send them somewhere unencrypted. Going back to in person drops
- * the link rather than leaving a credential lying in the row.
+ * Where a service happens, checked as a pair. An online service — or one the
+ * customer may take online (EITHER) — needs an https link: it is shown to
+ * everyone who books online, so nothing that could run script or send them
+ * somewhere unencrypted. Going back to in person drops the link rather than
+ * leaving a credential lying in the row.
  */
 export function resolveLocation(
     locationType: LocationType,
@@ -1254,7 +1365,10 @@ export function resolveLocation(
     }
     if (!meetingUrl) {
         throw new BadRequestException({
-            message: "An online service needs a meeting link",
+            message:
+                locationType === "EITHER"
+                    ? "A service people can take online needs a meeting link"
+                    : "An online service needs a meeting link",
             details: { field: "meetingUrl" },
         });
     }

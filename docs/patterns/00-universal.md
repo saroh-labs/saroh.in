@@ -60,10 +60,13 @@ each with why it stops there:
 - `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
   (418) — one class sharing its rate limiters, and one serializable write
   with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (643) — its state, effects
-  and handlers (the hold poll, confirm, letting a hold go) share one
-  component's state; the drawing is already in `steps/`. Less means a
-  reducer or hook seam, which is new logic.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (892; 643 before E7, E11,
+  G18 and A9's sign-in at the last step) — its state, effects and handlers
+  (the hold poll, confirm, letting a hold go, signing in and "Not you?")
+  share one component's state; the drawing is already in `steps/` and the
+  pure rules in `flow-helpers.ts` and `initial-start.ts`. Less means a
+  reducer or hook seam, which is new logic; the sign-in handlers are the
+  first one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,051),
   `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
@@ -161,7 +164,12 @@ with why it stops there:
   note, next steps and leave dialog to `editor-parts.tsx`. A little over;
   what is left shares one component's state.
 
-Split rather than listed: `providers/provider-list.tsx` (435 before; 120
+Split rather than listed: `sites/site-editor.tsx` (2,160 before; under 300 since
+round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
+became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
+what the server last accepted, the save and its autosave share one set of
+state, and the form-id stamping already went to `stamp-form-ids.ts`. And
+`providers/provider-list.tsx` (435 before; 120
 now) along its rows, which went to `provider-row.tsx` (331); and
 `lib/settings/activity.ts` (451 before; 297 now, with the Track stock lines)
 along its own seam — what a save recorded, the counts a stock line says and

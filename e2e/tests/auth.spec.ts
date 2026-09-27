@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
+/** Home's title is its greeting (F6): "Good morning, Priya", "Welcome, …". */
+const HOME_GREETING = /^(Good (morning|afternoon|evening)|Welcome|Hello)\b/;
+
 /**
  * The auth cases from #50 / S1-008, which the backlog records as
  * "manual-verified only" (B6).
@@ -43,7 +46,7 @@ test.describe("cross-origin session", () => {
 
         await expect(page).toHaveURL(new RegExp(`^${urls.APP_URL}/?$`));
         await expect(
-            page.getByRole("heading", { name: "Home", level: 1 }),
+            page.getByRole("heading", { name: HOME_GREETING, level: 1 }),
         ).toBeVisible();
     });
 
@@ -95,7 +98,7 @@ test.describe("cross-origin session", () => {
         // Opened by id: with no business chosen, `/` is the chooser.
         await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
         await expect(
-            page.getByRole("heading", { name: "Home", level: 1 }),
+            page.getByRole("heading", { name: HOME_GREETING, level: 1 }),
         ).toBeVisible();
 
         await page.getByRole("button", { name: "Your account" }).click();

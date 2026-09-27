@@ -8,6 +8,8 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
+import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { BookingsController } from "./bookings.controller";
 import { BookingsService } from "./bookings.service";
 import {
@@ -15,6 +17,7 @@ import {
     PublicBookingsController,
 } from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
+import { PublicTodayService } from "./public-today";
 import {
     RELEASE_HOLDS_TYPE,
     ReleaseHoldsHandler,
@@ -32,6 +35,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * booking command, whose org is derived from the target Service). The first
  * is served by {@link BookingsService}, the second by
  * {@link PublicBookingsService}; both write through the same reservation.
+ * A signed-in customer books through {@link AccountBookingsController}
+ * (round-2 A9), on the same service and limiter.
  */
 @Module({
     imports: [
@@ -39,15 +44,19 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         AnalyticsCoreModule,
         CapabilitiesModule,
         JobsModule,
+        // The customer session guard for signed-in booking (A9).
+        SiteAccountsModule,
     ],
     controllers: [
         BookingsController,
         PublicBookingsController,
         PublicBookingPageController,
+        AccountBookingsController,
     ],
     providers: [
         BookingsService,
         PublicBookingsService,
+        PublicTodayService,
         ReleaseHoldsHandler,
         OrganizationGuard,
     ],

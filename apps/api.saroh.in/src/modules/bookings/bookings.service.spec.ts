@@ -50,6 +50,7 @@ jest.mock("@saroh/database", () => {
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -70,12 +71,16 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    GoneException,
     NotFoundException,
+    ValidationPipe,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { validationPipeOptions } from "../../common/validation";
 import { BookingsService } from "./bookings.service";
+import { CreateServiceDto, UpdateServiceDto } from "./dto";
 import { PublicBookingsService } from "./public-bookings.service";
 import type { BookInput } from "./reservation";
 
@@ -119,6 +124,9 @@ const SERVICE = {
     timezone: "UTC",
     status: "ACTIVE",
     deletedAt: null,
+    visits: 1,
+    depositMode: "NONE",
+    showOnBookingPage: true,
 };
 
 // Mon 2026-07-20 09:00–10:00 UTC — the one rule that makes START a valid slot.
@@ -953,6 +961,7 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
 
     it("makes someone new a contact, marked as added by hand", async () => {
         wireBookHappyPath();
+        contactFindUnique.mockResolvedValue(null);
         await new BookingsService().bookByHand(ctx(), "svc_1", {
             startAt: START,
             bookerEmail: "new@example.com",
@@ -964,6 +973,48 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
             firstName: "New",
             lastName: "Person",
             source: "manual",
+        });
+    });
+
+    it("books an email that is already a contact's as that contact, never renaming them (E4)", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue({
+            id: "contact_9",
+            organizationId: "org_SVC",
+            email: "priya@example.com",
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: "9876543210",
+        });
+        await new BookingsService().bookByHand(ctx(), "svc_1", {
+            startAt: START,
+            bookerEmail: "priya@example.com",
+            bookerName: "P R",
+            bookerPhone: "000",
+        });
+        expect(contactFindUnique).toHaveBeenCalledWith({
+            where: {
+                organizationId_email: {
+                    organizationId: "org_SVC",
+                    email: "priya@example.com",
+                },
+            },
+        });
+        // The upsert finds them by email and updates nothing new.
+        expect(contactUpsert.mock.calls[0][0].where).toEqual({
+            organizationId_email: {
+                organizationId: "org_SVC",
+                email: "priya@example.com",
+            },
+        });
+        expect(contactUpsert.mock.calls[0][0].update).toEqual({
+            firstName: "Priya",
+            lastName: "Raman",
+            phone: "9876543210",
+        });
+        expect(bookingCreate.mock.calls[0][0].data).toMatchObject({
+            bookerName: "Priya Raman",
+            bookerPhone: "9876543210",
         });
     });
 
@@ -1129,6 +1180,376 @@ describe("online classes (ADR-007)", () => {
         ).toMatchObject({
             locationType: "ONLINE",
             meetingUrl: "https://meet.example.com/yoga",
+        });
+    });
+});
+
+describe("service fields: visits, Either, deposit, booking page (E1)", () => {
+    const serviceUpdate = prisma.service.update as jest.Mock;
+    const serviceFindMany = prisma.service.findMany as jest.Mock;
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const PRICED = { ...SERVICE, priceCents: 150_000, currency: "INR" };
+    const create = (over: Record<string, unknown>) =>
+        new BookingsService().createService(ctx(), {
+            name: "Root canal",
+            durationMinutes: 60,
+            timezone: "UTC",
+            ...over,
+        });
+
+    /** What the global pipe says about a body, or null when it passes. */
+    async function refusal(
+        metatype: typeof CreateServiceDto | typeof UpdateServiceDto,
+        value: Record<string, unknown>,
+    ): Promise<string[] | null> {
+        try {
+            await pipe.transform(value, { type: "body", metatype });
+            return null;
+        } catch (err) {
+            expect(err).toBeInstanceOf(BadRequestException);
+            const res = (err as BadRequestException).getResponse() as {
+                message: string[];
+            };
+            return res.message;
+        }
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        serviceCreate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                ...SERVICE,
+                ...data,
+                id: "svc_new",
+            }),
+        );
+    });
+
+    it("stores 3 visits and a 50% deposit, and the staff read works the deposit out", async () => {
+        const made = await create({
+            priceCents: 150_000,
+            currency: "INR",
+            visits: 3,
+            depositMode: "PERCENT_50",
+        });
+        expect(serviceCreate.mock.calls[0][0].data).toMatchObject({
+            visits: 3,
+            depositMode: "PERCENT_50",
+            showOnBookingPage: true,
+        });
+        expect(made).toMatchObject({
+            visits: 3,
+            depositMode: "PERCENT_50",
+            depositCents: 75_000,
+        });
+
+        serviceFindUnique.mockResolvedValue({
+            ...PRICED,
+            visits: 3,
+            depositMode: "PERCENT_50",
+        });
+        await expect(
+            new BookingsService().getService(ctx(), "svc_1"),
+        ).resolves.toMatchObject({ visits: 3, depositCents: 75_000 });
+    });
+
+    it.each([
+        ["PERCENT_25", 99_999, 25_000],
+        ["PERCENT_50", 99_999, 50_000],
+        ["PERCENT_25", 10, 3],
+        ["FULL", 99_999, 99_999],
+        ["NONE", 99_999, null],
+    ])(
+        "a %s deposit on %i paise is %p, rounded to the paisa",
+        async (depositMode, priceCents, expected) => {
+            serviceFindUnique.mockResolvedValue({
+                ...SERVICE,
+                priceCents,
+                depositMode,
+            });
+            const read = await new BookingsService().getService(ctx(), "svc_1");
+            expect(read.depositCents).toBe(expected);
+        },
+    );
+
+    it("reads an existing service as one visit, no deposit, shown", async () => {
+        const made = await create({});
+        expect(serviceCreate.mock.calls[0][0].data).toMatchObject({
+            visits: 1,
+            depositMode: "NONE",
+            showOnBookingPage: true,
+        });
+        expect(made.depositCents).toBeNull();
+
+        serviceFindMany.mockResolvedValue([SERVICE]);
+        const [listed] = await new BookingsService().listServices(ctx());
+        expect(listed).toMatchObject({
+            visits: 1,
+            depositMode: "NONE",
+            depositCents: null,
+            showOnBookingPage: true,
+        });
+    });
+
+    it("refuses a deposit on an unpriced service with a sentence", async () => {
+        const err = await create({ depositMode: "PERCENT_25" }).catch(
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toMatchObject({
+            message:
+                "A deposit is part of the price. Set a price first, or take nothing at booking.",
+            details: { field: "depositMode" },
+        });
+        await expect(
+            create({ priceCents: 0, depositMode: "FULL" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(serviceCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a deposit added to a free service, and a price cleared under a deposit", async () => {
+        serviceFindUnique.mockResolvedValue(SERVICE);
+        await expect(
+            new BookingsService().updateService(ctx(), "svc_1", {
+                depositMode: "PERCENT_50",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        serviceFindUnique.mockResolvedValue({
+            ...PRICED,
+            depositMode: "PERCENT_50",
+        });
+        await expect(
+            new BookingsService().updateService(ctx(), "svc_1", {
+                priceCents: 0,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(serviceUpdate).not.toHaveBeenCalled();
+    });
+
+    it("updates visits, the deposit and the booking-page switch on a priced service", async () => {
+        serviceFindUnique.mockResolvedValue(PRICED);
+        serviceUpdate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                ...PRICED,
+                ...data,
+            }),
+        );
+        const saved = await new BookingsService().updateService(
+            ctx(),
+            "svc_1",
+            {
+                visits: 4,
+                depositMode: "PERCENT_25",
+                showOnBookingPage: false,
+            },
+        );
+        expect(serviceUpdate.mock.calls[0][0].data).toEqual({
+            visits: 4,
+            depositMode: "PERCENT_25",
+            showOnBookingPage: false,
+        });
+        expect(saved).toMatchObject({
+            depositCents: 37_500,
+            showOnBookingPage: false,
+        });
+    });
+
+    it("lets a price change through when the service takes no deposit", async () => {
+        serviceFindUnique.mockResolvedValue(PRICED);
+        serviceUpdate.mockResolvedValue(PRICED);
+        await new BookingsService().updateService(ctx(), "svc_1", {
+            priceCents: 0,
+        });
+        expect(serviceUpdate.mock.calls[0][0].data).toEqual({ priceCents: 0 });
+    });
+
+    it("404s another business's service before changing anything", async () => {
+        serviceFindUnique.mockResolvedValue({
+            ...PRICED,
+            organizationId: "org_OTHER",
+        });
+        await expect(
+            new BookingsService().updateService(ctx(), "svc_1", {
+                visits: 3,
+                depositMode: "FULL",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            new BookingsService().getService(ctx(), "svc_1"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(serviceUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses the new fields to a role without service:write", async () => {
+        await expect(
+            new BookingsService().updateService(
+                ctx({ role: "MEMBER" }),
+                "svc_1",
+                { showOnBookingPage: false },
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+
+    describe("at the boundary", () => {
+        it.each([
+            ["13 visits", 13],
+            ["0 visits", 0],
+            ["half a visit", 1.5],
+            ["visits as text", "3"],
+        ])("refuses %s with a sentence", async (_label, visits) => {
+            for (const metatype of [CreateServiceDto, UpdateServiceDto]) {
+                const messages = await refusal(metatype, {
+                    name: "Root canal",
+                    durationMinutes: 60,
+                    timezone: "UTC",
+                    visits,
+                });
+                expect(messages).toContain(
+                    "Visits has to be between 1 and 12.",
+                );
+            }
+        });
+
+        it("takes 1 to 12 visits, each deposit, Either and the switch", async () => {
+            for (const visits of [1, 12]) {
+                await expect(
+                    refusal(UpdateServiceDto, { visits }),
+                ).resolves.toBeNull();
+            }
+            for (const depositMode of [
+                "NONE",
+                "PERCENT_25",
+                "PERCENT_50",
+                "FULL",
+            ]) {
+                await expect(
+                    refusal(UpdateServiceDto, { depositMode }),
+                ).resolves.toBeNull();
+            }
+            await expect(
+                refusal(UpdateServiceDto, {
+                    locationType: "EITHER",
+                    showOnBookingPage: false,
+                }),
+            ).resolves.toBeNull();
+        });
+
+        it.each([
+            ["an unknown deposit", { depositMode: "PERCENT_10" }],
+            ["a deposit amount from the client", { depositCents: 500 }],
+            [
+                'the string "false" for the switch',
+                { showOnBookingPage: "false" },
+            ],
+            ["an unknown place", { locationType: "HOME_VISIT" }],
+        ])("refuses %s", async (_label, body) => {
+            await expect(
+                refusal(UpdateServiceDto, body),
+            ).resolves.not.toBeNull();
+        });
+    });
+
+    describe("Either", () => {
+        it("needs a meeting link, as online does", async () => {
+            const err = await create({ locationType: "EITHER" }).catch(
+                (e: unknown) => e,
+            );
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect((err as BadRequestException).getResponse()).toMatchObject({
+                message:
+                    "A service people can take online needs a meeting link",
+                details: { field: "meetingUrl" },
+            });
+            await expect(
+                create({
+                    locationType: "EITHER",
+                    meetingUrl: "http://meet.example.com/clinic",
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it("keeps its https link", async () => {
+            await create({
+                locationType: "EITHER",
+                meetingUrl: "https://meet.example.com/clinic",
+            });
+            expect(serviceCreate.mock.calls[0][0].data).toMatchObject({
+                locationType: "EITHER",
+                meetingUrl: "https://meet.example.com/clinic",
+            });
+        });
+
+        it("books as in person when the booker doesn't say where (E7): no link on the booking", async () => {
+            wireBookHappyPath();
+            serviceFindUnique.mockResolvedValue({
+                ...SERVICE,
+                locationType: "EITHER",
+                meetingUrl: "https://meet.example.com/clinic",
+                availabilityRules: RULES,
+            });
+            bookingCreate.mockImplementation(
+                ({ data }: { data: Record<string, unknown> }) => ({
+                    id: "bk_1",
+                    status: "CONFIRMED",
+                    startAt: new Date(START),
+                    endAt: new Date("2026-07-20T10:00:00.000Z"),
+                    ...data,
+                }),
+            );
+            const booking = await new PublicBookingsService().book(
+                "svc_1",
+                baseInput(),
+                "iphash",
+            );
+            expect(bookingCreate.mock.calls[0][0].data.locationType).toBe(
+                "IN_PERSON",
+            );
+            const { toPublicBooking } = await import("./public-booking-page");
+            expect(toPublicBooking(booking)).toMatchObject({
+                online: false,
+                meetingUrl: null,
+            });
+        });
+    });
+
+    describe("a service hidden from the booking page", () => {
+        const HIDDEN = {
+            ...SERVICE,
+            showOnBookingPage: false,
+            availabilityRules: RULES,
+        };
+
+        it("is refused on the booking page", async () => {
+            wireBookHappyPath();
+            serviceFindUnique.mockResolvedValue(HIDDEN);
+            await expect(
+                new PublicBookingsService().book(
+                    "svc_1",
+                    baseInput(),
+                    "iphash",
+                ),
+            ).rejects.toBeInstanceOf(GoneException);
+            await expect(
+                new PublicBookingsService().publicAvailability(
+                    "svc_1",
+                    "2026-07-20T00:00:00.000Z",
+                    "2026-07-21T00:00:00.000Z",
+                ),
+            ).rejects.toBeInstanceOf(GoneException);
+            expect(bookingCreate).not.toHaveBeenCalled();
+        });
+
+        it("is still booked by staff", async () => {
+            wireBookHappyPath();
+            serviceFindUnique.mockResolvedValue(HIDDEN);
+            await new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerName: "Asha Rao",
+                bookerEmail: "asha@example.com",
+            });
+            expect(bookingCreate).toHaveBeenCalledTimes(1);
         });
     });
 });
@@ -1635,6 +2056,24 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
             cancelledLate: false,
         });
         expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+    });
+
+    it("retires a pay link sent for it (E4), and leaves its invoice issued", async () => {
+        await new BookingsService().cancelBooking(
+            ctx(),
+            "bk_1",
+            new Date("2026-07-19T20:00:00Z"),
+        );
+        expect(db.invoice!.updateMany).toHaveBeenCalledWith({
+            where: {
+                bookingId: "bk_1",
+                kind: "INVOICE",
+                source: "BOOKING",
+                status: "ISSUED",
+                payTokenHash: { not: null },
+            },
+            data: { payTokenHash: null },
+        });
     });
 });
 

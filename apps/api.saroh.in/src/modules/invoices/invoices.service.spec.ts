@@ -653,6 +653,21 @@ describe("lists and what is owed", () => {
         });
     });
 
+    it("lists only what was paid since an instant, never a credit note (H-7)", async () => {
+        db.invoice.findMany!.mockResolvedValue([]);
+        const since = "2026-09-26T06:00:00.000Z";
+        await service.list(owner, { paidSince: since });
+        const where = db.invoice.findMany!.mock.calls[0]![0].where;
+        // In the query, not over the capped newest page: an invoice made
+        // months ago and paid this morning is still found.
+        expect(where).toEqual({
+            organizationId: "org_1",
+            NOT: { source: "BOOKING", number: null },
+            paidAt: { gte: new Date(since) },
+            kind: { not: "CREDIT_NOTE" },
+        });
+    });
+
     it("says what each listed invoice is for, without sending every line", async () => {
         db.invoice.findMany!.mockResolvedValue([
             row({

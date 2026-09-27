@@ -1,6 +1,9 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Header, Ip, Param } from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
 
+import { hashClientIp } from "../../common/client-ip";
+import type { PublicVisit } from "./public-visit.service";
+import { PublicVisitService } from "./public-visit.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
@@ -21,6 +24,7 @@ export class PublicSitesController {
     constructor(
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
+        private readonly visits: PublicVisitService,
     ) {}
 
     /**
@@ -102,6 +106,36 @@ export class PublicSitesController {
     @Get(":siteId/posts/:slug")
     post(@Param("siteId") siteId: string, @Param("slug") slug: string) {
         return this.sites.getPublicPost(siteId, slug);
+    }
+
+    /**
+     * The business's place for this site, with no store named (G8): its first
+     * open shop, else the business profile's registered address and hours.
+     * What the booking page's header shows (E6). Not a snapshot: read live,
+     * so it is never cached.
+     */
+    @Get(":siteId/visit")
+    @Header("Cache-Control", "no-store")
+    visit(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+    ): Promise<PublicVisit> {
+        return this.visits.read(siteId, undefined, hashClientIp(ip));
+    }
+
+    /**
+     * One shop's address, hours and phone for the site's Visit us block
+     * (G8). A 404 unless the store is this site's business's, a SHOP, and
+     * not closed.
+     */
+    @Get(":siteId/visit/:storeId")
+    @Header("Cache-Control", "no-store")
+    visitStore(
+        @Param("siteId") siteId: string,
+        @Param("storeId") storeId: string,
+        @Ip() ip: string,
+    ): Promise<PublicVisit> {
+        return this.visits.read(siteId, storeId, hashClientIp(ip));
     }
 
     /** Current publication snapshot for a site by id. */

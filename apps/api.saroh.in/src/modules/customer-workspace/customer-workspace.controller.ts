@@ -7,6 +7,7 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 import { Transform } from "class-transformer";
@@ -16,10 +17,17 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AccountUnlinkService } from "../site-accounts/account-unlink.service";
+import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
-import { ContactNoteDto } from "./dto";
+import {
+    ListCustomersQueryDto,
+    ListUnlinkedQueryDto,
+} from "./customers-list.dto";
+import { CustomersListService } from "./customers-list.service";
+import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -44,7 +52,32 @@ export class CustomerWorkspaceController {
         private readonly workspace: CustomerWorkspaceService,
         private readonly details: CustomerDetailService,
         private readonly notes: ContactNotesService,
+        private readonly attention: ContactAttentionService,
+        private readonly customers: CustomersListService,
+        private readonly accounts: AccountUnlinkService,
     ) {}
+
+    /**
+     * The business's customers (DEC-041, C3): everyone who has paid or signs
+     * in on its site, with search, chips and counts, sort, "Bought at" and
+     * pages of 50.
+     */
+    @Get()
+    list(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: ListCustomersQueryDto,
+    ) {
+        return this.customers.list(ctx, query);
+    }
+
+    /** Paying store customers no contact holds yet, for the review sheet. */
+    @Get("unlinked")
+    unlinked(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: ListUnlinkedQueryDto,
+    ) {
+        return this.customers.unlinked(ctx, query);
+    }
 
     /** One read of a customer, rooted on the contact (U8). */
     @Get(":contactId/detail")
@@ -53,6 +86,25 @@ export class CustomerWorkspaceController {
         @Param("contactId") contactId: string,
     ) {
         return this.details.detail(ctx, contactId);
+    }
+
+    /** What "This isn't them" would move with the site account (A4). */
+    @Get(":contactId/account/unlink")
+    unlinkAccountPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.accounts.preview(ctx, contactId);
+    }
+
+    /** "This isn't them": the site account leaves this contact (A4). */
+    @Post(":contactId/account/unlink")
+    @HttpCode(200)
+    unlinkAccount(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.accounts.unlink(ctx, contactId);
     }
 
     @Post(":contactId/notes")
@@ -85,6 +137,60 @@ export class CustomerWorkspaceController {
         return { ok: true };
     }
 
+    /**
+     * Needs attention (DEC-040, C1): the entries this viewer may see, how
+     * many sensitive ones they can't, and suggestions for those who can add
+     * them.
+     */
+    @Get(":contactId/attention")
+    listAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.attention.list(ctx, contactId);
+    }
+
+    @Post(":contactId/attention")
+    @HttpCode(201)
+    createAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Body() dto: CreateAttentionDto,
+    ) {
+        return this.attention.create(ctx, contactId, dto);
+    }
+
+    @Patch(":contactId/attention/:entryId")
+    updateAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+        @Body() dto: UpdateAttentionDto,
+    ) {
+        return this.attention.update(ctx, contactId, entryId, dto);
+    }
+
+    @Delete(":contactId/attention/:entryId")
+    async removeAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+    ) {
+        await this.attention.remove(ctx, contactId, entryId);
+        return { ok: true };
+    }
+
+    /** "Add to Needs attention" on a suggestion. */
+    @Post(":contactId/attention/:entryId/confirm")
+    @HttpCode(200)
+    confirmAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+    ) {
+        return this.attention.confirm(ctx, contactId, entryId);
+    }
+
     /** Which contact a store customer is linked to (U18), or null. */
     @Get("links/by-customer/:customerId")
     contactFor(
@@ -102,12 +208,19 @@ export class CustomerWorkspaceController {
         return this.workspace.timeline(ctx, contactId);
     }
 
+    /**
+     * Store customers to link, and with `?include=contacts` other contacts
+     * who are likely the same person (C2). Each item says its `kind`.
+     */
     @Get(":contactId/suggestions")
     suggestions(
         @OrgContext() ctx: OrganizationContext,
         @Param("contactId") contactId: string,
+        @Query("include") include?: string,
     ) {
-        return this.workspace.suggestLinks(ctx, contactId);
+        return this.workspace.suggestLinks(ctx, contactId, {
+            includeContacts: include === "contacts",
+        });
     }
 
     @Post(":contactId/links")

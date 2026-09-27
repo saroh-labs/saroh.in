@@ -25,7 +25,10 @@ import type {
     PaymentStatus,
     UpdateOrderDto,
 } from "./dto";
+import { shipsToAddress, storedValueFor, typeOf } from "./fulfilment";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
+import type { OrderListQuery } from "./order-list";
+import { listOrderRows } from "./order-list";
 import {
     fromCents,
     priceOrderLines,
@@ -84,11 +87,10 @@ export class OrdersService {
      * without becoming a way to read someone else's. `storeId` here only
      * NARROWS that set, so a tampered value can at worst return nothing.
      *
-     * Returns the whole set rather than a page or a filtered slice: the tabs
-     * and the search on this screen are applied over loaded rows by the shared
-     * data view, which is the right trade at a merchant's volumes and is what
-     * makes switching tabs instant. When a business outgrows one page this is
-     * where the cursor goes, and the screen's contract does not change.
+     * The route's answer WITHOUT `v=2`: the whole set, unpaged, exactly as
+     * before B1, kept for one release so an app deployed before the API
+     * keeps working. The paged, filtered list is {@link listRows}; B2d
+     * removes this once every caller is on it.
      */
     async listForOrganization(
         organizationId: string,
@@ -99,6 +101,8 @@ export class OrdersService {
             where: {
                 organizationId,
                 ...(filter?.storeId ? { storeId: filter.storeId } : {}),
+                // An abandoned checkout is not an order (plan B, B1).
+                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
             },
             orderBy: { createdAt: "desc" },
             include: {
@@ -108,6 +112,23 @@ export class OrdersService {
             },
         });
         return orders.map((o) => serializeOrganizationOrder(o, view));
+    }
+
+    /**
+     * The Orders list, v2 (plan B, B1): filtered, paged and counted by the
+     * API, with money only for `order:read` and a customer's phone and email
+     * only for `contact:read`. Scoped like {@link listForOrganization}: every
+     * filter narrows inside the organization. See `order-list.ts`.
+     *
+     * `listForOrganization` answers the route without `v=2` for one release,
+     * so an app deployed before this API keeps working (B2d removes it).
+     */
+    listRows(
+        organizationId: string,
+        query: OrderListQuery,
+        view: { money: boolean; contact: boolean },
+    ) {
+        return listOrderRows(organizationId, query, view);
     }
 
     async get(storeId: string, orderId: string, userId: string) {
@@ -152,8 +173,12 @@ export class OrdersService {
                 field: "customerId",
             });
         }
+        // Either vocabulary in; only what this release may write is stored
+        // (fulfilment.ts: SHIPPING and the rest are refused until B2c).
+        const type = typeOf(dto.fulfilment ?? "PICKUP");
+        const fulfilment = storedValueFor(type);
         // The same rule an edit keeps: there is nowhere to deliver to.
-        if (dto.fulfilment === "DELIVERY" && !dto.address) {
+        if (shipsToAddress(type) && !dto.address) {
             throw new BadRequestException({
                 message: "A delivery needs an address.",
                 field: "address",
@@ -239,10 +264,9 @@ export class OrdersService {
             taxCents = gstInsideOrder(await withGstRates(lines), {
                 shippingCents,
                 discountCents,
-                deliveryState:
-                    dto.fulfilment === "DELIVERY"
-                        ? (dto.address?.state ?? null)
-                        : null,
+                deliveryState: shipsToAddress(type)
+                    ? (dto.address?.state ?? null)
+                    : null,
                 profile,
             });
         }
@@ -257,8 +281,8 @@ export class OrdersService {
             shipping: fromCents(shippingCents),
             discount: fromCents(discountCents),
             total: fromCents(totalCents),
-            // The kitchen flow (ADR-008): collected unless said otherwise.
-            fulfilment: dto.fulfilment ?? "COLLECT",
+            // The kitchen flow (ADR-008): picked up unless said otherwise.
+            fulfilment,
             notes: dto.notes ?? null,
             ...(dto.address
                 ? {
@@ -410,6 +434,17 @@ export class OrdersService {
                 );
             }
 
+            // The kitchen stage follows a status set here, so the next
+            // kitchen step is not refused as out of step (ADR-008). Worked
+            // out before any write: a status the order's type has no step
+            // for (a pick-up order SHIPPED) is refused, never turned into
+            // another kind of order.
+            const kitchen = statusChanging
+                ? stageForStatus(nextStatus, {
+                      stage: order.stage,
+                      fulfilment: order.fulfilment,
+                  })
+                : null;
             if (statusChanging) {
                 await applyInventoryTransition(
                     tx,
@@ -419,14 +454,6 @@ export class OrdersService {
                     userId,
                 );
             }
-            // The kitchen stage follows a status set here, so the next
-            // kitchen step is not refused as out of step (ADR-008).
-            const kitchen = statusChanging
-                ? stageForStatus(nextStatus, {
-                      stage: order.stage,
-                      fulfilment: order.fulfilment,
-                  })
-                : null;
             await tx.order.update({
                 where: { id: orderId },
                 data: {

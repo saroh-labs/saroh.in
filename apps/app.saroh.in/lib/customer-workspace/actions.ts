@@ -4,8 +4,18 @@ import { revalidatePath } from "next/cache";
 
 import { setConsent } from "@/lib/messages/service";
 
+import type { AttentionInput } from "./attention";
 import type { NoteInput, WorkspaceResult } from "./service";
-import { createNote, deleteNote, linkCustomer } from "./service";
+import {
+    createAttention,
+    createNote,
+    deleteNote,
+    getUnlinkPreview,
+    linkCustomer,
+    removeAttention,
+    unlinkAccount,
+    updateAttention,
+} from "./service";
 
 /**
  * Server actions for Customer Detail (#120, U18). Each forwards the session
@@ -29,6 +39,36 @@ export async function addNoteAction(contactId: string, input: NoteInput) {
 
 export async function deleteNoteAction(contactId: string, noteId: string) {
     const result = await deleteNote(contactId, noteId);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** Needs attention (C5): add an entry. */
+export async function addAttentionAction(
+    contactId: string,
+    input: AttentionInput,
+) {
+    const result = await createAttention(contactId, input);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+export async function updateAttentionAction(
+    contactId: string,
+    entryId: string,
+    input: AttentionInput,
+) {
+    const result = await updateAttention(contactId, entryId, input);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** Sent when the Undo window closes, never before. */
+export async function removeAttentionAction(
+    contactId: string,
+    entryId: string,
+) {
+    const result = await removeAttention(contactId, entryId);
     if (result.ok) revalidatePath(`/customers/${contactId}`);
     return result;
 }
@@ -58,5 +98,23 @@ export async function restoreOffersAction(contactId: string) {
         status: "GRANTED",
     });
     if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** What "This isn't them" would move, read when its confirm opens (A4). */
+export async function unlinkPreviewAction(contactId: string) {
+    return getUnlinkPreview(contactId);
+}
+
+/**
+ * "This isn't them": the site account moves to a record of its own. Both
+ * customers' pages change, so both are read again.
+ */
+export async function unlinkAccountAction(contactId: string) {
+    const result = await unlinkAccount(contactId);
+    if (result.ok) {
+        revalidatePath(`/customers/${contactId}`);
+        revalidatePath(`/customers/${result.data.contactId}`);
+    }
     return result;
 }

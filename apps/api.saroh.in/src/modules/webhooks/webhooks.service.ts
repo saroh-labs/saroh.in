@@ -9,6 +9,7 @@ import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { confirmHoldInTx } from "../bookings/booking-hold";
+import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
@@ -858,7 +859,7 @@ export class WebhooksService {
         await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${intent.organizationId} FOR UPDATE`;
         const invoice = await tx.invoice.findFirst({
             where: { id: invoiceId, organizationId: intent.organizationId },
-            select: { status: true, source: true },
+            select: { status: true, source: true, bookingId: true },
         });
 
         await tx.paymentIntent.update({
@@ -886,12 +887,32 @@ export class WebhooksService {
                       payment,
                   })
                 : null;
-        if (invoice?.status === "ISSUED" || held === "confirmed") {
+        // A booking's pay link (E4) paid after the booking was cancelled:
+        // cancelling retires the link, but a checkout already open can still
+        // take the money. The place is gone, so it is owed back, not a
+        // clean payment — the invoice stays issued for the business to void.
+        // The booking's lock after the invoice's (the webhook's order), so a
+        // cancel racing this is seen.
+        const cancelledBooking =
+            invoice?.status === "ISSUED" &&
+            invoice.source === "BOOKING" &&
+            invoice.bookingId
+                ? await isBookingCancelledInTx(tx, invoice.bookingId)
+                : false;
+        if (
+            (invoice?.status === "ISSUED" && !cancelledBooking) ||
+            held === "confirmed"
+        ) {
             if (invoice?.status === "ISSUED") {
                 await tx.invoice.update({
                     where: { id: invoiceId },
                     data: { status: "PAID", paidAt: new Date(), ...payment },
                 });
+                // A booking's pay link (E4): the booking reads as paid
+                // online. The invoice's lock is held, then the booking's.
+                if (invoice.source === "BOOKING" && invoice.bookingId) {
+                    await markBookingPaidInTx(tx, invoice.bookingId);
+                }
             }
             if (providerRef) {
                 await tx.paymentAttempt.create({
@@ -910,7 +931,9 @@ export class WebhooksService {
         const found =
             held === "released"
                 ? "RELEASED_HOLD"
-                : (invoice?.status ?? "MISSING");
+                : cancelledBooking
+                  ? "CANCELLED_BOOKING"
+                  : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,
@@ -967,6 +990,19 @@ async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
     return rows[0]?.status ?? intent.status;
+}
+
+/**
+ * Whether the booking is cancelled, read under its row lock (taken after the
+ * invoice's, the order `lockBookingInTx` and the cancel path use).
+ */
+async function isBookingCancelledInTx(
+    tx: Tx,
+    bookingId: string,
+): Promise<boolean> {
+    const rows = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
+    return rows[0]?.status === "CANCELLED";
 }
 
 /** True for a Prisma unique-constraint violation (P2002). */

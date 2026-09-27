@@ -62,7 +62,7 @@ export function Sessions({
                             <span className="text-site-muted block text-[11.5px] font-semibold uppercase tracking-[0.06em]">
                                 {dow}
                             </span>
-                            <span className="font-display block text-xl font-semibold leading-[1.1]">
+                            <span className="font-site-heading block text-xl font-semibold leading-[1.1]">
                                 {n}
                             </span>
                         </span>

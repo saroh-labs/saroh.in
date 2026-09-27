@@ -10,11 +10,13 @@ import type {
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
+    RenderedVisitUs,
 } from "@saroh/block-contract";
 import { BLOCK_META, blockFixture } from "@saroh/block-contract";
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { SAMPLE_VISIT } from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
@@ -26,6 +28,11 @@ import HeroSection from "./blocks/hero";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
+import VisitUsSection from "./blocks/visit-us";
+import BookingFlow from "./booking-flow/booking-flow";
+import type { BookingPageData } from "./booking-flow/model";
+import { SiteTheme } from "./site-theme";
+import { SITE_FONT_STACK, siteFontFamily } from "./tailwind-preset";
 
 /**
  * Gate G5 (#252) — what these blocks draw must not change.
@@ -311,6 +318,19 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
+    // A sample place rather than a fetch, and a pinned clock: "Open now"
+    // depends on the moment. Friday 25 Sep 2026, 10:00 in London.
+    it("visitUs", () => {
+        const { container } = render(
+            <VisitUsSection
+                content={BLOCK_META.visitUs.fixtures.default as RenderedVisitUs}
+                visit={SAMPLE_VISIT}
+                now={new Date("2026-09-25T09:00:00Z")}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
     /**
      * The forward-compatibility property, asserted rather than assumed: a
      * snapshot published against a newer contract, carrying a section type this
@@ -325,5 +345,150 @@ describe("block rendering", () => {
             />,
         );
         expect(container.innerHTML).toBe("");
+    });
+});
+
+/**
+ * A merchant's site is set in the merchant's type, never Saroh's (H1).
+ *
+ * The booking flow set its headings in Saroh's `font-display` and `saroh.app`
+ * loaded Geist and Bricolage Grotesque, so every booking page wore Saroh's
+ * typography. Gate G7 keeps the class out of the code; these pin what the
+ * flow draws and what an unstyled publication falls back to.
+ */
+describe("the merchant's type (H1)", () => {
+    const PAGE: BookingPageData = {
+        businessName: "Pulse Fitness",
+        open: true,
+        timezone: "Asia/Kolkata",
+        payOnline: false,
+        rules: {
+            bookAheadDays: 21,
+            latestBookingMinutes: 120,
+            freeCancelHours: 12,
+        },
+        services: [
+            {
+                id: "svc_pt",
+                name: "Personal training",
+                description: null,
+                durationMinutes: 60,
+                kind: "one",
+                capacity: 1,
+                priceCents: 120_000,
+                currency: "INR",
+                online: false,
+                staff: ["Karan Mehta"],
+            },
+        ],
+    };
+
+    beforeAll(() => {
+        window.matchMedia = vi.fn(() => ({
+            matches: false,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        })) as unknown as typeof window.matchMedia;
+    });
+
+    it("sets the booking flow's headings in font-site-heading", () => {
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl="https://api.test"
+                account={{
+                    customer: null,
+                    options: {
+                        businessName: "Pulse Fitness",
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                    },
+                    book: () =>
+                        Promise.resolve({ ok: false, status: 0, message: "" }),
+                    signOut: () => Promise.resolve({ ok: true }),
+                }}
+            />,
+        );
+        const title = screen.getByRole("heading", {
+            name: "Book your next session",
+        });
+        const step = screen.getByRole("heading", {
+            name: "What would you like?",
+        });
+        for (const heading of [title, step]) {
+            expect(heading).toHaveClass("font-site-heading");
+            expect(heading.className).not.toMatch(
+                /\bfont-(sans|display|mono)\b/,
+            );
+        }
+    });
+
+    it("sets the closed booking page's heading in font-site-heading", () => {
+        render(
+            <BookingFlow
+                page={{ ...PAGE, open: false }}
+                apiUrl="https://api.test"
+                account={{
+                    customer: null,
+                    options: {
+                        businessName: "Pulse Fitness",
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                    },
+                    book: () =>
+                        Promise.resolve({ ok: false, status: 0, message: "" }),
+                    signOut: () => Promise.resolve({ ok: true }),
+                }}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                name: "Online booking isn't open right now",
+            }),
+        ).toHaveClass("font-site-heading");
+    });
+
+    /*
+     * A publication from before #189 carries no styleVariables at all, and no
+     * publication carries a font variable yet. Both must still get a real
+     * face — the neutral stack — rather than an unset variable.
+     */
+    it("gives a publication with no variables the neutral type tokens", () => {
+        const { container } = render(<SiteTheme variables={null} />);
+        const css = container.querySelector("style")?.textContent ?? "";
+        expect(css).toContain(`--site-font-heading: ${SITE_FONT_STACK};`);
+        expect(css).toContain(`--site-font-body: ${SITE_FONT_STACK};`);
+        expect(css).not.toMatch(/Geist|Bricolage|--font-(sans|display)/);
+    });
+
+    it("keeps the type tokens beside a publication's own colours", () => {
+        const { container } = render(
+            <SiteTheme variables={{ "--site-bg": "40 30% 96%" }} />,
+        );
+        const css = container.querySelector("style")?.textContent ?? "";
+        expect(css).toContain(`--site-font-heading: ${SITE_FONT_STACK};`);
+        expect(css).toContain("--site-bg: 40 30% 96%;");
+    });
+
+    it("falls back to the neutral stack where no SiteTheme is mounted", () => {
+        for (const family of Object.values(siteFontFamily)) {
+            expect(family).toHaveLength(1);
+            expect(family[0]).toMatch(/^var\(--site-font-(heading|body), /);
+            expect(family[0]).toContain(SITE_FONT_STACK);
+        }
+        expect(SITE_FONT_STACK).toContain('"Noto Sans Devanagari"');
+        expect(SITE_FONT_STACK).not.toMatch(/Geist|Bricolage|Grotesk|Mono/);
     });
 });

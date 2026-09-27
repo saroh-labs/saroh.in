@@ -1,11 +1,26 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { BookingFlow, BookingUnavailable } from "@saroh/site-blocks";
+import type { SignedInCustomer, SignInOptions } from "@saroh/site-blocks";
+import {
+    BookingFlow,
+    BookingUnavailable,
+    initialDateOf,
+    initialTimeOf,
+} from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
+import { getSignedInCustomer } from "@/lib/customer-session";
 import { getSiteForHost } from "@/lib/publication";
+import { getSignInOptions } from "@/lib/sign-in";
+
+import {
+    requestSignInCode,
+    signOut,
+    verifySignInCode,
+} from "../account/actions";
+import { bookSignedIn } from "./actions";
 
 /**
  * The customer's booking page on a merchant's site (U19): `/<domain>/book`,
@@ -14,7 +29,16 @@ import { getSiteForHost } from "@/lib/publication";
  * `BookingFlow` in `@saroh/site-blocks`, from `--site-*` only.
  *
  * `?service=<id>` opens on one service; the services list and the booking
- * block link here with it.
+ * block link here with it. With `&date=YYYY-MM-DD&start=HH:MM` (On today on
+ * the home page, G18) it opens on that day with that time chosen, or says the
+ * time has just gone.
+ *
+ * Sign-in is always on (round-2 A9, ADR-011): the last step asks for a code
+ * by email, and the booking is made through this app's server with the
+ * session (`./actions.ts`). The page reads who is signed in on this host and
+ * what the sheet needs (the business's phone, the challenge) as it renders.
+ * Neither read can take the page down: without them the visitor is simply
+ * not signed in, and the sheet goes without the phone line.
  *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
@@ -41,14 +65,22 @@ export default async function BookPage({
     searchParams,
 }: {
     params: Promise<{ domain: string }>;
-    searchParams: Promise<{ service?: string | string[] }>;
+    searchParams: Promise<{
+        service?: string | string[];
+        date?: string | string[];
+        start?: string | string[];
+    }>;
 }) {
     const { domain } = await params;
-    const { service } = await searchParams;
+    const { service, date, start } = await searchParams;
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
 
-    const lookup = await getBookingPage(resolved.siteId);
+    const [lookup, customer, options] = await Promise.all([
+        getBookingPage(resolved.siteId),
+        getSignedInCustomer().catch((): SignedInCustomer | null => null),
+        getSignInOptions().catch((): SignInOptions | null => null),
+    ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         return <BookingUnavailable business={resolved.snapshot.site.name} />;
@@ -56,8 +88,24 @@ export default async function BookPage({
     return (
         <BookingFlow
             page={lookup.page}
+            account={{
+                customer,
+                options: options ?? {
+                    businessName: lookup.page.businessName,
+                    phone: null,
+                    challenge: { required: false, siteKey: null },
+                },
+                signIn: {
+                    requestCode: requestSignInCode,
+                    verifyCode: verifySignInCode,
+                },
+                book: bookSignedIn,
+                signOut,
+            }}
             apiUrl={publicApiUrl()}
             initialServiceId={typeof service === "string" ? service : null}
+            initialDate={initialDateOf(date)}
+            initialStart={initialTimeOf(start)}
         />
     );
 }

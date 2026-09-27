@@ -47,6 +47,14 @@ export interface ActivityDetail {
     withoutValues: boolean;
 }
 
+/** What a storefront's fulfilment change names each field (B17). */
+const FULFILMENT_FIELD_LABEL: Partial<Record<string, string>> = {
+    fulfilmentTypes: "How orders leave",
+    pickupLateAfterMinutes: "Pick-up late after",
+    localDeliveryLateAfterMinutes: "Local delivery late after",
+    shippingLateAfterMinutes: "Shipping late after",
+};
+
 /** How the sheet shows a recorded value. */
 function shown(field: string, value: ChangeValue): string {
     if (value === null) return "Not set";
@@ -167,6 +175,21 @@ function detailRows(
             return {
                 rows: profileRows(fieldsOf(meta), changes),
                 withoutValues: changes === null,
+            };
+        }
+        case "storefront.fulfilment.update": {
+            const changes = recordedChanges(meta) ?? [];
+            const where = text(meta.storefront);
+            return {
+                rows: changes.map((c) => {
+                    const label = FULFILMENT_FIELD_LABEL[c.field] ?? c.field;
+                    return row(
+                        where ? `${label}, ${where}` : label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    );
+                }),
+                withoutValues: false,
             };
         }
         case "storefront.hours.update": {

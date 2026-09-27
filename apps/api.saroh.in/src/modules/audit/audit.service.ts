@@ -31,6 +31,9 @@ export const AuditAction = {
     ModuleDisable: "organization.module.disabled",
     PlanChange: "organization.plan.changed",
     StorefrontHoursUpdate: "storefront.hours.update",
+    // How a storefront's orders leave, or when they count as late (B17);
+    // metadata names the storefront and each change as words.
+    StorefrontFulfilmentUpdate: "storefront.fulfilment.update",
     // An untracked product marked Sold out by hand at a storefront, or
     // available again (#515); metadata names the product and storefront.
     ProductSoldOutMark: "product.sold-out.mark",

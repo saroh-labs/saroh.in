@@ -147,6 +147,19 @@
   `audit:read`) plus one notice in the Owner/Admin inbox, so it is seen
   without a banner to build and dismiss.
 
+- **Current** — **A contact's email can be a reserved placeholder; read it
+  through `contacts/contact-email.ts`** (DEC-049, round-2 A1).
+  `Contact.email` is required and unique per business, so a contact that
+  must not hold a real address carries `account+<id>@account.invalid` (a
+  site account's separate contact), `merged+<id>@removed.invalid` (a merge's
+  retired contact) or `removed+<id>@removed.invalid` (privacy removal). Build
+  them only with that module's `reserved*Email`, test with
+  `isReservedContactEmail`, and show `contactEmailForDisplay`, which gives
+  the linked account's email or nothing. Never send to, pair on or show a
+  placeholder. A site account (`CustomerAccount`, ADR-011) is live in every
+  status but REMOVED: a MERGED one keeps its email reserved in the partial
+  unique index.
+
 ## Money — **Current**
 
 - `Decimal` with explicit precision (`@db.Decimal(10, 2)`, `@db.Decimal(12, 2)`);

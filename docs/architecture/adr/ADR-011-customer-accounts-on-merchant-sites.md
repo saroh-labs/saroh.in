@@ -90,8 +90,13 @@ Decided with the user on 2026-09-27:
   or past half the business's hourly ceiling, a code needs a bot challenge
   and may wait up to 10 minutes after the previous one; past a business
   ceiling, codes still go to visitors who pass the challenge and Saroh is
-  alerted. Only the visitor's own per-address limits refuse, and they say
-  when to try again. Codes are refused while the business is suspended or
+  alerted. Past half the hourly ceiling the challenge is asked of every
+  email, returning or new, so whether it is asked never says whether an
+  email has an account. A busy visitor address (counted per business) and
+  an email whose codes have taken 25 wrong tries in a day likewise mean
+  the challenge, not a refusal; the second alerts Saroh too. Only the
+  visitor's own per-destination limits refuse, and they say when to try
+  again. Codes are refused while the business is suspended or
   closing (`assertOrganizationOpen`).
 - **When a code can't be sent**, the sheet says "We couldn't send your code
   — try again in a few minutes" with the business's phone number, and the

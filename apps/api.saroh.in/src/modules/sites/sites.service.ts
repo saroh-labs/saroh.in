@@ -954,7 +954,7 @@ export class SitesService {
     }
 
     /**
-     * Update a site's search and social settings (#188).
+     * Update a site's name (G6) and its search and social settings (#188).
      *
      * ABSENT and NULL are deliberately different: a field the caller omitted is
      * left alone, a field sent as null is cleared. A settings form that PATCHes
@@ -974,6 +974,7 @@ export class SitesService {
         await assertSiteInOrg(ctx, siteId);
 
         const data: {
+            name?: string;
             seoTitle?: string | null;
             seoDescription?: string | null;
             socialImageUrl?: string | null;
@@ -982,6 +983,9 @@ export class SitesService {
             socialImageBytes?: number | null;
             postsPrefix?: string | null;
         } = {};
+        // The header's name, edited in the site editor's inspector (G6). The
+        // slug stays: it is the address, and renaming must not move the site.
+        if (dto.name !== undefined) data.name = dto.name;
         if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle;
         if (dto.seoDescription !== undefined)
             data.seoDescription = dto.seoDescription;
@@ -1013,6 +1017,7 @@ export class SitesService {
             data,
             select: {
                 id: true,
+                name: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,

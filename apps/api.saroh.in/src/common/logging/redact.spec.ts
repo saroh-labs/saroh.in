@@ -15,6 +15,15 @@ describe("redactHeaders", () => {
         expect(out["content-type"]).toBe("application/json");
         expect(out["user-agent"]).toBe("jest");
     });
+
+    it("redacts a site's signed relay and a customer's session (ADR-011)", () => {
+        const out = redactHeaders({
+            "x-saroh-relay": "v1.1790000000.MjAzLjAuMTEzLjc.a2F2aQ.sig",
+            "X-Customer-Session": "token",
+        });
+        expect(out["x-saroh-relay"]).toBe(REDACTED);
+        expect(out["X-Customer-Session"]).toBe(REDACTED);
+    });
 });
 
 describe("redactObject", () => {
@@ -50,6 +59,15 @@ describe("redactObject", () => {
         expect(out.user.profile.phone).toBe(REDACTED);
         expect(out.items[0].cardNumber).toBe(REDACTED);
         expect(out.items[1].sku).toBe("ok");
+    });
+
+    it("redacts a booking page's intake note (E7)", () => {
+        const out = redactObject({
+            bookerName: "Asha",
+            intakeNote: "I take blood thinners",
+        }) as Record<string, unknown>;
+        expect(out.intakeNote).toBe(REDACTED);
+        expect(out.bookerName).toBe("Asha");
     });
 
     it("passes primitives through untouched", () => {

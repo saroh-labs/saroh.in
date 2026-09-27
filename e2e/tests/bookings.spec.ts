@@ -40,8 +40,42 @@ interface Diary {
         status: string;
         outcome: string | null;
         bookerName: string | null;
+        bookerPhone: string | null;
         startAt: string;
+        contact: { id: string; firstName: string | null } | null;
     }[];
+}
+
+/** An upcoming one-to-one with a person and a contact, within the week. */
+async function upcomingWithContact(request: APIRequestContext) {
+    const from = new Date().toISOString();
+    const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    return (await diaries(request, from, to))
+        .filter((d) => d.person)
+        .flatMap((d) => d.bookings)
+        .find(
+            (b) =>
+                b.status === "CONFIRMED" &&
+                !b.outcome &&
+                b.bookerName &&
+                b.contact,
+        );
+}
+
+/** Open a booking's peek from the agenda of its day. */
+async function openPeek(
+    page: Page,
+    booking: { startAt: string; bookerName: string | null },
+) {
+    const day = new Date(Date.parse(booking.startAt) + IST_OFFSET_MS)
+        .toISOString()
+        .slice(0, 10);
+    await page.goto(`/bookings?date=${day}&layout=agenda`);
+    await page
+        .getByRole("button", { name: new RegExp(booking.bookerName ?? "") })
+        .first()
+        .click();
+    return page.getByRole("dialog");
 }
 
 async function diaries(request: APIRequestContext, from: string, to: string) {
@@ -72,6 +106,88 @@ test.describe("bookings calendar", () => {
         ).toBeVisible();
         await expect(
             page.getByText(/Customers can book/).first(),
+        ).toBeVisible();
+    });
+
+    test("the legend follows the business: a gym that runs classes shows Class", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/bookings");
+        const legend = page.getByRole("listitem");
+        await expect(legend.filter({ hasText: /^One-to-one$/ })).toBeVisible();
+        await expect(legend.filter({ hasText: /^Class$/ })).toBeVisible();
+        await expect(legend.filter({ hasText: /^Free$/ })).toBeVisible();
+        await page.goto("/bookings?layout=week");
+        await expect(page.getByText(/bookings? this week/)).toBeVisible();
+    });
+
+    test("the peek shows Needs attention and opens the customer's page", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const found = await upcomingWithContact(page.request);
+        test.skip(!found?.contact, "No upcoming booking with a contact");
+        if (!found?.contact) return;
+        const contactId = found.contact.id;
+
+        // An Allergy entry for this test only, taken off again afterwards.
+        const made = await page.request.post(
+            api(`/customers/${contactId}/attention`),
+            {
+                headers: orgHeader,
+                data: { kind: "ALLERGY", label: "E2E sesame" },
+            },
+        );
+        test.skip(!made.ok(), "The contact already has an allergy entry");
+        const entry = (await made.json()) as { id: string };
+        try {
+            const sheet = await openPeek(page, found);
+            await expect(sheet.getByText("Needs attention")).toBeVisible();
+            await expect(sheet.getByText(/Allergy: E2E sesame/)).toBeVisible();
+            await sheet.getByRole("link", { name: /^Open .+'s page$/ }).click();
+            await expect(page).toHaveURL(new RegExp(`/customers/${contactId}`));
+        } finally {
+            await page.request.delete(
+                api(`/customers/${contactId}/attention/${entry.id}`),
+                { headers: orgHeader },
+            );
+        }
+    });
+
+    test("a booking with no phone says where to add one", async ({ page }) => {
+        await signIn(page);
+        const from = new Date().toISOString();
+        const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+        const candidates = (await diaries(page.request, from, to))
+            .filter((d) => d.person)
+            .flatMap((d) => d.bookings)
+            .filter(
+                (b) =>
+                    b.status === "CONFIRMED" &&
+                    b.bookerName &&
+                    b.contact &&
+                    !b.bookerPhone,
+            );
+        let found: (typeof candidates)[number] | undefined;
+        for (const b of candidates) {
+            const res = await page.request.get(
+                api(`/contacts/${b.contact?.id}`),
+                { headers: orgHeader },
+            );
+            if (
+                res.ok() &&
+                !((await res.json()) as { phone: string | null }).phone
+            ) {
+                found = b;
+                break;
+            }
+        }
+        test.skip(!found, "Every upcoming booking has a phone in the seed");
+        if (!found) return;
+        const sheet = await openPeek(page, found);
+        await expect(
+            sheet.getByText("No phone yet — add it on their page"),
         ).toBeVisible();
     });
 
@@ -205,9 +321,22 @@ test.describe("bookings calendar", () => {
                 "No service this person takes starts inside the new hours",
             );
             await chip.click();
-            await book.getByRole("radio", { name: "Someone new" }).click();
-            await book.getByLabel("Name").fill("E2E Walk-in");
+            // The shared customer picker (E4): type, then add them new.
+            await book.getByLabel("Find the customer").fill("E2E Walk-in");
+            await book
+                .getByRole("button", {
+                    name: "+ Add \u201cE2E Walk-in\u201d as a new customer",
+                })
+                .click();
+            await expect(book.getByLabel("Name")).toHaveValue("E2E Walk-in");
             await book.getByLabel("Email").fill("e2e.walkin@example.com");
+            await book.getByRole("button", { name: "Add customer" }).click();
+            await expect(
+                book.getByRole("radio", { name: "E2E Walk-in · new" }),
+            ).toBeChecked();
+            await book
+                .getByRole("radio", { name: "Pays at the session" })
+                .click();
             await book.getByRole("button", { name: "Book it" }).click();
             await expect(
                 page.getByText(/^Booked E2E Walk-in with/).first(),
@@ -266,6 +395,59 @@ test.describe("bookings calendar", () => {
     });
 });
 
+test.describe("New booking finds the customer (E4)", () => {
+    test("the last 4 digits of a phone find them, +91 or not, and nothing is saved", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const people = (await (
+            await page.request.get(api("/contacts"), { headers: orgHeader })
+        ).json()) as {
+            id: string;
+            firstName: string | null;
+            lastName: string | null;
+            phone: string | null;
+        }[];
+        const withPhone = people.find(
+            (c) =>
+                c.firstName && (c.phone ?? "").replace(/\D/g, "").length >= 10,
+        );
+        test.skip(!withPhone, "Nobody on Pulse has a phone");
+        if (!withPhone) return;
+        const digits = (withPhone.phone ?? "").replace(/\D/g, "").slice(-10);
+        const name = [withPhone.firstName, withPhone.lastName]
+            .filter(Boolean)
+            .join(" ");
+
+        // The search itself: the same person by +91 and without.
+        const ids = async (q: string) =>
+            (
+                (await (
+                    await page.request.get(
+                        api(`/contacts/search?q=${encodeURIComponent(q)}`),
+                        { headers: orgHeader },
+                    )
+                ).json()) as { id: string }[]
+            ).map((r) => r.id);
+        expect(await ids(`+91 ${digits}`)).toContain(withPhone.id);
+        expect(await ids(digits)).toContain(withPhone.id);
+
+        // And in the dialog: typing the last 4 finds and picks them.
+        await page.goto("/bookings");
+        await page.getByRole("button", { name: "New booking" }).first().click();
+        const book = page.getByRole("dialog");
+        await book.getByLabel("Find the customer").fill(digits.slice(-4));
+        const chip = book.getByRole("radio", { name, exact: true });
+        await expect(chip).toBeVisible();
+        await chip.click();
+        await expect(chip).toBeChecked();
+        // Nothing is written until "Book it". The footer's Close and the
+        // corner's both read "Close"; the footer's comes first.
+        await book.getByRole("button", { name: "Close" }).first().click();
+        await expect(book).toBeHidden();
+    });
+});
+
 test.describe("availability and services", () => {
     test("new hours refuse an overlap; the draft is discarded, not saved", async ({
         page,
@@ -300,26 +482,105 @@ test.describe("availability and services", () => {
         }
     });
 
-    test("a class under two places is refused with the design's words", async ({
+    test("a class under two places is refused, and leaving asks first (E2)", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto("/services");
-        await page.getByRole("button", { name: "New service" }).click();
-        const dialog = page.getByRole("dialog");
-        await dialog.getByRole("radio", { name: "Class" }).click();
-        await dialog.getByLabel("Name").fill("E2E class");
-        const who = dialog.getByRole("group", { name: "Who takes it" });
+        await page.getByRole("link", { name: "New service" }).click();
+        await expect(
+            page.getByRole("heading", { level: 1, name: "New service" }),
+        ).toBeVisible();
+        // Visits and the deposit arrive with E10 and E8.
+        await expect(page.getByLabel("Visits")).toHaveCount(0);
+        await expect(
+            page.getByRole("radiogroup", { name: "Deposit" }),
+        ).toHaveCount(0);
+        await page.getByRole("radio", { name: "Class" }).click();
+        await page.getByLabel("Name").fill("E2E class");
+        await page.getByRole("textbox", { name: /^Price/ }).fill("0");
+        const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("button").first().click();
+            await who.getByRole("checkbox").first().click();
         }
-        await dialog.getByLabel("Places").fill("1");
-        await expect(dialog.getByRole("alert")).toHaveText(
+        await page.getByLabel("Places").fill("1");
+        await expect(page.getByRole("alert").first()).toHaveText(
             "A class needs at least 2 places.",
         );
         await expect(
-            dialog.getByRole("button", { name: "Add service" }),
+            page.getByRole("button", { name: "Add service" }),
         ).toBeDisabled();
-        await dialog.getByRole("button", { name: "Cancel" }).click();
+
+        await page
+            .getByRole("navigation", { name: "Breadcrumb" })
+            .getByRole("link", { name: "Services" })
+            .click();
+        await expect(
+            page.getByRole("alertdialog", {
+                name: "Leave without creating it?",
+            }),
+        ).toBeVisible();
+        await page.getByRole("link", { name: "Leave without saving" }).click();
+        await expect(
+            page.getByRole("heading", { level: 1, name: "Services" }),
+        ).toBeVisible();
+    });
+});
+
+test.describe("the Service Editor on Northwind (E2)", () => {
+    const NORTHWIND = "seed_org";
+    const nwApi = (path: string) =>
+        `${urls.API_URL}/organizations/${NORTHWIND}${path}`;
+
+    test("an Either service with a price is added, and its card says so", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto("/services/new");
+        const heading = page.getByRole("heading", {
+            level: 1,
+            name: "New service",
+        });
+        // isVisible() doesn't wait: give the page its first paint before
+        // deciding Northwind takes no bookings.
+        const opened = await heading
+            .waitFor({ timeout: 10_000 })
+            .then(() => true)
+            .catch(() => false);
+        test.skip(!opened, "Northwind doesn't take bookings");
+        const name = `E2E either ${Date.now()}`;
+        await page.getByLabel("Name").fill(name);
+        await page.getByRole("radio", { name: "Either — they choose" }).click();
+        await page
+            .getByLabel("Link to join")
+            .fill("https://meet.example.com/e2e-either");
+        await page.getByRole("textbox", { name: /^Price/ }).fill("500");
+        const who = page.getByRole("group", { name: "Who takes it" });
+        if (await who.isVisible()) {
+            await who.getByRole("checkbox").first().click();
+        }
+        await page.getByRole("button", { name: "Add service" }).click();
+        await page.waitForURL(/\/services\/(?!new)[^/]+$/);
+        const id = new URL(page.url()).pathname.split("/").pop() ?? "";
+        try {
+            await expect(
+                page.getByRole("heading", { level: 1, name }),
+            ).toBeVisible();
+            await expect(
+                page.getByText("Taking bookings", { exact: true }),
+            ).toBeVisible();
+
+            await page.goto("/services");
+            const card = page.getByRole("listitem").filter({ hasText: name });
+            await expect(card).toContainText("In person or online");
+            await expect(
+                card.getByRole("button", { name: "Stop taking bookings" }),
+            ).toBeVisible();
+        } finally {
+            await page.request.delete(nwApi(`/services/${id}`), {
+                headers: { "x-organization-id": NORTHWIND },
+            });
+        }
     });
 });

@@ -5,7 +5,12 @@ import { DateTime } from "luxon";
 import { paymentsOn } from "../invoices/payments-on";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { Slot } from "./availability";
-import { countOverlapping, enumerateSlots, staffSlots } from "./availability";
+import {
+    countOverlapping,
+    enumerateSlots,
+    outsideClosures,
+    staffSlots,
+} from "./availability";
 import type { BookingRulesValue } from "./booking-rules";
 import { loadBookingRules, withinBookingWindow } from "./booking-rules";
 import type { Staffing } from "./booking-slots";
@@ -14,8 +19,13 @@ import {
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
+import type { LocationType } from "./dto";
 import { loadBookableService } from "./reservation";
-import { businessTimezone, loadPeople } from "./staff-availability";
+import {
+    businessTimezone,
+    loadClosures,
+    loadPeople,
+} from "./staff-availability";
 
 /*
  * What a website shows of the business's bookings (#508): the booking page's
@@ -78,7 +88,13 @@ export interface PublicBookingPage {
         capacity: number;
         priceCents: number | null;
         currency: string | null;
+        /** Online only. A service offered either way is not (see `where`). */
         online: boolean;
+        /**
+         * Where it happens: IN_PERSON, ONLINE, or EITHER — the booker
+         * chooses, and the page asks Where (E7).
+         */
+        where: LocationType;
         /** Who takes it, by display name. */
         staff: string[];
     }[];
@@ -100,8 +116,12 @@ export interface PublicBookingPage {
 export async function publicDays(
     serviceId: string,
     now: Date = new Date(),
+    /** How many days from today. On today (G18) reads one. */
+    span: number = PUBLIC_DAYS,
 ): Promise<PublicDays> {
-    const { service, rules } = await loadBookableService(serviceId);
+    const { service, rules } = await loadBookableService(serviceId, {
+        bookingPage: true,
+    });
     const [bookingRules, zone, staffing] = await Promise.all([
         loadBookingRules(prisma, service.organizationId),
         businessTimezone(prisma, service.organizationId),
@@ -109,7 +129,7 @@ export async function publicDays(
     ]);
     const first = DateTime.fromJSDate(now, { zone }).startOf("day");
     const from = first.toJSDate();
-    const to = first.plus({ days: PUBLIC_DAYS }).toJSDate();
+    const to = first.plus({ days: span }).toJSDate();
     const names = new Map(staffing.people.map((p) => [p.id, p.name]));
     const availService = toAvailabilityService(service);
     // Never a start that has begun; then the business's own rules.
@@ -118,22 +138,29 @@ export async function publicDays(
     const kind: PublicDays["kind"] = service.capacity > 1 ? "class" : "one";
 
     // What the hours alone offer (open days), and what is free now.
+    // A day the business is closed is closed on the page, not Full (E3):
+    // closures are public, unlike a person's time off.
+    const closed = await loadClosures(prisma, service.organizationId, from, to);
     let hours: Slot[];
     let starts: PublicStart[];
     if (staffing.perPerson && staffing.zone) {
         const people = await loadPeople(
             prisma,
+            service.organizationId,
             staffing.people.map((p) => p.id),
             from,
             to,
         );
-        hours = staffSlots(
-            availService,
-            rules,
-            people.map((p) => ({ ...p, busy: [], timeOff: [] })),
-            staffing.zone,
-            from,
-            to,
+        hours = outsideClosures(
+            staffSlots(
+                availService,
+                rules,
+                people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                staffing.zone,
+                from,
+                to,
+            ),
+            closed,
         );
         starts = staffSlots(
             availService,
@@ -155,7 +182,10 @@ export async function publicDays(
                 };
             });
     } else {
-        hours = enumerateSlots(availService, rules, from, to);
+        hours = outsideClosures(
+            enumerateSlots(availService, rules, from, to),
+            closed,
+        );
         const busy = await busyOverlapping(service.id, from, to);
         const [instructor] = staffing.people as (
             Staffing["people"][number] | undefined
@@ -183,7 +213,7 @@ export async function publicDays(
             ? null
             : now.getTime() + bookingRules.bookAheadDays * 86_400_000;
     const days: PublicDay[] = [];
-    for (let i = 0; i < PUBLIC_DAYS; i += 1) {
+    for (let i = 0; i < span; i += 1) {
         const day = first.plus({ days: i });
         const dayFrom = day.toMillis();
         const dayTo = day.plus({ days: 1 }).toMillis();
@@ -200,6 +230,22 @@ export async function publicDays(
         });
     }
     return { timezone: zone, kind, capacity: service.capacity, days };
+}
+
+/**
+ * The services a site's booking page offers: active, shown on the booking
+ * page (E1), and of this site or of no site. On today (G18) lists the same
+ * ones, so it never shows a time the booking page would not.
+ */
+export function offeredOnSite(organizationId: string, siteId: string) {
+    return {
+        organizationId,
+        deletedAt: null,
+        status: "ACTIVE" as const,
+        // The merchant's "Show on booking page" (E1).
+        showOnBookingPage: true,
+        OR: [{ siteId: null }, { siteId }],
+    };
 }
 
 /**
@@ -228,12 +274,7 @@ export async function publicBookingPage(
     const [services, rules, zone, online] = await Promise.all([
         open
             ? prisma.service.findMany({
-                  where: {
-                      organizationId,
-                      deletedAt: null,
-                      status: "ACTIVE",
-                      OR: [{ siteId: null }, { siteId }],
-                  },
+                  where: offeredOnSite(organizationId, siteId),
                   orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                   select: {
                       id: true,
@@ -271,6 +312,12 @@ export async function publicBookingPage(
             priceCents: svc.priceCents,
             currency: svc.currency,
             online: svc.locationType === "ONLINE",
+            // The page asks Where for EITHER (E7); anything unknown reads
+            // as in person, which asks nothing and shows no link.
+            where:
+                svc.locationType === "ONLINE" || svc.locationType === "EITHER"
+                    ? svc.locationType
+                    : "IN_PERSON",
             staff: svc.staffServices
                 .map((row) => row.staff.name)
                 .sort((a, b) => a.localeCompare(b)),
@@ -286,6 +333,7 @@ export async function publicBookingPage(
  * Read live, not frozen at publish, so a changed price or a deleted service
  * is right on the next page view. Filtered to what may be offered:
  * - not deleted, and ACTIVE (an archived service is not on offer);
+ * - shown on the booking page (E1): a hidden service is booked by staff;
  * - its Organization has not DISABLED Appointments. A missing module row
  *   counts as on: enforcement is still dark (#117) and the backfill may not
  *   have written one, and hiding a merchant's services over an absent row
@@ -301,6 +349,7 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             id: { in: ids },
             deletedAt: null,
             status: "ACTIVE",
+            showOnBookingPage: true,
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             organization: APPOINTMENTS_OPEN,
@@ -337,9 +386,11 @@ export async function takesOnlinePayment(
 
 /**
  * What a public booking answers with (ADR-007): the booker's own booking and
- * nothing else — never the row, which carries the organization, the contact
- * and the IP hash. Read from the booking's frozen snapshot, so the first
- * answer and an idempotent replay are the same shape and the same link.
+ * nothing else — never the row, which carries the organization, the contact,
+ * the IP hash and the booker's own note (E7). Read from the booking's frozen
+ * snapshot, so the first answer and an idempotent replay are the same shape
+ * and the same link. Where it happens is the booking's own answer when it
+ * has one (a service offered either way, E7), else the service's.
  */
 export interface PublicBooking {
     reference: string;
@@ -356,6 +407,7 @@ export function toPublicBooking(booking: {
     endAt: Date;
     snapshot: unknown;
     status?: string;
+    locationType?: string | null;
 }): PublicBooking {
     const service = (
         booking.snapshot as {
@@ -366,7 +418,9 @@ export function toPublicBooking(booking: {
             };
         } | null
     )?.service;
-    const online = service?.locationType === "ONLINE";
+    const online = booking.locationType
+        ? booking.locationType === "ONLINE"
+        : service?.locationType === "ONLINE";
     return {
         reference: booking.id,
         startAt: booking.startAt.toISOString(),
@@ -381,7 +435,7 @@ export function toPublicBooking(booking: {
         meetingUrl:
             online &&
             booking.status === "CONFIRMED" &&
-            typeof service.meetingUrl === "string"
+            typeof service?.meetingUrl === "string"
                 ? service.meetingUrl
                 : null,
     };

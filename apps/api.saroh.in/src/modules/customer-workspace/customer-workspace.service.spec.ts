@@ -10,6 +10,20 @@ const CTX: OrganizationContext = {
     role: "OWNER",
 };
 
+/** A contact row as `loadContactIdentities` selects it. */
+function me(over: Record<string, unknown> = {}) {
+    return {
+        id: "c1",
+        email: "a@x.com",
+        phone: "+1 (555) 000",
+        firstName: "Asha",
+        lastName: null,
+        customerAccounts: [],
+        unlinkedCustomerAccounts: [],
+        ...over,
+    };
+}
+
 function make(overrides: Record<string, unknown> = {}) {
     const db = {
         contact: {
@@ -18,7 +32,10 @@ function make(overrides: Record<string, unknown> = {}) {
                 email: "a@x.com",
                 phone: "+1 (555) 000",
             }),
+            // loadContactIdentities: "me" first, then any candidates.
+            findMany: jest.fn().mockResolvedValue([me()]),
         },
+        $queryRaw: jest.fn().mockResolvedValue([]),
         customer: {
             findFirst: jest.fn().mockResolvedValue({ id: "cust1" }),
             findMany: jest.fn().mockResolvedValue([]),
@@ -88,8 +105,15 @@ describe("CustomerWorkspaceService", () => {
         expect(orJson.toLowerCase()).not.toContain("firstname");
         expect(orJson.toLowerCase()).not.toContain("lastname");
 
-        expect(suggestions[0].matchedOn).toContain("email");
-        expect(suggestions[0].customerId).toBe("cust1");
+        expect(suggestions).toEqual([
+            {
+                kind: "customer",
+                customerId: "cust1",
+                name: "Al Bo",
+                email: "A@X.com",
+                matchedOn: ["email"],
+            },
+        ]);
     });
 
     it("returns a suggestion, not an automatic link", async () => {
@@ -103,9 +127,132 @@ describe("CustomerWorkspaceService", () => {
                 phone: null,
             },
         ]);
-        await svc.suggestLinks(CTX, "c1");
+        await svc.suggestLinks(CTX, "c1", { includeContacts: true });
         // Suggesting must never write a link.
         expect(db.customerIdentityLink.upsert).not.toHaveBeenCalled();
+    });
+
+    it("drops a store customer whose row the query returned but who doesn't match", async () => {
+        // The phone query narrows on the last seven digits; the pairing decides.
+        const { svc, db } = make();
+        db.contact.findMany.mockResolvedValue([me({ phone: "9876543210" })]);
+        db.$queryRaw.mockResolvedValue([{ id: "cust2" }]);
+        db.customer.findMany.mockResolvedValue([
+            {
+                id: "cust2",
+                email: "b@x.com",
+                firstName: null,
+                lastName: null,
+                phone: "1119876543210",
+            },
+        ]);
+        await expect(svc.suggestLinks(CTX, "c1")).resolves.toEqual([]);
+    });
+
+    it("suggests other contacts only when asked, and says who signs in", async () => {
+        const { svc, db } = make();
+        db.contact.findMany.mockImplementation(
+            ({ where }: { where: { id?: { in?: string[] } } }) =>
+                Promise.resolve(
+                    where.id?.in?.includes("c1")
+                        ? [me({ phone: "+91 98765 43210" })]
+                        : where.id?.in
+                          ? [
+                                me({
+                                    id: "c2",
+                                    email: "account+c2@account.invalid",
+                                    phone: null,
+                                    firstName: "Asha",
+                                    lastName: "Rao",
+                                    customerAccounts: [
+                                        {
+                                            email: "a@x.com",
+                                            status: "ACTIVE",
+                                            unlinkedFromContactId: null,
+                                        },
+                                    ],
+                                }),
+                                me({
+                                    id: "c3",
+                                    email: "c3@x.com",
+                                    phone: "9876543210",
+                                }),
+                            ]
+                          : [{ id: "c2" }],
+                ),
+        );
+        db.$queryRaw.mockResolvedValue([{ id: "c3" }]);
+
+        await expect(svc.suggestLinks(CTX, "c1")).resolves.toEqual([]);
+        const all = await svc.suggestLinks(CTX, "c1", {
+            includeContacts: true,
+        });
+        expect(all).toEqual([
+            {
+                kind: "contact",
+                contactId: "c2",
+                name: "Asha Rao",
+                // The account's email, never the placeholder.
+                email: "a@x.com",
+                matchedOn: ["email"],
+                signsIn: true,
+            },
+            {
+                kind: "contact",
+                contactId: "c3",
+                name: "Asha",
+                email: "c3@x.com",
+                matchedOn: ["phone"],
+                signsIn: false,
+            },
+        ]);
+    });
+
+    it("never suggests a contact staff split from this one", async () => {
+        const { svc, db } = make();
+        db.contact.findMany.mockImplementation(
+            ({ where }: { where: { id?: { in?: string[] } } }) =>
+                Promise.resolve(
+                    where.id?.in?.includes("c1")
+                        ? [
+                              me({
+                                  unlinkedCustomerAccounts: [
+                                      { contactId: "c2" },
+                                  ],
+                              }),
+                          ]
+                        : where.id?.in
+                          ? [
+                                me({
+                                    id: "c2",
+                                    email: "account+c2@account.invalid",
+                                    customerAccounts: [
+                                        {
+                                            email: "a@x.com",
+                                            status: "ACTIVE",
+                                            unlinkedFromContactId: "c1",
+                                        },
+                                    ],
+                                }),
+                            ]
+                          : [{ id: "c2" }],
+                ),
+        );
+        await expect(
+            svc.suggestLinks(CTX, "c1", { includeContacts: true }),
+        ).resolves.toEqual([]);
+    });
+
+    it("404s suggestions for a contact outside the organization", async () => {
+        const { svc, db } = make();
+        db.contact.findMany.mockResolvedValue([]);
+        await expect(svc.suggestLinks(CTX, "c9")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(db.contact.findMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            id: { in: ["c9"] },
+        });
     });
 
     it("refuses to link a Customer from another Organization", async () => {
@@ -120,7 +267,13 @@ describe("CustomerWorkspaceService", () => {
     it("links within the org and writes an audit event", async () => {
         const { svc, db } = make();
         await svc.link(CTX, "c1", "cust1");
-        expect(db.customerIdentityLink.upsert).toHaveBeenCalled();
+        // A staff link keeps its user and says so (C2).
+        expect(db.customerIdentityLink.upsert.mock.calls[0][0].create).toEqual(
+            expect.objectContaining({
+                linkedByUserId: "user_1",
+                reason: "MANUAL",
+            }),
+        );
         expect(db.auditEvent.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
@@ -141,6 +294,38 @@ describe("CustomerWorkspaceService", () => {
         expect(db.order.findMany).not.toHaveBeenCalled();
         expect(db.booking.findMany).not.toHaveBeenCalled();
         expect(events.every((e) => e.moduleKey === "CRM")).toBe(true);
+    });
+
+    it("says on the timeline how each link was made", async () => {
+        const { svc, db, availability } = make();
+        (availability.listViews as jest.Mock).mockResolvedValue([
+            { key: "COMMERCE", readiness: "ACTIVE" },
+        ]);
+        db.customerIdentityLink.findMany.mockResolvedValue([
+            {
+                customerId: "cust1",
+                reason: "PAYMENT",
+                createdAt: new Date("2026-09-03"),
+            },
+            {
+                customerId: "cust2",
+                reason: "BACKFILL",
+                createdAt: new Date("2026-09-02"),
+            },
+            {
+                customerId: "cust3",
+                reason: "MANUAL",
+                createdAt: new Date("2026-09-01"),
+            },
+        ]);
+        const { events } = await svc.timeline(CTX, "c1");
+        expect(
+            events.filter((e) => e.type === "LINK").map((e) => e.title),
+        ).toEqual([
+            "Linked when they paid",
+            "Linked when the list was set up",
+            "Linked to their store record by your team",
+        ]);
     });
 
     it("finds the contact a store customer is linked to, in this organization", async () => {

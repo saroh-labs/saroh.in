@@ -279,14 +279,26 @@ export class CreateApprovalDto {
 }
 
 /**
- * Search and social settings for a site (#188).
+ * Search and social settings for a site (#188), and its name (G6).
  *
  * Every field is optional and nullable, and the two are different requests:
  * ABSENT means "leave this alone", NULL means "clear it". A settings form that
  * only sends what changed must not silently wipe the fields it omitted, and a
  * merchant clearing a share image must be able to actually clear it.
+ *
+ * The name is the one exception: optional but never null or blank, because a
+ * site always has a name — its header and its page titles are drawn from it.
  */
 export class UpdateSiteSettingsDto {
+    // Checked whenever it is present, null included: `@IsOptional` would let
+    // a null through, and a site with no name has an empty header.
+    @ValidateIf((_o, v) => v !== undefined)
+    @Transform(trim)
+    @IsString({ message: "Give your site a name" })
+    @MinLength(1, { message: "Give your site a name" })
+    @MaxLength(120, { message: "A site name must be at most 120 characters" })
+    name?: string;
+
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @Transform(trimOrNull)

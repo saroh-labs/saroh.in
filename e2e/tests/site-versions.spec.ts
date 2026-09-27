@@ -68,6 +68,63 @@ async function siteId(page: Page): Promise<string> {
     return id;
 }
 
+/** The editor at a phone's width (G4), where the bar folds into a menu. */
+const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
+
+/**
+ * The editor's Publish. On a phone it is in the "Status, view and publish"
+ * menu, opened here if it isn't already.
+ */
+async function publishButton(page: Page) {
+    const publish = page.getByRole("button", { name: /^Publish/ }).first();
+    if (onPhone(page) && !(await publish.isVisible())) {
+        await page
+            .getByRole("button", { name: "Status, view and publish" })
+            .click();
+    }
+    await expect(publish).toBeVisible();
+    return publish;
+}
+
+/**
+ * The first block's Visible/Hidden toggle in the inspector. On a phone the
+ * inspector is a sheet, opened here from the rail's block list: a hidden
+ * block is left off the page, so choosing "1 of N" on the page after hiding
+ * the first would pick the next one, and put back the wrong block.
+ */
+async function inspectorToggle(page: Page) {
+    const toggle = page
+        .getByRole("complementary", { name: "Inspector" })
+        .getByRole("button", { name: /^(Visible|Hidden)$/ })
+        .first();
+    if (onPhone(page) && !(await toggle.isVisible())) {
+        await page
+            .getByRole("navigation", { name: "Edit this page" })
+            .getByRole("button", { name: "Page" })
+            .click();
+        // The rail lists every block, hidden or not: the header, then the
+        // page's own blocks.
+        await page
+            .getByRole("dialog")
+            .getByRole("listitem")
+            .nth(1)
+            .getByRole("button")
+            .last()
+            .click();
+    }
+    await expect(toggle).toBeVisible({ timeout: 30_000 });
+    return toggle;
+}
+
+/** Put the phone's sheet or menu away, so the page is reachable again. */
+async function closeOverlays(page: Page) {
+    if (!onPhone(page)) return;
+    if (await page.getByRole("dialog").count()) {
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+    }
+}
+
 /**
  * Publish from the editor, through the pre-publish check, and wait until it
  * has happened. Returns what the success toast said.
@@ -84,11 +141,9 @@ async function publishFromEditor(page: Page): Promise<string> {
         })
         // The check's own button, drawn after the editor's "Publish".
         .last();
+    await closeOverlays(page);
     await expect(async () => {
-        await page
-            .getByRole("button", { name: /^Publish/ })
-            .first()
-            .click();
+        await (await publishButton(page)).click();
         await expect(confirm).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
     await confirm.click();
@@ -223,5 +278,53 @@ test.describe("taking a version back", () => {
         await expect(
             page.getByRole("main").getByText("Live", { exact: true }),
         ).toHaveCount(1);
+    });
+});
+
+test.describe("the editor's status after a reload (G2)", () => {
+    test("says what is not published yet, and nothing once it is", async ({
+        page,
+    }) => {
+        await signIn(page, demoUser);
+        const id = await siteId(page);
+        await page.goto(`${urls.APP_URL}/sites/${id}`);
+
+        /*
+         * Read through Publish's title rather than the pill: another test in
+         * this file can leave a change request open, and a review outranks
+         * "Not published" in the pill. The title always says what goes live.
+         */
+        // Publish's title, opening the phone's menu to read it and
+        // putting it away again.
+        const publishTitle = async () => {
+            const publish = await publishButton(page);
+            const title = await publish.getAttribute("title");
+            if (onPhone(page)) await page.keyboard.press("Escape");
+            return title;
+        };
+
+        // One block's visibility flips; the autosave counts it.
+        await (await inspectorToggle(page)).click();
+        await closeOverlays(page);
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toMatch(/^Put live: .*block/);
+
+        // The count is the server's, so a reload says the same.
+        await page.reload();
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toMatch(/^Put live: .*block/);
+
+        // Put it back, publish, and nothing is waiting.
+        await (await inspectorToggle(page)).click();
+        await closeOverlays(page);
+        await expect(await publishButton(page)).toBeEnabled({
+            timeout: 30_000,
+        });
+        await publishFromEditor(page);
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toBe("Nothing has changed since the last publish");
     });
 });

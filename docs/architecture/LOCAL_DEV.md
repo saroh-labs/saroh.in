@@ -74,14 +74,15 @@ write sandbox; re-seeding counts every shelf back.
 ### Showcase (the product film's world)
 
 ```bash
-pnpm --filter @saroh/database db:seed:showcase   # base seed, then seven businesses on top
+pnpm --filter @saroh/database db:seed:showcase   # base seed, then eight businesses on top
 pnpm --filter @saroh/database db:seed:reset      # removes both
 ```
 
 This runs the base seed first, then adds more to Northwind (about 50 products,
-500 customers, 500 orders, 120 contacts and 40 leads) and adds six more
-businesses — the first four each with one published site at
-`<slug>.saroh.app.localhost`, the two shops without one:
+500 customers, 500 orders, 120 contacts and 40 leads) and adds seven more
+businesses — Pulse, Prana, CarePoint, Lumen and Kavi Dental each with one
+published site at `<slug>.saroh.app.localhost`, Rye & Co. with its own, and
+the boutique without one:
 
 - **Pulse Fitness** (a gym): personal training, assessments, classes and a
   free trial, about 490 bookings. Four people on the diary (`pulse.ts`): the
@@ -157,6 +158,39 @@ businesses — the first four each with one published site at
   so a take is undone by re-seeding. `checkRye` stops the run if any of these
   states is missing.
 
+- **Kavi Dental** (a dental clinic on 12th Main, Indiranagar, owned by
+  `demo@saroh.dev`; Divya Kamath works the desk as a Member; `clinic.ts`,
+  `clinic-plan.ts`; E29): the clinic the round-2 bookings screens are verified
+  and filmed in. GST-registered in Karnataka (GSTIN `29AAKFK7719M1ZJ`, prefix
+  KD) but exempt: every service and invoice line is 0%, SAC 9993. Six
+  services — Check-up and clean (30 min, ₹1,200), Follow-up review (20 min,
+  ₹500), Root canal treatment (3 visits of 60 min, ₹12,000, 50% deposit),
+  Teeth whitening (2 visits of 45 min, ₹8,500), Video consultation (20 min,
+  ₹600, at the clinic or by video, with a meeting link) and X-ray, full mouth
+  (OPG) (hidden from the booking page; the desk books it). Two dentists,
+  Dr. Meenakshi Rao and Dr. Arun Pillai, with their own weekly hours, one of
+  them with a day off this week; booking rules of 4 weeks ahead, 2 hours
+  before and free cancel up to 24 hours. A published site (`kavi-dental`)
+  whose `/book` page lists the five shown services, and one storefront, "Kavi
+  Dental", a shop with the clinic's address and hours and nothing listed
+  (E9's treatment orders will go there). About 370 bookings from 60 days ago
+  to 3 weeks ahead, every one on a start the dentist's week offers, none in
+  the closure "Closed for Diwali" (the day before Diwali to two days after,
+  from a table of dates in `clinic-data.ts`) or on the day off: attended
+  visits, no-shows, a late cancel, video consultations online or in person.
+  The designs' patients and scenes: Rahul Verma's root canal (visit 1 last
+  week, visit 2 coming, booked on the site with a note still waiting as a
+  Needs attention suggestion), Leela Menon's check-up and video consultation,
+  Farah Khan's whitening, Vikram Rao's check-up, the X-ray it led to (billed,
+  overdue) and his review; Needs attention on Rahul (blood thinners, latex),
+  Farah (pregnant) and Leela (anxious patient). Visits paid online have their
+  invoice (source BOOKING, KD/26-27/0001…); the desk bills a visit by hand
+  afterwards, mostly paid there and then, some due or overdue. Treatments
+  carry no bill yet: E9 turns them into orders. `checkKavi` stops the run if
+  any of these states is missing, and `clinic.test.ts` plans the clinic for
+  every half hour's `now` over months and across Diwali, month, year and
+  financial-year boundaries to prove it works on any day.
+
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The
 showcase code is in `packages/database/src/seed/showcase/`. It uses a seeded
 random generator and dates relative to now, rounded down to the half hour:
@@ -168,7 +202,8 @@ when it boots. At the end it checks, in SQL, that every invoice adds up (and
 every tax invoice line's GST is its rate's), each invoice series runs from
 0001 with no gaps (INV-0001…, RC/26-27/0001…, RCCN/26-27/0001…), subscription periods
 follow the renewal rules, no service is booked past its capacity (counting the
-seats an open course still holds), and every class spent from a pack was one
+seats an open course still holds), no booking made after a closure was put up
+stands inside it, and every class spent from a pack was one
 the pack could pay for; it stops with the failing rows if not. Rows it wrote
 for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
 `seed_sc_rc_`), the earlier line-up, are removed.
@@ -177,14 +212,14 @@ for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
 
 Every account's password is `demo-password-123`, and every email is verified.
 
-| Email                | Business and role                                                                                                                                                                                                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `demo@saroh.dev`     | Northwind OWNER · Leela & Loom OWNER · Rye & Co. OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                 |
-| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                                                        |
-| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                                                         |
-| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                                                               |
-| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                                                                 |
-| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` · Rye & Co.: `nisha.kulkarni@` (MEMBER) |
+| Email                | Business and role                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo@saroh.dev`     | Northwind OWNER · Leela & Loom OWNER · Rye & Co. OWNER · Kavi Dental OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                                     |
+| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                                                                                                |
+| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                                                                                                 |
+| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                                                                                                       |
+| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                                                                                                         |
+| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` · Rye & Co.: `nisha.kulkarni@` (MEMBER) · Kavi Dental: `divya.kamath@` (MEMBER) |
 
 CarePoint is a Member's view on purpose. A Member's role today reads the
 business, its team and its sites but not contacts or bookings, so the clinic

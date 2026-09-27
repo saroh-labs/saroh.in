@@ -314,6 +314,16 @@ jobs:
       # The site-review flow takes the token out of that address and opens it
       # against this origin instead.
       E2E_RENDERER_URL: http://localhost:3005
+      # Site sign-in (round-2 A9): every booking page asks for an emailed
+      # code at the last step. The built apps have no development fallback
+      # for the relay and code secrets, so the stack gets throwaway ones (the
+      # relay one is also what the sign-in spec signs its API calls with).
+      # With no SMTP, the fake code transport leaves each code where the
+      # browser tests read it (`e2e/tests/site-codes.ts`); it never runs in
+      # production.
+      SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
+      SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
+      SITE_CODES_EMAIL_FAKE: log
 
     steps:
       - name: Checkout

@@ -524,17 +524,11 @@ export const NAV_GROUPS: NavGroup[] = [
                         label: "Subscriptions",
                         action: "subscription:read",
                     },
+                    // Plans are a tab of Subscriptions (D3), not a row.
                     {
                         href: "/billing/invoices",
                         label: "Invoices",
                         action: "invoice:read",
-                    },
-                    // Not in the design's section, but a plan is what a
-                    // subscription is made from and it has no other path.
-                    {
-                        href: "/billing/plans",
-                        label: "Plans",
-                        action: "subscription:read",
                     },
                 ],
             },
@@ -984,10 +978,12 @@ export function isNavChildCurrent(
  * Detail (`/customers/:contactId`, U18) is rooted on the contact, so it is
  * Sell › Customers where the business sells and Contacts where it does not:
  * the first of its homes the actor's rail holds is where the rail says you
- * are. Every other address is its own.
+ * are. A plan's pages (`/billing/plans/:planId`) are Subscriptions', whose
+ * tab Plans is (D3). Every other address is its own.
  */
 const NAV_HOMES: readonly { prefix: string; homes: readonly string[] }[] = [
     { prefix: "/customers/", homes: ["/commerce/customers", "/contacts"] },
+    { prefix: "/billing/plans/", homes: ["/billing/subscriptions"] },
 ];
 
 export function navPathname(

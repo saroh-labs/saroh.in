@@ -1,24 +1,40 @@
-import { PageHeader } from "@saroh/ui/page-header";
-
-import { CreateServiceForm } from "@/components/bookings/create-service-form";
-import { PageContainer } from "@/components/shared/page-container";
+import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
+import { ServiceEditor } from "@/components/services/service-editor/service-editor";
+import { loadEditorContext } from "@/lib/services/editor-data";
+import { showKind } from "@/lib/services/service-editor";
 import { requireSession } from "@/lib/session";
 
+export const metadata = { title: "New service" };
+
 /**
- * New-service page (S4-003). A back link, a heading, and the client
- * CreateServiceForm. Availability windows are added afterwards on the service
- * editor the form routes to on success. Mirrors the new-site page shell.
+ * Bookings › Services › New service (E2): the Service Editor, empty. It
+ * opens from New service on Services, the command menu and the site
+ * editor's pickers; adding one lands on its own page.
  */
 export default async function NewServicePage() {
     await requireSession();
-
-    return (
-        <PageContainer width="form">
-            <PageHeader
-                title="Create a service"
-                description="Name your bookable service and set its duration; add availability next."
+    const read = await loadEditorContext();
+    if (!read.ok) {
+        return (
+            <ServiceEditorState
+                state={read.forbidden ? "forbidden" : "failed"}
+                retryHref="/services/new"
             />
-            <CreateServiceForm />
-        </PageContainer>
+        );
+    }
+    const { services, staff, hasPage, canEdit, timezone, currency } =
+        read.context;
+    return (
+        <ServiceEditor
+            service={null}
+            rules={[]}
+            staff={staff?.staff ?? null}
+            usage={{ thisWeek: 0, comingUp: 0 }}
+            currency={currency}
+            timezone={timezone}
+            canEdit={canEdit}
+            kindUp={showKind(services, null)}
+            hasPage={hasPage}
+        />
     );
 }

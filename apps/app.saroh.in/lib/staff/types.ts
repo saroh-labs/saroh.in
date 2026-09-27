@@ -48,10 +48,29 @@ export interface StaffView {
     timeOff: TimeOff[];
 }
 
+/**
+ * The whole business closed (E3): nobody can be booked, on any service. A
+ * part-day range is one of these per day. The reason is team-only.
+ */
+export type Closure = TimeOff;
+
 /** Staff, and the zone their hours are wall-clock times in. */
 export interface StaffList {
     timezone: string;
     staff: StaffView[];
+    /** Current and coming closures, soonest first. */
+    closures: Closure[];
+}
+
+/**
+ * A range of the business's local days, all day or the same hours on each
+ * day — what time off and a closure are added as (E3).
+ */
+export interface OffRangeInput {
+    fromDate: string;
+    toDate?: string;
+    startMinute?: number;
+    endMinute?: number;
 }
 
 /** The business's booking rules; null is no rule. */

@@ -12,10 +12,11 @@ import {
     allergenWords,
     allergyCheck,
     eventText,
-    flowOf,
+    goesToAddress,
     isOpen,
     kitchenStanding,
     STEP_LABEL,
+    stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
@@ -94,7 +95,7 @@ export function OrderDetail({
     const first = firstName(order.customer?.name);
     const currency = order.money?.currency ?? "INR";
     const format = (n: number) => formatMoneyMajor(n, currency) ?? String(n);
-    const flow = flowOf(order.fulfilment);
+    const kitchenSteps = stepsOf(order);
     const standing = STANDING[kitchenStanding(order)];
     const refundedFull = order.refundStanding === "REFUNDED";
     const unpaid =
@@ -104,8 +105,8 @@ export function OrderDetail({
     const next: KitchenStage | null =
         can.stage && !unpaid ? (order.next.stages[0] ?? null) : null;
     const open = isOpen(order);
-    const age = open && clock !== null ? waiting(order.placedAt, clock) : null;
-    const delivery = order.fulfilment === "DELIVERY";
+    const age = open && clock !== null ? waiting(order, clock) : null;
+    const delivery = goesToAddress(order);
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
         null;
@@ -248,7 +249,7 @@ export function OrderDetail({
                     />
                 ) : null}
                 <KitchenStepper
-                    flow={flow}
+                    steps={kitchenSteps}
                     stage={order.stage}
                     refunded={refundedFull}
                     next={hold ? null : next}
@@ -388,7 +389,7 @@ export function OrderDetail({
                         {money ? (
                             <MoneyCard
                                 money={money}
-                                fulfilment={order.fulfilment}
+                                delivery={delivery}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}
                                 invoices={order.invoices}

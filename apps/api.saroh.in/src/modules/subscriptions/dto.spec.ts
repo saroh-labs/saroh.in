@@ -1,6 +1,8 @@
 // What the subscription routes accept, checked with the same validator the
 // global ValidationPipe runs. Timezones and dates that parse but do not
 // exist are the service's to refuse.
+import "reflect-metadata";
+
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
@@ -8,6 +10,8 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
+    PauseSubscriptionDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -41,6 +45,37 @@ describe("what a plan accepts", () => {
     it("refuses a price with three decimals", async () => {
         expect(await refused(PlanInputDto, { price: "12.345" })).toContain(
             "price",
+        );
+    });
+
+    it("takes classes a month from 1 to 60, or null for unlimited", async () => {
+        for (const classesPerMonth of [1, 8, 60, null]) {
+            expect(await refused(PlanInputDto, { classesPerMonth })).toEqual(
+                [],
+            );
+        }
+    });
+
+    it("refuses classes a month outside 1–60, a fraction, or text", async () => {
+        for (const classesPerMonth of [0, -1, 61, 2.5, "8"]) {
+            expect(await refused(PlanInputDto, { classesPerMonth })).toContain(
+                "classesPerMonth",
+            );
+        }
+    });
+
+    it("says why classes a month is refused, in the editor's words", async () => {
+        const [tooMany] = await validate(
+            plainToInstance(PlanInputDto, { classesPerMonth: 61 }),
+        );
+        expect(Object.values(tooMany!.constraints!)).toContain(
+            "60 a month is the most",
+        );
+    });
+
+    it("trims a name, so ' Monthly ' is 'Monthly'", () => {
+        expect(plainToInstance(PlanInputDto, { name: " Monthly " }).name).toBe(
+            "Monthly",
         );
     });
 
@@ -116,5 +151,51 @@ describe("what skipping and changing plan accept", () => {
 
     it("needs the plan to move to", async () => {
         expect(await refused(ChangePlanDto, {})).toContain("planId");
+    });
+});
+
+describe("what a pause accepts (D8)", () => {
+    it("takes 2, 4 or 8 weeks, a date, null, or nothing at all", async () => {
+        for (const body of [
+            { weeks: 2 },
+            { weeks: 4 },
+            { weeks: 8 },
+            { until: "2026-10-20" },
+            { until: null },
+            {},
+        ]) {
+            expect(await refused(PauseSubscriptionDto, body)).toEqual([]);
+        }
+    });
+
+    it("refuses any other length, or a date that isn't YYYY-MM-DD", async () => {
+        for (const weeks of [1, 3, 6, 12, "4"]) {
+            expect(await refused(PauseSubscriptionDto, { weeks })).toContain(
+                "weeks",
+            );
+        }
+        expect(
+            await refused(PauseSubscriptionDto, { until: "20 Oct" }),
+        ).toContain("until");
+    });
+});
+
+describe("what a page of a plan's history accepts (D2)", () => {
+    it("reads the limit from the query string as a number", async () => {
+        const query = plainToInstance(ListPlanEventsQueryDto, {
+            limit: "20",
+            cursor: "evt_1",
+        });
+        expect(query.limit).toBe(20);
+        expect(await validate(query)).toEqual([]);
+        expect(await refused(ListPlanEventsQueryDto, {})).toEqual([]);
+    });
+
+    it("refuses a limit of none, too many, or not a whole number", async () => {
+        for (const limit of ["0", "101", "ten", "2.5"]) {
+            expect(await refused(ListPlanEventsQueryDto, { limit })).toContain(
+                "limit",
+            );
+        }
     });
 });

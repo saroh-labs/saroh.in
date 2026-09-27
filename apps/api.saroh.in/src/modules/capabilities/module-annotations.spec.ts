@@ -39,6 +39,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "bookings/bookings.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
     "staff/staff.controller.ts": "APPOINTMENTS",
+    // E3: business closures and the time-off preview.
+    "staff/closures.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
@@ -103,6 +105,8 @@ const NEVER: Record<string, string> = {
         "spans every dated module, and drops a layer whose module is off itself",
     "customer-workspace/customer-workspace.controller.ts":
         "spans CRM, Commerce and Appointments at once",
+    "contacts/contact-search.controller.ts":
+        "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
@@ -137,7 +141,20 @@ const NEVER: Record<string, string> = {
     "payments/public-invoices.controller.ts":
         "a customer's invoice link — no session",
     "bookings/public-bookings.controller.ts": "public booking",
-    "sites/public-sites.controller.ts": "published sites",
+    // Also the place a site's Visit us block and booking page show (G8): a
+    // shop's address and hours stay true whichever modules are on.
+    "sites/public-sites.controller.ts":
+        "published sites, and the business's place and hours",
+    // A customer signs in on a merchant's site (ADR-011): sign-in is always
+    // on, so it must not vanish with a module switch.
+    "site-accounts/sign-in.controller.ts":
+        "customer sign-in on a published site — no organization context",
+    "site-accounts/sessions.controller.ts":
+        "a signed-in customer's session on a published site",
+    // A9: booking signed in. Appointments being off is checked per service
+    // (`appointmentsOpen`), as on the anonymous route.
+    "site-accounts/account-bookings.controller.ts":
+        "a signed-in customer booking on a published site — Appointments checked per service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",

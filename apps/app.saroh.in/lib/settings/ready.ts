@@ -1,20 +1,26 @@
 import type { ModuleView } from "@/lib/modules/schema";
-import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import type {
+    OrganizationSettings,
+    SetupFacts,
+} from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
 /**
- * "Ready to take payments" ("Saroh Settings" design): what is left before a
- * business is set up to sell, each with the place that fixes it.
+ * Getting a business ready to take money, and what email needs.
  *
- * Only facts the API already sends: the business's own settings, the
- * modules' readiness and the messaging providers connected. The design's
- * first item — "your email sender isn't verified" — has no fact behind it
- * (Saroh does not verify senders), so the email item says what is true: the
- * email provider is disconnected, or there is none while Communications is on.
- * Payments is added: a card headed "Ready to take payments" that hid itself
- * while no payment provider was connected would be claiming something false.
+ * `readyChecklist` is the one list of setup steps. Home shows it as "Get
+ * ready to take money" and Settings › Business as "Ready to take payments"
+ * (the "Saroh Home" and "Saroh Settings" designs, F8), so the two never
+ * count differently. Only facts the API already sends: the business's own
+ * settings and the modules' readiness.
+ *
+ * Email is not a step — it does not take money. What email needs is said on
+ * the Providers tab (`providersTabNote`), where it is fixed. The design's
+ * "your email sender isn't verified" has no fact behind it (Saroh does not
+ * verify senders), so that note says what is true: the email provider is
+ * disconnected, or there is none while Communications is on.
  */
 
 /** Why email needs a person, or `null` when it does not (or we can't tell). */
@@ -55,17 +61,31 @@ export function providersTabNote(attention: EmailAttention | null) {
     return null;
 }
 
+export type ReadyStepKey =
+    "payments" | "address" | "tax" | "catalogue" | "site";
+
 export interface ReadyItem {
-    key: "email" | "payments" | "logo" | "gstin" | "pipeline";
+    key: ReadyStepKey;
+    /** The step, as a thing to do ("Connect payments"). */
     label: string;
+    /** Why it matters, in a sentence. */
+    why: string;
+    /** The button, where the step is offered as one ("Add GSTIN"). */
     cta: string;
+    /** Where the step is done. */
     href: string;
     /** Something that worked has stopped — the danger dot, not the accent. */
     broken: boolean;
 }
 
+export interface ReadyStep extends ReadyItem {
+    done: boolean;
+}
+
 export interface ReadyChecklist {
-    /** What is left, in the order to do it. */
+    /** Every step that could be checked, in the order to do them. */
+    steps: ReadyStep[];
+    /** What is left, in the same order. */
     left: ReadyItem[];
     done: number;
     total: number;
@@ -74,112 +94,289 @@ export interface ReadyChecklist {
 const business = (section: string) =>
     `/settings/organization?${BUSINESS_TAB_PARAM}=${section}`;
 
+/** Modules that take money for something: a sale, a booking, a course. */
+const SELLING = ["COMMERCE", "APPOINTMENTS", "COURSES"] as const;
+
+type Check = ReadyItem & { left: boolean };
+
+const connect = (href: string): ReadyItem => ({
+    key: "payments",
+    label: "Connect payments",
+    why: "So money reaches your bank.",
+    cta: "Connect payments",
+    href,
+    broken: false,
+});
+
+function payments(modules: readonly ModuleView[]): Check | null {
+    const view = modules.find((m) => m.key === "PAYMENTS");
+    // Not offered to this business at all (its rollout hasn't reached it):
+    // nothing it could do about it here, so not a step.
+    if (!view) return null;
+    if (view.lifecycle !== "ENABLED") {
+        // Nothing that sells is on either: no money to take yet, so the step
+        // does not apply. Something sells: Payments has to come on first.
+        if (!SELLING.some((k) => on(modules, k))) return null;
+        return {
+            ...connect("/settings/modules"),
+            why: "Turn on Payments, then connect your provider, so money reaches your bank.",
+            left: true,
+        };
+    }
+    const href = view.blockers[0]?.actionHref ?? "/settings/providers";
+    if (view.readiness === "ATTENTION_REQUIRED") {
+        return {
+            key: "payments",
+            label: "Reconnect payments",
+            why: "Your payment provider is switched off, so customers can't pay online.",
+            cta: "Reconnect payments",
+            href,
+            broken: true,
+            left: true,
+        };
+    }
+    return { ...connect(href), left: view.readiness !== "ACTIVE" };
+}
+
+const filled = (v: string | null | undefined) => !!v?.trim();
+
+function address(
+    registered: NonNullable<OrganizationSettings["registeredAddress"]>,
+): Check {
+    return {
+        key: "address",
+        label: "Add your registered address",
+        why: "It's printed on every invoice you send.",
+        cta: "Add address",
+        href: business("address"),
+        broken: false,
+        left: !(
+            filled(registered.line1) &&
+            filled(registered.city) &&
+            filled(registered.postalCode) &&
+            filled(registered.state)
+        ),
+    };
+}
+
+function tax(
+    settings: Pick<OrganizationSettings, "tax" | "profile">,
+): Check | null {
+    // Absent from an API older than GST: unknown. Not GST-registered: there
+    // is no GSTIN to add, so the step does not apply.
+    if (!settings.tax?.registered) return null;
+    return {
+        key: "tax",
+        label: "Add your GSTIN",
+        why: "So your invoices count as tax invoices.",
+        cta: "Add GSTIN",
+        href: business("tax"),
+        broken: false,
+        left: !filled(settings.profile?.taxId),
+    };
+}
+
 /**
- * Each check is left, done, or unknown. Unknown — the list behind it could
- * not be read — counts neither way, so the count never claims a step is done
- * that nobody checked. A step that does not apply (Contacts is off, the
- * business is not GST-registered) is done, as the design counts it.
+ * A first product or service. Done once either list has one; it applies only
+ * while something that lists them is on, and what it asks for follows what
+ * is on.
+ *
+ * Done is the API's count when it sends one (H-5): Commerce's readiness is
+ * satisfied by a storefront alone, so reading it ticked "first product" for
+ * a business with a storefront and nothing in it. An older API sends no
+ * count, and the blockers are read as before.
+ */
+function catalogue(
+    modules: readonly ModuleView[],
+    facts: SetupFacts | undefined,
+): Check | null {
+    const sells = on(modules, "COMMERCE");
+    const books = on(modules, "APPOINTMENTS");
+    if (!sells && !books) return null;
+    const blocked = (key: string, code: string) =>
+        modules
+            .find((m) => m.key === key)
+            ?.blockers.some((b) => b.code === code) ?? false;
+    const hasProduct =
+        sells &&
+        (facts
+            ? facts.products > 0
+            : !blocked("COMMERCE", "COMMERCE_NO_CATALOG"));
+    const hasService =
+        books &&
+        (facts
+            ? facts.services > 0
+            : !blocked("APPOINTMENTS", "APPOINTMENTS_NO_SERVICE"));
+    const left = !hasProduct && !hasService;
+
+    if (books && !sells) {
+        return {
+            key: "catalogue",
+            label: "Add your first service",
+            why: "Customers can only book what's listed.",
+            cta: "Add a service",
+            href: "/services/new",
+            broken: false,
+            left,
+        };
+    }
+    return {
+        key: "catalogue",
+        ...(books
+            ? {
+                  label: "Add your first product or service",
+                  why: "Customers can only buy or book what's listed.",
+              }
+            : {
+                  label: "Add your first product",
+                  why: "A name, a price and a photo is enough to start.",
+              }),
+        cta: "Add a product",
+        href: "/commerce/products/new",
+        broken: false,
+        left,
+    };
+}
+
+/**
+ * Publishing the site. Done is the API's fact when it sends one (H-6): a
+ * site exists and none is without something published now — the same fact
+ * Home's "Your site isn't live" reads. Readiness counts any publication
+ * ever made, so a site taken down still ticked it. An older API sends no
+ * fact, and the blockers are read as before.
+ */
+function site(
+    modules: readonly ModuleView[],
+    facts: SetupFacts | undefined,
+): Check | null {
+    // The website is off: nothing to publish, so the step does not apply.
+    if (!on(modules, "WEBSITE")) return null;
+    const blocker = modules
+        .find((m) => m.key === "WEBSITE")
+        ?.blockers.find(
+            (b) =>
+                b.code === "WEBSITE_NO_PUBLICATION" ||
+                b.code === "WEBSITE_NO_SITE",
+        );
+    const left = facts
+        ? facts.sites === 0 || facts.sitesNotLive > 0
+        : blocker !== undefined;
+    return {
+        key: "site",
+        label: "Publish your site",
+        why: "Nobody can find you until it's live.",
+        cta: "Publish site",
+        href:
+            blocker?.actionHref ??
+            (facts?.sites === 0 ? "/sites/new" : "/sites"),
+        broken: false,
+        left,
+    };
+}
+
+/**
+ * The steps to take money, in order: connect payments, the registered
+ * address, GST, a first product or service, and publishing the site.
+ *
+ * Each check is left, done, or not a step at all. Unknown — the list behind
+ * it could not be read — is left out, so the count never claims a step is
+ * done that nobody checked. So is a step that does not apply (the business
+ * is not GST-registered, the website is off): Home ticks the done steps, and
+ * a tick beside "Add your GSTIN" for a business with no GSTIN would be false.
  */
 export function readyChecklist({
     settings,
     modules,
-    messaging,
 }: {
-    settings: Pick<OrganizationSettings, "logo" | "tax" | "profile">;
+    settings: Pick<
+        OrganizationSettings,
+        "tax" | "profile" | "registeredAddress" | "setup"
+    >;
     modules: readonly ModuleView[] | null;
-    messaging: readonly ConnectedCommsProvider[] | null;
 }): ReadyChecklist {
-    const checks: { item: ReadyItem; left: boolean }[] = [];
+    const checks = [
+        modules ? payments(modules) : null,
+        // Absent from an API older than the registered address: unknown.
+        settings.registeredAddress ? address(settings.registeredAddress) : null,
+        tax(settings),
+        modules ? catalogue(modules, settings.setup) : null,
+        modules ? site(modules, settings.setup) : null,
+    ].filter((c): c is Check => c !== null);
 
-    const email = emailAttention(modules, messaging);
-    if (modules && messaging) {
-        checks.push({
-            left: email !== null,
-            item:
-                email === "disconnected"
-                    ? {
-                          key: "email",
-                          label: "Email to customers isn't sending — your email provider is disconnected",
-                          cta: "Reconnect email",
-                          href: "/settings/providers",
-                          broken: true,
-                      }
-                    : {
-                          key: "email",
-                          label: "Connect an email provider so messages to customers get sent",
-                          cta: "Connect email",
-                          href: "/settings/providers",
-                          broken: false,
-                      },
-        });
+    const steps: ReadyStep[] = checks.map(({ left, ...item }) => ({
+        ...item,
+        done: !left,
+    }));
+    const left: ReadyItem[] = checks
+        .filter((c) => c.left)
+        .map(({ left: _left, ...item }) => item);
+    return {
+        steps,
+        left,
+        done: steps.length - left.length,
+        total: steps.length,
+    };
+}
+
+/**
+ * Where Home puts the checklist: first while fewer than half the steps are
+ * done, lower down once more are, and only a "Show setup" link while hidden.
+ * Nothing once every step is done, or when none could be checked.
+ */
+export type TakeMoneyPlace = "first" | "late" | "hidden" | null;
+
+export function takeMoneyPlace(
+    list: Pick<ReadyChecklist, "done" | "total">,
+    hidden: boolean,
+): TakeMoneyPlace {
+    if (list.total === 0 || list.done >= list.total) return null;
+    if (hidden) return "hidden";
+    return list.done < list.total / 2 ? "first" : "late";
+}
+
+/**
+ * Hiding the checklist is remembered per person, per business, in this
+ * browser: a convenience, never a setting (default 123). Storage can be
+ * missing or refuse (a private window, blocked site data), so every read and
+ * write is guarded, and a failed read is "not hidden".
+ */
+export const SETUP_HIDDEN_KEY = "saroh.home.setupHidden";
+
+type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+function readHiddenMap(storage: () => StorageLike): Record<string, unknown> {
+    try {
+        const raw: unknown = JSON.parse(
+            storage().getItem(SETUP_HIDDEN_KEY) ?? "{}",
+        );
+        return raw && typeof raw === "object" && !Array.isArray(raw)
+            ? (raw as Record<string, unknown>)
+            : {};
+    } catch {
+        return {};
     }
+}
 
-    if (modules) {
-        const payments = modules.find((m) => m.key === "PAYMENTS");
-        const step =
-            payments?.lifecycle === "ENABLED" && payments.readiness !== "ACTIVE"
-                ? payments.blockers[0]
-                : undefined;
-        const broken = payments?.readiness === "ATTENTION_REQUIRED";
-        checks.push({
-            left: step !== undefined,
-            item: {
-                key: "payments",
-                label: broken
-                    ? "Your payment provider is switched off — customers can't pay online"
-                    : "Connect a payment provider so customers can pay online",
-                cta: broken ? "Reconnect payments" : "Connect payments",
-                href: step?.actionHref ?? "/settings/providers",
-                broken,
-            },
-        });
+export function readSetupHidden(
+    storage: () => StorageLike,
+    businessId: string,
+): boolean {
+    return readHiddenMap(storage)[businessId] === true;
+}
+
+/** False when the browser would not keep it. */
+export function writeSetupHidden(
+    storage: () => StorageLike,
+    businessId: string,
+    hidden: boolean,
+): boolean {
+    try {
+        const next = { ...readHiddenMap(storage) };
+        if (hidden) next[businessId] = true;
+        else delete next[businessId];
+        storage().setItem(SETUP_HIDDEN_KEY, JSON.stringify(next));
+        return true;
+    } catch {
+        return false;
     }
-
-    // Absent from an API older than the logo: unknown, not missing.
-    if (settings.logo !== undefined) {
-        checks.push({
-            left: settings.logo === null,
-            item: {
-                key: "logo",
-                label: "Add your logo — it goes on every receipt and invoice",
-                cta: "Add logo",
-                href: business("identity"),
-                broken: false,
-            },
-        });
-    }
-
-    if (settings.tax) {
-        checks.push({
-            left: settings.tax.registered && !settings.profile?.taxId?.trim(),
-            item: {
-                key: "gstin",
-                label: "Add your GSTIN so invoices count as tax invoices",
-                cta: "Add GSTIN",
-                href: business("tax"),
-                broken: false,
-            },
-        });
-    }
-
-    if (modules) {
-        const pipeline = on(modules, "CRM")
-            ? modules
-                  .find((m) => m.key === "CRM")
-                  ?.blockers.find((b) => b.code === "CRM_NO_PIPELINE")
-            : undefined;
-        checks.push({
-            left: pipeline !== undefined,
-            item: {
-                key: "pipeline",
-                label: "Create a pipeline so enquiries don't get lost",
-                cta: "Set up",
-                href: pipeline?.actionHref ?? "/settings/modules",
-                broken: false,
-            },
-        });
-    }
-
-    const left = checks.filter((c) => c.left).map((c) => c.item);
-    return { left, done: checks.length - left.length, total: checks.length };
 }

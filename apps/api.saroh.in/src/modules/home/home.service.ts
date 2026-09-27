@@ -1,12 +1,63 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { OrgRole } from "../../common/types/organization-context";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
-import { UNFULFILLED_STATUSES } from "../orders/order-standing";
-import type { OrgAction } from "../organizations/organization-actions";
-import { can } from "../organizations/organization-policy";
+import { StockChecksService } from "../stock/stock-checks.service";
+import { lastDayHeader, readLastDay } from "./home-last-day";
+import type {
+    HomeAction,
+    HomeBooking,
+    HomeEvidence,
+    HomeInput,
+    HomeModel,
+    HomeNumber,
+    HomeSeverity,
+    HomeUnavailable,
+} from "./home-model";
+import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
+import type { RefundReason } from "./home-money-sources";
+import {
+    failedRenewals,
+    overdueInvoices,
+    refundReason,
+    refundReasonWords,
+    refundsOwedTitle,
+} from "./home-money-sources";
+import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
+import type { OpenOrders } from "./home-open-orders";
+import { readOpenOrders } from "./home-open-orders";
+import { pausesWaitingOnPayments } from "./home-pause-sources";
+import { sitesNotLive, stockShort } from "./home-site-stock-sources";
+import { readToday, todayScope } from "./home-today";
+
+export type {
+    HomeAction,
+    HomeBooking,
+    HomeEvidence,
+    HomeInline,
+    HomeInput,
+    HomeLastDay,
+    HomeModel,
+    HomeNeed,
+    HomeNumber,
+    HomeSeverity,
+    HomeSinceItem,
+    HomeToday,
+    HomeTodayItem,
+    HomeTone,
+    HomeUnavailable,
+} from "./home-model";
+
+const SEVERITY_RANK: Record<HomeSeverity, number> = {
+    ATTENTION: 0,
+    OVERDUE: 1,
+    SETUP: 2,
+    SUGGESTION: 3,
+};
+
+/** How far ahead the schedule band looks. */
+const UPCOMING_LIMIT = 8;
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -36,149 +87,6 @@ import { can } from "../organizations/organization-policy";
  * capped ({@link EVIDENCE_LIMIT}) and always ordered oldest-first: the thing
  * that has waited longest is the thing most likely to be a problem.
  */
-export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
-
-const SEVERITY_RANK: Record<HomeSeverity, number> = {
-    ATTENTION: 0,
-    OVERDUE: 1,
-    SETUP: 2,
-    SUGGESTION: 3,
-};
-
-/**
- * How many rows of evidence an action carries. Five is what fits on Home
- * without turning it into the list screen it links to; `count` still reports the
- * true total, so "5 of 23" is expressible and nothing is silently hidden.
- */
-const EVIDENCE_LIMIT = 5;
-
-/** How far ahead the schedule band looks. */
-const UPCOMING_LIMIT = 8;
-
-/**
- * One concrete row behind an action's count.
- *
- * `amountMinor` is in MINOR units and `currency` may be null, because the two
- * sources disagree and pretending otherwise would print wrong money: an Order
- * stores a Decimal with an explicit currency, while a CRM Lead stores a bare
- * integer with no currency at all. A null currency means "this number has no
- * stated currency" and the client must render it without a symbol — not guess
- * one from the locale.
- */
-export interface HomeEvidence {
-    id: string;
-    /** The thing itself — a lead's title, an order's number. */
-    title: string;
-    /** Who it concerns, when known. */
-    subtitle: string | null;
-    /** ISO instant this row is measured from: due date, or placed date. */
-    at: string | null;
-    amountMinor: number | null;
-    currency: string | null;
-    href: string;
-}
-
-export interface HomeAction {
-    code: string;
-    title: string;
-    href: string;
-    severity: HomeSeverity;
-    moduleKey?: string;
-    /** The true total behind the action, which may exceed `evidence.length`. */
-    count?: number;
-    evidence?: HomeEvidence[];
-}
-
-/**
- * A booking on the schedule band.
- *
- * `timezone` travels with every row rather than being resolved here: a booking
- * is stored in absolute UTC plus the zone the booker saw, and an Organization
- * has no single timezone to fold them into. Deciding server-side what counts as
- * "today" would be wrong for any merchant whose bookers are not in their zone,
- * so the client groups by each booking's own day.
- */
-export interface HomeBooking {
-    id: string;
-    startAt: string;
-    endAt: string;
-    timezone: string;
-    serviceName: string;
-    who: string | null;
-    status: string;
-    href: string;
-}
-
-/**
- * A count that is a destination.
- *
- * Every number on Home links to the exact rows it counts — `href` carries the
- * filter, not just the screen. A tile that states "12 open leads" and lands on
- * an unfiltered list has made the merchant do the filtering twice.
- */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
-}
-
-/**
- * A part of Home that could not be read.
- *
- * The difference between "you have no open orders" and "we could not find out
- * whether you have open orders" is the whole of PRODUCT_STRATEGY §30, and the
- * client cannot render a difference the API does not express.
- */
-export interface HomeUnavailable {
-    /** Module key the failed source belongs to, e.g. `COMMERCE`. */
-    moduleKey: string;
-    /** What the merchant would call it, e.g. "Open orders". */
-    label: string;
-}
-
-export interface HomeModel {
-    actions: HomeAction[];
-    primaryAction: HomeAction | null;
-    hasAnyModule: boolean;
-    /** Confirmed bookings from now forward; the client groups them by day. */
-    upcoming: HomeBooking[];
-    numbers: HomeNumber[];
-    /**
-     * Sources that failed. Empty on a healthy read. Non-empty means what is
-     * shown is INCOMPLETE, and Home must say so rather than presenting the
-     * subset as the whole picture (§30).
-     */
-    unavailable: HomeUnavailable[];
-}
-
-export interface HomeInput {
-    organizationId: string;
-    organizationRole: OrgRole;
-    /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
-    organizationActions?: ReadonlySet<OrgAction>;
-    projectId?: string;
-}
-
-/** A person's display name from optional name parts, falling back to email. */
-function personName(person: {
-    firstName?: string | null;
-    lastName?: string | null;
-    email?: string | null;
-}): string | null {
-    const full = [person.firstName, person.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-    if (full) return full;
-    // NOT `?? null`: an email of "" is not nullish, so `??` would return the
-    // empty string and the caller would render a blank line where it expects
-    // either a name or a deliberate absence.
-    const email = person.email?.trim();
-    return email !== undefined && email.length > 0 ? email : null;
-}
-
 @Injectable()
 export class HomeService {
     private readonly logger = new Logger(HomeService.name);
@@ -186,6 +94,9 @@ export class HomeService {
     constructor(
         private readonly availability: ModuleAvailabilityService,
         @Optional() private readonly db: typeof prisma = prisma,
+        // Optional so a spec can build Home without the stock module; the
+        // app always injects it, and without it the stock row is not read.
+        @Optional() private readonly stockChecks?: StockChecksService,
     ) {}
 
     /**
@@ -230,7 +141,6 @@ export class HomeService {
         // emitting an action for a module the actor cannot see.
         const views = await this.availability.listViews(input);
         const actions: HomeAction[] = [];
-        const unavailable: HomeUnavailable[] = [];
 
         // Setup / attention actions straight from module readiness.
         for (const view of views) {
@@ -283,69 +193,239 @@ export class HomeService {
         // Reaching CRM is not reading leads: since DEC-020 a Member reaches the
         // module for contacts and holds no `lead:read`, so the two lead bands
         // below ask for the action rather than the module.
-        const canReadLeads = input.organizationActions
-            ? input.organizationActions.has("lead:read")
-            : can(input.organizationRole, "lead:read");
+        const canReadLeads = holds(input, "lead:read");
+        // The business's days: "Due today" on an order, "was due 14 Sep".
+        const zone = await this.businessZone(input.organizationId);
         const numbers: HomeNumber[] = [];
-        let upcoming: HomeBooking[] = [];
 
-        if (available.has("CRM")) {
-            numbers.push(
-                ...(await this.attempt(
-                    { moduleKey: "CRM", label: "Customer numbers" },
-                    () => this.crmNumbers(input.organizationId, canReadLeads),
-                    [],
-                    unavailable,
-                )),
-            );
-        }
+        /*
+         * Every source below is independent of the others, so they are read
+         * at once rather than one after another (H-4): Home is read on every
+         * navigation (the rail's badges), and some twenty-five serial reads
+         * made each one wait on the sum of them. Each keeps its own guard —
+         * one failing is named and the rest still render — and each records
+         * its failure in its own slot, so `unavailable` lists the parts in
+         * the same order however the reads finish.
+         */
+        const slots: HomeUnavailable[][] = [];
+        const guard = <T>(
+            source: HomeUnavailable,
+            read: () => Promise<T>,
+            fallback: T,
+        ): Promise<T> => {
+            const slot: HomeUnavailable[] = [];
+            slots.push(slot);
+            return this.attempt(source, read, fallback, slot);
+        };
+        const skip = <T>(value: T): Promise<T> => Promise.resolve(value);
 
-        if (active.has("CRM") && canReadLeads) {
-            const overdue = await this.attempt(
-                { moduleKey: "CRM", label: "Overdue follow-ups" },
-                () => this.overdueFollowUps(input.organizationId, now),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-            if (overdue.count > 0) {
-                actions.push({
-                    code: "CRM_OVERDUE_FOLLOWUPS",
-                    title: `Follow up on ${overdue.count} overdue lead${overdue.count === 1 ? "" : "s"}`,
-                    href: "/leads",
-                    severity: "OVERDUE",
-                    moduleKey: "CRM",
-                    count: overdue.count,
-                    evidence: overdue.evidence,
-                });
-            }
+        const noEvidence = { count: 0, evidence: [] as HomeEvidence[] };
+        const noRefunds: typeof noEvidence & { reason?: RefundReason } =
+            noEvidence;
+        const canReadInvoices = holds(input, "invoice:read");
+        const canReadSubscriptions = holds(input, "subscription:read");
+        const stockChecks = this.stockChecks;
+        const scope = todayScope(input, available);
+
+        const [
+            crmNumbers,
+            overdue,
+            open,
+            schedule,
+            today,
+            lastDay,
+            owed,
+            renewals,
+            waiting,
+            overdueInvoiceAction,
+            short,
+            notLive,
+        ] = await Promise.all([
+            available.has("CRM")
+                ? guard(
+                      { moduleKey: "CRM", label: "Customer numbers" },
+                      () => this.crmNumbers(input.organizationId, canReadLeads),
+                      [] as HomeNumber[],
+                  )
+                : skip([] as HomeNumber[]),
+            active.has("CRM") && canReadLeads
+                ? guard(
+                      { moduleKey: "CRM", label: "Overdue follow-ups" },
+                      () => this.overdueFollowUps(input.organizationId, now),
+                      noEvidence,
+                  )
+                : skip(noEvidence),
+            available.has("COMMERCE")
+                ? guard<OpenOrders>(
+                      { moduleKey: "COMMERCE", label: "Open orders" },
+                      () =>
+                          readOpenOrders(this.db, input.organizationId, {
+                              now,
+                              zone,
+                              // An order's money is `order:read`'s;
+                              // `order:stage` moves it without seeing it
+                              // (DEC-024).
+                              money: holds(input, "order:read"),
+                          }),
+                      noEvidence,
+                  )
+                : skip<OpenOrders>(noEvidence),
+            available.has("APPOINTMENTS")
+                ? guard(
+                      { moduleKey: "APPOINTMENTS", label: "Schedule" },
+                      async () => {
+                          const [next, total] = await Promise.all([
+                              this.upcomingBookings(input.organizationId, now),
+                              this.db.booking.count({
+                                  where: {
+                                      organizationId: input.organizationId,
+                                      status: "CONFIRMED",
+                                      startAt: { gte: now },
+                                  },
+                              }),
+                          ]);
+                          return { upcoming: next, total };
+                      },
+                      { upcoming: [] as HomeBooking[], total: 0 },
+                  )
+                : skip({ upcoming: [] as HomeBooking[], total: 0 }),
+            // The business's day, in its zone (F5): bookings, classes,
+            // pick-ups.
+            scope
+                ? guard(
+                      {
+                          moduleKey: scope.bookings
+                              ? "APPOINTMENTS"
+                              : "COMMERCE",
+                          label: "Today",
+                      },
+                      () => readToday(this.db, input, scope, { now, zone }),
+                      null,
+                  )
+                : skip(null),
+            // The greeting's clock and the last 24 hours (F6), in the same
+            // zone.
+            guard(
+                { moduleKey: "HOME", label: "The last 24 hours" },
+                () => readLastDay(this.db, input, available, { now, zone }),
+                lastDayHeader(now, zone),
+            ),
+            // Money taken through an invoice's pay link after the invoice
+            // was already paid or voided (U13). The customer is owed it
+            // back, so it is ATTENTION: already wrong, and only the merchant
+            // can put it right. Shown wherever Payments is available — a
+            // business that has since disconnected its provider still owes
+            // the refund — and only to people who can read invoices.
+            available.has("PAYMENTS") && canReadInvoices
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Payments to refund" },
+                      () => this.refundsOwed(input.organizationId),
+                      noRefunds,
+                  )
+                : skip(noRefunds),
+            // Renewals that haven't been paid, and invoices past due (F1).
+            // Like refunds owed, they show wherever Payments is available:
+            // the money is owed whether or not a provider is connected
+            // today. Each asks for its own read, so a role holding one sees
+            // only that one.
+            available.has("PAYMENTS") && canReadSubscriptions
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Failed renewals" },
+                      () =>
+                          failedRenewals(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              canReadInvoices,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            // Pauses that ended with Payments off (D8): shown because
+            // Payments is off, so not gated on it.
+            canReadSubscriptions
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Paused subscriptions" },
+                      () =>
+                          pausesWaitingOnPayments(
+                              this.db,
+                              input.organizationId,
+                              now,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            available.has("PAYMENTS") && canReadInvoices
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Overdue invoices" },
+                      () => overdueInvoices(this.db, input.organizationId, now),
+                      null,
+                  )
+                : skip(null),
+            // Shelves short for open orders (F1): the Stock screen's own
+            // checks.
+            available.has("COMMERCE") &&
+            holds(input, "store:read") &&
+            stockChecks
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Stock" },
+                      () =>
+                          stockShort(
+                              this.db,
+                              stockChecks,
+                              input.organizationId,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            // Websites that aren't live (F1). Not for a Reviewer: they are
+            // asked to look at named sites, and their Home is its own view
+            // (F9).
+            available.has("WEBSITE") &&
+            holds(input, "site:read") &&
+            input.organizationRole !== "REVIEWER"
+                ? guard(
+                      { moduleKey: "WEBSITE", label: "Website" },
+                      () => sitesNotLive(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
+        ]);
+        const unavailable = slots.flat();
+
+        numbers.push(...crmNumbers);
+
+        if (overdue.count > 0) {
+            actions.push({
+                code: "CRM_OVERDUE_FOLLOWUPS",
+                title: `Follow up on ${overdue.count} overdue lead${overdue.count === 1 ? "" : "s"}`,
+                href: "/leads",
+                severity: "OVERDUE",
+                moduleKey: "CRM",
+                count: overdue.count,
+                evidence: overdue.evidence,
+            });
         }
 
         if (available.has("COMMERCE")) {
-            const open = await this.attempt(
-                { moduleKey: "COMMERCE", label: "Open orders" },
-                () => this.openOrders(input.organizationId),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-
             if (open.count > 0) {
                 numbers.push({
                     key: "OPEN_ORDERS",
                     label: "Open orders",
                     value: open.count,
                     // The SCREEN that shows them, not the section above it.
-                    // The rail badges whatever href an OVERDUE action carries,
-                    // so pointing this at "/commerce" put the count on Sell
-                    // and sent the merchant to a list of storefronts to hunt
-                    // for orders one storefront at a time.
+                    // The rail badges whatever href an OVERDUE action
+                    // carries, so pointing this at "/commerce" put the count
+                    // on Sell and sent the merchant to a list of storefronts
+                    // to hunt for orders one storefront at a time.
                     href: "/commerce/orders",
                     moduleKey: "COMMERCE",
                 });
             }
 
-            // The ACTION, unlike the number, still requires ACTIVE: telling a
-            // merchant to fulfil orders through a module that is not ready is
-            // sending them at a door that does not open.
+            // The ACTION, unlike the number, still requires ACTIVE: telling
+            // a merchant to fulfil orders through a module that is not ready
+            // is sending them at a door that does not open.
             if (active.has("COMMERCE")) {
                 if (open.count > 0) {
                     actions.push({
@@ -356,6 +436,7 @@ export class HomeService {
                         moduleKey: "COMMERCE",
                         count: open.count,
                         evidence: open.evidence,
+                        ...(open.moreTone ? { moreTone: open.moreTone } : {}),
                     });
                 } else {
                     actions.push({
@@ -370,71 +451,41 @@ export class HomeService {
             }
         }
 
-        if (available.has("APPOINTMENTS")) {
-            const schedule = await this.attempt(
-                { moduleKey: "APPOINTMENTS", label: "Schedule" },
-                async () => ({
-                    upcoming: await this.upcomingBookings(
-                        input.organizationId,
-                        now,
-                    ),
-                    total: await this.db.booking.count({
-                        where: {
-                            organizationId: input.organizationId,
-                            status: "CONFIRMED",
-                            startAt: { gte: now },
-                        },
-                    }),
-                }),
-                { upcoming: [], total: 0 },
-                unavailable,
-            );
-            upcoming = schedule.upcoming;
-            const total = schedule.total;
-            if (total > 0) {
-                numbers.push({
-                    key: "UPCOMING_BOOKINGS",
-                    label: "Upcoming bookings",
-                    value: total,
-                    href: "/bookings",
-                    moduleKey: "APPOINTMENTS",
-                });
-            }
+        const upcoming = schedule.upcoming;
+        if (schedule.total > 0) {
+            numbers.push({
+                key: "UPCOMING_BOOKINGS",
+                label: "Upcoming bookings",
+                value: schedule.total,
+                href: "/bookings",
+                moduleKey: "APPOINTMENTS",
+            });
         }
 
-        // Money taken through an invoice's pay link after the invoice was
-        // already paid or voided (U13). The customer is owed it back, so it
-        // is ATTENTION: already wrong, and only the merchant can put it right.
-        // Shown wherever Payments is available — a business that has since
-        // disconnected its provider still owes the refund — and only to
-        // people who can read invoices.
-        const canReadInvoices = input.organizationActions
-            ? input.organizationActions.has("invoice:read")
-            : can(input.organizationRole, "invoice:read");
-        if (available.has("PAYMENTS") && canReadInvoices) {
-            const owed = await this.attempt(
-                { moduleKey: "PAYMENTS", label: "Payments to refund" },
-                () => this.refundsOwed(input.organizationId),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-            if (owed.count > 0) {
-                actions.push({
-                    code: "PAYMENTS_REFUNDS_OWED",
-                    title:
-                        owed.count === 1
-                            ? "Refund a payment taken on a settled invoice"
-                            : `Refund ${owed.count} payments taken on settled invoices`,
-                    href:
-                        owed.count === 1 && owed.evidence[0]
-                            ? owed.evidence[0].href
-                            : "/billing/invoices",
-                    severity: "ATTENTION",
-                    moduleKey: "PAYMENTS",
-                    count: owed.count,
-                    evidence: owed.evidence,
-                });
-            }
+        if (owed.count > 0) {
+            actions.push({
+                code: "PAYMENTS_REFUNDS_OWED",
+                title: refundsOwedTitle(owed.count, owed.reason),
+                href:
+                    owed.count === 1 && owed.evidence[0]
+                        ? owed.evidence[0].href
+                        : "/billing/invoices",
+                severity: "ATTENTION",
+                moduleKey: "PAYMENTS",
+                count: owed.count,
+                evidence: owed.evidence,
+            });
+        }
+        if (renewals) actions.push(renewals);
+        if (waiting) actions.push(waiting);
+        if (overdueInvoiceAction) actions.push(overdueInvoiceAction);
+        if (short) actions.push(short);
+        if (notLive) {
+            // It names the sites, so readiness's general "Publish your site
+            // to go live" would say the same thing twice.
+            const setup = actions.findIndex((a) => a.code === "WEBSITE_SETUP");
+            if (setup >= 0) actions.splice(setup, 1);
+            actions.push(notLive);
         }
 
         if (active.has("INSIGHTS")) {
@@ -458,7 +509,35 @@ export class HomeService {
             upcoming,
             numbers,
             unavailable,
+            ...flattenNeeds(actions, zone),
+            today,
+            lastDay,
         };
+    }
+
+    /**
+     * The zone the business keeps its days in, or India's when it has set
+     * none (as invoicing reads it). Not a source of its own: when it can't be
+     * read, the default only moves "Due today" by the zones' difference, and
+     * saying Home is missing a part would be untrue.
+     */
+    private async businessZone(organizationId: string): Promise<string> {
+        try {
+            const profile = await this.db.businessProfile.findUnique({
+                where: { organizationId },
+                select: { timezone: true },
+            });
+            // "" included, as older rows stored it.
+            const zone = profile?.timezone?.trim() ?? "";
+            return zone.length > 0 ? zone : HOME_DEFAULT_ZONE;
+        } catch (error) {
+            this.logger.warn(
+                `Home could not read the business's time zone: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return HOME_DEFAULT_ZONE;
+        }
     }
 
     /**
@@ -499,43 +578,10 @@ export class HomeService {
                 amountMinor: row.lead.value,
                 currency: null,
                 href: `/leads/${row.lead.id}`,
-            })),
-        };
-    }
-
-    /** Unfulfilled orders, oldest first — longest wait is the biggest problem. */
-    private async openOrders(
-        organizationId: string,
-    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
-        const where = {
-            organizationId,
-            // The same constant Sell -> Orders resolves a row's standing
-            // from, so the number badged here and the tab there cannot drift.
-            status: { in: [...UNFULFILLED_STATUSES] },
-        };
-
-        const [count, rows] = await Promise.all([
-            this.db.order.count({ where }),
-            this.db.order.findMany({
-                where,
-                orderBy: { createdAt: "asc" },
-                take: EVIDENCE_LIMIT,
-                include: { customer: true },
-            }),
-        ]);
-
-        return {
-            count,
-            evidence: rows.map((row) => ({
-                id: row.id,
-                title: row.orderId,
-                subtitle: personName(row.customer),
-                at: row.createdAt.toISOString(),
-                // Decimal in MAJOR units on the row; the wire contract is minor
-                // units, so it is converted once here rather than in each client.
-                amountMinor: Math.round(Number(row.total) * 100),
-                currency: row.currency,
-                href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
+                // The where asked for a due date before now.
+                ...(row.dueAt
+                    ? { tag: overdueTag(row.dueAt, now), tone: "bad" as const }
+                    : {}),
             })),
         };
     }
@@ -546,9 +592,12 @@ export class HomeService {
      * first. A refund the provider has reported (or one Saroh started)
      * takes the row off the list.
      */
-    private async refundsOwed(
-        organizationId: string,
-    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
+    private async refundsOwed(organizationId: string): Promise<{
+        count: number;
+        evidence: HomeEvidence[];
+        /** The oldest row's reason, for the action's title. */
+        reason?: RefundReason;
+    }> {
         const where = {
             organizationId,
             invoiceId: { not: null },
@@ -571,20 +620,28 @@ export class HomeService {
                         select: {
                             id: true,
                             number: true,
-                            status: true,
                             billToName: true,
                         },
+                    },
+                    attempts: {
+                        where: { status: CAPTURED_NEEDS_REFUND },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { rawResponse: true },
                     },
                 },
             }),
         ]);
         const evidence: HomeEvidence[] = [];
+        let reason: RefundReason | undefined;
         for (const row of rows) {
             if (!row.invoice) continue;
-            const after =
-                row.invoice.status === "VOID"
-                    ? "Paid online after it was voided"
-                    : "Paid online after it was already paid";
+            // Why, as recorded when the money came (K-1): the invoice's
+            // status now can't tell a cancelled booking's pay link from an
+            // invoice never paid.
+            const why = refundReason(row.attempts[0]?.rawResponse);
+            reason ??= why;
+            const after = refundReasonWords(why);
             evidence.push({
                 id: row.id,
                 title: row.invoice.number ?? "Invoice",
@@ -597,7 +654,7 @@ export class HomeService {
                 href: `/billing/invoices/${row.invoice.id}`,
             });
         }
-        return { count, evidence };
+        return { count, evidence, reason };
     }
 
     /** The next confirmed bookings from now, each in the zone it was made in. */

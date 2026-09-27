@@ -1,5 +1,8 @@
 "use server";
 
+import type { VisitPlacesRead } from "@/lib/stores/storefronts";
+import { listVisitPlaces } from "@/lib/stores/storefronts";
+
 import type {
     CreateSiteInput,
     PreviewLinkDays,
@@ -162,4 +165,12 @@ export async function createPreviewLink(
 
 export async function revokePreviewLink(siteId: string, linkId: string) {
     return revokePreviewLinkApi(siteId, linkId);
+}
+
+/**
+ * The shops a Visit us block can show (G8). A read, but the editor is a
+ * client component and reaches the API only through an action.
+ */
+export async function listVisitPlacesForPicker(): Promise<VisitPlacesRead> {
+    return listVisitPlaces();
 }

@@ -15,8 +15,17 @@ import { apiFetch, orgBase } from "@/lib/api/http";
 
 export type ServiceStatus = "ACTIVE" | "ARCHIVED";
 
-/** Where a service happens (ADR-007): at the business, or by a link. */
-export type LocationType = "IN_PERSON" | "ONLINE";
+/**
+ * Where a service happens (ADR-007): at the business, by a link, or either,
+ * chosen per booking (E1; the booking page asks from E7).
+ */
+export type LocationType = "IN_PERSON" | "ONLINE" | "EITHER";
+
+/**
+ * What is paid at booking (E1), as a share of the price. The API stores it
+ * now and takes it from E8; nothing in the workspace sets it before then.
+ */
+export type DepositMode = "NONE" | "PERCENT_25" | "PERCENT_50" | "FULL";
 
 /** A bookable Service (mirror of the api's Service row, JSON-serialized). */
 export interface Service {
@@ -41,6 +50,13 @@ export interface Service {
     meetingUrl: string | null;
     createdAt: string;
     updatedAt: string;
+    /** Visits one booking of it is, 1 to 12 (E1; honoured from E9/E10). */
+    visits: number;
+    depositMode: DepositMode;
+    /** What is paid at booking, in paise, worked out by the API; null for none. */
+    depositCents: number | null;
+    /** Whether the booking page offers it; staff book it either way. */
+    showOnBookingPage: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -169,6 +185,9 @@ export interface CreateServiceInput {
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
+    visits?: number;
+    depositMode?: DepositMode;
+    showOnBookingPage?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -188,6 +207,9 @@ export interface UpdateServiceInput {
     locationType?: LocationType;
     /** `null` clears it; the API also clears it on going back to in person. */
     meetingUrl?: string | null;
+    visits?: number;
+    depositMode?: DepositMode;
+    showOnBookingPage?: boolean;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
@@ -258,24 +280,46 @@ export async function listServices(): Promise<Service[]> {
     return (await res.json()) as Service[];
 }
 
-/** One owned service, or null when missing / not permitted. */
-export async function getService(serviceId: string): Promise<Service | null> {
+/**
+ * One service for the Service Editor (E2), or why not: missing (404, or
+ * another business's), forbidden, or a read that failed. A failed read is
+ * never "that service isn't here".
+ */
+export async function readService(
+    serviceId: string,
+): Promise<
+    | { ok: true; service: Service }
+    | { ok: false; reason: "missing" | "forbidden" | "failed" }
+> {
     const base = await orgBase();
-    if (!base) return null;
-    const res = await apiFetch(`${base}/services/${serviceId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as Service;
+    if (!base) return { ok: false, reason: "failed" };
+    try {
+        const res = await apiFetch(`${base}/services/${serviceId}`);
+        if (res.status === 404) return { ok: false, reason: "missing" };
+        if (res.status === 403) return { ok: false, reason: "forbidden" };
+        if (!res.ok) return { ok: false, reason: "failed" };
+        return { ok: true, service: (await res.json()) as Service };
+    } catch {
+        return { ok: false, reason: "failed" };
+    }
 }
 
-/** A service's availability rules (day + start/end). Empty on any failure. */
+/**
+ * A service's availability rules (day + start/end), or null when they could
+ * not be read — never an empty list, which the editor would save over them.
+ */
 export async function listRules(
     serviceId: string,
-): Promise<AvailabilityRule[]> {
+): Promise<AvailabilityRule[] | null> {
     const base = await orgBase();
-    if (!base) return [];
-    const res = await apiFetch(`${base}/services/${serviceId}/rules`);
-    if (!res.ok) return [];
-    return (await res.json()) as AvailabilityRule[];
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/services/${serviceId}/rules`);
+        if (!res.ok) return null;
+        return (await res.json()) as AvailabilityRule[];
+    } catch {
+        return null;
+    }
 }
 
 /** A single service's bookings (newest slot first). Empty on any failure. */
@@ -482,9 +526,12 @@ export type BookByHandInput = {
     packPurchaseId?: string;
     /** Who takes it (U3); absent, whoever is free. */
     staffId?: string;
-    /** How it is paid (U3). */
+    /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
-} & ({ contactId: string } | { bookerEmail: string; bookerName?: string });
+} & (
+    | { contactId: string }
+    | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
+);
 
 /**
  * Book someone in by hand (#384): the same open-slot and capacity rules as
@@ -499,6 +546,21 @@ export function bookByHand(
         "POST",
         input,
         "Could not make the booking",
+    );
+}
+
+/**
+ * "Send a pay link" (E4): issue the booking's invoice and get its pay link,
+ * to copy and send. Needs `booking:write` and `invoice:write`.
+ */
+export function createBookingPayLink(
+    bookingId: string,
+): Promise<ApiResult<{ url: string }>> {
+    return send<{ url: string }>(
+        `/bookings/${bookingId}/pay-link`,
+        "POST",
+        undefined,
+        "Couldn't make the pay link",
     );
 }
 

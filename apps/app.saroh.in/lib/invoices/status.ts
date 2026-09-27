@@ -1,3 +1,5 @@
+import { isSince } from "@/lib/views/since";
+
 import type {
     Invoice,
     InvoiceKind,
@@ -420,6 +422,22 @@ export function withCorrectionsUnder<
         out.push(r, ...(under.get(r.id) ?? []));
     }
     return out;
+}
+
+/**
+ * The invoices Home's "Last 24 hours" link opens: those paid from `since`
+ * on, credit notes never. `fromApi` is the API's own `?paidSince=` read
+ * (H-7), which finds an old invoice paid today; without it (an API from
+ * before it) the capped list on hand is filtered instead. No `since`: every
+ * invoice on hand.
+ */
+export function paidSinceRows<
+    T extends { kind?: InvoiceKind; paidAt?: string | null },
+>(onHand: T[], fromApi: T[] | null, since: Date | null): T[] {
+    if (!since) return onHand;
+    return (fromApi ?? onHand).filter(
+        (i) => i.kind !== "CREDIT_NOTE" && isSince(i.paidAt, since),
+    );
 }
 
 /** An HSN or SAC as the design sets it: "1905 90 10", "9968 13". */

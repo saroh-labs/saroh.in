@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
     IsIn,
     IsInt,
@@ -15,6 +15,9 @@ import {
 import type { Interval } from "./periods";
 import { INTERVALS } from "./periods";
 
+/** The most of a plan's events one page reads (D2). */
+export const PLAN_EVENTS_PAGE_MAX = 100;
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -26,6 +29,9 @@ const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
 export const PLAN_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
+
+/** The most classes a month a plan can include (the Plan Editor's limit). */
+export const PLAN_CLASSES_MAX = 60;
 
 export const SUBSCRIPTION_STATUSES = ["ACTIVE", "PAUSED", "CANCELLED"] as const;
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
@@ -62,6 +68,15 @@ export class PlanInputDto {
     @IsOptional()
     @IsIn(INTERVALS)
     interval?: Interval;
+
+    /** A membership's classes a month, 1–60; null is as many as they like. */
+    @IsOptional()
+    @IsInt({ message: "How many classes a month?" })
+    @Min(1, { message: "How many classes a month?" })
+    @Max(PLAN_CLASSES_MAX, {
+        message: `${PLAN_CLASSES_MAX} a month is the most`,
+    })
+    classesPerMonth?: number | null;
 }
 
 export class ListPlansQueryDto {
@@ -69,6 +84,24 @@ export class ListPlansQueryDto {
     @IsIn(PLAN_STATUSES)
     status?: PlanStatus;
 }
+
+/** A page of a plan's history (D2): after the event `cursor`, `limit` of them. */
+export class ListPlanEventsQueryDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    cursor?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(PLAN_EVENTS_PAGE_MAX)
+    limit?: number;
+}
+
+/** A page of a subscription's log (D9): the same paging as a plan's. */
+export class ListSubscriptionEventsQueryDto extends ListPlanEventsQueryDto {}
 
 export class SubscribeDto {
     @IsString()
@@ -137,6 +170,32 @@ export class SkipCollectionDto {
 export class ChangePlanDto {
     @IsString()
     planId!: string;
+}
+
+/**
+ * A pause's lengths with an end date (D8, default 30): the only choices a
+ * customer has from their own account (A8), and staff's besides "Until I
+ * resume".
+ */
+export const PAUSE_WEEKS = [2, 4, 8] as const;
+export type PauseWeeks = (typeof PAUSE_WEEKS)[number];
+
+/**
+ * How long to pause (D8). `weeks` pauses for 2, 4 or 8 weeks from today;
+ * `until` names the day it resumes (YYYY-MM-DD, in the subscription's
+ * timezone), or null to pause until someone resumes it. Both are staff's:
+ * a customer's own pause (A8) takes `weeks` only. An empty body is the
+ * open-ended pause every earlier client sent.
+ */
+export class PauseSubscriptionDto {
+    @IsOptional()
+    @IsIn(PAUSE_WEEKS, { message: "Pause for 2, 4 or 8 weeks" })
+    weeks?: PauseWeeks;
+
+    @IsOptional()
+    @ValidateIf((_, v) => v !== null)
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A resume date is YYYY-MM-DD" })
+    until?: string | null;
 }
 
 export class CancelSubscriptionDto {

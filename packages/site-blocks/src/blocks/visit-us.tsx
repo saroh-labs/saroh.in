@@ -1,0 +1,326 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import type { RenderedVisitUs } from "@saroh/block-contract";
+import { ctaHref } from "@saroh/block-contract";
+
+import { DEFAULT_API_URL } from "../api-url";
+import type { OpeningHoursDay } from "../lib/opening-hours";
+import {
+    isOpeningWeek,
+    openState,
+    openStateText,
+    weekSummary,
+} from "../lib/opening-hours";
+import { cn } from "../lib/utils";
+
+/**
+ * `visitUs` v1 — one place's address, hours and phone, read live (G8).
+ *
+ * The section stores which storefront and two switches. Everything a visitor
+ * reads comes from the public visit read when the page is viewed:
+ *
+ *   GET ${apiUrl}/public/sites/:siteId/visit/:storeId
+ *
+ * which serves a place only while it belongs to the site's business, is a
+ * `SHOP` and is not closed. So:
+ * - no storefront chosen, or the place is gone, closed or went online-only:
+ *   the block renders NOTHING rather than a card with no place in it;
+ * - no hours saved: the hours line and "Open now" are left out, never
+ *   "Closed" (a claim the business never made);
+ * - no phone: no Call button;
+ * - the request fails: the block's own error state, with a retry.
+ *
+ * `visit` skips the fetch — the catalog, the Add-block picker and the tests
+ * pass a sample place, because a fixture's id belongs to no storefront.
+ * `siteId` undefined means this is drawn where no site is live (the editor's
+ * canvas); the block then says where the real values come from instead of
+ * inventing them.
+ *
+ * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
+ */
+
+/** A place as the public visit read returns it (G8). */
+export interface PublicVisit {
+    /** `storefront` — a SHOP; `business` — the profile fallback (E6). */
+    source: "storefront" | "business";
+    storeId: string | null;
+    name: string;
+    address: string | null;
+    phone: string | null;
+    hours: OpeningHoursDay[] | null;
+    /** The business's zone (DEC-033); India when none is set. */
+    timezone: string;
+    /**
+     * Days (`YYYY-MM-DD` in the zone) the business is closed for the whole
+     * of its hours (E3) — the list the hero's line reads (review G-2).
+     * Optional: an API from before it read as no closures.
+     */
+    closedDates?: string[];
+}
+
+export function isPublicVisit(value: unknown): value is PublicVisit {
+    if (typeof value !== "object" || value === null) return false;
+    const v = value as Record<string, unknown>;
+    return (
+        (v.source === "storefront" || v.source === "business") &&
+        (v.storeId === null || typeof v.storeId === "string") &&
+        typeof v.name === "string" &&
+        (v.address === null || typeof v.address === "string") &&
+        (v.phone === null || typeof v.phone === "string") &&
+        (v.hours === null || isOpeningWeek(v.hours)) &&
+        typeof v.timezone === "string" &&
+        (v.closedDates === undefined ||
+            (Array.isArray(v.closedDates) &&
+                v.closedDates.every((d) => typeof d === "string")))
+    );
+}
+
+/** What the card says when the merchant left the title empty. */
+export const VISIT_US_TITLE = "Come and see us";
+
+/**
+ * A maps search for the address — Get directions. Lines are split and
+ * trimmed, as `contact` does, rather than a regex over whitespace.
+ */
+export function directionsHref(address: string): string {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        address
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .join(", "),
+    )}`;
+}
+
+type LoadState =
+    | { kind: "loading" }
+    | { kind: "ready"; visit: PublicVisit | null }
+    | { kind: "error" };
+
+const noPage = () => undefined;
+
+/** A value with something in it, else null: an empty string says nothing. */
+function said(value: string | null | undefined): string | null {
+    const trimmed = value?.trim();
+    return trimmed === undefined || trimmed === "" ? null : trimmed;
+}
+
+export default function VisitUsSection({
+    content,
+    siteId,
+    apiUrl = DEFAULT_API_URL,
+    visit: given,
+    now,
+}: {
+    content: RenderedVisitUs;
+    /**
+     * The live site's id — the read resolves the business from it. `null`:
+     * a live render that could not tell (the block draws nothing).
+     * Undefined: not a live site at all (the editor canvas).
+     */
+    siteId?: string | null;
+    /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
+    apiUrl?: string;
+    /** A sample place to draw instead of fetching (catalog, tests). */
+    visit?: PublicVisit;
+    /** The moment "Open now" is worked out for. Tests pin it. */
+    now?: Date;
+}) {
+    const storeId = said(content.storeId);
+    const [state, setState] = useState<LoadState>(
+        given ? { kind: "ready", visit: given } : { kind: "loading" },
+    );
+
+    const load = useCallback(async (): Promise<LoadState> => {
+        if (!siteId || !storeId) return { kind: "ready", visit: null };
+        try {
+            const res = await fetch(
+                `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/visit/${encodeURIComponent(storeId)}`,
+                { headers: { accept: "application/json" } },
+            );
+            // Gone, closed or no longer a place: nothing to show, not an error.
+            if (res.status === 404) return { kind: "ready", visit: null };
+            if (!res.ok) return { kind: "error" };
+            const body: unknown = await res.json().catch(() => null);
+            // Narrowed, not cast (#264).
+            return isPublicVisit(body)
+                ? { kind: "ready", visit: body }
+                : { kind: "error" };
+        } catch {
+            return { kind: "error" };
+        }
+    }, [apiUrl, siteId, storeId]);
+
+    useEffect(() => {
+        if (given || siteId === undefined) return;
+        let active = true;
+        void load().then((next) => {
+            if (active) setState(next);
+        });
+        return () => {
+            active = false;
+        };
+    }, [given, siteId, load]);
+
+    const title = said(content.title) ?? VISIT_US_TITLE;
+
+    if (!given && siteId === undefined) {
+        return (
+            <VisitCard title={title}>
+                <p className="mt-1.5 text-sm leading-relaxed opacity-85">
+                    {storeId
+                        ? "The address, opening hours and phone of your shop show here on your live site."
+                        : "Choose which shop this shows. Its address, hours and phone show here on your live site."}
+                </p>
+            </VisitCard>
+        );
+    }
+    if (!storeId && !given) return null;
+    if (state.kind === "ready" && state.visit === null) return null;
+
+    if (state.kind === "loading") {
+        return (
+            <VisitCard title={title}>
+                <p className="mt-1.5 text-sm opacity-85">
+                    Loading our address and hours…
+                </p>
+            </VisitCard>
+        );
+    }
+    if (state.kind === "error") {
+        return (
+            <VisitCard title={title}>
+                <p role="alert" className="mt-1.5 text-sm opacity-85">
+                    We couldn&apos;t load our address and hours right now —
+                    please try again shortly.
+                </p>
+                <div className="mt-4">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setState({ kind: "loading" });
+                            void load().then(setState);
+                        }}
+                        className={secondaryButton}
+                    >
+                        Try again
+                    </button>
+                </div>
+            </VisitCard>
+        );
+    }
+
+    const place = state.visit;
+    if (!place) return null;
+    const showHours = content.showHours !== false;
+    const hours = showHours ? weekSummary(place.hours) : null;
+    const status = showHours
+        ? // A closure day reads closed here as it does in the hero (G-2).
+          openState(
+              place.hours,
+              now ?? new Date(),
+              place.timezone,
+              place.closedDates,
+          )
+        : null;
+    const address = said(place.address);
+    const directions =
+        content.showMap !== false && address ? directionsHref(address) : null;
+    const phone = said(place.phone);
+
+    return (
+        <VisitCard
+            title={title}
+            actions={
+                phone || directions ? (
+                    <div className="flex flex-wrap gap-2">
+                        {phone ? (
+                            <a
+                                href={ctaHref(
+                                    { kind: "call", number: phone },
+                                    noPage,
+                                )}
+                                className={primaryButton}
+                            >
+                                Call {phone}
+                            </a>
+                        ) : null}
+                        {directions ? (
+                            <a
+                                href={directions}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={secondaryButton}
+                            >
+                                Get directions
+                            </a>
+                        ) : null}
+                    </div>
+                ) : null
+            }
+        >
+            {address || hours ? (
+                <p className="mt-1.5 text-sm leading-relaxed opacity-85">
+                    {address ? (
+                        <span className="block whitespace-pre-line">
+                            {address}
+                        </span>
+                    ) : null}
+                    {hours ? <span className="block">{hours}</span> : null}
+                </p>
+            ) : null}
+            {status ? (
+                <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                    <span
+                        aria-hidden="true"
+                        className={cn(
+                            "inline-block size-2 rounded-full",
+                            status.open ? "bg-site-accent" : "bg-site-bg/50",
+                        )}
+                    />
+                    {openStateText(status)}
+                </p>
+            ) : null}
+        </VisitCard>
+    );
+}
+
+/*
+ * The design's card: the page's ink as the ground and its paper as the type,
+ * the merchant's accent on the one button that matters. A button's radius is
+ * the site's; the card's is a step rounder, so a square-cornered theme stays
+ * square.
+ */
+const buttonBase =
+    "inline-flex min-h-11 items-center rounded-[var(--site-radius)] px-4 text-[0.9rem] font-semibold transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-fg";
+const primaryButton = cn(buttonBase, "bg-site-accent text-site-accent-fg");
+const secondaryButton = cn(
+    buttonBase,
+    "border border-site-bg/35 bg-transparent text-site-bg",
+);
+
+function VisitCard({
+    title,
+    actions,
+    children,
+}: {
+    title: string;
+    actions?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+            <div className="bg-site-fg text-site-bg grid items-center gap-4 rounded-[calc(var(--site-radius)*1.6)] p-[22px] [grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))]">
+                <div className="min-w-0">
+                    <h2 className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                        {title}
+                    </h2>
+                    {children}
+                </div>
+                {actions ?? null}
+            </div>
+        </section>
+    );
+}

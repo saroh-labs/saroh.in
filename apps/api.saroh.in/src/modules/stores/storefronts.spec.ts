@@ -191,6 +191,7 @@ describe("StorefrontsService", () => {
 
     it("reads money and rates as 2-decimal strings", async () => {
         db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
             currency: "INR",
             taxEnabled: true,
             taxRate: { toString: () => "18" },
@@ -241,9 +242,81 @@ describe("StorefrontsService", () => {
                 storeId: "st_1",
                 currency: "INR",
                 shippingEnabled: false,
+                // Shipping off: it offers no way yet (B2a keeps it in step).
+                fulfilmentTypes: [],
             },
-            update: { shippingEnabled: false },
+            update: { shippingEnabled: false, fulfilmentTypes: [] },
         });
+    });
+
+    it("keeps which ways it offers in step with the collection and shipping toggles (B2a)", async () => {
+        // Before any settings: the column defaults, shipping only.
+        expect((await service.get("org_1", "st_1")).fulfilmentTypes).toEqual([
+            "SHIPPING",
+        ]);
+        // A storefront that has delivered keeps offering it; collection on
+        // adds pick-up, in the table's order.
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: ["LOCAL_DELIVERY", "SHIPPING"],
+            collectionEnabled: false,
+            shippingEnabled: true,
+            taxRate: "0",
+        });
+        await service.update("org_1", "st_1", { collectionEnabled: true });
+        expect(db.__tx.storeSettings.upsert!.mock.calls[0][0].update).toEqual({
+            collectionEnabled: true,
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        });
+        await service.update("org_1", "st_1", { shippingEnabled: false });
+        expect(db.__tx.storeSettings.upsert!.mock.calls[1][0].update).toEqual({
+            shippingEnabled: false,
+            fulfilmentTypes: ["LOCAL_DELIVERY"],
+        });
+        // A save that touches neither toggle leaves the list alone.
+        await service.update("org_1", "st_1", { tipsEnabled: true });
+        expect(db.__tx.storeSettings.upsert!.mock.calls[2][0].update).toEqual({
+            tipsEnabled: true,
+        });
+    });
+
+    it("moves only the toggle an older app sent: a local-only storefront gains no Shipping (O-4)", async () => {
+        // Saved with the chips as Local delivery alone: shipping stays on
+        // for it, as `fulfilmentPatch` keeps the toggles in step.
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: ["LOCAL_DELIVERY"],
+            collectionEnabled: false,
+            shippingEnabled: true,
+            taxRate: "0",
+        });
+        await service.update("org_1", "st_1", { collectionEnabled: true });
+        expect(db.__tx.storeSettings.upsert!.mock.calls[0][0].update).toEqual({
+            collectionEnabled: true,
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+        });
+    });
+
+    it("reads an empty list from the toggles, as a row the old image made (O-3)", async () => {
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
+            collectionEnabled: true,
+            shippingEnabled: true,
+            taxRate: "0",
+        });
+        expect((await service.get("org_1", "st_1")).fulfilmentTypes).toEqual([
+            "PICKUP",
+            "SHIPPING",
+        ]);
+    });
+
+    it("reads a legacy word stored in the list as its type (B2a)", async () => {
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: ["SHIPPING", "COLLECT"],
+            taxRate: "0",
+        });
+        expect((await service.get("org_1", "st_1")).fulfilmentTypes).toEqual([
+            "PICKUP",
+            "SHIPPING",
+        ]);
     });
 
     it("renames without touching settings", async () => {
@@ -362,6 +435,7 @@ describe("StorefrontsService — checkout, pause and a shop's week", () => {
             null,
         );
         db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
             checkoutProvider: "STRIPE",
             taxRate: { toString: () => "0" },
         });
@@ -436,10 +510,15 @@ describe("opening hours in Settings › Activity (#509)", () => {
         ];
         db.storeSettings
             .findUnique!.mockResolvedValueOnce({
+                fulfilmentTypes: [],
                 taxRate: "0",
                 openingHours: before,
             })
-            .mockResolvedValue({ taxRate: "0", openingHours: after });
+            .mockResolvedValue({
+                fulfilmentTypes: [],
+                taxRate: "0",
+                openingHours: after,
+            });
 
         await service.update(
             "org_1",
@@ -474,6 +553,7 @@ describe("opening hours in Settings › Activity (#509)", () => {
         const service = new StorefrontsService({ record } as never);
         const week = [...WEEKDAYS, day("SAT"), day("SUN")];
         db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
             taxRate: "0",
             openingHours: week,
         });

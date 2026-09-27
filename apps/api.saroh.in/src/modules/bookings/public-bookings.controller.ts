@@ -10,8 +10,9 @@ import {
     Post,
     Query,
 } from "@nestjs/common";
-import { hashClientIp } from "../../common/client-ip";
+import type { Booking } from "@saroh/database";
 
+import { hashClientIp } from "../../common/client-ip";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -25,6 +26,8 @@ import type {
 import { toPublicBooking } from "./public-booking-page";
 import type { PublicHold, PublicStaff } from "./public-bookings.service";
 import { PublicBookingsService } from "./public-bookings.service";
+import type { PublicToday } from "./public-today";
+import { PublicTodayService } from "./public-today";
 
 /** The section contract's cap on a services list (#255). */
 const MAX_PUBLIC_SERVICE_IDS = 24;
@@ -131,6 +134,15 @@ export class PublicBookingsController {
     }
 
     /**
+     * The ANONYMOUS booking route (U19): name and email typed on the page.
+     *
+     * Sign-in is always on (A9, ADR-011): the booking page books through
+     * `POST public/site-accounts/bookings` now, and no site code calls this
+     * any more (`apps/saroh.app/lib/no-anonymous-booking.test.ts` pins it).
+     * It keeps serving for the release that moved the page, so a page
+     * loaded before that deploy still books; the next release makes it
+     * answer 410 "Sign in to book". Staff bookings are another route.
+     *
      * Reserve a slot on `:serviceId`. The source IP (from `@Ip()`) is immediately
      * hashed (sha256) and only the hash is ever passed on — the raw IP never
      * leaves this handler.
@@ -154,22 +166,37 @@ export class PublicBookingsController {
                 idempotencyKey: dto.idempotencyKey,
                 staffId: dto.staffId,
                 pay: dto.pay,
+                locationType: dto.locationType,
+                intakeNote: dto.intakeNote,
             },
             hashClientIp(ip),
         );
-        const state = holdState(booking, new Date());
-        return {
-            ...toPublicBooking(booking),
-            state,
-            // Who it is with, by name, and how it is paid — the booker's own
-            // booking, so nothing here is anyone else's.
-            holdExpiresAt:
-                state === "HELD"
-                    ? (booking.holdExpiresAt?.toISOString() ?? null)
-                    : null,
-            payToken,
-        };
+        return publicBookingResult(booking, payToken);
     }
+}
+
+/**
+ * What a booking answers the booker with: their own booking, where it
+ * stands, and for a pay-now hold the token that pays it. Shared by the
+ * anonymous route and the signed-in one (A9).
+ */
+export function publicBookingResult(
+    booking: Booking,
+    payToken: string | null,
+    now: Date = new Date(),
+): PublicBookingResult {
+    const state = holdState(booking, now);
+    return {
+        ...toPublicBooking(booking),
+        state,
+        // Who it is with, by name, and how it is paid — the booker's own
+        // booking, so nothing here is anyone else's.
+        holdExpiresAt:
+            state === "HELD"
+                ? (booking.holdExpiresAt?.toISOString() ?? null)
+                : null,
+        payToken,
+    };
 }
 
 /**
@@ -189,11 +216,30 @@ export type PublicBookingResult = PublicBooking & {
  */
 @Controller("public/sites")
 export class PublicBookingPageController {
-    constructor(private readonly bookings: PublicBookingsService) {}
+    constructor(
+        private readonly bookings: PublicBookingsService,
+        private readonly today: PublicTodayService,
+    ) {}
 
     @Get(":siteId/booking")
     @Header("Cache-Control", "no-store")
     page(@Param("siteId") siteId: string): Promise<PublicBookingPage> {
         return this.bookings.publicBookingPage(siteId);
+    }
+
+    /**
+     * "On today" on the site's home page (G18): up to four of today's
+     * classes and free times, as the booking page offers them, and the
+     * business's hours and zone for "Open now · closes 9pm". Read live, so
+     * never cached; limited per visitor. The source IP is hashed here and
+     * only the hash is passed on.
+     */
+    @Get(":siteId/today")
+    @Header("Cache-Control", "no-store")
+    todayOn(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+    ): Promise<PublicToday> {
+        return this.today.read(siteId, hashClientIp(ip));
     }
 }

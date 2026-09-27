@@ -99,7 +99,9 @@ src/
 - **Success is bare JSON** — no success envelope.
 - **Errors are thrown Nest exceptions.** `AllExceptionsFilter` shapes every one
   as `{ error: { code, message, statusCode, correlationId, details? } }` and
-  keeps 5xx messages generic.
+  keeps 5xx messages generic. The one exception is a deliberate 503 thrown
+  with `{ message, details }` (a site sign-in code that could not be sent,
+  `reason: "unavailable"`): its words and reason reach the client.
 
 ## Cross-cutting — **Current**
 

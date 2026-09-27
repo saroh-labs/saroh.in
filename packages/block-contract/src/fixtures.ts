@@ -435,6 +435,23 @@ export const BLOCK_META = {
             },
         },
     },
+    visitUs: {
+        label: "Visit us",
+        description:
+            "One shop's address, opening hours and phone, with Open now and Get directions, read live from the storefront.",
+        variants: soleVariant(
+            "A card with the address and the week's hours, a call button and a directions link.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                title: "Come and see us",
+                // An id that belongs to no storefront: the catalog and the
+                // snapshot hand the component a sample place instead.
+                storeId: "fixture-shop",
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */

@@ -1,5 +1,7 @@
 "use server";
 
+import type { PeekPerson } from "./peek";
+import { readPeekPerson } from "./peek-person";
 import type {
     AvailabilityRuleInput,
     BookByHandInput,
@@ -13,6 +15,7 @@ import {
     archiveService as archiveServiceApi,
     bookByHand as bookByHandApi,
     cancelBooking as cancelBookingApi,
+    createBookingPayLink as createBookingPayLinkApi,
     createService as createServiceApi,
     listAvailability as listAvailabilityApi,
     readServices,
@@ -33,6 +36,11 @@ import {
 
 export async function bookByHand(serviceId: string, input: BookByHandInput) {
     return bookByHandApi(serviceId, input);
+}
+
+/** "Send a pay link" for a booking just made (E4). */
+export async function createBookingPayLink(bookingId: string) {
+    return createBookingPayLinkApi(bookingId);
 }
 
 export async function createService(input: CreateServiceInput) {
@@ -67,6 +75,17 @@ export async function cancelBooking(
 /** Move a booking to another slot (#121). */
 export async function rescheduleBooking(bookingId: string, startAt: string) {
     return rescheduleBookingApi(bookingId, startAt);
+}
+
+/**
+ * The person behind a booking, read when its peek opens (E5): their phone and
+ * Needs attention, as far as the viewer's role may see. Null when they can't
+ * be read.
+ */
+export async function readBookingPerson(
+    contactId: string,
+): Promise<PeekPerson | null> {
+    return readPeekPerson(contactId);
 }
 
 /** Record how an appointment went (#241). */

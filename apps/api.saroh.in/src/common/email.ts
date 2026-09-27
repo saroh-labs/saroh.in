@@ -1,7 +1,12 @@
 import type { Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
-import { env } from "../env";
+import { declaredNodeEnv, env } from "../env";
+import {
+    codeSenderName,
+    codeSubject,
+} from "../modules/site-accounts/sender-name";
+import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -436,4 +441,135 @@ export async function sendWaitlistInvitationEmail(
     } catch {
         return "failed";
     }
+}
+
+// ---------------------------------------------------------------------------
+// Site sign-in codes (ADR-011; round-2 plan A, A2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The code email's own sending address, on Saroh's identity domain and apart
+ * from workspace sign-in mail, so a complaint about one merchant's codes
+ * cannot hurt the workspace's delivery.
+ */
+const SITE_CODES_FROM_ADDRESS = env.SITE_CODES_EMAIL_FROM ?? "codes@saroh.in";
+
+/**
+ * The code email's own transport: its own SMTP credentials (its sending
+ * stream) when `SITE_CODES_SMTP_*` are set, else the identity SMTP
+ * credentials. Either way a transport of its own with short timeouts, so a
+ * stuck provider answers inside the request and the caller can retry.
+ */
+/**
+ * Whether the code stream's own SMTP connection starts in TLS (review M-3).
+ * `SITE_CODES_SMTP_SECURE` says so outright; unset, the port decides: 465
+ * is implicit TLS, anything else (587, 25, 2525) starts plain and upgrades
+ * with STARTTLS. Never `SMTP_SECURE`: that belongs to the identity stream,
+ * whose port may differ, and a TLS hello on 587 fails every send.
+ */
+export function siteCodesSmtpSecure(
+    port: number,
+    secure: string | undefined,
+): boolean {
+    if (secure === "true") return true;
+    if (secure === "false") return false;
+    return port === 465;
+}
+
+function getSiteCodesTransporter(): Transporter | null {
+    const own = env.SITE_CODES_SMTP_HOST !== undefined;
+    const host = own
+        ? env.SITE_CODES_SMTP_HOST
+        : (env.SMTP_HOST ?? env.SMTP_HOSTNAME);
+    const port = own ? env.SITE_CODES_SMTP_PORT : env.SMTP_PORT;
+    const user = own
+        ? env.SITE_CODES_SMTP_USER
+        : (env.SMTP_USER ?? env.USER_ACCOUNT);
+    const pass = own
+        ? env.SITE_CODES_SMTP_PASS
+        : (env.SMTP_PASS ?? env.USER_PASSWORD);
+    if (!host || !user || !pass) return null;
+    const portNumber = port ? Number(port) : 465;
+    return nodemailer.createTransport({
+        host,
+        port: portNumber,
+        // The identity fallback connects exactly as the identity transport does.
+        secure: own
+            ? siteCodesSmtpSecure(portNumber, env.SITE_CODES_SMTP_SECURE)
+            : env.SMTP_SECURE !== "false",
+        auth: { user, pass },
+        connectionTimeout: 5_000,
+        greetingTimeout: 5_000,
+        socketTimeout: 10_000,
+    });
+}
+
+const siteCodesTransporter = getSiteCodesTransporter();
+
+/**
+ * Send a customer their sign-in code for a business's site.
+ *
+ * `businessName` must already be cleaned (`site-accounts/sender-name.ts`):
+ * it goes into the display name ("‹Business› via Saroh") and the subject
+ * ("Your code for ‹Business›"), and is escaped again here for the body.
+ *
+ * Awaited, and it says how it went, because a code that did not leave is a
+ * booking that cannot be made: the caller retries and alerts. Nothing here
+ * logs the address or the code outside development.
+ *
+ * With no SMTP, development prints the code (the fake transport) and leaves
+ * it in the temp-directory outbox a local browser test reads
+ * (`site-code-outbox.ts`), or fails every send when
+ * `SITE_CODES_EMAIL_FAKE=fail`. Outside development the fake runs only when
+ * `SITE_CODES_EMAIL_FAKE` names it, and never in production; anywhere else
+ * nothing left.
+ */
+export async function sendSiteSignInCodeEmail(
+    to: string,
+    details: { code: string; businessName: string; minutes: number },
+): Promise<EmailOutcome> {
+    const { code, businessName, minutes } = details;
+    if (!siteCodesTransporter) {
+        // NODE_ENV as declared, not the schema's default (review A-4).
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(
+                `[Site sign-in code] (no SMTP) ${to} for ${businessName}: code ${code}`,
+            );
+            // Where a browser test on this machine picks it up (A9).
+            writeSiteCodeOutbox(to, code);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await siteCodesTransporter.sendMail({
+            from: {
+                name: codeSenderName(businessName),
+                address: SITE_CODES_FROM_ADDRESS,
+            },
+            to,
+            subject: codeSubject(businessName),
+            html: siteCodeEmail(businessName, code, minutes),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** The code email's body; every value in it is escaped. */
+export function siteCodeEmail(
+    businessName: string,
+    code: string,
+    minutes: number,
+): string {
+    const name = esc(businessName);
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Your code for ${name}</h2>
+  <p>Enter this code on ${name}'s website to confirm it's you.</p>
+  <p style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0">${esc(code)}</p>
+  <p style="color:#666;font-size:12px">This code expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.</p>
+  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice if your sign-in email changes.</p>
+</div>`;
 }

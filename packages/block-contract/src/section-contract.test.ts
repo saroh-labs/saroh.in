@@ -67,6 +67,29 @@ describe("hero v1", () => {
         }
     });
 
+    it("keeps the On today switch on v1 and v2 (G18)", () => {
+        for (const version of [1, 2]) {
+            const result = parseSectionContent("hero", version, {
+                heading: "Welcome",
+                onToday: true,
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect((result.data as { onToday?: boolean }).onToday).toBe(
+                    true,
+                );
+            }
+        }
+        // A hero written before the switch existed is unchanged: no flag.
+        const old = parseSectionContent("hero", 2, { heading: "Welcome" });
+        expect(old.success && "onToday" in (old.data as object)).toBe(false);
+        // Only a switch: a string is refused rather than read as "on".
+        expect(
+            parseSectionContent("hero", 1, { heading: "W", onToday: "yes" })
+                .success,
+        ).toBe(false);
+    });
+
     it("rejects a hero missing its heading", () => {
         const result = parseSectionContent("hero", 1, { subheading: "Sub" });
         expect(result.success).toBe(false);
@@ -290,6 +313,7 @@ describe("per-section padding override (#189)", () => {
         testimonials: { items: [{ quote: "Quick.", name: "Sam" }] },
         contact: { phone: "+44 113 496 0000" },
         servicesList: { serviceIds: ["svc_1"] },
+        visitUs: {},
     };
 
     it("is accepted on every section type", () => {

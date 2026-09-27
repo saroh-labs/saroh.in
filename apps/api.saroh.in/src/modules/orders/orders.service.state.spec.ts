@@ -50,7 +50,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
@@ -138,6 +142,8 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             id: ORDER,
             status: "PROCESSING",
             paymentStatus: "UNPAID",
+            stage: "READY",
+            fulfilment: "DELIVERY",
             items: [{ productId: "p1", quantity: 1 }],
         });
 
@@ -253,22 +259,24 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             status: "PROCESSING",
             paymentStatus: "PAID",
             stage: "READY",
-            fulfilment: "COLLECT",
+            fulfilment: "DELIVERY",
             organizationId: ORG,
             items: [{ productId: "p1", quantity: 1 }],
         });
 
         await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
 
-        // Shipped means a courier took it, whatever it was meant to be.
+        // A delivery that is shipped is with a courier; its type stays.
         expect(orderUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
                     status: "SHIPPED",
                     stage: "HANDED_TO_COURIER",
-                    fulfilment: "DELIVERY",
                 }),
             }),
+        );
+        expect(orderUpdate.mock.calls[0][0].data).not.toHaveProperty(
+            "fulfilment",
         );
         expect(eventCreate).toHaveBeenCalledWith({
             data: expect.objectContaining({
@@ -304,6 +312,56 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
                 }),
             }),
         );
+    });
+
+    it.each([
+        ["COLLECT", "READY", "SHIPPED", /A pick-up order isn't shipped/],
+        ["PICKUP", "READY", "SHIPPED", /A pick-up order isn't shipped/],
+        ["DIGITAL", "NEW", "SHIPPED", /A digital order isn't shipped/],
+        ["APPOINTMENT_IN_PERSON", "NEW", "DELIVERED", /finished by its visits/],
+    ])(
+        "refuses to mark a %s order (at %s) %s: 409, a sentence, and nothing written",
+        async (fulfilment, stage, status, sentence) => {
+            const service = makeService();
+            orderFindFirst.mockResolvedValue({
+                id: ORDER,
+                status: "PROCESSING",
+                paymentStatus: "PAID",
+                stage,
+                fulfilment,
+                organizationId: ORG,
+                items: [{ productId: "p1", quantity: 1 }],
+            });
+
+            const err = await service
+                .updateStatus(STORE, ORDER, USER, {
+                    status: status as "SHIPPED" | "DELIVERED",
+                })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(ConflictException);
+            expect((err as ConflictException).message).toMatch(sentence);
+            expect(orderUpdate).not.toHaveBeenCalled();
+            expect(eventCreate).not.toHaveBeenCalled();
+        },
+    );
+
+    it("a local delivery stored in the new name ships the way today's does", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "LOCAL_DELIVERY",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
+        // Until B2c's switch, the handover it writes is today's.
+        expect(orderUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "SHIPPED",
+            stage: "HANDED_TO_COURIER",
+        });
     });
 
     it("still 404s a missing order before any lifecycle check", async () => {

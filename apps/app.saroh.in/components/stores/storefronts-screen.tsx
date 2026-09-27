@@ -22,7 +22,6 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -46,6 +45,9 @@ import type {
     StorefrontSummary,
     Weekday,
 } from "@/lib/stores/storefronts";
+
+import { FulfilmentSection } from "./fulfilment-section";
+import { Note, Section } from "./storefront-section";
 
 /**
  * The currencies offered before a storefront's first order: the ones Saroh's
@@ -243,31 +245,6 @@ function StorefrontList({
     );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-    return (
-        <section
-            aria-label={title}
-            className="rounded-xl border border-border px-5 py-[18px]"
-        >
-            <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {title}
-            </h2>
-            <div className="flex flex-col gap-5">{children}</div>
-        </section>
-    );
-}
-
-function Note({ id, children }: { id?: string; children: ReactNode }) {
-    return (
-        <p
-            id={id}
-            className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
-        >
-            {children}
-        </p>
-    );
-}
-
 interface SectionProps {
     store: StorefrontSettings;
     canEdit: boolean;
@@ -324,6 +301,17 @@ function StorefrontDetail({
             <BasicsSection {...shared} businessName={businessName} />
             {store.kind === "SHOP" ? <PlaceSection {...shared} /> : null}
             <CheckoutSection {...shared} businessName={businessName} />
+            {/* An API from before B17 sends no chips: the old toggles stay. */}
+            {store.fulfilmentTypes ? (
+                <FulfilmentSection
+                    store={store}
+                    types={store.fulfilmentTypes}
+                    canEdit={canEdit}
+                    pending={pending}
+                    save={save}
+                    setStore={setStore}
+                />
+            ) : null}
             <BehaviourSection {...shared} />
             {canClose || canEdit ? (
                 <ClosingSection
@@ -1094,6 +1082,9 @@ function BehaviourSection({
     save,
     setStore,
 }: SectionProps) {
+    // How orders leave has its own chips (B17), which keep collection and
+    // delivery in step; the toggles show only for an API without them.
+    const chips = store.fulfilmentTypes !== undefined;
     const [threshold, setThreshold] = useState(
         store.freeShippingThreshold ?? "",
     );
@@ -1116,7 +1107,7 @@ function BehaviourSection({
 
     return (
         <Section title="Behaviour">
-            {store.kind === "SHOP" ? (
+            {store.kind === "SHOP" && !chips ? (
                 <ToggleRow
                     id="storefront-collection"
                     label="Collection from this storefront"
@@ -1131,18 +1122,20 @@ function BehaviourSection({
                     )}
                 />
             ) : null}
-            <ToggleRow
-                id="storefront-delivery"
-                label="Delivery"
-                note="Orders from here can be sent to the customer. Off means nothing is sent, so there is no shipping to charge."
-                checked={store.shippingEnabled}
-                disabled={!canEdit || pending}
-                onChange={flip(
-                    "shippingEnabled",
-                    "Delivery turned on",
-                    "Delivery turned off",
-                )}
-            />
+            {chips ? null : (
+                <ToggleRow
+                    id="storefront-delivery"
+                    label="Delivery"
+                    note="Orders from here can be sent to the customer. Off means nothing is sent, so there is no shipping to charge."
+                    checked={store.shippingEnabled}
+                    disabled={!canEdit || pending}
+                    onChange={flip(
+                        "shippingEnabled",
+                        "Delivery turned on",
+                        "Delivery turned off",
+                    )}
+                />
+            )}
             {store.shippingEnabled ? (
                 <form
                     className="grid gap-2"

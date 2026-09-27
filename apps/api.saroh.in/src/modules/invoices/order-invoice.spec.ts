@@ -148,6 +148,38 @@ describe("an order's invoice", () => {
             orderBillTo(order({ fulfilment: "COLLECT" })).address,
         ).toBeNull();
     });
+
+    // B2a: the six types (DEC-045), read through `typeOf`. A row in the new
+    // names (written by the switch release) invoices as its legacy word did.
+    it.each(["LOCAL_DELIVERY", "SHIPPING"])(
+        "a %s order is taxed where it goes, and billed to its address, as DELIVERY is",
+        (fulfilment) => {
+            const doc = buildOrderInvoice(
+                order({ fulfilment, deliveryState: "Goa" }),
+                RYE,
+            );
+            expect(doc).toEqual(
+                buildOrderInvoice(order({ deliveryState: "Goa" }), RYE),
+            );
+            expect(doc.placeOfSupply).toBe("30");
+            expect(doc.taxType).toBe("INTER");
+            expect(orderBillTo(order({ fulfilment })).address).toBe(
+                "Meera Iyer, 12 Church Street, Bengaluru 560001, Karnataka",
+            );
+        },
+    );
+
+    it.each(["PICKUP", "DIGITAL", "APPOINTMENT_IN_PERSON"])(
+        "a %s order is supplied where the business is, with no address",
+        (fulfilment) => {
+            const doc = buildOrderInvoice(
+                order({ fulfilment, deliveryState: "Goa" }),
+                RYE,
+            );
+            expect(doc.placeOfSupply).toBe("29");
+            expect(orderBillTo(order({ fulfilment })).address).toBeNull();
+        },
+    );
 });
 
 describe("a credit note", () => {

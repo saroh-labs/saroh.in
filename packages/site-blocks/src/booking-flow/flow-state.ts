@@ -19,8 +19,14 @@ export type Phase =
           payError: string | null;
           when: string;
           price: string;
+          /**
+           * The provider's window closed on a payment (E11). Only a hint:
+           * the webhook confirms the booking. If the hold runs out anyway,
+           * the expired card says the money may have left their account.
+           */
+          checkoutPaid?: boolean;
       }
-    | { kind: "expired"; when: string }
+    | { kind: "expired"; when: string; checkoutPaid?: boolean }
     | {
           kind: "done";
           booking: BookResult;

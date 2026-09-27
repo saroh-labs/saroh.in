@@ -22,3 +22,8 @@ export * from "./backfill/listings-stock-levels";
 export * from "./backfill/held-stock";
 // The #530 same-product merge, exported for the same reason.
 export * from "./backfill/merge-same-products";
+// The C1 Needs attention backfill, exported for the same reason.
+export * from "./backfill/contact-attention";
+// The C2 paying-customer contacts backfill, exported for the same reason, and
+// for the API's payment path, which runs its per-customer rule.
+export * from "./backfill/paying-customer-contacts";

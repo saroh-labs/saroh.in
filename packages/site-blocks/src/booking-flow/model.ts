@@ -4,6 +4,12 @@
  * Pure — no React, no fetch — so every rule here is tested on its own.
  */
 
+/** Where a service happens (E7): the customer chooses for EITHER. */
+export type ServiceWhere = "IN_PERSON" | "ONLINE" | "EITHER";
+
+/** Where one booking happens: the answer to Where. */
+export type BookingWhere = "IN_PERSON" | "ONLINE";
+
 /** A service as the booking page offers it. */
 export interface BookingService {
     id: string;
@@ -14,7 +20,13 @@ export interface BookingService {
     capacity: number;
     priceCents: number | null;
     currency: string | null;
+    /** Online only. */
     online: boolean;
+    /**
+     * Where it happens (E7). Absent from an API older than the page: then
+     * it is online when `online` says so, else in person.
+     */
+    where?: ServiceWhere;
     /** Who takes it, by display name. */
     staff: string[];
 }
@@ -80,6 +92,14 @@ export interface BookResult {
 export interface HoldView {
     state: HoldState;
     holdExpiresAt: string | null;
+    /**
+     * The booker's own booking as it stands — once confirmed, with the link
+     * to join an online one (E7). Left out when the answer has none.
+     */
+    booking?: {
+        online: boolean;
+        meetingUrl: string | null;
+    };
 }
 
 type Obj = Record<string, unknown>;
@@ -104,6 +124,10 @@ function isService(v: unknown): v is BookingService {
         numOrNull(v.priceCents) &&
         strOrNull(v.currency) &&
         typeof v.online === "boolean" &&
+        (v.where === undefined ||
+            v.where === "IN_PERSON" ||
+            v.where === "ONLINE" ||
+            v.where === "EITHER") &&
         Array.isArray(v.staff) &&
         v.staff.every(isStr)
     );
@@ -172,8 +196,51 @@ export function isHoldView(v: unknown): v is HoldView {
     return (
         isObj(v) &&
         HOLD_STATES.includes(v.state as string) &&
-        (v.holdExpiresAt === null || isInstant(v.holdExpiresAt))
+        (v.holdExpiresAt === null || isInstant(v.holdExpiresAt)) &&
+        (v.booking === undefined ||
+            (isObj(v.booking) &&
+                typeof v.booking.online === "boolean" &&
+                strOrNull(v.booking.meetingUrl)))
     );
+}
+
+// ── Where, and what the team should know (E7) ────────────────────────────
+
+/** The longest note the page takes: the API refuses more (default 110). */
+export const MAX_INTAKE_NOTE = 1000;
+
+/** Where a service happens, from an API that may predate `where`. */
+export function serviceWhere(service: BookingService): ServiceWhere {
+    return service.where ?? (service.online ? "ONLINE" : "IN_PERSON");
+}
+
+/** Only a service offered either way asks Where. */
+export function asksWhere(service: BookingService | null): boolean {
+    return !!service && serviceWhere(service) === "EITHER";
+}
+
+/** The two answers to Where: at the business, or a video call. */
+export function whereLabel(where: BookingWhere, business: string): string {
+    return where === "ONLINE" ? "Video call" : `At ${business}`;
+}
+
+/**
+ * Where a booking happens, as the confirmation says it: "At Kavi Dental"
+ * or "Video call". Only for a business that also works online — one that
+ * only ever meets in person has nothing to tell apart — else null.
+ */
+export function whereText(
+    service: BookingService,
+    booking: { online: boolean },
+    services: BookingService[],
+    business: string,
+): string | null {
+    const mixed = services.some((s) => serviceWhere(s) !== "IN_PERSON");
+    if (!mixed) return null;
+    if (booking.online || serviceWhere(service) === "ONLINE") {
+        return whereLabel("ONLINE", business);
+    }
+    return whereLabel("IN_PERSON", business);
 }
 
 // ── Words and numbers ────────────────────────────────────────────────────

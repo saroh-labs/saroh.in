@@ -716,27 +716,27 @@ describe("Payments (ADR-007)", () => {
         expect(offered).toContain("/billing/invoices");
     });
 
-    it("puts Subscriptions and Plans beside Invoices, and only the page you are on lights", () => {
-        const offered = hrefs(
-            navFor({ role: "OWNER", moduleKeys: AVAILABLE_TO.OWNER }),
-        );
+    it("puts Subscriptions beside Invoices; Plans is a tab, not a row (D3)", () => {
+        const groups = navFor({
+            role: "OWNER",
+            moduleKeys: AVAILABLE_TO.OWNER,
+        });
+        const offered = hrefs(groups);
         expect(offered).toContain("/billing/subscriptions");
-        expect(offered).toContain("/billing/plans");
+        expect(offered).not.toContain("/billing/plans");
+        // A plan's own page lights Subscriptions, whose tab it is.
+        const here = navPathname("/billing/plans/p_1", groups);
+        expect(here).toBe("/billing/subscriptions");
         const siblings = [
             { href: "/billing/subscriptions" },
-            { href: "/billing/plans" },
             { href: "/billing/invoices" },
         ];
         expect(
-            isNavChildCurrent(
-                "/billing/plans",
-                "/billing/subscriptions",
-                siblings,
-            ),
-        ).toBe(false);
-        expect(
-            isNavChildCurrent("/billing/plans", "/billing/plans", siblings),
+            isNavChildCurrent(here, "/billing/subscriptions", siblings),
         ).toBe(true);
+        expect(isNavChildCurrent(here, "/billing/invoices", siblings)).toBe(
+            false,
+        );
     });
 
     it("marks Payments on every Payments page, Invoices included", () => {
@@ -977,7 +977,6 @@ describe("Bookings, a section across two modules", () => {
             "Payments",
             "Subscriptions",
             "Invoices",
-            "Plans",
         ]);
     });
 });

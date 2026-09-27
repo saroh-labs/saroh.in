@@ -6,6 +6,7 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
         $queryRaw: jest.fn(),
+        $executeRaw: jest.fn(),
         customerSubscription: {
             create: jest.fn(),
             update: jest.fn(),
@@ -13,7 +14,13 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
             count: jest.fn(),
         },
-        subscriptionPlan: { findFirst: jest.fn() },
+        subscriptionPlan: {
+            findFirst: jest.fn(),
+            create: jest.fn(),
+            updateMany: jest.fn(),
+        },
+        subscriptionPlanEvent: { create: jest.fn() },
+        subscriptionEvent: { create: jest.fn(), findFirst: jest.fn() },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -21,7 +28,7 @@ jest.mock("@saroh/database", () => {
             delete: jest.fn(),
             deleteMany: jest.fn(),
         },
-        invoice: { findFirst: jest.fn() },
+        invoice: { findFirst: jest.fn(), findMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
     };
     return {
@@ -39,6 +46,7 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn(),
                 findMany: jest.fn(),
                 count: jest.fn(),
+                groupBy: jest.fn(),
             },
             invoice: { findMany: jest.fn(), count: jest.fn() },
             subscriptionSkip: { findMany: jest.fn() },
@@ -78,10 +86,10 @@ const owner: OrganizationContext = {
 const member: OrganizationContext = { ...owner, role: "MEMBER" };
 
 const issueInTx = jest.fn();
-const createPayLink = jest.fn();
+const createPayLinkInTx = jest.fn();
 const service = new SubscriptionsService({
     issueInTx,
-    createPayLink,
+    createPayLinkInTx,
 } as unknown as InvoicesService);
 
 const decimal = (s: string) => ({ toString: () => s });
@@ -127,6 +135,7 @@ function sub(over: Record<string, unknown> = {}) {
         collectionNote: null,
         pendingPlanId: null,
         pendingPlan: null,
+        pausedUntil: null,
         createdAt: at("2026-09-01T00:00:00Z"),
         ...over,
     };
@@ -140,6 +149,10 @@ beforeEach(() => {
         ...PLAN,
         _count: { subscriptions: 0 },
     });
+    db.subscriptionPlan!.findMany!.mockResolvedValue([
+        { ...PLAN, classesPerMonth: null },
+    ]);
+    db.customerSubscription!.groupBy!.mockResolvedValue([]);
     db.businessProfile!.findUnique!.mockResolvedValue({ timezone: "UTC" });
     db.customerSubscription!.findFirst!.mockResolvedValue(sub());
     db.invoice!.findMany!.mockResolvedValue([]);
@@ -151,7 +164,11 @@ beforeEach(() => {
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
     tx.invoice!.findFirst!.mockResolvedValue(null);
+    tx.invoice!.findMany!.mockResolvedValue([]);
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.subscriptionEvent!.create!.mockResolvedValue({});
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
+    issueInTx.mockResolvedValue({ id: "inv_new", number: "INV-0001" });
 });
 
 afterEach(() => jest.useRealTimers());
@@ -316,6 +333,7 @@ describe("pause and resume", () => {
             data: {
                 status: "ACTIVE",
                 pausedAt: null,
+                pausedUntil: null,
                 currentPeriodEnd: at("2026-10-06T00:00:00Z"),
                 anchorAt: at("2026-10-06T00:00:00Z"),
             },
@@ -354,6 +372,7 @@ describe("pause and resume", () => {
             data: {
                 status: "ACTIVE",
                 pausedAt: null,
+                pausedUntil: null,
                 currentPeriodEnd: at("2026-10-01T00:00:00Z"),
             },
         });
@@ -396,6 +415,7 @@ describe("pause and resume", () => {
             data: {
                 status: "CANCELLED",
                 pausedAt: null,
+                pausedUntil: null,
                 cancelledAt: at("2026-10-01T00:00:00Z"),
                 cancelAtPeriodEnd: false,
             },
@@ -779,11 +799,428 @@ describe("plans", () => {
     });
 
     it("archives a plan for new sign-ups only", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            name: PLAN.name,
+            status: "ACTIVE",
+        });
         await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
-        expect(db.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
+        expect(tx.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
             where: { id: "plan_1", organizationId: "org_1" },
             data: { status: "ARCHIVED" },
         });
+    });
+});
+
+// — D1: classes, who pays what, a monthly figure, one name ——————————————
+
+describe("a plan's read (D1)", () => {
+    it("returns its classes a month, who pays what and its monthly figure", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([
+            { ...PLAN, price: decimal("1500"), classesPerMonth: 8 },
+        ]);
+        db.customerSubscription!.groupBy!.mockResolvedValue([
+            {
+                planId: "plan_1",
+                price: decimal("1500"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "ACTIVE",
+                _count: { _all: 12 },
+            },
+            {
+                planId: "plan_1",
+                price: decimal("1200"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "ACTIVE",
+                _count: { _all: 3 },
+            },
+        ]);
+        const plan = await service.getPlan(owner, "plan_1");
+        expect(plan).toMatchObject({
+            classesPerMonth: 8,
+            subscriberCount: 15,
+            monthly: "1500.00",
+            monthlyFromMembers: "21600.00",
+            byPrice: [
+                { price: "1500.00", count: 12, current: true },
+                { price: "1200.00", count: 3, current: false },
+            ],
+        });
+    });
+
+    it("counts every plan's subscribers in one grouped query, live ones only", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([
+            { ...PLAN, classesPerMonth: null },
+            { ...PLAN, id: "plan_2", name: "Annual", classesPerMonth: null },
+        ]);
+        db.customerSubscription!.groupBy!.mockResolvedValue([
+            {
+                planId: "plan_2",
+                price: decimal("1200"),
+                currency: "INR",
+                interval: "MONTH",
+                status: "PAUSED",
+                _count: { _all: 2 },
+            },
+        ]);
+        const plans = await service.listPlans(owner, {});
+        expect(db.customerSubscription!.groupBy).toHaveBeenCalledTimes(1);
+        expect(db.customerSubscription!.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    planId: { in: ["plan_1", "plan_2"] },
+                    status: { in: ["ACTIVE", "PAUSED"] },
+                },
+            }),
+        );
+        expect(plans.map((p) => p.subscriberCount)).toEqual([0, 2]);
+    });
+
+    it("asks nothing more when there are no plans", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        expect(await service.listPlans(owner, {})).toEqual([]);
+        expect(db.customerSubscription!.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("answers another business's plan with a 404", async () => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        await expect(service.getPlan(owner, "plan_x")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(db.subscriptionPlan!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "plan_x", organizationId: "org_1" },
+            }),
+        );
+    });
+
+    it("is refused to a Member", async () => {
+        await expect(service.getPlan(member, "plan_1")).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        await expect(service.listPlans(member, {})).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+    });
+});
+
+describe("a plan's name and classes (D1)", () => {
+    const WHOLE = {
+        name: "Monthly",
+        price: "1500",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+    /** The clash lookup is the findFirst that asks by name. */
+    function clashWith(other: { id: string; name: string } | null) {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? other
+                        : { ...PLAN, classesPerMonth: null },
+                ),
+        );
+    }
+
+    beforeEach(() => {
+        clashWith(null);
+        tx.subscriptionPlan!.create!.mockImplementation(
+            (args: { data: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "plan_1",
+                    status: "ACTIVE",
+                    ...args.data,
+                }),
+        );
+    });
+
+    it("saves classes a month on create", async () => {
+        await service.createPlan(owner, { ...WHOLE, classesPerMonth: 8 });
+        expect(tx.subscriptionPlan!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ classesPerMonth: 8 }),
+            }),
+        );
+    });
+
+    it("leaves classes unlimited when not given", async () => {
+        await service.createPlan(owner, WHOLE);
+        expect(
+            tx.subscriptionPlan!.create!.mock.calls[0]![0].data.classesPerMonth,
+        ).toBeNull();
+    });
+
+    it("changes classes a month, or clears them with null", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
+        expect(tx.subscriptionPlan!.updateMany!.mock.calls[0]![0].data).toEqual(
+            { classesPerMonth: 12 },
+        );
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: null });
+        expect(tx.subscriptionPlan!.updateMany!.mock.calls[1]![0].data).toEqual(
+            { classesPerMonth: null },
+        );
+    });
+
+    it("refuses a name another live plan has, ignoring case, naming it", async () => {
+        clashWith({ id: "plan_9", name: "monthly" });
+        const refused = service.createPlan(owner, WHOLE);
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toMatchObject({
+            response: {
+                message: expect.stringContaining("monthly"),
+                details: { field: "name", planId: "plan_9" },
+            },
+        });
+        expect(tx.subscriptionPlan!.create).not.toHaveBeenCalled();
+    });
+
+    it("looks for the clash among plans that aren't archived, case-insensitively", async () => {
+        await service.createPlan(owner, WHOLE);
+        const byName = tx.subscriptionPlan!.findFirst!.mock.calls.find(
+            ([a]) => a.where.name,
+        )![0];
+        expect(byName.where).toEqual({
+            organizationId: "org_1",
+            status: { not: "ARCHIVED" },
+            name: { equals: "Monthly", mode: "insensitive" },
+        });
+    });
+
+    it("checks under the business's plan-name lock, taken first", async () => {
+        await service.createPlan(owner, WHOLE);
+        expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.subscriptionPlan!.findFirst!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("lets a plan keep its own name on a rename", async () => {
+        await service.updatePlan(owner, "plan_1", { name: "Monthly" });
+        const byName = tx.subscriptionPlan!.findFirst!.mock.calls.find(
+            ([a]) => a.where.name,
+        )![0];
+        expect(byName.where.id).toEqual({ not: "plan_1" });
+    });
+
+    it("refuses a rename onto another live plan's name", async () => {
+        clashWith({ id: "plan_9", name: "Annual" });
+        await expect(
+            service.updatePlan(owner, "plan_1", { name: "annual" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("takes no lock and checks no name when the name isn't changing", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1600" });
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+        expect(tx.subscriptionPlan!.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses to sell an archived plan again while its name is taken", async () => {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? { id: "plan_9", name: "Monthly membership" }
+                        : { name: PLAN.name, status: "ARCHIVED" },
+                ),
+        );
+        await expect(
+            service.setPlanStatus(owner, "plan_1", "ACTIVE"),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("answers another business's plan with a 404 on change", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.updatePlan(owner, "plan_x", { name: "Monthly" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.setPlanStatus(owner, "plan_x", "ARCHIVED"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("is refused to a Member", async () => {
+        await expect(service.createPlan(member, WHOLE)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+    });
+});
+
+// — D2: every plan change is recorded ————————————————————————————————
+
+describe("a plan's history (D2)", () => {
+    const WHOLE = {
+        name: "Monthly",
+        price: "1500",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+    const operator: OrganizationContext = {
+        ...owner,
+        userId: "op_1",
+        roleKey: "platform-operator",
+    };
+    const events = () =>
+        tx.subscriptionPlanEvent!.create!.mock.calls.map(([a]) => a.data);
+
+    /** The plan as the save finds it; any lookup by name finds no clash. */
+    function planIs(over: Record<string, unknown> = {}) {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? null
+                        : { ...PLAN, classesPerMonth: null, ...over },
+                ),
+        );
+    }
+
+    beforeEach(() => {
+        planIs();
+        tx.subscriptionPlan!.create!.mockImplementation(
+            (args: { data: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "plan_1",
+                    status: "ACTIVE",
+                    ...args.data,
+                }),
+        );
+    });
+
+    it("records a new plan as CREATED, every field from nothing, by who made it", async () => {
+        await service.createPlan(owner, { ...WHOLE, classesPerMonth: 8 });
+        expect(events()).toEqual([
+            {
+                organizationId: "org_1",
+                planId: "plan_1",
+                kind: "CREATED",
+                actorKind: "TEAM",
+                actorUserId: "user_1",
+                changes: {
+                    name: [null, "Monthly"],
+                    price: [null, "1500.00"],
+                    currency: [null, "INR"],
+                    interval: [null, "MONTH"],
+                    classesPerMonth: [null, 8],
+                    status: [null, "ACTIVE"],
+                },
+            },
+        ]);
+    });
+
+    it("records a price change from ₹1,200 to ₹1,500 as one PRICE_CHANGED", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1500" });
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "PRICE_CHANGED",
+                changes: { price: ["1200.00", "1500.00"] },
+            }),
+        ]);
+    });
+
+    it("names each kind of edit, and UPDATED for more than one at once", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 8 });
+        await service.updatePlan(owner, "plan_1", { name: "Standard" });
+        await service.updatePlan(owner, "plan_1", { description: "Gym" });
+        await service.updatePlan(owner, "plan_1", { interval: "YEAR" });
+        await service.updatePlan(owner, "plan_1", {
+            name: "Standard",
+            price: "1500",
+        });
+        expect(events().map((e) => e.kind)).toEqual([
+            "CLASSES_CHANGED",
+            "RENAMED",
+            "DESCRIPTION_CHANGED",
+            "PRICE_CHANGED",
+            "UPDATED",
+        ]);
+        expect(events()[4].changes).toEqual({
+            name: ["Monthly membership", "Standard"],
+            price: ["1200.00", "1500.00"],
+        });
+    });
+
+    it("records nothing for a save that changes nothing", async () => {
+        await service.updatePlan(owner, "plan_1", {
+            name: PLAN.name,
+            price: "1200.00",
+            classesPerMonth: null,
+        });
+        expect(tx.subscriptionPlanEvent!.create).not.toHaveBeenCalled();
+    });
+
+    it("records nothing when the save is refused", async () => {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? { id: "plan_9", name: "Standard" }
+                        : { ...PLAN, classesPerMonth: null },
+                ),
+        );
+        await expect(
+            service.updatePlan(owner, "plan_1", { name: "standard" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.updatePlan(owner, "plan_x", { price: "1" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(tx.subscriptionPlanEvent!.create).not.toHaveBeenCalled();
+    });
+
+    it("locks the plan before reading what it was", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1500" });
+        expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.subscriptionPlan!.findFirst!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("records an archive and a sale again, and nothing when the status stays", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            name: PLAN.name,
+            status: "ACTIVE",
+        });
+        await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
+        await service.setPlanStatus(owner, "plan_1", "ACTIVE");
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? null
+                        : { name: PLAN.name, status: "ARCHIVED" },
+                ),
+        );
+        await service.setPlanStatus(owner, "plan_1", "ACTIVE");
+        await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "ARCHIVED",
+                changes: { status: ["ACTIVE", "ARCHIVED"] },
+            }),
+            expect.objectContaining({
+                kind: "RESTORED",
+                changes: { status: ["ARCHIVED", "ACTIVE"] },
+            }),
+        ]);
+    });
+
+    it("records a Saroh operator's change as OPERATOR", async () => {
+        await service.updatePlan(operator, "plan_1", { price: "1500" });
+        expect(events()[0]).toMatchObject({
+            actorKind: "OPERATOR",
+            actorUserId: "op_1",
+        });
+    });
+
+    it("is read with subscription:read, which a Member lacks", async () => {
+        await expect(
+            service.planEvents(member, "plan_1", {}),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
 
@@ -1067,6 +1504,9 @@ describe("changing plan from the next renewal", () => {
             id: "plan_2",
             name: "Weekly box",
             status: "ACTIVE",
+            price: decimal("300"),
+            currency: "INR",
+            interval: "WEEK",
         });
     });
 
@@ -1385,25 +1825,613 @@ describe("a failed charge", () => {
     });
 
     it("retries by making a new pay link for that invoice", async () => {
-        db.invoice!.findMany!.mockResolvedValue([paid, overdue]);
-        createPayLink.mockResolvedValue({ token: "tok" });
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        createPayLinkInTx.mockResolvedValue({ token: "tok" });
         await expect(service.retryPayment(owner, "sub_1")).resolves.toEqual({
             invoiceId: "inv_1",
             token: "tok",
         });
-        expect(createPayLink).toHaveBeenCalledWith(owner, "inv_1");
+        expect(createPayLinkInTx).toHaveBeenCalledWith(tx, owner, "inv_1");
+    });
+
+    it("makes the link and records RETRIED on one transaction, under the subscription's lock (review S-5)", async () => {
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        const order: string[] = [];
+        tx.$queryRaw.mockImplementation(() => {
+            order.push("lock");
+            return Promise.resolve([]);
+        });
+        createPayLinkInTx.mockImplementation((t: unknown) => {
+            order.push(t === tx ? "link in tx" : "link outside");
+            return Promise.resolve({ token: "tok" });
+        });
+        tx.subscriptionEvent!.create!.mockImplementation(
+            (args: { data: { kind: string } }) => {
+                order.push(args.data.kind);
+                return Promise.resolve({});
+            },
+        );
+        await service.retryPayment(owner, "sub_1");
+        expect(db.$transaction).toHaveBeenCalledTimes(1);
+        expect(order).toEqual(["lock", "link in tx", "RETRIED"]);
+    });
+
+    it("records no RETRIED when the link is refused", async () => {
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        createPayLinkInTx.mockRejectedValue(
+            new ConflictException("Connect a payment provider"),
+        );
+        await expect(service.retryPayment(owner, "sub_1")).rejects.toThrow(
+            "Connect a payment provider",
+        );
+        expect(tx.subscriptionEvent!.create).not.toHaveBeenCalled();
     });
 
     it("has nothing to retry when the latest charge is not overdue", async () => {
         await expect(
             service.retryPayment(owner, "sub_1"),
         ).rejects.toBeInstanceOf(ConflictException);
-        expect(createPayLink).not.toHaveBeenCalled();
+        expect(createPayLinkInTx).not.toHaveBeenCalled();
     });
 
     it("refuses a Member a retry", async () => {
         await expect(
             service.retryPayment(member, "sub_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+});
+
+describe("the subscription's log (D9)", () => {
+    /** Each event written, as its row's data. */
+    const logged = () =>
+        tx.subscriptionEvent!.create!.mock.calls.map(
+            ([a]) => (a as { data: Record<string, unknown> }).data,
+        );
+    const byOwner = { actorKind: "TEAM", actorUserId: "user_1" };
+
+    it("records a subscribe with its first invoice and the plan it was sold at", async () => {
+        db.customerSubscription!.count!.mockResolvedValue(0);
+        await service.subscribe(owner, { contactId: "c_1", planId: "plan_1" });
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                organizationId: "org_1",
+                subscriptionId: "sub_1",
+                kind: "SUBSCRIBED",
+                ...byOwner,
+                invoiceId: "inv_new",
+                data: {
+                    plan: {
+                        id: "plan_1",
+                        name: "Monthly membership",
+                        price: "1200.00",
+                        currency: "INR",
+                        interval: "MONTH",
+                    },
+                    startsAt: null,
+                },
+            }),
+        ]);
+    });
+
+    it("records a pause by the team member, and nothing for a refused one", async () => {
+        await service.pause(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({ kind: "PAUSED", ...byOwner }),
+        ]);
+
+        tx.subscriptionEvent!.create!.mockClear();
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-20T00:00:00Z") }),
+        );
+        await expect(service.pause(owner, "sub_1")).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(logged()).toEqual([]);
+    });
+
+    it("records a Saroh operator's action as OPERATOR", async () => {
+        await service.pause(
+            { ...owner, userId: "op_1", roleKey: "platform-operator" },
+            "sub_1",
+        );
+        expect(logged()[0]).toMatchObject({
+            kind: "PAUSED",
+            actorKind: "OPERATOR",
+            actorUserId: "op_1",
+        });
+    });
+
+    it("records a resume inside the paid period with the days it added", async () => {
+        jest.setSystemTime(at("2026-09-10T09:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ status: "PAUSED", pausedAt: at("2026-09-05T09:00:00Z") }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "RESUMED",
+                invoiceId: null,
+                data: { extendedDays: 5 },
+            }),
+        ]);
+    });
+
+    it("records a resume past the paid period with its new invoice, after the booked plan it switched to", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                pendingPlanId: "plan_2",
+                pendingPlan: WEEKLY_BOX,
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual([
+            "PLAN_CHANGED",
+            "RESUMED",
+        ]);
+        expect(logged()[0]!.data).toEqual({
+            from: {
+                id: "plan_1",
+                name: "Monthly membership",
+                price: "1200.00",
+                currency: "INR",
+                interval: "MONTH",
+            },
+            to: {
+                id: "plan_2",
+                name: "Weekly box",
+                price: "300.00",
+                currency: "INR",
+                interval: "MONTH",
+            },
+        });
+        expect(logged()[1]).toMatchObject({
+            invoiceId: "inv_new",
+            data: { restarted: true },
+        });
+    });
+
+    it("records an end when a resume finds its last period over", async () => {
+        jest.setSystemTime(at("2026-10-20T15:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "ENDED",
+                ...byOwner,
+                data: { at: "2026-10-01T00:00:00.000Z" },
+            }),
+        ]);
+    });
+
+    it("records a cancel now, and one left to run out with when it ends", async () => {
+        await service.cancel(owner, "sub_1", { when: "now" });
+        await service.cancel(owner, "sub_1", { when: "periodEnd" });
+        expect(logged().map((e) => [e.kind, e.data])).toEqual([
+            ["CANCELLED", {}],
+            ["CANCEL_SCHEDULED", { endsAt: "2026-10-01T00:00:00.000Z" }],
+        ]);
+    });
+
+    it("records Keep", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ cancelAtPeriodEnd: true }),
+        );
+        await service.keep(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual(["KEPT"]);
+    });
+
+    it("records a booked plan change, the one it replaced, and taking it back", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...WEEKLY_BOX,
+            id: "plan_3",
+            name: "Loaf and beans",
+            status: "ACTIVE",
+        });
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ pendingPlanId: "plan_2", pendingPlan: WEEKLY_BOX }),
+        );
+        await service.changePlan(owner, "sub_1", { planId: "plan_3" });
+        await service.cancelPlanChange(owner, "sub_1");
+        expect(logged().map((e) => e.kind)).toEqual([
+            "PLAN_CHANGE_BOOKED",
+            "PLAN_CHANGE_CANCELLED",
+        ]);
+        expect(logged()[0]!.data).toEqual({
+            to: expect.objectContaining({ id: "plan_3", price: "300.00" }),
+            from: "2026-10-01T00:00:00.000Z",
+            replaced: expect.objectContaining({ id: "plan_2" }),
+        });
+        expect(logged()[1]!.data).toEqual({
+            plan: expect.objectContaining({ id: "plan_2", name: "Weekly box" }),
+        });
+    });
+
+    it("records a new collection day and the period it then invoiced, and nothing for a save that changes nothing", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ collectionWeekday: 6, collectionNote: "1 loaf" }),
+        );
+        await service.setCollection(owner, "sub_1", { weekday: 6 });
+        expect(logged()).toEqual([]);
+        await service.setCollection(owner, "sub_1", {
+            weekday: 3,
+            note: "1 loaf",
+        });
+        expect(logged()).toEqual([
+            expect.objectContaining({
+                kind: "COLLECTION_CHANGED",
+                data: { weekday: [6, 3] },
+            }),
+            // The old day's skips had left the period uncharged (none here).
+            expect.objectContaining({
+                kind: "INVOICED",
+                invoiceId: "inv_new",
+                data: {
+                    periodStart: "2026-09-01T00:00:00.000Z",
+                    periodEnd: "2026-10-01T00:00:00.000Z",
+                },
+            }),
+        ]);
+    });
+
+    it("records a skip and its undo by date", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ collectionWeekday: 6 }),
+        );
+        await service.skipCollection(owner, "sub_1", { date: "2026-09-26" });
+        tx.subscriptionSkip!.findFirst!.mockResolvedValueOnce({ id: "skip_1" });
+        await service.unskipCollection(owner, "sub_1", "2026-09-26");
+        expect(logged().map((e) => [e.kind, e.data])).toEqual([
+            ["COLLECTION_SKIPPED", { date: "2026-09-26" }],
+            ["COLLECTION_UNSKIPPED", { date: "2026-09-26" }],
+            // The period had no invoice, so the undo invoiced it.
+            ["INVOICED", expect.anything()],
+        ]);
+    });
+
+    it("records nothing for a retry with nothing to retry", async () => {
+        await expect(service.retryPayment(owner, "sub_1")).rejects.toThrow();
+        expect(logged()).toEqual([]);
+    });
+
+    describe("renewal, by the job", () => {
+        const now = at("2026-10-01T02:00:00Z");
+
+        it("records RENEWED by the job with its invoice and period", async () => {
+            await service.renewOne("sub_1", now);
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "RENEWED",
+                    actorKind: "JOB",
+                    actorUserId: null,
+                    invoiceId: "inv_new",
+                    data: {
+                        periodStart: "2026-10-01T00:00:00.000Z",
+                        periodEnd: "2026-11-01T00:00:00.000Z",
+                    },
+                }),
+            ]);
+        });
+
+        it("records the end of one set to end, and nothing when nothing was due", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValueOnce(
+                sub({ cancelAtPeriodEnd: true }),
+            );
+            await service.renewOne("sub_1", now);
+            await service.renewOne("sub_1", at("2026-09-20T00:00:00Z"));
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "ENDED",
+                    actorKind: "JOB",
+                    data: { at: "2026-10-01T00:00:00.000Z" },
+                }),
+            ]);
+        });
+
+        it("records a period already invoiced with that invoice", async () => {
+            tx.invoice!.findFirst!.mockResolvedValueOnce({ id: "inv_old" });
+            await expect(service.renewOne("sub_1", now)).resolves.toBe(
+                "advanced",
+            );
+            expect(logged()).toEqual([
+                expect.objectContaining({
+                    kind: "RENEWED",
+                    invoiceId: "inv_old",
+                }),
+            ]);
+        });
+    });
+});
+
+describe("pause with an end date (D8)", () => {
+    const events = () =>
+        tx.subscriptionEvent!.create!.mock.calls.map((c) => c[0].data);
+
+    it("pauses 4 weeks to the start of that day, and says so in its event", async () => {
+        // 1 Oct, 10:00 UTC.
+        jest.setSystemTime(at("2026-10-01T10:00:00Z"));
+        await service.pause(owner, "sub_1", { weeks: 4 });
+        expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+            where: { id: "sub_1" },
+            data: {
+                status: "PAUSED",
+                pausedAt: at("2026-10-01T10:00:00Z"),
+                pausedUntil: at("2026-10-29T00:00:00Z"),
+            },
+        });
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "PAUSED",
+                actorKind: "TEAM",
+                data: { until: "2026-10-29T00:00:00.000Z" },
+            }),
+        ]);
+    });
+
+    it("pauses until resumed with no end date, as every earlier client asked", async () => {
+        await service.pause(owner, "sub_1", { until: null });
+        await service.pause(owner, "sub_1");
+        for (const call of tx.customerSubscription!.update!.mock.calls) {
+            expect(call[0].data.pausedUntil).toBeNull();
+        }
+        expect(events().map((e) => e.data)).toEqual([
+            { until: null },
+            { until: null },
+        ]);
+    });
+
+    it("takes a day staff name, in the subscription's zone", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ timezone: "Asia/Kolkata" }),
+        );
+        await service.pause(owner, "sub_1", { until: "2026-10-20" });
+        expect(
+            tx.customerSubscription!.update!.mock.calls[0]![0].data.pausedUntil,
+        ).toEqual(at("2026-10-19T18:30:00Z"));
+    });
+
+    it("refuses an end date that has passed, and writes nothing", async () => {
+        await expect(
+            service.pause(owner, "sub_1", { until: "2026-09-01" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+        expect(events()).toEqual([]);
+    });
+
+    it("refuses a Member, who can't write subscriptions", async () => {
+        await expect(
+            service.pause(member, "sub_1", { weeks: 2 }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("clears the end date on a resume by hand", async () => {
+        jest.setSystemTime(at("2026-09-10T09:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                pausedUntil: at("2026-09-19T00:00:00Z"),
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(
+            tx.customerSubscription!.update!.mock.calls[0]![0].data,
+        ).toMatchObject({
+            status: "ACTIVE",
+            pausedAt: null,
+            pausedUntil: null,
+        });
+    });
+
+    it("shows when a paused one resumes, and nothing once it runs", async () => {
+        db.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-20T00:00:00Z"),
+                pausedUntil: at("2026-10-18T00:00:00Z"),
+            }),
+        );
+        expect((await service.get(owner, "sub_1")).pausedUntil).toBe(
+            "2026-10-18T00:00:00.000Z",
+        );
+        db.customerSubscription!.findFirst!.mockResolvedValue(sub());
+        expect((await service.get(owner, "sub_1")).pausedUntil).toBeNull();
+    });
+
+    describe("the renewal job on the end date", () => {
+        // Paused 1 Oct for 4 weeks, paid to 1 Nov.
+        const pausedFourWeeks = (over: Record<string, unknown> = {}) =>
+            sub({
+                status: "PAUSED",
+                currentPeriodStart: at("2026-10-01T00:00:00Z"),
+                currentPeriodEnd: at("2026-11-01T00:00:00Z"),
+                anchorAt: at("2026-10-01T00:00:00Z"),
+                pausedAt: at("2026-10-01T10:00:00Z"),
+                pausedUntil: at("2026-10-29T00:00:00Z"),
+                ...over,
+            });
+        const on29Oct = at("2026-10-29T00:30:00Z");
+
+        it("resumes it on 29 Oct, moving the paid period 28 days later, with no invoice", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "resumed",
+            );
+            expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+                where: { id: "sub_1" },
+                data: {
+                    status: "ACTIVE",
+                    pausedAt: null,
+                    pausedUntil: null,
+                    currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+                    anchorAt: at("2026-11-29T00:00:00Z"),
+                },
+            });
+            expect(issueInTx).not.toHaveBeenCalled();
+            expect(events()).toEqual([
+                expect.objectContaining({
+                    kind: "RESUMED",
+                    actorKind: "JOB",
+                    actorUserId: null,
+                    data: { extendedDays: 28 },
+                }),
+            ]);
+        });
+
+        it("extends the same way when the job only gets to it after the period's end (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(
+                service.renewOne("sub_1", at("2026-11-02T08:00:00Z")),
+            ).resolves.toBe("resumed");
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                status: "ACTIVE",
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("extends a pause ending the moment the period does (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    pausedUntil: at("2026-11-01T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-11-01T00:30:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({ currentPeriodEnd: at("2026-12-02T00:00:00Z") });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("starts a restart's period on the pause's end date, not the day the job runs (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-10-31T09:00:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                anchorAt: at("2026-10-29T00:00:00Z"),
+                currentPeriodStart: at("2026-10-29T00:00:00Z"),
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).toHaveBeenCalledTimes(1);
+        });
+
+        it("takes the row lock before it reads", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await service.renewOne("sub_1", on29Oct);
+            expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+                tx.customerSubscription!.findUnique!.mock
+                    .invocationCallOrder[0]!,
+            );
+        });
+
+        it("issues the next invoice when the pause outlasted the paid period", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "resumed",
+            );
+            expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+                where: { id: "sub_1" },
+                data: expect.objectContaining({
+                    status: "ACTIVE",
+                    pausedUntil: null,
+                    anchorAt: at("2026-10-29T00:00:00Z"),
+                    currentPeriodStart: at("2026-10-29T00:00:00Z"),
+                    currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+                }),
+            });
+            expect(issueInTx).toHaveBeenCalledTimes(1);
+            expect(events()).toEqual([
+                expect.objectContaining({
+                    kind: "RESUMED",
+                    actorKind: "JOB",
+                    invoiceId: "inv_new",
+                    data: { restarted: true },
+                }),
+            ]);
+        });
+
+        it("leaves it paused with Payments off, writes RESUME_REFUSED once, and no invoice", async () => {
+            tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "refused",
+            );
+            tx.subscriptionEvent!.findFirst!.mockResolvedValue({ id: "ev_1" });
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "refused",
+            );
+            expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+            expect(issueInTx).not.toHaveBeenCalled();
+            expect(events().map((e) => e.kind)).toEqual(["RESUME_REFUSED"]);
+        });
+
+        it("does nothing before the date, for an open-ended pause, or once resumed", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(
+                service.renewOne("sub_1", at("2026-10-28T23:00:00Z")),
+            ).resolves.toBe("skipped");
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({ pausedUntil: null }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "skipped",
+            );
+            // Resumed by hand before the date, or by an earlier delivery.
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                sub({ currentPeriodEnd: at("2026-11-29T00:00:00Z") }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "skipped",
+            );
+            expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+            expect(events()).toEqual([]);
+        });
+
+        it("ends one set to end whose period ran out while paused, even with Payments off", async () => {
+            tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                    cancelAtPeriodEnd: true,
+                }),
+            );
+            await service.renewOne("sub_1", on29Oct);
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({ status: "CANCELLED", pausedUntil: null });
+            expect(events().map((e) => e.kind)).toEqual(["ENDED"]);
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
     });
 });

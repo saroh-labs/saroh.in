@@ -97,7 +97,10 @@
   order's invoice, a credit note and an edit's correction say). Writes go
   through `invoices/order-invoicing.ts` on the caller's transaction:
   `ensureOrderInvoice` (order row lock, then the partial unique index
-  `Invoice_one_per_order`), `creditNoteForRefund` (unique on
+  `Invoice_one_per_order`; under that lock it also gives the paying store
+  customer a contact, `customer-workspace/ensure-contact.ts`, C2 — no lock
+  of its own, and `ON CONFLICT DO NOTHING` so it never fails a payment),
+  `creditNoteForRefund` (unique on
   `paymentRefundId`, so the refund path and the refund webhook make one),
   `correctOrderInvoiceForEdit`, `invoiceSupersededPayment`,
   `creditRestOfOrder`. Lock order: order, intent, invoice — the webhook
@@ -249,6 +252,18 @@
 - **Renewal** is the self-rescheduling `subscription.renew` job
   (`backend-jobs.md`); `renewOne` takes the row lock and is idempotent per
   period (partial unique index on live invoices per period).
+- **A pause has an end date, or none** (plan 2026-09-26-004, D8;
+  `subscriptions/pause-until.ts`). `pausedUntil` is the start of that day in
+  the subscription's zone: 2, 4 or 8 weeks, or a day staff name; null is
+  "Until I resume", which is staff's only — a customer's own pause (A8)
+  takes `weeks`. The renewal job picks it up on that date and resumes it
+  through the manual resume's own code (`resumeLocked`), extending the paid
+  period by the pause's calendar days or starting a new invoiced period, and
+  writes RESUMED as JOB; any resume clears `pausedUntil`. With Payments off,
+  a resume that would start a new period is refused: it stays paused, one
+  RESUME_REFUSED is written per pause, and Home's
+  `PAYMENTS_PAUSES_WAITING` reads the subscriptions themselves until
+  Payments is back on.
 - **Collections** (plan 2026-09-23-003, U7) are dated from the subscription's
   collection weekday in its own timezone, within each period — a monthly plan
   can collect weekly (`subscriptions/collections.ts`, the one source for any
@@ -265,6 +280,33 @@
   currency and interval — a new interval starts its chain where the old
   period ended. Undo clears it; cancelling now drops it; archived plans are
   refused.
+- **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
+  write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
+  KEY UPDATE, after the name lock), reads what it was, and writes one
+  `SubscriptionPlanEvent` in the same transaction, with
+  `{ field: [before, after] }` for the fields that changed
+  (`plan-events.ts`). A save that
+  changes nothing, or is refused, writes none. The log is append-only; an
+  operator's change reads as Saroh support (DEC-035). There is no backfill:
+  a plan without a CREATED event says "Earlier changes weren't recorded"
+  (`earlierUnrecorded`).
+- **Everything done to a subscription is a subscription event** (D9).
+  Each action writes one `SubscriptionEvent` inside its own transaction,
+  after the subscription's row lock, through
+  `subscriptions/subscription-events.ts` (`subscriptionEventLog(tx, …)`,
+  bound to the actor): TEAM or OPERATOR from the context, JOB for the
+  renewal job, CUSTOMER with `customerAccountId` from a customer's own
+  session (epic A). A refused action rolls back and writes none; the job
+  writes RENEWED once per period, since a redelivered run finds the period
+  already moved under the lock. A new action that changes a subscription
+  adds a kind to `SUBSCRIPTION_EVENT_KINDS` and records it. Who did it is
+  named by `event-actors.ts`, shared with the plan log, so an operator is
+  Saroh support in both. The log is append-only, keyed to its subscription
+  by `(subscriptionId, organizationId)`, and read newest first by cursor
+  (`GET subscriptions/:id/events`); the invoice an event names is left out
+  without `invoice:read`. No backfill: without a SUBSCRIBED event the read
+  says `earlierUnrecorded`. Home's failed-renewal source reads its
+  RENEWAL_FAILED and MANDATE_LIMIT_LOW events (F1, written by D13).
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.

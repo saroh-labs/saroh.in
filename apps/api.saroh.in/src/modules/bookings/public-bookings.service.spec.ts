@@ -50,6 +50,7 @@ jest.mock("@saroh/database", () => {
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -120,6 +121,9 @@ const SERVICE = {
     timezone: "UTC",
     status: "ACTIVE",
     deletedAt: null,
+    visits: 1,
+    depositMode: "NONE",
+    showOnBookingPage: true,
 };
 
 // Mon 2026-07-20 09:00–10:00 UTC — the one rule that makes START a valid slot.
@@ -639,6 +643,8 @@ describe("PublicBookingsService.publicServices — the website's services list (
             id: { in: ["a"] },
             deletedAt: null,
             status: "ACTIVE",
+            // A service hidden from the booking page is left out (E1).
+            showOnBookingPage: true,
             organization: {
                 organizationModules: {
                     none: {
@@ -723,5 +729,189 @@ describe("toPublicBooking — what a booker is answered with", () => {
                 snapshot: { service: { name: "Consult" } },
             }),
         ).toMatchObject({ online: false, meetingUrl: null });
+    });
+});
+
+describe("the booking page's Where and intake note (E7)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const EITHER = {
+        ...SERVICE,
+        locationType: "EITHER",
+        meetingUrl: "https://meet.example.com/kavi",
+        availabilityRules: RULES,
+    };
+
+    /** The created row, as the mocked create writes it. */
+    function echoCreate() {
+        bookingCreate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                id: "bk_1",
+                status: "CONFIRMED",
+                ...data,
+            }),
+        );
+    }
+
+    it("records a Video call on an Either service as ONLINE, and hands over the link", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue(EITHER);
+        echoCreate();
+
+        const booking = await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({ locationType: "ONLINE" }),
+            "iphash",
+        );
+
+        expect(bookingCreate.mock.calls[0][0].data.locationType).toBe(
+            "ONLINE",
+        );
+        expect(toPublicBooking(booking)).toMatchObject({
+            online: true,
+            meetingUrl: "https://meet.example.com/kavi",
+        });
+    });
+
+    it("records In person on an Either service, with no link", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue(EITHER);
+        echoCreate();
+
+        const booking = await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({ locationType: "IN_PERSON" }),
+            "iphash",
+        );
+
+        expect(bookingCreate.mock.calls[0][0].data.locationType).toBe(
+            "IN_PERSON",
+        );
+        expect(toPublicBooking(booking)).toMatchObject({
+            online: false,
+            meetingUrl: null,
+        });
+    });
+
+    it("leaves an In person service's booking as the service says, and refuses Online for it before anything is held", async () => {
+        wireBookHappyPath();
+        const service = new PublicBookingsService();
+        await service.book("svc_1", baseInput(), "iphash");
+        expect(bookingCreate.mock.calls[0][0].data.locationType).toBeNull();
+
+        jest.clearAllMocks();
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            locationType: "IN_PERSON",
+            availabilityRules: RULES,
+        });
+        await expect(
+            service.book(
+                "svc_1",
+                baseInput({ locationType: "ONLINE" }),
+                "iphash",
+            ),
+        ).rejects.toThrow(
+            new BadRequestException("This is only offered in person."),
+        );
+        expect(transaction).not.toHaveBeenCalled();
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the note on the booking only — trimmed, never in the snapshot or the job", async () => {
+        wireBookHappyPath();
+        await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({ intakeNote: "  I take blood thinners  " }),
+            "iphash",
+        );
+        const data = bookingCreate.mock.calls[0][0].data;
+        expect(data.intakeNote).toBe("I take blood thinners");
+        expect(JSON.stringify(data.snapshot)).not.toContain("blood");
+        expect(JSON.stringify(jobCreate.mock.calls[0][0].data)).not.toContain(
+            "blood",
+        );
+    });
+
+    it("keeps no note when the booker left it empty", async () => {
+        wireBookHappyPath();
+        await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({ intakeNote: "   " }),
+            "iphash",
+        );
+        expect(bookingCreate.mock.calls[0][0].data.intakeNote).toBeNull();
+    });
+
+    it("refuses a note of 1,001 characters → 400, and holds nothing", async () => {
+        wireBookHappyPath();
+        await expect(
+            new PublicBookingsService().book(
+                "svc_1",
+                baseInput({ intakeNote: "a".repeat(1001) }),
+                "iphash",
+            ),
+        ).rejects.toThrow(
+            new BadRequestException(
+                "Keep the note to 1,000 characters or fewer.",
+            ),
+        );
+        expect(transaction).not.toHaveBeenCalled();
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a replay that changed Where: it is not the request that booked", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue(EITHER);
+        bookingFindUnique.mockResolvedValue({
+            id: "bk_prev",
+            bookerEmail: "jane@example.com",
+            startAt: new Date(START),
+            staffId: null,
+            paidWith: null,
+            holdExpiresAt: null,
+            locationType: "IN_PERSON",
+        });
+        const service = new PublicBookingsService();
+        await expect(
+            service.book(
+                "svc_1",
+                baseInput({ idempotencyKey: "idem_1", locationType: "ONLINE" }),
+                "iphash",
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        // The same answer is still replayed.
+        await expect(
+            service.book(
+                "svc_1",
+                baseInput({
+                    idempotencyKey: "idem_1",
+                    locationType: "IN_PERSON",
+                }),
+                "iphash",
+            ),
+        ).resolves.toMatchObject({ id: "bk_prev" });
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("never answers the booker with the note", () => {
+        const answer = toPublicBooking({
+            id: "bk_1",
+            startAt: new Date(START),
+            endAt: new Date("2026-07-20T10:00:00.000Z"),
+            status: "CONFIRMED",
+            locationType: "ONLINE",
+            intakeNote: "Nervous about needles",
+            snapshot: {
+                service: {
+                    name: "Video consultation",
+                    locationType: "EITHER",
+                    meetingUrl: "https://meet.example.com/kavi",
+                },
+            },
+        } as Parameters<typeof toPublicBooking>[0]);
+        expect(JSON.stringify(answer)).not.toContain("needles");
+        expect(answer.meetingUrl).toBe("https://meet.example.com/kavi");
     });
 });

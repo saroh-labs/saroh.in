@@ -7,12 +7,14 @@ import {
     canCancel,
     eventText,
     flowOf,
+    goesToAddress,
     isOpen,
     kitchenStanding,
     PAYMENT_TRANSITIONS,
     putBackOf,
     refundableQuantity,
     standingOf,
+    stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { OrderReadEvent, OrderReadLine } from "@/lib/orders/read";
@@ -63,14 +65,67 @@ const line = (over: Partial<OrderReadLine> = {}): OrderReadLine => ({
 });
 
 describe("the kitchen flow", () => {
-    it("collects at the counter, or goes out with a courier", () => {
-        expect(flowOf("COLLECT")).toEqual([
+    it("walks the steps the API sends for its type, in its words (DEC-045)", () => {
+        const steps = [
+            { stage: "NEW" as const, label: "Paid" },
+            { stage: "SENT" as const, label: "Sent" },
+        ];
+        expect(stepsOf({ fulfilment: "COLLECT", steps })).toBe(steps);
+        expect(flowOf({ fulfilment: "COLLECT", steps })).toEqual([
+            "NEW",
+            "SENT",
+        ]);
+    });
+
+    it("falls back to the two flows an API before B2a knew", () => {
+        expect(flowOf({ fulfilment: "COLLECT" })).toEqual([
             "NEW",
             "PREPARING",
             "READY",
             "COLLECTED",
         ]);
-        expect(flowOf("DELIVERY").at(-2)).toBe("HANDED_TO_COURIER");
+        expect(flowOf({ fulfilment: "DELIVERY" }).at(-2)).toBe(
+            "HANDED_TO_COURIER",
+        );
+        expect(stepsOf({ fulfilment: "DELIVERY" })[3]).toEqual({
+            stage: "HANDED_TO_COURIER",
+            label: "Handed to courier",
+        });
+    });
+
+    it("goes to an address for a local delivery or a shipment, read from the type", () => {
+        expect(
+            goesToAddress({
+                fulfilment: "DELIVERY",
+                fulfilmentType: "SHIPPING",
+            }),
+        ).toBe(true);
+        expect(
+            goesToAddress({
+                fulfilment: "DELIVERY",
+                fulfilmentType: "LOCAL_DELIVERY",
+            }),
+        ).toBe(true);
+        expect(
+            goesToAddress({ fulfilment: "COLLECT", fulfilmentType: "DIGITAL" }),
+        ).toBe(false);
+        expect(goesToAddress({ fulfilment: "DELIVERY" })).toBe(true);
+        expect(goesToAddress({ fulfilment: "COLLECT" })).toBe(false);
+    });
+
+    it("is done at the last of the type's steps", () => {
+        const o = {
+            status: "PROCESSING" as const,
+            stage: "NEW" as const,
+            fulfilment: "COLLECT" as const,
+            steps: [
+                { stage: "NEW" as const, label: "Paid" },
+                { stage: "SENT" as const, label: "Sent" },
+            ],
+            refundStanding: "NONE" as const,
+        };
+        expect(isOpen(o)).toBe(true);
+        expect(isOpen({ ...o, stage: "SENT" })).toBe(false);
     });
 
     it("is open until its last stage, a cancel or a refund in full", () => {
@@ -102,18 +157,50 @@ describe("waiting", () => {
     const placed = "2026-09-23T09:14:00Z";
     const at = (min: number) => Date.parse(placed) + min * 60_000;
 
-    it("counts minutes, and is late from the 20-minute target", () => {
-        expect(waiting(placed, at(16))).toEqual({
+    const pickup = {
+        placedAt: placed,
+        late: false,
+        lateAfterMinutes: 120,
+        fulfilmentLabel: "Pick-up",
+    };
+
+    it("counts minutes, and keeps no target of its own: late is the API's", () => {
+        expect(waiting(pickup, at(16))).toEqual({
             text: "Waiting 16 min",
             minutes: 16,
             late: false,
+            rule: "Pick-up orders count as late after 2 h",
         });
-        expect(waiting(placed, at(20)).late).toBe(true);
+        // Twenty minutes is no longer late by itself (B2b).
+        expect(waiting(pickup, at(20)).late).toBe(false);
+        expect(waiting({ ...pickup, late: true }, at(125))).toMatchObject({
+            text: "Late · 2 h 5 min",
+            late: true,
+        });
+    });
+
+    it("says nothing is late when the API sends no rule (an API before B2b)", () => {
+        expect(waiting({ placedAt: placed }, at(600))).toEqual({
+            text: "Waiting 10 h",
+            minutes: 600,
+            late: false,
+            rule: null,
+        });
     });
 
     it("reads hours and days as hours and days", () => {
-        expect(waiting(placed, at(222)).text).toBe("Waiting 3 h 42 min");
-        expect(waiting(placed, at(60 * 50)).text).toBe("Waiting 2 days");
+        expect(waiting(pickup, at(222)).text).toBe("Waiting 3 h 42 min");
+        expect(waiting(pickup, at(60 * 50)).text).toBe("Waiting 2 days");
+        expect(
+            waiting(
+                {
+                    ...pickup,
+                    lateAfterMinutes: 2880,
+                    fulfilmentLabel: "Shipping",
+                },
+                at(1),
+            ).rule,
+        ).toBe("Shipping orders count as late after 2 days");
     });
 });
 

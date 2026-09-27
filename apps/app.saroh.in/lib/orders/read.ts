@@ -15,9 +15,60 @@ export type KitchenStage =
     | "READY"
     | "COLLECTED"
     | "HANDED_TO_COURIER"
-    | "DELIVERED";
+    | "DELIVERED"
+    // Local delivery's handover and Digital's done step (DEC-045); the API
+    // writes them from the switch release (B2c) on.
+    | "OUT_FOR_DELIVERY"
+    | "SENT";
 
+/** The legacy word the API sends as `fulfilment` until B2d. */
 export type Fulfilment = "COLLECT" | "DELIVERY";
+
+/** The six ways an order leaves (DEC-045); COLLECT reads as PICKUP. */
+export type FulfilmentType =
+    | "PICKUP"
+    | "LOCAL_DELIVERY"
+    | "SHIPPING"
+    | "DIGITAL"
+    | "APPOINTMENT_IN_PERSON"
+    | "APPOINTMENT_ONLINE";
+
+/**
+ * A step of the order's type as the API words it ("Out for delivery"), and
+ * the stage it stands for. The app draws these and keeps no copy of the
+ * table (`orders/fulfilment.ts` in the API).
+ */
+export interface FulfilmentStep {
+    stage: KitchenStage;
+    label: string;
+}
+
+/** How an order leaves, as every order read and row answers it. */
+export interface FulfilmentFields {
+    /** The legacy word, until the contract release (B2d). */
+    fulfilment: Fulfilment;
+    fulfilmentType: FulfilmentType;
+    /** "Pick-up", "Local delivery"… */
+    fulfilmentLabel: string;
+    steps: FulfilmentStep[];
+    /** Where on `steps` the order stands. */
+    stepIndex: number;
+    /** What the printed ticket is called; null when nothing is printed. */
+    ticketName: string | null;
+    /**
+     * Whether it is late, worked out by the API from when it was placed and
+     * its type's threshold (DEC-045; the storefront's own from B17). The
+     * app keeps no threshold of its own. Absent from an API before B2b.
+     */
+    late?: boolean;
+    /** Whole minutes past the threshold; null when not late. */
+    lateBy?: number | null;
+    /** The threshold, in minutes; null for a type that is never late. */
+    lateAfterMinutes?: number | null;
+    /** Who took it and their number (B2b); null until given. */
+    courierName?: string | null;
+    trackingNumber?: string | null;
+}
 
 export type RefundStanding = "NONE" | "PARTLY_REFUNDED" | "REFUNDED";
 
@@ -109,7 +160,7 @@ export interface OrderReadInvoice {
     status: string;
 }
 
-export interface OrderRead {
+export interface OrderRead extends FulfilmentFields {
     id: string;
     /** The storefront's own number, e.g. "1063". */
     orderId: string;
@@ -120,7 +171,6 @@ export interface OrderRead {
     paymentStatus: "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
     refundStanding: RefundStanding;
     stage: KitchenStage;
-    fulfilment: Fulfilment;
     customer: {
         id: string;
         name: string | null;

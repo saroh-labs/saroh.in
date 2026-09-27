@@ -20,10 +20,35 @@ export interface Plan {
     price: string;
     currency: string;
     interval: Interval;
-    status: "ACTIVE" | "ARCHIVED";
+    /** DRAFT arrives with D5: never sold until it is published. */
+    status: "ACTIVE" | "ARCHIVED" | "DRAFT";
+    /**
+     * When a live plan's unpublished changes were last saved (D5); absent or
+     * null when it has none.
+     */
+    pendingChangedAt?: string | null;
+    /** A membership's classes a month. Null: as many as they like. */
+    classesPerMonth: number | null;
     /** People on it now — active or paused. */
     subscriberCount: number;
+    /** Who pays what: the people on it, by the terms they bought at. */
+    byPrice: PlanPriceRow[];
+    /** The plan's price as a month's worth ("1000.00" for ₹12,000 a year). */
+    monthly: string;
+    /** What its running (not paused) members pay in a month, in its currency. */
+    monthlyFromMembers: string;
     createdAt: string;
+}
+
+/** One price people on a plan pay, and how many pay it. */
+export interface PlanPriceRow {
+    price: string;
+    currency: string;
+    interval: Interval;
+    /** Active or paused, on these terms. */
+    count: number;
+    /** The terms it sells at now; any other row is an older price. */
+    current: boolean;
 }
 
 export interface Subscription {
@@ -42,6 +67,8 @@ export interface Subscription {
     startsAt: string | null;
     endsAt: string | null;
     pausedAt: string | null;
+    /** When a pause resumes on its own (D8); null until someone resumes it. */
+    pausedUntil: string | null;
     cancelledAt: string | null;
     overdue: boolean;
     overdueCount: number;
@@ -129,6 +156,43 @@ export interface SubscriptionCharge {
 export type Optional<T> =
     { state: "ok"; data: T } | { state: "denied" } | { state: "failed" };
 
+/** A plan as an event names it (D9). */
+export interface SubscriptionEventPlan {
+    id: string;
+    name: string;
+    price: string;
+    currency: string;
+    interval: Interval;
+}
+
+/** One thing done to a subscription, from its log (D9). */
+export interface SubscriptionEvent {
+    id: string;
+    /** SUBSCRIBED, PAUSED, RESUMED, … — the API's SUBSCRIPTION_EVENT_KINDS. */
+    kind: string;
+    actor: {
+        kind: "TEAM" | "CUSTOMER" | "JOB" | "OPERATOR";
+        /** Null for Saroh support, the job and a customer. */
+        userId: string | null;
+        /** A team member's name now, "Saroh support", "Saroh"; else null. */
+        name: string | null;
+    };
+    /** The invoice it issued or acted on; null without `invoice:read`. */
+    invoice: { id: string; number: string | null } | null;
+    note: string | null;
+    /** What the kind needs to be said in words. */
+    data: Record<string, unknown>;
+    createdAt: string;
+}
+
+export interface SubscriptionEventsPage {
+    /** Newest first. */
+    events: SubscriptionEvent[];
+    nextCursor: string | null;
+    /** It began before the log was kept: "Earlier changes weren't recorded". */
+    earlierUnrecorded: boolean;
+}
+
 /** The person on it, from the customer read: how to reach them, and allergies. */
 export interface SubscriberCard {
     phone: string | null;
@@ -147,6 +211,8 @@ export interface PlanInput {
     price?: string;
     currency?: string;
     interval?: Interval;
+    /** 1–60; null is as many as they like. */
+    classesPerMonth?: number | null;
 }
 
 export interface SubscribeInput {
@@ -192,6 +258,21 @@ export async function listCharges(
         );
         return res;
     });
+}
+
+/**
+ * Its log, newest first, a page at a time (D9). Optional: a failed read is
+ * named in the Changes card and costs nothing else on the page.
+ */
+export async function listSubscriptionEvents(
+    id: string,
+    cursor?: string,
+): Promise<Optional<SubscriptionEventsPage>> {
+    const query = new URLSearchParams({ limit: "50" });
+    if (cursor) query.set("cursor", cursor);
+    return optionalRead((base) =>
+        apiFetch(`${base}${sub(id)}/events?${query.toString()}`),
+    );
 }
 
 /**
@@ -257,6 +338,105 @@ export async function listPlans(): Promise<Plan[]> {
     return (await getJson<Plan[]>(`${base}/subscription-plans`)) ?? [];
 }
 
+/**
+ * The plans, as the Plans tab reads them: a failed read is named in the tab
+ * and costs nothing else, so the subscriptions still show (D3).
+ */
+export async function listPlansOptional(): Promise<Optional<Plan[]>> {
+    return optionalRead<Plan[]>((base) =>
+        apiFetch(`${base}/subscription-plans`),
+    );
+}
+
+/** One plan, or null when it does not exist (a 403 is `forbidden()`). */
+export async function getPlan(id: string): Promise<Plan | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<Plan>(`${base}${plan(id)}`);
+}
+
+/**
+ * The people on one plan (D4): its newest subscriptions and every active or
+ * paused one, as the list reads them. Optional: a failed read costs Plan
+ * Detail its Subscribers tab and nothing else.
+ */
+export async function listPlanSubscriptions(
+    planId: string,
+): Promise<Optional<CappedList<Subscription>>> {
+    const base = await orgBase();
+    if (!base) return { state: "failed" };
+    const q = `${base}/subscriptions?planId=${encodeURIComponent(planId)}`;
+    try {
+        const reads = await Promise.all(
+            [q, `${q}&status=ACTIVE`, `${q}&status=PAUSED`].map((u) =>
+                apiFetch(u),
+            ),
+        );
+        if (reads.some((r) => r.status === 403)) return { state: "denied" };
+        if (reads.some((r) => !r.ok)) return { state: "failed" };
+        const [newest, active, paused] = (await Promise.all(
+            reads.map((r) => r.json()),
+        )) as Subscription[][];
+        return { state: "ok", data: withLive(newest, active, paused) };
+    } catch {
+        return { state: "failed" };
+    }
+}
+
+/** A value a plan event records: money as "1500.00", classes as a number. */
+export type PlanEventValue = string | number | null;
+
+/** One change to a plan, as the API records it (D2). */
+export interface PlanEvent {
+    id: string;
+    kind:
+        | "CREATED"
+        | "PUBLISHED"
+        | "PRICE_CHANGED"
+        | "CLASSES_CHANGED"
+        | "RENAMED"
+        | "DESCRIPTION_CHANGED"
+        | "UPDATED"
+        | "ARCHIVED"
+        | "RESTORED"
+        | "DRAFT_DISCARDED";
+    /** `{ field: [before, after] }`, only the fields that changed. */
+    changes: Partial<Record<string, [PlanEventValue, PlanEventValue]>>;
+    actor: {
+        kind: "TEAM" | "JOB" | "OPERATOR";
+        userId: string | null;
+        /** "Saroh support" for an operator, "Saroh" for the job. */
+        name: string | null;
+    };
+    createdAt: string;
+}
+
+export interface PlanEventsPage {
+    /** Newest first. */
+    events: PlanEvent[];
+    /** Ask with this for the next, older page; null at the end. */
+    nextCursor: string | null;
+    /** The plan is older than its history: "Earlier changes weren't recorded". */
+    earlierUnrecorded: boolean;
+}
+
+/**
+ * A page of a plan's history, newest first. Optional: a failed read is
+ * named in the History tab, and the rest of Plan Detail still shows.
+ */
+export async function listPlanEvents(
+    planId: string,
+    cursor?: string | null,
+): Promise<Optional<PlanEventsPage>> {
+    return optionalRead<PlanEventsPage>((base) =>
+        apiFetch(
+            `${base}${plan(planId)}/events${
+                cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
+            }`,
+        ),
+    );
+}
+
 export async function getRenewals(): Promise<Renewals | null> {
     const base = await orgBase();
     if (!base) return null;
@@ -291,11 +471,17 @@ export function subscribe(input: SubscribeInput) {
         "Could not subscribe them.",
     );
 }
-export function pauseSubscription(id: string) {
+/**
+ * How long a pause lasts (D8): 2, 4 or 8 weeks from today, or until a day
+ * (YYYY-MM-DD in its zone), or `until: null` until someone resumes it.
+ */
+export type PauseChoice = { weeks: 2 | 4 | 8 } | { until: string | null };
+
+export function pauseSubscription(id: string, choice: PauseChoice) {
     return send<Subscription>(
         `${sub(id)}/pause`,
         "POST",
-        {},
+        choice,
         "Could not pause that.",
     );
 }
