@@ -67,6 +67,8 @@ export interface Subscription {
     startsAt: string | null;
     endsAt: string | null;
     pausedAt: string | null;
+    /** When a pause resumes on its own (D8); null until someone resumes it. */
+    pausedUntil: string | null;
     cancelledAt: string | null;
     overdue: boolean;
     overdueCount: number;
@@ -469,11 +471,17 @@ export function subscribe(input: SubscribeInput) {
         "Could not subscribe them.",
     );
 }
-export function pauseSubscription(id: string) {
+/**
+ * How long a pause lasts (D8): 2, 4 or 8 weeks from today, or until a day
+ * (YYYY-MM-DD in its zone), or `until: null` until someone resumes it.
+ */
+export type PauseChoice = { weeks: 2 | 4 | 8 } | { until: string | null };
+
+export function pauseSubscription(id: string, choice: PauseChoice) {
     return send<Subscription>(
         `${sub(id)}/pause`,
         "POST",
-        {},
+        choice,
         "Could not pause that.",
     );
 }

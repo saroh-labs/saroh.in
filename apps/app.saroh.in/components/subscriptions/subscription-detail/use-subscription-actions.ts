@@ -15,6 +15,8 @@ import {
     skipCollection,
     unskipCollection,
 } from "@/lib/subscriptions/actions";
+import type { PauseOption } from "@/lib/subscriptions/pause";
+import { pauseAgain } from "@/lib/subscriptions/pause";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import type { CollectionRow } from "@/lib/subscriptions/view";
 import { dayText } from "@/lib/subscriptions/view";
@@ -73,25 +75,29 @@ export function useSubscriptionActions(
         ? dayText(sub.nextRenewalAt, tz, now)
         : null;
 
-    function pause() {
+    function pause(option: PauseOption) {
         void run(
-            () => pauseSubscription(sub.id),
+            () => pauseSubscription(sub.id, option.choice),
             () => {
                 closeStep();
                 showUndo(
-                    "Paused. Nothing is charged until you resume it.",
+                    option.until
+                        ? `Paused until ${dayText(option.until, tz, now)}. It restarts on its own.`
+                        : "Paused. Nothing is charged until you resume it.",
                     undo(() => resumeSubscription(sub.id)),
                 );
             },
         );
     }
     function resume() {
+        // Undo puts the same pause back, to the same day when it had one.
+        const again = pauseAgain(sub, now);
         void run(
             () => resumeSubscription(sub.id),
             () =>
                 showUndo(
                     "Resumed.",
-                    undo(() => pauseSubscription(sub.id)),
+                    undo(() => pauseSubscription(sub.id, again)),
                 ),
         );
     }

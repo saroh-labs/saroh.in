@@ -49,6 +49,14 @@ describe("changeWhat", () => {
             }),
         ).toBe("Started on Sourdough weekly at ₹1,200");
         expect(what({ kind: "PAUSED" })).toBe("Paused");
+        expect(what({ kind: "PAUSED", data: { until: null } })).toBe("Paused");
+        // D8: until the start of 20 Oct, Kolkata.
+        expect(
+            what({
+                kind: "PAUSED",
+                data: { until: "2026-10-19T18:30:00.000Z" },
+            }),
+        ).toBe("Paused until 20 Oct");
         expect(what({ kind: "RESUMED", data: { extendedDays: 5 } })).toBe(
             "Resumed — the paid period moved 5 days later",
         );
