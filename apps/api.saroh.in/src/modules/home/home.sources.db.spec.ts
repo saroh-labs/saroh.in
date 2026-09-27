@@ -33,6 +33,7 @@ describe("Home F1 sources (DB)", () => {
     let liveInvoiceId = "";
     let cancelledInvoiceId = "";
     let handInvoiceId = "";
+    let behindInvoiceId = "";
     let shortLevelId = "";
 
     async function invoice(
@@ -158,15 +159,18 @@ describe("Home F1 sources (DB)", () => {
             })
         ).id;
         // A live subscription whose older bill is unpaid but whose latest
-        // renewal is paid: not a failed renewal.
+        // renewal is paid: not a failed renewal, but still money owed — an
+        // overdue invoice (H-2), never nowhere.
         const behind = await subscription(orgId, plan2.id, "ACTIVE", "asha");
-        await invoice(orgId, {
-            subscriptionId: behind.id,
-            source: "SUBSCRIPTION",
-            issuedAt: ago(40 * DAY),
-            dueAt: ago(33 * DAY),
-            periodStart: ago(40 * DAY),
-        });
+        behindInvoiceId = (
+            await invoice(orgId, {
+                subscriptionId: behind.id,
+                source: "SUBSCRIPTION",
+                issuedAt: ago(40 * DAY),
+                dueAt: ago(33 * DAY),
+                periodStart: ago(40 * DAY),
+            })
+        ).id;
         await invoice(orgId, {
             subscriptionId: behind.id,
             source: "SUBSCRIPTION",
@@ -318,12 +322,16 @@ describe("Home F1 sources (DB)", () => {
         ]);
     });
 
-    it("lists the hand-written and the cancelled subscription's invoices as overdue, and never the live renewal's", async () => {
+    it("lists the hand-written, the cancelled subscription's and a live one's older bill as overdue, and never the live renewal's", async () => {
         const action = await overdueInvoices(prisma, orgId, NOW);
         const ids = action?.evidence?.map((e) => e.id) ?? [];
 
-        expect(action?.count).toBe(2);
-        expect(ids.sort()).toEqual([cancelledInvoiceId, handInvoiceId].sort());
+        expect(action?.count).toBe(3);
+        // The older unpaid bill of a subscription whose latest renewal was
+        // paid: no failed-renewal row speaks for it, so it is listed here.
+        expect(ids.sort()).toEqual(
+            [behindInvoiceId, cancelledInvoiceId, handInvoiceId].sort(),
+        );
         expect(ids).not.toContain(liveInvoiceId);
         const hand = action?.evidence?.find((e) => e.id === handInvoiceId);
         expect(hand).toMatchObject({
@@ -334,7 +342,9 @@ describe("Home F1 sources (DB)", () => {
     });
 
     it("lists nothing overdue before anything falls due", async () => {
-        expect(await overdueInvoices(prisma, orgId, ago(30 * DAY))).toBeNull();
+        // Before the oldest due date (the live subscription's older bill,
+        // due 33 days ago).
+        expect(await overdueInvoices(prisma, orgId, ago(34 * DAY))).toBeNull();
         expect(await failedRenewals(prisma, orgId, ago(3 * DAY), true)).toBe(
             null,
         );
