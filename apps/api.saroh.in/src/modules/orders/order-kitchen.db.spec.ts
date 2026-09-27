@@ -518,6 +518,189 @@ describe("editing before preparing (real database)", () => {
     });
 });
 
+/**
+ * B2a, the expand release (DEC-045): the six types are in the database, and
+ * every write is still today's. These pin today's delivery flow and prove
+ * this release already serves the rows the switch release (B2c) writes.
+ */
+describe("fulfilment types, release 1 (real database)", () => {
+    const ADDRESS = {
+        line1: "12 Church Street",
+        city: "Bengaluru",
+        state: "Karnataka",
+        postalCode: "560001",
+    };
+
+    /** A paid order stored in `fulfilment`, standing at `stage`/`status`. */
+    async function storedAs(
+        fulfilment:
+            "COLLECT" | "DELIVERY" | "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING",
+        at: {
+            stage?: "NEW" | "READY" | "OUT_FOR_DELIVERY" | "HANDED_TO_COURIER";
+            status?: "PENDING" | "PROCESSING" | "SHIPPED";
+        } = {},
+    ) {
+        const order = await paidOrder();
+        await prisma.order.update({
+            where: { id: order.id },
+            data: {
+                fulfilment,
+                stage: at.stage ?? "NEW",
+                status: at.status ?? "PENDING",
+                deliveryLine1: ADDRESS.line1,
+                deliveryCity: ADDRESS.city,
+                deliveryState: ADDRESS.state,
+                deliveryPostalCode: ADDRESS.postalCode,
+            },
+        });
+        return order;
+    }
+
+    it("a DELIVERY order walks New → Handed to courier → Delivered as today: events, statuses, stock", async () => {
+        const order = await storedAs("DELIVERY");
+        const before = await stock(pastry);
+        for (const to of [
+            "PREPARING",
+            "READY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ] as const) {
+            await kitchen.moveStage(member, order.id, { to });
+        }
+        const row = await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+            include: { events: { orderBy: { createdAt: "asc" } } },
+        });
+        expect(row).toMatchObject({
+            stage: "DELIVERED",
+            status: "DELIVERED",
+            fulfilment: "DELIVERY",
+        });
+        expect(row.events.map((e) => [e.toStage, e.toStatus])).toEqual([
+            ["PREPARING", "PROCESSING"],
+            ["READY", "PROCESSING"],
+            ["HANDED_TO_COURIER", "SHIPPED"],
+            ["DELIVERED", "DELIVERED"],
+        ]);
+        expect(await stock(pastry)).toEqual({
+            quantity: before.quantity - 3,
+            reserved: before.reserved - 3,
+        });
+    });
+
+    it("the read answers the legacy word and the type, with the type's steps", async () => {
+        const order = await storedAs("COLLECT", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        const read = await kitchen.read(member, order.id);
+        expect(read).toMatchObject({
+            fulfilment: "COLLECT",
+            fulfilmentType: "PICKUP",
+            fulfilmentLabel: "Pick-up",
+            stepIndex: 2,
+            ticketName: "Order ticket",
+            next: { stages: ["COLLECTED"] },
+        });
+        expect(read.steps.map((s) => s.label)).toEqual([
+            "New",
+            "Preparing",
+            "Ready",
+            "Collected",
+        ]);
+    });
+
+    it("a row stored as LOCAL_DELIVERY (the switch release's) reads and moves; nothing new is written", async () => {
+        const order = await storedAs("LOCAL_DELIVERY", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        const read = await kitchen.read(owner, order.id);
+        expect(read).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "LOCAL_DELIVERY",
+            next: { stages: ["HANDED_TO_COURIER"] },
+        });
+        await kitchen.moveStage(owner, order.id, { to: "HANDED_TO_COURIER" });
+        const moved = await kitchen.moveStage(owner, order.id, {
+            to: "DELIVERED",
+        });
+        await kitchen.undoStage(owner, order.id, moved.eventId);
+        const row = await prisma.order.findUniqueOrThrow({
+            where: { id: order.id },
+        });
+        expect(row).toMatchObject({
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+            fulfilment: "LOCAL_DELIVERY",
+        });
+    });
+
+    it("an order Out for delivery (written by the switch release) is delivered, and undone, here", async () => {
+        const order = await storedAs("LOCAL_DELIVERY", {
+            stage: "OUT_FOR_DELIVERY",
+            status: "SHIPPED",
+        });
+        const read = await kitchen.read(owner, order.id);
+        expect(read.next.stages).toEqual(["DELIVERED"]);
+        expect(read.steps[read.stepIndex].label).toBe("Out for delivery");
+        const moved = await kitchen.moveStage(owner, order.id, {
+            to: "DELIVERED",
+        });
+        await kitchen.undoStage(owner, order.id, moved.eventId);
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({ stage: "OUT_FOR_DELIVERY", status: "SHIPPED" });
+    });
+
+    it("a local delivery can't be sent Out for delivery before the switch", async () => {
+        const order = await storedAs("DELIVERY", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await expect(
+            kitchen.moveStage(owner, order.id, { to: "OUT_FOR_DELIVERY" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("an edit to LOCAL_DELIVERY is stored as DELIVERY; to SHIPPING is refused and writes nothing", async () => {
+        const order = await storedAs("COLLECT");
+        await kitchen.edit(owner, order.id, {
+            fulfilment: "LOCAL_DELIVERY",
+            address: ADDRESS,
+        });
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .fulfilment,
+        ).toBe("DELIVERY");
+
+        const events = await prisma.orderEvent.count({
+            where: { orderId: order.id },
+        });
+        await expect(
+            kitchen.edit(owner, order.id, { fulfilment: "SHIPPING" }),
+        ).rejects.toThrow("Shipping isn't available yet.");
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({ fulfilment: "DELIVERY" });
+        expect(
+            await prisma.orderEvent.count({ where: { orderId: order.id } }),
+        ).toBe(events);
+    });
+
+    it("an edit naming the type it already is changes nothing about how it leaves", async () => {
+        const order = await storedAs("DELIVERY");
+        const edit = await kitchen.edit(owner, order.id, {
+            fulfilment: "LOCAL_DELIVERY",
+            notes: "Ring twice",
+        });
+        const event = await prisma.orderEvent.findUniqueOrThrow({
+            where: { id: edit.eventId ?? "" },
+        });
+        expect(event.note).toBe("notes changed");
+    });
+});
+
 describe("a later edit supersedes an unpaid difference (real database)", () => {
     /** The order's edit charges, oldest first. */
     async function differenceIntents(orderId: string) {

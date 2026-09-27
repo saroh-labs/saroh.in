@@ -1,7 +1,10 @@
 import { fromMinor, toMoneyString } from "../../common/money";
-import type { FulfilmentType, PaymentStanding } from "./order-list-filters";
-import { fulfilmentTypeOf, paymentStandingOf } from "./order-list-filters";
+import type { FulfilmentView } from "./fulfilment";
+import { fulfilmentView } from "./fulfilment";
+import type { PaymentStanding } from "./order-list-filters";
+import { paymentStandingOf } from "./order-list-filters";
 import { amountDueCents } from "./order-read";
+import type { OrderStage } from "./order-stage";
 import { orderStanding } from "./order-standing";
 
 /**
@@ -12,15 +15,16 @@ import { orderStanding } from "./order-standing";
  * hide (DEC-024): money (`total`, `unpaidAmount`) only with `order:read`, and
  * a customer's phone and email only with `contact:read`.
  *
- * B2a adds the type's `steps` and `stepIndex`, B2b `late` and `lateBy`, and
- * B15 `attention`; none of them has a stand-in here.
+ * B2a adds how it leaves: the legacy word and the type, its `steps` and
+ * `stepIndex` (`fulfilment.ts`). B2b adds `late` and `lateBy`, and B15
+ * `attention`; neither has a stand-in here.
  */
 
 interface DecimalLike {
     toString(): string;
 }
 
-export interface OrderRowDto {
+export interface OrderRowDto extends FulfilmentView {
     id: string;
     /** The storefront's own order number, e.g. "1042". */
     orderId: string;
@@ -40,10 +44,6 @@ export interface OrderRowDto {
     status: string;
     paymentStatus: string;
     stage: string;
-    /** The stored word, COLLECT or DELIVERY until B2c switches writes. */
-    fulfilment: string;
-    /** The fulfilment type (DEC-045): COLLECT reads as PICKUP. */
-    fulfilmentType: FulfilmentType;
     /** Today's one-word standing, for the screens that still draw it. */
     standing: ReturnType<typeof orderStanding>;
     /** Paid, not paid yet, partly refunded or refunded. */
@@ -150,8 +150,9 @@ export function serializeOrderRow(
         status: order.status,
         paymentStatus: order.paymentStatus,
         stage: order.stage,
-        fulfilment: order.fulfilment,
-        fulfilmentType: fulfilmentTypeOf(order.fulfilment),
+        // The legacy word (COLLECT or DELIVERY until B2d), the type, and
+        // the type's steps with where the order stands on them.
+        ...fulfilmentView(order.fulfilment, order.stage as OrderStage),
         standing: orderStanding(order.status, order.paymentStatus),
         payment: paymentStandingOf(order.paymentStatus, captured, refunded),
         currency: order.currency,

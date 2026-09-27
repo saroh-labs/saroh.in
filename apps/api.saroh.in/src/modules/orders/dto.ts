@@ -14,13 +14,22 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type { ListTab, PaymentStanding } from "./order-list-filters";
-import {
-    FULFILMENT_FILTER_VALUES,
-    LIST_TABS,
-    PAYMENT_STANDINGS,
-    STAGE_FILTER_VALUES,
-} from "./order-list-filters";
+/** The Orders list's tabs: All · Open · Refunded (default 14). */
+export const LIST_TABS = ["all", "open", "refunded"] as const;
+export type ListTab = (typeof LIST_TABS)[number];
+
+/**
+ * How the money on an order stands, as one word for the row and the filter.
+ * Derived from payments and refunds the way Order Detail's `refundStanding`
+ * is, so the list and the order never disagree (`order-list-filters.ts`).
+ */
+export const PAYMENT_STANDINGS = [
+    "PAID",
+    "UNPAID",
+    "PARTLY_REFUNDED",
+    "REFUNDED",
+] as const;
+export type PaymentStanding = (typeof PAYMENT_STANDINGS)[number];
 
 export const ORDER_STATUSES = [
     "PENDING",
@@ -352,13 +361,14 @@ export class ListOrdersQuery {
     @IsOptional()
     @Transform(listOf)
     @IsArray()
-    @IsIn(STAGE_FILTER_VALUES, { each: true, message: "Unknown step" })
+    @IsIn(ORDER_STAGES, { each: true, message: "Unknown step" })
     stage?: string[];
 
+    /** The types, or the legacy words (matched as their types until B2d). */
     @IsOptional()
     @Transform(listOf)
     @IsArray()
-    @IsIn(FULFILMENT_FILTER_VALUES, {
+    @IsIn(ORDER_FULFILMENTS, {
         each: true,
         message: "Unknown way of fulfilling an order",
     })

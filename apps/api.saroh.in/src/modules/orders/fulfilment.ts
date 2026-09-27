@@ -7,7 +7,7 @@ import type {
     OrderStage,
     OrderStatus,
 } from "./dto";
-import { FULFILMENT_TYPES } from "./dto";
+import { FULFILMENT_TYPES, ORDER_FULFILMENTS } from "./dto";
 
 /**
  * How an order leaves, and the steps it takes to get there (DEC-045).
@@ -40,7 +40,7 @@ export type { FulfilmentType, LegacyFulfilment } from "./dto";
  * has already rewritten the rows. A constant, not an environment flag: it
  * must follow the migration, not the environment.
  */
-export const WRITES_NEW_FULFILMENT_VALUES: boolean = false;
+export const WRITES_NEW_FULFILMENT_VALUES = false;
 
 /** The ways a storefront itself offers; the rest follow the product. */
 export const STOREFRONT_FULFILMENT_TYPES = [
@@ -280,7 +280,7 @@ const isType = (v: string): v is FulfilmentType =>
  * The type a stored (or sent) value means: COLLECT → PICKUP, DELIVERY →
  * LOCAL_DELIVERY, a type as itself. Anything else is a bug, not a guess.
  */
-export function typeOf(stored: OrderFulfilment | string): FulfilmentType {
+export function typeOf(stored: string): FulfilmentType {
     if (stored in LEGACY_TYPE) return LEGACY_TYPE[stored as LegacyFulfilment];
     if (isType(stored)) return stored;
     throw new Error(`Unknown order fulfilment: ${stored}`);
@@ -399,7 +399,7 @@ export interface FulfilmentView {
 
 /** The fields an order read carries, from the stored value and stage. */
 export function fulfilmentView(
-    stored: OrderFulfilment | string,
+    stored: string,
     stage: OrderStage,
 ): FulfilmentView {
     const type = typeOf(stored);
@@ -420,7 +420,7 @@ export function fulfilmentView(
  * is left out.
  */
 export function storefrontTypesOf(
-    stored: readonly (OrderFulfilment | string)[],
+    stored: readonly string[],
 ): StorefrontFulfilmentType[] {
     const types = new Set(stored.map(typeOf));
     return STOREFRONT_FULFILMENT_TYPES.filter((t) => types.has(t));
@@ -450,4 +450,26 @@ export function storefrontTypesFrom(settings: {
               ? settings.shippingEnabled
               : settings.localDelivery,
     );
+}
+
+/**
+ * The stored values a filter by type matches: each type, and its legacy
+ * word until the contract release drops it, so Pick-up finds COLLECT
+ * orders. Accepts either vocabulary.
+ */
+export function storedValuesOf(values: readonly string[]): OrderFulfilment[] {
+    const types = new Set(values.map(typeOf));
+    return ORDER_FULFILMENTS.filter((v) => types.has(typeOf(v)));
+}
+
+/**
+ * Each stored value's default late threshold in minutes, for a query that
+ * judges late in SQL (the Orders list): the types that are ever late, under
+ * both vocabularies. B17's per-storefront setting replaces the defaults.
+ */
+export function defaultLateThresholds(): [OrderFulfilment, number][] {
+    return ORDER_FULFILMENTS.flatMap((v): [OrderFulfilment, number][] => {
+        const minutes = FULFILMENT_RULES[typeOf(v)].lateAfterMinutes;
+        return minutes === null ? [] : [[v, minutes]];
+    });
 }

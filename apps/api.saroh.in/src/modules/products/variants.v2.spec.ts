@@ -227,7 +227,7 @@ describe("Variants and stock per variant (DB)", () => {
             status: "PROCESSING",
         });
         await orders.updateStatus(storeId, created.id, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await stockOf(v.S)).toEqual({ quantity: 3, reserved: 0 });
     });
@@ -483,7 +483,7 @@ describe("Variants and stock per variant (DB)", () => {
                 status: "PROCESSING",
             });
             await orders.updateStatus(storeId, order.id, ownerId, {
-                status: "SHIPPED",
+                status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
             });
             expect(await stockOf(t.S)).toEqual({ quantity: 8, reserved: 0 });
             expect(await own(tonerId)).toEqual({ quantity: 0, reserved: 0 });
@@ -574,7 +574,7 @@ describe("Variants and stock per variant (DB)", () => {
             expect(await own(id)).toEqual({ quantity: 0, reserved: 0 });
             expect(await stockRowOf(later.id)).toBe("VARIANT");
 
-            await move(later.id, ["PROCESSING", "SHIPPED"]);
+            await move(later.id, ["PROCESSING", "DELIVERED"]);
             await move(early.id, ["CANCELLED"]);
             expect(await stockOf(sv.S)).toEqual({ quantity: 5, reserved: 0 });
             expect(await stockOf(sv.M)).toEqual({ quantity: 3, reserved: 0 });
@@ -628,7 +628,7 @@ describe("Variants and stock per variant (DB)", () => {
             expect(await stockOf(sv.S)).toEqual({ quantity: 4, reserved: 2 });
 
             await move(whole.id, ["CANCELLED"]);
-            await move(forS.id, ["PROCESSING", "SHIPPED"]);
+            await move(forS.id, ["PROCESSING", "DELIVERED"]);
             expect(await own(lip)).toEqual({ quantity: 3, reserved: 0 });
             expect(await stockOf(sv.S)).toEqual({ quantity: 2, reserved: 0 });
             expect(await stockOf(sv.M)).toEqual({ quantity: 1, reserved: 0 });

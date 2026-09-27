@@ -4,15 +4,15 @@ import { BadRequestException, ValidationPipe } from "@nestjs/common";
 
 import { validationPipeOptions } from "../../common/validation";
 import { ListOrdersQuery } from "./dto";
+import { storedValuesOf } from "./fulfilment";
 import {
     computedConditions,
     dayRange,
-    fulfilmentTypeOf,
+    DEFAULT_LATE_AFTER_MINUTES,
     lateSql,
     orderConditions,
     paymentStandingOf,
     searchSql,
-    storedFulfilments,
     tabCondition,
     ts,
 } from "./order-list-filters";
@@ -23,31 +23,32 @@ import {
  * itself runs in `order-list.db.spec.ts`.
  */
 
-describe("fulfilment words", () => {
-    it("reads the stored legacy words as their types", () => {
-        expect(fulfilmentTypeOf("COLLECT")).toBe("PICKUP");
-        expect(fulfilmentTypeOf("DELIVERY")).toBe("LOCAL_DELIVERY");
-        expect(fulfilmentTypeOf("SHIPPING")).toBe("SHIPPING");
-        expect(fulfilmentTypeOf("APPOINTMENT_ONLINE")).toBe(
-            "APPOINTMENT_ONLINE",
-        );
-    });
-
+describe("fulfilment words (read through fulfilment.ts, B2a)", () => {
     it("matches a type's legacy word too, until B2d drops it", () => {
-        expect(storedFulfilments(["PICKUP"]).sort()).toEqual([
+        expect(storedValuesOf(["PICKUP"]).sort()).toEqual([
             "COLLECT",
             "PICKUP",
         ]);
-        expect(storedFulfilments(["DELIVERY"]).sort()).toEqual([
+        expect(storedValuesOf(["DELIVERY"]).sort()).toEqual([
             "DELIVERY",
             "LOCAL_DELIVERY",
         ]);
-        expect(storedFulfilments(["SHIPPING"])).toEqual(["SHIPPING"]);
-        expect(storedFulfilments(["COLLECT", "SHIPPING"]).sort()).toEqual([
+        expect(storedValuesOf(["SHIPPING"])).toEqual(["SHIPPING"]);
+        expect(storedValuesOf(["COLLECT", "SHIPPING"]).sort()).toEqual([
             "COLLECT",
             "PICKUP",
             "SHIPPING",
         ]);
+    });
+
+    it("judges late by each type's default, under both words (default 16)", () => {
+        expect(DEFAULT_LATE_AFTER_MINUTES).toEqual({
+            COLLECT: 120,
+            PICKUP: 120,
+            DELIVERY: 1440,
+            LOCAL_DELIVERY: 1440,
+            SHIPPING: 2880,
+        });
     });
 });
 

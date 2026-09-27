@@ -135,7 +135,7 @@ describe("Products at one storefront (characterization, DB)", () => {
             status: "PROCESSING",
         });
         await orders.updateStatus(storeId, a.id, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         expect(await inventory.get(storeId, id, ownerId)).toMatchObject({
             quantity: 3,
@@ -246,7 +246,7 @@ describe("Products at one storefront (characterization, DB)", () => {
             status: "PROCESSING",
         });
         await orders.updateStatus(storeId, open.id, ownerId, {
-            status: "SHIPPED",
+            status: "DELIVERED", // a pick-up order: never SHIPPED (B2a)
         });
         const after = await inventory.get(storeId, id, ownerId);
         expect(after.variants.find((v) => v.variantId === small.id)).toEqual({
