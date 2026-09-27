@@ -87,8 +87,10 @@ async function publishButton(page: Page) {
 }
 
 /**
- * The first Visible/Hidden toggle in the inspector. On a phone the inspector
- * is a sheet that opens on a block, so the first block is chosen to open it.
+ * The first block's Visible/Hidden toggle in the inspector. On a phone the
+ * inspector is a sheet, opened here from the rail's block list: a hidden
+ * block is left off the page, so choosing "1 of N" on the page after hiding
+ * the first would pick the next one, and put back the wrong block.
  */
 async function inspectorToggle(page: Page) {
     const toggle = page
@@ -96,11 +98,19 @@ async function inspectorToggle(page: Page) {
         .getByRole("button", { name: /^(Visible|Hidden)$/ })
         .first();
     if (onPhone(page) && !(await toggle.isVisible())) {
-        const block = page
-            .getByRole("button", { name: /block, 1 of \d+/ })
-            .first();
-        await expect(block).toBeVisible({ timeout: 30_000 });
-        await block.click();
+        await page
+            .getByRole("navigation", { name: "Edit this page" })
+            .getByRole("button", { name: "Page" })
+            .click();
+        // The rail lists every block, hidden or not: the header, then the
+        // page's own blocks.
+        await page
+            .getByRole("dialog")
+            .getByRole("listitem")
+            .nth(1)
+            .getByRole("button")
+            .last()
+            .click();
     }
     await expect(toggle).toBeVisible({ timeout: 30_000 });
     return toggle;
