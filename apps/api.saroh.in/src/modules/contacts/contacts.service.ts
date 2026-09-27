@@ -9,6 +9,8 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { ContactSearchResult } from "./contact-search";
+import { SEARCH_LIMIT, searchContacts } from "./contact-search";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
 
 /**
@@ -340,6 +342,21 @@ export class ContactsService {
         }
 
         return out;
+    }
+
+    /**
+     * Find a customer by name or phone, most recent first (E4,
+     * `contact-search.ts`). `contact:read`: the phone in each result is part
+     * of the contact (DEC-039). The shared customer picker calls it for New
+     * booking, and New order (B13) will.
+     */
+    async search(
+        ctx: OrganizationContext,
+        query: string | undefined,
+        limit: number = SEARCH_LIMIT,
+    ): Promise<ContactSearchResult[]> {
+        authorize(ctx, "contact:read");
+        return searchContacts(prisma, ctx.organizationId, query, limit);
     }
 
     /**

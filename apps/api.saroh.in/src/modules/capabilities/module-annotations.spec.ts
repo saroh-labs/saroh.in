@@ -103,6 +103,8 @@ const NEVER: Record<string, string> = {
         "spans every dated module, and drops a layer whose module is off itself",
     "customer-workspace/customer-workspace.controller.ts":
         "spans CRM, Commerce and Appointments at once",
+    "contacts/contact-search.controller.ts":
+        "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",

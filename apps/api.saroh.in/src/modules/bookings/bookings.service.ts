@@ -25,6 +25,7 @@ import {
     lockBookingInTx,
     releaseHoldInTx,
 } from "./booking-hold";
+import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
 import { isLateCancel, loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
@@ -651,6 +652,8 @@ export class BookingsService {
             // A class paid for with a pack goes back to it (ADR-007) —
             // unless it was cancelled too late to (U3).
             if (!late) await reversePackInTx(tx, booking.id);
+            // A pay link sent for it (E4) stops working with the place.
+            await retirePayLinkInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
             // sequence rather than a list of states with the times missing.
             await tx.bookingEvent.create({
@@ -1094,15 +1097,39 @@ export class BookingsService {
                 bookerPhone: contact.phone ?? undefined,
             };
         } else if (dto.bookerEmail) {
-            booker = {
-                startAt: dto.startAt,
-                bookerEmail: dto.bookerEmail,
-                // A field left blank is not given, rather than "".
-                bookerName: dto.bookerName?.trim() ? dto.bookerName : undefined,
-                bookerPhone: dto.bookerPhone?.trim()
-                    ? dto.bookerPhone
-                    : undefined,
-            };
+            // An email that is already someone's picks that someone (E4),
+            // as they stand: booking them never renames them or forks a
+            // second contact.
+            const known = await prisma.contact.findUnique({
+                where: {
+                    organizationId_email: {
+                        organizationId: ctx.organizationId,
+                        email: dto.bookerEmail.trim().toLowerCase(),
+                    },
+                },
+            });
+            booker = known
+                ? {
+                      startAt: dto.startAt,
+                      bookerEmail: known.email,
+                      bookerName:
+                          [known.firstName, known.lastName]
+                              .filter(Boolean)
+                              .join(" ")
+                              .trim() || undefined,
+                      bookerPhone: known.phone ?? undefined,
+                  }
+                : {
+                      startAt: dto.startAt,
+                      bookerEmail: dto.bookerEmail,
+                      // A field left blank is not given, rather than "".
+                      bookerName: dto.bookerName?.trim()
+                          ? dto.bookerName
+                          : undefined,
+                      bookerPhone: dto.bookerPhone?.trim()
+                          ? dto.bookerPhone
+                          : undefined,
+                  };
         } else {
             throw new BadRequestException({
                 message: "Choose someone from your contacts, or give an email.",
@@ -1180,6 +1207,39 @@ export class BookingsService {
                     : null,
             },
         );
+    }
+
+    /**
+     * "Send a pay link" for a booking (E4): issue its invoice and hand back
+     * the link to copy (`booking-pay-link.ts`). It issues an invoice, so it
+     * needs `invoice:write` as well as `booking:write`. Another business's
+     * booking is a 404; a cancelled, unpriced or already paid one a 409.
+     */
+    async payLink(
+        ctx: OrganizationContext,
+        bookingId: string,
+        now: Date = new Date(),
+    ): Promise<{ token: string }> {
+        authorize(ctx, "booking:write");
+        authorize(ctx, "invoice:write");
+        await this.requireOwnedBooking(ctx, bookingId);
+        const connected = await prisma.merchantPaymentProvider.count({
+            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+        });
+        if (connected === 0) {
+            throw new ConflictException(
+                "Connect a payment provider to take payment online.",
+            );
+        }
+        const { token } = await prisma.$transaction((tx) =>
+            bookingPayLinkInTx(tx, {
+                organizationId: ctx.organizationId,
+                bookingId,
+                actorUserId: ctx.userId,
+                now,
+            }),
+        );
+        return { token };
     }
 
     /**

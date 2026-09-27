@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
 import { formatMoney } from "@/lib/format/money";
 import {
     cancelBooking,
@@ -20,6 +19,7 @@ import type {
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
 import { runsClasses } from "@/lib/services/booking-calendar";
+import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import {
     addDays,
@@ -108,7 +108,7 @@ export function CalendarScreen({
     staff,
     services,
     rules,
-    contacts,
+    people,
     can,
     newBooking,
 }: {
@@ -122,7 +122,8 @@ export function CalendarScreen({
     staff: StaffView[] | null;
     services: Service[];
     rules: BookingRules | null;
-    contacts: ContactOption[];
+    /** What New booking may do about the customer and a pay link (E4). */
+    people: BookingPeople;
     can: { book: boolean; hours: boolean };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
@@ -662,7 +663,7 @@ export function CalendarScreen({
             <NewBookingFromGap
                 target={gap}
                 services={services}
-                contacts={contacts}
+                people={people}
                 timezone={timezone}
                 money={money}
                 onClose={() => setGap(null)}

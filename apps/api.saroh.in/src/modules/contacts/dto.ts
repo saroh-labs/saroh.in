@@ -1,5 +1,15 @@
-import { Transform } from "class-transformer";
-import { IsEmail, IsOptional, IsString, MaxLength } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import {
+    IsEmail,
+    IsInt,
+    IsOptional,
+    IsString,
+    Max,
+    MaxLength,
+    Min,
+} from "class-validator";
+
+import { SEARCH_LIMIT_MAX } from "./contact-search";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -74,4 +84,24 @@ export class CreateContactDto {
     @IsString()
     @MaxLength(160)
     company?: string;
+}
+
+/**
+ * Find a customer by name or phone (E4): `?q=` as typed, `?limit=` at most
+ * {@link SEARCH_LIMIT_MAX}. The query arrives as text, so `limit` converts
+ * explicitly.
+ */
+export class SearchContactsQueryDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(200)
+    q?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(SEARCH_LIMIT_MAX)
+    limit?: number;
 }
