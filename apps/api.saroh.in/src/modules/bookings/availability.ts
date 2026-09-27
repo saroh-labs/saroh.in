@@ -206,6 +206,20 @@ export function availableSlots(
 }
 
 /**
+ * Slots with none of `closed` in them (E3). A business closure takes out
+ * every start it touches, on the service's own grid: the starts either side
+ * stay where they were, so what is offered and what `isValidSlotStart`
+ * accepts still agree.
+ */
+export function outsideClosures<T extends Interval>(
+    slots: T[],
+    closed: Interval[],
+): T[] {
+    if (closed.length === 0) return slots;
+    return slots.filter((slot) => countOverlapping(slot, closed) === 0);
+}
+
+/**
  * Is `startAt` the exact start of a real, geometrically-valid slot for this
  * Service (aligned to a rule window + duration stepping)? This validates the
  * booking's requested instant BEFORE the transactional capacity check — a

@@ -109,6 +109,15 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { heading: "Services", serviceIds: [] },
             };
+        case "visitUs":
+            // No shop yet: the editor picks the only one, or asks which. Until
+            // then the live site shows nothing for it.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Come and see us" },
+            };
         case "contact":
             // Invalid until one channel is filled in, and the editor says so.
             return {

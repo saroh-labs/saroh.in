@@ -5,6 +5,8 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type {
     BookingBrief,
     BookingRules,
+    Closure,
+    OffRangeInput,
     StaffList,
     StaffView,
     WeeklyRange,
@@ -117,10 +119,15 @@ export function removeExtraHours(staffId: string, extraHoursId: string) {
     );
 }
 
-/** Whole local days (`fromDate`–`toDate`) or a stretch (`startAt`–`endAt`). */
+/**
+ * Whole local days (`fromDate`–`toDate`), the same hours on each of them
+ * (`startMinute`–`endMinute`, E3), or a stretch (`startAt`–`endAt`).
+ */
 export interface TimeOffInput {
     fromDate?: string;
     toDate?: string;
+    startMinute?: number;
+    endMinute?: number;
     startAt?: string;
     endAt?: string;
     reason?: string;
@@ -141,6 +148,49 @@ export function removeTimeOff(staffId: string, timeOffId: string) {
         "DELETE",
         undefined,
         "Could not remove the time off",
+    );
+}
+
+/** Several rows of a person's time off at once — one line on the screen. */
+export function removeTimeOffMany(staffId: string, ids: string[]) {
+    return send<StaffView>(
+        `/staff/${staffId}/time-off/remove`,
+        "POST",
+        { ids },
+        "Could not remove the time off",
+    );
+}
+
+/** Close the business; answers with the kept bookings it covers (E3). */
+export function addClosure(input: OffRangeInput & { reason?: string }) {
+    return send<{ closures: Closure[]; affected: BookingBrief[] }>(
+        "/closures",
+        "POST",
+        input,
+        "Could not close the business then",
+    );
+}
+
+/** Open again: every row of one line, or none. */
+export function removeClosures(ids: string[]) {
+    return send<Closure[]>(
+        "/closures/remove",
+        "POST",
+        { ids },
+        "Could not open the business again",
+    );
+}
+
+/**
+ * The confirmed bookings a range would cover, before it is saved: one
+ * person's, or — with no `staffId` — everyone's, for a closure.
+ */
+export function previewOff(input: OffRangeInput & { staffId?: string }) {
+    return send<{ affected: BookingBrief[] }>(
+        "/time-off/preview",
+        "POST",
+        input,
+        "Could not check the bookings then",
     );
 }
 

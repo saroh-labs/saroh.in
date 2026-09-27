@@ -20,7 +20,13 @@ export interface Plan {
     price: string;
     currency: string;
     interval: Interval;
-    status: "ACTIVE" | "ARCHIVED";
+    /** DRAFT arrives with D5: never sold until it is published. */
+    status: "ACTIVE" | "ARCHIVED" | "DRAFT";
+    /**
+     * When a live plan's unpublished changes were last saved (D5); absent or
+     * null when it has none.
+     */
+    pendingChangedAt?: string | null;
     /** A membership's classes a month. Null: as many as they like. */
     classesPerMonth: number | null;
     /** People on it now — active or paused. */
@@ -276,6 +282,16 @@ export async function listPlans(): Promise<Plan[]> {
     const base = await orgBase();
     if (!base) return [];
     return (await getJson<Plan[]>(`${base}/subscription-plans`)) ?? [];
+}
+
+/**
+ * The plans, as the Plans tab reads them: a failed read is named in the tab
+ * and costs nothing else, so the subscriptions still show (D3).
+ */
+export async function listPlansOptional(): Promise<Optional<Plan[]>> {
+    return optionalRead<Plan[]>((base) =>
+        apiFetch(`${base}/subscription-plans`),
+    );
 }
 
 export async function getRenewals(): Promise<Renewals | null> {

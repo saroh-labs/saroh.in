@@ -963,6 +963,14 @@ async function clearVolume(prisma: Db) {
     await prisma.contactNoteAllergen.deleteMany({
         where: { noteId: { startsWith: RYE.prefix } },
     });
+    await prisma.contactAttention.deleteMany({
+        where: {
+            OR: [
+                { contactId: { startsWith: RYE.prefix } },
+                { allergenId: { startsWith: RYE.prefix } },
+            ],
+        },
+    });
     await prisma.contactNote.deleteMany({ where });
     await prisma.customer.deleteMany({ where });
     await prisma.contact.deleteMany({ where });

@@ -50,6 +50,7 @@ jest.mock("@saroh/database", () => {
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },

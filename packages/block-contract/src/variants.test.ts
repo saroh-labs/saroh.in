@@ -311,3 +311,55 @@ describe("servicesList", () => {
         expect(rendered.cta.href).toBe("/book");
     });
 });
+
+/** G8 — Visit us binds a place by id and reads it live. */
+describe("visitUs", () => {
+    it("is valid with nothing chosen yet, so a just-added block saves", () => {
+        expect(parseSectionContent("visitUs", 1, {}).success).toBe(true);
+    });
+
+    it("keeps a title, a storefront id and both switches", () => {
+        const parsed = parseSectionContent("visitUs", 1, {
+            title: "  Come and see us ",
+            storeId: "store_1",
+            showMap: false,
+            showHours: true,
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            title: "Come and see us",
+            storeId: "store_1",
+            showMap: false,
+            showHours: true,
+        });
+    });
+
+    it("never stores the place itself, so it can't go stale", () => {
+        const parsed = parseSectionContent("visitUs", 1, {
+            storeId: "store_1",
+            address: "22 Hill Road",
+            hours: "Tue–Sun 7am–7pm",
+        });
+        expect(parsed.success && parsed.data).toEqual({ storeId: "store_1" });
+    });
+
+    it("refuses an empty storefront id and an over-long title", () => {
+        expect(parseSectionContent("visitUs", 1, { storeId: "" }).success).toBe(
+            false,
+        );
+        expect(
+            parseSectionContent("visitUs", 1, { title: "x".repeat(161) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("publishes exactly what was authored", () => {
+        const draft = { title: "Visit", storeId: "store_1", showMap: false };
+        expect(
+            toRendered("visitUs", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("has one look, and content without one wears it", () => {
+        expect(resolveVariant("visitUs", {})).toBe("default");
+    });
+});

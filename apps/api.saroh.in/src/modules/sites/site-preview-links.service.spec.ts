@@ -227,6 +227,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
         });
         expect(buildSnapshot).toHaveBeenCalledTimes(1);
         expect(view.site.name).toBe("Acme");
+        expect(view.siteId).toBe("site_1");
         expect(view.snapshot).toEqual({ site: { name: "Acme" }, pages: [] });
         // Opening the link is recorded, without the page waiting on it.
         expect(linkUpdate.mock.calls[0][0].data.lastUsedAt).toBeInstanceOf(

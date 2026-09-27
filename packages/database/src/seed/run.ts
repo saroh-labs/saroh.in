@@ -1360,6 +1360,19 @@ export async function deleteSeeded(
             prisma.contactNoteAllergen.deleteMany({
                 where: { noteId: { startsWith: prefix } },
             }),
+        // Needs attention (C1): a seeded contact's entries, and any entry
+        // naming a seeded allergen, whatever made it (the backfill's rows
+        // don't carry the prefix).
+        () =>
+            prisma.contactAttention.deleteMany({
+                where: {
+                    OR: [
+                        { id: { startsWith: prefix } },
+                        { contactId: { startsWith: prefix } },
+                        { allergenId: { startsWith: prefix } },
+                    ],
+                },
+            }),
         () => prisma.subscriptionSkip.deleteMany({ where }),
         // Stock and where a product is sold (#510), before the variants and
         // products they hang off. Inventory and VariantInventory are no longer

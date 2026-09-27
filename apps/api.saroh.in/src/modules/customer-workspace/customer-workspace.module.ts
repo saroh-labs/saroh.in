@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
@@ -20,6 +21,7 @@ import { CustomerWorkspaceService } from "./customer-workspace.service";
         CustomerWorkspaceService,
         CustomerDetailService,
         ContactNotesService,
+        ContactAttentionService,
         OrganizationGuard,
     ],
 })

@@ -31,6 +31,7 @@ import type {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
     ListPlansQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
@@ -39,13 +40,11 @@ import type {
 } from "./dto";
 import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
+import type { PlanEventsPage } from "./plan-events";
+import { listPlanEvents, planActor } from "./plan-events";
+import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
-import {
-    assertPlanNameFree,
-    lockPlanNames,
-    planViews,
-    readPlan,
-} from "./plans";
+import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 
 type Tx = Prisma.TransactionClient;
@@ -288,29 +287,8 @@ export class SubscriptionsService {
         dto: PlanInputDto,
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        const { name, price, currency, interval } = dto;
-        if (!name) fieldError("Give the plan a name", "name");
-        if (!price) fieldError("Set a price", "price");
-        if (!currency) fieldError("Choose a currency", "currency");
-        if (!interval) fieldError("Choose how often it renews", "interval");
-        const { organizationId } = ctx;
-        const created = await prisma.$transaction(async (tx) => {
-            await lockPlanNames(tx, organizationId);
-            await assertPlanNameFree(tx, organizationId, name);
-            return tx.subscriptionPlan.create({
-                data: {
-                    organizationId,
-                    name,
-                    description: dto.description ?? null,
-                    price: fromCents(toCents(price)),
-                    currency,
-                    interval,
-                    classesPerMonth: dto.classesPerMonth ?? null,
-                },
-                select: { id: true },
-            });
-        });
-        return readPlan(organizationId, created.id);
+        const id = await createPlanRow(ctx.organizationId, planActor(ctx), dto);
+        return readPlan(ctx.organizationId, id);
     }
 
     async updatePlan(
@@ -319,71 +297,29 @@ export class SubscriptionsService {
         dto: PlanInputDto,
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        const { organizationId } = ctx;
-        await prisma.$transaction(async (tx) => {
-            if (dto.name !== undefined) await lockPlanNames(tx, organizationId);
-            const plan = await tx.subscriptionPlan.findFirst({
-                where: { id, organizationId },
-                select: { status: true },
-            });
-            if (!plan) notFound("Plan");
-            // An archived plan's name is checked when it is sold again.
-            if (dto.name !== undefined && plan.status !== "ARCHIVED") {
-                await assertPlanNameFree(tx, organizationId, dto.name, id);
-            }
-            await tx.subscriptionPlan.updateMany({
-                where: { id, organizationId },
-                data: {
-                    ...(dto.name !== undefined ? { name: dto.name } : {}),
-                    ...(dto.description !== undefined
-                        ? { description: dto.description }
-                        : {}),
-                    ...(dto.price !== undefined
-                        ? { price: fromCents(toCents(dto.price)) }
-                        : {}),
-                    ...(dto.currency !== undefined
-                        ? { currency: dto.currency }
-                        : {}),
-                    ...(dto.interval !== undefined
-                        ? { interval: dto.interval }
-                        : {}),
-                    ...(dto.classesPerMonth !== undefined
-                        ? { classesPerMonth: dto.classesPerMonth }
-                        : {}),
-                },
-            });
-        });
-        return readPlan(organizationId, id);
+        await updatePlanRow(ctx.organizationId, planActor(ctx), id, dto);
+        return readPlan(ctx.organizationId, id);
     }
 
-    /**
-     * Archived plans take no new sign-ups; everyone on them carries on.
-     * Selling one again needs its name free: another plan may have taken it
-     * while it was archived.
-     */
+    /** Archive a plan, or sell it again (`plan-writes.ts` says the rules). */
     async setPlanStatus(
         ctx: OrganizationContext,
         id: string,
         status: "ACTIVE" | "ARCHIVED",
     ): Promise<PlanView> {
         authorize(ctx, "subscription:write");
-        const { organizationId } = ctx;
-        await prisma.$transaction(async (tx) => {
-            if (status === "ACTIVE") await lockPlanNames(tx, organizationId);
-            const plan = await tx.subscriptionPlan.findFirst({
-                where: { id, organizationId },
-                select: { name: true, status: true },
-            });
-            if (!plan) notFound("Plan");
-            if (status === "ACTIVE" && plan.status === "ARCHIVED") {
-                await assertPlanNameFree(tx, organizationId, plan.name, id);
-            }
-            await tx.subscriptionPlan.updateMany({
-                where: { id, organizationId },
-                data: { status },
-            });
-        });
-        return readPlan(organizationId, id);
+        await setPlanStatusRow(ctx.organizationId, planActor(ctx), id, status);
+        return readPlan(ctx.organizationId, id);
+    }
+
+    /** A plan's history, newest first (D2). */
+    async planEvents(
+        ctx: OrganizationContext,
+        id: string,
+        query: ListPlanEventsQueryDto,
+    ): Promise<PlanEventsPage> {
+        authorize(ctx, "subscription:read");
+        return listPlanEvents(ctx.organizationId, id, query);
     }
 
     // — Subscriptions —————————————————————————————————————————————

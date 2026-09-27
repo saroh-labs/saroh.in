@@ -5,6 +5,7 @@ import { BillingModule } from "../billing/billing.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PublicSitesController } from "./public-sites.controller";
+import { PublicVisitService } from "./public-visit.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
@@ -23,7 +24,12 @@ import { SitesService } from "./sites.service";
         CapabilitiesModule,
     ],
     controllers: [SitesController, PublicSitesController],
-    providers: [SitesService, SitePreviewLinksService, OrganizationGuard],
+    providers: [
+        SitesService,
+        SitePreviewLinksService,
+        PublicVisitService,
+        OrganizationGuard,
+    ],
     exports: [SitesService],
 })
 export class SitesModule {}

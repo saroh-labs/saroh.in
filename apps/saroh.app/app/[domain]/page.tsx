@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PageSections } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
-import { findHomePage, getPublicationForHost } from "@/lib/publication";
+import { findHomePage, getSiteForHost } from "@/lib/publication";
 
 /**
  * Tenant site home (S2-006).
@@ -19,13 +19,15 @@ export default async function SiteHomePage({
     params: Promise<{ domain: string }>;
 }) {
     const { domain } = await params;
-    const snapshot = await getPublicationForHost(domain);
+    // The site's id as well as its snapshot: Visit us reads its place by it
+    // (G8), as the post routes read posts by it (#232).
+    const resolved = await getSiteForHost(domain);
 
-    if (!snapshot) {
+    if (!resolved) {
         notFound();
     }
 
-    const home = findHomePage(snapshot);
+    const home = findHomePage(resolved.snapshot);
     if (!home) {
         notFound();
     }
@@ -35,6 +37,7 @@ export default async function SiteHomePage({
             sections={home.sections}
             apiUrl={publicApiUrl()}
             bookHref="/book"
+            siteId={resolved.siteId}
         />
     );
 }

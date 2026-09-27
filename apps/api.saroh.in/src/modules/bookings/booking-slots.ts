@@ -14,6 +14,7 @@ import {
     countOverlapping,
     intersectIntervals,
     isPersonSlotStart,
+    outsideClosures,
     staffSlots,
     weeklyIntervals,
     withinIntervals,
@@ -24,6 +25,7 @@ import { courseSeatIntervals } from "./course-seats";
 import type { ReserveWith } from "./reservation";
 import {
     businessTimezone,
+    loadClosures,
     loadPeople,
     serviceStaff,
 } from "./staff-availability";
@@ -79,7 +81,13 @@ export async function openSlots(
         const ids = staffId
             ? [staffId]
             : staffing.people.map((person) => person.id);
-        const people = await loadPeople(prisma, ids, from, to);
+        const people = await loadPeople(
+            prisma,
+            service.organizationId,
+            ids,
+            from,
+            to,
+        );
         const slots: StaffSlot[] = staffSlots(
             availService,
             rules,
@@ -90,8 +98,14 @@ export async function openSlots(
         );
         return slots;
     }
-    const busy = await busyOverlapping(service.id, from, to);
-    const slots = availableSlots(availService, rules, from, to, busy);
+    const [busy, closed] = await Promise.all([
+        busyOverlapping(service.id, from, to),
+        loadClosures(prisma, service.organizationId, from, to),
+    ]);
+    const slots = outsideClosures(
+        availableSlots(availService, rules, from, to, busy),
+        closed,
+    );
     if (staffing.people.length === 0) return slots;
     const instructors = staffId
         ? [staffId]
@@ -158,6 +172,7 @@ export async function resolvePerson(
     );
     const people = await loadPeople(
         prisma,
+        service.organizationId,
         candidates.map((p) => p.id),
         startAt,
         endAt,
@@ -236,6 +251,26 @@ export async function resolvePerson(
             : "That time is not an open slot for this service",
         field: "startAt",
     });
+}
+
+/**
+ * Refuse a booking that falls while the whole business is closed (E3) — by
+ * hand, moved, or from the booking page. Checked before the slot's own
+ * checks, so every path says the same thing. A closure is public (the
+ * booking page shows the day closed), so the booker may hear why.
+ */
+export async function refuseIfClosed(
+    organizationId: string,
+    startAt: Date,
+    endAt: Date,
+): Promise<void> {
+    const closed = await loadClosures(prisma, organizationId, startAt, endAt);
+    if (countOverlapping({ startAt, endAt }, closed) > 0) {
+        throw new BadRequestException({
+            message: "The business is closed then. Pick another time.",
+            field: "startAt",
+        });
+    }
 }
 
 /**

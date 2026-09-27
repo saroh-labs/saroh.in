@@ -22,3 +22,5 @@ export * from "./backfill/listings-stock-levels";
 export * from "./backfill/held-stock";
 // The #530 same-product merge, exported for the same reason.
 export * from "./backfill/merge-same-products";
+// The C1 Needs attention backfill, exported for the same reason.
+export * from "./backfill/contact-attention";

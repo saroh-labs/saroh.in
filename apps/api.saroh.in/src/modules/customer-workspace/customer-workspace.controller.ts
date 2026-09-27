@@ -16,10 +16,11 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
-import { ContactNoteDto } from "./dto";
+import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -44,6 +45,7 @@ export class CustomerWorkspaceController {
         private readonly workspace: CustomerWorkspaceService,
         private readonly details: CustomerDetailService,
         private readonly notes: ContactNotesService,
+        private readonly attention: ContactAttentionService,
     ) {}
 
     /** One read of a customer, rooted on the contact (U8). */
@@ -83,6 +85,60 @@ export class CustomerWorkspaceController {
     ) {
         await this.notes.remove(ctx, contactId, noteId);
         return { ok: true };
+    }
+
+    /**
+     * Needs attention (DEC-040, C1): the entries this viewer may see, how
+     * many sensitive ones they can't, and suggestions for those who can add
+     * them.
+     */
+    @Get(":contactId/attention")
+    listAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.attention.list(ctx, contactId);
+    }
+
+    @Post(":contactId/attention")
+    @HttpCode(201)
+    createAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Body() dto: CreateAttentionDto,
+    ) {
+        return this.attention.create(ctx, contactId, dto);
+    }
+
+    @Patch(":contactId/attention/:entryId")
+    updateAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+        @Body() dto: UpdateAttentionDto,
+    ) {
+        return this.attention.update(ctx, contactId, entryId, dto);
+    }
+
+    @Delete(":contactId/attention/:entryId")
+    async removeAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+    ) {
+        await this.attention.remove(ctx, contactId, entryId);
+        return { ok: true };
+    }
+
+    /** "Add to Needs attention" on a suggestion. */
+    @Post(":contactId/attention/:entryId/confirm")
+    @HttpCode(200)
+    confirmAttention(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("entryId") entryId: string,
+    ) {
+        return this.attention.confirm(ctx, contactId, entryId);
     }
 
     /** Which contact a store customer is linked to (U18), or null. */

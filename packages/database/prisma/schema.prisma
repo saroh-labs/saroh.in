@@ -265,6 +265,15 @@ model Organization {
   customerAccounts    CustomerAccount[]
   customerSignInCodes CustomerSignInCode[]
   customerSessions    CustomerSession[]
+
+  // Needs attention on a customer (DEC-040, C1).
+  contactAttention ContactAttention[]
+
+  // Days or hours the whole business is closed (E3).
+  businessClosures BusinessClosure[]
+
+  // Every change to a plan, append-only (plan 2026-09-26-004, D2).
+  subscriptionPlanEvents SubscriptionPlanEvent[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -981,6 +990,10 @@ model StoreAllergen {
   products     ProductAllergen[]
   // Customers' notes that name it (U8). Removing it is refused while any do.
   contactNotes ContactNoteAllergen[]
+
+  // Needs attention Allergy entries that name it (C1). Removing it is
+  // refused while an entry that is still on a record does.
+  contactAttention ContactAttention[]
 
   @@index([storeId])
   @@index([organizationId])
@@ -2425,6 +2438,80 @@ model ContactNoteAllergen {
   @@index([organizationId])
 }
 
+// ContactAttention: one entry on a customer's Needs attention list (DEC-040,
+// C1) — an allergy, a medical note, an access need or anything else the team
+// must know before serving them. One list per person, read by Customer
+// Detail, orders, bookings and Home through one helper (`attentionFor`),
+// which leaves out sensitive entries for anyone without the sensitive
+// permission.
+//
+// An Allergy entry names an allergen from the business's list when it has
+// one (structured, so an order can be checked against a product's
+// "Contains"); without a list it is free text in `label`. A booking-page note
+// or the customer's own note arrives as SUGGESTED and becomes ACTIVE only
+// when staff add it; "Nothing to add" and removal set `removedAt`. Rows are
+// never deleted by the API, so who added what stays readable.
+model ContactAttention {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  kind      AttentionKind
+  // At most 60 characters (the API checks it): what the tag says.
+  label     String
+  // At most 500 characters.
+  detail    String?
+  // Left out of every read for a role without the sensitive permission.
+  sensitive Boolean       @default(false)
+
+  // NoAction, as ContactNoteAllergen: removing an allergen from the list is
+  // refused while an entry still on a record names it.
+  allergenId String?
+  allergen   StoreAllergen? @relation(fields: [allergenId], references: [id], onDelete: NoAction)
+
+  source    AttentionSource @default(STAFF)
+  status    AttentionStatus @default(ACTIVE)
+  // The booking whose note suggested it (C12). The entry outlives the booking.
+  bookingId String?
+  booking   Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  // Users, by id and without a foreign key, as ContactNote: a person who
+  // leaves the team keeps their entries.
+  createdByUserId   String?
+  confirmedByUserId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  removedAt         DateTime?
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([allergenId])
+  @@index([bookingId])
+}
+
+enum AttentionKind {
+  ALLERGY
+  MEDICAL
+  ACCESS
+  OTHER
+}
+
+/// Who put an entry on the record: the team, the booking page's
+/// "Anything we should know?", or the customer on their own account.
+enum AttentionSource {
+  STAFF
+  BOOKING_PAGE
+  CUSTOMER
+}
+
+/// SUGGESTED waits for staff to add it; only ACTIVE entries are read out.
+enum AttentionStatus {
+  SUGGESTED
+  ACTIVE
+}
+
 // SavedView: a per-actor, per-resource named set of list filters (#124). The
 // `filters` payload is the SHAREABLE URL query contract (search/filter/sort/
 // page) — plain JSON, NEVER raw SQL — so a saved view can never smuggle an
@@ -3086,6 +3173,9 @@ model Contact {
   // pair is never suggested again.
   unlinkedCustomerAccounts CustomerAccount[] @relation("CustomerAccountUnlinkedFrom")
 
+  // Needs attention: one shared list of what the team must know (DEC-040, C1).
+  attention ContactAttention[]
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -3549,6 +3639,9 @@ model Booking {
   // booking of a service that isn't EITHER — means "as the service says".
   locationType String?
 
+  // A booking-page note waiting to become Needs attention (C1, C12).
+  attentionSuggestions ContactAttention[]
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -3674,6 +3767,27 @@ model StaffExtraHours {
 
   @@index([organizationId])
   @@index([staffId, date])
+}
+
+/// The whole business closed: nobody can be booked, on any service, with or
+/// without staff (E3). Kept apart from StaffTimeOff, whose staffId stays
+/// required. A part-day range is one row per day, written in one transaction
+/// and shown as one line. Unlike time off, a closure is public: the booking
+/// page shows the day as closed. The reason is for the team only.
+model BusinessClosure {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  startAt DateTime // absolute; a whole day starts at local midnight
+  endAt   DateTime // exclusive
+  allDay  Boolean  @default(false)
+  reason  String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, startAt])
 }
 
 /// Business-wide booking rules (U3). No row, or a null column, is no rule —
@@ -4550,7 +4664,43 @@ model SubscriptionPlan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Every change to it, newest last (D2).
+  events SubscriptionPlanEvent[]
+
+  // The composite key its events point at, so an event can't name another
+  // business's plan.
+  @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+// One change to a plan: who made it, when, and each changed field's value
+// before and after (plan 2026-09-26-004, D2). Append-only: nothing updates
+// or deletes a row; it goes only with its plan (a draft deleted, D5).
+model SubscriptionPlanEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // CREATED | PUBLISHED | PRICE_CHANGED | CLASSES_CHANGED | RENAMED |
+  // DESCRIPTION_CHANGED | UPDATED | ARCHIVED | RESTORED | DRAFT_DISCARDED
+  // (PLAN_EVENT_KINDS in plan-events.ts).
+  kind        String
+  // TEAM | JOB | OPERATOR. An operator's change reads as Saroh support
+  // (DEC-035).
+  actorKind   String
+  // Who made it. Not a foreign key: someone who leaves the team keeps their
+  // changes in the history. Null for the job.
+  actorUserId String?
+
+  // { field: [before, after] }, plan fields only; money as "1500.00".
+  changes Json @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, planId, createdAt])
 }
 
 // A person on a plan. Invoiced forward, one invoice per period; "overdue" is

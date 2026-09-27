@@ -35,6 +35,12 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: "/services",
         linkLabel: "Open Services",
     },
+    visitUs: {
+        reads: "Reads your shop's address and opening hours live, so they're never out of date here.",
+        notice: "The address lives on the storefront, and the hours in Settings › Hours — change them there, and this block follows.",
+        href: "/commerce/storefronts",
+        linkLabel: "Open Storefronts",
+    },
     booking: {
         reads: "Reads your services and their availability live, so a visitor can only book what you actually offer.",
         notice: "Which services can be booked, and when, follow Services and your opening hours — change them there, and this block follows.",

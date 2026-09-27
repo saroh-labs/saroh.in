@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
     IsIn,
     IsInt,
@@ -14,6 +14,9 @@ import {
 
 import type { Interval } from "./periods";
 import { INTERVALS } from "./periods";
+
+/** The most of a plan's events one page reads (D2). */
+export const PLAN_EVENTS_PAGE_MAX = 100;
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -80,6 +83,21 @@ export class ListPlansQueryDto {
     @IsOptional()
     @IsIn(PLAN_STATUSES)
     status?: PlanStatus;
+}
+
+/** A page of a plan's history (D2): after the event `cursor`, `limit` of them. */
+export class ListPlanEventsQueryDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    cursor?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(PLAN_EVENTS_PAGE_MAX)
+    limit?: number;
 }
 
 export class SubscribeDto {

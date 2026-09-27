@@ -115,7 +115,13 @@ export class AllergensService {
             select: {
                 id: true,
                 name: true,
-                _count: { select: { products: true, contactNotes: true } },
+                _count: {
+                    select: {
+                        products: true,
+                        contactNotes: true,
+                        contactAttention: { where: { removedAt: null } },
+                    },
+                },
             },
         });
         if (!allergen) throw new NotFoundException("Allergen not found");
@@ -135,7 +141,23 @@ export class AllergensService {
                 field: "allergenId",
             });
         }
-        await prisma.storeAllergen.delete({ where: { id: allergenId } });
+        // The same for Needs attention (C1): an entry still on a record, or
+        // waiting as a suggestion, is taken off first.
+        const onRecords = allergen._count.contactAttention;
+        if (onRecords > 0) {
+            throw new ConflictException({
+                message: `${allergen.name} is on ${onRecords} ${onRecords === 1 ? "customer's" : "customers'"} Needs attention — take it off first.`,
+                field: "allergenId",
+            });
+        }
+        // Entries already removed keep their label and let the allergen go.
+        await prisma.$transaction([
+            prisma.contactAttention.updateMany({
+                where: { allergenId, organizationId },
+                data: { allergenId: null },
+            }),
+            prisma.storeAllergen.delete({ where: { id: allergenId } }),
+        ]);
         return { id: allergen.id, name: allergen.name };
     }
 }

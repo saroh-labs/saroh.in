@@ -124,6 +124,22 @@ export async function lockPlanNames(
 }
 
 /**
+ * Lock one plan's row for the rest of the transaction, so two changes to it
+ * run one after the other and each event's "before" is what that change
+ * saw (D2). FOR NO KEY UPDATE: a subscription or an event naming the plan
+ * takes FOR KEY SHARE on it, which this doesn't wait on. Taken after
+ * {@link lockPlanNames}. Locks nothing for another business's plan, which
+ * the caller's read then answers with a 404.
+ */
+export async function lockPlan(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "SubscriptionPlan" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR NO KEY UPDATE`;
+}
+
+/**
  * Names are unique per business among plans that aren't archived, ignoring
  * case and the spaces around them (the DTO trims). An archived plan's name
  * is free to reuse. A clash is a 409 naming the other plan.

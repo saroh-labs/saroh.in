@@ -1,8 +1,6 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
 import {
     Dialog,
     DialogContent,
@@ -13,26 +11,18 @@ import {
 } from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { PageHeader } from "@saroh/ui/page-header";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Repeat } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import type { ContactOption } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
-import { invoiceMoney } from "@/lib/invoices/money";
 import {
     createPlan,
     setPlanArchived,
     updatePlan,
 } from "@/lib/subscriptions/actions";
-import { intervalWords } from "@/lib/subscriptions/renewal";
 import type { Interval, Plan } from "@/lib/subscriptions/service";
-
-import { SubscribeDialog } from "./subscribe-dialog";
 
 const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
 const INTERVALS: { value: Interval; label: string }[] = [
@@ -43,166 +33,11 @@ const INTERVALS: { value: Interval; label: string }[] = [
 ];
 
 /**
- * Billing → Subscriptions → Plans, after the design: one card per plan with
- * what it costs, how often, and how many people are on it. Editing a plan
- * changes only what is sold next — everyone on it keeps the price they
- * agreed. An archived plan is not sold, so its button is gone rather than
- * dead.
- */
-export function PlansScreen({
-    plans,
-    contacts,
-    canWrite,
-}: {
-    plans: Plan[];
-    contacts: ContactOption[];
-    canWrite: boolean;
-}) {
-    const [editing, setEditing] = useState<Plan | "new" | null>(null);
-    const [subscribeTo, setSubscribeTo] = useState<string | null>(null);
-
-    return (
-        <>
-            <PageHeader
-                breadcrumb={[
-                    <Link
-                        key="subs"
-                        href="/billing/subscriptions"
-                        className="hover:text-foreground"
-                    >
-                        Subscriptions
-                    </Link>,
-                    "Plans",
-                ]}
-                title="Plans"
-                className="mb-0"
-                actions={
-                    canWrite ? (
-                        <Button
-                            variant="outline"
-                            onClick={() => setEditing("new")}
-                        >
-                            New plan
-                        </Button>
-                    ) : undefined
-                }
-            />
-
-            {plans.length === 0 ? (
-                <EmptyState
-                    icon={<Repeat />}
-                    title="No plans yet"
-                    description="A plan is what you sell on repeat — a monthly membership, a quarterly package. Make one, then put people on it."
-                    action={
-                        canWrite ? (
-                            <Button onClick={() => setEditing("new")}>
-                                Make a plan
-                            </Button>
-                        ) : undefined
-                    }
-                />
-            ) : (
-                <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]">
-                    {plans.map((p) => (
-                        <li key={p.id}>
-                            <PlanCard
-                                plan={p}
-                                canWrite={canWrite}
-                                onEdit={() => setEditing(p)}
-                                onSubscribe={() => setSubscribeTo(p.id)}
-                            />
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {editing ? (
-                <PlanDialog
-                    plan={editing === "new" ? null : editing}
-                    onClose={() => setEditing(null)}
-                />
-            ) : null}
-            {subscribeTo ? (
-                <SubscribeDialog
-                    open
-                    onOpenChange={(o) =>
-                        !o ? setSubscribeTo(null) : undefined
-                    }
-                    contacts={contacts}
-                    plans={plans}
-                    initialPlanId={subscribeTo}
-                />
-            ) : null}
-        </>
-    );
-}
-
-function PlanCard({
-    plan,
-    canWrite,
-    onEdit,
-    onSubscribe,
-}: {
-    plan: Plan;
-    canWrite: boolean;
-    onEdit: () => void;
-    onSubscribe: () => void;
-}) {
-    const archived = plan.status === "ARCHIVED";
-    const n = plan.subscriberCount;
-    return (
-        <article
-            className={
-                archived
-                    ? "flex h-full flex-col gap-3 rounded-[12px] border border-border bg-muted/40 p-5"
-                    : "flex h-full flex-col gap-3 rounded-[12px] border border-border bg-card p-5"
-            }
-        >
-            <header className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h2 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                        {plan.name}
-                    </h2>
-                    <p className="text-[12.5px] text-muted-foreground">
-                        {n === 0
-                            ? "No one on it"
-                            : `${n} ${n === 1 ? "member" : "members"}`}
-                    </p>
-                </div>
-                {archived ? <Badge variant="neutral">Archived</Badge> : null}
-            </header>
-            <p className="flex items-baseline gap-1.5">
-                <span className="font-display text-[26px] font-semibold tabular-nums tracking-[-0.03em]">
-                    {invoiceMoney(plan.price, plan.currency)}
-                </span>
-                <span className="text-[13px] text-muted-foreground">
-                    {intervalWords(plan.interval).per}
-                </span>
-            </p>
-            {plan.description ? (
-                <p className="text-[13px] leading-[1.55] text-muted-foreground">
-                    {plan.description}
-                </p>
-            ) : null}
-            {canWrite ? (
-                <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                    {!archived ? (
-                        <Button onClick={onSubscribe}>Subscribe someone</Button>
-                    ) : null}
-                    <Button variant="ghost" onClick={onEdit}>
-                        {archived ? "Restore or edit" : "Edit"}
-                    </Button>
-                </div>
-            ) : null}
-        </article>
-    );
-}
-
-/**
  * A plan, new or changed. For a plan people are on, the dialog says that a
- * change reaches new sign-ups only, and offers Archive.
+ * change reaches new sign-ups only, and offers Archive. The Plans tab's New
+ * plan and Edit open it until the Plan Editor page replaces it (D7).
  */
-function PlanDialog({
+export function PlanDialog({
     plan,
     onClose,
 }: {

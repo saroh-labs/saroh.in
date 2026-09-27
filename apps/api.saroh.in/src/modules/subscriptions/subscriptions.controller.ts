@@ -24,6 +24,7 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
     ListPlansQueryDto,
     ListSubscriptionsQueryDto,
     PlanInputDto,
@@ -55,6 +56,16 @@ export class SubscriptionPlansController {
     @Get(":planId")
     get(@OrgContext() ctx: OrganizationContext, @Param("planId") id: string) {
         return this.subscriptions.getPlan(ctx, id);
+    }
+
+    /** The plan's history, newest first, a page at a time (D2). */
+    @Get(":planId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Query() query: ListPlanEventsQueryDto,
+    ) {
+        return this.subscriptions.planEvents(ctx, id, query);
     }
 
     @Post()

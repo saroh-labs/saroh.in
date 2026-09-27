@@ -15,7 +15,11 @@
 export { PageSections, default as SectionRenderer } from "./section-renderer";
 export type { Section } from "./section-renderer";
 
-export { BlockFixturePreview, SAMPLE_SERVICES } from "./block-fixture-preview";
+export {
+    BlockFixturePreview,
+    SAMPLE_SERVICES,
+    SAMPLE_VISIT,
+} from "./block-fixture-preview";
 export { default as BookingSection } from "./blocks/booking";
 export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
@@ -29,6 +33,24 @@ export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
+export {
+    default as VisitUsSection,
+    directionsHref,
+    isPublicVisit,
+} from "./blocks/visit-us";
+export type { PublicVisit } from "./blocks/visit-us";
+
+// The one rule for "Open now" (G8): Visit us, the header (G18) and the
+// booking page's header (E6) all say it through this.
+export {
+    FALLBACK_TIME_ZONE,
+    clockText,
+    isOpeningWeek,
+    openState,
+    openStateText,
+    weekSummary,
+} from "./lib/opening-hours";
+export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.

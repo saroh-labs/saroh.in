@@ -30,6 +30,7 @@ import {
 import { requireSession } from "@/lib/session";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
+import { withClosures } from "@/lib/staff/time-off";
 
 /**
  * Bookings › Calendar (U15). The day by person by default, the week, or the
@@ -50,9 +51,14 @@ function layoutOf(value: unknown): CalendarLayout {
     return value === "week" || value === "agenda" ? value : "day";
 }
 
+/**
+ * The people, with the business's closures as everyone's time off (E3), so
+ * the calendar offers no free time while the business is closed.
+ */
 async function readStaff(): Promise<StaffList | null> {
     try {
-        return await listStaff();
+        const list = await listStaff();
+        return list ? withClosures(list) : null;
     } catch {
         return null;
     }

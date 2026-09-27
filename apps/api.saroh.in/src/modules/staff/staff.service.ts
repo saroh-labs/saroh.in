@@ -8,7 +8,6 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import type { Interval } from "../bookings/availability";
 import {
     overlaps,
     withinIntervals,
@@ -18,6 +17,8 @@ import type { BookingRulesValue } from "../bookings/booking-rules";
 import { loadBookingRules } from "../bookings/booking-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import { authorize } from "../organizations/organization-policy";
+import type { ClosureView } from "./closures.service";
+import { closureViews } from "./closures.service";
 import type {
     AddExtraHoursDto,
     AddTimeOffDto,
@@ -33,24 +34,17 @@ import {
     rangeRefusal,
     weeklyHoursRefusal,
     weeklyMinutes,
-    wholeDays,
 } from "./hours";
+import type { BookingBrief } from "./off-bookings";
+import { MAX_LISTED, upcomingBookings } from "./off-bookings";
+import type { OffSpan } from "./off-range";
+import { offRangeRefusal, offSpans } from "./off-range";
 
 const DAY = 86_400_000;
 /** How far back a person's read carries time off and extra hours. */
 const HISTORY_DAYS = 31;
-/** The most kept bookings a save lists; more than this is a different talk. */
-const MAX_LISTED = 200;
 
-/** A booking named in a warning: enough to find it, nothing more. */
-export interface BookingBrief {
-    id: string;
-    startAt: Date;
-    endAt: Date;
-    serviceId: string;
-    serviceName: string;
-    bookerName: string | null;
-}
+export type { BookingBrief };
 
 export interface StaffView {
     id: string;
@@ -88,6 +82,8 @@ export interface StaffView {
 export interface StaffList {
     timezone: string;
     staff: StaffView[];
+    /** Current and coming days the whole business is closed (E3). */
+    closures: ClosureView[];
 }
 
 const staffInclude = (since: Date) =>
@@ -183,15 +179,16 @@ export class StaffService {
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
         authorize(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
-        const [rows, timezone] = await Promise.all([
+        const [rows, timezone, closures] = await Promise.all([
             prisma.staffMember.findMany({
                 where: { organizationId: ctx.organizationId },
                 include: staffInclude(since),
                 orderBy: [{ status: "asc" }, { name: "asc" }],
             }),
             businessTimezone(prisma, ctx.organizationId),
+            closureViews(ctx.organizationId, since),
         ]);
-        return { timezone, staff: rows.map(toView) };
+        return { timezone, staff: rows.map(toView), closures };
     }
 
     async get(
@@ -431,8 +428,10 @@ export class StaffService {
     // ── Time off ───────────────────────────────────────────────────────────
 
     /**
-     * Time off, by whole days or a stretch of time. Bookings it covers are
-     * kept and listed — the merchant decides what to do with each.
+     * Time off: a range of whole days, the same hours on each day of a range
+     * (E3, one row per day, written together), or one stretch of time.
+     * Bookings it covers are kept and listed — the merchant decides what to
+     * do with each.
      */
     async addTimeOff(
         ctx: OrganizationContext,
@@ -443,8 +442,7 @@ export class StaffService {
         authorize(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
 
-        let span: Interval;
-        let allDay: boolean;
+        let spans: OffSpan[];
         if (dto.fromDate) {
             if (dto.startAt || dto.endAt) {
                 refuse(
@@ -452,53 +450,79 @@ export class StaffService {
                     "startAt",
                 );
             }
-            const toDate = dto.toDate ?? dto.fromDate;
-            if (!isCalendarDate(dto.fromDate)) {
-                refuse("That is not a date.", "fromDate");
-            }
-            if (!isCalendarDate(toDate))
-                refuse("That is not a date.", "toDate");
-            if (toDate < dto.fromDate) {
-                refuse("The last day must be on or after the first.", "toDate");
-            }
+            const range = {
+                fromDate: dto.fromDate,
+                toDate: dto.toDate,
+                startMinute: dto.startMinute,
+                endMinute: dto.endMinute,
+            };
+            const refusal = offRangeRefusal(range);
+            if (refusal) refuse(refusal.message, refusal.field);
             const zone = await businessTimezone(prisma, ctx.organizationId);
-            span = wholeDays(dto.fromDate, toDate, zone);
-            allDay = true;
+            spans = offSpans(range, zone);
         } else if (dto.startAt && dto.endAt) {
-            span = {
+            const span = {
                 startAt: new Date(dto.startAt),
                 endAt: new Date(dto.endAt),
+                allDay: false,
             };
             if (span.endAt <= span.startAt) {
                 refuse("The end must be after the start.", "endAt");
             }
-            allDay = false;
+            if (span.endAt.getTime() - span.startAt.getTime() > 366 * DAY) {
+                refuse("Time off can be at most a year at a time.", "toDate");
+            }
+            spans = [span];
         } else {
             refuse(
                 "Choose the days, or a start and end time.",
                 dto.startAt ? "endAt" : "fromDate",
             );
         }
-        if (span.endAt.getTime() - span.startAt.getTime() > 366 * DAY) {
-            refuse("Time off can be at most a year at a time.", "toDate");
+        if (spans.length === 0) {
+            refuse("Those hours don't happen on those days.", "startMinute");
         }
 
-        await prisma.staffTimeOff.create({
-            data: {
+        await prisma.staffTimeOff.createMany({
+            data: spans.map((span) => ({
                 organizationId: ctx.organizationId,
                 staffId: person.id,
                 startAt: span.startAt,
                 endAt: span.endAt,
-                allDay,
+                allDay: span.allDay,
                 reason: blankToNull(dto.reason),
                 createdByUserId: ctx.userId,
-            },
-            select: { id: true },
+            })),
         });
         const affected = (
-            await this.upcomingBookings(ctx, person.id, now)
-        ).filter((b) => overlaps(b, span));
+            await upcomingBookings(ctx.organizationId, person.id, now)
+        ).filter((b) => spans.some((span) => overlaps(b, span)));
         return { staff: await this.read(ctx, person.id, now), affected };
+    }
+
+    /** Take away several rows of time off at once — one line on the screen. */
+    async removeTimeOffMany(
+        ctx: OrganizationContext,
+        staffId: string,
+        ids: string[],
+    ): Promise<StaffView> {
+        authorize(ctx, "service:write");
+        const person = await this.requireStaff(ctx, staffId);
+        const unique = [...new Set(ids)];
+        await prisma.$transaction(async (tx) => {
+            const { count } = await tx.staffTimeOff.deleteMany({
+                where: {
+                    id: { in: unique },
+                    staffId: person.id,
+                    organizationId: ctx.organizationId,
+                },
+            });
+            // All or nothing: a stale id means the screen is out of date.
+            if (count !== unique.length) {
+                throw new NotFoundException("Time off not found");
+            }
+        });
+        return this.read(ctx, person.id);
     }
 
     async removeTimeOff(
@@ -649,47 +673,6 @@ export class StaffService {
         }
     }
 
-    /** A person's confirmed bookings from now on, soonest first. */
-    private async upcomingBookings(
-        ctx: OrganizationContext,
-        staffId: string,
-        now: Date,
-    ): Promise<BookingBrief[]> {
-        const rows = await prisma.booking.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                staffId,
-                status: "CONFIRMED",
-                endAt: { gt: now },
-            },
-            orderBy: { startAt: "asc" },
-            take: MAX_LISTED * 5,
-            select: {
-                id: true,
-                startAt: true,
-                endAt: true,
-                serviceId: true,
-                bookerName: true,
-                service: { select: { name: true } },
-                contact: { select: { firstName: true, lastName: true } },
-            },
-        });
-        return rows.map((r) => {
-            const contactName = [r.contact?.firstName, r.contact?.lastName]
-                .filter(Boolean)
-                .join(" ")
-                .trim();
-            return {
-                id: r.id,
-                startAt: r.startAt,
-                endAt: r.endAt,
-                serviceId: r.serviceId,
-                serviceName: r.service.name,
-                bookerName: contactName || r.bookerName,
-            };
-        });
-    }
-
     /**
      * Upcoming bookings of a person that their hours (weekly and extra) no
      * longer cover. Time off is its own warning and is not counted here.
@@ -699,7 +682,11 @@ export class StaffService {
         staffId: string,
         now: Date,
     ): Promise<BookingBrief[]> {
-        const upcoming = await this.upcomingBookings(ctx, staffId, now);
+        const upcoming = await upcomingBookings(
+            ctx.organizationId,
+            staffId,
+            now,
+        );
         if (upcoming.length === 0) return [];
         const first = upcoming[0].startAt;
         const last = upcoming.reduce(

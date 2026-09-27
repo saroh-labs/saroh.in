@@ -1,6 +1,8 @@
 // What the subscription routes accept, checked with the same validator the
 // global ValidationPipe runs. Timezones and dates that parse but do not
 // exist are the service's to refuse.
+import "reflect-metadata";
+
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
@@ -8,6 +10,7 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    ListPlanEventsQueryDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -147,5 +150,25 @@ describe("what skipping and changing plan accept", () => {
 
     it("needs the plan to move to", async () => {
         expect(await refused(ChangePlanDto, {})).toContain("planId");
+    });
+});
+
+describe("what a page of a plan's history accepts (D2)", () => {
+    it("reads the limit from the query string as a number", async () => {
+        const query = plainToInstance(ListPlanEventsQueryDto, {
+            limit: "20",
+            cursor: "evt_1",
+        });
+        expect(query.limit).toBe(20);
+        expect(await validate(query)).toEqual([]);
+        expect(await refused(ListPlanEventsQueryDto, {})).toEqual([]);
+    });
+
+    it("refuses a limit of none, too many, or not a whole number", async () => {
+        for (const limit of ["0", "101", "ten", "2.5"]) {
+            expect(await refused(ListPlanEventsQueryDto, { limit })).toContain(
+                "limit",
+            );
+        }
     });
 });

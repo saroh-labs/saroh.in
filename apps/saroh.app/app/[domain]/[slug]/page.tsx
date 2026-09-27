@@ -119,6 +119,7 @@ export default async function SitePostPage({
             sections={page.sections}
             apiUrl={publicApiUrl()}
             bookHref="/book"
+            siteId={siteId}
         />
     );
 }

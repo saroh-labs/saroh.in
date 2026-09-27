@@ -10,9 +10,10 @@ import * as api from "./service";
 /** Thin: the API decides who may, and what a subscription may become. */
 
 function refresh() {
-    // "layout", so each subscription's own page is refreshed with the list.
+    // "layout", so each subscription's and each plan's own page is refreshed
+    // with the list and its Plans tab.
     revalidatePath("/billing/subscriptions", "layout");
-    revalidatePath("/billing/plans");
+    revalidatePath("/billing/plans", "layout");
     revalidatePath("/billing/invoices");
 }
 
@@ -84,6 +85,10 @@ export async function createPlan(input: PlanInput) {
 export async function updatePlan(id: string, input: PlanInput) {
     return then(api.updatePlan(id, input));
 }
+/**
+ * Archive, or sell again. The Plans tab's Undo calls it with the opposite,
+ * so one action serves both ways (D3).
+ */
 export async function setPlanArchived(id: string, archived: boolean) {
     return then(api.setPlanArchived(id, archived));
 }

@@ -162,6 +162,18 @@ export interface ServicesListContent {
     cta?: CtaValue;
 }
 
+/**
+ * `visitUs` — which shop's address and hours to show (G8). The place itself is
+ * read live by the site, never stored here. Both switches read as on when
+ * absent.
+ */
+export interface VisitUsContent {
+    title?: string;
+    storeId?: string;
+    showMap?: boolean;
+    showHours?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -216,6 +228,7 @@ export interface SectionContentByType {
     testimonials: TestimonialsContent;
     contact: ContactContent;
     servicesList: ServicesListContent;
+    visitUs: VisitUsContent;
 }
 
 /**

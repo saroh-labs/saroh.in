@@ -15,6 +15,7 @@ import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
 import type { ServicesLoad } from "./types";
 import { VariantField } from "./variant-field";
+import { VisitUsFields } from "./visit-us";
 
 /**
  * The per-type editor for one section.
@@ -147,6 +148,15 @@ function perTypeFields({
         case "servicesList":
             return (
                 <ServicesListFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "visitUs":
+            return (
+                <VisitUsFields
                     section={section}
                     pages={pages}
                     services={services}
