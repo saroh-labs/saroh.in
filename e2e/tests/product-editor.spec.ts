@@ -43,7 +43,7 @@ async function signIn(page: Page) {
 }
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
-const orgHeader = { "x-organization-id": ORG };
+const orgHeader = { "x-organization-id": ORG, origin: urls.APP_URL };
 
 test.describe("product editor", () => {
     test("create, add variants, stock and photos, publish, then read it back", async ({
@@ -217,7 +217,10 @@ test.describe("product editor", () => {
         const name = `E2E Stock Count ${testInfo.project.name}`;
         const inventory = (id: string) =>
             `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`;
-        const nwHeader = { "x-organization-id": NW.organizationId };
+        const nwHeader = {
+            "x-organization-id": NW.organizationId,
+            origin: urls.APP_URL,
+        };
 
         await signIn(page);
         await page.goto(`/open/${NW.organizationId}`);

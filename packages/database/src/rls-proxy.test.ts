@@ -170,6 +170,67 @@ describe("createRlsProxy", () => {
         expect(guc()).toBe("org_9");
     });
 
+    it("runs the array form's ops in order in ONE transaction that sets the GUC first (#53)", async () => {
+        process.env.RLS_ENFORCEMENT = "1";
+        const { proxy, calls, guc, txOptions } = makeFake();
+        const p = proxy as unknown as {
+            $transaction: (
+                ops: unknown[],
+                options?: unknown,
+            ) => Promise<unknown[]>;
+            lead: {
+                findMany: (a: unknown) => Promise<unknown>;
+                count: () => Promise<unknown>;
+            };
+        };
+
+        const results = await runInOrgContext("org_5", () => {
+            const ops = [p.lead.findMany({}), p.lead.count()];
+            // Like a PrismaPromise, nothing runs until the batch does.
+            expect(calls).toEqual([]);
+            return p.$transaction(ops, { isolationLevel: "Serializable" });
+        });
+
+        expect(calls).toEqual([
+            "base.$transaction",
+            "tx.$executeRaw",
+            "tx.lead.findMany",
+            "tx.lead.count",
+        ]);
+        expect(results).toHaveLength(2);
+        expect(guc()).toBe("org_5");
+        expect(txOptions).toEqual([{ isolationLevel: "Serializable" }]);
+    });
+
+    it("refuses an array-form op that did not come through the proxy in context", async () => {
+        process.env.RLS_ENFORCEMENT = "1";
+        const { proxy } = makeFake();
+        const p = proxy as unknown as {
+            $transaction: (ops: unknown[]) => Promise<unknown[]>;
+        };
+        await expect(
+            runInOrgContext("org_5", () =>
+                p.$transaction([Promise.resolve(1)]),
+            ),
+        ).rejects.toThrow(/organization context/);
+    });
+
+    it("still runs a single org-scoped op when awaited on its own", async () => {
+        process.env.RLS_ENFORCEMENT = "1";
+        const { proxy, calls } = makeFake();
+        const p = proxy as unknown as {
+            lead: { count: () => Promise<unknown> };
+        };
+        const op = runInOrgContext("org_3", () => p.lead.count());
+        expect(calls).toEqual([]);
+        await op;
+        expect(calls).toEqual([
+            "base.$transaction",
+            "tx.$executeRaw",
+            "tx.lead.count",
+        ]);
+    });
+
     it("keeps the caller's isolation level when it sets the GUC", async () => {
         process.env.RLS_ENFORCEMENT = "1";
         const { proxy, txOptions } = makeFake();

@@ -94,8 +94,15 @@ export interface BillingProvider {
      * `false` so the caller rejects with 401 BEFORE parsing or any DB write.
      */
     verifyWebhook(rawBody: Buffer, headers: WebhookHeaders): boolean;
-    /** Normalize an ALREADY-VERIFIED payload into a {@link ParsedBillingEvent}. */
-    parseWebhook(payload: unknown): ParsedBillingEvent;
+    /**
+     * Normalize an ALREADY-VERIFIED payload into a {@link ParsedBillingEvent}.
+     * `providerEventId` must be unique per DELIVERY, not per event type: the
+     * inbox drops a repeat as a duplicate (PAY-04).
+     */
+    parseWebhook(
+        payload: unknown,
+        headers?: WebhookHeaders,
+    ): ParsedBillingEvent;
 }
 
 /** Factory over the concrete providers — injectable so tests swap in a fake. */

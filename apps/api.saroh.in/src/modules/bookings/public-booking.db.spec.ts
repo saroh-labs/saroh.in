@@ -453,6 +453,35 @@ describe("the booking page (real database)", () => {
             await prisma.invoice.count({ where: { bookingId: a.booking.id } }),
         ).toBe(1);
     });
+
+    it("gives one slot to one of eight people booking at once, and tells the rest it is taken (#106)", async () => {
+        // The outcome every loser must get. Under real concurrency (the load
+        // smoke, scripts/load-smoke.mjs) some losers used to get a 500: the
+        // pg driver adapter reported the conflict with no P2034 code
+        // (common/prisma-errors.ts). One test process rarely loses the race
+        // that way, so this pins the outcome rather than reproducing the race.
+        const at = nextMonday(6, 4);
+        const results = await Promise.allSettled(
+            Array.from({ length: 8 }, (_, i) =>
+                publicBookings.bookOnline(
+                    oneToOne,
+                    booker(`race-${i}@example.in`, "DESK", at),
+                    `ip_race_${i}`,
+                ),
+            ),
+        );
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        for (const r of results) {
+            if (r.status === "rejected") {
+                expect(r.reason).toBeInstanceOf(ConflictException);
+            }
+        }
+        expect(
+            await prisma.booking.count({
+                where: { serviceId: oneToOne, startAt: at },
+            }),
+        ).toBe(1);
+    });
 });
 
 describe("a hold's lifecycle under the team and the webhook (#508, real database)", () => {

@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpException,
+    Ip,
+    Param,
+    Post,
+} from "@nestjs/common";
+
+import { hashClientIp } from "../../common/client-ip";
+import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 
 import { CreateIntentDto } from "./dto";
 import type {
@@ -6,6 +18,25 @@ import type {
     PublicReceiptResult,
 } from "./payments.service";
 import { PaymentsService } from "./payments.service";
+
+/**
+ * Limits (PAY-08). Each intent without a key costs a call to the merchant's
+ * provider and a row, so one leaked order id could otherwise open intents
+ * without end. The checkout runs in the buyer's browser, so the caller's
+ * address is the buyer's own. Per order as well, because one order has one
+ * buyer. The receipt is polled while a payment settles, so its limit is loose.
+ */
+const INTENTS_PER_ORDER = 10;
+const INTENTS_PER_CALLER = 30;
+const RECEIPTS_PER_CALLER = 240;
+const WINDOW_MS = 60_000;
+
+function tooManyRequests(): HttpException {
+    return new HttpException(
+        "Too many requests for this order. Try again shortly.",
+        429,
+    );
+}
 
 /**
  * PUBLIC checkout API (S5-004), mounted at `/public/orders` with NO guards —
@@ -21,6 +52,19 @@ import { PaymentsService } from "./payments.service";
  */
 @Controller("public/orders")
 export class PublicPaymentsController {
+    private readonly intentsPerOrder = new FixedWindowRateLimiter(
+        INTENTS_PER_ORDER,
+        WINDOW_MS,
+    );
+    private readonly intentsPerCaller = new FixedWindowRateLimiter(
+        INTENTS_PER_CALLER,
+        WINDOW_MS,
+    );
+    private readonly receiptsPerCaller = new FixedWindowRateLimiter(
+        RECEIPTS_PER_CALLER,
+        WINDOW_MS,
+    );
+
     constructor(private readonly payments: PaymentsService) {}
 
     /**
@@ -31,10 +75,18 @@ export class PublicPaymentsController {
      */
     @Post(":orderId/payment-intent")
     @HttpCode(201)
-    createIntent(
+    async createIntent(
         @Param("orderId") orderId: string,
         @Body() dto: CreateIntentDto,
+        @Ip() ip?: string,
     ): Promise<CreateIntentResult> {
+        const caller = hashClientIp(ip) ?? "unknown";
+        if (
+            !this.intentsPerCaller.take(caller) ||
+            !this.intentsPerOrder.take(orderId)
+        ) {
+            throw tooManyRequests();
+        }
         return this.payments.createIntentForOrderPublic(orderId, {
             idempotencyKey: dto.idempotencyKey,
             provider: dto.provider,
@@ -47,7 +99,13 @@ export class PublicPaymentsController {
      * secrets, no internal ids.
      */
     @Get(":orderId/receipt")
-    receipt(@Param("orderId") orderId: string): Promise<PublicReceiptResult> {
+    async receipt(
+        @Param("orderId") orderId: string,
+        @Ip() ip?: string,
+    ): Promise<PublicReceiptResult> {
+        if (!this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown")) {
+            throw tooManyRequests();
+        }
         return this.payments.getReceipt(orderId);
     }
 }

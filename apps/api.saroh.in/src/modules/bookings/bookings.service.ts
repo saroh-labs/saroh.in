@@ -9,6 +9,7 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
+import { isSerializationFailure } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
@@ -945,7 +946,7 @@ export class BookingsService {
             );
         } catch (err) {
             // Lost the race with a concurrent booking for the same seat.
-            if ((err as { code?: string }).code === "P2034") {
+            if (isSerializationFailure(err)) {
                 throw new ConflictException("That slot is fully booked");
             }
             throw err;

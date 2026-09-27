@@ -22,7 +22,10 @@ import {
 } from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
 import { assertPaymentTransition } from "../orders/order-state";
-import { SUPERSEDED_INTENT } from "../payments/intent-state";
+import {
+    OPEN_INTENT_STATUSES,
+    SUPERSEDED_INTENT,
+} from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import type {
@@ -520,15 +523,18 @@ export class WebhooksService {
         tx: Tx,
         intent: IntentRow,
     ): Promise<{ applied: boolean }> {
-        // Never override a succeeded intent with a late failure.
-        if (intent.status !== "SUCCEEDED" && intent.status !== "FAILED") {
-            await tx.paymentIntent.update({
-                where: { id: intent.id },
-                data: { status: "FAILED" },
-            });
-            return { applied: true };
-        }
-        return { applied: false };
+        // Only an open intent can fail. The condition is in the UPDATE, not
+        // on `intent.status` (read without a lock): a success committed in
+        // the meantime, or an intent an edit SUPERSEDED, must stay as it is.
+        // Overwriting either lost track of money taken (PAY-02).
+        const { count } = await tx.paymentIntent.updateMany({
+            where: {
+                id: intent.id,
+                status: { in: [...OPEN_INTENT_STATUSES] },
+            },
+            data: { status: "FAILED" },
+        });
+        return { applied: count > 0 };
     }
 
     private async applyRefund(
@@ -834,10 +840,19 @@ export class WebhooksService {
      */
     private async applyInvoiceSuccess(
         tx: Tx,
-        intent: IntentRow,
+        unlocked: IntentRow,
         invoiceId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // The intent's status under its row lock, taken before the Invoice's
+        // (intent → Invoice, the lock order). `unlocked` was read without
+        // a lock: two events for one payment (payment.captured and order.paid)
+        // could both see it unpaid, and the second then recorded a good
+        // payment as "needs a refund" (PAY-01).
+        const intent = {
+            ...unlocked,
+            status: await lockIntent(tx, unlocked),
+        };
         if (intent.status === "SUCCEEDED") return { applied: false };
 
         await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} AND "organizationId" = ${intent.organizationId} FOR UPDATE`;

@@ -96,6 +96,62 @@ async function withGuc<T>(
     }, options);
 }
 
+/** Marks an operation made under an org context, with how to run it on a tx. */
+const DEFERRED = Symbol("rls-proxy.deferred");
+
+type RunOn = (tx: TransactionClient) => Promise<unknown>;
+
+/**
+ * An org-scoped operation that, like Prisma's own PrismaPromise, does nothing
+ * until it is awaited. Being lazy and recognisable is what lets the array form
+ * `$transaction([prisma.a.update(…), prisma.b.delete(…)])` work under
+ * enforcement: the operations are collected and run, in order, inside ONE
+ * transaction that sets the GUC first. An eager per-op transaction would have
+ * started each one on its own (no longer atomic) and handed Prisma plain
+ * promises, which it refuses — the category merge and post-category delete
+ * both failed that way with enforcement on (#53).
+ */
+class DeferredOp implements PromiseLike<unknown> {
+    readonly [DEFERRED]: RunOn;
+    private started?: Promise<unknown>;
+
+    constructor(
+        private readonly start: () => Promise<unknown>,
+        runOn: RunOn,
+    ) {
+        this[DEFERRED] = runOn;
+    }
+
+    private promise(): Promise<unknown> {
+        this.started ??= this.start();
+        return this.started;
+    }
+
+    then<A = unknown, B = never>(
+        onFulfilled?: ((value: unknown) => A | PromiseLike<A>) | null,
+        onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
+    ): Promise<A | B> {
+        return this.promise().then(onFulfilled, onRejected);
+    }
+
+    catch<B = never>(
+        onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
+    ): Promise<unknown> {
+        return this.promise().catch(onRejected);
+    }
+
+    finally(onFinally?: (() => void) | null): Promise<unknown> {
+        return this.promise().finally(onFinally);
+    }
+
+    readonly [Symbol.toStringTag] = "PrismaPromise";
+}
+
+/** An org-scoped op, lazy, that runs in its own GUC'd tx unless batched. */
+function deferOp(base: PrismaClient, orgId: string, runOn: RunOn): DeferredOp {
+    return new DeferredOp(() => withGuc(base, orgId, runOn), runOn);
+}
+
 /** Wrap one model delegate (e.g. `prisma.lead`) so each op carries the GUC. */
 function wrapDelegate(
     base: PrismaClient,
@@ -124,7 +180,7 @@ function wrapDelegate(
                         args,
                     );
                 }
-                return withGuc(base, orgId, (t) => {
+                return deferOp(base, orgId, (t) => {
                     const d = (t as unknown as Record<string, unknown>)[
                         model
                     ] as Record<string, (...a: unknown[]) => Promise<unknown>>;
@@ -150,7 +206,7 @@ function wrapRaw(base: PrismaClient, method: string) {
                 base as unknown as Record<string, (...a: unknown[]) => unknown>
             )[method](...args);
         }
-        return withGuc(base, orgId, (t) =>
+        return deferOp(base, orgId, (t) =>
             (
                 t as unknown as Record<
                     string,
@@ -162,7 +218,8 @@ function wrapRaw(base: PrismaClient, method: string) {
 }
 
 /** Wrap `$transaction` so a service's atomic block carries the GUC (and never
- *  nests): interactive form sets the GUC first; array form prepends it. */
+ *  nests): the interactive form sets the GUC first; the array form runs its
+ *  deferred ops, in order, in one transaction that sets it first. */
 function wrapTransaction(base: PrismaClient) {
     // Prisma's `$transaction` has two overloads (interactive fn / array) that do
     // not unify under a generic wrapper; call it through a permissive signature.
@@ -188,11 +245,30 @@ function wrapTransaction(base: PrismaClient) {
             return withGuc(base, orgId, fn, options as TransactionOptions);
         }
         // Array form: `$transaction([...])`.
-        const ops = arg as Promise<unknown>[];
+        const ops = arg as unknown[];
         if (orgId === null) return runTx(ops, options);
-        const setGuc = base.$executeRaw`SELECT set_config('app.current_organization_id', ${orgId}, true)`;
-        return runTx([setGuc, ...ops], options).then((res) =>
-            (res as unknown[]).slice(1),
+        // Under a context every op here came through this proxy and is a lazy
+        // DeferredOp: run them in order inside one GUC'd transaction, as
+        // Prisma's own array form runs them in order inside one.
+        const batch = ops.map((op) =>
+            op instanceof DeferredOp ? op[DEFERRED] : undefined,
+        );
+        if (batch.some((run) => run === undefined)) {
+            return Promise.reject(
+                new Error(
+                    "$transaction([...]) under an organization context takes only operations made through the RLS-aware prisma client, in the same context.",
+                ),
+            );
+        }
+        return withGuc(
+            base,
+            orgId,
+            async (tx) => {
+                const results: unknown[] = [];
+                for (const run of batch as RunOn[]) results.push(await run(tx));
+                return results;
+            },
+            options as TransactionOptions,
         );
     };
 }

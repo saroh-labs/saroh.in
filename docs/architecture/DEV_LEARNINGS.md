@@ -616,3 +616,31 @@ public, uncapped enquiry field does.
    characters) and the product editor's `stripHtml` (the merchant's own
    browser) were not.
    **Category**: security · CodeQL · `packages/block-contract/src/examples.ts` · `packages/site-blocks/src/blocks/contact.tsx`
+
+## Database — a booking that lost the race for a seat answered 500 (#106)
+
+**Problem**: Under concurrent public bookings, most losers got "fully booked"
+(409), but about 1 in 150 got a 500. No test had ever shown it, because one test
+process rarely loses the race that way.
+**Root cause**: Through the pg driver adapter, a Postgres serialization failure
+(40001) inside an interactive transaction can surface as a bare
+`DriverAdapterError` whose `cause.kind` is `TransactionWriteConflict`, with no
+`code`. Every `code === "P2034"` check missed it.
+**Fix**: `prismaErrorCode()` / `isSerializationFailure()` in
+`apps/api.saroh.in/src/common/prisma-errors.ts` read both shapes, and every
+serializable path uses them. Found by `scripts/load-smoke.mjs`.
+**Category**: database · rule in `docs/patterns/backend-data-and-money.md`
+
+## RLS — `$transaction([...])` failed only with enforcement on (#53)
+
+**Problem**: With `RLS_ENFORCEMENT=on`, the category merge and deleting a post
+category failed with "All elements of the array need to be Prisma Client
+promises". With enforcement off, they worked.
+**Root cause**: The RLS proxy ran each org-scoped operation eagerly in its own
+GUC-setting transaction and returned a plain promise. The array form needs
+Prisma's lazy promises, and would not have been atomic anyway.
+**Fix**: An org-scoped operation is now lazy and recognisable (`DeferredOp` in
+`packages/database/src/rls-proxy.ts`), and the array form runs them in order
+in one GUC'd transaction. `TEST_RLS=on` runs the whole integration suite under
+enforcement, so the next one shows up in CI.
+**Category**: RLS · rule in `docs/patterns/backend-data-and-money.md`

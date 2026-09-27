@@ -4,9 +4,9 @@ import type { Request, Response } from "express";
 
 import type { CorrelatedRequest } from "../logging/correlation-id.middleware";
 import { logHttpRequestOnce } from "../logging/http-request-log";
-import { redactHeaders, redactUrl } from "../logging/redact";
 import { RESPONSE_ID_HEADER } from "../logging/request-context";
-import { structuredLogger } from "../logging/structured-logger";
+import { reportError } from "../observability/report-error";
+import type { OrganizationContext } from "../types/organization-context";
 
 /**
  * Error-envelope contract (S0-007)
@@ -44,7 +44,9 @@ interface ErrorEnvelope {
 }
 
 type MaybeCorrelated = Request &
-    Partial<Pick<CorrelatedRequest, "correlationId" | "startTime">>;
+    Partial<Pick<CorrelatedRequest, "correlationId" | "startTime">> & {
+        organizationContext?: OrganizationContext;
+    };
 
 function statusToCode(status: number): string {
     const name: unknown = (HttpStatus as Record<number, unknown>)[status];
@@ -114,21 +116,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
             // Never surface internals for 5xx — generic envelope only.
             code = "INTERNAL_SERVER_ERROR";
             message = "Internal server error";
-            structuredLogger.error("unhandled_exception", {
+            // Logs it, and forwards it to the error tracker once one is
+            // installed (#103).
+            reportError(exception, {
                 correlationId,
-                method: req.method,
-                path: redactUrl(req.originalUrl),
                 statusCode,
-                errorName:
-                    exception instanceof Error
-                        ? exception.name
-                        : typeof exception,
-                errorMessage:
-                    exception instanceof Error
-                        ? exception.message
-                        : String(exception),
-                stack: exception instanceof Error ? exception.stack : undefined,
-                headers: redactHeaders(req.headers),
+                method: req.method,
+                url: req.originalUrl,
+                headers: req.headers,
+                organizationId: req.organizationContext?.organizationId,
             });
         } else {
             code = statusToCode(statusCode);

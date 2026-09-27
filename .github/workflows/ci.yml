@@ -176,6 +176,18 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
         run: pnpm --filter @saroh/api test:int
 
+      # The same suite again, the way production runs once RLS is switched on
+      # (#53): the schema from the migrations (where the policies live), a
+      # NOBYPASSRLS role with DML rights only, RLS_ENFORCEMENT=on, and every
+      # service call made for an organization inside its RLS context. It
+      # replaces the database the step above used. See
+      # apps/api.saroh.in/test/rls-mode.ts.
+      - name: Integration tests under RLS (NOBYPASSRLS role)
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
+          TEST_RLS: "on"
+        run: pnpm --filter @saroh/api test:int
+
   # The migration history is not exercised anywhere else in this workflow: the
   # integration suite builds its database with `prisma db push`, which reads
   # schema.prisma directly and never executes a migration file. So a migration

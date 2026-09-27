@@ -112,7 +112,6 @@ export class AdminAccessService {
             const replay = await tx.adminAccessSession.findUnique({
                 where: { idempotencyKey },
             });
-            if (replay) return replay;
 
             const organization = await tx.organization.findUnique({
                 where: { id: input.organizationId },
@@ -128,6 +127,24 @@ export class AdminAccessService {
                 throw new ConflictException(
                     "Retained deleted Organizations cannot be opened",
                 );
+            }
+
+            // A retry replays the session it opened, but only after the checks
+            // above, and only while it is the same request for a session that
+            // is still open (SEC-001). Replaying a revoked or lapsed session
+            // used to answer 201 and read as an active grant.
+            if (replay) {
+                if (replay.reason !== reason) {
+                    throw new ConflictException(
+                        "That idempotency key already opened access for a different reason",
+                    );
+                }
+                if (replay.revokedAt !== null || replay.expiresAt <= now) {
+                    throw new ConflictException(
+                        "The access session this key opened has ended. Open a new one with a new key.",
+                    );
+                }
+                return replay;
             }
 
             // One active support window per staff member and Organization keeps

@@ -53,8 +53,10 @@ Before the split, one API restart signed out every user.
 - **Adopted** — **Every app root has `error.tsx` and `loading.tsx`.** Gap:
   templates, saroh.in and ui have neither.
 - **Adopted** — **Show `error.digest` as a reference** — the only handle a user
-  can give support — and log the error (`TODO(#103)`: forward it to a tracker
-  once one exists). Current in the accounts, admin and saroh.app boundaries; gap:
+  can give support. Report the error with `reportError(error, { boundary,
+digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
+  once a tracker is registered. Never call `console.error` directly in a
+  boundary. Current in the accounts, admin and saroh.app boundaries; gap:
   `app.saroh.in/app/error.tsx` does not show it.
 - **Current** — **A 403 from a server read calls `forbidden()` instead of throwing
   an ordinary error.**

@@ -93,7 +93,10 @@ test.describe("a line the API refused", () => {
             const counted = await page.request.put(
                 `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`,
                 {
-                    headers: { "x-organization-id": NW.organizationId },
+                    headers: {
+                        "x-organization-id": NW.organizationId,
+                        origin: urls.APP_URL,
+                    },
                     data: { quantity: 1 },
                 },
             );

@@ -31,6 +31,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { installErrorTracking } from "./common/observability/report-error";
 import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
@@ -153,6 +154,8 @@ async function bootstrap() {
         new LoggingInterceptor(),
     );
     app.useGlobalFilters(new AllExceptionsFilter());
+    // Off unless ERROR_TRACKING_DSN is set (#103).
+    installErrorTracking(env.ERROR_TRACKING_DSN);
 
     const port = env.PORT;
     await app.listen(port);

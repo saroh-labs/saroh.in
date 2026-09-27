@@ -275,7 +275,8 @@
   takes a row lock (the course, the pack purchase, the booking) before
   counting. The RLS proxy passes the isolation level through
   (`packages/database/src/rls-proxy.ts`); the locks hold either way. A lost race
-  (`P2034`) is retried once so the answer is true now, then a plain 409.
+  (`isSerializationFailure()`, `P2034` however it arrives) is retried once so
+  the answer is true now, then a plain 409.
 - **One reservation core:** a course or pack booking goes through
   `BookingsService.reserveInTx(tx, …)` on the caller's transaction, so a
   refusal takes everything back. Course bookings link to their enrolment and
