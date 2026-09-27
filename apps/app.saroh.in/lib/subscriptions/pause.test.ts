@@ -14,6 +14,8 @@ const NOW = new Date("2026-09-19T04:30:00Z");
 const SUB = {
     timezone: "Asia/Kolkata",
     contact: { id: "c1", name: "Meera Iyer", email: "meera@example.in" },
+    // Paid up to 16 Oct, Kolkata midnight.
+    currentPeriodEnd: "2026-10-15T18:30:00.000Z",
 };
 
 describe("pause lengths (D8)", () => {
@@ -62,8 +64,29 @@ describe("pause lengths (D8)", () => {
             "Nothing is charged or collected until 3 Oct. It restarts on its own. The days it's paused are added to the period Meera has paid for.",
         );
         expect(pauseNote(open, SUB, NOW)).toBe(
-            "Nothing is charged or collected until you resume it. The days it's paused are added to the period Meera has paid for.",
+            "Nothing is charged or collected until you resume it. Resume before 16 Oct and the days it's paused are added to the period Meera has paid for; later, a new period starts with its invoice.",
         );
+    });
+
+    it("doesn't promise the days back when the pause outlasts the paid period (review S-1)", () => {
+        const [, four] = pauseOptions(SUB, NOW);
+        // 17 Oct is after the period's end on 16 Oct.
+        expect(pauseNote(four, SUB, NOW)).toBe(
+            "Nothing is charged or collected until 17 Oct. Meera has paid up to 16 Oct, so on 17 Oct it restarts with a new period and its invoice.",
+        );
+        // Ending the day the period does still adds the days, as the API decides.
+        expect(
+            pauseNote(
+                {
+                    key: "day",
+                    label: "",
+                    until: "2026-10-16",
+                    choice: { until: "2026-10-16" },
+                },
+                SUB,
+                NOW,
+            ),
+        ).toMatch(/until 16 Oct\. It restarts on its own\. The days/);
     });
 
     it("puts the same pause back when a resume is undone", () => {

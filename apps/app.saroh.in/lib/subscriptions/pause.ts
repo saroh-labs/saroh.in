@@ -65,18 +65,31 @@ export function pauseOptions(
     ];
 }
 
-/** What the sheet says under the choices. */
+/**
+ * What the sheet says under the choices (review S-1). A pause that ends on
+ * or before the paid period's end moves that end later by the days paused;
+ * one that ends after it starts a new period, with its invoice, on the day
+ * it ends — the API decides the same way from the same dates. The pause's
+ * end is the start of its day, so "on or before" is its day on or before
+ * the period's last day.
+ */
 export function pauseNote(
     option: PauseOption | undefined,
-    sub: Pick<Subscription, "timezone" | "contact">,
+    sub: Pick<Subscription, "timezone" | "contact" | "currentPeriodEnd">,
     now: Date,
 ): string {
     const first = sub.contact.name.split(" ")[0] || sub.contact.name;
+    const tz = sub.timezone;
+    const periodEnd = dayText(sub.currentPeriodEnd, tz, now);
     const added = `The days it's paused are added to the period ${first} has paid for.`;
     if (!option?.until) {
-        return `Nothing is charged or collected until you resume it. ${added}`;
+        return `Nothing is charged or collected until you resume it. Resume before ${periodEnd} and the days it's paused are added to the period ${first} has paid for; later, a new period starts with its invoice.`;
     }
-    return `Nothing is charged or collected until ${dayText(option.until, sub.timezone, now)}. It restarts on its own. ${added}`;
+    const until = dayText(option.until, tz, now);
+    if (option.until <= localDay(new Date(sub.currentPeriodEnd), tz)) {
+        return `Nothing is charged or collected until ${until}. It restarts on its own. ${added}`;
+    }
+    return `Nothing is charged or collected until ${until}. ${first} has paid up to ${periodEnd}, so on ${until} it restarts with a new period and its invoice.`;
 }
 
 /**
