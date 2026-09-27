@@ -441,8 +441,10 @@ test.describe("New booking finds the customer (E4)", () => {
         await expect(chip).toBeVisible();
         await chip.click();
         await expect(chip).toBeChecked();
-        // Nothing is written until "Book it".
-        await book.getByRole("button", { name: "Close" }).click();
+        // Nothing is written until "Book it". The footer's Close and the
+        // corner's both read "Close"; the footer's comes first.
+        await book.getByRole("button", { name: "Close" }).first().click();
+        await expect(book).toBeHidden();
     });
 });
 
@@ -496,7 +498,7 @@ test.describe("availability and services", () => {
         ).toHaveCount(0);
         await page.getByRole("radio", { name: "Class" }).click();
         await page.getByLabel("Name").fill("E2E class");
-        await page.getByLabel(/^Price/).fill("0");
+        await page.getByRole("textbox", { name: /^Price/ }).fill("0");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
             await who.getByRole("checkbox").first().click();
@@ -540,17 +542,20 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             level: 1,
             name: "New service",
         });
-        test.skip(
-            !(await heading.isVisible()),
-            "Northwind doesn't take bookings",
-        );
+        // isVisible() doesn't wait: give the page its first paint before
+        // deciding Northwind takes no bookings.
+        const opened = await heading
+            .waitFor({ timeout: 10_000 })
+            .then(() => true)
+            .catch(() => false);
+        test.skip(!opened, "Northwind doesn't take bookings");
         const name = `E2E either ${Date.now()}`;
         await page.getByLabel("Name").fill(name);
         await page.getByRole("radio", { name: "Either — they choose" }).click();
         await page
             .getByLabel("Link to join")
             .fill("https://meet.example.com/e2e-either");
-        await page.getByLabel(/^Price/).fill("500");
+        await page.getByRole("textbox", { name: /^Price/ }).fill("500");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
             await who.getByRole("checkbox").first().click();
