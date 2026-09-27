@@ -28,8 +28,9 @@ import { getBookingRules, listStaff } from "@/lib/staff/service";
  * Bookings › Availability (U16): each person's weekly hours, time off and
  * one-off extra hours, and the business's booking rules. Reads the staff
  * (U3) and three weeks of bookings (U4) — the bookings only to say which
- * would fall outside new hours or on a day off. Without them the editor
- * still works and says it could not check.
+ * would fall outside new hours or in extra hours; time off and closures
+ * ask the API what they cover (E3). Without them the editor still works
+ * and says it could not check.
  */
 export const metadata = { title: "Availability" };
 
@@ -89,7 +90,7 @@ export default async function AvailabilityPage() {
     );
 
     // The live bookings with a person: this week's for "outside these
-    // hours", and a count per person per day for time off.
+    // hours", and a count per person per day for extra hours.
     const weekEnd = addDays(today, 7);
     let kept: KeptBooking[] | null = null;
     let bookedOn: Record<string, number> | null = null;
@@ -151,6 +152,7 @@ export default async function AvailabilityPage() {
                 )}
                 <AvailabilityEditor
                     staff={staffList.staff}
+                    closures={staffList.closures}
                     rules={rules ?? NO_RULES}
                     timezone={timezone}
                     today={today}
