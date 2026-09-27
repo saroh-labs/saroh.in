@@ -1,6 +1,6 @@
 # ADR-011 — Customer accounts on merchant sites
 
-**Status:** Accepted — 2026-09-26 (DEC-037); implementation pending
+**Status:** Accepted — 2026-09-26 (DEC-037); amended 2026-09-27 (email only this round, §6); implementation pending
 **Supersedes in part:** [ADR-008](./ADR-008-operations-staff-gst-kitchen.md) §2 "The public booking page" (the limits on credits online, buying packs online, a waitlist, customer recognition, sign-in and customer messages) and §3 "Not sending email or SMS" (for sign-in codes and for messages sent through a business's own provider)
 **Amends:** DEC-011 (Saroh's own email also sends a site's sign-in codes) · ADR-008 §2 "One read of a customer" (merge, DEC-042)
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-007](./ADR-007-subscriptions-invoices-classes.md) (the Contact is the person) · ADR-009 (merchant sites run on `apps/saroh.app`, and customer-facing server routes call the API) · DEC-027 (client addresses behind proxies)
@@ -24,22 +24,28 @@ Decided with the user on 2026-09-26:
 
 - **Yes, starting now.** People who sign in on a merchant's site are that
   business's customers and the users of that site.
-- **Sign-in is a one-time code**, sent by SMS to a phone or by email.
+- **Sign-in is a one-time code**, sent by email.
 - **Accounts are per business**, never shared across Saroh.
-- Email codes go through Saroh's email. Who pays for SMS is open (§6).
+- Email codes go through Saroh's email.
+
+Decided with the user on 2026-09-27:
+
+- **Sign-in is email only.** Phone codes and SMS are out of this round, not
+  deferred behind a payer question. Phone sign-in is a later step with its
+  own decision (§6).
 
 ## 2. Decisions
 
 ### An account belongs to one business
 
 - **`CustomerAccount`** is an organization-owned row: `organizationId`
-  (required, RLS `org_isolation`), a required `contactId`, a verified phone
-  (E.164) and/or a verified email (lower-cased, trimmed), each with its
-  `verifiedAt`, a status (`ACTIVE`, `BLOCKED`, `REMOVED`), `createdAt` and
-  `lastSignedInAt`.
-- **A verified phone or email is unique per business**, not across Saroh
-  (partial unique indexes on `(organizationId, phone)` and
-  `(organizationId, email)` where the account is not removed). The same person
+  (required, RLS `org_isolation`), a required `contactId`, a verified email
+  (lower-cased, trimmed) with its `verifiedAt`, a status (`ACTIVE`,
+  `BLOCKED`, `REMOVED`), `createdAt` and `lastSignedInAt`. A verified phone
+  is not part of this round; it is added with phone sign-in (§6).
+- **A verified email is unique per business**, not across Saroh (a partial
+  unique index on `(organizationId, email)` where the account is not
+  removed). The same person
   at two businesses has two accounts, two sessions and two histories; neither
   business can see that the other exists.
 - **It is not a Saroh user.** Better Auth's `User` is the workspace identity
@@ -51,8 +57,8 @@ Decided with the user on 2026-09-26:
 
 ### Signing in is a one-time code
 
-- One flow for new and returning people: type a phone or an email, receive a
-  six-digit code, type it. Verifying a code for a destination with no account
+- One flow for new and returning people: type an email, receive a six-digit
+  code, type it. Verifying a code for a destination with no account
   creates one. The response never says whether an account existed.
 - **`CustomerSignInCode`** stores the business, the channel, a keyed hash of
   the destination, a keyed hash of the code (never the code), `expiresAt`
@@ -68,13 +74,9 @@ Decided with the user on 2026-09-26:
   display name and body ("Your code for Kavi Dental"). This widens DEC-011's
   "Saroh-owned email is identity mail only" to a site's customers' identity
   mail — still identity, never a business message.
-- **SMS codes go through an `SmsSender` port.** Which account sends them —
-  Saroh's, or the business's own connected SMS provider — is the open decision
-  in §6. In India, transactional SMS also needs a registered sender and
-  template; whoever sends registers them.
-- A site offers the channels it can send on. Until SMS is settled, a site
-  offers email only, and the phone field is not shown — never a field that
-  fails.
+- **Email is the only channel this round.** The sign-in sheet has no phone
+  field, and the API has no SMS sender or port. A code request names no
+  channel; it is an email.
 
 ### A session lives on the site's own host
 
@@ -105,7 +107,7 @@ Decided with the user on 2026-09-26:
   business-wide record of a person (ADR-007). Bookings, subscriptions, packs,
   invoices and notes already hang off the Contact, so the account area reads
   them through it and nothing is copied.
-- **On first sign-in**, the verified phone or email is matched against the
+- **On first sign-in**, the verified email is matched against the
   business's contacts. **Exactly one contact** with that normalised value and
   no account → the account is linked to it, and the contact shows "Signs in
   on your website" with **"This isn't them"**, which unlinks and moves the
@@ -139,17 +141,18 @@ These replace ADR-008's "no" for the public booking page:
 - **Message the business** in one thread, answered by the team in the
   workspace.
 - **Receive messages about their own orders, bookings and invoices** — in the
-  account's thread always, and by email, SMS or WhatsApp only through the
-  business's own connected provider (DEC-011) and only to a verified channel.
+  account's thread always, and by email only through the business's own
+  connected email provider (DEC-011) and only to the verified email. SMS and
+  WhatsApp need a verified phone, which comes with phone sign-in (§6).
   Saroh's own email sends sign-in codes and nothing else.
 
 ### Merging and removing
 
 Merging two contacts (DEC-042) with accounts:
 
-- The surviving contact keeps its account. The other account's verified phone
-  or email moves to it when the survivor has none for that channel; otherwise
-  the other account is retired (`REMOVED`) and its sessions revoked.
+- The surviving contact keeps its account. When the survivor has no account,
+  the other account moves to it; otherwise the other account is retired
+  (`REMOVED`) and its sessions revoked.
 - Two accounts never end up on one contact, and a verified value never ends up
   on two accounts.
 
@@ -170,8 +173,9 @@ for the law — issued invoices and their bill-to — is kept.
 - **Password accounts.** Rejected: small-business customers forget them, and
   a code proves the phone or email the business will message.
 - **Magic links.** Rejected as the only way: opening a link on another device
-  from the one browsing fails, and SMS links are distrusted. A code works on
-  both channels.
+  from the one browsing fails. A code can be typed wherever the email is read.
+- **SMS codes now** (Saroh's SMS account, or the business's own provider).
+  Set aside on 2026-09-27: email only this round (§6).
 
 ## 4. Consequences
 
@@ -194,8 +198,12 @@ for the law — issued invoices and their bill-to — is kept.
 - Not a way for one business to see another's customers.
 - Not a replacement for guest checkout on the invoice pay page.
 
-## 6. Open, to confirm
+## 6. SMS and phone sign-in
 
-- **Who pays for SMS** — Saroh's SMS account (a cost Saroh carries or passes
-  on) or the business's own connected provider (Twilio or another; the
-  business registers the sender). Email-only sign-in ships first either way.
+- **Closed on 2026-09-27: email only for now.** The earlier open question,
+  who pays for SMS, is not answered because SMS is not in this round.
+- **Phone later, as its own decision.** Phone sign-in, SMS codes and SMS or
+  WhatsApp messages to a verified phone come back together, with a new
+  decision on who sends and pays, and on the registered sender and template
+  Indian transactional SMS needs. Until then no copy offers a phone sign-in or
+  promises a text.

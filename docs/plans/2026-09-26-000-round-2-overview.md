@@ -30,7 +30,7 @@ file name. `DESIGN-NOTES.md` has the reasoning behind them.
 
 | Epic | Plan | Units | What it delivers |
 |---|---|---|---|
-| A. Customer accounts and messaging on merchant sites | [001](./2026-09-26-001-feat-customer-accounts-plan.md) | 15 | Sign-in by one-time code, one account per business (ADR-011). An account area with bookings, orders and tracking, plan and packs, messages and Me. Credits and packs online, a class waitlist, and customer messages. |
+| A. Customer accounts and messaging on merchant sites | [001](./2026-09-26-001-feat-customer-accounts-plan.md) | 14 | Sign-in by a one-time code sent by email, one account per business (ADR-011); no phone sign-in this round. An account area with bookings, orders and tracking, plan and packs, messages and Me. Credits and packs online, a class waitlist, and customer messages. |
 | B. Orders and fulfilment | [002](./2026-09-26-002-feat-orders-fulfilment-plan.md) | 16 | Richer list API and rows, filters, quick view, bulk kitchen actions, states, Order Detail changes, six fulfilment types with shipping tracking, a pay link for an order, New order v2. |
 | C. Customers | [003](./2026-09-26-003-feat-customers-plan.md) | 14 | The business-wide Customers list and its API, Needs attention, Customer Detail gaps, merge, privacy removal, email and address editing, reviews and packs on the detail. |
 | D. Payments | [004](./2026-09-26-004-feat-payments-plan.md) | 18 | The Plans tab, Plan Detail, and the Plan Editor with drafts and the shared editor shell. Plan and subscription event logs, pause with an end date, and classes from the next renewal. Provider autopay (DEC-038). Invoices: bill of supply, PDF, sending, the source filter and locked states. |
@@ -38,12 +38,12 @@ file name. `DESIGN-NOTES.md` has the reasoning behind them.
 | F. Home and Settings | [006](./2026-09-26-006-feat-home-settings-plan.md) | 16 | The Home redesign, Settings' real differences, Team's hidden column, and storefront people joining the team. |
 | G. Site editor and customer site | [007](./2026-09-26-007-feat-site-editor-customer-site-plan.md) | 21 | The #260 split first, then bound blocks, module pages, header and footer text, Undo toasts, the narrow layout and in-place preview. Customer site v2 without the brand: shop and bag, Prices, On today, open or closed, and nav gated by module. |
 | H. Design system: Brand v2 | [008](./2026-09-26-008-feat-brand-v2-plan.md) | 8 | **The font-leak fix (phase 1).** Then fonts per site, the brand API and panel, a logo, contrast and starting themes. Hindi is later. |
-| | | **136** | |
+| | | **135** | |
 
 Also written: [the permission matrix](./2026-09-26-permission-matrix.md)
 (DEC-039), and ADR-011.
 
-Unit IDs are per epic (A1…A15, B1…B16, and so on). Each plan's units say
+Unit IDs are per epic (A1…A14, B1…B16, and so on). Each plan's units say
 Goal, Files, Approach, Dependencies, Test scenarios and Verification, and
 none is bigger than one to two days of agent work.
 
@@ -53,7 +53,7 @@ none is bigger than one to two days of agent work.
 on an existing ADR. It includes the font-leak fix. **Phase 2** builds on
 phase 1's foundations, or rests on a default in the list below; confirming the
 defaults while phase 1 runs keeps phase 2 unblocked. **Phase 3** waits on the
-permission matrix review (DEC-039) or the SMS decision (ADR-011 §6).
+permission matrix review (DEC-039).
 
 ### Phase 1
 
@@ -85,7 +85,6 @@ permission matrix review (DEC-039) or the SMS decision (ADR-011 §6).
 
 | Epic | Units | Waits on |
 |---|---|---|
-| A | A15 SMS sender and phone sign-in | who pays for SMS |
 | B | B16 orders permission pass | matrix review |
 | C | C13 customer permissions | matrix review |
 | E | E26 booking permissions (`booking:settings`, `pack:sell`) | matrix review |
@@ -131,11 +130,14 @@ permission matrix review (DEC-039) or the SMS decision (ADR-011 §6).
   - B13 uses C2's contact helper;
   - B14 needs E9;
   - G14 needs G8, G10 and G12;
-  - H7 needs G2;
-  - A15 needs an SMS channel on the provider table if the business's own provider sends SMS.
+  - H7 needs G2.
 
 ## Later (not planned this round)
 
+- **Phone sign-in and SMS** — phone codes, a verified phone on the account,
+  and SMS or WhatsApp messages to it. Out of this round (user, 2026-09-27);
+  it comes back as its own decision, including who sends and pays for SMS
+  (ADR-011 §6). The former A15.
 - **Courses** — the Courses, Course Detail and Course Editor screens
   (DEC-044), with everything the courses-packs gap report lists for them:
   - deposits, per-session charging, the late-join cut-off, the waitlist,
@@ -166,13 +168,13 @@ it.
 
 **Customer accounts (A)**
 
-1. Until who pays for SMS is decided, a site offers email sign-in only; the phone field is not shown.
+1. A site offers email sign-in only; there is no phone field. (Decided 2026-09-27: phone codes and SMS are out of this round.)
 2. Browsing is open, and a code is asked for at the last step of booking or buying. The invoice pay link needs no sign-in.
 3. Once accounts are on for a site, guest booking and guest checkout end there.
 4. The code email's sender name is "‹Business› via Saroh", from Saroh's identity sender.
-5. Codes are 6 digits, live 10 minutes and allow 5 tries; resends wait 30 seconds, with at most 5 an hour and 10 a day per destination.
+5. Codes are 6 digits, live 10 minutes and allow 5 tries; resends wait 30 seconds, with at most 5 an hour and 10 a day per email address.
 6. Sessions last 30 days, renewed on use, and never more than 90.
-7. A first sign-in links to the one contact with that verified phone or email. The merchant can undo it ("This isn't them"). Zero or several matches make a new contact and a duplicate suggestion.
+7. A first sign-in links to the one contact with that verified email. The merchant can undo it ("This isn't them"). Zero or several matches make a new contact and a duplicate suggestion.
 8. From their account a customer can pause, resume or cancel at period end, and pay a failed invoice. Plan changes stay with the business.
 9. A class waitlist offers a freed place to the first person in line and holds it for 2 hours (or until 1 hour before the class, whichever is sooner), then offers it to the next.
 10. Messages about a customer's own orders, bookings and invoices need no marketing consent; marketing still does.
@@ -268,7 +270,7 @@ it.
 72. Codes and destinations are stored as keyed hashes under a new server secret. Session tokens are stored as SHA-256.
 73. Code limits per destination and per business are counted from stored rows, so they survive a restart. The per-address limit uses the existing in-process limiter.
 74. Expired or used codes, sessions and waitlist rows are deleted after 30 days by a cleanup job.
-75. From Me, a customer can change their name, email and phone. A new email or phone is checked with a code.
+75. From Me, a customer can change their name, email and phone. A new email is checked with a code; the phone is a contact detail, not a way to sign in.
 76. No waitlist offer is made within 1 hour of a class starting.
 77. Customer messages have their own thread tables. Anything sent outside the account is recorded in the existing `Message` and `Delivery` records.
 78. A contact without a site account gets no in-account messages. Staff copy says "They'll see it when they sign in on your site".
@@ -366,9 +368,6 @@ it.
 
 ## Still for the user to decide
 
-- **Who pays for SMS** (ADR-011 §6): Saroh's SMS account or the business's own
-  provider. Phone sign-in (A15), and SMS for order-ready and similar messages,
-  wait on it.
 - **The permission matrix review** (DEC-039), with the eleven questions at the
   end of the matrix.
 - **Saroh's own billing** (Settings › Plan & billing): when, and in which
