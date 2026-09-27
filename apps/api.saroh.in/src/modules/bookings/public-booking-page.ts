@@ -116,6 +116,8 @@ export interface PublicBookingPage {
 export async function publicDays(
     serviceId: string,
     now: Date = new Date(),
+    /** How many days from today. On today (G18) reads one. */
+    span: number = PUBLIC_DAYS,
 ): Promise<PublicDays> {
     const { service, rules } = await loadBookableService(serviceId, {
         bookingPage: true,
@@ -127,7 +129,7 @@ export async function publicDays(
     ]);
     const first = DateTime.fromJSDate(now, { zone }).startOf("day");
     const from = first.toJSDate();
-    const to = first.plus({ days: PUBLIC_DAYS }).toJSDate();
+    const to = first.plus({ days: span }).toJSDate();
     const names = new Map(staffing.people.map((p) => [p.id, p.name]));
     const availService = toAvailabilityService(service);
     // Never a start that has begun; then the business's own rules.
@@ -211,7 +213,7 @@ export async function publicDays(
             ? null
             : now.getTime() + bookingRules.bookAheadDays * 86_400_000;
     const days: PublicDay[] = [];
-    for (let i = 0; i < PUBLIC_DAYS; i += 1) {
+    for (let i = 0; i < span; i += 1) {
         const day = first.plus({ days: i });
         const dayFrom = day.toMillis();
         const dayTo = day.plus({ days: 1 }).toMillis();
@@ -228,6 +230,22 @@ export async function publicDays(
         });
     }
     return { timezone: zone, kind, capacity: service.capacity, days };
+}
+
+/**
+ * The services a site's booking page offers: active, shown on the booking
+ * page (E1), and of this site or of no site. On today (G18) lists the same
+ * ones, so it never shows a time the booking page would not.
+ */
+export function offeredOnSite(organizationId: string, siteId: string) {
+    return {
+        organizationId,
+        deletedAt: null,
+        status: "ACTIVE" as const,
+        // The merchant's "Show on booking page" (E1).
+        showOnBookingPage: true,
+        OR: [{ siteId: null }, { siteId }],
+    };
 }
 
 /**
@@ -256,14 +274,7 @@ export async function publicBookingPage(
     const [services, rules, zone, online] = await Promise.all([
         open
             ? prisma.service.findMany({
-                  where: {
-                      organizationId,
-                      deletedAt: null,
-                      status: "ACTIVE",
-                      // The merchant's "Show on booking page" (E1).
-                      showOnBookingPage: true,
-                      OR: [{ siteId: null }, { siteId }],
-                  },
+                  where: offeredOnSite(organizationId, siteId),
                   orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                   select: {
                       id: true,

@@ -25,6 +25,8 @@ import type {
 import { toPublicBooking } from "./public-booking-page";
 import type { PublicHold, PublicStaff } from "./public-bookings.service";
 import { PublicBookingsService } from "./public-bookings.service";
+import type { PublicToday } from "./public-today";
+import { PublicTodayService } from "./public-today";
 
 /** The section contract's cap on a services list (#255). */
 const MAX_PUBLIC_SERVICE_IDS = 24;
@@ -191,11 +193,30 @@ export type PublicBookingResult = PublicBooking & {
  */
 @Controller("public/sites")
 export class PublicBookingPageController {
-    constructor(private readonly bookings: PublicBookingsService) {}
+    constructor(
+        private readonly bookings: PublicBookingsService,
+        private readonly today: PublicTodayService,
+    ) {}
 
     @Get(":siteId/booking")
     @Header("Cache-Control", "no-store")
     page(@Param("siteId") siteId: string): Promise<PublicBookingPage> {
         return this.bookings.publicBookingPage(siteId);
+    }
+
+    /**
+     * "On today" on the site's home page (G18): up to four of today's
+     * classes and free times, as the booking page offers them, and the
+     * business's hours and zone for "Open now · closes 9pm". Read live, so
+     * never cached; limited per visitor. The source IP is hashed here and
+     * only the hash is passed on.
+     */
+    @Get(":siteId/today")
+    @Header("Cache-Control", "no-store")
+    todayOn(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+    ): Promise<PublicToday> {
+        return this.today.read(siteId, hashClientIp(ip));
     }
 }

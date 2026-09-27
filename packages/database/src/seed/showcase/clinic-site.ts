@@ -29,6 +29,8 @@ export const KAVI_SITE: SeedSite = {
                             href: "/book",
                             style: "primary",
                         },
+                        // "Free today" beside the headline (G18).
+                        onToday: true,
                     },
                 },
                 {

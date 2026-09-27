@@ -241,7 +241,16 @@ const imageSchema = z.object({
 // Section content schemas (per type + version)
 // ---------------------------------------------------------------------------
 
-/** hero v1 — a headline block with optional CTA + image. */
+/**
+ * hero v1 — a headline block with optional CTA + image.
+ *
+ * `onToday` (G18) sets "On today" beside the headline: the next classes with
+ * places and the next free appointment times, and whether the business is
+ * open now. A switch, not content — the times are read live from the booking
+ * page's own availability, never stored here. Optional, so it extends v1
+ * (and v2, which extends v1) in place, as `paddingOverride` did: every
+ * existing hero validates and renders exactly as before.
+ */
 const heroV1 = z.object({
     variant,
     padding: paddingOverride,
@@ -249,6 +258,7 @@ const heroV1 = z.object({
     subheading: z.string().optional(),
     cta: ctaSchema.optional(),
     image: imageSchema.optional(),
+    onToday: z.boolean().optional(),
 });
 
 /**

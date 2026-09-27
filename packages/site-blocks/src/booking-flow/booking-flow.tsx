@@ -9,6 +9,7 @@ import type { Result } from "./api";
 import { book, fetchDays, fetchHold, releaseHold, startPayment } from "./api";
 import { kicker, newKey, usePhone, zoneName } from "./flow-helpers";
 import type { DaysState, Phase } from "./flow-state";
+import { findInitialStart, INITIAL_TIME_GONE } from "./initial-start";
 import type {
     BookingDay,
     BookingPageData,
@@ -69,12 +70,17 @@ export interface BookingFlowProps {
     apiUrl?: string;
     /** A service to open on (`?service=`), when it is one the page offers. */
     initialServiceId?: string | null;
+    /** With it, a day and time to choose (`?date=&start=`, On today, G18). */
+    initialDate?: string | null;
+    initialStart?: string | null;
 }
 
 export default function BookingFlow({
     page,
     apiUrl = DEFAULT_API_URL,
     initialServiceId = null,
+    initialDate = null,
+    initialStart = null,
 }: BookingFlowProps) {
     const phone = usePhone();
     const ids = useId();
@@ -87,7 +93,7 @@ export default function BookingFlow({
     const [daysState, setDaysState] = useState<DaysState>(
         first ? { kind: "loading", serviceId: first.id } : { kind: "idle" },
     );
-    const [date, setDate] = useState<string | null>(null);
+    const [date, setDate] = useState<string | null>(first ? initialDate : null);
     const [start, setStart] = useState<BookingStart | null>(null);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -147,6 +153,29 @@ export default function BookingFlow({
     useEffect(() => {
         if (firstId) loadDays(firstId);
     }, [firstId, loadDays]);
+
+    // A time linked to from On today (G18): chosen once its days arrive, if
+    // still free; gone, the page opens on the day and says so.
+    const linked = useRef(
+        first && initialDate && initialStart
+            ? { date: initialDate, time: initialStart }
+            : null,
+    );
+    const firstIsClass = first?.kind === "class";
+    useEffect(() => {
+        const want = linked.current;
+        if (!want || daysState.kind !== "ready") return;
+        linked.current = null;
+        if (daysState.serviceId !== firstId) return;
+        const found = findInitialStart(
+            daysState.days,
+            want.date,
+            want.time,
+            firstIsClass,
+        );
+        if (found) setStart(found);
+        else setSubmitError(INITIAL_TIME_GONE);
+    }, [daysState, firstId, firstIsClass]);
 
     const pickService = (id: string) => {
         if (id === serviceId) return;

@@ -717,6 +717,8 @@ export type SeedSection =
                   href: string;
                   style: "primary" | "secondary" | "link";
               };
+              /** "On today" beside the headline (G18). */
+              onToday?: boolean;
           };
       }
     | { type: "richText"; content: { format: "html"; value: string } }

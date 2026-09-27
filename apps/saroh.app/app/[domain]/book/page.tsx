@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { BookingFlow, BookingUnavailable } from "@saroh/site-blocks";
+import {
+    BookingFlow,
+    BookingUnavailable,
+    initialDateOf,
+    initialTimeOf,
+} from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
@@ -14,7 +19,9 @@ import { getSiteForHost } from "@/lib/publication";
  * `BookingFlow` in `@saroh/site-blocks`, from `--site-*` only.
  *
  * `?service=<id>` opens on one service; the services list and the booking
- * block link here with it.
+ * block link here with it. With `&date=YYYY-MM-DD&start=HH:MM` (On today on
+ * the home page, G18) it opens on that day with that time chosen, or says the
+ * time has just gone.
  *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
@@ -41,10 +48,14 @@ export default async function BookPage({
     searchParams,
 }: {
     params: Promise<{ domain: string }>;
-    searchParams: Promise<{ service?: string | string[] }>;
+    searchParams: Promise<{
+        service?: string | string[];
+        date?: string | string[];
+        start?: string | string[];
+    }>;
 }) {
     const { domain } = await params;
-    const { service } = await searchParams;
+    const { service, date, start } = await searchParams;
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
 
@@ -58,6 +69,8 @@ export default async function BookPage({
             page={lookup.page}
             apiUrl={publicApiUrl()}
             initialServiceId={typeof service === "string" ? service : null}
+            initialDate={initialDateOf(date)}
+            initialStart={initialTimeOf(start)}
         />
     );
 }

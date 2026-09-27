@@ -29,6 +29,12 @@ export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
+export {
+    default as OnTodayHero,
+    isPublicToday,
+    todayHref,
+} from "./blocks/on-today";
+export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
@@ -40,8 +46,8 @@ export {
 } from "./blocks/visit-us";
 export type { PublicVisit } from "./blocks/visit-us";
 
-// The one rule for "Open now" (G8): Visit us, the header (G18) and the
-// booking page's header (E6) all say it through this.
+// The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
+// the booking page's header (E6) all say it through this.
 export {
     FALLBACK_TIME_ZONE,
     clockText,
@@ -75,6 +81,7 @@ export {
     BookingUnavailable,
 } from "./booking-flow/booking-flow";
 export type { BookingFlowProps } from "./booking-flow/booking-flow";
+export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
 export { isBookingPage } from "./booking-flow/model";
 export type { BookingPageData, BookingService } from "./booking-flow/model";
 
