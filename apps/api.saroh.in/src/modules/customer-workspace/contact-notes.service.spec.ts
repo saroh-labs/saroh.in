@@ -167,6 +167,39 @@ describe("ContactNotesService", () => {
         expect(db.contactAttention.createMany).not.toHaveBeenCalled();
     });
 
+    it("doesn't bring back an Allergy entry the team removed when the note is edited (review C-6)", async () => {
+        const { svc, db } = make();
+        // The note already names Nuts; the team removed its entry, so
+        // Needs attention has no live Allergy entry for it.
+        db.storeAllergen.count.mockResolvedValue(2);
+
+        await svc.update(OWNER, "c1", "note_1", {
+            body: "Nut allergy, and sesame",
+            allergenIds: ["alg_nuts", "alg_sesame"],
+        });
+
+        // Only the allergen the edit adds goes on Needs attention.
+        expect(db.contactAttention.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    label: "Sesame",
+                    allergenId: "alg_sesame",
+                }),
+            ],
+        });
+    });
+
+    it("adds nothing to Needs attention when an edit keeps the same allergens (review C-6)", async () => {
+        const { svc, db } = make();
+
+        await svc.update(OWNER, "c1", "note_1", {
+            body: "Nut allergy — severe",
+            allergenIds: ["alg_nuts"],
+        });
+
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
+    });
+
     it("refuses an allergen that is not on the organization's list", async () => {
         const { svc, db } = make();
         db.storeAllergen.count.mockResolvedValue(0);
