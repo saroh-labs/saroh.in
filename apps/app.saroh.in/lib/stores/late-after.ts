@@ -1,4 +1,4 @@
-import type { StorefrontFulfilmentType } from "./storefronts";
+import type { StorefrontFulfilmentType } from "./fulfilment-types";
 
 /**
  * "Mark pick-up orders late after [N] [hours ▾]" (plan B, B17): a storefront's

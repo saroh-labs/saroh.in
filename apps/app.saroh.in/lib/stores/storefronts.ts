@@ -1,6 +1,7 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 import type { StorefrontAllowance } from "@/lib/business-limits";
+import type { StorefrontFulfilmentType } from "./fulfilment-types";
 
 /**
  * Sell → Storefronts: every storefront in the business and the settings that
@@ -34,13 +35,12 @@ export interface OpeningHoursDay {
 }
 
 /** The physical ways a storefront's orders leave (DEC-045), in table order. */
-export const STOREFRONT_FULFILMENT_TYPES = [
-    "PICKUP",
-    "LOCAL_DELIVERY",
-    "SHIPPING",
-] as const;
-export type StorefrontFulfilmentType =
-    (typeof STOREFRONT_FULFILMENT_TYPES)[number];
+// The ways a storefront offers live in a module with no server code, so a
+// client component can read them without pulling this API client in.
+export {
+    STOREFRONT_FULFILMENT_TYPES,
+    type StorefrontFulfilmentType,
+} from "./fulfilment-types";
 
 /** When a storefront's orders count as late, in minutes, per way (B17). */
 export type LateAfterMinutes = Record<StorefrontFulfilmentType, number>;

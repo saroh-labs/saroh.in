@@ -13,6 +13,7 @@ import {
 } from "@saroh/ui/select";
 import { useState } from "react";
 
+import { STOREFRONT_FULFILMENT_TYPES } from "@/lib/stores/fulfilment-types";
 import type { LateUnit } from "@/lib/stores/late-after";
 import {
     DEFAULT_LATE_AFTER,
@@ -27,7 +28,6 @@ import type {
     StorefrontInput,
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
-import { STOREFRONT_FULFILMENT_TYPES } from "@/lib/stores/storefronts";
 
 import { Note, Section } from "./storefront-section";
 
