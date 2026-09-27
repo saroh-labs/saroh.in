@@ -1523,8 +1523,14 @@ enum StockRow {
   NONE
 }
 
-// The kitchen stage (ADR-008). NEW → PREPARING → READY → COLLECTED, or
-// READY → HANDED_TO_COURIER → DELIVERED for a delivery.
+// The kitchen stage (ADR-008). Each fulfilment type walks its own steps
+// (DEC-045; the table is apps/api.saroh.in/src/modules/orders/fulfilment.ts):
+// NEW → PREPARING → READY → COLLECTED for a pick-up, READY →
+// OUT_FOR_DELIVERY → DELIVERED for a local delivery, READY →
+// HANDED_TO_COURIER → DELIVERED for shipping, NEW → SENT for a download.
+// OUT_FOR_DELIVERY and SENT arrive in release 1 of the expand/contract
+// (docs/architecture/ORDER_FULFILMENT_ROLLOUT.md) and are written from
+// release 2 on.
 enum OrderStage {
   NEW
   PREPARING
@@ -1532,11 +1538,24 @@ enum OrderStage {
   COLLECTED
   HANDED_TO_COURIER
   DELIVERED
+  OUT_FOR_DELIVERY
+  SENT
 }
 
+// How an order leaves (DEC-045). COLLECT and DELIVERY are the legacy words
+// for PICKUP and LOCAL_DELIVERY: release 1 (B2a) adds the six types beside
+// them and still writes only the legacy two, release 2 (B2c) switches every
+// row and write to the new names, and release 3 (B2d) drops COLLECT and
+// DELIVERY. Read it through `typeOf` in orders/fulfilment.ts, never raw.
 enum OrderFulfilment {
   COLLECT
   DELIVERY
+  PICKUP
+  LOCAL_DELIVERY
+  SHIPPING
+  DIGITAL
+  APPOINTMENT_IN_PERSON
+  APPOINTMENT_ONLINE
 }
 
 enum OrderEventKind {
@@ -1831,6 +1850,13 @@ model StoreSettings {
   skuSuggest Boolean @default(true)
 
   updatedAt DateTime @updatedAt
+
+  // The physical ways this storefront's orders leave (DEC-045): only
+  // PICKUP, LOCAL_DELIVERY and SHIPPING are ever stored here; Digital and the
+  // appointment types follow the product. Kept in step with
+  // `collectionEnabled` and `shippingEnabled` until B17 replaces those two
+  // toggles with a chip set.
+  fulfilmentTypes OrderFulfilment[] @default([])
 }
 
 model StoreFeatures {

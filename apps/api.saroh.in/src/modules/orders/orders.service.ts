@@ -24,6 +24,7 @@ import type {
     PaymentStatus,
     UpdateOrderDto,
 } from "./dto";
+import { shipsToAddress, storedValueFor, typeOf } from "./fulfilment";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import {
     fromCents,
@@ -151,8 +152,12 @@ export class OrdersService {
                 field: "customerId",
             });
         }
+        // Either vocabulary in; only what this release may write is stored
+        // (fulfilment.ts: SHIPPING and the rest are refused until B2c).
+        const type = typeOf(dto.fulfilment ?? "PICKUP");
+        const fulfilment = storedValueFor(type);
         // The same rule an edit keeps: there is nowhere to deliver to.
-        if (dto.fulfilment === "DELIVERY" && !dto.address) {
+        if (shipsToAddress(type) && !dto.address) {
             throw new BadRequestException({
                 message: "A delivery needs an address.",
                 field: "address",
@@ -238,10 +243,9 @@ export class OrdersService {
             taxCents = gstInsideOrder(await withGstRates(lines), {
                 shippingCents,
                 discountCents,
-                deliveryState:
-                    dto.fulfilment === "DELIVERY"
-                        ? (dto.address?.state ?? null)
-                        : null,
+                deliveryState: shipsToAddress(type)
+                    ? (dto.address?.state ?? null)
+                    : null,
                 profile,
             });
         }
@@ -256,8 +260,8 @@ export class OrdersService {
             shipping: fromCents(shippingCents),
             discount: fromCents(discountCents),
             total: fromCents(totalCents),
-            // The kitchen flow (ADR-008): collected unless said otherwise.
-            fulfilment: dto.fulfilment ?? "COLLECT",
+            // The kitchen flow (ADR-008): picked up unless said otherwise.
+            fulfilment,
             notes: dto.notes ?? null,
             ...(dto.address
                 ? {
@@ -413,6 +417,17 @@ export class OrdersService {
                 );
             }
 
+            // The kitchen stage follows a status set here, so the next
+            // kitchen step is not refused as out of step (ADR-008). Worked
+            // out before any write: a status the order's type has no step
+            // for (a pick-up order SHIPPED) is refused, never turned into
+            // another kind of order.
+            const kitchen = statusChanging
+                ? stageForStatus(nextStatus, {
+                      stage: order.stage,
+                      fulfilment: order.fulfilment,
+                  })
+                : null;
             if (statusChanging) {
                 await applyInventoryTransition(
                     tx,
@@ -422,14 +437,6 @@ export class OrdersService {
                     userId,
                 );
             }
-            // The kitchen stage follows a status set here, so the next
-            // kitchen step is not refused as out of step (ADR-008).
-            const kitchen = statusChanging
-                ? stageForStatus(nextStatus, {
-                      stage: order.stage,
-                      fulfilment: order.fulfilment,
-                  })
-                : null;
             await tx.order.update({
                 where: { id: orderId },
                 data: {

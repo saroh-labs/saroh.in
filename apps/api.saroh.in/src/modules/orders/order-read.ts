@@ -1,4 +1,6 @@
 import { toMoneyString } from "../../common/money";
+import type { FulfilmentView } from "./fulfilment";
+import { fulfilmentView } from "./fulfilment";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
@@ -116,7 +118,7 @@ export interface OrderMoneyDto {
     owedBack: { id: string; amount: string }[];
 }
 
-export interface OrderReadDto {
+export interface OrderReadDto extends FulfilmentView {
     id: string;
     orderId: string;
     placedAt: Date;
@@ -127,7 +129,6 @@ export interface OrderReadDto {
     /** NONE | PARTLY_REFUNDED | REFUNDED — derived from refund sums. */
     refundStanding: "NONE" | "PARTLY_REFUNDED" | "REFUNDED";
     stage: string;
-    fulfilment: string;
     customer: {
         id: string;
         name: string | null;
@@ -383,7 +384,9 @@ export function serializeOrderRead(
             refundedCents,
         ),
         stage: order.stage,
-        fulfilment: order.fulfilment,
+        // The legacy word and the type, their steps and where it stands
+        // (fulfilment.ts); the app draws these and keeps no copy.
+        ...fulfilmentView(order.fulfilment, stage),
         customer: order.customer
             ? {
                   id: order.customer.id,

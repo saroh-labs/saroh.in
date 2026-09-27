@@ -16,6 +16,12 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
+import type { StorefrontFulfilmentType } from "../orders/fulfilment";
+import {
+    NEW_STOREFRONT_TYPES,
+    storefrontTypesFrom,
+    storefrontTypesOf,
+} from "../orders/fulfilment";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
@@ -74,6 +80,12 @@ export interface StorefrontSettings extends StorefrontSummary {
     address: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
+    /**
+     * The ways this storefront's orders leave (DEC-045): PICKUP,
+     * LOCAL_DELIVERY and SHIPPING, in that order. Follows the collection and
+     * shipping toggles until B17's chips replace them.
+     */
+    fulfilmentTypes: StorefrontFulfilmentType[];
     tipsEnabled: boolean;
     guestCheckout: boolean;
     /** ISO, when paused; `null` while taking payments. */
@@ -217,6 +229,9 @@ export class StorefrontsService {
             openingHours:
                 (settings?.openingHours as OpeningHoursDay[] | null) ?? null,
             collectionEnabled: settings?.collectionEnabled ?? false,
+            fulfilmentTypes: settings
+                ? storefrontTypesOf(settings.fulfilmentTypes)
+                : NEW_STOREFRONT_TYPES,
             tipsEnabled: settings?.tipsEnabled ?? false,
             guestCheckout: settings?.guestCheckout ?? true,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
@@ -346,6 +361,24 @@ export class StorefrontsService {
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
                 : {}),
+            // Which ways it offers follows the two toggles (B2a) until B17
+            // gives them their own chips; a local delivery it offered stays.
+            ...(dto.collectionEnabled !== undefined ||
+            dto.shippingEnabled !== undefined
+                ? {
+                      fulfilmentTypes: storefrontTypesFrom({
+                          collectionEnabled:
+                              dto.collectionEnabled ??
+                              current.collectionEnabled,
+                          shippingEnabled:
+                              dto.shippingEnabled ?? current.shippingEnabled,
+                          localDelivery:
+                              current.fulfilmentTypes.includes(
+                                  "LOCAL_DELIVERY",
+                              ),
+                      }),
+                  }
+                : {}),
         };
 
         await prisma.$transaction(async (tx) => {
@@ -364,6 +397,8 @@ export class StorefrontsService {
                     create: {
                         storeId,
                         currency: current.currency,
+                        // What it already reads as offering, likewise.
+                        fulfilmentTypes: current.fulfilmentTypes,
                         ...settings,
                     },
                     update: settings,

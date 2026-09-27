@@ -207,17 +207,201 @@ describe("editing and the legacy status PATCH", () => {
     it("keeps the stage in step with a status set by the old PATCH", () => {
         const cur = { stage: "NEW" as const, fulfilment: "COLLECT" as const };
         expect(stageForStatus("PROCESSING", cur).stage).toBe("PREPARING");
-        expect(stageForStatus("SHIPPED", cur)).toEqual({
-            stage: "HANDED_TO_COURIER",
-            fulfilment: "DELIVERY",
-        });
         expect(stageForStatus("DELIVERED", cur).stage).toBe("COLLECTED");
+        const courier = {
+            stage: "READY" as const,
+            fulfilment: "DELIVERY" as const,
+        };
+        expect(stageForStatus("SHIPPED", courier)).toEqual({
+            stage: "HANDED_TO_COURIER",
+        });
         expect(
             stageForStatus("DELIVERED", {
                 stage: "HANDED_TO_COURIER",
                 fulfilment: "DELIVERY",
             }).stage,
         ).toBe("DELIVERED");
-        expect(stageForStatus("CANCELLED", cur)).toEqual(cur);
+        expect(stageForStatus("CANCELLED", cur)).toEqual({ stage: "NEW" });
+    });
+
+    // Deliberate change (B2a): it used to turn any order it SHIPPED into a
+    // delivery at HANDED_TO_COURIER. It never changes the type now.
+    it.each<[OrderFulfilment, RegExp]>([
+        [
+            "COLLECT",
+            /^A pick-up order isn't shipped\. Change how it's fulfilled first\.$/,
+        ],
+        ["PICKUP", /^A pick-up order isn't shipped/],
+        ["DIGITAL", /^A digital order isn't shipped/],
+        ["APPOINTMENT_ONLINE", /^An appointment isn't shipped/],
+    ])(
+        "SHIPPED on a %s order is refused (409), not turned into a delivery",
+        (fulfilment, sentence) => {
+            const run = () =>
+                stageForStatus("SHIPPED", { stage: "READY", fulfilment });
+            expect(run).toThrow(ConflictException);
+            expect(run).toThrow(sentence);
+        },
+    );
+
+    it("DELIVERED on an appointment is refused: its visits finish it", () => {
+        expect(() =>
+            stageForStatus("DELIVERED", {
+                stage: "NEW",
+                fulfilment: "APPOINTMENT_IN_PERSON",
+            }),
+        ).toThrow(ConflictException);
+    });
+
+    it("per type: SHIPPED and DELIVERED land on the type's own stages", () => {
+        const at = (fulfilment: OrderFulfilment, stage: OrderStage = "READY") =>
+            ({ stage, fulfilment }) as const;
+        expect(stageForStatus("SHIPPED", at("SHIPPING")).stage).toBe(
+            "HANDED_TO_COURIER",
+        );
+        // Release 1 writes today's handover for a local delivery…
+        expect(stageForStatus("SHIPPED", at("LOCAL_DELIVERY")).stage).toBe(
+            "HANDED_TO_COURIER",
+        );
+        // …and the switch release its own, except for one already with a
+        // courier the old way.
+        expect(
+            stageForStatus("SHIPPED", at("LOCAL_DELIVERY"), true).stage,
+        ).toBe("OUT_FOR_DELIVERY");
+        expect(
+            stageForStatus(
+                "SHIPPED",
+                at("LOCAL_DELIVERY", "HANDED_TO_COURIER"),
+                true,
+            ).stage,
+        ).toBe("HANDED_TO_COURIER");
+        expect(stageForStatus("DELIVERED", at("PICKUP")).stage).toBe(
+            "COLLECTED",
+        );
+        expect(stageForStatus("DELIVERED", at("SHIPPING")).stage).toBe(
+            "DELIVERED",
+        );
+        expect(stageForStatus("DELIVERED", at("DIGITAL", "NEW")).stage).toBe(
+            "SENT",
+        );
+        // No Preparing step: PROCESSING leaves a digital order where it is.
+        expect(stageForStatus("PROCESSING", at("DIGITAL", "NEW")).stage).toBe(
+            "NEW",
+        );
+    });
+});
+
+describe("the six types (order-stage over fulfilment.ts)", () => {
+    const paid = (
+        fulfilment: OrderFulfilment,
+        over: Partial<StageSubject> = {},
+    ) => order({ fulfilment, ...over });
+
+    it("both vocabularies walk the same steps: PICKUP as COLLECT, LOCAL_DELIVERY as DELIVERY", () => {
+        const walk = (fulfilment: OrderFulfilment, stages: OrderStage[]) => {
+            let o = paid(fulfilment);
+            const statuses: string[] = [];
+            for (const to of stages) {
+                o = step(o, to);
+                statuses.push(o.status);
+            }
+            return statuses;
+        };
+        const pickUp: OrderStage[] = ["PREPARING", "READY", "COLLECTED"];
+        expect(walk("PICKUP", pickUp)).toEqual(walk("COLLECT", pickUp));
+        const local: OrderStage[] = [
+            "PREPARING",
+            "READY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ];
+        expect(walk("LOCAL_DELIVERY", local)).toEqual(walk("DELIVERY", local));
+        expect(walk("DELIVERY", local)).toEqual([
+            "PROCESSING",
+            "PROCESSING",
+            "SHIPPED",
+            "DELIVERED",
+        ]);
+    });
+
+    it("a local delivery is not sent Out for delivery until the switch release", () => {
+        const ready = paid("LOCAL_DELIVERY", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        expect(nextStages(ready)).toEqual(["HANDED_TO_COURIER"]);
+        expect(() => planStageMove(ready, "OUT_FOR_DELIVERY")).toThrow(
+            BadRequestException,
+        );
+    });
+
+    it("release 1 serves release 2's rows: Out for delivery → Delivered, and the legacy courier move", () => {
+        const out = paid("LOCAL_DELIVERY", {
+            stage: "OUT_FOR_DELIVERY",
+            status: "SHIPPED",
+        });
+        expect(nextStages(out)).toEqual(["DELIVERED"]);
+        expect(planStageMove(out, "DELIVERED")).toMatchObject({
+            fromStatus: "SHIPPED",
+            toStatus: "DELIVERED",
+        });
+        const legacy = paid("LOCAL_DELIVERY", {
+            stage: "HANDED_TO_COURIER",
+            status: "SHIPPED",
+        });
+        expect(nextStages(legacy)).toEqual(["DELIVERED"]);
+    });
+
+    it("shipping: Ready → Handed to courier (SHIPPED) → Delivered", () => {
+        let o = step(step(paid("SHIPPING"), "PREPARING"), "READY");
+        expect(nextStages(o)).toEqual(["HANDED_TO_COURIER"]);
+        o = step(o, "HANDED_TO_COURIER");
+        expect(o.status).toBe("SHIPPED");
+        o = step(o, "DELIVERED");
+        expect(o).toMatchObject({ stage: "DELIVERED", status: "DELIVERED" });
+        expect(nextStages(o)).toEqual([]);
+    });
+
+    it("digital skips Preparing: Paid → Sent ends DELIVERED, and only once paid", () => {
+        const o = paid("DIGITAL");
+        expect(nextStages(o)).toEqual(["SENT"]);
+        expect(step(o, "SENT")).toMatchObject({
+            stage: "SENT",
+            status: "DELIVERED",
+        });
+        expect(() => planStageMove(o, "PREPARING")).toThrow(
+            BadRequestException,
+        );
+        const unpaid = paid("DIGITAL", { paymentStatus: "UNPAID" });
+        expect(nextStages(unpaid)).toEqual([]);
+        expect(() => planStageMove(unpaid, "SENT")).toThrow(
+            /not paid yet, so it cannot be sent/,
+        );
+    });
+
+    it.each<OrderFulfilment>(["APPOINTMENT_IN_PERSON", "APPOINTMENT_ONLINE"])(
+        "an %s order has no kitchen steps: its visits move it",
+        (fulfilment) => {
+            const o = paid(fulfilment);
+            expect(nextStages(o)).toEqual([]);
+            expect(() => planStageMove(o, "PREPARING")).toThrow(
+                /moves on by its visits/,
+            );
+        },
+    );
+
+    it("a shipping order is not collected, with today's sentence", () => {
+        expect(() =>
+            planStageMove(
+                paid("SHIPPING", { stage: "READY", status: "PROCESSING" }),
+                "COLLECTED",
+            ),
+        ).toThrow(/handed to a courier, not collected/);
+    });
+
+    it("a stage no type has from here is refused in step words", () => {
+        expect(() =>
+            planStageMove(paid("SHIPPING", { stage: "NEW" }), "SENT"),
+        ).toThrow("An order that is new cannot become sent.");
     });
 });

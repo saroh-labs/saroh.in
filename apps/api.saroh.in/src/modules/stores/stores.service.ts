@@ -21,6 +21,7 @@ import {
     resolveCapabilities,
 } from "../organizations/organization-policy";
 
+import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
@@ -348,7 +349,18 @@ export class StoresService {
                     organization: { connect: { id: organizationId } },
                     // Nested create runs in one transaction → no orphan store.
                     owners: { create: { userId, role: "OWNER" } },
-                    ...(currency ? { settings: { create: { currency } } } : {}),
+                    // Its settings say what it offers from the start (B2a), the
+                    // same as a storefront with no settings row reads.
+                    ...(currency
+                        ? {
+                              settings: {
+                                  create: {
+                                      currency,
+                                      fulfilmentTypes: NEW_STOREFRONT_TYPES,
+                                  },
+                              },
+                          }
+                        : {}),
                 },
             });
             return { id: store.id };
