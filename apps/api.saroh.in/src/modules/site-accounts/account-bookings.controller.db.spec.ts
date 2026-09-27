@@ -613,4 +613,88 @@ describe("'This isn't them' after booking signed in", () => {
             { key: "bookings", count: 1, label: "1 booking" },
         ]);
     });
+
+    it("moves the invoice billing that booking, and its credit note, so Spent follows (review C-1)", async () => {
+        const biz = await business();
+        const owner = await prisma.user.create({
+            data: { email: `a9-owner-${next()}@example.com` },
+        });
+        const who = `zoya-${next()}@example.in`;
+        const zoya = await prisma.contact.create({
+            data: {
+                organizationId: biz.organizationId,
+                email: who,
+                firstName: "Zoya",
+                emailVerifiedAt: new Date(Date.now() - 86_400_000),
+                emailVerifiedVia: "SIGN_IN_CODE",
+            },
+        });
+        const byStaff = await prisma.booking.create({
+            data: {
+                organizationId: biz.organizationId,
+                serviceId: biz.yoga,
+                contactId: zoya.id,
+                startAt: nextMonday(7, 2),
+                endAt: new Date(nextMonday(7, 2).getTime() + 3_600_000),
+                timezone: "UTC",
+                snapshot: {},
+            },
+        });
+        const { token, account } = await signIn(biz.host, who);
+        const booked = await book(biz, token, {
+            serviceId: biz.yoga,
+            startAt: nextMonday(7).toISOString(),
+        });
+        expect(booked.status).toBe(201);
+        const online = await prisma.booking.findFirstOrThrow({
+            where: { customerAccountId: account.id },
+        });
+
+        const invoice = (data: Record<string, unknown>) =>
+            prisma.invoice.create({
+                data: {
+                    organizationId: biz.organizationId,
+                    contactId: zoya.id,
+                    status: "PAID",
+                    currency: "INR",
+                    subtotal: "500",
+                    total: "500",
+                    ...data,
+                },
+            });
+        const paid = await invoice({ bookingId: online.id, source: "BOOKING" });
+        const credit = await invoice({
+            kind: "CREDIT_NOTE",
+            relatedInvoiceId: paid.id,
+            status: "ISSUED",
+            subtotal: "100",
+            total: "100",
+        });
+        const staffs = await invoice({ bookingId: byStaff.id });
+        const handWritten = await invoice({});
+
+        const unlinking = new AccountUnlinkService();
+        const ctx = {
+            organizationId: biz.organizationId,
+            userId: owner.id,
+            role: "OWNER" as const,
+        };
+        const preview = await unlinking.preview(ctx, zoya.id);
+        expect(preview.sentence).toBe(
+            "1 booking and 2 invoices they made online move with them.",
+        );
+        const result = await unlinking.unlink(ctx, zoya.id);
+        expect(result.moves).toEqual([
+            { key: "bookings", count: 1, label: "1 booking" },
+            { key: "invoices", count: 2, label: "2 invoices" },
+        ]);
+
+        const contactOf = async (id: string) =>
+            (await prisma.invoice.findUniqueOrThrow({ where: { id } }))
+                .contactId;
+        expect(await contactOf(paid.id)).toBe(result.contactId);
+        expect(await contactOf(credit.id)).toBe(result.contactId);
+        expect(await contactOf(staffs.id)).toBe(zoya.id);
+        expect(await contactOf(handWritten.id)).toBe(zoya.id);
+    });
 });

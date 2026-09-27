@@ -12,7 +12,8 @@ import type { Prisma } from "@saroh/database";
  *
  * Each kind of record the account can make is one mover here, added by the
  * unit that first writes it with the account on it:
- * - bookings with `customerAccountId` (A9);
+ * - bookings with `customerAccountId` (A9), and the invoices billing them,
+ *   so the money follows the booking (review C-1);
  * - orders and identity links made while signed in (G13);
  * - thread messages the customer wrote (A13);
  * - waitlist entries (A12);
@@ -77,10 +78,63 @@ export const BOOKINGS_MOVER: UnlinkMover = {
 };
 
 /**
+ * The invoices billing the bookings that move (review C-1): a paid online
+ * booking's invoice, and any credit note or supplementary invoice correcting
+ * it (those name the invoice, not the booking). They are billed to the
+ * contact the booking was on; left behind, the contact the account leaves
+ * would keep its "Spent" and the new one would show a booking with no money.
+ * Only documents billed to the contact being left move: an invoice staff
+ * billed to someone else stays theirs.
+ *
+ * Reads the bookings by their `customerAccountId`, so it runs before or
+ * after BOOKINGS_MOVER alike: a moved booking sits on the new contact.
+ */
+export const BOOKING_INVOICES_MOVER: UnlinkMover = {
+    key: "invoices",
+    model: "Booking",
+    noun: ["invoice", "invoices"],
+    count: (tx, scope) =>
+        tx.invoice.count({
+            where: bookingInvoices(scope, [scope.fromContactId]),
+        }),
+    move: async (tx, scope) =>
+        (
+            await tx.invoice.updateMany({
+                where: bookingInvoices(scope, [
+                    scope.fromContactId,
+                    scope.toContactId,
+                ]),
+                data: { contactId: scope.toContactId },
+            })
+        ).count,
+};
+
+/**
+ * Invoices billed to the contact being left, for a booking the account made
+ * since it linked (on either contact named), or correcting one.
+ */
+function bookingInvoices(scope: UnlinkScope, bookingOn: string[]) {
+    const booking = {
+        organizationId: scope.organizationId,
+        customerAccountId: scope.accountId,
+        contactId: { in: bookingOn },
+        createdAt: { gte: scope.since },
+    };
+    return {
+        organizationId: scope.organizationId,
+        contactId: scope.fromContactId,
+        OR: [{ booking }, { relatedInvoice: { booking } }],
+    };
+}
+
+/**
  * The records that move with the account. A9 adds the first, bookings made
  * signed in; each unit above adds its own, with a db test.
  */
-export const UNLINK_MOVERS: readonly UnlinkMover[] = [BOOKINGS_MOVER];
+export const UNLINK_MOVERS: readonly UnlinkMover[] = [
+    BOOKINGS_MOVER,
+    BOOKING_INVOICES_MOVER,
+];
 
 /**
  * Models that carry a `customerAccountId` and deliberately stay where they
