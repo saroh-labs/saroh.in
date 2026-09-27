@@ -68,6 +68,53 @@ async function siteId(page: Page): Promise<string> {
     return id;
 }
 
+/** The editor at a phone's width (G4), where the bar folds into a menu. */
+const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
+
+/**
+ * The editor's Publish. On a phone it is in the "Status, view and publish"
+ * menu, opened here if it isn't already.
+ */
+async function publishButton(page: Page) {
+    const publish = page.getByRole("button", { name: /^Publish/ }).first();
+    if (onPhone(page) && !(await publish.isVisible())) {
+        await page
+            .getByRole("button", { name: "Status, view and publish" })
+            .click();
+    }
+    await expect(publish).toBeVisible();
+    return publish;
+}
+
+/**
+ * The first Visible/Hidden toggle in the inspector. On a phone the inspector
+ * is a sheet that opens on a block, so the first block is chosen to open it.
+ */
+async function inspectorToggle(page: Page) {
+    const toggle = page
+        .getByRole("complementary", { name: "Inspector" })
+        .getByRole("button", { name: /^(Visible|Hidden)$/ })
+        .first();
+    if (onPhone(page) && !(await toggle.isVisible())) {
+        const block = page
+            .getByRole("button", { name: /block, 1 of \d+/ })
+            .first();
+        await expect(block).toBeVisible({ timeout: 30_000 });
+        await block.click();
+    }
+    await expect(toggle).toBeVisible({ timeout: 30_000 });
+    return toggle;
+}
+
+/** Put the phone's sheet or menu away, so the page is reachable again. */
+async function closeOverlays(page: Page) {
+    if (!onPhone(page)) return;
+    if (await page.getByRole("dialog").count()) {
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+    }
+}
+
 /**
  * Publish from the editor, through the pre-publish check, and wait until it
  * has happened. Returns what the success toast said.
@@ -84,11 +131,9 @@ async function publishFromEditor(page: Page): Promise<string> {
         })
         // The check's own button, drawn after the editor's "Publish".
         .last();
+    await closeOverlays(page);
     await expect(async () => {
-        await page
-            .getByRole("button", { name: /^Publish/ })
-            .first()
-            .click();
+        await (await publishButton(page)).click();
         await expect(confirm).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
     await confirm.click();
@@ -239,33 +284,37 @@ test.describe("the editor's status after a reload (G2)", () => {
          * this file can leave a change request open, and a review outranks
          * "Not published" in the pill. The title always says what goes live.
          */
-        const publish = page.getByRole("button", { name: /^Publish/ }).first();
-        const toggle = page
-            .getByRole("complementary", { name: "Inspector" })
-            .getByRole("button", { name: /^(Visible|Hidden)$/ })
-            .first();
-        await expect(toggle).toBeVisible({ timeout: 30_000 });
+        // Publish's title, opening the phone's menu to read it and
+        // putting it away again.
+        const publishTitle = async () => {
+            const publish = await publishButton(page);
+            const title = await publish.getAttribute("title");
+            if (onPhone(page)) await page.keyboard.press("Escape");
+            return title;
+        };
 
         // One block's visibility flips; the autosave counts it.
-        await toggle.click();
-        await expect(publish).toHaveAttribute("title", /^Put live: .*block/, {
-            timeout: 30_000,
-        });
+        await (await inspectorToggle(page)).click();
+        await closeOverlays(page);
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toMatch(/^Put live: .*block/);
 
         // The count is the server's, so a reload says the same.
         await page.reload();
-        await expect(publish).toHaveAttribute("title", /^Put live: .*block/, {
-            timeout: 30_000,
-        });
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toMatch(/^Put live: .*block/);
 
         // Put it back, publish, and nothing is waiting.
-        await toggle.click();
-        await expect(publish).toBeEnabled({ timeout: 30_000 });
+        await (await inspectorToggle(page)).click();
+        await closeOverlays(page);
+        await expect(await publishButton(page)).toBeEnabled({
+            timeout: 30_000,
+        });
         await publishFromEditor(page);
-        await expect(publish).toHaveAttribute(
-            "title",
-            "Nothing has changed since the last publish",
-            { timeout: 30_000 },
-        );
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .toBe("Nothing has changed since the last publish");
     });
 });
