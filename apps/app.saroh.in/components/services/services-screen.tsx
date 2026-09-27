@@ -12,49 +12,46 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { formatMoney } from "@/lib/format/money";
 import { updateService } from "@/lib/services/actions";
 import type { Service } from "@/lib/services/service";
+import {
+    lengthLine,
+    servicesSummary,
+    takingLabel,
+    takingToast,
+    usageLine,
+} from "@/lib/services/service-cards";
+import type { ServiceUsage } from "@/lib/services/usage";
 import type { StaffView } from "@/lib/staff/types";
-
-import type { ServiceTarget } from "./service-dialog";
-import { ServiceDialog } from "./service-dialog";
-
-export interface ServiceUsage {
-    /** Places or bookings this week, cancelled ones left out. */
-    thisWeek: number;
-    /** Bookings (or class starts) still to come. */
-    comingUp: number;
-}
 
 const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
 
 /**
- * Bookings › Services (U16, the design's `?view=services`): what people can
- * book, as cards — kind, price, length and the gap after, places, who
- * takes it, and how it is being used. New / Edit in a dialog; Pause takes a
- * service off the booking page and keeps the bookings already made, with
- * Undo. The full editor keeps everything else a service has.
+ * Bookings › Services (U16, E2, the design's `?view=services`): what people
+ * can book, as cards — kind, price, length and the gap after, where, places,
+ * who takes it, and how it is being used. New service and Edit (View for a
+ * role that can't change services) open the Service Editor; Stop taking
+ * bookings takes a service off the booking page and keeps the bookings
+ * already made, with Undo.
  */
 export function ServicesScreen({
     services,
     staff,
     usage,
-    timezone,
     currency,
     canEdit,
+    hasPage,
 }: {
     services: Service[];
     /** Null when the staff read failed. */
     staff: StaffView[] | null;
     /** Null when the bookings read failed. */
     usage: Record<string, ServiceUsage> | null;
-    timezone: string;
     currency: string;
     canEdit: boolean;
+    /** Whether the business has a booking page; null when unknown. */
+    hasPage: boolean | null;
 }) {
     const router = useRouter();
-    const [target, setTarget] = useState<ServiceTarget>(null);
     const [busy, setBusy] = useState<string | null>(null);
-    const on = services.filter((s) => s.status === "ACTIVE").length;
-    const paused = services.length - on;
     const takers = (id: string) =>
         (staff ?? []).filter(
             (p) => p.status === "ACTIVE" && p.serviceIds.includes(id),
@@ -69,19 +66,14 @@ export function ServicesScreen({
         setBusy(null);
         if (!res.ok) return showError(res.error);
         router.refresh();
-        showUndo(
-            wasOn
-                ? `${s.name} paused. It's off the booking page; bookings already made still happen.`
-                : `${s.name} is bookable again.`,
-            () => {
-                void updateService(s.id, {
-                    status: wasOn ? "ACTIVE" : "ARCHIVED",
-                }).then((back) => {
-                    if (!back.ok) showError(back.error);
-                    router.refresh();
-                });
-            },
-        );
+        showUndo(takingToast(s.name, wasOn), () => {
+            void updateService(s.id, {
+                status: wasOn ? "ACTIVE" : "ARCHIVED",
+            }).then((back) => {
+                if (!back.ok) showError(back.error);
+                router.refresh();
+            });
+        });
     }
 
     return (
@@ -91,22 +83,22 @@ export function ServicesScreen({
                     Services
                 </h1>
                 <span className="ml-auto text-[12.5px] text-muted-foreground">
-                    {on} on the booking page
-                    {paused ? ` · ${paused} paused` : ""}
+                    {servicesSummary(services, hasPage)}
                 </span>
                 {canEdit ? (
                     <Button
+                        asChild
                         className="h-[38px] rounded-[9px] px-4 text-[13px]"
-                        onClick={() => setTarget({ service: null })}
                     >
-                        New service
+                        <Link href="/services/new">New service</Link>
                     </Button>
                 ) : null}
             </div>
             <p className="mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
-                What people can book. One-to-one services fill a person&apos;s
-                free time; classes run at set times with a number of places.
-                Changing a price only affects bookings made after.
+                What people can book, and who takes it. One-to-one services fill
+                a person&apos;s free time; classes run at set times with a
+                number of places. Changing a price only affects bookings made
+                after.
             </p>
             {canEdit ? null : (
                 <ReadOnlyNote>
@@ -130,7 +122,6 @@ export function ServicesScreen({
                             ? formatMoney(s.priceCents, s.currency ?? currency)
                             : "Free";
                         const who = takers(s.id);
-                        const use = usage?.[s.id];
                         return (
                             <li
                                 key={s.id}
@@ -180,11 +171,7 @@ export function ServicesScreen({
                                         : ""}
                                 </div>
                                 <div className="mt-1 text-[12.5px]">
-                                    {s.durationMinutes} min ·{" "}
-                                    {s.bufferAfterMinutes
-                                        ? `${s.bufferAfterMinutes} min gap after`
-                                        : "no gap after"}
-                                    {isClass ? ` · ${s.capacity} places` : ""}
+                                    {lengthLine(s)}
                                 </div>
                                 <div className="mt-0.5 text-[12.5px] text-muted-foreground">
                                     {staff === null
@@ -194,53 +181,40 @@ export function ServicesScreen({
                                           : "Nobody takes it yet — it books in its own hours"}
                                 </div>
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">
-                                    {!live
-                                        ? `Paused — hidden from the booking page${use?.comingUp ? `; ${use.comingUp === 1 ? "its 1 booking still to come still happens" : `its ${use.comingUp} bookings still to come still happen`}` : ""}`
-                                        : use
-                                          ? `${use.thisWeek} booked this week · ${use.comingUp} still to come`
-                                          : "Bookings couldn't be counted"}
+                                    {usageLine(
+                                        s,
+                                        usage === null ? null : usage[s.id],
+                                    )}
                                 </div>
-                                {canEdit ? (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <Button
-                                            variant="outline"
-                                            className={btn}
-                                            onClick={() =>
-                                                setTarget({ service: s })
-                                            }
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className={btn}
+                                    >
+                                        <Link
+                                            href={`/services/${s.id}`}
+                                            aria-label={`${canEdit ? "Edit" : "View"} ${s.name}`}
                                         >
-                                            Edit
-                                        </Button>
+                                            {canEdit ? "Edit" : "View"}
+                                        </Link>
+                                    </Button>
+                                    {canEdit ? (
                                         <Button
                                             variant="outline"
                                             className={btn}
                                             disabled={busy === s.id}
                                             onClick={() => void toggle(s)}
                                         >
-                                            {live
-                                                ? "Pause"
-                                                : "Put back on sale"}
+                                            {takingLabel(live)}
                                         </Button>
-                                    </div>
-                                ) : null}
+                                    ) : null}
+                                </div>
                             </li>
                         );
                     })}
                 </ul>
             )}
-            <ServiceDialog
-                target={target}
-                staff={staff ?? []}
-                timezone={timezone}
-                currency={currency}
-                comingUp={Object.fromEntries(
-                    Object.entries(usage ?? {}).map(([id, u]) => [
-                        id,
-                        u.comingUp,
-                    ]),
-                )}
-                onClose={() => setTarget(null)}
-            />
         </>
     );
 }
