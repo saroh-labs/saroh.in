@@ -3,7 +3,7 @@ title: "Round 2 — staff permissions: the capability model"
 type: review
 status: reworked 2026-09-27 around the user's answer; four product choices still open (§9)
 date: 2026-09-26
-revised: 2026-09-27
+revised: 2026-09-27 (and deepened the same day: mandate owner, reach rules, storefront people, pay links, Q4)
 decisions: DEC-039 (this model), DEC-006, DEC-020, DEC-024 (superseded in part), DEC-032, DEC-040, DEC-048
 source: saroh-fixtures.js (PRODUCT_PERMS, PRODUCT_VIEWERS, ROLE_RULES) and the round-2 .dc.html designs; apps/api.saroh.in/src/modules/organizations/{organization-actions,organization-policy,capability-catalogue}.ts
 ---
@@ -31,8 +31,12 @@ version's eleven questions, and the four product choices still open.
    role (built-in or custom) or **directly, as an extra permission** (Team's
    "Extra permissions" column, F17).
 2. **A capability shows everything within its scope.** `order:read` shows the
-   whole order: items, customer, totals, payments, refunds and its pay link.
-   **There is no separate money redaction by role.**
+   whole order: items, customer, totals, payments, refunds, and whether it
+   has a live pay link. **There is no separate money redaction by role.**
+   A pay link itself is a bearer credential, not data: it is stored only as
+   a hash, shown once to whoever makes it, and never readable afterwards by
+   anyone (B11). Making a new one needs `order:create` or `order:edit`, and
+   the old one stops working.
 3. **A screen that gathers several scopes shows each part to whoever holds
    that part's read.** Customer Detail's Orders tab needs `order:read`; its
    Plan tab `subscription:read`; the Calendar's money cells and Home's
@@ -42,8 +46,11 @@ version's eleven questions, and the four product choices still open.
 4. **The fixed roles are default bundles.** Owner holds everything; Admin
    everything but `org:delete`; Member a day-to-day bundle (§4, Q1);
    Reviewer the website only, enumerated and never derived from a floor
-   (DEC-006, #276). A business can change a built-in role's bundle or make its
-   own role (built: roles are rows, `resolveCapabilities`).
+   (DEC-006, #276). A business makes its own roles (built: roles are rows,
+   `resolveCapabilities`). It can't edit a built-in role's bundle today
+   (`OrganizationRolesService.requireInvented` refuses), although a stored row
+   for a built-in key would be honoured; F18's Q4 freeze is the only thing
+   that would write one.
 5. **A capability is split only where a business would plausibly grant one
    without the other**, and each split says why (§3). A write implies the
    read of its scope (`order:stage` → `order:read`). An old umbrella implies
@@ -79,10 +86,10 @@ Rules that hold whatever is chosen in §9:
 
 | Capability | Scope | Status | Implies | Used by |
 |---|---|---|---|---|
-| `order:read` | Orders list, quick view, Order Detail and a customer's Orders tab — the whole order, money included | exists | — | Orders, Order Detail, Customer Detail |
+| `order:read` | Orders list, quick view, Order Detail and a customer's Orders tab — the whole order, money included, and whether a pay link is live (never the link: §1 rule 2) | exists | — | Orders, Order Detail, Customer Detail |
 | `order:stage` | Move an order through its steps, undo the last step, print the ticket, bulk moves, record the courier and tracking number | exists; relabel "Move orders through their steps and print" (design `order:fulfil`) | `order:read` (F18) | Orders, Order Detail, Home Today |
-| `order:create` | Take a new order (New order, walk-in), and its pay link | new; today `order:write` | `order:read` | New order v2 |
-| `order:edit` | Change items, address or how it's fulfilled until handover; replace a pay link | new; today `order:write` | `order:read` | Order Detail Edit, Change how it's fulfilled |
+| `order:create` | Take a new order (New order, walk-in), and make its pay link (shown once) | new; today `order:write` | `order:read` | New order v2 |
+| `order:edit` | Change items, address or how it's fulfilled until handover; make a new pay link, which stops the old one ("New pay link", never "Copy") | new; today `order:write` | `order:read` | Order Detail Edit, Change how it's fulfilled, row menu |
 | `order:refund` | Refund and cancel (a cancel is a full refund) | new; today `payment:manage` | `order:read` | Order Detail refund and cancel, row menu |
 | `order:export` | Export orders to CSV | new; today `order:read` | `order:read` | Orders Export |
 | `order:write` | Kept for roles saved before the split; the role editor shows its parts | exists | `order:create`, `order:edit`, `order:export` | saved custom roles |
@@ -105,8 +112,15 @@ Rules that hold whatever is chosen in §9:
 | Capability | Scope | Status | Implies | Used by |
 |---|---|---|---|---|
 | `payment:read` | Money in and out: takings, fees, refunds paid, the Calendar's in, out and due, Home's This week takings (design `payments:read`) | exists | — | Calendar money, Home This week, Payments |
-| `payment:manage` | Connect providers, refund invoices, mandates | exists | `order:refund` | Providers, autopay |
-| `subscription:read` / `subscription:write` | Subscriptions, renewals, plans and their figures / subscribe, pause, cancel; create, edit and publish plans | exists | write → read | Subscriptions, Plan Detail, Plan Editor |
+| `payment:manage` | Connect providers (and so whether autopay is possible at all), refund invoices | exists | `order:refund` | Providers |
+| `subscription:read` / `subscription:write` | Subscriptions, renewals, plans and their figures, and a subscription's autopay (the mandate card) / subscribe, pause, cancel; create, edit and publish plans; **autopay: send a set-up link, cancel autopay, retry a renewal** | exists | write → read | Subscriptions, Subscription Detail, Plan Detail, Plan Editor |
+
+**Mandate actions have one owner, `subscription:write`** (decided
+2026-09-27; plan D says the same). A mandate belongs to one subscription and
+ends with it (plan D, D20), so whoever can cancel the subscription already
+ends its autopay; gating "Cancel autopay" on another key would let someone
+end the subscription but not its autopay. `payment:manage` keeps what is
+business-wide.
 | `invoice:read` / `invoice:write` | Invoices and their amounts / issue, send, credit and void | exists | write → read | Invoices, Invoice Detail |
 
 ### Products and stock (settled in round 1)
@@ -127,7 +141,7 @@ Rules that hold whatever is chosen in §9:
 | `site:update` | Site settings and the brand (`PUT sites/:id/style`) |
 | `site:publish` | Publish (also during review, DEC-047) |
 | `site:comment` / `site:approve` | Review |
-| `member:read` / `member:invite` / `member:role:update` / `member:remove` | Team; `member:role:update` also sets a person's extra permissions (F17) |
+| `member:read` / `member:invite` / `member:role:update` / `member:remove` | Team; `member:role:update` also sets a person's extra permissions (F17), always within the actor's reach (§5) |
 | `org:update` | Business settings |
 | `module:manage` | Turn modules on and off, Class packs included |
 | `message:read` / `message:write` | Read and answer customer messages (plan A) |
@@ -135,6 +149,17 @@ Rules that hold whatever is chosen in §9:
 A storefront role (Admin, Manager, Editor, Viewer; DEC-048) is a default
 bundle narrowed to one storefront. The bundles stay what they grant today;
 F16 lists them on this page when it reads `StoreMembers` in detail.
+
+**Storefront people on the team (F16, DEC-048 amended 2026-09-27).** Someone
+who joins through a storefront, or who the backfill adds, gets a business
+membership in the **"Storefront team"** role, not Member: `org:read`,
+`member:read`, `module:read`, `media:read`, `store:read` and
+`product-review:read`. It holds no `contact:read`, `booking:read`,
+`service:read`, orders or money, so a Viewer of one shop does not gain the
+business's customers or diary. Their work inside the storefront still comes
+from their storefront role. It is an ordinary custom role the owner can
+widen, and the owner is told who was added (Activity, and a one-time Team
+notice with Change role).
 
 ## 3. Why each split exists, and the splits dropped
 
@@ -221,6 +246,26 @@ with implied holds added. `member:role:update` sets them, the change is
 audited, and Team's "Extra permissions" column shows them (it stays hidden
 while nobody has any, F15). An `ownerOnly` action can't be granted this way.
 
+**The reach rule** (security review, 2026-09-27). Holding
+`member:role:update` is necessary, not sufficient, for every actor, Owner
+included:
+
+- **Nobody grants what they don't hold.** Every extra given, and every
+  action put into a role that is created or edited, must be one the actor
+  holds (implied holds count).
+- **Nobody grants to themselves.** Nobody changes their own extras; a
+  person who wants more changes role, through someone else.
+- **Nobody reaches above themselves.** Nobody changes the extras of someone
+  whose capabilities exceed their own, or edits a role that already holds
+  more than they do (the rule `assertWithinReach` applies to role changes
+  today, extended to capability sets).
+
+The role editor has a hole today: `OrganizationRolesService.create` and
+`update` keep any grantable action with no reach check, so a custom role
+holding `member:role:update` can add `payment:manage` to itself. **F19**
+closes it, first in phase 2, before B16, C13 and E26 add `order:refund`,
+`customer:merge`, `customer:remove` and `customer:sensitive`.
+
 ## 6. The first version's eleven questions, answered
 
 | # | Question | Answer |
@@ -245,7 +290,10 @@ while nobody has any, F15). An `ownerOnly` action can't be granted this way.
 | B16 (plan 002) | `order:create`, `order:edit`, `order:export`, `order:refund` with implied holds; Sell rows on their own reads | 2 |
 | E26 (plan 005) | Relabel `service:write`; add `pack:sell` implied by `pack:write`; `pack:read` serves prices | 2 |
 | F11 (plan 006) | Staff landing: rows follow each person's capabilities | 2 |
-| F17 (plan 006) | Extra permissions per person | 2 |
+| F16 (plan 006) | Storefront people join the team as "Storefront team", and the owner is told | 2 |
+| F19 (plan 006) | The role editor stays within reach (closes today's hole) | 2, first |
+| F17 (plan 006) | Extra permissions per person, within reach | 2 |
+| D14, D20 (plan 004) | Autopay actions under `subscription:write` | 2 |
 | F18 (plan 006) | The Member default bundle, `order:stage` → `order:read`, the money-free kitchen view dropped, role templates | 3 — waits on Q1, Q3 and Q4 |
 
 Until F18 ships, the shipped Member stands: it moves orders through the
@@ -276,11 +324,22 @@ capabilities above.
   entries go to `contact:write` holders only (C1's stand-in).
 - **Q3. Which role templates ship.** Proposed: all four in §4 (Counter,
   Front desk, Practitioner, Packer).
-- **Q4. Does a new Member bundle reach existing businesses?** Proposed: a
-  business that never changed its Member role gets the new default, with a
-  release note that says in plain words what Members can now see (order
-  totals and payments) and do. A business that saved its own Member keeps
-  its list, plus implied holds — which means its Members who move orders
-  also start seeing order money, since `order:stage` implies `order:read`.
-  The alternative is to freeze today's Member for every existing business as
-  a saved row, so only new businesses get the new default.
+- **Q4. Does a new Member bundle reach existing businesses?**
+  - **What happens either way.** F18 makes `order:stage` imply `order:read`,
+    and implied holds apply to every role, saved rows included. So under
+    **both** answers, every Member and every custom role that moves orders
+    (a "Counter" or "Kitchen" role) starts seeing order totals and payments
+    the day F18 ships. A business that kept money from its counter staff
+    loses that. F18 therefore lists, per business, the roles that will start
+    seeing order money, in the release note and in a one-time Team notice
+    with Edit role, before it applies. (Keeping money from order movers
+    would mean not adding that implication, which reopens the money-free
+    kitchen view the user's model dropped.)
+  - **What Q4 decides** is only the rest of the new Member bundle
+    (`order:create`, `booking:write`, `pack:read`, `pack:sell`). Proposed:
+    every existing business gets it, with a release note that says in plain
+    words what Members can now do. No business can have saved its own
+    Member today, since built-in roles can't be edited. The alternative
+    freezes today's Member for every existing business as a saved row, so
+    only new businesses get the new default; frozen Members still gain order
+    money through the implication above.
