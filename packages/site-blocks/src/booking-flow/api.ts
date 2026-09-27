@@ -127,7 +127,11 @@ export function releaseHold(
     );
 }
 
-/** The non-secret handoff the provider's checkout opens with. */
+/**
+ * The non-secret handoff the provider's checkout opens with (E11,
+ * `checkout.ts`): Razorpay's order id and the business's public key, or
+ * Cashfree's payment session. Never a secret, never an amount of the page's.
+ */
 export interface PaymentHandoff {
     provider: string;
     amountCents: number;
@@ -144,6 +148,9 @@ function isHandoff(v: unknown): v is PaymentHandoff {
         typeof h.provider === "string" &&
         typeof h.amountCents === "number" &&
         typeof h.currency === "string" &&
+        (h.providerIntentId == null ||
+            typeof h.providerIntentId === "string") &&
+        (h.publicKey == null || typeof h.publicKey === "string") &&
         typeof h.clientParams === "object" &&
         h.clientParams !== null
     );
