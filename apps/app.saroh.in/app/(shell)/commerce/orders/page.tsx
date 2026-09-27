@@ -1,6 +1,6 @@
 import { PageContainer } from "@/components/shared/page-container";
 import { OrdersScreen } from "@/components/stores/orders-screen";
-import { listBusinessOrders } from "@/lib/orders/business-service";
+import { listAllOrderRows } from "@/lib/orders/business-service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -26,12 +26,15 @@ export default async function OrdersPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [orders, stores, { view }, organization] = await Promise.all([
-        listBusinessOrders(),
-        listBusinessStores(),
-        searchParams,
-        resolveActiveOrganization(),
-    ]);
+    // Every row, for now: the screen still filters and searches what it
+    // holds. B3 moves its tabs, filters and paging onto the API's.
+    const [{ rows: orders }, stores, { view }, organization] =
+        await Promise.all([
+            listAllOrderRows(),
+            listBusinessStores(),
+            searchParams,
+            resolveActiveOrganization(),
+        ]);
     // A Member reaches the list through `order:stage` alone (DEC-024) and
     // gets the kitchen's view of it.
     const fullRead = organization?.actions
