@@ -176,12 +176,41 @@ export class StockChecksService {
         );
     }
 
+    /**
+     * The open SHORT checks alone — a shelf holding fewer than open orders
+     * were promised — for Home's "short for orders" row (round 2, F1). The
+     * caller has already checked `store:read`; nothing here names an order.
+     */
+    async openShort(organizationId: string): Promise<StockCheck[]> {
+        const reader: StockReader = {
+            organizationId,
+            canWrite: false,
+            seesPeople: false,
+            seesOrders: false,
+        };
+        const open = await this.unresolved(
+            organizationId,
+            this.shelfChecks(reader),
+        );
+        return open
+            .filter((c) => c.kind === "SHORT")
+            .map(({ fingerprint: _f, ...check }) => check);
+    }
+
     /** The checks nobody has resolved as they stand now. */
     private async open(reader: StockReader): Promise<Found[]> {
+        return this.unresolved(reader.organizationId, this.found(reader));
+    }
+
+    /** Of the checks `found` reads, those no resolution still covers. */
+    private async unresolved(
+        organizationId: string,
+        found: Promise<Found[]>,
+    ): Promise<Found[]> {
         const [all, resolutions] = await Promise.all([
-            this.found(reader),
+            found,
             prisma.stockCheckResolution.findMany({
-                where: { organizationId: reader.organizationId },
+                where: { organizationId },
                 select: { key: true, fingerprint: true },
             }),
         ]);

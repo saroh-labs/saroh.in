@@ -35,6 +35,6 @@ import { StockService } from "./stock.service";
         IdempotencyService,
         OrganizationGuard,
     ],
-    exports: [StockService],
+    exports: [StockService, StockChecksService],
 })
 export class StockModule {}
