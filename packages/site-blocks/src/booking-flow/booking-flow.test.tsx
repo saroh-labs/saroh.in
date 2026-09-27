@@ -810,3 +810,132 @@ describe("Where and anything we should know (E7)", () => {
         expect(screen.getByRole("link", { name: LINK })).toBeInTheDocument();
     });
 });
+
+describe("opening on a time from On today (G18)", () => {
+    const TWO_TIMES = {
+        ...ONE_DAYS,
+        days: [
+            ...ONE_DAYS.days.slice(0, 2),
+            {
+                date: "2026-09-20",
+                open: true,
+                starts: [
+                    ONE_DAYS.days[2].starts[0],
+                    {
+                        startAt: "2026-09-20T02:30:00.000Z",
+                        endAt: "2026-09-20T03:30:00.000Z",
+                        staffId: "staff_karan",
+                        staffName: "Karan Mehta",
+                        placesLeft: null,
+                    },
+                ],
+            },
+        ],
+    };
+
+    it("opens on the service and day with the linked time chosen", async () => {
+        serve(() => json(TWO_TIMES));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                initialServiceId="svc_pt"
+                initialDate="2026-09-20"
+                initialStart="08:00"
+            />,
+        );
+        const time = await screen.findByRole("radio", {
+            name: "08:00 with Karan Mehta",
+        });
+        await waitFor(() =>
+            expect(time).toHaveAttribute("aria-checked", "true"),
+        );
+        expect(
+            screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
+        ).toHaveAttribute("aria-checked", "true");
+        // Straight on to who they are.
+        expect(screen.getByLabelText("Name")).toBeInTheDocument();
+        expect(screen.queryByText(/just gone/)).toBeNull();
+    });
+
+    it("opens on the day and says so when the time has just gone", async () => {
+        serve(() => json(TWO_TIMES));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                initialServiceId="svc_pt"
+                initialDate="2026-09-20"
+                initialStart="10:15"
+            />,
+        );
+        expect(
+            await screen.findByText(
+                "That time has just gone — here's what's left.",
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+        ).toHaveAttribute("aria-checked", "false");
+        expect(screen.queryByLabelText("Name")).toBeNull();
+    });
+
+    it("chooses a class session with places, and not a full one", async () => {
+        serve(() => json(CLASS_DAYS));
+        const { unmount } = render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                initialServiceId="svc_hiit"
+                initialDate="2026-09-20"
+                initialStart="18:30"
+            />,
+        );
+        const open = await screen.findByRole("radio", {
+            name: /18:30.*2 places left/,
+        });
+        await waitFor(() =>
+            expect(open).toHaveAttribute("aria-checked", "true"),
+        );
+        unmount();
+
+        serve(() => json(CLASS_DAYS));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                initialServiceId="svc_hiit"
+                initialDate="2026-09-20"
+                initialStart="07:00"
+            />,
+        );
+        expect(
+            await screen.findByText(
+                "That time has just gone — here's what's left.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("ignores a date and time without a service", async () => {
+        serve(() => json(TWO_TIMES));
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                initialDate="2026-09-20"
+                initialStart="08:00"
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        );
+        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" });
+        expect(
+            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+        ).toHaveAttribute("aria-checked", "false");
+        expect(screen.queryByText(/just gone/)).toBeNull();
+    });
+});
