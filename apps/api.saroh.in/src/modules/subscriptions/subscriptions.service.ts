@@ -1081,25 +1081,29 @@ export class SubscriptionsService {
         id: string,
     ): Promise<{ invoiceId: string; token: string }> {
         authorize(ctx, "subscription:write");
-        const row = await prisma.customerSubscription.findFirst({
-            where: { id, organizationId: ctx.organizationId },
-            select: SUBSCRIPTION_SELECT,
-        });
-        if (!row) notFound("Subscription");
-        const invoices = await this.invoicesFor(ctx.organizationId, [id]);
-        const failed = failedCharge(row, invoices.get(id), new Date());
-        if (!failed) {
-            throw new ConflictException(
-                "The latest charge is not overdue, so there is nothing to retry.",
+        // One transaction under the subscription's lock: the link and its
+        // RETRIED commit together, and a refused link records nothing.
+        return prisma.$transaction(async (tx) => {
+            const row = await this.lock(tx, ctx.organizationId, id);
+            const invoices = await this.invoicesFor(
+                ctx.organizationId,
+                [id],
+                tx,
             );
-        }
-        const { token } = await this.invoices.createPayLink(ctx, failed.id);
-        // The link is the invoice's own write, so this is recorded once it
-        // is made; a refused link records nothing.
-        await prisma.$transaction(async (tx) => {
+            const failed = failedCharge(row, invoices.get(id), new Date());
+            if (!failed) {
+                throw new ConflictException(
+                    "The latest charge is not overdue, so there is nothing to retry.",
+                );
+            }
+            const { token } = await this.invoices.createPayLinkInTx(
+                tx,
+                ctx,
+                failed.id,
+            );
             await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
+            return { invoiceId: failed.id, token };
         });
-        return { invoiceId: failed.id, token };
     }
 
     /**
@@ -1598,10 +1602,11 @@ export class SubscriptionsService {
     private async invoicesFor(
         organizationId: string,
         subscriptionIds: string[],
+        db: Tx = prisma,
     ): Promise<Map<string, SubscriptionInvoices>> {
         const byId = new Map<string, SubscriptionInvoices>();
         if (subscriptionIds.length === 0) return byId;
-        const rows: InvoiceRowLite[] = await prisma.invoice.findMany({
+        const rows: InvoiceRowLite[] = await db.invoice.findMany({
             where: {
                 organizationId,
                 status: { in: ["ISSUED", "PAID"] },
