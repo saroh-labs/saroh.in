@@ -165,6 +165,52 @@ export interface HomeNeed {
     inline?: HomeInline;
 }
 
+/**
+ * The kinds of row on Home's Today column (F5): a one-to-one booking, a
+ * class, a pick-up. The column is built in `home-today.ts`.
+ */
+export type HomeTodayKind = "BOOKING" | "CLASS" | "PICKUP";
+
+export interface HomeTodayItem {
+    /** The booking's id; a class's `class:<service>:<start>`; the order's id. */
+    id: string;
+    kind: HomeTodayKind;
+    /** ISO instant it starts, or for a pick-up when it should be ready. */
+    startAt: string;
+    /** "09:30", in the business's zone. */
+    time: string;
+    /** "Cleaning · Farah Khan", "Morning Yoga class", "Pick-up · Anika Rao". */
+    what: string;
+    /** "With Dr. Arun · pays at the desk", "Order #1042 · Ready". */
+    who: string | null;
+    /** The person a booking is for, for "Farah Khan arrived."; else null. */
+    person: string | null;
+    /** How it went, said by a person; null until someone says. */
+    outcome: "ATTENDED" | "NO_SHOW" | null;
+    /** When that was said, "09:32" in the business's zone. */
+    outcomeTime: string | null;
+    /** A pick-up's kitchen stage (`READY` is ready to hand over). */
+    stage: string | null;
+    /** The person's Needs attention labels this viewer may read. */
+    flags: string[];
+    href: string;
+    /** Whether this viewer may mark it Arrived or No-show (`booking:write`). */
+    markable: boolean;
+}
+
+export interface HomeToday {
+    /** The zone the day is kept in, e.g. `Asia/Kolkata`. */
+    zone: string;
+    /** The business's date, `2026-09-27`. */
+    date: string;
+    /**
+     * Whether the day's bookings were read: only then may an empty column
+     * say "Nothing else booked today".
+     */
+    bookings: boolean;
+    items: HomeTodayItem[];
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
@@ -189,6 +235,12 @@ export interface HomeModel {
      * open orders" row, which stands for the three it counted but didn't send.
      */
     needsTotal: number;
+    /**
+     * The business's day (F5): its bookings, classes and pick-ups in time
+     * order. Null when the viewer reads none of them, or when the read
+     * failed (then `unavailable` names "Today").
+     */
+    today: HomeToday | null;
 }
 
 export interface HomeInput {

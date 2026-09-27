@@ -107,6 +107,43 @@ export interface HomeUnavailable {
     label: string;
 }
 
+/**
+ * One row of Home's Today column (F5), already in the business's clock.
+ * See `lib/home/today.ts` for which rows show and what each says.
+ */
+export interface HomeTodayItem {
+    id: string;
+    kind: "BOOKING" | "CLASS" | "PICKUP";
+    /** ISO instant it starts; for a pick-up, when it should be ready. */
+    startAt: string;
+    /** "09:30" in the business's zone. */
+    time: string;
+    what: string;
+    who: string | null;
+    /** The person a booking is for; null on a class or a pick-up. */
+    person: string | null;
+    outcome: "ATTENDED" | "NO_SHOW" | null;
+    /** When the outcome was said, "09:32". */
+    outcomeTime: string | null;
+    /** A pick-up's kitchen stage. */
+    stage: string | null;
+    /** Needs attention labels this viewer may read. */
+    flags: string[];
+    href: string;
+    /** May be marked Arrived or No-show by this viewer (`booking:write`). */
+    markable: boolean;
+}
+
+/** The business's day (F5). */
+export interface HomeToday {
+    zone: string;
+    /** `2026-09-18`. */
+    date: string;
+    /** Whether bookings were read, so an empty day may say so. */
+    bookings: boolean;
+    items: HomeTodayItem[];
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
@@ -119,6 +156,8 @@ export interface HomeModel {
     needs: HomeNeed[];
     /** How many things need doing; a "3 more" row counts as three. */
     needsTotal: number;
+    /** Today (F5); null when the viewer reads none of it, or it failed. */
+    today: HomeToday | null;
 }
 
 const EMPTY: HomeModel = {
@@ -130,6 +169,7 @@ const EMPTY: HomeModel = {
     unavailable: [],
     needs: [],
     needsTotal: 0,
+    today: null,
 };
 
 export async function getHome(projectId?: string): Promise<HomeModel> {
@@ -140,7 +180,9 @@ export async function getHome(projectId?: string): Promise<HomeModel> {
     if (!res.ok) {
         throw new Error(`GET home failed: ${res.status}`);
     }
-    const model = (await res.json()) as HomeModel;
+    const read = (await res.json()) as HomeModel;
+    // An API from before F5 sends no `today`: no column, not an empty day.
+    const model: HomeModel = { ...read, today: read.today ?? null };
     // An API from before F3 sends no `needs`. Say the list couldn't be read,
     // never "Nothing needs you", while the two deploys cross.
     if (!Array.isArray(model.needs)) {
