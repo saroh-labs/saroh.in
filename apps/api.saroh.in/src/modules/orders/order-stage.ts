@@ -27,7 +27,7 @@ import { assertStatusTransition } from "./order-state";
  *
  *   Pick-up         NEW ─► PREPARING ─► READY ─► COLLECTED
  *   Local delivery                       READY ─► OUT_FOR_DELIVERY ─► DELIVERED
- *                   (until B2c's switch:  READY ─► HANDED_TO_COURIER ─► DELIVERED)
+ *                   (handed over before B2c's switch: HANDED_TO_COURIER ─► DELIVERED)
  *   Shipping                             READY ─► HANDED_TO_COURIER ─► DELIVERED
  *   Digital         NEW (paid) ─► SENT
  *   Appointments    no kitchen steps: their visits finish them
@@ -169,10 +169,14 @@ function wrongMove(
     to: OrderStage,
 ): { message: string; field: string } {
     const courier = to === "HANDED_TO_COURIER" || to === "OUT_FOR_DELIVERY";
+    // Where a ready order goes next, in the type's own words.
+    const handover = STAGE_MOVES[type].find((m) => m.from === "READY")?.to;
     if (to === "COLLECTED" && type !== "PICKUP" && stage === "READY") {
         return {
             message:
-                "This order is for delivery, so it is handed to a courier, not collected.",
+                handover === "OUT_FOR_DELIVERY"
+                    ? "This order is a local delivery, so it goes out for delivery, not collected."
+                    : "This order is for delivery, so it is handed to a courier, not collected.",
             field: "stage",
         };
     }
@@ -180,6 +184,15 @@ function wrongMove(
         return {
             message:
                 "This order is collected at the counter, so it is not handed to a courier.",
+            field: "stage",
+        };
+    }
+    if (courier && stage === "READY" && handover && handover !== to) {
+        return {
+            message:
+                handover === "OUT_FOR_DELIVERY"
+                    ? "This order is a local delivery, so it goes out for delivery, not to a courier."
+                    : "This order is a shipment, so it is handed to a courier, not sent out for delivery.",
             field: "stage",
         };
     }

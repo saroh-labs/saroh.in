@@ -266,12 +266,13 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
 
         await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
 
-        // A delivery that is shipped is with a courier; its type stays.
+        // A local delivery that is shipped is out for delivery (B2c); its
+        // type stays.
         expect(orderUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
                     status: "SHIPPED",
-                    stage: "HANDED_TO_COURIER",
+                    stage: "OUT_FOR_DELIVERY",
                 }),
             }),
         );
@@ -285,7 +286,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
                 fromStatus: "PROCESSING",
                 toStatus: "SHIPPED",
                 fromStage: "READY",
-                toStage: "HANDED_TO_COURIER",
+                toStage: "OUT_FOR_DELIVERY",
             }),
         });
     });
@@ -345,23 +346,50 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         },
     );
 
-    it("a local delivery stored in the new name ships the way today's does", async () => {
+    it("a local delivery in the new name ships out for delivery; a shipment goes to its courier", async () => {
         const service = makeService();
-        orderFindFirst.mockResolvedValue({
+        const ready = (fulfilment: string) => ({
             id: ORDER,
             status: "PROCESSING",
             paymentStatus: "PAID",
             stage: "READY",
+            fulfilment,
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        orderFindFirst.mockResolvedValue(ready("LOCAL_DELIVERY"));
+        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
+        expect(orderUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "SHIPPED",
+            stage: "OUT_FOR_DELIVERY",
+        });
+        orderFindFirst.mockResolvedValue(ready("SHIPPING"));
+        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
+        expect(orderUpdate.mock.calls[1][0].data).toMatchObject({
+            status: "SHIPPED",
+            stage: "HANDED_TO_COURIER",
+        });
+    });
+
+    it("a local delivery already with a courier (before the switch) is delivered from there", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "SHIPPED",
+            paymentStatus: "PAID",
+            stage: "HANDED_TO_COURIER",
             fulfilment: "LOCAL_DELIVERY",
             organizationId: ORG,
             items: [{ productId: "p1", quantity: 1 }],
         });
-        await service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" });
-        // Until B2c's switch, the handover it writes is today's.
+        await service.updateStatus(STORE, ORDER, USER, { status: "DELIVERED" });
         expect(orderUpdate.mock.calls[0][0].data).toMatchObject({
-            status: "SHIPPED",
-            stage: "HANDED_TO_COURIER",
+            status: "DELIVERED",
+            stage: "DELIVERED",
         });
+        expect(orderUpdate.mock.calls[0][0].data).not.toHaveProperty(
+            "fulfilment",
+        );
     });
 
     it("still 404s a missing order before any lifecycle check", async () => {

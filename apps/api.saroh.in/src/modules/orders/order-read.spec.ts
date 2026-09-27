@@ -157,7 +157,7 @@ describe("serializeOrderRead", () => {
         ).toEqual(paper);
     });
 
-    it("answers the legacy word and the type, with its steps (B2a)", () => {
+    it("answers the legacy word and the type, with its steps (B2a, switched by B2c)", () => {
         const read = serializeOrderRead(base, opts(false));
         expect(read).toMatchObject({
             fulfilment: "DELIVERY",
@@ -166,12 +166,12 @@ describe("serializeOrderRead", () => {
             stepIndex: 1,
             ticketName: "Packing slip",
         });
-        // Until the switch, a local delivery is handed to a courier.
+        // From the switch on, a local delivery goes out for delivery.
         expect(read.steps.map((s) => s.stage)).toEqual([
             "NEW",
             "PREPARING",
             "READY",
-            "HANDED_TO_COURIER",
+            "OUT_FOR_DELIVERY",
             "DELIVERED",
         ]);
         // A row already in the new names reads the same.
@@ -196,6 +196,21 @@ describe("serializeOrderRead", () => {
             fulfilmentType: "SHIPPING",
             stepIndex: 2,
             next: { stages: ["HANDED_TO_COURIER"] },
+        });
+        // A ready local delivery is offered Out for delivery, not a courier.
+        expect(
+            serializeOrderRead(
+                {
+                    ...base,
+                    fulfilment: "LOCAL_DELIVERY",
+                    stage: "READY",
+                    status: "PROCESSING",
+                },
+                opts(false),
+            ),
+        ).toMatchObject({
+            stepIndex: 2,
+            next: { stages: ["OUT_FOR_DELIVERY"] },
         });
     });
 

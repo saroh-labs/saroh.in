@@ -30,8 +30,8 @@ const words = (type: FulfilmentType, stage = "NEW" as const) =>
     stepsFor(type, stage, true).map((s) => s.label);
 
 describe("the fulfilment rule table (DEC-045)", () => {
-    it("is release 1: the write switch is off", () => {
-        expect(WRITES_NEW_FULFILMENT_VALUES).toBe(false);
+    it("is release 2: the write switch is on (B2c)", () => {
+        expect(WRITES_NEW_FULFILMENT_VALUES).toBe(true);
     });
 
     it("gives each type the designs' steps, late default, ticket and done word", () => {
@@ -152,25 +152,48 @@ describe("the normaliser", () => {
 });
 
 describe("the write switch", () => {
-    it("off: stores the legacy word, and refuses the types today's image can't read", () => {
-        expect(storedValueFor("PICKUP")).toBe("COLLECT");
-        expect(storedValueFor("LOCAL_DELIVERY")).toBe("DELIVERY");
+    it("off (release 1): stores the legacy word, and refuses the types that image's predecessor can't read", () => {
+        expect(storedValueFor("PICKUP", false)).toBe("COLLECT");
+        expect(storedValueFor("LOCAL_DELIVERY", false)).toBe("DELIVERY");
         for (const t of [
             "SHIPPING",
             "DIGITAL",
             "APPOINTMENT_IN_PERSON",
             "APPOINTMENT_ONLINE",
         ] as const) {
-            expect(() => storedValueFor(t)).toThrow(BadRequestException);
+            expect(() => storedValueFor(t, false)).toThrow(BadRequestException);
         }
-        expect(() => storedValueFor("SHIPPING")).toThrow(
+        expect(() => storedValueFor("SHIPPING", false)).toThrow(
             "Shipping isn't available yet.",
         );
     });
 
-    it("on (B2c): stores the type itself", () => {
+    it("on (B2c, the default now): stores each physical type and Digital as itself", () => {
+        for (const t of [
+            "PICKUP",
+            "LOCAL_DELIVERY",
+            "SHIPPING",
+            "DIGITAL",
+        ] as const) {
+            expect(storedValueFor(t)).toBe(t);
+        }
+    });
+
+    it("on: an appointment is never typed into an order; it is booked (E9)", () => {
+        for (const t of [
+            "APPOINTMENT_IN_PERSON",
+            "APPOINTMENT_ONLINE",
+        ] as const) {
+            expect(() => storedValueFor(t)).toThrow(BadRequestException);
+            expect(() => storedValueFor(t)).toThrow(
+                "An appointment is made by booking it, not by adding an order.",
+            );
+        }
+    });
+
+    it("on: the default moves are the final table", () => {
         for (const t of FULFILMENT_TYPES) {
-            expect(storedValueFor(t, true)).toBe(t);
+            expect(movesFor(t)).toEqual(FULFILMENT_RULES[t].moves);
         }
     });
 
@@ -215,6 +238,42 @@ describe("steps and where an order stands", () => {
         expect(fourth("HANDED_TO_COURIER", true).stage).toBe(
             "HANDED_TO_COURIER",
         );
+    });
+
+    it("after the switch, a backfilled order reads exactly as its legacy word did", () => {
+        // COLLECT → PICKUP and DELIVERY → LOCAL_DELIVERY by the migration:
+        // the same type, steps, step index, label and ticket either way.
+        for (const stage of [
+            "NEW",
+            "PREPARING",
+            "READY",
+            "COLLECTED",
+        ] as const) {
+            expect(fulfilmentView("PICKUP", stage)).toEqual(
+                fulfilmentView("COLLECT", stage),
+            );
+        }
+        for (const stage of [
+            "NEW",
+            "READY",
+            "OUT_FOR_DELIVERY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ] as const) {
+            expect(fulfilmentView("LOCAL_DELIVERY", stage)).toEqual(
+                fulfilmentView("DELIVERY", stage),
+            );
+        }
+        // A ready local delivery is now offered Out for delivery next.
+        expect(
+            fulfilmentView("LOCAL_DELIVERY", "READY").steps.map((s) => s.label),
+        ).toEqual([
+            "New",
+            "Preparing",
+            "Ready",
+            "Out for delivery",
+            "Delivered",
+        ]);
     });
 
     it("finds the step; a stage the type lacks reads as done if it ends an order", () => {
@@ -459,11 +518,15 @@ describe("the late rule (DEC-045, default 16)", () => {
 });
 
 describe("going by courier", () => {
-    it("a shipment and (before the switch) a local delivery do; the rest never", () => {
+    it("a shipment does, and a local delivery only if handed over the old way; the rest never", () => {
         expect(goesByCourier("SHIPPING", "READY")).toBe(true);
         expect(goesByCourier("DELIVERY", "HANDED_TO_COURIER")).toBe(true);
-        expect(goesByCourier("LOCAL_DELIVERY", "READY")).toBe(true);
-        expect(goesByCourier("LOCAL_DELIVERY", "OUT_FOR_DELIVERY")).toBe(false);
+        expect(goesByCourier("LOCAL_DELIVERY", "HANDED_TO_COURIER")).toBe(true);
+        // With the switch on a local delivery goes out for delivery.
+        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"]) {
+            expect(goesByCourier(stored, "READY")).toBe(false);
+            expect(goesByCourier(stored, "OUT_FOR_DELIVERY")).toBe(false);
+        }
         for (const stored of [
             "COLLECT",
             "PICKUP",

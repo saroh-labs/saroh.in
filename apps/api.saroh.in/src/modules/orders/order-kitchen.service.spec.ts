@@ -844,9 +844,9 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
         ).toEqual(["trackingNumber", "trackingUrl"]);
     });
 
-    it("go with the handover: a Member hands over with them", async () => {
+    it("go with the handover: a Member hands a shipment over with them", async () => {
         reset({
-            fulfilment: "DELIVERY",
+            fulfilment: "SHIPPING",
             stage: "READY",
             status: "PROCESSING",
         });
@@ -927,11 +927,49 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
         await expect(
             kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
         ).rejects.toThrow("A pick-up order isn't handed to a courier.");
-        reset({ fulfilment: "DELIVERY", stage: "READY", status: "PROCESSING" });
+        reset({ fulfilment: "SHIPPING", stage: "READY", status: "PROCESSING" });
         await expect(
             kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(mockDb.order.courierName).toBeNull();
+    });
+
+    it("a local delivery goes out for delivery (B2c): no courier, before or after", async () => {
+        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"] as const) {
+            reset({
+                fulfilment: stored,
+                stage: "READY",
+                status: "PROCESSING",
+            });
+            await expect(
+                kitchen.moveStage(MEMBER, "order_1", {
+                    to: "HANDED_TO_COURIER",
+                    courierName: "Delhivery",
+                }),
+            ).rejects.toThrow(
+                "This order is a local delivery, so it goes out for delivery, not to a courier.",
+            );
+            await expect(
+                kitchen.moveStage(MEMBER, "order_1", {
+                    to: "OUT_FOR_DELIVERY",
+                    courierName: "Delhivery",
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(mockDb.order).toMatchObject({
+                stage: "READY",
+                courierName: null,
+            });
+            await kitchen.moveStage(MEMBER, "order_1", {
+                to: "OUT_FOR_DELIVERY",
+            });
+            expect(mockDb.order).toMatchObject({
+                stage: "OUT_FOR_DELIVERY",
+                status: "SHIPPED",
+            });
+            await expect(
+                kitchen.edit(OWNER, "order_1", { trackingNumber: "AWB4411" }),
+            ).rejects.toThrow("A local delivery isn't handed to a courier.");
+        }
     });
 });
 

@@ -18,8 +18,9 @@ import { FULFILMENT_TYPES, ORDER_FULFILMENTS } from "./dto";
  * already exist (ADR-008's "status values stay"). A step word changes here
  * and nowhere else: the app draws what the API sends, and keeps no copy.
  *
- * The column still holds the legacy words COLLECT and DELIVERY, so every
- * reader goes through {@link typeOf}; nothing compares the raw enum. The
+ * The column can still hold the legacy words COLLECT and DELIVERY (an order
+ * release 1 wrote while release 2 rolled out, until B2d converts it), so
+ * every reader goes through {@link typeOf}; nothing compares the raw enum. The
  * types come in by expand and contract over three releases
  * (`docs/architecture/ORDER_FULFILMENT_ROLLOUT.md`):
  *
@@ -34,13 +35,15 @@ export { FULFILMENT_TYPES } from "./dto";
 export type { FulfilmentType, LegacyFulfilment } from "./dto";
 
 /**
- * The write switch. Off in release 1: create, edit and the kitchen store
- * only the values the previous image can read, so rolling back is deploying
- * the previous tag. B2c's change flips it, in the release whose migration
- * has already rewritten the rows. A constant, not an environment flag: it
- * must follow the migration, not the environment.
+ * The write switch. Off in release 1: create, edit and the kitchen stored
+ * only the values the image before it could read. On from release 2 (B2c),
+ * whose migration (`20261011100000_order_fulfilment_switch`) rewrites every
+ * row first: every write is a type's own name, a local delivery goes out for
+ * delivery, and Shipping and Digital can be created. Rolling back is
+ * deploying release 1's tag, which reads all of it. A constant, not an
+ * environment flag: it must follow the migration, not the environment.
  */
-export const WRITES_NEW_FULFILMENT_VALUES = false;
+export const WRITES_NEW_FULFILMENT_VALUES = true;
 
 /** The ways a storefront itself offers; the rest follow the product. */
 export const STOREFRONT_FULFILMENT_TYPES = [
@@ -304,14 +307,23 @@ export function shipsToAddress(type: FulfilmentType): boolean {
 }
 
 /**
- * What a create or an edit stores for a type. With the switch off, only
- * the two types a legacy word names can be written, and they are written
- * in that word; the rest are refused.
+ * What a create or an edit stores for a type. With the switch on, the type
+ * itself, except an appointment: it is made by booking it and finished by
+ * its visits (E9 writes it), never typed into an order. With the switch
+ * off, only the two types a legacy word names can be written, and they are
+ * written in that word; the rest are refused.
  */
 export function storedValueFor(
     type: FulfilmentType,
     writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
 ): OrderFulfilment {
+    if (writesNew && FULFILMENT_RULES[type].visits) {
+        throw new BadRequestException({
+            message:
+                "An appointment is made by booking it, not by adding an order.",
+            field: "fulfilment",
+        });
+    }
     if (writesNew) return type;
     if (type === "PICKUP" || type === "LOCAL_DELIVERY") return legacyWord(type);
     throw new BadRequestException({
