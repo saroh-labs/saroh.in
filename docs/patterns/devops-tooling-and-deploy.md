@@ -110,5 +110,12 @@ audit that blocks on critical advisories; plus integration tests,
   migration's locks and timing, and each release's rollback are in
   `docs/architecture/ORDER_FULFILMENT_ROLLOUT.md` (B2a writes it; B2c and
   B2d keep it up).
+- **Current** — **Round 2's Phase 1 release** (customer sign-in on merchant
+  sites, Needs attention, a contact for every paying customer, and order
+  fulfilment release 1) is `docs/architecture/ROUND_2_PHASE_1_ROLLOUT.md`:
+  check the PostgreSQL version and the site sign-in secrets before deploy;
+  back up, migrate, deploy the API and wait for `/health/ready`, then
+  saroh.app, then the other frontends; run the C1 and C2 backfills after;
+  roll saroh.app back together with the API.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

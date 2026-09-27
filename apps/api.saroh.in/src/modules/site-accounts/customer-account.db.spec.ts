@@ -304,6 +304,61 @@ describe("CustomerSession", () => {
     });
 });
 
+describe("A booking made signed in (A9)", () => {
+    // The key is single-column SET NULL so it runs on PostgreSQL 14; a
+    // composite SET NULL would also null the booking's required organization
+    // and the delete would fail (review M-4).
+    it("keeps the booking, without its contact or account, when the contact is deleted", async () => {
+        const contact = await makeContact(orgA);
+        const account = await makeAccount(
+            orgA,
+            contact.id,
+            "booked-signed-in@example.in",
+        );
+        const service = await prisma.service.create({
+            data: {
+                organizationId: orgA,
+                name: "Morning yoga",
+                durationMinutes: 60,
+                timezone: "UTC",
+            },
+        });
+        const startAt = new Date(Date.now() + 86_400_000);
+        const booking = await prisma.booking.create({
+            data: {
+                organizationId: orgA,
+                serviceId: service.id,
+                contactId: contact.id,
+                customerAccountId: account.id,
+                startAt,
+                endAt: new Date(startAt.getTime() + 3_600_000),
+                timezone: "UTC",
+                snapshot: {},
+            },
+        });
+
+        await prisma.contact.delete({ where: { id: contact.id } });
+
+        expect(
+            await prisma.customerAccount.count({ where: { id: account.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.booking.findUnique({
+                where: { id: booking.id },
+                select: {
+                    organizationId: true,
+                    contactId: true,
+                    customerAccountId: true,
+                },
+            }),
+        ).toEqual({
+            organizationId: orgA,
+            contactId: null,
+            customerAccountId: null,
+        });
+    });
+});
+
 describe("Contact verified-email stamp", () => {
     it("starts unverified and records how it was verified", async () => {
         const contact = await makeContact(orgA);
