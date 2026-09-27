@@ -1,12 +1,6 @@
 import type { RenderedBooking } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
-import {
-    act,
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-} from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import BookingSection from "./booking";
@@ -63,7 +57,7 @@ describe("booking availability response", () => {
             ]),
         );
         expect(screen.queryByRole("alert")).toBeNull();
-        expect(screen.getAllByRole("radio")).toHaveLength(1);
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
     });
 });
 
@@ -131,7 +125,7 @@ describe("booking block — availability failures", () => {
                 screen.queryByRole("button", { name: "Try again" }),
             ).toBeNull();
             expect(
-                screen.queryByRole("button", { name: "Confirm booking" }),
+                screen.queryByRole("link", { name: "Book a time" }),
             ).toBeNull();
         },
     );
@@ -149,127 +143,55 @@ describe("booking block — availability failures", () => {
     });
 });
 
-describe("booking block — submit failures", () => {
+describe("booking block — sign-in is always on (A9)", () => {
     const startAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const endAt = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
 
-    async function pickSlotAndSubmit() {
-        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
-        fireEvent.click(await screen.findByRole("radio"));
-        fireEvent.change(screen.getByLabelText(/Email/), {
-            target: { value: "jane@example.com" },
-        });
-        fireEvent.click(
-            screen.getByRole("button", { name: "Confirm booking" }),
+    it("shows the next free times and sends the visitor to the booking page to book", async () => {
+        stubFetch(json([{ startAt, endAt }], 200));
+        render(
+            <BookingSection
+                content={CONTENT}
+                apiUrl="https://api"
+                bookHref="/book"
+            />,
         );
-    }
 
-    // The booking API's 400s are written for developers; a visitor never
-    // sees one (review of #327). The times are refreshed, so the third
-    // response is the reload.
-    it.each(["Validation failed", "startAt is not a valid instant"])(
-        "never shows a 400's own words (%s)",
-        async (message) => {
-            const fetchMock = stubFetch(
-                json([{ startAt, endAt }], 200),
-                apiError(400, message),
-                json([{ startAt, endAt }], 200),
-            );
-            await pickSlotAndSubmit();
-
-            const alert = await screen.findByRole("alert");
-            expect(alert).toHaveTextContent(
-                "We couldn't book that — please check your email address and choose a time again.",
-            );
-            expect(alert).not.toHaveTextContent(message);
-            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
-        },
-    );
-
-    it.each([404, 410])(
-        "shows the closed notice when booking closes at submit (%i)",
-        async (status) => {
-            stubFetch(
-                json([{ startAt, endAt }], 200),
-                apiError(
-                    status,
-                    "This business isn't taking online bookings right now",
-                ),
-            );
-            await pickSlotAndSubmit();
-
-            expect(
-                await screen.findByText(/Online booking isn't open right now/),
-            ).toBeInTheDocument();
-            expect(screen.queryByRole("alert")).toBeNull();
-            expect(
-                screen
-                    .getByRole("button", {
-                        name: "Confirm booking",
-                        hidden: true,
-                    })
-                    .closest("form"),
-            ).toHaveAttribute("hidden");
-        },
-    );
-
-    it("never shows a 5xx body", async () => {
-        stubFetch(
-            json([{ startAt, endAt }], 200),
-            apiError(500, "Internal server error"),
-        );
-        await pickSlotAndSubmit();
-
-        expect(await screen.findByRole("alert")).toHaveTextContent(
-            "Something went wrong — please check your details and try again.",
-        );
-    });
-});
-
-describe("booking block — the confirmation", () => {
-    const startAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const endAt = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
-
-    async function book(response: Response) {
-        stubFetch(json([{ startAt, endAt }], 200), response);
-        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
-        fireEvent.click(await screen.findByRole("radio"));
-        fireEvent.change(screen.getByLabelText(/Email/), {
-            target: { value: "jane@example.com" },
-        });
-        fireEvent.click(
-            screen.getByRole("button", { name: "Confirm booking" }),
-        );
-        await screen.findByText("You're booked!");
-    }
-
-    it("gives an online booking its link to join", async () => {
-        await book(
-            json(
-                {
-                    reference: "bk_1",
-                    online: true,
-                    meetingUrl: "https://meet.example.com/yoga",
-                },
-                201,
+        const link = await screen.findByRole("link", { name: "Book a time" });
+        expect(link).toHaveAttribute("href", "/book?service=svc_1");
+        expect(
+            screen.getByText(
+                "You'll pick your time and confirm your email with a code.",
             ),
-        );
-        const link = screen.getByRole("link", { name: "Join online" });
-        expect(link).toHaveAttribute("href", "https://meet.example.com/yoga");
-        expect(link).toHaveAttribute("rel", "noopener noreferrer");
+        ).toBeInTheDocument();
     });
 
-    it("says only that they are booked when there is no link", async () => {
-        await book(
-            json({ reference: "bk_1", online: false, meetingUrl: null }, 201),
+    it("draws no guest details form, and books nothing itself", async () => {
+        const fetchMock = stubFetch(json([{ startAt, endAt }], 200));
+        const { container } = render(
+            <BookingSection
+                content={CONTENT}
+                apiUrl="https://api"
+                bookHref="/book"
+            />,
         );
-        expect(screen.queryByRole("link", { name: "Join online" })).toBeNull();
+        await screen.findByRole("link", { name: "Book a time" });
+
+        expect(container.querySelector("form")).toBeNull();
+        expect(container.querySelector("input")).toBeNull();
+        expect(screen.queryByLabelText(/Email/)).toBeNull();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(
+            /\/availability\?/,
+        );
     });
 
-    it("never renders a link that is not https", async () => {
-        await book(
-            json({ reference: "bk_1", meetingUrl: "javascript:alert(1)" }, 201),
-        );
-        expect(screen.queryByRole("link", { name: "Join online" })).toBeNull();
+    it("in a preview, with no booking page, the button goes nowhere", async () => {
+        stubFetch(json([{ startAt, endAt }], 200));
+        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
+
+        const link = await screen.findByText("Book a time");
+        expect(link).not.toHaveAttribute("href");
+        expect(link).toHaveAttribute("aria-disabled", "true");
     });
 });

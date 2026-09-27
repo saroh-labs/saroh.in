@@ -153,3 +153,48 @@ describe("optionsResult", () => {
         expect(optionsResult({ businessName: "Kavi" })).toBe(null);
     });
 });
+
+/**
+ * The API wraps every error in its envelope (`AllExceptionsFilter`):
+ * `{ error: { code, message, statusCode, correlationId, details } }`. The
+ * reasons live at `error.details`, and each one must still be read there
+ * (A9: the booking page's sign-in runs against the real API).
+ */
+describe("answers in the API's error envelope", () => {
+    const envelope = (status: number, details: Record<string, unknown>) => ({
+        error: {
+            code: "ERROR",
+            message: "Words for Saroh, not for the customer",
+            statusCode: status,
+            correlationId: "cid_1",
+            details,
+        },
+    });
+
+    it("reads a challenge, a wait and a code that couldn't be sent", () => {
+        expect(
+            codeResult(
+                400,
+                envelope(400, { reason: "challenge", siteKey: "0x4AAA" }),
+            ),
+        ).toEqual({ ok: false, reason: "challenge", siteKey: "0x4AAA" });
+        expect(
+            codeResult(429, envelope(429, { reason: "wait", retryAfter: 540 })),
+        ).toEqual({ ok: false, reason: "wait", retryAfterSeconds: 540 });
+        expect(
+            codeResult(503, envelope(503, { reason: "unavailable" })),
+        ).toEqual({ ok: false, reason: "unavailable" });
+    });
+
+    it("tells a wrong code from an expired one, and reads a merge", () => {
+        expect(
+            sessionAnswer(400, envelope(400, { reason: "invalid" })),
+        ).toEqual({ ok: false, reason: "invalid" });
+        expect(
+            sessionAnswer(400, envelope(400, { reason: "expired" })),
+        ).toEqual({ ok: false, reason: "expired" });
+        expect(
+            sessionAnswer(409, envelope(409, { signsInAs: "f…@example.in" })),
+        ).toEqual({ ok: false, reason: "merged", signsInAs: "f…@example.in" });
+    });
+});

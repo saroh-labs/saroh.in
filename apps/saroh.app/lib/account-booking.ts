@@ -1,0 +1,60 @@
+import type { SignedInBookRequest } from "@saroh/site-blocks";
+
+/**
+ * The body the signed-in booking sends the API (round-2 plan A, A9), built
+ * from what the page asked for — an allow-list, since a server action's
+ * arguments come from the browser. Null when the request isn't one the
+ * page makes. The API checks every field again; this only keeps anything
+ * else from being forwarded.
+ *
+ * There is never an email, a phone or an amount: the booker is the
+ * account's and the price is the service's.
+ */
+export type AccountBookingBody = SignedInBookRequest;
+
+const MAX_ID = 64;
+const MAX_KEY = 128;
+const MAX_NAME = 128;
+const MAX_NOTE = 1_000;
+
+function text(value: unknown, max: number): string | undefined {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed && trimmed.length <= max ? trimmed : undefined;
+}
+
+export function accountBookingBody(
+    request: unknown,
+): AccountBookingBody | null {
+    if (!request || typeof request !== "object") return null;
+    const r = request as Record<string, unknown>;
+    const serviceId = text(r.serviceId, MAX_ID);
+    const startAt = text(r.startAt, 40);
+    const idempotencyKey = text(r.idempotencyKey, MAX_KEY);
+    if (!serviceId || !startAt || !idempotencyKey) return null;
+    if (r.pay !== "NOW" && r.pay !== "DESK") return null;
+    if (
+        r.locationType !== undefined &&
+        r.locationType !== "IN_PERSON" &&
+        r.locationType !== "ONLINE"
+    ) {
+        return null;
+    }
+    const body: AccountBookingBody = {
+        serviceId,
+        startAt,
+        idempotencyKey,
+        pay: r.pay,
+    };
+    const staffId = text(r.staffId, MAX_ID);
+    if (staffId) body.staffId = staffId;
+    const bookerName = text(r.bookerName, MAX_NAME);
+    if (bookerName) body.bookerName = bookerName;
+    if (r.locationType) body.locationType = r.locationType;
+    // A note is kept as written (the API trims it); past its length, the
+    // API's own sentence says so.
+    if (typeof r.intakeNote === "string" && r.intakeNote.trim()) {
+        body.intakeNote = r.intakeNote.slice(0, MAX_NOTE + 1);
+    }
+    return body;
+}

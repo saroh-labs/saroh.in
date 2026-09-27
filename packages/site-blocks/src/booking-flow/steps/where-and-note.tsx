@@ -6,8 +6,8 @@ import { focusRing, inputFill, optionClasses } from "../styles";
 /**
  * The details step's own questions (E7), under who the booker is: Where,
  * for a service offered either way, and "Anything we should know?". They
- * sit apart from the name, email and phone on purpose — sign-in replaces
- * those fields (A9) and these stay.
+ * sit apart from who is booking on purpose: sign-in replaced the name,
+ * email and phone fields (A9), and these stayed.
  */
 export function WhereAndNote({
     ids,
@@ -63,8 +63,7 @@ export function WhereAndNote({
                     </div>
                     {where === "ONLINE" ? (
                         <p className="text-site-muted mt-1.5 text-[12.5px]">
-                            The link to join shows here once you&apos;re
-                            booked.
+                            The link to join shows here once you&apos;re booked.
                         </p>
                     ) : null}
                 </div>

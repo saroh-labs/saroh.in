@@ -392,7 +392,29 @@ describe("the merchant's type (H1)", () => {
     });
 
     it("sets the booking flow's headings in font-site-heading", () => {
-        render(<BookingFlow page={PAGE} apiUrl="https://api.test" />);
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl="https://api.test"
+                account={{
+                    customer: null,
+                    options: {
+                        businessName: "Pulse Fitness",
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                    },
+                    book: () =>
+                        Promise.resolve({ ok: false, status: 0, message: "" }),
+                    signOut: () => Promise.resolve({ ok: true }),
+                }}
+            />,
+        );
         const title = screen.getByRole("heading", {
             name: "Book your next session",
         });
@@ -412,6 +434,23 @@ describe("the merchant's type (H1)", () => {
             <BookingFlow
                 page={{ ...PAGE, open: false }}
                 apiUrl="https://api.test"
+                account={{
+                    customer: null,
+                    options: {
+                        businessName: "Pulse Fitness",
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                        verifyCode: () =>
+                            Promise.resolve({ ok: false, reason: "error" }),
+                    },
+                    book: () =>
+                        Promise.resolve({ ok: false, status: 0, message: "" }),
+                    signOut: () => Promise.resolve({ ok: true }),
+                }}
             />,
         );
         expect(

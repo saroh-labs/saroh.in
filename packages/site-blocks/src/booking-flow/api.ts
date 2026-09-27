@@ -1,11 +1,16 @@
 import type { BookingDays, BookingWhere, BookResult, HoldView } from "./model";
-import { isBookingDays, isBookResult, isHoldView } from "./model";
+import { isBookingDays, isHoldView } from "./model";
 
 /**
  * The booking page's calls, made from the visitor's browser straight to the
  * public API (U19) — the booking block's way — so the API's per-visitor rate
  * limit sees the visitor, not the site's server. Every answer is narrowed; a
  * wrong shape is a failure, never a crash.
+ *
+ * The booking itself is the exception (A9): it needs the customer's session,
+ * which lives in a host-only cookie a browser script can't read, so the site's
+ * server makes it (`SignedInBookRequest`, `BookSignedIn`) and answers through
+ * {@link resultOf}.
  *
  * A failure carries words for the booker: the API's own message for a 4xx,
  * where it is written for visitors (the slot was just taken, the hold ran
@@ -14,7 +19,17 @@ import { isBookingDays, isBookResult, isHoldView } from "./model";
  */
 
 export type Result<T> =
-    { ok: true; value: T } | { ok: false; status: number; message: string };
+    | { ok: true; value: T }
+    | {
+          ok: false;
+          status: number;
+          message: string;
+          /**
+           * The API's reason, where it gives one a page branches on: e.g.
+           * "already-booked" (A9), "signed-out".
+           */
+          reason?: string;
+      };
 
 const TROUBLE = "Something went wrong on our side. Please try again.";
 const OFFLINE =
@@ -38,17 +53,51 @@ async function call<T>(
         return { ok: false, status: 0, message: OFFLINE };
     }
     const body: unknown = await res.json().catch(() => null);
-    if (res.ok) {
+    return resultOf(res.status, body, narrow);
+}
+
+/**
+ * An API answer as the page takes it: the narrowed value, or a failure in
+ * words for the booker with the API's reason. Shared with the site's server
+ * actions, which call the API for the page when the call needs its session
+ * (A9, `apps/saroh.app/app/[domain]/book/actions.ts`).
+ */
+export function resultOf<T>(
+    status: number,
+    body: unknown,
+    narrow: (v: unknown) => v is T,
+): Result<T> {
+    if (status >= 200 && status < 300) {
         return narrow(body)
             ? { ok: true, value: body }
-            : { ok: false, status: res.status, message: TROUBLE };
+            : { ok: false, status, message: TROUBLE };
     }
+    const reason = reasonOf(body);
     return {
         ok: false,
-        status: res.status,
-        message: messageOf(res.status, body),
+        status,
+        message: messageOf(status, body),
+        ...(reason ? { reason } : {}),
     };
 }
+
+/** `error.details.reason` in the API's envelope, when it names one. */
+function reasonOf(body: unknown): string | undefined {
+    if (typeof body !== "object" || body === null) return undefined;
+    const b = body as {
+        details?: { reason?: unknown };
+        error?: { details?: { reason?: unknown } };
+    };
+    const reason = b.error?.details?.reason ?? b.details?.reason;
+    return typeof reason === "string" ? reason : undefined;
+}
+
+/** A failure from the page's own side: the site's server couldn't be reached. */
+export const OFFLINE_RESULT = {
+    ok: false as const,
+    status: 0,
+    message: OFFLINE,
+};
 
 /** The API's envelope is `{ error: { message } }`; older answers `{ message }`. */
 function messageOf(status: number, body: unknown): string {
@@ -78,11 +127,19 @@ export function fetchDays(
     );
 }
 
-export interface BookRequest {
+/**
+ * A booking a signed-in customer makes (A9). There is no email and no
+ * phone: the booker is their account's. `bookerName` only names a contact
+ * that has no name yet. The site's server sends it with the session
+ * (`POST public/site-accounts/bookings`); the anonymous route the page used
+ * before sign-in (U19) is called by nothing any more.
+ *
+ * No amount is ever sent: the price is the service's, on the server.
+ */
+export interface SignedInBookRequest {
+    serviceId: string;
     startAt: string;
-    bookerName: string;
-    bookerEmail: string;
-    bookerPhone?: string;
+    bookerName?: string;
     idempotencyKey: string;
     staffId?: string;
     pay: "NOW" | "DESK";
@@ -92,18 +149,10 @@ export interface BookRequest {
     intakeNote?: string;
 }
 
-/** Book it. No amount is ever sent: the price is the service's, on the server. */
-export function book(
-    apiUrl: string,
-    serviceId: string,
-    request: BookRequest,
-): Promise<Result<BookResult>> {
-    return call(
-        `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/book`,
-        { method: "POST", body: JSON.stringify(request) },
-        isBookResult,
-    );
-}
+/** Book it, signed in: the site's server action that does. */
+export type BookSignedIn = (
+    request: SignedInBookRequest,
+) => Promise<Result<BookResult>>;
 
 export function fetchHold(
     apiUrl: string,
