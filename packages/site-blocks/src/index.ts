@@ -78,6 +78,19 @@ export type { BookingFlowProps } from "./booking-flow/booking-flow";
 export { isBookingPage } from "./booking-flow/model";
 export type { BookingPageData, BookingService } from "./booking-flow/model";
 
+// Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
+// The site's server actions arrive as `api`; the sheet never calls the API.
+export { UNAVAILABLE_TEXT, callLine, retryText } from "./account/api";
+export type {
+    CodeRequestResult,
+    SignInApi,
+    SignInOptions,
+    SignedInCustomer,
+    VerifyResult,
+} from "./account/api";
+export { SignInSheet } from "./account/sign-in-sheet";
+export type { SignInSheetProps } from "./account/sign-in-sheet";
+
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
