@@ -91,6 +91,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
+        // D1: a plan's monthly figure and who pays what.
+        "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
