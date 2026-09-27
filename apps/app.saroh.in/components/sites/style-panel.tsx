@@ -104,6 +104,13 @@ export function StylePanel({
             </div>
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+                {/* H1: the site's text moved to a system font when Saroh's
+                    own faces stopped loading on merchant sites. Says so, and
+                    promises no date; the font-pairing picker replaces it. */}
+                <p className="text-xs text-muted-foreground">
+                    Your site&apos;s text now uses a plain system font. Font
+                    choices aren&apos;t available yet.
+                </p>
                 <section className="space-y-3">
                     <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                         Colour
