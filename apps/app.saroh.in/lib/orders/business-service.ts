@@ -1,5 +1,7 @@
 import { getJson, orgBase } from "@/lib/api/http";
 
+import type { FulfilmentFields } from "./read";
+
 /**
  * Orders across the whole business — the read behind Sell → Orders.
  *
@@ -30,17 +32,14 @@ export type OrderStanding =
 export type PaymentStanding =
     "PAID" | "UNPAID" | "PARTLY_REFUNDED" | "REFUNDED";
 
-/** The six ways an order leaves (DEC-045); COLLECT reads as PICKUP. */
-export type FulfilmentType =
-    | "PICKUP"
-    | "LOCAL_DELIVERY"
-    | "SHIPPING"
-    | "DIGITAL"
-    | "APPOINTMENT_IN_PERSON"
-    | "APPOINTMENT_ONLINE";
+/** The six ways an order leaves (DEC-045), with the words the API sends. */
+export type { FulfilmentType } from "./read";
 
-/** One row of the Orders list, as the API builds it (`order-row.ts`). */
-export interface OrderRow {
+/**
+ * One row of the Orders list, as the API builds it (`order-row.ts`), with
+ * how it leaves: the legacy word, the type, its steps and where it stands.
+ */
+export interface OrderRow extends FulfilmentFields {
     id: string;
     /** The storefront's own order number, e.g. "1042". */
     orderId: string;
@@ -59,9 +58,6 @@ export interface OrderRow {
     status: string;
     paymentStatus: string;
     stage: string;
-    /** The stored word (COLLECT or DELIVERY) until the switch release. */
-    fulfilment: string;
-    fulfilmentType: FulfilmentType;
     standing: OrderStanding;
     payment: PaymentStanding;
     currency: string;

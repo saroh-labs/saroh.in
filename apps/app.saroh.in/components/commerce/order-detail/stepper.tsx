@@ -1,28 +1,29 @@
 import { cn } from "@saroh/ui/lib/utils";
 
 import { STAGE_LABEL, STEP_LABEL } from "@/lib/orders/lifecycle";
-import type { KitchenStage } from "@/lib/orders/read";
+import type { FulfilmentStep, KitchenStage } from "@/lib/orders/read";
 
 import { FOCUS } from "./parts";
 
 /**
  * Where the order is in the kitchen: small dots, no numbers, no button
  * borders (the design's audit flattened it), grouped and labelled as progress
- * for a screen reader — "Progress: Preparing, step 2 of 4".
+ * for a screen reader — "Progress: Preparing, step 2 of 4". The steps and
+ * their words are the order type's, as the API sends them (DEC-045).
  *
  * The step that comes next is a real button, drawn exactly like the others:
  * the header's primary button is the way most people move an order, and this
  * one means the stepper itself answers Tab and Enter, not only the pointer.
  */
 export function KitchenStepper({
-    flow,
+    steps,
     stage,
     refunded,
     next,
     busy,
     onAdvance,
 }: {
-    flow: KitchenStage[];
+    steps: FulfilmentStep[];
     stage: KitchenStage;
     /** Refunded in full: every step reads as done, none as current. */
     refunded: boolean;
@@ -32,15 +33,15 @@ export function KitchenStepper({
     busy: boolean;
     onAdvance: () => void;
 }) {
-    const at = flow.indexOf(stage);
+    const at = steps.findIndex((s) => s.stage === stage);
     const label = refunded
         ? "Progress: refunded"
-        : `Progress: ${STAGE_LABEL[stage]}, step ${at + 1} of ${flow.length}`;
+        : `Progress: ${steps[at]?.label ?? STAGE_LABEL[stage]}, step ${at + 1} of ${steps.length}`;
 
     return (
         <div role="group" aria-label={label} className="px-0.5 pt-0.5">
             <ol className="flex flex-wrap items-center gap-2">
-                {flow.map((s, i) => {
+                {steps.map(({ stage: s, label: word }, i) => {
                     const done = i < at || refunded;
                     const now = i === at && !refunded;
                     const body = (
@@ -67,7 +68,7 @@ export function KitchenStepper({
                                           : "font-medium text-muted-foreground",
                                 )}
                             >
-                                {STAGE_LABEL[s]}
+                                {word}
                             </span>
                         </>
                     );
@@ -95,7 +96,7 @@ export function KitchenStepper({
                                     {body}
                                 </span>
                             )}
-                            {i < flow.length - 1 ? (
+                            {i < steps.length - 1 ? (
                                 <span
                                     aria-hidden
                                     className={cn(

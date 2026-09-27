@@ -338,6 +338,18 @@ describe("a shop customer's overview", () => {
         );
         expect(deliveryAddress(rows)).toBe("14 Hill Road, Bengaluru");
         expect(howTheyGet([order()])).toBe("Always collects at Rye & Co.");
+        // Read from the type (DEC-045): a shipment is delivered too, and a
+        // download is not.
+        expect(
+            howTheyGet([
+                order({ fulfilment: "DELIVERY", fulfilmentType: "SHIPPING" }),
+            ]),
+        ).toBe("Always delivered.");
+        expect(
+            howTheyGet([
+                order({ fulfilment: "COLLECT", fulfilmentType: "PICKUP" }),
+            ]),
+        ).toBe("Always collects at Rye & Co.");
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
         );

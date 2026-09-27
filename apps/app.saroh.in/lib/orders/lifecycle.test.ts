@@ -7,12 +7,14 @@ import {
     canCancel,
     eventText,
     flowOf,
+    goesToAddress,
     isOpen,
     kitchenStanding,
     PAYMENT_TRANSITIONS,
     putBackOf,
     refundableQuantity,
     standingOf,
+    stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { OrderReadEvent, OrderReadLine } from "@/lib/orders/read";
@@ -63,14 +65,67 @@ const line = (over: Partial<OrderReadLine> = {}): OrderReadLine => ({
 });
 
 describe("the kitchen flow", () => {
-    it("collects at the counter, or goes out with a courier", () => {
-        expect(flowOf("COLLECT")).toEqual([
+    it("walks the steps the API sends for its type, in its words (DEC-045)", () => {
+        const steps = [
+            { stage: "NEW" as const, label: "Paid" },
+            { stage: "SENT" as const, label: "Sent" },
+        ];
+        expect(stepsOf({ fulfilment: "COLLECT", steps })).toBe(steps);
+        expect(flowOf({ fulfilment: "COLLECT", steps })).toEqual([
+            "NEW",
+            "SENT",
+        ]);
+    });
+
+    it("falls back to the two flows an API before B2a knew", () => {
+        expect(flowOf({ fulfilment: "COLLECT" })).toEqual([
             "NEW",
             "PREPARING",
             "READY",
             "COLLECTED",
         ]);
-        expect(flowOf("DELIVERY").at(-2)).toBe("HANDED_TO_COURIER");
+        expect(flowOf({ fulfilment: "DELIVERY" }).at(-2)).toBe(
+            "HANDED_TO_COURIER",
+        );
+        expect(stepsOf({ fulfilment: "DELIVERY" })[3]).toEqual({
+            stage: "HANDED_TO_COURIER",
+            label: "Handed to courier",
+        });
+    });
+
+    it("goes to an address for a local delivery or a shipment, read from the type", () => {
+        expect(
+            goesToAddress({
+                fulfilment: "DELIVERY",
+                fulfilmentType: "SHIPPING",
+            }),
+        ).toBe(true);
+        expect(
+            goesToAddress({
+                fulfilment: "DELIVERY",
+                fulfilmentType: "LOCAL_DELIVERY",
+            }),
+        ).toBe(true);
+        expect(
+            goesToAddress({ fulfilment: "COLLECT", fulfilmentType: "DIGITAL" }),
+        ).toBe(false);
+        expect(goesToAddress({ fulfilment: "DELIVERY" })).toBe(true);
+        expect(goesToAddress({ fulfilment: "COLLECT" })).toBe(false);
+    });
+
+    it("is done at the last of the type's steps", () => {
+        const o = {
+            status: "PROCESSING" as const,
+            stage: "NEW" as const,
+            fulfilment: "COLLECT" as const,
+            steps: [
+                { stage: "NEW" as const, label: "Paid" },
+                { stage: "SENT" as const, label: "Sent" },
+            ],
+            refundStanding: "NONE" as const,
+        };
+        expect(isOpen(o)).toBe(true);
+        expect(isOpen({ ...o, stage: "SENT" })).toBe(false);
     });
 
     it("is open until its last stage, a cancel or a refund in full", () => {
