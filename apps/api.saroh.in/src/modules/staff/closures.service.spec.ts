@@ -155,6 +155,13 @@ describe("ClosuresService — closing", () => {
             status: "CONFIRMED",
         });
         expect(where).not.toHaveProperty("staffId");
+        // The closure's time is in the query, not filtered after (K-4).
+        expect(where.OR).toEqual([
+            {
+                startAt: { lt: expect.any(Date) },
+                endAt: { gt: expect.any(Date) },
+            },
+        ]);
     });
 
     it("refuses To before From on the field, writing nothing", async () => {
