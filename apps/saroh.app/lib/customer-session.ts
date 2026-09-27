@@ -13,13 +13,22 @@ import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
  *
  * The token lives in a `__Host-` cookie: Secure, HttpOnly, SameSite=Lax,
  * Path=/ and — what the prefix enforces — no Domain, so it belongs to this
- * one host and no other merchant's site ever receives it. It expires with
- * the session. Browser scripts cannot read it; this server forwards it to
- * the API in `x-customer-session`, beside the signed relay, and the API
- * accepts it only on the host it was issued for.
+ * one host and no other merchant's site ever receives it. It lasts as long
+ * as a session can (90 days from sign-in): a session slides while it is
+ * used, so the API — not the cookie — says when it has ended (review A-5).
+ * Browser scripts cannot read it; this server forwards it to the API in
+ * `x-customer-session`, beside the signed relay, and the API accepts it
+ * only on the host it was issued for.
  */
 export const SESSION_COOKIE = "__Host-saroh_session";
 export const CUSTOMER_SESSION_HEADER = "x-customer-session";
+
+/**
+ * How long the cookie lives: the API's longest session (`SESSION_MAX_AGE_MS`
+ * in `sessions.service.ts`). A session's own `expiresAt` is only where it
+ * stood at sign-in; it slides with every visit.
+ */
+export const SESSION_COOKIE_MAX_AGE_MS = 90 * 24 * 60 * 60_000;
 
 const API_URL =
     env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
@@ -63,12 +72,20 @@ export async function readSessionToken(): Promise<string | null> {
     return value;
 }
 
-/** Keep a new session. Server actions and route handlers only. */
+/**
+ * Keep a new session, for as long as any session can last. Server actions
+ * and route handlers only.
+ */
 export async function setSessionCookie(
     token: string,
-    expiresAt: Date,
+    now: Date = new Date(),
 ): Promise<void> {
-    (await cookies()).set(sessionCookie(token, expiresAt));
+    (await cookies()).set(
+        sessionCookie(
+            token,
+            new Date(now.getTime() + SESSION_COOKIE_MAX_AGE_MS),
+        ),
+    );
 }
 
 /** Forget the session. Where cookies can't be written (a page render), a no-op. */
@@ -83,7 +100,34 @@ export async function clearSessionCookie(): Promise<void> {
 
 export type SiteCall =
     | { ok: true; res: Response }
-    | { ok: false; reason: "no-host" | "no-address" | "unreachable" };
+    | {
+          ok: false;
+          reason: "no-host" | "no-address" | "unreachable" | "unconfigured";
+      };
+
+/**
+ * The relay for this request, or "unconfigured" when this server has no
+ * `SITE_RELAY_SECRET` to sign it with. That is Saroh's misconfiguration,
+ * not the visitor's: the page stays up, the sheet says the code couldn't be
+ * sent, and an ERROR says why (review M-1).
+ */
+function signedRelay(
+    requestHeaders: Headers,
+    host: string,
+): { ok: true; relay: string | null } | { ok: false } {
+    try {
+        return { ok: true, relay: relayFor(requestHeaders, host) };
+    } catch (error) {
+        console.error(
+            JSON.stringify({
+                level: "error",
+                event: "site_relay_secret_missing",
+                message: error instanceof Error ? error.message : String(error),
+            }),
+        );
+        return { ok: false };
+    }
+}
 
 /**
  * Call `public/site-accounts/<path>` with the signed relay for the host this
@@ -97,7 +141,9 @@ export async function siteAccountsFetch(
     const requestHeaders = await headers();
     const host = servedHost(requestHeaders);
     if (!host) return { ok: false, reason: "no-host" };
-    const relay = relayFor(requestHeaders, host);
+    const signed = signedRelay(requestHeaders, host);
+    if (!signed.ok) return { ok: false, reason: "unconfigured" };
+    const relay = signed.relay;
     if (!relay) return { ok: false, reason: "no-address" };
     const sent: Record<string, string> = {
         accept: "application/json",
@@ -120,9 +166,28 @@ export async function siteAccountsFetch(
 }
 
 /**
+ * Whether a 401 says the session itself is over (revoked, expired, or a
+ * token that isn't this site's): `details.reason` is `signed-out`. Any
+ * other 401 — a relay the API couldn't check — says nothing about the
+ * session, and signing the customer out for it would lose them for good.
+ */
+async function sessionEnded(res: Response): Promise<boolean> {
+    if (res.status !== 401) return false;
+    const body = (await res
+        .clone()
+        .json()
+        .catch(() => null)) as {
+        details?: { reason?: unknown };
+        error?: { details?: { reason?: unknown } };
+    } | null;
+    const reason = body?.error?.details?.reason ?? body?.details?.reason;
+    return reason === "signed-out";
+}
+
+/**
  * Call a signed-in customer route with this request's session. Null when
- * there is no session; a 401 clears the cookie (revoked, expired, or a
- * token that isn't this site's).
+ * there is no session; a 401 that says the session is over clears the
+ * cookie (review A-6).
  */
 export async function accountFetch(
     path: string,
@@ -131,7 +196,7 @@ export async function accountFetch(
     const session = await readSessionToken();
     if (!session) return null;
     const call = await siteAccountsFetch(path, { ...init, session });
-    if (call.ok && call.res.status === 401) await clearSessionCookie();
+    if (call.ok && (await sessionEnded(call.res))) await clearSessionCookie();
     return call;
 }
 

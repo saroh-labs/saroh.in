@@ -5,7 +5,25 @@ vi.mock("next/headers", () => ({
     headers: vi.fn(),
 }));
 
-import { codeResult, optionsResult, sessionAnswer } from "./sign-in";
+import {
+    codeCallFailed,
+    codeResult,
+    optionsResult,
+    sessionAnswer,
+} from "./sign-in";
+
+describe("codeCallFailed (review M-1)", () => {
+    it("tells the customer the code couldn't be sent when this server can't sign the relay", () => {
+        expect(codeCallFailed("unconfigured")).toEqual({
+            ok: false,
+            reason: "unavailable",
+        });
+        expect(codeCallFailed("unreachable")).toEqual({
+            ok: false,
+            reason: "error",
+        });
+    });
+});
 
 /**
  * What each of the API's sign-in answers means to the sheet (round-2 plan
@@ -103,10 +121,11 @@ describe("sessionAnswer", () => {
             reason: "merged",
             signsInAs: "f•••@example.in",
         });
-        expect(sessionAnswer(403, {})).toEqual({
-            ok: false,
-            reason: "blocked",
-        });
+        expect(
+            sessionAnswer(403, {
+                error: { statusCode: 403, details: { reason: "blocked" } },
+            }),
+        ).toEqual({ ok: false, reason: "blocked" });
         expect(
             sessionAnswer(429, {
                 details: { reason: "limit", retryAfter: 90 },
@@ -115,6 +134,25 @@ describe("sessionAnswer", () => {
         expect(sessionAnswer(502, null)).toEqual({
             ok: false,
             reason: "error",
+        });
+    });
+});
+
+describe("sessionAnswer — a business that isn't taking sign-ins (review A-7)", () => {
+    it("reads a 403 without the blocked reason as closed, not as the customer blocked", () => {
+        // The API's lifecycle gate: ORGANIZATION_NOT_ACTIVE, no details.
+        expect(
+            sessionAnswer(403, {
+                error: {
+                    code: "FORBIDDEN",
+                    statusCode: 403,
+                    message: "This business is suspended",
+                },
+            }),
+        ).toEqual({ ok: false, reason: "closed" });
+        expect(sessionAnswer(403, null)).toEqual({
+            ok: false,
+            reason: "closed",
         });
     });
 });

@@ -13,7 +13,12 @@ import {
     siteAccountsFetch,
 } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
-import { codeResult, customerFromEmail, sessionAnswer } from "@/lib/sign-in";
+import {
+    codeCallFailed,
+    codeResult,
+    customerFromEmail,
+    sessionAnswer,
+} from "@/lib/sign-in";
 
 /**
  * Signing in on a merchant's site (ADR-011; round-2 plan A, A3): ask for a
@@ -47,7 +52,7 @@ export async function requestSignInCode(
                 ? { email: address, challenge: challenge.slice(0, 2_048) }
                 : { email: address },
     });
-    if (!call.ok) return { ok: false, reason: "error" };
+    if (!call.ok) return codeCallFailed(call.reason);
     return codeResult(call.res.status, await call.res.json().catch(() => null));
 }
 
@@ -72,7 +77,7 @@ export async function verifySignInCode(
     );
     if (!answer.ok) return answer;
 
-    await setSessionCookie(answer.token, answer.expiresAt);
+    await setSessionCookie(answer.token);
     return { ok: true, customer: await whoIs(answer.token, address) };
 }
 
