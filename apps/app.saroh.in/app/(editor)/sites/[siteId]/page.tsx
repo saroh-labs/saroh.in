@@ -136,6 +136,8 @@ export default async function SiteEditorPage({
             // The header and footer the canvas draws around the page (#336).
             navigation={site.navigation}
             footerPreview={site.footerPreview}
+            // Name and footer are the site's settings (G6): read-only without them.
+            canUpdateSite={site.can.manageSettings}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
             address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}

@@ -15,6 +15,7 @@ import {
     archiveService as archiveServiceApi,
     bookByHand as bookByHandApi,
     cancelBooking as cancelBookingApi,
+    createBookingPayLink as createBookingPayLinkApi,
     createService as createServiceApi,
     listAvailability as listAvailabilityApi,
     readServices,
@@ -35,6 +36,11 @@ import {
 
 export async function bookByHand(serviceId: string, input: BookByHandInput) {
     return bookByHandApi(serviceId, input);
+}
+
+/** "Send a pay link" for a booking just made (E4). */
+export async function createBookingPayLink(bookingId: string) {
+    return createBookingPayLinkApi(bookingId);
 }
 
 export async function createService(input: CreateServiceInput) {

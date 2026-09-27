@@ -252,6 +252,18 @@
 - **Renewal** is the self-rescheduling `subscription.renew` job
   (`backend-jobs.md`); `renewOne` takes the row lock and is idempotent per
   period (partial unique index on live invoices per period).
+- **A pause has an end date, or none** (plan 2026-09-26-004, D8;
+  `subscriptions/pause-until.ts`). `pausedUntil` is the start of that day in
+  the subscription's zone: 2, 4 or 8 weeks, or a day staff name; null is
+  "Until I resume", which is staff's only — a customer's own pause (A8)
+  takes `weeks`. The renewal job picks it up on that date and resumes it
+  through the manual resume's own code (`resumeLocked`), extending the paid
+  period by the pause's calendar days or starting a new invoiced period, and
+  writes RESUMED as JOB; any resume clears `pausedUntil`. With Payments off,
+  a resume that would start a new period is refused: it stays paused, one
+  RESUME_REFUSED is written per pause, and Home's
+  `PAYMENTS_PAUSES_WAITING` reads the subscriptions themselves until
+  Payments is back on.
 - **Collections** (plan 2026-09-23-003, U7) are dated from the subscription's
   collection weekday in its own timezone, within each period — a monthly plan
   can collect weekly (`subscriptions/collections.ts`, the one source for any

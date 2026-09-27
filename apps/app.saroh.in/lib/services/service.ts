@@ -526,9 +526,12 @@ export type BookByHandInput = {
     packPurchaseId?: string;
     /** Who takes it (U3); absent, whoever is free. */
     staffId?: string;
-    /** How it is paid (U3). */
+    /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
-} & ({ contactId: string } | { bookerEmail: string; bookerName?: string });
+} & (
+    | { contactId: string }
+    | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
+);
 
 /**
  * Book someone in by hand (#384): the same open-slot and capacity rules as
@@ -543,6 +546,21 @@ export function bookByHand(
         "POST",
         input,
         "Could not make the booking",
+    );
+}
+
+/**
+ * "Send a pay link" (E4): issue the booking's invoice and get its pay link,
+ * to copy and send. Needs `booking:write` and `invoice:write`.
+ */
+export function createBookingPayLink(
+    bookingId: string,
+): Promise<ApiResult<{ url: string }>> {
+    return send<{ url: string }>(
+        `/bookings/${bookingId}/pay-link`,
+        "POST",
+        undefined,
+        "Couldn't make the pay link",
     );
 }
 

@@ -49,6 +49,11 @@ export interface SiteEditorProps {
     navigation: SiteNavigation | null;
     /** The footer, sanitized by the API, for the canvas to draw (#336). */
     footerPreview: SiteFooter | null;
+    /**
+     * Whether this person holds `site:update` (G6). Without it the header's
+     * name and the footer's line show read-only in the inspector.
+     */
+    canUpdateSite: boolean;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */

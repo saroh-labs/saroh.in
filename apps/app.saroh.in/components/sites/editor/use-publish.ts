@@ -25,7 +25,6 @@ export interface DraftReadiness {
  */
 export function usePublish({
     siteId,
-    siteName,
     address,
     initialFlags,
     initialNeverPublished,
@@ -34,7 +33,6 @@ export function usePublish({
     refreshReview,
 }: {
     siteId: string;
-    siteName: string;
     address?: string | null;
     initialFlags: SiteFlags;
     initialNeverPublished: boolean;
@@ -136,14 +134,20 @@ export function usePublish({
     }
 
     /**
-     * A saved style is a change publishing would make; without this the pill
-     * read "Published" (review). Stable, so the style autosave can depend on it.
+     * A saved site setting — the style, or the name or footer typed in the
+     * inspector (G6) — is a change publishing would make; without this the
+     * pill read "Published" (review). Stable, so the autosaves can depend on
+     * it. The next section save recounts, and its answer replaces this.
      */
-    const markStylePending = useCallback(() => {
+    const markSitePending = useCallback((kind: SiteChangeKind) => {
         setPendingSiteChanges((prev) =>
-            prev === null || prev.includes("style") ? prev : [...prev, "style"],
+            prev === null || prev.includes(kind) ? prev : [...prev, kind],
         );
     }, []);
+    const markStylePending = useCallback(
+        () => markSitePending("style"),
+        [markSitePending],
+    );
 
     /**
      * Publishing goes through the pre-publish check first — the spec makes it
@@ -172,7 +176,8 @@ export function usePublish({
         await refreshFlags();
     }
 
-    async function onPublish() {
+    /** `siteName` is the name as it is now: the inspector can change it (G6). */
+    async function onPublish(siteName: string) {
         setPublishing(true);
         const res = await publishSite(siteId);
         setPublishing(false);
@@ -222,6 +227,7 @@ export function usePublish({
         pendingKnown,
         recordSaved,
         markStylePending,
+        markSitePending,
         checking,
         setChecking,
         publishing,

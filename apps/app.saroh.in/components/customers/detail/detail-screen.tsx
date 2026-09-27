@@ -34,6 +34,12 @@ import {
 } from "@/lib/customer-workspace/view";
 
 import { IdentityLinkDialog } from "../identity-link-dialog";
+import {
+    AttentionCard,
+    AttentionEditor,
+    HeaderAttention,
+    useAttention,
+} from "./attention";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { EditSheet } from "./edit-sheet";
@@ -88,6 +94,10 @@ export function CustomerDetailScreen({
     const [removing, setRemoving] = useState(false);
     const [stopping, setStopping] = useState(false);
     const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
+    const attention = useAttention({
+        contactId: d.contact.id,
+        attention: d.attention,
+    });
     const name = d.contact.name;
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
@@ -233,6 +243,17 @@ export function CustomerDetailScreen({
                 return (
                     <Overview
                         d={d}
+                        attention={
+                            d.attention !== undefined ? (
+                                <AttentionCard
+                                    state={attention}
+                                    canWrite={canWrite}
+                                    userId={userId}
+                                    timeZone={d.timezone}
+                                    now={now}
+                                />
+                            ) : null
+                        }
                         now={now}
                         canStop={canStopOffers(d.consent)}
                         stopping={stopping}
@@ -264,6 +285,7 @@ export function CustomerDetailScreen({
                             ? signsInLine(d.siteAccount, canWrite)
                             : null
                     }
+                    attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
                     onEdit={() => setEditing((n) => n + 1)}
                     menu={menu}
@@ -303,6 +325,13 @@ export function CustomerDetailScreen({
                         phone: d.contact.phone ?? "",
                         company: d.contact.company ?? "",
                     }}
+                />
+            ) : null}
+            {canWrite ? (
+                <AttentionEditor
+                    state={attention}
+                    contactId={d.contact.id}
+                    choices={d.notes?.allergenChoices ?? []}
                 />
             ) : null}
             {canWrite ? (

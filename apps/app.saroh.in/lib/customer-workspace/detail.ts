@@ -1,4 +1,5 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type { DetailAttention } from "@/lib/customer-workspace/attention";
 import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
 import type { FulfilmentType } from "@/lib/orders/read";
 import type { Interval } from "@/lib/subscriptions/service";
@@ -180,6 +181,11 @@ export interface CustomerDetail {
         allergenChoices: { id: string; name: string }[];
     } | null;
     allergens: { id: string; name: string }[] | null;
+    /**
+     * Needs attention (DEC-040, C1) as this viewer may see it; null when it
+     * couldn't be read. Absent only from an API before C1.
+     */
+    attention?: DetailAttention | null;
     linkedCustomers?:
         | {
               linkId: string;

@@ -77,11 +77,20 @@ pattern files refer back here.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
-- **Current** — **One customer record behind an order and a booking is not true
-  yet.** `Customer` is store-scoped (its `organizationId` is still nullable), and
-  linking it to a `Contact` is manual
-  (`components/customers/identity-link-dialog.tsx`). Do not claim unification in
-  UI, marketing or docs until auto-linking ships (§14, `PRODUCT.md`).
+- **Current** (round 2, C2–C4) — **Customers is one list for the business,
+  keyed on the `Contact`.** Sell → Customers reads `GET
+organizations/:org/customers`: everyone who has paid (an order through a
+  linked store customer, a paid invoice, a subscription or a pack) or signs
+  in on the business's site. A store `Customer` is still kept per storefront;
+  a paying one gets a contact made and linked by the backfill and at their
+  next payment (link reason `BACKFILL` or `PAYMENT`) — **unless a contact
+  already holds their email**. Then nothing is linked on its own (#120): the
+  list names them ("12 paying customers aren't linked to a contact yet ·
+  Review") and a person links them from the review sheet. So say "one list of
+  customers", never that every order and booking is already one record:
+  someone added by hand, or who ordered and hasn't paid, is in Contacts or on
+  their storefront record, not in this list, and the list says so (§14,
+  `PRODUCT.md`).
 - **Adopted** — Never silently merge uncertain identities: normalise email and
   phone, and keep links reversible and auditable (§14).
 - **Adopted** (2026-09-26, DEC-041, DEC-042) — **Customers is everyone who

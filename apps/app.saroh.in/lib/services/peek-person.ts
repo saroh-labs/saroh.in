@@ -28,7 +28,9 @@ export async function readPeekPerson(
     return { phone: contact.phone, attention };
 }
 
-async function readAttention(
+/** Needs attention for one contact; null when it can't be read. The
+ * customer picker (E4) reads it too, through `lib/customers/search.ts`. */
+export async function readAttention(
     base: string,
     contactId: string,
 ): Promise<PeekAttention | null> {

@@ -30,6 +30,7 @@ import { Bar, CARD, Empty, LABEL } from "./parts";
  */
 export function Overview({
     d,
+    attention,
     now,
     canStop,
     stopping,
@@ -39,6 +40,8 @@ export function Overview({
     onBookings,
 }: {
     d: CustomerDetail;
+    /** Needs attention's card (C5), first: what to know before serving them. */
+    attention?: React.ReactNode;
     now: Date;
     canStop: boolean;
     stopping: boolean;
@@ -51,6 +54,7 @@ export function Overview({
     const orders = d.orders !== undefined;
     return (
         <div className="flex flex-col gap-4">
+            {attention}
             {orders && d.orders && rows.length === 0 ? (
                 <Empty title="No orders yet">
                     Totals, favourites and how they get their orders fill in

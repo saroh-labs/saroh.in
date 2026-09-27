@@ -5,6 +5,7 @@ import { tabFromView } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { sinceParam } from "@/lib/views/since";
 
 export const metadata = { title: "Invoices" };
 
@@ -15,16 +16,20 @@ export const metadata = { title: "Invoices" };
 export default async function InvoicesPage({
     searchParams,
 }: {
-    searchParams: Promise<{ view?: string }>;
+    searchParams: Promise<{ view?: string; since?: string }>;
 }) {
     await requireSession();
-    const [{ rows: invoices, truncated }, organization, business, { view }] =
-        await Promise.all([
-            listInvoices(),
-            resolveActiveOrganization(),
-            getInvoiceBusiness(),
-            searchParams,
-        ]);
+    const [
+        { rows: invoices, truncated },
+        organization,
+        business,
+        { view, since },
+    ] = await Promise.all([
+        listInvoices(),
+        resolveActiveOrganization(),
+        getInvoiceBusiness(),
+        searchParams,
+    ]);
     const canWrite = organization?.actions
         ? organization.actions.includes("invoice:write")
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
@@ -45,6 +50,8 @@ export default async function InvoicesPage({
                         : null
                 }
                 initialTab={tabFromView(view)}
+                // From Home's "Last 24 hours" (F6): the invoices paid since.
+                paidSince={sinceParam({ since })}
             />
         </PageContainer>
     );

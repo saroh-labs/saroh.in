@@ -71,7 +71,10 @@ export function changeWhat(
                 : `Started${on}`;
         }
         case "PAUSED":
-            return "Paused";
+            // D8: a pause with an end date says the day it resumes.
+            return str(data.until)
+                ? `Paused until ${day(data.until)}`
+                : "Paused";
         case "RESUMED": {
             if (data.restarted === true) {
                 return `Resumed — a new period started${invoice}`;

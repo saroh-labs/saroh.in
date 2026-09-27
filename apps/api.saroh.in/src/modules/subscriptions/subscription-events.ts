@@ -27,6 +27,7 @@ import {
 export const SUBSCRIPTION_EVENT_KINDS = [
     /** Put on a plan; `invoiceId` is its first invoice, if one was issued. */
     "SUBSCRIBED",
+    /** `data.until`: the day it resumes on its own, or null until resumed (D8). */
     "PAUSED",
     /** `data.extendedDays` inside the paid period; `data.restarted` after it, with the new invoice. */
     "RESUMED",
@@ -53,9 +54,12 @@ export const SUBSCRIPTION_EVENT_KINDS = [
     "RENEWED",
     /** "Retry now": a new pay link for `invoiceId`. */
     "RETRIED",
-    // Written by later units; named here so the log and its readers know them.
-    /** A resume the job couldn't make (D8). */
+    /**
+     * A pause's end date came, but the resume would restart billing with
+     * Payments off (D8): `data.until`, `data.reason` PAYMENTS_OFF. Once a pause.
+     */
     "RESUME_REFUSED",
+    // Written by later units; named here so the log and its readers know them.
     /** A renewal's charge failed or wasn't answered (D13). */
     "RENEWAL_FAILED",
     /** The invoice is above the autopay limit, so it wasn't charged (D13). */

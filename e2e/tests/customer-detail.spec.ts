@@ -301,3 +301,147 @@ test.describe("customer detail, as a Member", () => {
         ).toBeDisabled();
     });
 });
+
+/**
+ * Needs attention on Customer Detail (C5, DEC-040). Writes happen on
+ * Northwind; Kavi Dental is a film set, so it is only read — by Divya on the
+ * desk, a Member, who sees Rahul's latex allergy and a count in place of his
+ * sensitive medical note.
+ */
+const KAVI = "seed_sc_kavi_org";
+const RAHUL = "seed_sc_kavi_contact_rahul";
+/** A Northwind contact nothing else here changes. */
+const NW_CONTACT = "seed_contact_2";
+const desk = { email: "divya.kamath@saroh.dev", password: member.password };
+const DESK_STATE = path.join(os.tmpdir(), "e2e-customer-detail-desk.json");
+
+/** The row by the name: the heading and the tags beside it. */
+const nameRow = (page: Page) => page.locator("h1").locator("..");
+
+/** Take every "Wheelchair" entry this suite added off the contact. */
+async function clearWheelchair(page: Page) {
+    const base = `${urls.API_URL}/organizations/${NORTHWIND}/customers/${NW_CONTACT}/attention`;
+    const res = await page.request.get(base);
+    const body = (await res.json()) as {
+        entries?: { id: string; label: string }[];
+    };
+    for (const e of body.entries ?? []) {
+        if (e.label !== "Wheelchair") continue;
+        await page.request.delete(`${base}/${e.id}`, {
+            headers: { origin: urls.APP_URL },
+        });
+    }
+}
+
+test.describe("needs attention", () => {
+    test("add Access 'Wheelchair': the tag shows by the name; Remove has Undo", async ({
+        page,
+    }) => {
+        await signIn(page, NORTHWIND);
+        await clearWheelchair(page);
+        try {
+            await page.goto(`/customers/${NW_CONTACT}`);
+            const card = page.getByRole("region", { name: "Needs attention" });
+            await card.getByRole("button", { name: "Add" }).click();
+            const sheet = page.getByRole("dialog", {
+                name: "Add to Needs attention",
+            });
+            await sheet.getByRole("radio", { name: "Access" }).click();
+            // Access isn't sensitive unless someone ticks it.
+            await expect(sheet.getByRole("checkbox")).not.toBeChecked();
+            await sheet
+                .getByLabel("Short label for the team")
+                .fill("Wheelchair");
+            await sheet
+                .getByRole("button", { name: "Add to Needs attention" })
+                .click();
+            await expect(sheet).toHaveCount(0);
+
+            await expect(
+                nameRow(page).getByText("Access: Wheelchair"),
+            ).toBeVisible();
+            await expect(card).toContainText("Access: Wheelchair");
+
+            await card
+                .getByRole("button", { name: "Remove Access: Wheelchair" })
+                .click();
+            await expect(card).not.toContainText("Access: Wheelchair");
+            await expect(
+                nameRow(page).getByText("Access: Wheelchair"),
+            ).toHaveCount(0);
+            await page.getByRole("button", { name: "Undo" }).last().click();
+            await expect(card).toContainText("Access: Wheelchair");
+        } finally {
+            await clearWheelchair(page);
+        }
+    });
+
+    test("a save that fails keeps what was typed and says so", async ({
+        page,
+    }) => {
+        await signIn(page, NORTHWIND);
+        await page.goto(`/customers/${NW_CONTACT}`);
+        await page
+            .getByRole("region", { name: "Needs attention" })
+            .getByRole("button", { name: "Add" })
+            .click();
+        const sheet = page.getByRole("dialog", {
+            name: "Add to Needs attention",
+        });
+        await sheet.getByRole("radio", { name: "Access" }).click();
+        await sheet.getByLabel("Short label for the team").fill("Wheelchair");
+        // The Server Action's POST never reaches the server.
+        await page.route(`**/customers/${NW_CONTACT}**`, (route) =>
+            route.request().method() === "POST"
+                ? route.abort()
+                : route.continue(),
+        );
+        await sheet
+            .getByRole("button", { name: "Add to Needs attention" })
+            .click();
+        await expect(sheet.getByRole("alert")).toContainText(
+            "Nothing was saved",
+        );
+        await expect(sheet.getByLabel("Short label for the team")).toHaveValue(
+            "Wheelchair",
+        );
+        await expect(
+            sheet.getByRole("radio", { name: "Access" }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
+    test("a Member sees the allergy, and a count in place of the medical note", async ({
+        browser,
+        page,
+    }) => {
+        await saveSession(browser, desk, DESK_STATE);
+        await signIn(page, KAVI, DESK_STATE);
+        await page.goto(`/customers/${RAHUL}`);
+        await expect(
+            page.getByRole("heading", { name: "Rahul Verma" }),
+        ).toBeVisible();
+        await expect(nameRow(page).getByText("Allergy: Latex")).toBeVisible();
+        await expect(
+            nameRow(page).getByText("1 more note you can't see"),
+        ).toBeVisible();
+        const main = page.getByRole("main");
+        await expect(main).not.toContainText("Blood thinners");
+        await expect(main).not.toContainText("warfarin");
+        // Reads, but can't change the record.
+        const card = page.getByRole("region", { name: "Needs attention" });
+        await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+        await expect(card).toContainText(
+            "Your role can read this but not change their record.",
+        );
+    });
+
+    test("an Owner sees the medical note by the name", async ({ page }) => {
+        await signIn(page, KAVI);
+        await page.goto(`/customers/${RAHUL}`);
+        await expect(
+            nameRow(page).getByText("Medical: Blood thinners"),
+        ).toBeVisible();
+        await expect(nameRow(page).getByText("Allergy: Latex")).toBeVisible();
+        await expect(page.getByRole("main")).not.toContainText("you can't see");
+    });
+});

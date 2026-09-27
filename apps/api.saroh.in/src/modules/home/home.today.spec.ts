@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import type { TodayBookingRow, TodayOrderRow } from "./home-today";
@@ -414,7 +415,7 @@ describe("HomeService: the today block", () => {
                 findUnique: jest.fn().mockResolvedValue({ timezone: ZONE }),
             },
         };
-        return new HomeService(availability, db as never);
+        return new HomeService(availability, quietLastDay(db) as never);
     }
     const OWNER = {
         organizationId: "org_1",

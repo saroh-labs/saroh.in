@@ -80,6 +80,7 @@ const sub = (over: Partial<Subscription> = {}): Subscription => ({
     startsAt: null,
     endsAt: null,
     pausedAt: null,
+    pausedUntil: null,
     cancelledAt: null,
     overdue: false,
     overdueCount: 0,

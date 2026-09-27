@@ -211,6 +211,46 @@ export interface HomeToday {
     items: HomeTodayItem[];
 }
 
+/** What a Last 24 hours figure counts (F6). */
+export type HomeSinceKind = "ORDERS" | "BOOKINGS" | "REVIEWS" | "PAYMENTS";
+
+/**
+ * One figure of Home's "Last 24 hours" strip (F6): a count, or for money
+ * the amount taken in one currency, and the link that opens exactly the
+ * rows it counts. Only figures above zero are sent; the words are the
+ * client's, as money's formatting is.
+ */
+export interface HomeSinceItem {
+    kind: HomeSinceKind;
+    count: number;
+    /** Payments only: what came in, in minor units, and its currency. */
+    amountMinor: number | null;
+    currency: string | null;
+    href: string;
+}
+
+/**
+ * The greeting's clock and the last 24 hours (F6), in the business's zone
+ * (DEC-033), as F5's Today is.
+ */
+export interface HomeLastDay {
+    /** The zone the day is kept in, e.g. `Asia/Kolkata`. */
+    zone: string;
+    /** The business's date, `2026-09-18`. */
+    date: string;
+    /** For "Good morning": the business's clock, not the viewer's. */
+    partOfDay: "morning" | "afternoon" | "evening";
+    /** ISO instant the window opens: 24 hours before this read. */
+    since: string;
+    /**
+     * Nothing sold, booked or paid yet, told only to someone who may set
+     * the business up (`org:update`): Home says "Welcome" and shows no strip.
+     */
+    fresh: boolean;
+    /** The figures above zero this viewer may read; empty when none. */
+    items: HomeSinceItem[];
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
@@ -241,6 +281,11 @@ export interface HomeModel {
      * failed (then `unavailable` names "Today").
      */
     today: HomeToday | null;
+    /**
+     * The header (F6). Always sent; when its read fails, `items` is empty
+     * and `unavailable` names "The last 24 hours".
+     */
+    lastDay: HomeLastDay;
 }
 
 export interface HomeInput {

@@ -5,13 +5,14 @@ import Link from "next/link";
 import { BookingsView } from "@/components/bookings/bookings-view";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
-import { listContacts } from "@/lib/contacts/service";
-import { contactName } from "@/lib/crm/format";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
+import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
 /**
  * Every booking as one list (S4-003) — the register the calendar replaced as
@@ -40,16 +41,33 @@ export default async function BookingsPage({
 }) {
     await requireSession();
 
-    const [upcoming, params, services, contacts, organization] =
-        await Promise.all([
-            listBookingsWithPast(),
-            searchParams,
-            listServices().catch(() => []),
-            // Contacts belong to CRM, which may be off: then the dialog asks for
-            // a name and email instead of offering people you know.
-            listContacts().catch(() => []),
-            resolveActiveOrganization(),
-        ]);
+    const [every, params, services, organization] = await Promise.all([
+        listBookingsWithPast(),
+        searchParams,
+        listServices().catch(() => []),
+        resolveActiveOrganization(),
+    ]);
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // New booking finds the customer by search (E4) and can send a pay link.
+    const people = {
+        canSearch: may("contact:read"),
+        payLink:
+            may("booking:write") &&
+            may("invoice:write") &&
+            (await hasPaymentProvider().catch(() => false)),
+    };
+
+    // From Home's "Last 24 hours" (F6): the confirmed bookings made since
+    // then, as Home counted them.
+    const since = sinceParam(params);
+    const upcoming = since
+        ? every.filter(
+              (b) => b.status === "CONFIRMED" && isSince(b.createdAt, since),
+          )
+        : every;
 
     return (
         <PageContainer width="wide">
@@ -79,12 +97,9 @@ export default async function BookingsPage({
                                     name: s.name,
                                     timezone: s.timezone,
                                     minutes: s.durationMinutes,
+                                    priceCents: s.priceCents,
                                 }))}
-                            contacts={contacts.map((c) => ({
-                                id: c.id,
-                                name: contactName(c),
-                                email: c.email,
-                            }))}
+                            people={people}
                             // Paying with a class pack spends one (ADR-007).
                             canUsePacks={
                                 canReadPacks(organization) &&
@@ -94,7 +109,15 @@ export default async function BookingsPage({
                     </>
                 }
             />
-            <div className="mt-6">
+            <div className="mt-6 space-y-4">
+                {since ? (
+                    <SinceNotice
+                        count={upcoming.length}
+                        noun={{ one: "booking", other: "bookings" }}
+                        verb="made"
+                        clearHref={withoutSince("/bookings/all", params)}
+                    />
+                ) : null}
                 <BookingsView
                     bookings={upcoming}
                     initialView={viewParam(params)}

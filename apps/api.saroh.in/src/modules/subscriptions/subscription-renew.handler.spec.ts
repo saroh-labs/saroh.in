@@ -51,14 +51,15 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("subscription.renew", () => {
-    it("asks for due subscriptions with Payments on, and any set to end", async () => {
+    it("asks for due subscriptions with Payments on, any set to end, and pauses that have ended", async () => {
+        const now = new Date("2026-10-01T02:00:00Z");
         await handler.handle(JOB);
         expect(findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
-                    currentPeriodEnd: { lte: new Date("2026-10-01T02:00:00Z") },
                     OR: [
                         {
+                            currentPeriodEnd: { lte: now },
                             status: "ACTIVE",
                             organization: {
                                 organizationModules: {
@@ -70,9 +71,12 @@ describe("subscription.renew", () => {
                             },
                         },
                         {
+                            currentPeriodEnd: { lte: now },
                             status: { in: ["ACTIVE", "PAUSED"] },
                             cancelAtPeriodEnd: true,
                         },
+                        // D8: a pause whose end date has come.
+                        { status: "PAUSED", pausedUntil: { lte: now } },
                     ],
                 },
                 take: RENEW_BATCH,
@@ -116,6 +120,25 @@ describe("subscription.renew", () => {
         await handler.handle(JOB);
         expect(log).toHaveBeenCalledWith(
             expect.stringContaining('"renewed":1,"advanced":0,"uncharged":1'),
+        );
+        log.mockRestore();
+    });
+
+    it("counts pauses it resumed, and ones Payments being off kept paused (D8)", async () => {
+        findMany.mockResolvedValue([
+            { id: "sub_1", organizationId: "org_1" },
+            { id: "sub_2", organizationId: "org_2" },
+        ]);
+        renewOne
+            .mockResolvedValueOnce("resumed")
+            .mockResolvedValueOnce("refused");
+        const log = jest
+            .spyOn(Logger.prototype, "log")
+            .mockImplementation(() => undefined);
+
+        await handler.handle(JOB);
+        expect(log).toHaveBeenCalledWith(
+            expect.stringContaining('"resumed":1,"refused":1'),
         );
         log.mockRestore();
     });

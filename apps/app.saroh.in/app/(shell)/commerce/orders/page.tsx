@@ -1,9 +1,11 @@
 import { PageContainer } from "@/components/shared/page-container";
+import { SinceNotice } from "@/components/shared/since-notice";
 import { OrdersScreen } from "@/components/stores/orders-screen";
 import { listAllOrderRows } from "@/lib/orders/business-service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
+import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
 /**
  * Sell → Orders: every order in the business.
@@ -28,13 +30,16 @@ export default async function OrdersPage({
     await requireSession();
     // Every row, for now: the screen still filters and searches what it
     // holds. B3 moves its tabs, filters and paging onto the API's.
-    const [{ rows: orders }, stores, { view }, organization] =
-        await Promise.all([
-            listAllOrderRows(),
-            listBusinessStores(),
-            searchParams,
-            resolveActiveOrganization(),
-        ]);
+    const [{ rows: all }, stores, params, organization] = await Promise.all([
+        listAllOrderRows(),
+        listBusinessStores(),
+        searchParams,
+        resolveActiveOrganization(),
+    ]);
+    const { view } = params;
+    // From Home's "Last 24 hours" (F6): only the orders placed since then.
+    const since = sinceParam(params);
+    const orders = all.filter((o) => isSince(o.placedAt, since));
     // A Member reaches the list through `order:stage` alone (DEC-024) and
     // gets the kitchen's view of it.
     const fullRead = organization?.actions
@@ -48,6 +53,16 @@ export default async function OrdersPage({
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 initialFilterId={typeof view === "string" ? view : undefined}
                 kitchen={!fullRead}
+                notice={
+                    since ? (
+                        <SinceNotice
+                            count={orders.length}
+                            noun={{ one: "order", other: "orders" }}
+                            verb="placed"
+                            clearHref={withoutSince("/commerce/orders", params)}
+                        />
+                    ) : null
+                }
             />
         </PageContainer>
     );
