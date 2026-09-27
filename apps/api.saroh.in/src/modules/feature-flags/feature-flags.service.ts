@@ -160,6 +160,17 @@ export class FeatureFlagService {
                 select: { enabled: true },
             });
 
+            // An override references its flag's row, and a flag that was
+            // never set globally has none (a fresh database), so the override
+            // would fail its foreign key. Register the flag dark first: the
+            // global default an unseeded flag already resolves to, so nothing
+            // changes for any other organization.
+            await tx.featureFlag.upsert({
+                where: { key },
+                create: { key, enabledByDefault: false },
+                update: {},
+            });
+
             await tx.featureFlagOverride.upsert({
                 where: {
                     flagKey_organizationId: { flagKey: key, organizationId },

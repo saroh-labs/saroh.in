@@ -231,6 +231,27 @@ describe("FeatureFlagService.setOverride", () => {
             },
         });
     });
+
+    it("registers a never-configured flag dark before its first override", async () => {
+        overrideFindUnique.mockResolvedValue(null);
+
+        await service.setOverride(
+            FlagKey.ORG_AUTHORIZATION,
+            "org_1",
+            true,
+            "user_1",
+        );
+
+        // Created off, and an existing global default is left as it is.
+        expect(flagUpsert).toHaveBeenCalledWith({
+            where: { key: FlagKey.ORG_AUTHORIZATION },
+            create: { key: FlagKey.ORG_AUTHORIZATION, enabledByDefault: false },
+            update: {},
+        });
+        expect(flagUpsert.mock.invocationCallOrder[0]).toBeLessThan(
+            overrideUpsert.mock.invocationCallOrder[0],
+        );
+    });
 });
 
 describe("FeatureFlagService.list", () => {
