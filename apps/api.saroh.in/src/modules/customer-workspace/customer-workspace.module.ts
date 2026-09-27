@@ -8,6 +8,7 @@ import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
+import { CustomersListService } from "./customers-list.service";
 
 /**
  * Unified customer workspace (#120). Depends on CapabilitiesModule for the
@@ -22,6 +23,7 @@ import { CustomerWorkspaceService } from "./customer-workspace.service";
         CustomerDetailService,
         ContactNotesService,
         ContactAttentionService,
+        CustomersListService,
         OrganizationGuard,
     ],
 })

@@ -21,6 +21,11 @@ import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
+import {
+    ListCustomersQueryDto,
+    ListUnlinkedQueryDto,
+} from "./customers-list.dto";
+import { CustomersListService } from "./customers-list.service";
 import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -47,7 +52,30 @@ export class CustomerWorkspaceController {
         private readonly details: CustomerDetailService,
         private readonly notes: ContactNotesService,
         private readonly attention: ContactAttentionService,
+        private readonly customers: CustomersListService,
     ) {}
+
+    /**
+     * The business's customers (DEC-041, C3): everyone who has paid or signs
+     * in on its site, with search, chips and counts, sort, "Bought at" and
+     * pages of 50.
+     */
+    @Get()
+    list(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: ListCustomersQueryDto,
+    ) {
+        return this.customers.list(ctx, query);
+    }
+
+    /** Paying store customers no contact holds yet, for the review sheet. */
+    @Get("unlinked")
+    unlinked(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: ListUnlinkedQueryDto,
+    ) {
+        return this.customers.unlinked(ctx, query);
+    }
 
     /** One read of a customer, rooted on the contact (U8). */
     @Get(":contactId/detail")
