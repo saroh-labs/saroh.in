@@ -5,6 +5,10 @@
 > `docs/plans/2026-09-26-002-feat-orders-fulfilment-plan.md` (Key Technical
 > Decisions, "The enum changes by expand and contract"). Referenced from
 > `docs/patterns/devops-tooling-and-deploy.md`.
+>
+> Release 1 (B2a) ships to production inside round 2's Phase 1 release: its
+> whole checklist, deploy order, backfills and rollback are in
+> `ROUND_2_PHASE_1_ROLLOUT.md`. The steps below still apply within it.
 
 An order used to be Collect or Delivery (`OrderFulfilment` COLLECT,
 DELIVERY). It becomes one of six types — PICKUP, LOCAL_DELIVERY, SHIPPING,
