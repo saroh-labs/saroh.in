@@ -300,26 +300,102 @@ test.describe("availability and services", () => {
         }
     });
 
-    test("a class under two places is refused with the design's words", async ({
+    test("a class under two places is refused, and leaving asks first (E2)", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto("/services");
-        await page.getByRole("button", { name: "New service" }).click();
-        const dialog = page.getByRole("dialog");
-        await dialog.getByRole("radio", { name: "Class" }).click();
-        await dialog.getByLabel("Name").fill("E2E class");
-        const who = dialog.getByRole("group", { name: "Who takes it" });
+        await page.getByRole("link", { name: "New service" }).click();
+        await expect(
+            page.getByRole("heading", { level: 1, name: "New service" }),
+        ).toBeVisible();
+        // Visits and the deposit arrive with E10 and E8.
+        await expect(page.getByLabel("Visits")).toHaveCount(0);
+        await expect(
+            page.getByRole("radiogroup", { name: "Deposit" }),
+        ).toHaveCount(0);
+        await page.getByRole("radio", { name: "Class" }).click();
+        await page.getByLabel("Name").fill("E2E class");
+        await page.getByLabel(/^Price/).fill("0");
+        const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("button").first().click();
+            await who.getByRole("checkbox").first().click();
         }
-        await dialog.getByLabel("Places").fill("1");
-        await expect(dialog.getByRole("alert")).toHaveText(
+        await page.getByLabel("Places").fill("1");
+        await expect(page.getByRole("alert").first()).toHaveText(
             "A class needs at least 2 places.",
         );
         await expect(
-            dialog.getByRole("button", { name: "Add service" }),
+            page.getByRole("button", { name: "Add service" }),
         ).toBeDisabled();
-        await dialog.getByRole("button", { name: "Cancel" }).click();
+
+        await page
+            .getByRole("navigation", { name: "Breadcrumb" })
+            .getByRole("link", { name: "Services" })
+            .click();
+        await expect(
+            page.getByRole("alertdialog", {
+                name: "Leave without creating it?",
+            }),
+        ).toBeVisible();
+        await page.getByRole("link", { name: "Leave without saving" }).click();
+        await expect(
+            page.getByRole("heading", { level: 1, name: "Services" }),
+        ).toBeVisible();
+    });
+});
+
+test.describe("the Service Editor on Northwind (E2)", () => {
+    const NORTHWIND = "seed_org";
+    const nwApi = (path: string) =>
+        `${urls.API_URL}/organizations/${NORTHWIND}${path}`;
+
+    test("an Either service with a price is added, and its card says so", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto("/services/new");
+        const heading = page.getByRole("heading", {
+            level: 1,
+            name: "New service",
+        });
+        test.skip(
+            !(await heading.isVisible()),
+            "Northwind doesn't take bookings",
+        );
+        const name = `E2E either ${Date.now()}`;
+        await page.getByLabel("Name").fill(name);
+        await page.getByRole("radio", { name: "Either — they choose" }).click();
+        await page
+            .getByLabel("Link to join")
+            .fill("https://meet.example.com/e2e-either");
+        await page.getByLabel(/^Price/).fill("500");
+        const who = page.getByRole("group", { name: "Who takes it" });
+        if (await who.isVisible()) {
+            await who.getByRole("checkbox").first().click();
+        }
+        await page.getByRole("button", { name: "Add service" }).click();
+        await page.waitForURL(/\/services\/(?!new)[^/]+$/);
+        const id = new URL(page.url()).pathname.split("/").pop() ?? "";
+        try {
+            await expect(
+                page.getByRole("heading", { level: 1, name }),
+            ).toBeVisible();
+            await expect(
+                page.getByText("Taking bookings", { exact: true }),
+            ).toBeVisible();
+
+            await page.goto("/services");
+            const card = page.getByRole("listitem").filter({ hasText: name });
+            await expect(card).toContainText("In person or online");
+            await expect(
+                card.getByRole("button", { name: "Stop taking bookings" }),
+            ).toBeVisible();
+        } finally {
+            await page.request.delete(nwApi(`/services/${id}`), {
+                headers: { "x-organization-id": NORTHWIND },
+            });
+        }
     });
 });
