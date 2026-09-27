@@ -33,7 +33,7 @@ import type { ReviewState, SiteFlags, SitePage } from "@/lib/sites/service";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
- * page is shown (theme, width, zoom, full-screen preview), and the two ways
+ * page is shown (theme, width, zoom, Preview), and the two ways
  * work leaves the editor (Share for review, Publish). Moved out of
  * `site-editor.tsx` (#260), then laid out as Saroh Site Editor.dc.html draws
  * it (G2): the status is true after a reload, Publish says what it puts
@@ -72,7 +72,8 @@ export function EditorTopBar({
     setDevice,
     zoom,
     setZoom,
-    setFullScreen,
+    previewing,
+    setPreviewing,
 }: {
     siteId: string;
     siteName: string;
@@ -102,7 +103,9 @@ export function EditorTopBar({
     setDevice: (next: Device) => void;
     zoom: Zoom;
     setZoom: (next: Zoom) => void;
-    setFullScreen: (open: boolean) => void;
+    /** Preview in place (G5), on or off. */
+    previewing: boolean;
+    setPreviewing: (on: boolean) => void;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -304,17 +307,23 @@ export function EditorTopBar({
                 />
 
                 {/*
-                 * Preview removes the editing chrome; it does not switch
-                 * to another renderer. Escape returns.
+                 * Preview removes the editing tools from the same canvas;
+                 * it does not switch to another renderer (G5). While it is
+                 * on, the button says where it goes back to, as the design
+                 * does, and Escape returns too.
                  */}
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground"
-                    onClick={() => setFullScreen(true)}
+                    aria-pressed={previewing}
+                    className={cn(
+                        "h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground",
+                        previewing && "bg-secondary",
+                    )}
+                    onClick={() => setPreviewing(!previewing)}
                 >
                     <Eye aria-hidden className="size-[15px]" />
-                    Preview
+                    {previewing ? "Editing" : "Preview"}
                 </Button>
 
                 {/*

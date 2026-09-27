@@ -28,6 +28,11 @@ describe("fitScaleFor", () => {
         expect(fitScaleFor("tablet", 600)).toBe(552 / 768);
     });
 
+    it("fits to the whole canvas in Preview, which has no padding (G5)", () => {
+        expect(fitScaleFor("phone", 300, 0)).toBe(300 / 375);
+        expect(fitScaleFor("desktop", 300, 0)).toBe(1);
+    });
+
     it("reports more than 1 for a canvas wider than the frame", () => {
         // Capping is the zoom's job, so the raw measure is kept.
         expect(fitScaleFor("phone", 1000)).toBe(952 / 375);

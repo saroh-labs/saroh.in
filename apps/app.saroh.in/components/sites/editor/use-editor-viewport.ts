@@ -18,9 +18,27 @@ export const CANVAS_PADDING = 48;
  * How far "Fit" would scale a frame of this device into a canvas this wide.
  * Desktop has no fixed width, so it is never scaled.
  */
-export function fitScaleFor(device: Device, canvasWidth: number): number {
+export function fitScaleFor(
+    device: Device,
+    canvasWidth: number,
+    /** Preview draws the page edge to edge, with no padding (G5). */
+    padding: number = CANVAS_PADDING,
+): number {
     const frame = DEVICE_PX[device];
-    return frame === null ? 1 : (canvasWidth - CANVAS_PADDING) / frame;
+    return frame === null ? 1 : (canvasWidth - padding) / frame;
+}
+
+/*
+ * Preview carried across a page switch (G5). The editor is keyed on its page,
+ * so following a link in Preview remounts it; this says that the next mount of
+ * that page starts in Preview. Memory only, so a reload starts in editing, and
+ * cleared once read so coming back later does not.
+ */
+let carried: { siteId: string; pageId: string } | null = null;
+
+/** Open the next mount of this page in Preview. */
+export function carryPreview(siteId: string, pageId: string): void {
+    carried = { siteId, pageId };
 }
 
 /*
@@ -50,15 +68,18 @@ export function editorColumns(railWidth: number, panelWidth: number): string {
 
 /**
  * Everything about how the page is shown rather than what is on it: panel
- * widths, the device, zoom and Fit, full-screen preview, and where the canvas
- * was scrolled to. Moved out of `site-editor.tsx` unchanged (#260).
+ * widths, the device, zoom and Fit, Preview, and where the canvas was
+ * scrolled to. Moved out of `site-editor.tsx` (#260).
  */
 export function useEditorViewport({
     siteId,
+    pageId,
     sectionCount,
     initialScrollTop,
 }: {
     siteId: string;
+    /** The open page, for Preview carried across a page switch. */
+    pageId: string;
     /** The page's section count on load, which the place store is keyed by. */
     sectionCount: number;
     /** Where the canvas was scrolled to last time, restored on mount. */
@@ -103,8 +124,16 @@ export function useEditorViewport({
     const [zoom, setZoom] = useState<Zoom>(100);
     /** Briefly dimmed while a device switch animates — the cross-fade. */
     const [switching, setSwitching] = useState(false);
-    /** Full-screen preview: everything else hides, Escape returns (spec §2). */
-    const [fullScreen, setFullScreen] = useState(false);
+    /*
+     * Preview (G5): the same canvas with the editing tools taken away, so the
+     * site can be used as a visitor would. Escape returns.
+     */
+    const [previewing, setPreviewing] = useState(
+        () => carried?.siteId === siteId && carried.pageId === pageId,
+    );
+    useEffect(() => {
+        carried = null;
+    }, []);
     const canvasRef = useRef<HTMLDivElement | null>(null);
 
     const [fitScale, setFitScale] = useState(1);
@@ -113,13 +142,19 @@ export function useEditorViewport({
         const el = canvasRef.current;
         if (el === null) return;
         const measure = () => {
-            setFitScale(fitScaleFor(device, el.clientWidth));
+            setFitScale(
+                fitScaleFor(
+                    device,
+                    el.clientWidth,
+                    previewing ? 0 : CANVAS_PADDING,
+                ),
+            );
         };
         measure();
         const ro = new ResizeObserver(measure);
         ro.observe(el);
         return () => ro.disconnect();
-    }, [device]);
+    }, [device, previewing]);
     const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
@@ -135,13 +170,13 @@ export function useEditorViewport({
     }, []);
 
     useEffect(() => {
-        if (!fullScreen) return;
+        if (!previewing) return;
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") setFullScreen(false);
+            if (e.key === "Escape") setPreviewing(false);
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [fullScreen]);
+    }, [previewing]);
 
     /*
      * Remembered per site — the spec lists preview scroll position among the
@@ -172,8 +207,8 @@ export function useEditorViewport({
         setZoom,
         zoomScale,
         switching,
-        fullScreen,
-        setFullScreen,
+        previewing,
+        setPreviewing,
         canvasRef,
         onCanvasScroll,
     };

@@ -30,6 +30,8 @@ import type { SiteStyleOptions } from "@/lib/sites/style";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
+    // The site's menu (G17) asks where it is.
+    usePathname: () => "/sites",
 }));
 
 const actions = vi.hoisted(() => ({
@@ -584,16 +586,181 @@ describe("SiteEditor shell", () => {
         expect(rows).toHaveLength(1);
     });
 
-    it("full-screen preview hides the editor and Escape returns", () => {
+    /*
+     * G5 changed this: Preview was a full-screen overlay with its own copy
+     * of the page ("Escape to return"). It is now the same canvas with the
+     * editing tools put away, and the top bar stays.
+     */
+    it("Preview puts the editing tools away in place, and Escape returns", () => {
         render();
+        const blocksBefore = $$("[data-block-index]").length;
+        expect(blocksBefore).toBeGreaterThan(0);
         click(button("Preview"));
-        expect(button("Escape to return")).toBeTruthy();
+
+        // The same canvas, with no block outlines or labels on it.
+        expect($("[data-previewing]")).not.toBeNull();
+        expect($$("[data-block-index]")).toHaveLength(0);
+        expect(() => button(/^Hero block, 1 of/)).toThrow();
+        expect(() => button("Header, on every page")).toThrow();
+        expect(host.textContent).toContain("Welcome in");
+        // The rail and inspector are away, kept mounted, and the bar stays.
+        const aside = $("aside");
+        expect(aside?.closest("[hidden]")).not.toBeNull();
+        expect(button("Editing").getAttribute("aria-pressed")).toBe("true");
+        expect(button("Publish")).toBeTruthy();
+        expect(host.textContent).toContain(
+            "This is your site with the draft. Try it; nothing is live until you publish.",
+        );
+        // No window bar round the site.
+        expect(host.textContent).not.toContain("flour.saroh.app/");
+
         act(() => {
             window.dispatchEvent(
                 new KeyboardEvent("keydown", { key: "Escape" }),
             );
         });
-        expect(() => button("Escape to return")).toThrow();
+        expect($("[data-previewing]")).toBeNull();
+        expect($$("[data-block-index]")).toHaveLength(blocksBefore);
+        expect($("aside")?.closest("[hidden]")).toBeNull();
+        expect(button("Preview").getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("Back to editing leaves Preview, with the block still selected", () => {
+        render();
+        click(button("Our story"));
+        click(button("Preview"));
+        click(button(/^Back to editing/));
+        expect($("[data-previewing]")).toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+    });
+
+    it("keeps the device and zoom in Preview", () => {
+        render();
+        click(button("Show at phone width"));
+        click(button("Preview"));
+        expect(frame().style.maxWidth).toBe("23.4375rem");
+        expect(frame().style.transform).toBe("scale(1)");
+        // Still switchable from the bar while previewing.
+        click(button("Show at tablet width"));
+        expect(frame().style.maxWidth).toBe("48rem");
+        expect($("[data-previewing]")).not.toBeNull();
+        expect(button("Zoom").textContent).toContain("100%");
+    });
+
+    it("opens a page linked from the site's menu in Preview, and stays in Preview", () => {
+        const contact: SitePage = {
+            id: "p-contact",
+            path: "/contact",
+            title: "Contact",
+            isHome: false,
+            hidden: false,
+        };
+        const props = render({
+            pages: [...PAGES, contact],
+            navigation: { items: [{ pageId: "p-contact" }] },
+        });
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        const link = $$("header a").find((a) => a.textContent === "Contact");
+        if (!link) throw new Error("No Contact link in the menu");
+        // A real click, which can be cancelled, as a browser's is.
+        act(() => link.click());
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).toHaveBeenCalledWith(
+            `/sites/${props.siteId}?page=p-contact`,
+        );
+
+        // The route remounts the editor on that page (it is keyed on it).
+        act(() => {
+            root.render(
+                <SiteEditor key="p-contact" {...props} pageId="p-contact" />,
+            );
+        });
+        expect(button(/^Page: Contact\./)).toBeTruthy();
+        expect($("[data-previewing]")).not.toBeNull();
+
+        // Only that once: the next time this page opens, it opens editing.
+        act(() => {
+            root.render(
+                <SiteEditor key="again" {...props} pageId="p-contact" />,
+            );
+        });
+        expect($("[data-previewing]")).toBeNull();
+        opened.mockRestore();
+    });
+
+    /** A page whose one block is a hero with a button to `href`. */
+    function withButton(href: string): Partial<Props> {
+        return {
+            initialSections: [
+                {
+                    key: "s1",
+                    type: "hero",
+                    contractVersion: 1,
+                    content: {
+                        heading: "Welcome in",
+                        cta: { label: "Go", href, style: "primary" },
+                    },
+                },
+            ],
+        };
+    }
+
+    /** Click a link as a browser does: the click can be cancelled. */
+    function pressLink(text: string) {
+        const link = $$("a").find((a) => a.textContent.trim() === text);
+        if (!link) throw new Error(`No link ${text}`);
+        act(() => link.click());
+    }
+
+    it("sends a link to another site to a new tab in Preview", () => {
+        render(withButton("https://example.com"));
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).toHaveBeenCalledWith(
+            "https://example.com",
+            "_blank",
+            "noopener",
+        );
+        expect(push).not.toHaveBeenCalled();
+        opened.mockRestore();
+    });
+
+    it("opens a page a button links to in Preview, not a tab", () => {
+        const { siteId } = render(withButton("/about"));
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        opened.mockRestore();
+    });
+
+    it("selects the block, and opens nothing, when a link is clicked while editing", () => {
+        const { siteId } = render(withButton("/about"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        opened.mockRestore();
+    });
+
+    it("stays on the page, and says why, when a page is linked while a save is due", async () => {
+        const { siteId } = render(withButton("/about"));
+        // An edit that has not gone out yet: the autosave is still waiting.
+        const heading = Array.from(
+            document.querySelectorAll<HTMLInputElement>("input"),
+        ).find((i) => i.value === "Welcome in");
+        if (!heading) throw new Error("No heading field");
+        type(heading, "Welcome back");
+        click(button("Preview"));
+        pressLink("Go");
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Save this page before opening another.",
+        );
+        await wait(5000);
     });
 
     it("removes a block at once, and Undo puts it back in its place with its content", () => {
