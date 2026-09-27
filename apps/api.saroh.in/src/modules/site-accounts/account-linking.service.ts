@@ -12,9 +12,11 @@ import {
 /**
  * Who a verified sign-in is (DEC-049; round-2 plan A).
  *
- * A4 owns this file. A2 builds only `linkOrCreate`, the one call a verified
- * code needs; A4 adds the workspace badge, "This isn't them" and its
- * `unlink-plan.ts`, and C9 routes the contact through `resolveContact`.
+ * A4 owns this file. A2 built `linkOrCreate`, the one call a verified code
+ * needs; A4 reviewed it against the plan, stamps a verified link, and adds
+ * the workspace badge and "This isn't them" (`account-unlink.service.ts`,
+ * `unlink-plan.ts`). C9 routes the contact through `resolveContact` at the
+ * seam below (`resolveLinkTarget`).
  *
  * The rule, for a verified email `e` in one business:
  * - an ACTIVE account holds `e` → sign in to it;
@@ -49,6 +51,20 @@ export function maskEmail(email: string): string {
 }
 
 const MAX_MERGE_HOPS = 5;
+
+/**
+ * THE SEAM FOR C9's `resolveContact`. Every contact id `linkOrCreate` links
+ * an account to passes through here. Until C9 lands merges don't exist, so
+ * the contact is itself; C9 replaces the body with
+ * `resolveContact(tx, contactId)` (`FOR SHARE`, one hop through
+ * `mergedIntoId`) so a sign-in racing a merge lands on the survivor.
+ */
+export function resolveLinkTarget(
+    _tx: Prisma.TransactionClient,
+    contactId: string,
+): Promise<string> {
+    return Promise.resolve(contactId);
+}
 
 @Injectable()
 export class AccountLinkingService {
@@ -91,13 +107,22 @@ export class AccountLinkingService {
 
         const holder = holders.length === 1 ? holders[0] : undefined;
         if (holder?.emailVerifiedAt) {
+            const target = await resolveLinkTarget(tx, holder.id);
             const taken = await this.accounts.findLiveForContact(
                 organizationId,
-                holder.id,
+                target,
                 tx,
             );
             if (!taken) {
-                return this.open(tx, organizationId, holder.id, email, now);
+                // The code proves the inbox again: the stamp says so now.
+                await tx.contact.update({
+                    where: { id: target },
+                    data: {
+                        emailVerifiedAt: now,
+                        emailVerifiedVia: "SIGN_IN_CODE",
+                    },
+                });
+                return this.open(tx, organizationId, target, email, now);
             }
         }
 

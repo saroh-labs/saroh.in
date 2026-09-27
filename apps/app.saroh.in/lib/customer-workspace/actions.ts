@@ -10,8 +10,10 @@ import {
     createAttention,
     createNote,
     deleteNote,
+    getUnlinkPreview,
     linkCustomer,
     removeAttention,
+    unlinkAccount,
     updateAttention,
 } from "./service";
 
@@ -96,5 +98,23 @@ export async function restoreOffersAction(contactId: string) {
         status: "GRANTED",
     });
     if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** What "This isn't them" would move, read when its confirm opens (A4). */
+export async function unlinkPreviewAction(contactId: string) {
+    return getUnlinkPreview(contactId);
+}
+
+/**
+ * "This isn't them": the site account moves to a record of its own. Both
+ * customers' pages change, so both are read again.
+ */
+export async function unlinkAccountAction(contactId: string) {
+    const result = await unlinkAccount(contactId);
+    if (result.ok) {
+        revalidatePath(`/customers/${contactId}`);
+        revalidatePath(`/customers/${result.data.contactId}`);
+    }
     return result;
 }
