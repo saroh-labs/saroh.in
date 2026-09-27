@@ -280,24 +280,46 @@ export async function listServices(): Promise<Service[]> {
     return (await res.json()) as Service[];
 }
 
-/** One owned service, or null when missing / not permitted. */
-export async function getService(serviceId: string): Promise<Service | null> {
+/**
+ * One service for the Service Editor (E2), or why not: missing (404, or
+ * another business's), forbidden, or a read that failed. A failed read is
+ * never "that service isn't here".
+ */
+export async function readService(
+    serviceId: string,
+): Promise<
+    | { ok: true; service: Service }
+    | { ok: false; reason: "missing" | "forbidden" | "failed" }
+> {
     const base = await orgBase();
-    if (!base) return null;
-    const res = await apiFetch(`${base}/services/${serviceId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as Service;
+    if (!base) return { ok: false, reason: "failed" };
+    try {
+        const res = await apiFetch(`${base}/services/${serviceId}`);
+        if (res.status === 404) return { ok: false, reason: "missing" };
+        if (res.status === 403) return { ok: false, reason: "forbidden" };
+        if (!res.ok) return { ok: false, reason: "failed" };
+        return { ok: true, service: (await res.json()) as Service };
+    } catch {
+        return { ok: false, reason: "failed" };
+    }
 }
 
-/** A service's availability rules (day + start/end). Empty on any failure. */
+/**
+ * A service's availability rules (day + start/end), or null when they could
+ * not be read — never an empty list, which the editor would save over them.
+ */
 export async function listRules(
     serviceId: string,
-): Promise<AvailabilityRule[]> {
+): Promise<AvailabilityRule[] | null> {
     const base = await orgBase();
-    if (!base) return [];
-    const res = await apiFetch(`${base}/services/${serviceId}/rules`);
-    if (!res.ok) return [];
-    return (await res.json()) as AvailabilityRule[];
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/services/${serviceId}/rules`);
+        if (!res.ok) return null;
+        return (await res.json()) as AvailabilityRule[];
+    } catch {
+        return null;
+    }
 }
 
 /** A single service's bookings (newest slot first). Empty on any failure. */
