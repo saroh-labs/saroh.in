@@ -68,8 +68,8 @@ function moneyDb(opts: {
 
 describe("overdueTag", () => {
     it("counts whole days past due, and never says 0", () => {
-        expect(overdueTag(ago(2 * DAY + 3600_000), NOW)).toBe("Overdue 2 days");
-        expect(overdueTag(ago(3600_000), NOW)).toBe("Overdue 1 day");
+        expect(overdueTag(ago(2 * DAY + 3600_000), NOW)).toBe("Late · 2 days");
+        expect(overdueTag(ago(3600_000), NOW)).toBe("Late · 1 day");
     });
 });
 
@@ -126,7 +126,7 @@ describe("renewalTag", () => {
         ).toBeNull();
     });
 
-    it("says Overdue N days on a past-due invoice with no event", () => {
+    it("says Late · N days on a past-due invoice with no event", () => {
         expect(
             renewalTag(
                 { ...invoice, dueAt: ago(2 * DAY + 60_000) },
@@ -134,7 +134,7 @@ describe("renewalTag", () => {
                 [],
                 NOW,
             ),
-        ).toBe("Overdue 2 days");
+        ).toBe("Late · 2 days");
     });
 });
 
@@ -160,7 +160,7 @@ describe("failedRenewals", () => {
                     amountMinor: 120000,
                     currency: "INR",
                     href: "/billing/subscriptions/sub_1",
-                    tag: "Overdue 2 days",
+                    tag: "Late · 2 days",
                     tone: "bad",
                 },
             ],
@@ -251,9 +251,10 @@ describe("overdueInvoices", () => {
         dueAt: ago(2 * DAY + 60_000),
         billToName: "Café Mocha",
         contact: null,
+        lines: [{ description: "Catering, 12 Sep" }],
     };
 
-    it("gives a hand-written invoice two days past due, tagged Overdue 2 days", async () => {
+    it("gives a hand-written invoice two days past due, tagged Late · 2 days", async () => {
         const db = moneyDb({ overdue: [HAND_WRITTEN] });
         const action = await overdueInvoices(db as never, "org_1", NOW);
 
@@ -273,8 +274,10 @@ describe("overdueInvoices", () => {
                 amountMinor: 400000,
                 currency: "INR",
                 href: "/billing/invoices/inv_1",
-                tag: "Overdue 2 days",
+                tag: "Late · 2 days",
                 tone: "bad",
+                // Its first line, for Home's row (F3).
+                detail: "Catering, 12 Sep",
             },
         ]);
     });
@@ -412,7 +415,7 @@ describe("sitesNotLive", () => {
 
         expect(action).toMatchObject({
             code: "WEBSITE_NOT_LIVE",
-            title: "Your website isn't live yet",
+            title: "Your site isn't live",
             href: "/sites/site_1",
             severity: "SETUP",
             moduleKey: "WEBSITE",
@@ -524,6 +527,7 @@ const handOverdue = () => ({
     dueAt: ago(2 * DAY + 3600_000, new Date()),
     billToName: "Café Mocha",
     contact: null,
+    lines: [],
 });
 
 describe("HomeService with the F1 sources", () => {
@@ -540,7 +544,7 @@ describe("HomeService with the F1 sources", () => {
             "PAYMENTS_OVERDUE_INVOICES",
         ]);
         const renewal = model.actions[0];
-        expect(renewal.evidence?.[0].tag).toBe("Overdue 2 days");
+        expect(renewal.evidence?.[0].tag).toBe("Late · 2 days");
         expect(model.actions[1].evidence?.map((e) => e.id)).toEqual(["inv_1"]);
         expect(model.unavailable).toEqual([]);
     });

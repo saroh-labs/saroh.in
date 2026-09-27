@@ -15,16 +15,20 @@ import type {
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
-import { EVIDENCE_LIMIT, holds, personName } from "./home-model";
+import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
 import { failedRenewals, overdueInvoices } from "./home-money-sources";
+import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
+import { openOrderWords } from "./home-order-rows";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 
 export type {
     HomeAction,
     HomeBooking,
     HomeEvidence,
+    HomeInline,
     HomeInput,
     HomeModel,
+    HomeNeed,
     HomeNumber,
     HomeSeverity,
     HomeTone,
@@ -177,6 +181,8 @@ export class HomeService {
         // module for contacts and holds no `lead:read`, so the two lead bands
         // below ask for the action rather than the module.
         const canReadLeads = holds(input, "lead:read");
+        // The business's days: "Due today" on an order, "was due 14 Sep".
+        const zone = await this.businessZone(input.organizationId);
         const numbers: HomeNumber[] = [];
         let upcoming: HomeBooking[] = [];
 
@@ -214,7 +220,14 @@ export class HomeService {
         if (available.has("COMMERCE")) {
             const open = await this.attempt(
                 { moduleKey: "COMMERCE", label: "Open orders" },
-                () => this.openOrders(input.organizationId),
+                () =>
+                    this.openOrders(input.organizationId, {
+                        now,
+                        zone,
+                        // An order's money is `order:read`'s; `order:stage`
+                        // moves it without seeing it (DEC-024).
+                        money: holds(input, "order:read"),
+                    }),
                 { count: 0, evidence: [] },
                 unavailable,
             );
@@ -416,7 +429,33 @@ export class HomeService {
             upcoming,
             numbers,
             unavailable,
+            ...flattenNeeds(actions, zone),
         };
+    }
+
+    /**
+     * The zone the business keeps its days in, or India's when it has set
+     * none (as invoicing reads it). Not a source of its own: when it can't be
+     * read, the default only moves "Due today" by the zones' difference, and
+     * saying Home is missing a part would be untrue.
+     */
+    private async businessZone(organizationId: string): Promise<string> {
+        try {
+            const profile = await this.db.businessProfile.findUnique({
+                where: { organizationId },
+                select: { timezone: true },
+            });
+            // "" included, as older rows stored it.
+            const zone = profile?.timezone?.trim() ?? "";
+            return zone.length > 0 ? zone : HOME_DEFAULT_ZONE;
+        } catch (error) {
+            this.logger.warn(
+                `Home could not read the business's time zone: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return HOME_DEFAULT_ZONE;
+        }
     }
 
     /**
@@ -457,13 +496,22 @@ export class HomeService {
                 amountMinor: row.lead.value,
                 currency: null,
                 href: `/leads/${row.lead.id}`,
+                // The where asked for a due date before now.
+                ...(row.dueAt
+                    ? { tag: overdueTag(row.dueAt, now), tone: "bad" as const }
+                    : {}),
             })),
         };
     }
 
-    /** Unfulfilled orders, oldest first — longest wait is the biggest problem. */
+    /**
+     * Unfulfilled orders, oldest first — longest wait is the biggest problem.
+     * Each says what to do with it and whether it is late (F3); its money
+     * only to someone who reads orders.
+     */
     private async openOrders(
         organizationId: string,
+        view: { now: Date; zone: string; money: boolean },
     ): Promise<{ count: number; evidence: HomeEvidence[] }> {
         const where = {
             organizationId,
@@ -484,17 +532,24 @@ export class HomeService {
 
         return {
             count,
-            evidence: rows.map((row) => ({
-                id: row.id,
-                title: row.orderId,
-                subtitle: personName(row.customer),
-                at: row.createdAt.toISOString(),
-                // Decimal in MAJOR units on the row; the wire contract is minor
-                // units, so it is converted once here rather than in each client.
-                amountMinor: Math.round(Number(row.total) * 100),
-                currency: row.currency,
-                href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
-            })),
+            evidence: rows.map((row) => {
+                const who = personName(row.customer);
+                return {
+                    id: row.id,
+                    title: row.orderId,
+                    subtitle: who,
+                    at: row.createdAt.toISOString(),
+                    // Decimal in MAJOR units on the row; the wire contract is
+                    // minor units, so it is converted once here rather than in
+                    // each client.
+                    amountMinor: view.money
+                        ? Math.round(Number(row.total) * 100)
+                        : null,
+                    currency: view.money ? row.currency : null,
+                    href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
+                    ...openOrderWords(row, who, view.now, view.zone),
+                };
+            }),
         };
     }
 

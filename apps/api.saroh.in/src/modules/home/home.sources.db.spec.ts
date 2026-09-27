@@ -309,7 +309,7 @@ describe("Home F1 sources (DB)", () => {
                 amountMinor: 120000,
                 currency: "INR",
                 href: `/billing/subscriptions/${liveSubId}`,
-                tag: "Overdue 2 days",
+                tag: "Late · 2 days",
             }),
         ]);
     });
@@ -325,7 +325,7 @@ describe("Home F1 sources (DB)", () => {
         expect(hand).toMatchObject({
             subtitle: "Café Mocha",
             amountMinor: 400000,
-            tag: "Overdue 2 days",
+            tag: "Late · 2 days",
         });
     });
 
