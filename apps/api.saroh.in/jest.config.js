@@ -228,6 +228,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
         // D9: what a subscription action records, and reading its log.
         "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
+        // D8: a pause's end date, and the job's resume on it.
+        "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

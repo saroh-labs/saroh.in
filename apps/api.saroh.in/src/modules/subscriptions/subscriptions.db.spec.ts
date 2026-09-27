@@ -6,6 +6,7 @@
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { pausesWaitingOnPayments } from "../home/home-pause-sources";
 import { InvoicesService } from "../invoices/invoices.service";
 import {
     SUBSCRIPTION_RENEW_TYPE,
@@ -807,5 +808,177 @@ describe("a plan's history (D2, real database)", () => {
                 },
             }),
         ).rejects.toThrow();
+    });
+});
+
+describe("a pause with an end date (D8, real database)", () => {
+    const HOUR = 60 * 60 * 1000;
+    const DAY = 24 * HOUR;
+
+    const eventsOf = (subscriptionId: string, kind?: string) =>
+        prisma.subscriptionEvent.findMany({
+            where: { subscriptionId, ...(kind ? { kind } : {}) },
+            orderBy: { createdAt: "asc" },
+        });
+
+    /** A monthly member, paid from today for a month, paused for `weeks`. */
+    async function pausedFor(
+        ctx: OrganizationContext,
+        plan: string,
+        weeks: 2 | 4 | 8,
+    ) {
+        const s = await service.subscribe(ctx, {
+            contactId: (
+                await prisma.contact.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        email: `paused-${people++}@example.com`,
+                    },
+                })
+            ).id,
+            planId: plan,
+            timezone: "UTC",
+        });
+        const paused = await service.pause(ctx, s.id, { weeks });
+        return { before: s, paused, until: new Date(paused.pausedUntil!) };
+    }
+
+    it("resumes a 4-week pause on its date, 28 days later, once however often the job runs", async () => {
+        const { before, paused, until } = await pausedFor(org, planId, 4);
+        expect(paused.status).toBe("PAUSED");
+        // The start of the day four weeks on, in its zone (UTC).
+        const today = new Date(new Date().toISOString().slice(0, 10));
+        expect(until).toEqual(new Date(today.getTime() + 28 * DAY));
+
+        // The day before, nothing happens.
+        await handler.renewDue(new Date(until.getTime() - HOUR));
+        expect((await service.get(org, before.id)).status).toBe("PAUSED");
+
+        // On the day: two deliveries at once, then the run again.
+        const on = new Date(until.getTime() + HOUR);
+        const outcomes = await Promise.all([
+            service.renewOne(before.id, on),
+            service.renewOne(before.id, on),
+        ]);
+        expect(outcomes.sort()).toEqual(["resumed", "skipped"]);
+        await handler.renewDue(on);
+
+        const after = await service.get(org, before.id);
+        expect(after).toMatchObject({
+            status: "ACTIVE",
+            pausedAt: null,
+            pausedUntil: null,
+        });
+        expect(
+            new Date(after.currentPeriodEnd).getTime() -
+                new Date(before.currentPeriodEnd).getTime(),
+        ).toBe(28 * DAY);
+        // Still covered by its first invoice.
+        expect(await invoicesOf(before.id)).toHaveLength(1);
+        const resumed = await eventsOf(before.id, "RESUMED");
+        expect(resumed).toHaveLength(1);
+        expect(resumed[0]).toMatchObject({
+            actorKind: "JOB",
+            actorUserId: null,
+            data: { extendedDays: 28 },
+        });
+        expect((await eventsOf(before.id, "PAUSED"))[0]!.data).toEqual({
+            until: until.toISOString(),
+        });
+    });
+
+    it("issues the next invoice when an 8-week pause outlasts the paid month", async () => {
+        const { before, until } = await pausedFor(org, planId, 8);
+        expect(until > new Date(before.currentPeriodEnd)).toBe(true);
+
+        await handler.renewDue(new Date(until.getTime() + HOUR));
+
+        const after = await service.get(org, before.id);
+        expect(after.status).toBe("ACTIVE");
+        expect(new Date(after.currentPeriodStart)).toEqual(until);
+        const invoices = await invoicesOf(before.id);
+        expect(invoices).toHaveLength(2);
+        expect(invoices[1]!.periodStart).toEqual(until);
+        expect(await eventsOf(before.id, "RESUMED")).toEqual([
+            expect.objectContaining({
+                actorKind: "JOB",
+                invoiceId: invoices[1]!.id,
+                data: { restarted: true },
+            }),
+        ]);
+    });
+
+    it("clears the date on a resume by hand, and leaves the job nothing to resume", async () => {
+        const { before, until } = await pausedFor(org, planId, 2);
+        const resumed = await service.resume(org, before.id);
+        expect(resumed.pausedUntil).toBeNull();
+        const row = await prisma.customerSubscription.findUniqueOrThrow({
+            where: { id: before.id },
+        });
+        expect(row.pausedUntil).toBeNull();
+
+        await expect(
+            service.renewOne(before.id, new Date(until.getTime() + HOUR)),
+        ).resolves.toBe("skipped");
+        expect(
+            (await eventsOf(before.id, "RESUMED")).map((e) => e.actorKind),
+        ).toEqual(["TEAM"]);
+    });
+
+    it("keeps it paused with Payments off, says so once, raises it on Home, and resumes once Payments is back", async () => {
+        const off = await makeOrg("pause-payments-off");
+        const monthly = await service.createPlan(off, {
+            name: "Monthly",
+            price: "1200",
+            currency: "INR",
+            interval: "MONTH",
+        });
+        const { before, until } = await pausedFor(off, monthly.id, 8);
+        const module = await prisma.organizationModule.create({
+            data: {
+                organizationId: off.organizationId,
+                moduleKey: "PAYMENTS",
+                status: "DISABLED",
+            },
+        });
+        const on = new Date(until.getTime() + HOUR);
+
+        await handler.renewDue(on);
+        await handler.renewDue(new Date(on.getTime() + HOUR));
+
+        expect((await service.get(off, before.id)).status).toBe("PAUSED");
+        expect(await invoicesOf(before.id)).toHaveLength(1);
+        const refused = await eventsOf(before.id, "RESUME_REFUSED");
+        expect(refused).toHaveLength(1);
+        expect(refused[0]).toMatchObject({
+            actorKind: "JOB",
+            data: { until: until.toISOString(), reason: "PAYMENTS_OFF" },
+        });
+        const home = await pausesWaitingOnPayments(
+            prisma,
+            off.organizationId,
+            on,
+        );
+        expect(home).toMatchObject({
+            code: "PAYMENTS_PAUSES_WAITING",
+            count: 1,
+        });
+        expect(home?.evidence?.[0]?.id).toBe(before.id);
+        // Another business's pauses aren't its.
+        expect(
+            await pausesWaitingOnPayments(prisma, org.organizationId, on),
+        ).toBeNull();
+
+        await prisma.organizationModule.update({
+            where: { id: module.id },
+            data: { status: "ENABLED" },
+        });
+        await handler.renewDue(new Date(on.getTime() + 2 * HOUR));
+        expect((await service.get(off, before.id)).status).toBe("ACTIVE");
+        expect(await invoicesOf(before.id)).toHaveLength(2);
+        expect(await eventsOf(before.id, "RESUMED")).toHaveLength(1);
+        expect(
+            await pausesWaitingOnPayments(prisma, off.organizationId, on),
+        ).toBeNull();
     });
 });

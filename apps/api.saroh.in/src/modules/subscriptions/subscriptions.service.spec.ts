@@ -20,7 +20,7 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
         },
         subscriptionPlanEvent: { create: jest.fn() },
-        subscriptionEvent: { create: jest.fn() },
+        subscriptionEvent: { create: jest.fn(), findFirst: jest.fn() },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -135,6 +135,7 @@ function sub(over: Record<string, unknown> = {}) {
         collectionNote: null,
         pendingPlanId: null,
         pendingPlan: null,
+        pausedUntil: null,
         createdAt: at("2026-09-01T00:00:00Z"),
         ...over,
     };
@@ -329,6 +330,7 @@ describe("pause and resume", () => {
             data: {
                 status: "ACTIVE",
                 pausedAt: null,
+                pausedUntil: null,
                 currentPeriodEnd: at("2026-10-06T00:00:00Z"),
                 anchorAt: at("2026-10-06T00:00:00Z"),
             },
@@ -367,6 +369,7 @@ describe("pause and resume", () => {
             data: {
                 status: "ACTIVE",
                 pausedAt: null,
+                pausedUntil: null,
                 currentPeriodEnd: at("2026-10-01T00:00:00Z"),
             },
         });
@@ -409,6 +412,7 @@ describe("pause and resume", () => {
             data: {
                 status: "CANCELLED",
                 pausedAt: null,
+                pausedUntil: null,
                 cancelledAt: at("2026-10-01T00:00:00Z"),
                 cancelAtPeriodEnd: false,
             },
@@ -2107,6 +2111,245 @@ describe("the subscription's log (D9)", () => {
                     invoiceId: "inv_old",
                 }),
             ]);
+        });
+    });
+});
+
+describe("pause with an end date (D8)", () => {
+    const events = () =>
+        tx.subscriptionEvent!.create!.mock.calls.map((c) => c[0].data);
+
+    it("pauses 4 weeks to the start of that day, and says so in its event", async () => {
+        // 1 Oct, 10:00 UTC.
+        jest.setSystemTime(at("2026-10-01T10:00:00Z"));
+        await service.pause(owner, "sub_1", { weeks: 4 });
+        expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+            where: { id: "sub_1" },
+            data: {
+                status: "PAUSED",
+                pausedAt: at("2026-10-01T10:00:00Z"),
+                pausedUntil: at("2026-10-29T00:00:00Z"),
+            },
+        });
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "PAUSED",
+                actorKind: "TEAM",
+                data: { until: "2026-10-29T00:00:00.000Z" },
+            }),
+        ]);
+    });
+
+    it("pauses until resumed with no end date, as every earlier client asked", async () => {
+        await service.pause(owner, "sub_1", { until: null });
+        await service.pause(owner, "sub_1");
+        for (const call of tx.customerSubscription!.update!.mock.calls) {
+            expect(call[0].data.pausedUntil).toBeNull();
+        }
+        expect(events().map((e) => e.data)).toEqual([
+            { until: null },
+            { until: null },
+        ]);
+    });
+
+    it("takes a day staff name, in the subscription's zone", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({ timezone: "Asia/Kolkata" }),
+        );
+        await service.pause(owner, "sub_1", { until: "2026-10-20" });
+        expect(
+            tx.customerSubscription!.update!.mock.calls[0]![0].data.pausedUntil,
+        ).toEqual(at("2026-10-19T18:30:00Z"));
+    });
+
+    it("refuses an end date that has passed, and writes nothing", async () => {
+        await expect(
+            service.pause(owner, "sub_1", { until: "2026-09-01" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+        expect(events()).toEqual([]);
+    });
+
+    it("refuses a Member, who can't write subscriptions", async () => {
+        await expect(
+            service.pause(member, "sub_1", { weeks: 2 }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("clears the end date on a resume by hand", async () => {
+        jest.setSystemTime(at("2026-09-10T09:00:00Z"));
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-05T09:00:00Z"),
+                pausedUntil: at("2026-09-19T00:00:00Z"),
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(
+            tx.customerSubscription!.update!.mock.calls[0]![0].data,
+        ).toMatchObject({
+            status: "ACTIVE",
+            pausedAt: null,
+            pausedUntil: null,
+        });
+    });
+
+    it("shows when a paused one resumes, and nothing once it runs", async () => {
+        db.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-20T00:00:00Z"),
+                pausedUntil: at("2026-10-18T00:00:00Z"),
+            }),
+        );
+        expect((await service.get(owner, "sub_1")).pausedUntil).toBe(
+            "2026-10-18T00:00:00.000Z",
+        );
+        db.customerSubscription!.findFirst!.mockResolvedValue(sub());
+        expect((await service.get(owner, "sub_1")).pausedUntil).toBeNull();
+    });
+
+    describe("the renewal job on the end date", () => {
+        // Paused 1 Oct for 4 weeks, paid to 1 Nov.
+        const pausedFourWeeks = (over: Record<string, unknown> = {}) =>
+            sub({
+                status: "PAUSED",
+                currentPeriodStart: at("2026-10-01T00:00:00Z"),
+                currentPeriodEnd: at("2026-11-01T00:00:00Z"),
+                anchorAt: at("2026-10-01T00:00:00Z"),
+                pausedAt: at("2026-10-01T10:00:00Z"),
+                pausedUntil: at("2026-10-29T00:00:00Z"),
+                ...over,
+            });
+        const on29Oct = at("2026-10-29T00:30:00Z");
+
+        it("resumes it on 29 Oct, moving the paid period 28 days later, with no invoice", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "resumed",
+            );
+            expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+                where: { id: "sub_1" },
+                data: {
+                    status: "ACTIVE",
+                    pausedAt: null,
+                    pausedUntil: null,
+                    currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+                    anchorAt: at("2026-11-29T00:00:00Z"),
+                },
+            });
+            expect(issueInTx).not.toHaveBeenCalled();
+            expect(events()).toEqual([
+                expect.objectContaining({
+                    kind: "RESUMED",
+                    actorKind: "JOB",
+                    actorUserId: null,
+                    data: { extendedDays: 28 },
+                }),
+            ]);
+        });
+
+        it("takes the row lock before it reads", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await service.renewOne("sub_1", on29Oct);
+            expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+                tx.customerSubscription!.findUnique!.mock
+                    .invocationCallOrder[0]!,
+            );
+        });
+
+        it("issues the next invoice when the pause outlasted the paid period", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "resumed",
+            );
+            expect(tx.customerSubscription!.update).toHaveBeenCalledWith({
+                where: { id: "sub_1" },
+                data: expect.objectContaining({
+                    status: "ACTIVE",
+                    pausedUntil: null,
+                    anchorAt: at("2026-10-29T00:00:00Z"),
+                    currentPeriodStart: at("2026-10-29T00:00:00Z"),
+                    currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+                }),
+            });
+            expect(issueInTx).toHaveBeenCalledTimes(1);
+            expect(events()).toEqual([
+                expect.objectContaining({
+                    kind: "RESUMED",
+                    actorKind: "JOB",
+                    invoiceId: "inv_new",
+                    data: { restarted: true },
+                }),
+            ]);
+        });
+
+        it("leaves it paused with Payments off, writes RESUME_REFUSED once, and no invoice", async () => {
+            tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "refused",
+            );
+            tx.subscriptionEvent!.findFirst!.mockResolvedValue({ id: "ev_1" });
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "refused",
+            );
+            expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+            expect(issueInTx).not.toHaveBeenCalled();
+            expect(events().map((e) => e.kind)).toEqual(["RESUME_REFUSED"]);
+        });
+
+        it("does nothing before the date, for an open-ended pause, or once resumed", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(
+                service.renewOne("sub_1", at("2026-10-28T23:00:00Z")),
+            ).resolves.toBe("skipped");
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({ pausedUntil: null }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "skipped",
+            );
+            // Resumed by hand before the date, or by an earlier delivery.
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                sub({ currentPeriodEnd: at("2026-11-29T00:00:00Z") }),
+            );
+            await expect(service.renewOne("sub_1", on29Oct)).resolves.toBe(
+                "skipped",
+            );
+            expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+            expect(events()).toEqual([]);
+        });
+
+        it("ends one set to end whose period ran out while paused, even with Payments off", async () => {
+            tx.organizationModule!.findFirst!.mockResolvedValue({ id: "m_1" });
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                    cancelAtPeriodEnd: true,
+                }),
+            );
+            await service.renewOne("sub_1", on29Oct);
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({ status: "CANCELLED", pausedUntil: null });
+            expect(events().map((e) => e.kind)).toEqual(["ENDED"]);
+            expect(issueInTx).not.toHaveBeenCalled();
         });
     });
 });
