@@ -132,11 +132,45 @@ export async function listOrderRows(
 ): Promise<OrderListPage> {
     const base = await orgBase();
     if (!base) return EMPTY_PAGE;
-    return (
-        (await getJson<OrderListPage>(
-            `${base}/orders?${orderListQuery(params)}`,
-        )) ?? EMPTY_PAGE
+    const read = await getJson<OrderListPage | OrderRow[]>(
+        `${base}/orders?${orderListQuery(params)}`,
     );
+    return read ? toOrderListPage(read, params) : EMPTY_PAGE;
+}
+
+/** Open, as an older API's row says it: not delivered, cancelled or refunded. */
+function openRow(row: OrderRow): boolean {
+    return row.standing === "UNFULFILLED" || row.status === "SHIPPED";
+}
+
+function refundedRow(row: OrderRow): boolean {
+    return row.payment === "REFUNDED" || row.standing === "REFUNDED";
+}
+
+/**
+ * The v2 page, whatever came back (O-2). An API rolled back past B1
+ * ignores `v=2` and answers the old bare array — every order, unpaged and
+ * unfiltered — and reading `.rows` off it crashed the list. Read as one
+ * page with no next, the tab's rows kept and each tab counted from them,
+ * so the list still works while the deploys cross.
+ */
+export function toOrderListPage(
+    read: OrderListPage | OrderRow[],
+    params: OrderListParams = {},
+): OrderListPage {
+    if (!Array.isArray(read)) return read;
+    const counts = {
+        all: read.length,
+        open: read.filter(openRow).length,
+        refunded: read.filter(refundedRow).length,
+    };
+    const rows =
+        params.tab === "open"
+            ? read.filter(openRow)
+            : params.tab === "refunded"
+              ? read.filter(refundedRow)
+              : read;
+    return { rows, counts, nextCursor: null };
 }
 
 /**
