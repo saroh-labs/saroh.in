@@ -19,7 +19,7 @@ Make Customers one list for the whole business, keyed on the Contact and served 
 - close Customer Detail's gaps: header tags, a Reviews tab, packs, editing the email and the address, phone layout and copy;
 - add **merge** and **privacy removal** (DEC-042).
 
-The foundations come first: Needs attention, a contact for every paying customer, and the list API. Screens come second, and merge and removal third. The customer permissions (`customer:*`) wait for the matrix review.
+The foundations come first: Needs attention, a contact for every paying customer, and the list API. Screens come second, and merge and removal third. The customer capabilities follow the capability model (DEC-039, 2026-09-27) and land in phase 2 (C13).
 
 ---
 
@@ -51,20 +51,20 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
 - R1. One Customers list for the business, keyed on the Contact: everyone who has paid (an order, an invoice, a subscription or a pack) or signed in on the business's site (DEC-041). Leads, Pipeline and Contacts are unchanged.
 - R2. Every paying store customer has a linked Contact: made at backfill and whenever they next pay. A contact with exactly the same normalised email or phone is offered as a merge, never merged (DEC-041).
 - R3. The list offers:
-  - search by name, and by phone or email only with contact access;
+  - search by name, phone or email (all part of the person, `contact:read`);
   - filter chips with counts: All · Returning · Subscribers · Open order · Said yes to offers · Needs attention;
   - sort by Last order, Spent or Name;
   - a "Bought at …" storefront select, shown only with more than one storefront;
   - pages of 50 with Previous and Next;
   - a locked state for roles without access.
 - R4. "Spent" counts each rupee once. It is paid orders (delivery included) plus paid non-order invoices, net of refunds and credit notes; "Customer since" is the first payment (default 20). The list and Customer Detail read the same rule.
-- R5. Money figures are left out by the API for a role without a money read (DEC-024, matrix M-2). Phone and email are left out without contact access (matrix C-1).
+- R5. Each part of a customer screen follows its own read (DEC-039, matrix §1): the person with `contact:read`, phone and email included; their orders with `order:read`, whole; "Spent", which sums orders and invoices, with both `order:read` and `invoice:read`. Nothing inside a part is hidden from someone who holds its read.
 - R6. **Needs attention** (DEC-040). Each customer has one list of entries. An entry has:
   - a kind (Allergy, Medical, Access or Other), a label and optional detail;
   - a sensitive flag, on by default for Medical;
   - a source (staff, booking page or customer), plus who added it and when.
 
-  Allergy entries carry a structured allergen. Sensitive entries go only to a role with the sensitive permission. Before the matrix review that means `contact:write`, Owner and Admin only (matrix C-4).
+  Allergy entries carry a structured allergen. Sensitive entries go only to someone holding the sensitive capability (`customer:sensitive`, matrix Q2). Until C13 that means `contact:write`, Owner and Admin by default.
 - R7. Existing note allergens become Allergy entries, and Order Detail's allergy banner still matches exactly.
 - R8. Customer Detail shows Needs attention tags in the header, and entries can be added, edited and removed there. The list shows the red Allergy and Medical tags (Medical only with the sensitive permission).
 - R9. Customer Detail gains a Reviews tab (reply and hide through the existing endpoints) and the person's class packs (a card on Overview and a tab). The Courses tab and card wait for Courses (DEC-044, default 27).
@@ -83,7 +83,7 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
   - Hard delete stays only for a contact with no orders or invoices (#384).
 - R13. A booking page's "Anything we should know?" note arrives on Customer Detail as a suggestion ("1 note from the booking page") with "Add to Needs attention" and "Nothing to add". It never goes straight onto the record (DEC-040).
 - R14. Tabs scroll sideways on phones (default 28), and copy matches the design.
-- R15. After the matrix review, the customer actions (`customer:read`, `customer:contact`, `customer:sensitive`, `customer:merge`, `customer:remove`, and `contact:write` relabelled) replace the stand-ins.
+- R15. The customer capabilities of the capability model replace the stand-ins: `contact:read` and `contact:write` relabelled "See customers and contacts" and "Edit customers and contacts", plus `customer:merge`, `customer:remove` and `customer:sensitive` (the last as the user answers matrix Q2). There is no `customer:read`, `customer:write` or `customer:contact` key.
 
 ---
 
@@ -186,14 +186,14 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
 
   Suggestions (R13, and a customer's own health notes, default 12) are the same row in `SUGGESTED`. So "Add to Needs attention" is a status change, and "Nothing to add" sets `removedAt`.
 - **One read helper decides visibility:** `attentionFor(ctx, contactIds)` returns active entries. It leaves out sensitive entries unless `canSeeSensitive(ctx)`. It includes a `hiddenSensitiveCount` so a screen can say "1 more note you can't see" without its content. Orders (B15), bookings (E4), Home (F2) and the kitchen view all call it, and none filters on its own.
-- **`canSeeSensitive(ctx)`** is `allows(ctx, "contact:write")` until C13, then `allows(ctx, "customer:sensitive")`. It is one function, so the swap is one line plus the catalogue.
+- **`canSeeSensitive(ctx)`** is `allows(ctx, "contact:write")` until C13, then `allows(ctx, "customer:sensitive")` (or, if the user answers matrix Q2 the other way, `contact:read`). It is one function, so the swap is one line plus the catalogue.
 - **Allergy stays structured.** The backfill turns each `ContactNoteAllergen` into an Allergy entry, labelled with the allergen's name, not sensitive, with source STAFF. The note keeps its text. Order Detail's banner reads Allergy entries through `attentionFor`. During the transition `ContactNoteAllergen` rows are still written for one release, then dropped in a two-deploy change.
 - **The list API is new and separate:** `GET organizations/:org/customers?q=&chip=&sort=&store=&page=`. It is keyed on Contact and computed in SQL: a CTE of paying contacts (orders via confirmed identity links, non-order invoices paid, subscriptions, pack purchases) union signed-in accounts (plan A; empty until A1). It returns:
   - `lastOrderAt`, `orderCount`, `spent[]` (per currency), `openOrder`, `subscriber`, `offersConsent` and `attentionTags`;
   - chip counts computed from the same CTE in one query.
 
   Spent reuses the detail's rule. A shared SQL fragment and a spec assert that the list's and the detail's totals agree for the same person.
-- **Search** matches the name, and the phone and email only when the caller has contact access. Phone matching is on digits only. Without contact access, a query that looks like a phone or an email is answered as a name search, never refused, so the refusal doesn't reveal that the value exists.
+- **Search** matches the name, the phone and the email; anyone who can open the list holds `contact:read`, which covers all three (DEC-039). Phone matching is on digits only.
 - **Paging is offset with 50 rows** and a stable tiebreak on id. The design pages by Previous and Next; businesses have hundreds, not millions.
 - **"A contact for every paying customer" (C2)**:
   - A backfill script, idempotent, per organization: every store `Customer` with a paid order and no confirmed link gets a new Contact (their email, name and phone) and a link with `linkedByUserId = null` and reason `backfill`.
@@ -225,13 +225,13 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
 
 ### Permissions touched
 
-| Action | Needs (until C13) | Needs (after C13, if the matrix says so) |
+| Action | Needs (until C13) | Needs (after C13, the capability model) |
 |---|---|---|
-| Read the Customers list and Customer Detail | `contact:read` (Owner, Admin, Member) | `customer:read` |
-| See phone and email, and search by them | `contact:read` | `customer:contact` (matrix C-1 proposes Members keep it) |
-| See money (Spent, the orders' totals) | `order:read` or `invoice:read` (matrix M-2) | unchanged |
-| See sensitive Needs attention | `contact:write` (Owner, Admin) | `customer:sensitive` |
-| Add, edit or remove Needs attention; confirm a suggestion; edit email and address | `contact:write` | `contact:write`, relabelled (matrix C-3) |
+| Read the Customers list and Customer Detail, phone and email included, and search by them | `contact:read` (Owner, Admin, Member) | `contact:read`, relabelled "See customers and contacts" |
+| See the orders tab and order totals | `order:read` | unchanged |
+| See "Spent" | `order:read` and `invoice:read` | unchanged |
+| See sensitive Needs attention | `contact:write` (Owner, Admin) | `customer:sensitive` (matrix Q2) |
+| Add, edit or remove Needs attention; confirm a suggestion; edit email and address | `contact:write` | `contact:write`, relabelled "Edit customers and contacts" |
 | Merge | `contact:write` | `customer:merge` |
 | Privacy removal | `contact:write` | `customer:remove` |
 | Reply to or hide a review from Customer Detail | `product-review:write` | unchanged |
@@ -317,7 +317,7 @@ flowchart LR
   C11 --> C13
 ```
 
-Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 3: C13 (blocked on the matrix review).
+Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12, C13 (the capability model decides it).
 
 ### C1. Needs attention API and backfill
 
@@ -426,7 +426,7 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
   Counts ignore the active chip but honour the search and storefront.
 - "Bought at": an order at that storefront.
 - Sort: last order (nulls last), spent (per the business's one currency, DEC-030 amendment), or name.
-- Money comes back only with `order:read` or `invoice:read`. The phone, email and the ability to search them only with contact access.
+- Order counts and last order come back with `order:read`, and `spent` with both `order:read` and `invoice:read` (matrix §1 rule 3). The phone and email come with the person.
 - A removed contact (C11) is listed as "Removed customer", with no search by the old values.
 
 **Execution note:** Test first on the spent agreement between list and detail.
@@ -437,8 +437,8 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 - Happy path: page 1 of 120 customers returns 50, `total: 120`, and chip counts.
 - Happy path: Spent for a person with an order, a paid subscription invoice and a refund equals Customer Detail's Spent.
 - Edge case: a store customer's order and that order's invoice count once.
-- Edge case: a Member searches "98450" → a name search, which matches no names; an Owner finds the phone.
-- Edge case: a Member gets no `spent` field, not zeros.
+- Edge case: a Member (`contact:read`) searches "98450" and finds the person by phone.
+- Edge case: a caller without both `order:read` and `invoice:read` (today's Member) gets no `spent` field, not zeros.
 - Error path: `store` of another business → 404.
 - Integration: 5,000 seeded customers, first page under the measured budget (recorded in the PR).
 
@@ -474,7 +474,7 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 
 **Test scenarios:**
 - Happy path (e2e, Northwind): search a name, pick "Returning", sort by Spent, open a row → Customer Detail.
-- Edge case: a Member sees no Spent column and no phone search hint.
+- Edge case: a caller without both `order:read` and `invoice:read` sees no Spent column.
 - Edge case: `/stores/<id>/customers` lands on the list filtered to that storefront.
 - Error path: the API fails → the failed state, with Try again.
 
@@ -559,7 +559,7 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 **Approach:**
 - The balance is derived, never stored (ADR-007), and uses `lib/class-packs/balance.ts`.
 - "Sell a pack" opens the existing `sell-pack-dialog.tsx` with the person chosen.
-- Money shows only with a money read. The Courses tab is deferred (default 27).
+- Pack prices and sales show with `pack:read`, which covers them (DEC-039). The Courses tab is deferred (default 27).
 
 **Test scenarios:**
 - Happy path: a person with a pack of 10, 3 used, sees "7 left · expires 12 Oct".
@@ -617,7 +617,7 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 - Test: `merge-plan.spec.ts`, `merge.db.spec.ts`, `merge.relations.spec.ts` (reads the Prisma DMMF: every relation to `Contact` is handled)
 
 **Approach:**
-- The preview returns per-relation counts, field choices (both values of name, email, phone, company and address, for a caller with contact access) and refusals.
+- The preview returns per-relation counts, field choices (both values of name, email, phone, company and address) and refusals.
 - The merge takes the survivor id and the field choices, locks both contacts in id order, re-checks the refusals, and re-points each relation in the table under Context & Research:
   - `Consent`: per channel, the more recently updated wins; the other is deleted (default 24);
   - `CustomerIdentityLink`: re-point, skipping duplicates;
@@ -747,15 +747,15 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 
 ---
 
-### C13. Customer permissions (blocked on the matrix review)
+### C13. Customer capabilities
 
-**Goal:** Apply the matrix's decisions for customers.
+**Goal:** Apply the capability model for customers (DEC-039; matrix §2 and §3).
 
 **Requirements:** R15
 
-**Dependencies:** The matrix review (DEC-039, questions C-1 – C-4); C4, C5, C10, C11
+**Dependencies:** C4, C5, C10, C11. Decided by the capability model, except whether sensitive notes are their own capability (matrix Q2), which changes one line in `canSeeSensitive` and whether one key is added.
 
-**Phase:** 3, **blocked on the matrix review**
+**Phase:** 2
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/organizations/{organization-actions,organization-policy,capability-catalogue}.ts` (+ spec), `customer-workspace/attention-read.ts` (`canSeeSensitive`), `customers-list.service.ts`, `merge.service.ts`, `privacy-removal.service.ts`
@@ -763,13 +763,16 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 - Test: `organization-policy.spec.ts`, `capability-catalogue.spec.ts`, `e2e/permissions/permissions.spec.ts` (one row per customer endpoint)
 
 **Approach:**
-- Add the agreed actions with catalogue labels (design wording from `saroh-fixtures.js`).
-- Imply them from `contact:write` where the matrix says so, through `withImplied`, so existing custom roles keep what they had.
-- Swap the stand-ins in one place each.
+- Relabel `contact:read` and `contact:write` ("See customers and contacts", "Edit customers and contacts"); `contact:write` implies `contact:read`.
+- Add `customer:merge` and `customer:remove`, held by Owner and Admin. Neither is implied by `contact:write`: both are new powers, so no saved role loses anything. The hard delete of a contact with no orders or invoices stays with `contact:write` (DEC-042).
+- Add `customer:sensitive` (Owner and Admin) and swap `canSeeSensitive` to it, as the user answers Q2; until then the stand-in stays.
+- The Customers list and detail follow matrix §1 rule 3: each part on its own read, nothing hidden inside a part.
 
 **Test scenarios:**
-- Happy path: a "Practitioner" custom role with `customer:sensitive` reads Medical entries and cannot edit them.
-- Edge case: a custom role saved before the change, holding `contact:write`, keeps merge and remove if the matrix implies them.
+- Happy path: a "Practitioner" custom role with `customer:sensitive` and `contact:read` reads Medical entries and cannot edit them.
+- Happy path: a role with `contact:read` sees phone and email and searches by them.
+- Edge case: a custom role saved before the change, holding `contact:write`, can edit and hard-delete as before but gets 403 on merge and privacy removal.
+- Edge case: a caller with `order:read` but not `invoice:read` sees the orders tab and no "Spent".
 - Integration: the permission matrix e2e covers list, detail, attention, merge and removal.
 
 **Verification:** The matrix page's customer rows are each backed by a policy test.
@@ -838,7 +841,7 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 | Sensitive notes leak through a new surface | One read helper (`attentionFor`); no surface filters on its own; the permissions e2e |
 | An auto-made contact duplicates a CRM contact | Never auto-link on an existing email; suggest instead (C2) |
 | Removal breaks tax records | Orders and invoices untouched; tested by printing an invoice after removal |
-| Matrix answers change what Members see | Stand-ins in one function each; C13 swaps them |
+| The sensitive answer (matrix Q2) changes who reads medical notes | One function (`canSeeSensitive`); C13 swaps it |
 
 ---
 
@@ -858,5 +861,5 @@ Phase 1: C1, C2, C3, C4, C5, C6, C7, C8, C14. Phase 2: C9, C10, C11, C12. Phase 
 - Gap report: `gap-reports/customers.md`
 - Decisions: DEC-040, DEC-041, DEC-042, DEC-039, ADR-011, ADR-008 (amended), DEC-035
 - Overview and defaults: `docs/plans/2026-09-26-000-round-2-overview.md` (defaults 12, 20–28)
-- Matrix: `docs/plans/2026-09-26-permission-matrix.md` (§1, M-2)
+- Matrix: `docs/plans/2026-09-26-permission-matrix.md` (§1–§3, Q2)
 - Related plans: 001 (A1 accounts, A5 health notes), 002 (B13, B15), 005 (E4, E7), 006 (F2)

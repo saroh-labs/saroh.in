@@ -216,9 +216,9 @@ phone on the booking.
 |---|---|---|---|
 | `message:read` | Owner, Admin (custom grantable) | Customer Detail Messages tab, Home "Reply" row | Existing; reads customer threads |
 | `message:write` | Owner, Admin | Replying to a customer | Existing |
-| `contact:write` | Owner, Admin | "This isn't them" (unlink an account) | Existing; becomes `customer:write` if the matrix adopts it (C13) |
+| `contact:write` | Owner, Admin | "This isn't them" (unlink an account) | Existing; relabelled "Edit customers and contacts" in C13 (DEC-039) |
 | `booking:read` | Owner, Admin, Member | Waitlist on a class's roster | Existing |
-| (customer context) | the signed-in customer, own data only | every account endpoint | New guard, not an `OrgAction` (matrix §7) |
+| (customer context) | the signed-in customer, own data only | every account endpoint | New guard, not an `OrgAction` (matrix §8) |
 
 No new staff action is added in this epic.
 

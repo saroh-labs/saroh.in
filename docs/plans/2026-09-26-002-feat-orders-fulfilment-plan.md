@@ -35,8 +35,10 @@ Then the screens:
 - the Visits card for appointment orders;
 - Needs attention on every order surface.
 
-The permission split (`order:create/edit/refund/export`) waits for the matrix
-review (DEC-039).
+The permission split (`order:create/edit/refund/export`) follows the
+capability model (DEC-039, 2026-09-27) and is phase 2 (B16). Until F18
+applies the new Member bundle, a Member keeps today's kitchen view without
+money (DEC-024).
 
 Invoices (the bill of supply, PDF, sending, the source filter and invoice
 locked states) are plan D's (`2026-09-26-004-feat-payments-plan.md`).
@@ -74,8 +76,10 @@ the design.
 - R1. The organization order list returns, per order: stage, fulfilment type,
   payment standing (paid, unpaid, partly refunded, refunded), the product ids,
   whether its customer has Needs attention (sensitive entries only to the
-  sensitive gate), whether it is late, and its age. Money is left out without
-  `order:read` (DEC-024).
+  sensitive gate), whether it is late, and its age. A caller with `order:read`
+  gets the whole row, money included (DEC-039). Until F18, a caller with
+  `order:stage` only (today's Member) gets the kitchen view without money
+  (DEC-024).
 - R2. The list filters server-side by date range (with a custom range), step,
   fulfilment type, storefront, payment, product, Needs attention and late. It
   searches by order number or customer name (and phone or email only with the
@@ -131,10 +135,10 @@ the design.
 - R17. Needs attention (DEC-040) shows as a tag on rows, a filter, on the
   quick view, on Order Detail's customer card and on the kitchen view; the
   allergy banner keeps its exact allergen match.
-- R18. After the matrix review, the new actions `order:create`,
-  `order:edit`, `order:refund` and `order:export` are enforced. Each is
-  implied by the umbrella it replaces, so existing custom roles keep what
-  they had.
+- R18. The capabilities `order:create`, `order:edit`, `order:refund` and
+  `order:export` are enforced (DEC-039, the capability model). Each implies
+  `order:read` and is implied by the umbrella it replaces, so existing custom
+  roles keep what they had.
 
 ---
 
@@ -344,8 +348,8 @@ the design.
     returns `{ rows, counts: {all, open, refunded}, nextCursor }`.
   - Rows are built by one serializer shared with the quick view
     (`order-row.ts`). Money fields are omitted without `order:read`, and
-    customer phone and email without the contact gate (today `contact:read`;
-    `customer:contact` after C13).
+    customer phone and email without `contact:read` (which C13 relabels; there
+    is no separate contact gate under the capability model).
   - Product filtering joins through `OrderItem`. Attention reads plan C's C1
     read helper, which returns only non-sensitive kinds unless the caller
     holds the sensitive gate. Before C1 ships, `attention` is null and the
@@ -380,14 +384,15 @@ the design.
 | Action | Today | This plan | Needs |
 |---|---|---|---|
 | List orders with money, filters, tab counts | `order:read` | unchanged | `order:read` |
-| List and quick view without money; bulk stage moves; ticket print | `order:stage` | bulk uses the same action | `order:stage` |
+| List and quick view without money (until F18); bulk stage moves; ticket print | `order:stage` | bulk uses the same action | `order:stage` (implies `order:read` from F18) |
 | Change fulfilment, Add an item, edit address | `order:write` | unchanged until B16 | `order:write` → `order:edit` (B16) |
 | Cancel as refund, refund reason, another amount | `payment:manage` | unchanged until B16 | → `order:refund` (B16) |
 | Make and replace an order pay link | — | new | `order:write` (→ `order:create` or `order:edit`, B16) |
 | New order v2 | `order:write` | unchanged until B16 | → `order:create` (B16) |
 | Export CSV | `order:read` | unchanged until B16 | → `order:export` (B16) |
-| See customer phone and email on rows | `contact:read` | unchanged until C13 | → `customer:contact` (C13) |
-| See sensitive Needs attention | — | C1 interim: `contact:write` | → `customer:sensitive` (C13) |
+| See customer phone and email on rows | `contact:read` | unchanged | `contact:read`, relabelled (C13) |
+| See sensitive Needs attention | — | C1 interim: `contact:write` | → `customer:sensitive` (C13, per matrix Q2) |
+| Sell rail rows | the module | gated on their own reads (B16, matrix W-1) | `order:read`, `store:read`, `contact:read` |
 | Set a product's allowed types | `store:write` | unchanged | `store:write` |
 
 ---
@@ -401,8 +406,10 @@ the design.
   refunding the delivery difference (DESIGN-NOTES, Orders audit).
 - Tabs are All · Open · Refunded (default 14).
 - "Or another amount" stays, capped and with a reason (default 13).
-- The Member keeps `order:stage` without money until the matrix review
-  (DEC-024, DEC-039).
+- The capability model (DEC-039, 2026-09-27): `order:read` shows the whole
+  order, and the order writes are split where a business would grant one
+  without another. The Member keeps `order:stage` without money until F18
+  applies the new Member bundle (matrix Q1).
 
 ### Needs the user's eye (found while planning)
 
@@ -491,11 +498,11 @@ flowchart LR
   B1 --> B15
   E9[(E9 visits API)] --> B14[B14 Visits card]
   B2 --> B14
-  M[(matrix review)] --> B16[B16 permission pass]
+  B1 --> B16[B16 permission pass]
 ```
 
 Phase 1: B1, B2, B3, B4, B5, B6, B7, B10, B11. Phase 2: B8, B9, B12, B13,
-B14, B15. Phase 3: B16.
+B14, B15, B16.
 
 ---
 
@@ -784,7 +791,8 @@ without leaving it.
 
 **Test scenarios:**
 - Happy path: open the quick view, mark it Ready, and the row updates.
-- Edge case: a Member's quick view has no money and no refund in the menu.
+- Edge case: an `order:stage`-only caller's quick view (today's Member,
+  until F18) has no money and no refund in the menu.
 - Error path: the quick view's read fails → a named notice in the panel; the
   list stays.
 
@@ -1277,24 +1285,29 @@ the sensitive gate.
 
 ---
 
-### B16. Orders permission pass — blocked on the matrix review
+### B16. Orders permission pass: the split order capabilities
 
-**Goal:** Enforce the split order actions the review settles.
+**Goal:** Enforce the order capabilities the capability model sets (DEC-039;
+matrix §2 and §3).
 
 **Requirements:** R18
 
-**Dependencies:** The permission matrix review (DEC-039; matrix §2, O-1 to
-O-4)
+**Dependencies:** B1, B5, B9, B13 (the endpoints it gates). Decided by the
+capability model; no open question blocks it. The Member default bundle is
+F18's, not this unit's.
 
-**Phase:** 3
+**Phase:** 2
 
 **Files:**
 - Modify:
   - `apps/api.saroh.in/src/modules/organizations/organization-actions.ts`,
     `organization-policy.ts` (`withImplied`: `order:write` → `order:create`,
-    `order:edit` and `order:export`; `payment:manage` → `order:refund`);
-  - `capability-catalogue.ts` (labels);
-  - the order controllers and services (each endpoint asks its action);
+    `order:edit` and `order:export`; `payment:manage` → `order:refund`; each
+    of the four → `order:read`);
+  - `capability-catalogue.ts` (labels, including `order:stage` relabelled
+    "Move orders through their steps and print");
+  - the order controllers and services (each endpoint asks its capability);
+  - the workspace rail (each Sell row on its own read, matrix W-1);
   - `apps/app.saroh.in/lib/orders/*` (`can*` flags from the API).
 - Test:
   - `apps/api.saroh.in/src/modules/organizations/organization-policy.spec.ts`;
@@ -1302,16 +1315,22 @@ O-4)
   - `e2e/permissions/permissions.spec.ts` (a row per endpoint).
 
 **Approach:**
-- Apply the review's answers.
+- `order:create` gates New order and a new order's pay link; `order:edit`
+  gates Edit, Change how it's fulfilled and replacing a pay link;
+  `order:refund` gates refund and cancel; `order:export` gates the CSV.
 - Implied holds keep every existing custom role working.
-- Role templates, if chosen (matrix §8), pre-fill Team's "New role"; they are
-  not built-in roles.
+- The built-in bundles don't change here: Owner and Admin already hold every
+  order capability, and the Member's is F18's.
+- A Reviewer holds no Sell read, so the Sell rail group disappears for them.
 
 **Test scenarios:**
 - Happy path: a custom role saved with `order:write` before B16 can still
   create, edit and export.
+- Happy path: a custom role with `order:create` only takes a new order and
+  sees it whole, money included, but gets 403 on Edit and Refund.
 - Error path: a role with `order:stage` only → New order 403; the quick view
   still works.
+- Edge case: a Reviewer's rail has no Sell group.
 - Integration: the permissions matrix spec covers every order endpoint.
 
 **Verification:** The matrix's order rows match the API's refusals one to
@@ -1348,7 +1367,8 @@ one.
   - one invoice per order, which is the order's mirror (DEC-023);
   - refund money rules (DEC-026);
   - no overselling (DEC-032);
-  - a Member sees no money until the review (DEC-024).
+  - a Member moves orders without seeing money until F18 applies the new
+    Member bundle (DEC-024, DEC-039).
 
 ---
 

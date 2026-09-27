@@ -378,14 +378,14 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: "Retry" on a failed renewal retries the mandate charge when there is one, and sends a pay link otherwise. The provider port gains mandate set-up, charge, cancel and status calls, and the webhook inbox gains their events. Copy says "UPI Autopay or card" only where the business's provider supports it and the customer has set one up.
 - Migration: a mandate table (organization-owned, RLS) and a subscription's link to it; nothing changes for subscriptions without one.
 
-## DEC-039 Staff permissions for the new screens are settled in one matrix before they ship
+## DEC-039 Staff permissions are capabilities granted to people; the built-in roles are default bundles
 
-**Status: Accepted — 2026-09-26** — [docs/plans/2026-09-26-permission-matrix.md](../plans/2026-09-26-permission-matrix.md)
+**Status: Accepted — 2026-09-26; reworked 2026-09-27 (the capability model)** — [docs/plans/2026-09-26-permission-matrix.md](../plans/2026-09-26-permission-matrix.md) · supersedes in part DEC-024 (the money-free kitchen view for Members) and DEC-020 ("Members see no money" as a rule)
 
-- Context: the designs gate by permission: `customer:read/contact/sensitive/merge/remove`, `order:create/fulfil/edit/refund/export`, `pack:sell`, `booking:settings`, and a Member who sees no money. Some of them differ from DEC-020 and DEC-024; the design's Member reads orders with money and takes new orders.
-- Decision: **every action the round-2 designs need is listed against Owner, Admin, Member, Reviewer and custom roles**, marking what exists and what is proposed. **The user reviews it in detail before any unit adds or changes a permission**, and those units are marked "blocked on the matrix review". Until then the shipped map stands: Members read no money (DEC-024), and a Reviewer sees only the sites they were invited to (DEC-006).
-- Consequences: screens can be built against today's actions and gain the new ones after the review. The API goes on refusing what it refuses today.
-- Migration: none until the review.
+- Context: the designs gate by permission: `customer:read/contact/sensitive/merge/remove`, `order:create/fulfil/edit/refund/export`, `pack:sell`, `booking:settings`, and a Member who sees no money. The first version of the matrix (2026-09-26) set these against the four roles and hid money from Members screen by screen. The user answered on 2026-09-27: what someone sees depends on the permissions they are given, not only on their role; someone who can read orders sees every detail of an order.
+- Decision: **permissions are capabilities, granted to a person through their role or directly as extra permissions.** **A capability shows everything within its scope**: `order:read` shows the whole order, money included, and **there is no separate money redaction by role**. A screen that gathers several scopes shows each part to whoever holds that part's read. **Owner, Admin, Member and Reviewer are default bundles**; a business can change them or make its own role. **A capability is split only where a business would plausibly grant one without the other**, and the matrix gives each split its reason (`order:read` / `order:stage` / `order:create` / `order:edit` / `order:refund` / `order:export`, `contact:read` / `customer:sensitive` / `customer:merge` / `customer:remove`, `booking:write`, `pack:sell`). Splits whose only purpose was hiding money or contact details from Members are dropped (`customer:contact`, the money-free kitchen view). A write implies its read, and an old umbrella implies its new parts, so saved roles keep what they could do. The matrix answers the first version's eleven questions; **four product choices stay with the user**: the Member default bundle, whether sensitive notes are their own capability, which role templates ship, and whether a new Member bundle reaches existing businesses.
+- Consequences: B16, C13, E26 and F11 are no longer blocked and move to phase 2, with F17 (extra permissions per person). F18 applies the Member bundle, makes `order:stage` imply `order:read` and drops the money-free kitchen view; it waits on the open choices. Until F18 ships, the shipped Member stands (DEC-024), and a Reviewer sees only the sites they were invited to (DEC-006).
+- Migration: none for the new keys (roles store lists; implied holds keep saved roles whole). F17 adds a per-person grants list on the membership.
 
 ## DEC-040 Needs attention is one field on the customer, and sensitive entries need their own permission
 
@@ -397,7 +397,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - a sensitive flag, on by default for Medical;
     - where it came from (staff, the booking page's "Anything we should know?", or the customer), and who added it and when.
 
-    **Sensitive entries go only to a role holding the sensitive permission.** The API leaves them out; the screen does not just hide them. The same list shows on Customers, Customer Detail, Orders and Order Detail (the kitchen view included), Bookings, Home and the booking page's intake. Allergy entries keep their structured allergen, so the allergy banner still matches exactly.
+    **Sensitive entries go only to someone holding the sensitive capability** (DEC-039). The API leaves them out; the screen does not just hide them. The same list shows on Customers, Customer Detail, Orders and Order Detail (the kitchen view included), Bookings, Home and the booking page's intake. Allergy entries keep their structured allergen, so the allergy banner still matches exactly.
 
 - Consequences: existing allergen notes become Allergy entries. A note from the booking page arrives as a suggestion that staff confirm ("Add to Needs attention" or "Nothing to add"). It never goes straight onto the record.
 - Migration: a `ContactAttention` table (organization-owned, RLS) and a backfill from `ContactNoteAllergen`.

@@ -295,7 +295,7 @@ there is no public catalogue endpoint. Staff-made orders are paid through
 
 ## Permissions touched
 
-No new action. Everything maps to today's keys (see the permission matrix §6).
+No new action. Everything maps to today's keys (see the permission matrix §2, "Website, team and settings").
 
 | What | Needs |
 |---|---|

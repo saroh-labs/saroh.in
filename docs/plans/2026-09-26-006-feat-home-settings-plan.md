@@ -1,5 +1,5 @@
 ---
-title: "feat: Home and Settings — the ranked Home redesign, Settings' real differences, Team's hidden column, storefront people on the team"
+title: "feat: Home and Settings — the ranked Home redesign, Settings' real differences, Team's extra permissions and default bundles, storefront people on the team"
 type: feat
 status: active
 date: 2026-09-26
@@ -16,9 +16,13 @@ epic: TBD
 
 Rebuild Home to the design: a greeting, a "Last 24 hours" strip, one flat
 **Needs you** list with tone tags and inline actions, a **Today** column, a
-**This week** money panel for those who may see money, and a **Get ready to
-take money** checklist. It also gets a Reviewer view, and a staff landing once
-the permission matrix is reviewed.
+**This week** money panel for those who hold `payment:read`, and a **Get ready
+to take money** checklist. It also gets a Reviewer view and a staff landing.
+
+Team gets the capability model (DEC-039, 2026-09-27): **extra permissions per
+person** (F17), and **the default bundles** — the Member bundle, the
+money-free kitchen view dropped, and role templates (F18), which waits on the
+user's answers to the matrix's open questions.
 
 Home's API gains the missing sources: failed renewals, overdue invoices, stock
 short, site not live, low-star reviews, booking-page notes and unanswered
@@ -40,7 +44,8 @@ severity, lists several days of Coming up, and shows count tiles. The design
 (`Saroh Home.dc.html`) is one flat list: one row per thing that needs doing,
 each with a tone tag ("Late · 2h", "Before their visit") and an inline action
 that confirms and then offers Undo. Beside it are what's happening today, who
-has arrived, and — for owners and admins only — how the week's money looks.
+has arrived, and — for whoever holds `payment:read`, Owners and Admins by
+default — how the week's money looks.
 Several rows the design lists have no source in `home.service.ts` yet:
 - a failed renewal;
 - an overdue invoice;
@@ -84,8 +89,9 @@ roster underneath.
   new orders, bookings, payments in, and reviews, each linking to the rows it
   counts.
 - R7. This week (takings so far against the same days last week, bookings,
-  orders, owed to you) shows only to a role holding the matching money read;
-  the API leaves the money out for anyone else. "Payout on the way" is dropped
+  orders, owed to you) shows each figure to whoever holds its own read
+  (`payment:read` for takings); the API leaves out a figure the caller has no
+  read for. "Payout on the way" is dropped
   (default 52).
 - R8. "Get ready to take money" lists the steps still open, and the order
   follows the design. It can be hidden and shown again, and it disappears when
@@ -102,12 +108,17 @@ roster underneath.
   booking, payment failed, someone joins the team, Monday summary) and by
   which channel (bell, email, WhatsApp). The channels are the ones the
   business can actually send on.
-- R14. Team hides the "Extra permissions" column while no one has any.
+- R14. Team hides the "Extra permissions" column while no one has any. A
+  person can be given capabilities beyond their role (F17), and the column
+  then shows them.
 - R15. Adding someone to a storefront also gives them a business membership
   (Member) when they have none. Removing them from the team removes their
   storefront roles. A storefront invite needs `member:invite` (DEC-048).
 - R16. A staff member's Home shows the work for the storefronts they are
-  assigned to. This waits on the matrix review (DEC-039, F11).
+  assigned to, each row following their own capabilities (DEC-039, F11).
+- R17. The built-in roles are default bundles (DEC-039). Member's bundle,
+  `order:stage` implying `order:read`, and the role templates follow the
+  user's answers to the matrix's Q1, Q3 and Q4 (F18).
 
 ---
 
@@ -116,7 +127,9 @@ roster underneath.
 - No financial-year picker: the year is set by GST law (DEC-028, default 55).
 - Country stays in the Registered address card (DEC-029, default 59).
 - Hours stay one card for every storefront (DEC-034).
-- No new permission keys. F11 is where they arrive, after the matrix review.
+- No new capability keys here; the order, customer and pack keys are B16's,
+  C13's and E26's. F17 adds per-person grants, and F18 changes the built-in
+  bundles.
 - The Activity and Hours tabs stay (default 57). Custom roles are shown, not
   marked "Coming soon" (default 58).
 - CRM follow-ups stay on Home (default 53).
@@ -213,8 +226,9 @@ roster underneath.
 
 - A source that fails is named, never shown as zero or "all clear"
   (`saroh-product.md`, "What it must answer"; `HomeUnavailable`).
-- The API leaves money out; the screen does not hide it (DEC-024,
-  `backend-auth-and-access.md`).
+- The API leaves out what the caller has no read for; the screen does not
+  hide it (`backend-auth-and-access.md`). Within a scope nothing is hidden
+  (DEC-039).
 - A new permission or policy change needs a label in the capability catalogue
   (`capability-catalogue.spec.ts`).
 - Settings saves are audited per field (DEC-035). A new business type value
@@ -268,8 +282,8 @@ roster underneath.
   a `view` of `"business"`, `"reviewer"` or `"staff"`. The reviewer view
   reads only the sites `SiteReviewer` grants and their open review notes; it
   never calls another source. The staff view (F11) filters to the
-  storefronts the person holds a storefront role on (DEC-048, default 61) and
-  waits for the matrix review.
+  storefronts the person holds a storefront role on (DEC-048, default 61),
+  and each source asks the person's own capabilities.
 - **Business types.** `BUSINESS_TYPES` becomes `individual`, `partnership`,
   `llp`, `pvt`, `public` and `trust`. The stored value `company` is migrated
   to `pvt` (default 60). A null type reads as "Not set".
@@ -305,7 +319,9 @@ roster underneath.
 | This week | `payment:read`, `booking:read`, `order:read`, `invoice:read` per figure | no |
 | Today: Arrived / No-show | `booking:write` | no |
 | Reviewer view | `site:read`, narrowed by `SiteReviewer` | no |
-| Staff landing (F11) | per the matrix review | **blocked on the matrix review** |
+| Staff landing (F11) | each source's own read, narrowed to the person's storefronts | no |
+| Extra permissions per person (F17) | `member:role:update` | a per-person grants list |
+| Default bundles and templates (F18) | — (shipped defaults) | Member bundle per matrix Q1, Q4 |
 | Business types, Undo | `org:update` | no |
 | Turn-off consequences | `module:manage`, plus `module:read` for the counts | no |
 | Alerts | the signed-in person, for their own preferences | no |
@@ -358,6 +374,9 @@ flowchart LR
   F9[F9 Reviewer view]
   F3 --> F11[F11 staff landing]
   F16[F16 storefront people join team] --> F11
+  F15 --> F17[F17 extra permissions per person]
+  F17 --> F18[F18 default bundles and templates]
+  B16[(B16, C13, E26)] --> F18
   F10[F10 business types]
   F12[F12 Settings Undo + states]
   F13[F13 turn-off consequences]
@@ -370,7 +389,8 @@ Cross-epic:
 - F4 needs D13 (Retry through a mandate), D17 (Send reminder) and A13
   (Reply). It can ship first with Mark sent and Retry by pay link.
 - F13 renders E12's Class packs row.
-- F11 waits on the matrix review (DEC-039).
+- F18 follows B16, C13 and E26 (the capabilities it bundles) and waits on
+  the matrix's Q1, Q3 and Q4.
 
 ### F1. Home API: Needs-you sources — failed renewals, overdue invoices, stock short, site not live
 
@@ -418,8 +438,8 @@ count); `attempt()`.
   notice.
 - Error path: the stock checks throw, so "Stock" is unavailable and the
   other rows still render.
-- Permission: a Member gets no invoice or renewal rows and no amounts, and
-  the payload carries no money fields.
+- Permission: a caller without `invoice:read` and `subscription:read` (a
+  Member by default) gets no invoice or renewal rows.
 
 **Verification:** Rye shows its short size; Pulse its failed renewal; Kavi
 Dental its overdue X-ray invoice.
@@ -615,7 +635,7 @@ the design.
 
 ### F7. Home: This week money panel
 
-**Goal:** Owners and admins see the week's money in words.
+**Goal:** Whoever holds `payment:read` sees the week's money in words.
 
 **Requirements:** R7
 
@@ -644,7 +664,8 @@ the design.
   to compare".
 - Edge case: a refund this week lowers takings; an order invoice is never
   counted twice.
-- Permission: a Member's payload has no `week` money fields at all.
+- Permission: a caller without `payment:read` (a Member by default) gets no
+  takings figure at all; its bookings figure still shows with `booking:read`.
 
 **Verification:** The figures agree with Invoices and Orders for the same
 days.
@@ -756,17 +777,18 @@ Private limited.
 
 ---
 
-### F11. Staff landing — **blocked on the matrix review**
+### F11. Staff landing
 
 **Goal:** A Member (or a custom role such as Front desk or Dentist) lands on
 their own day: the storefronts and work they are assigned to.
 
 **Requirements:** R16
 
-**Dependencies:** F3, F16; the permission matrix review (DEC-039), which
-decides which rows a Member and the proposed templates see.
+**Dependencies:** F3, F16. Decided by the capability model (DEC-039): each
+row asks the person's own capabilities, so it needs no answer about who holds
+what.
 
-**Phase:** 3
+**Phase:** 2
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/home/home.service.ts` (`view: "staff"`, with sources filtered to the caller's storefront roles and the staff member's services)
@@ -780,13 +802,15 @@ decides which rows a Member and the proposed templates see.
   (`Membership.staffMember`).
 - The date line says "Hill Road only" when the view is narrowed. There is no
   switch on Home (design).
-- Rows follow the matrix outcome: kitchen orders with `order:stage`, notes
-  with the sensitive read, and so on.
+- Each row follows the person's capabilities, as everywhere: orders with
+  `order:read` or `order:stage` (the kitchen view until F18), sensitive notes
+  with the sensitive capability, takings with `payment:read`, and so on.
 
 **Test scenarios:**
 - Happy path: a Member on Hill Road sees Hill Road's open orders only.
 - Edge case: a Member with no storefront role sees every storefront.
-- Security: no money fields for a Member (DEC-024).
+- Edge case: a person given `payment:read` as an extra permission (F17) sees
+  the takings figure; one without it doesn't.
 
 **Verification:** Arjun, Sana and Dr. Arun from the design's roles match
 their views.
@@ -921,7 +945,7 @@ connected provider.
 
 **Approach:**
 - Render the column only when some member has a grant beyond their role.
-  Nothing grants one yet, so it is hidden.
+  Nothing grants one until F17, so it is hidden.
 - The grid template loses the column, and the xl layout keeps its widths.
   Nothing else on Team changes (DEC-048).
 
@@ -978,6 +1002,95 @@ team (DEC-048).
 
 ---
 
+### F17. Extra permissions per person
+
+**Goal:** A person can hold capabilities beyond their role, as the capability
+model says (DEC-039; matrix §5), and Team shows them.
+
+**Requirements:** R14
+
+**Dependencies:** F15
+
+**Phase:** 2
+
+**Files:**
+- Modify: `packages/database/prisma/schema.prisma` (`Membership.extraActions String[]`, default empty), with a migration
+- Modify: `apps/api.saroh.in/src/modules/organizations/organization-policy.ts` (`resolveCapabilities` takes the role's list and the person's extras; the union, filtered to known actions, then `withImplied`), `organization-context.service.ts`, `organization-members.service.ts` and `organization-members.controller.ts` (`PUT members/:id/extra-actions`, under `member:role:update`, audited)
+- Modify: `apps/app.saroh.in/components/organizations/team-screen.tsx` (the column shows a person's extras; an "Extra permissions" sheet per person, grouped like the role editor)
+- Test: `resolve-capabilities.spec.ts`, `organization-members.service.spec.ts`, `e2e/permissions/permissions.spec.ts`
+
+**Approach:**
+- A person's capabilities are their role's bundle plus their extras. An
+  extra never removes anything; taking a power away is a role change.
+- `ownerOnly` actions (`org:delete`) can't be granted. An Admin can't grant
+  an extra they don't hold themselves.
+- Unknown strings are dropped on read, as role lists are.
+- The change is audited on the person's Activity ("Given: Refund orders").
+- A Reviewer can't be given extras beyond the website (DEC-006): only
+  `site:*` review capabilities.
+
+**Test scenarios:**
+- Happy path: a Member given `order:refund` can refund and still can't edit
+  an order.
+- Edge case: removing the extra takes the power away on the next request.
+- Error path: granting `org:delete` → 400; an Admin granting `payment:manage`
+  they hold → OK; a Member without `member:role:update` → 403.
+- Integration: Team shows the column once one person has an extra, and hides
+  it when the last extra is removed.
+
+**Verification:** `db:verify:replay` passes; the permissions e2e covers a
+person with an extra.
+
+---
+
+### F18. Default bundles: the Member bundle and role templates
+
+**Goal:** Apply the user's answers to the matrix's open questions: the
+Member default bundle, whether it reaches existing businesses, and which
+role templates ship (DEC-039; matrix §4 and §9).
+
+**Requirements:** R17
+
+**Dependencies:** B16, C13, E26 (the capabilities it bundles), F17; **waits
+on the user's answers to matrix Q1, Q3 and Q4**.
+
+**Phase:** 3
+
+**Files:**
+- Modify: `apps/api.saroh.in/src/modules/organizations/organization-policy.ts` (the Member set in `CAPABILITIES`; `withImplied`: `order:stage` → `order:read`)
+- Modify: `apps/api.saroh.in/src/modules/orders/*` (the money-free kitchen projection removed; `kitchenOnly` gone)
+- Modify: `apps/api.saroh.in/src/modules/organizations/capability-catalogue.ts` (role templates as data), `organization-roles.service.ts`
+- Modify: `apps/app.saroh.in/components/organizations/roles-tab.tsx` ("New role" offers the templates)
+- Create, if Q4 keeps existing businesses on today's Member: `packages/database/src/backfill/<ts>-freeze-member-role.ts` (writes today's Member list as a saved row for every existing business)
+- Test: `organization-policy.spec.ts`, `resolve-capabilities.spec.ts`, `organization-roles.service.spec.ts`, `e2e/permissions/permissions.spec.ts`
+
+**Approach:**
+- The Member set becomes the answer to Q1 (proposed: today's reads plus
+  `order:read`, `order:create`, `booking:write`, `pack:read`, `pack:sell`).
+- `order:stage` implies `order:read`, and the kitchen view becomes a layout
+  only: nobody reads an order without its money.
+- Q4 decides who gets the new Member: the proposal applies it to every
+  business that never saved its own Member, with a release note in plain
+  words; the alternative backfill freezes today's Member for existing
+  businesses.
+- Templates (Q3) are data beside the catalogue; one pre-fills "New role" and
+  is never a built-in role.
+
+**Test scenarios:**
+- Happy path: a Member at a business with no saved Member row reads an order
+  with its total, takes a new order and books a class.
+- Edge case: a business's saved Member row keeps its list, plus implied holds
+  (its Members who move orders now read them whole) — or, if Q4 freezes,
+  nothing changes for it.
+- Edge case: picking the Front desk template pre-fills New role; saving it
+  makes an ordinary custom role.
+- Integration: the permissions e2e rows for Member match matrix §4.
+
+**Verification:** The matrix's default bundles table matches
+`CAPABILITIES` one to one.
+
+---
+
 ## System-Wide Impact
 
 - **Interaction graph:** Home reads subscriptions, invoices, stock checks,
@@ -998,7 +1111,8 @@ team (DEC-048).
   storefront invites; e2e `home.spec.ts` covers Northwind.
 - **Unchanged invariants:**
   - the ranking order (ATTENTION → OVERDUE → SETUP → SUGGESTION);
-  - no money without a money read (DEC-024);
+  - nothing is shown without its scope's read, and nothing inside a scope is
+    hidden from someone who holds it (DEC-039);
   - a Reviewer sees only the sites they were invited to (DEC-006);
   - the last OWNER can't be removed.
 
@@ -1012,7 +1126,8 @@ team (DEC-048).
 | Undo implies a message can be recalled | The 10-second hold, and no Undo once sent (default 51) |
 | The storefront roster change widens access | Membership is created as MEMBER only; an existing role is never lowered; a storefront invite now needs `member:invite` |
 | F2 and F4 depend on other epics | They ship in parts: Mark sent and Retry by pay link first |
-| The staff landing needs the matrix | F11 is blocked and phase 3; nothing else here waits on it |
+| The Member bundle waits on the user (matrix Q1, Q3, Q4) | Only F18 waits; F11 and F17 follow the capability model and ship in phase 2 |
+| A new Member bundle changes what existing staff see | Q4 is the user's; the release note says in plain words what Members can now see and do, or the backfill freezes today's Member |
 
 ---
 

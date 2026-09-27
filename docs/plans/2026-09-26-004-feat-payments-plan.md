@@ -5,7 +5,7 @@ status: active
 date: 2026-09-26
 origin: /saroh-designs — Saroh Subscriptions.dc.html, Saroh Subscription Detail.dc.html, Saroh Plan Detail.dc.html, Saroh Plan Editor.dc.html, Saroh Invoices.dc.html, Saroh Invoice Detail.dc.html (+ saroh-fixtures.js); gap reports subscriptions-plans.md, orders-invoices.md (invoices half), home-calendar-settings.md (Retry)
 builds_on: ADR-007 (subscriptions, invoices), ADR-008 / DEC-023 (an invoice for every order), DEC-028 (numbering), #507 (Subscriptions and Subscription Detail screens)
-decisions: DEC-038 (provider autopay, amends ADR-007), DEC-043 (drafts and one editor shell), DEC-039 (permissions wait for the matrix), DEC-044 (courses later)
+decisions: DEC-038 (provider autopay, amends ADR-007), DEC-043 (drafts and one editor shell), DEC-039 (the capability model), DEC-044 (courses later)
 overview: docs/plans/2026-09-26-000-round-2-overview.md (epic D)
 epic: TBD
 ---
@@ -72,7 +72,7 @@ period is still invoiced, and a pay link stays the fallback.
 - R1. A plan's API returns and accepts its classes a month, a count of subscribers per price they pay, and a monthly-equivalent figure. Plan names are unique per business among plans that aren't archived.
 - R2. Every change to a plan (created, published, price changed, classes changed, renamed, archived, restored, draft discarded) writes one plan event with who, when, and before → after for the changed fields. Events are never edited or deleted.
 - R3. Plans are a tab of Subscriptions (`?tab=plans`), with the design's cards, Archive and "Sell again", each with Undo. `/billing/plans` redirects to the tab. A role without `subscription:read` sees the locked state.
-- R4. Plan Detail (`/billing/plans/[planId]`) has Overview, Subscribers and History, with loading, empty ("Nobody's on this plan yet"), failed, not-found ("That plan isn't here") and locked states. Money figures appear only for a role with the money read.
+- R4. Plan Detail (`/billing/plans/[planId]`) has Overview, Subscribers and History, with loading, empty ("Nobody's on this plan yet"), failed, not-found ("That plan isn't here") and locked states. Its figures show to anyone with `subscription:read`, which covers them (DEC-039).
 - R5. A plan can be a **Draft**, which is refused at subscribe, on the site and in "Sell again" lists. A live plan can carry **one set of unpublished changes** on the server. Publish changes applies them in one transaction, Discard drops them, and Delete draft removes a plan that was never published (DEC-043).
 - R6. One editor shell (autosave, the publish banner, Publish / Publish changes / Discard / Delete draft, leave-with-unsaved-work, a failed-save state) is shared by the Plan Editor and the Pack Editor (E18).
 - R7. The Plan Editor (`/billing/plans/new`, `/billing/plans/[planId]/edit`) replaces `PlanDialog`. It has Details, Price and billing (month and year first, week and quarter under "More"; default 29), Classes included (shown only when Appointments is on; default 31), and an At a glance side panel. Its copy never promises autopay a business can't take (DEC-038).
@@ -96,7 +96,7 @@ period is still invoiced, and a pay link stays the fallback.
 - No proration on a plan change (ADR-008 §3). A plan change still applies from the next renewal.
 - No currency picker: plans use the business's currency (DEC-030 amendment).
 - No mandate for class packs or one-off invoices this round. Mandates pay subscription renewals only. Per-session charging waits for Courses (DEC-044), and the port is shaped so it can be added.
-- No new permissions here. Units build against today's actions (`subscription:*`, `invoice:*`, `payment:*`) until the matrix review (DEC-039).
+- No new capabilities here. Units use today's (`subscription:*`, `invoice:*`, `payment:*`), which already fit the capability model (DEC-039): each shows everything in its scope, money included.
 - Courses: the `?course=` filter keeps working for existing course invoices, and nothing else about courses changes (DEC-044).
 
 ### Deferred to Follow-Up Work
@@ -199,9 +199,9 @@ period is still invoiced, and a pay link stays the fallback.
 
 ### Permissions touched
 
-| Action | Needs (today's actions; revisit after the matrix review, DEC-039) |
+| Action | Needs (today's capabilities, which fit the capability model, DEC-039) |
 |---|---|
-| Read plans, Plan Detail, plan events | `subscription:read`; money figures (monthly figure, per-price revenue) also need `subscription:read` (already a money read) |
+| Read plans, Plan Detail, plan events, and their figures (monthly figure, per-price revenue) | `subscription:read` |
 | Create, autosave, publish, discard, archive, restore, delete draft | `subscription:write` |
 | Subscription actions, pause with an end, events | `subscription:read` / `subscription:write` as today |
 | Send an autopay set-up link, cancel autopay | `subscription:write` |
@@ -884,7 +884,7 @@ Ship order: D1 → D2 → D9 → D5 → D6 → D3/D4/D7/D8/D10 in parallel, D18 
   - an issued invoice never changes (DEC-023);
   - numbering (DEC-028);
   - one live subscription per person per plan;
-  - no money figures without a money read (DEC-024).
+  - each figure shows with its own scope's read (DEC-039).
 
 ---
 

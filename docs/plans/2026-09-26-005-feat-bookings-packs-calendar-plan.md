@@ -62,7 +62,7 @@ The calendar's first pass (U17) reads one month of items. It shows no money, no 
 - R17. A Week view (Mon–Sun) replaces Next 7 days. It has card columns for every business, and an hour grid (06:00–22:00, with an All day row) for businesses with staff.
 - R18. The month grid is a keyboard grid (`role=grid`, one tab stop, arrows, Home/End, PageUp/PageDown). At narrow widths the day opens as a dialog sheet that traps and returns focus.
 - R19. Clinics get a Payments layer, read from paid invoices (default 48). There is no Courses layer this round (default 49).
-- R20. `booking:settings` and `pack:sell` land only after the permission matrix review (E26, DEC-039).
+- R20. The capability model (DEC-039) applies to bookings and packs in E26: `service:write` is relabelled "Change services, hours, time off and booking rules" (the design's `booking:settings`, no new key), and `pack:sell` is added, implied by `pack:write`. `pack:read` covers a pack's prices and sales.
 
 ---
 
@@ -129,7 +129,7 @@ The calendar's first pass (U17) reads one month of items. It shows no money, no 
 - One lock order for every flow: Order → StockLevel → PaymentRefund → payment intent → Invoice → Booking (`backend-billing-and-classes.md`). Deposits and visits take the same order.
 - An issued invoice never changes: a deposit refund is a credit note (DEC-023).
 - A refund is real only when the provider confirms it, and an unsure answer holds the money (DEC-026).
-- Money figures are left out by the API for a role without the matching money read (DEC-024).
+- Each part of a screen follows its own read (DEC-039): a pack's prices and sales with `pack:read`, a booking's price and deposit with `booking:read`, and the Calendar's money cells with `payment:read`. Nothing inside a part is hidden from someone who holds its read.
 - Demo stores are film sets. Rye and Pulse are read-only in browser checks, and writes happen on Northwind.
 
 ### External References
@@ -178,12 +178,13 @@ The calendar's first pass (U17) reads one month of items. It shows no money, no 
 
 | Action | Needs | Notes |
 |---|---|---|
-| Service fields, Service Editor, time off, closures, booking rules | `service:write` (today) | Relabelled or replaced by `booking:settings` in E26 after the review |
+| Service fields, Service Editor, time off, closures, booking rules | `service:write` | Relabelled "Change services, hours, time off and booking rules" in E26 (the design's `booking:settings`) |
 | New booking, move, cancel, deposit refund on free cancel | `booking:write` | Unchanged; the refund runs inside the cancel, no `payment:manage` asked |
 | "Also sell" / CLASS_PACKS on and off | `module:manage` | Owner and Admin |
 | Create, edit, publish, discard, archive and extend packs | `pack:write` | |
-| Sell a pack at the desk | `pack:write` today; `pack:sell` after E26 | Matrix B-3 |
-| Pack Detail sales and money figures, calendar money | `payment:read` / `invoice:read` | Left out by the API otherwise (DEC-024) |
+| Sell a pack at the desk | `pack:write` today; `pack:sell` after E26 | Implied by `pack:write` |
+| Pack Detail, holders, prices and sales | `pack:read` | The whole pack, money included (DEC-039) |
+| Calendar money cells and month strip | `payment:read` | The Payments scope (matrix §1 rule 3) |
 | Calendar layers | `order:read` or `order:stage`, `booking:read`, `subscription:read`, `invoice:read` | Each layer asks its own |
 | Needs attention on booking surfaces | C1's read; sensitive via `contact:write` until C13 | DEC-040 |
 
@@ -235,7 +236,8 @@ flowchart LR
   E25 --> E27[E27 hour grid]
   E21[E21 copy, range, shortcuts]
   E28[E28 keyboard grid + sheet]
-  E26[E26 booking permissions — matrix]
+  E2 --> E26[E26 booking capabilities]
+  E15 --> E26
 ```
 
 ---
@@ -682,7 +684,7 @@ flowchart LR
 - Edge case: first-only when the person held it before → 409 "Only for a first pack".
 - Edge case: a one-to-one pack isn't offered for a class.
 - Error path: extending by 31 days → 400. Validity 6 → 400.
-- Error path: a Member without a money read gets holders without prices.
+- Edge case: a caller with `pack:read` gets holders and prices; one without it gets 403.
 
 **Verification:** The reads return what Saroh Pack Detail.dc.html needs.
 
@@ -735,7 +737,7 @@ flowchart LR
 
 **Approach:**
 - Cards show:
-    - the kind, credits, validity, price (with a money read), "First pack only" and Draft or "Changes not published";
+    - the kind, credits, validity, price, "First pack only" and Draft or "Changes not published";
     - holders and credits left.
 - The sell dialog adds "Paid by" and states "Books nothing · invoice ₹X" only when Payments is on (`GET class-packs/selling`).
 - The memberships section links to Plans (plan D).
@@ -796,12 +798,12 @@ flowchart LR
 
 **Approach:**
 - Used this week lists redemptions by day, with the class and person.
-- Sales shows each sale with its method. Money only with a money read; otherwise the tab says who sold it, without prices.
+- Sales shows each sale with its method, amount and who sold it (`pack:read` covers them).
 - Activity reads `PackEvent`.
 
 **Test scenarios:**
 - Happy path: a redemption booked today shows under Used this week.
-- Edge case: a viewer without a money read sees Sales without amounts.
+- Edge case: a Sales row sold at the desk with no payment shows "None" as the method.
 
 **Verification:** Side by side with Saroh Pack Detail.dc.html.
 
@@ -867,7 +869,7 @@ flowchart LR
 **Test scenarios:**
 - Happy path: a paid order + a refund + a reported fee → the day shows in, out = refund + fee.
 - Edge case: an order and its invoice count once.
-- Edge case: a Member (no `payment:read`) gets items without money fields.
+- Edge case: a caller without `payment:read` gets the calendar's items without the money cells (the Payments part), and their bookings with their prices (the Bookings part).
 - Edge case: a provider payload with no fee → fee null, and Out = refunds only.
 - Integration: `db:verify:replay` passes.
 
@@ -988,7 +990,7 @@ flowchart LR
 **Test scenarios:**
 - Happy path: the CSV rows sum to the strip.
 - Edge case: a past month drops "so far".
-- Edge case: a viewer without the money read sees no strip and no money cells.
+- Edge case: a viewer without `payment:read` sees no strip and no money cells.
 
 **Verification:** Side by side with the design's month strip.
 
@@ -1049,15 +1051,15 @@ flowchart LR
 
 ---
 
-### E26. Booking permissions: `booking:settings` and `pack:sell` — blocked on the matrix review
+### E26. Booking capabilities: `service:write` relabelled and `pack:sell`
 
-**Goal:** Apply the review's answers to B-2 and B-3 (the permission matrix).
+**Goal:** Apply the capability model to bookings and packs (DEC-039; matrix §2, answers 6 and 7).
 
 **Requirements:** R20
 
-**Dependencies:** DEC-039 review; E2, E15
+**Dependencies:** E2, E15. Decided by the capability model; whether Members hold `pack:read` and `pack:sell` by default is F18's (matrix Q1), not this unit's.
 
-**Phase:** 3
+**Phase:** 2
 
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/organizations/{organization-actions,organization-policy,capability-catalogue}.ts`, `modules/class-packs/class-packs.service.ts`, `modules/staff/staff.service.ts`, `modules/bookings/bookings.service.ts`
@@ -1065,12 +1067,16 @@ flowchart LR
 - Test: `apps/api.saroh.in/src/modules/organizations/capability-catalogue.spec.ts`, `e2e/permissions/permissions.spec.ts`
 
 **Approach:**
-- The proposal is to relabel `service:write` as "Change services, hours, time off and booking rules" (no new key) and add `pack:sell`, implied by `pack:write`. What ships is whatever the review returns.
-- Every endpoint gets a row in the permissions matrix.
+- Relabel `service:write` "Change services, hours, time off and booking rules"; no `booking:settings` key (one power, one key).
+- Add `pack:sell`, held by Owner and Admin, implied by `pack:write`, and implying `pack:read`. The sell endpoint asks `pack:sell`.
+- `pack:read` serves the whole pack, prices and sales included; the money-free pack projection is removed.
+- `booking:write` and `service:write` imply their reads.
+- Every endpoint gets a row in the permissions matrix e2e.
 
 **Test scenarios:**
 - Happy path: a custom role with `pack:sell` only can sell and can't edit.
 - Edge case: an existing custom role with `pack:write` still sells (implied).
+- Edge case: a custom role with `pack:read` sees Pack Detail's Sales with amounts.
 
 **Verification:** The permissions e2e covers every booking and pack endpoint.
 
@@ -1161,7 +1167,7 @@ flowchart LR
 | One-to-one packs contradict ADR-008 | Default 45 is to be confirmed; kind defaults to CLASSES, so nothing changes until a business chooses |
 | Fees not reported by a provider | Show none; never estimate (default 47) |
 | The CLASS_PACKS flag isn't set in an environment | Rollout runbook step, with the backfill run after the flag |
-| E26 is waiting on the review | Screens use today's actions until then |
+| Members' default packs access waits on matrix Q1 | E26 ships the capabilities; F18 changes the Member bundle, and screens read `can*` flags from the API either way |
 
 ---
 

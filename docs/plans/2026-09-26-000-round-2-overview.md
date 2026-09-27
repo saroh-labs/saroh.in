@@ -35,15 +35,21 @@ file name. `DESIGN-NOTES.md` has the reasoning behind them.
 | C. Customers | [003](./2026-09-26-003-feat-customers-plan.md) | 14 | The business-wide Customers list and its API, Needs attention, Customer Detail gaps, merge, privacy removal, email and address editing, reviews and packs on the detail. |
 | D. Payments | [004](./2026-09-26-004-feat-payments-plan.md) | 18 | The Plans tab, Plan Detail, and the Plan Editor with drafts and the shared editor shell. Plan and subscription event logs, pause with an end date, and classes from the next renewal. Provider autopay (DEC-038). Invoices: bill of supply, PDF, sending, the source filter and locked states. |
 | E. Bookings, services, packs and calendar | [005](./2026-09-26-005-feat-bookings-packs-calendar-plan.md) | 28 | The Service Editor (visits, deposits, "Either", show on the booking page), time off ranges and business closed, new-booking search, and the booking page's gaps. Packs, Pack Detail and Pack Editor with drafts. The Business Calendar's second pass. |
-| F. Home and Settings | [006](./2026-09-26-006-feat-home-settings-plan.md) | 16 | The Home redesign, Settings' real differences, Team's hidden column, and storefront people joining the team. |
+| F. Home and Settings | [006](./2026-09-26-006-feat-home-settings-plan.md) | 18 | The Home redesign, Settings' real differences, Team's hidden column, storefront people joining the team, extra permissions per person, and the default bundles of the capability model. |
 | G. Site editor and customer site | [007](./2026-09-26-007-feat-site-editor-customer-site-plan.md) | 21 | The #260 split first, then bound blocks, module pages, header and footer text, Undo toasts, the narrow layout and in-place preview. Customer site v2 without the brand: shop and bag, Prices, On today, open or closed, and nav gated by module. |
 | H. Design system: Brand v2 | [008](./2026-09-26-008-feat-brand-v2-plan.md) | 10 | **The font-leak fix (phase 1).** Then Brand v2 with choice: a font catalogue of pairings and a palette catalogue plus a custom colour, both extensible as data; the brand API and panel, a logo, contrast, starting themes, and existing sites moved across as close as they look. Hindi is later. |
-| | | **137** | |
+| | | **139** | |
 
 **The font fix changes every live site.** On the day H1 ships, every
 merchant site's text moves from Saroh's fonts to a neutral system font stack,
 and stays there until the merchant picks a font pairing in Brand v2. Colours
 do not change. The user chose to ship it now (2026-09-27; default 141).
+
+**Permissions are capabilities, not roles** (DEC-039, reworked 2026-09-27).
+A capability shows everything within its scope — `order:read` shows the whole
+order, money included — and the built-in roles are default bundles. The
+matrix answers its first version's eleven questions under this model and
+keeps four product choices for the user (Q1–Q4 below).
 
 Also written: [the permission matrix](./2026-09-26-permission-matrix.md)
 (DEC-039), and ADR-011.
@@ -58,7 +64,7 @@ none is bigger than one to two days of agent work.
 on an existing ADR. It includes the font-leak fix. **Phase 2** builds on
 phase 1's foundations, or rests on a default in the list below; confirming the
 defaults while phase 1 runs keeps phase 2 unblocked. **Phase 3** waits on the
-permission matrix review (DEC-039).
+user's answers to the permission matrix's open questions (Q1, Q3, Q4).
 
 ### Phase 1
 
@@ -78,11 +84,11 @@ permission matrix review (DEC-039).
 | Epic | Units |
 |---|---|
 | A | A6 account bookings · A7 orders and Track · A8 plan and packs · A9 sign-in to book, recognition · A10 credits online · A11 buy packs online · A12 class waitlist · A13 message thread · A14 transactional messages |
-| B | B8 Order Detail quick wins · B9 cancel as refund, change fulfilment · B12 product fulfilment types · B13 New order v2 · B14 Visits card · B15 Needs attention on orders |
-| C | C9 merge API · C10 merge screens · C11 privacy removal · C12 booking-page notes |
+| B | B8 Order Detail quick wins · B9 cancel as refund, change fulfilment · B12 product fulfilment types · B13 New order v2 · B14 Visits card · B15 Needs attention on orders · B16 order capabilities |
+| C | C9 merge API · C10 merge screens · C11 privacy removal · C12 booking-page notes · C13 customer capabilities |
 | D | D11 mandates port and Razorpay · D12 autopay set-up by the customer · D13 renewals charge the mandate · D14 autopay in the workspace · D15 bill of supply · D16 invoice PDF · D17 send an invoice |
-| E | E6 header facts and half-hour starts · E8 deposits · E9 visits API · E10 visits on the page and in Bookings · E12 Class packs module · E13 pack API · E15 Packs list and sell dialog · E16–E17 Pack Detail · E18 Pack Editor · E19–E20 calendar API · E22 named problems · E23 money cells · E24 days off and team · E25 Week view · E27 hour grid |
-| F | F2 more Needs-you sources · F4 inline actions with Undo · F7 This week · F10 business types · F14 alerts |
+| E | E6 header facts and half-hour starts · E8 deposits · E9 visits API · E10 visits on the page and in Bookings · E12 Class packs module · E13 pack API · E15 Packs list and sell dialog · E16–E17 Pack Detail · E18 Pack Editor · E19–E20 calendar API · E22 named problems · E23 money cells · E24 days off and team · E25 Week view · E26 booking and pack capabilities · E27 hour grid |
+| F | F2 more Needs-you sources · F4 inline actions with Undo · F7 This week · F10 business types · F11 staff landing · F14 alerts · F17 extra permissions per person |
 | G | G9 Plans block · G13 bag and checkout · G14–G16 module pages · G19 module-gated nav · G20 Prices · G21 new-site setup |
 | H | H2 brand contract · H3 font and palette catalogues · H4 contrast rules · H5 font files per site · H6 renderer · H7 logo · H8 Brand panel · H9 starting themes · H10 existing sites move across |
 
@@ -90,10 +96,10 @@ permission matrix review (DEC-039).
 
 | Epic | Units | Waits on |
 |---|---|---|
-| B | B16 orders permission pass | matrix review |
-| C | C13 customer permissions | matrix review |
-| E | E26 booking permissions (`booking:settings`, `pack:sell`) | matrix review |
-| F | F11 staff landing | matrix review |
+| F | F18 default bundles: the Member bundle, `order:stage` → `order:read`, role templates | matrix Q1, Q3 and Q4 |
+
+B16, C13, E26 and F11 were phase 3 until 2026-09-27. The capability model
+decides them, so they are phase 2.
 
 ## Dependencies between epics
 
@@ -104,10 +110,12 @@ permission matrix review (DEC-039).
   - C9 and C11 (a merge or a removal moves or retires an account).
 - **Needs attention** (C1) comes before C5, C12, B13 (allergy clash), B15, E4,
   F2 and A5 (a customer's own health note).
-- **The permission matrix** (DEC-039) gates B16, C13, E26 and F11. Units
-  before it build against today's actions. The sensitive gate falls back to
-  Owner and Admin (via `contact:write`) until C13 swaps in
-  `customer:sensitive`.
+- **The capability model** (DEC-039): B16, C13 and E26 add the split
+  capabilities; F17 adds extra permissions per person; F18 changes the
+  built-in bundles and comes after all four. Until F18, the shipped Member
+  stands (the kitchen view without money, DEC-024). The sensitive gate falls
+  back to Owner and Admin (via `contact:write`) until C13 swaps in
+  `customer:sensitive` (matrix Q2).
 - **The draft helper and editor shell** (D5, D6) come before D7, E14 and E18,
   and later the course editor.
 - **Fulfilment types** (B2) come before B10, B12, B13, A7 (Track) and G13.
@@ -302,7 +310,7 @@ it.
 93. A removed contact's email becomes a unique placeholder that can't be delivered to, and every reader treats it as no email.
 94. Privacy removal offers to delete form entries and leads too, unticked by default.
 95. A booking-page note counts as sensitive until staff confirm it.
-96. Without contact access, a search that looks like a phone number or an email runs as a name search.
+96. Customers search matches name, phone and email for anyone who can open the list (`contact:read`); there is no separate contact gate (DEC-039).
 97. A contact's address is six new optional fields, following DEC-029's state and PIN rules.
 98. The old allergen note rows are written for one more release, then dropped in a two-deploy change.
 
@@ -375,8 +383,16 @@ it.
 
 ## Still for the user to decide
 
-- **The permission matrix review** (DEC-039), with the eleven questions at the
-  end of the matrix.
+- **Four permission choices** (DEC-039, matrix §9). The capability model
+  answers the matrix's eleven questions; these product choices remain:
+  - **Q1.** The Member default bundle (proposed: today's reads plus whole
+    orders, New order, booking changes, and selling packs).
+  - **Q2.** Whether sensitive notes are their own capability,
+    `customer:sensitive` (proposed: yes).
+  - **Q3.** Which role templates ship (proposed: Counter, Front desk,
+    Practitioner, Packer).
+  - **Q4.** Whether a new Member bundle reaches existing businesses
+    (proposed: yes, for those that never changed their Member role).
 - **Saroh's own billing** (Settings › Plan & billing): when, and in which
   plan.
 - **The Pick-up late rule** (default 16): the design's 2 hours, or today's
