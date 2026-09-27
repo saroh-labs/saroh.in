@@ -1,5 +1,7 @@
 "use server";
 
+import type { PeekPerson } from "./peek";
+import { readPeekPerson } from "./peek-person";
 import type {
     AvailabilityRuleInput,
     BookByHandInput,
@@ -67,6 +69,17 @@ export async function cancelBooking(
 /** Move a booking to another slot (#121). */
 export async function rescheduleBooking(bookingId: string, startAt: string) {
     return rescheduleBookingApi(bookingId, startAt);
+}
+
+/**
+ * The person behind a booking, read when its peek opens (E5): their phone and
+ * Needs attention, as far as the viewer's role may see. Null when they can't
+ * be read.
+ */
+export async function readBookingPerson(
+    contactId: string,
+): Promise<PeekPerson | null> {
+    return readPeekPerson(contactId);
 }
 
 /** Record how an appointment went (#241). */

@@ -357,7 +357,7 @@ function Form({
             </div>
             <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
                 {pay === "DESK"
-                    ? "Booked now; the calendar shows they pay at the desk."
+                    ? "Booked now; the calendar shows they pay at the session."
                     : "Recorded as paid. Saroh takes no payment and makes no receipt for it."}
             </p>
             {error ? (
