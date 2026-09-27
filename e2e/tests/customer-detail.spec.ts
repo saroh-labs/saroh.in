@@ -82,7 +82,7 @@ const tab = (page: Page, name: RegExp) => page.getByRole("tab", { name });
  * a member like that, so the test asks the API for one.
  */
 async function memberWithClassesToCome(page: Page): Promise<string> {
-    const headers = { "x-organization-id": PULSE };
+    const headers = { "x-organization-id": PULSE, origin: urls.APP_URL };
     const base = `${urls.API_URL}/organizations/${PULSE}`;
     const from = new Date().toISOString();
     const to = new Date(Date.now() + 14 * 86_400_000).toISOString();

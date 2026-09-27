@@ -37,7 +37,8 @@ async function signIn(page: Page) {
 }
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;
-const orgHeader = { "x-organization-id": ORG };
+// The API refuses a write with no Origin (#50).
+const orgHeader = { "x-organization-id": ORG, origin: urls.APP_URL };
 
 /** Track stock on, and the shelf counted back to what it was. */
 async function putBack(request: APIRequestContext, productId: string) {

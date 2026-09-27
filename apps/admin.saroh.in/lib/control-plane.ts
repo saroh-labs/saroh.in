@@ -1,3 +1,4 @@
+import { requestOrigin } from "@saroh/auth/origins";
 import { headers } from "next/headers";
 
 import { env } from "@/env";
@@ -132,12 +133,16 @@ export async function adminFetch(
     path: string,
     init?: RequestInit,
 ): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
+    const incoming = await headers();
+    const cookie = incoming.get("cookie") ?? "";
+    // The API refuses a write with no Origin (#50); say where this came from.
+    const origin = requestOrigin(incoming);
     return fetch(`${API_URL}/admin${path}`, {
         ...init,
         headers: {
             "content-type": "application/json",
             cookie,
+            ...(origin ? { origin } : {}),
             ...(init?.headers ?? {}),
         },
         cache: "no-store",

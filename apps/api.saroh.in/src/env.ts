@@ -141,6 +141,13 @@ const envSchema = z.object({
     // crashed mid-flight) is reclaimed by the next claim. Default 5 min.
     JOB_VISIBILITY_MS: z.coerce.number().int().positive().default(300_000),
 
+    // Error tracking (#103). Off when unset: every 5xx is still logged, and
+    // nothing leaves the process. No tracker SDK is installed yet, so a value
+    // here only logs a warning at startup — see
+    // src/common/observability/report-error.ts and
+    // docs/architecture/ERROR_TRACKING_AND_UPTIME.md.
+    ERROR_TRACKING_DSN: z.string().url().optional(),
+
     npm_package_version: z.string().optional(),
 });
 

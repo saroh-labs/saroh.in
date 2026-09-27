@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import * as path from "node:path";
 
 import { assertTestDatabase } from "./db-guard";
+import { isRlsTestMode, RLS_TEST_ROLE, RLS_URL_ENV, roleUrl } from "./rls-mode";
 
 /**
  * Jest globalSetup for the integration project. Runs once, in the main Jest
@@ -26,33 +28,82 @@ import { assertTestDatabase } from "./db-guard";
  * That division matters: `db push` means NO spec here executes a migration
  * file, so this suite cannot tell you whether a migration works. Only the
  * replay job can.
+ *
+ * The exception is RLS mode (`TEST_RLS=on`, see `rls-mode.ts`): row-level
+ * security policies exist only in migration files, so that run replays the
+ * migrations instead and adds a NOBYPASSRLS role for the workers.
  */
 export default async function globalSetup(): Promise<void> {
     const testDatabaseUrl = assertTestDatabase();
 
     const databaseDir = path.resolve(__dirname, "../../../packages/database");
-
-    // prisma.config.js loads dotenv, but dotenv does NOT override an env var
-    // that is already present — so passing DATABASE_URL here wins over the
-    // dev URL in packages/database/.env.
-    execFileSync(
-        "pnpm",
-        [
-            "exec",
-            "prisma",
-            "db",
-            "push",
-            "--force-reset",
-            // Prisma 7 removed `--skip-generate` from `prisma db push` (it no
-            // longer generates as a side effect, so there is nothing to skip).
-            // Passing it aborts the push, which took the whole integration
-            // project down with it.
-            "--accept-data-loss",
-        ],
-        {
+    const prisma = (args: string[], input?: string) =>
+        execFileSync("pnpm", ["exec", "prisma", ...args], {
             cwd: databaseDir,
-            stdio: "inherit",
+            stdio:
+                input === undefined
+                    ? "inherit"
+                    : ["pipe", "inherit", "inherit"],
+            input,
+            // prisma.config.js loads dotenv, but dotenv does NOT override an env
+            // var that is already present — so passing DATABASE_URL here wins
+            // over the dev URL in packages/database/.env.
             env: { ...process.env, DATABASE_URL: testDatabaseUrl },
-        },
+        });
+
+    if (isRlsTestMode()) {
+        buildFromMigrationsWithRole(testDatabaseUrl, prisma);
+        return;
+    }
+
+    prisma([
+        "db",
+        "push",
+        "--force-reset",
+        // Prisma 7 removed `--skip-generate` from `prisma db push` (it no
+        // longer generates as a side effect, so there is nothing to skip).
+        // Passing it aborts the push, which took the whole integration
+        // project down with it.
+        "--accept-data-loss",
+    ]);
+}
+
+/**
+ * RLS mode: an empty `public` schema, the whole migration chain, and a
+ * runtime role that row-level security applies to. The role's password is
+ * new each run and only ever lives in this process's environment.
+ */
+function buildFromMigrationsWithRole(
+    testDatabaseUrl: string,
+    prisma: (args: string[], input?: string) => unknown,
+): void {
+    prisma(
+        ["db", "execute", "--stdin"],
+        "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;",
+    );
+    prisma(["migrate", "deploy"]);
+
+    const password = randomBytes(18).toString("hex");
+    const database = new URL(testDatabaseUrl).pathname.replace(/^\//, "");
+    prisma(
+        ["db", "execute", "--stdin"],
+        `DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RLS_TEST_ROLE}') THEN
+        CREATE ROLE ${RLS_TEST_ROLE} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+END $$;
+ALTER ROLE ${RLS_TEST_ROLE} LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD '${password}';
+GRANT CONNECT ON DATABASE "${database}" TO ${RLS_TEST_ROLE};
+GRANT USAGE ON SCHEMA public TO ${RLS_TEST_ROLE};
+-- TRUNCATE only for the suite's between-file wipe (test/truncate.ts).
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public TO ${RLS_TEST_ROLE};
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${RLS_TEST_ROLE};`,
+    );
+
+    process.env[RLS_URL_ENV] = roleUrl(
+        testDatabaseUrl,
+        RLS_TEST_ROLE,
+        password,
     );
 }

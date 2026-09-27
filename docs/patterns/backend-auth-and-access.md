@@ -105,7 +105,12 @@ what the API allows.
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
-  rejects an untrusted `Origin` on POST, PUT, PATCH and DELETE.
+  rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
+  POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the
+  API sends `origin: requestOrigin(await headers())`** (`@saroh/auth/origins`),
+  as `apiFetch` and `adminFetch` do. A new server-side client that forgets it
+  gets a 403 on every write. So does a Playwright test that writes through
+  `request`: put `origin: urls.APP_URL` in its headers.
 - **Current** — **Frontend session reads keep "signed out" and "could not check"
   apart.** Edge middleware checks cookie presence only
   (`@saroh/auth/middleware`); Server Components use `requireSession()`, and only

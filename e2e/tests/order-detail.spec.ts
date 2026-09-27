@@ -55,7 +55,7 @@ async function priyaOrderToday(page: Page): Promise<string> {
     // The list's v2 shape (plan B, B1): asked by customer, newest first.
     const res = await page.request.get(
         `${urls.API_URL}/organizations/${RYE}/orders?v=2&customerId=${PRIYA}`,
-        { headers: { "x-organization-id": RYE } },
+        { headers: { "x-organization-id": RYE, origin: urls.APP_URL } },
     );
     expect(res.ok()).toBe(true);
     const { rows } = (await res.json()) as {
@@ -78,7 +78,7 @@ const shown = (page: Page, text: string | RegExp) =>
 
 /** A paid, collected-at-the-counter order to walk through the kitchen. */
 async function freshOrder(page: Page): Promise<string> {
-    const headers = { "x-organization-id": NORTHWIND };
+    const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
     const made = await page.request.post(
         `${urls.API_URL}/stores/${NW_STORE}/orders`,
         {

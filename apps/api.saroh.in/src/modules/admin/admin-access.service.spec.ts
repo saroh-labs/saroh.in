@@ -213,10 +213,52 @@ describe("AdminAccessService", () => {
         });
 
         expect(result).toEqual(activeSession);
-        expect(organizationFindUnique).not.toHaveBeenCalled();
         expect(sessionUpdateMany).not.toHaveBeenCalled();
         expect(sessionCreate).not.toHaveBeenCalled();
         expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    describe("a replay re-validates rather than short-circuits (SEC-001)", () => {
+        const open = (reason = "Investigating customer report") =>
+            service.open({
+                organizationId: "org_1",
+                staff,
+                reason,
+                idempotencyKey: "access-open-123",
+            });
+
+        it("refuses to replay a session that has since been revoked", async () => {
+            sessionFindUnique.mockResolvedValue({
+                ...activeSession,
+                revokedAt: new Date("2026-07-30T09:59:00.000Z"),
+            });
+            await expect(open()).rejects.toThrow(ConflictException);
+            expect(sessionCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses to replay a session that has lapsed", async () => {
+            sessionFindUnique.mockResolvedValue({
+                ...activeSession,
+                expiresAt: new Date("2026-07-30T09:59:59.000Z"),
+            });
+            await expect(open()).rejects.toThrow(/has ended/);
+        });
+
+        it("refuses the same key for a different reason", async () => {
+            sessionFindUnique.mockResolvedValue(activeSession);
+            await expect(open("Something else entirely")).rejects.toThrow(
+                /different reason/,
+            );
+        });
+
+        it("re-checks the organization before replaying", async () => {
+            sessionFindUnique.mockResolvedValue(activeSession);
+            organizationFindUnique.mockResolvedValue({
+                id: "org_1",
+                lifecycleStatus: "DELETED_RETAINED",
+            });
+            await expect(open()).rejects.toThrow(/cannot be opened/);
+        });
     });
 
     it("authorizes a read for the same Organization and active staff grant", async () => {

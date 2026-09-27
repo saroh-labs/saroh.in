@@ -6,6 +6,7 @@ import {
 import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
@@ -157,7 +158,8 @@ export async function reserve(
             },
         );
     } catch (err) {
-        const code = (err as { code?: string }).code;
+        // P2034 however it arrives (common/prisma-errors.ts).
+        const code = prismaErrorCode(err);
         // Idempotency race: two concurrent books with the same
         // (serviceId, idempotencyKey). The loser is refused one of three
         // ways — the unique index (P2002), a serialization failure

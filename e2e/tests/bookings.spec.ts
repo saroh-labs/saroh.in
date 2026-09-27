@@ -11,7 +11,7 @@ import { demoUser, urls } from "../playwright.config";
  */
 
 const ORG = "seed_sc_pulse_org";
-const orgHeader = { "x-organization-id": ORG };
+const orgHeader = { "x-organization-id": ORG, origin: urls.APP_URL };
 const api = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 const IST_OFFSET_MS = 330 * 60_000;
 

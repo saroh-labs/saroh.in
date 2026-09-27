@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
@@ -373,11 +374,7 @@ export class OrdersService {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
                 // A serialization failure only means something on the coded
                 // path: another order took the code's last use first.
-                if (
-                    applied &&
-                    err instanceof Prisma.PrismaClientKnownRequestError &&
-                    err.code === "P2034"
-                ) {
+                if (applied && isSerializationFailure(err)) {
                     throw new ConflictException({
                         message: `${applied.code} was just used by another order. Try again, or remove it.`,
                         details: { field: "discountCode" },

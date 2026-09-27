@@ -11,6 +11,22 @@
  *
  * @type {import('jest').Config}
  */
+/**
+ * RLS mode (`TEST_RLS=on`, test/rls-mode.ts) runs as a DML-only NOBYPASSRLS
+ * role. These specs rebuild an old schema with DDL (ALTER TABLE, CREATE INDEX)
+ * to test one-off backfills; only the migration owner may do that, and the
+ * backfills run as the owner too. They run in the normal suite.
+ */
+const rlsMode = ["1", "on", "true"].includes(
+    (process.env.TEST_RLS ?? "").trim().toLowerCase(),
+);
+const OWNER_DDL_SPECS = rlsMode
+    ? [
+          "<rootDir>/src/modules/products/listings-stock-levels.backfill.db.spec.ts",
+          "<rootDir>/src/modules/catalogue/catalogue-settings.backfill.db.spec.ts",
+      ]
+    : [];
+
 module.exports = {
     preset: "ts-jest",
     // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
@@ -100,6 +116,7 @@ module.exports = {
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
         "<rootDir>/src/modules/staff/staff.service.spec.ts",
         "<rootDir>/src/modules/staff/hours.spec.ts",
+        ...OWNER_DDL_SPECS,
     ],
     moduleFileExtensions: ["ts", "js", "json"],
     globalSetup: "<rootDir>/test/global-setup.ts",

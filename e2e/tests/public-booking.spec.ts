@@ -129,6 +129,8 @@ test.describe("the booking page", () => {
 
         await page.request.delete(
             `${urls.API_URL}/organizations/${ORG}/services/bookings/${booked.reference}`,
+            // The API refuses a write with no Origin (#50).
+            { headers: { origin: urls.APP_URL } },
         );
     });
 
@@ -282,6 +284,8 @@ test.describe("the booking page", () => {
         await signIn(page);
         await page.request.delete(
             `${urls.API_URL}/organizations/${ORG}/services/bookings/${booked.reference}`,
+            // The API refuses a write with no Origin (#50).
+            { headers: { origin: urls.APP_URL } },
         );
     });
 });

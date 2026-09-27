@@ -7,6 +7,7 @@ import { useEffect } from "react";
 
 import { AccessDenied } from "@/components/shared/access-denied";
 import { isDenial, statusFromError } from "@/lib/api/errors";
+import { reportError } from "@saroh/ui/lib/report-error";
 
 /**
  * The shared body of every segment-level `error.tsx`.
@@ -56,8 +57,7 @@ export function SectionError({
     backLabel?: string;
 }) {
     useEffect(() => {
-        // TODO(#103): forward to error tracking once observability lands.
-        console.error(error);
+        reportError(error, { boundary: "app/section", digest: error.digest });
     }, [error]);
 
     const denied = isDenial(error);
