@@ -171,8 +171,8 @@ export interface OrdersEmptyCopy {
 /**
  * The design's empty states: a search that found nothing names it and offers
  * Clear search; an empty Open or Refunded tab says what would land there;
- * only an empty business says "No orders yet". (B7 adds the per-filter,
- * failed and locked states.)
+ * only an empty business says "No orders yet". The failed and locked states
+ * are never empty lists (`orders-states.tsx`, B7); B4 adds the filters'.
  */
 export function ordersEmptyCopy(
     query: OrdersQuery,

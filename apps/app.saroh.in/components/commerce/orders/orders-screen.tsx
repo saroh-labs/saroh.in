@@ -2,9 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { PageHeader } from "@saroh/ui/page-header";
 import { showError } from "@saroh/ui/toast";
-import { Check, Plus, Receipt, RotateCcw, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -19,7 +18,6 @@ import type { OrdersQuery } from "@/lib/orders/list-query";
 import {
     nextPageHref,
     orderListParams,
-    ordersEmptyCopy,
     ordersHref,
     pageRange,
     previousPageHref,
@@ -27,6 +25,7 @@ import {
 
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderTabs } from "./order-tabs";
+import { OrdersEmpty, OrdersHeading } from "./orders-states";
 
 /**
  * Sell → Orders, after the "Saroh Orders Screen" design (plan B, B3): every
@@ -40,7 +39,8 @@ import { OrderTabs } from "./order-tabs";
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. Filters, the quick view, the row menu and bulk moves are later
- * units (B4, B5, B6); the states beyond empty are B7's.
+ * units (B4, B5, B6). Loading, failed, locked and every empty list are in
+ * `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
     query,
@@ -95,10 +95,7 @@ export function OrdersScreen({
 
     return (
         <>
-            <PageHeader
-                breadcrumb={["Sell", "Orders"]}
-                title="Orders"
-                className="mb-3"
+            <OrdersHeading
                 actions={
                     stores.length > 0 && !kitchen ? (
                         <>
@@ -170,7 +167,7 @@ export function OrdersScreen({
 
             <div aria-busy={navigating} className="pt-3.5">
                 {rows.length === 0 ? (
-                    <EmptyOrders
+                    <OrdersEmpty
                         query={query}
                         storeName={store?.name ?? firstStore?.name ?? null}
                         go={go}
@@ -292,69 +289,6 @@ function SearchField({
                 aria-label="Search orders"
                 className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
             />
-        </div>
-    );
-}
-
-/**
- * The design's empty states: the search, the tab, or a business with no
- * orders yet — each with the one thing that fills it.
- */
-function EmptyOrders({
-    query,
-    storeName,
-    go,
-}: {
-    query: OrdersQuery;
-    storeName: string | null;
-    go: (patch: Partial<OrdersQuery>) => void;
-}) {
-    const copy = ordersEmptyCopy(query, storeName);
-    const Icon =
-        copy.kind === "search"
-            ? Search
-            : query.tab === "open"
-              ? Check
-              : query.tab === "refunded"
-                ? RotateCcw
-                : Receipt;
-    return (
-        <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
-            <Icon
-                aria-hidden
-                className="size-[30px] stroke-[1.8] text-muted-foreground"
-            />
-            <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                {copy.title}
-            </p>
-            <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                {copy.note}
-            </p>
-            {copy.action === "clear-search" ? (
-                <Button
-                    variant="outline"
-                    className="mt-1"
-                    onClick={() => go({ q: "" })}
-                >
-                    Clear search
-                </Button>
-            ) : copy.action === "clear-since" ? (
-                <Button
-                    variant="outline"
-                    className="mt-1"
-                    onClick={() => go({ since: null })}
-                >
-                    Show all orders
-                </Button>
-            ) : copy.action === "show-all" ? (
-                <Button
-                    variant="outline"
-                    className="mt-1"
-                    onClick={() => go({ tab: "all" })}
-                >
-                    View all orders
-                </Button>
-            ) : null}
         </div>
     );
 }
