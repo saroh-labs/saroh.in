@@ -580,6 +580,11 @@ async function mergeAllergens(ctx: OrgRun): Promise<void> {
             await tx.contactNoteAllergen.deleteMany({
                 where: { allergenId: loser.id },
             });
+            // Needs attention's Allergy entries (C1) follow the name too.
+            await tx.contactAttention.updateMany({
+                where: { allergenId: loser.id },
+                data: { allergenId: winner.id },
+            });
             await tx.storeAllergen.delete({ where: { id: loser.id } });
         }
         ctx.report.merged.push({

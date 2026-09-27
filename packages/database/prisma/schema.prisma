@@ -260,6 +260,9 @@ model Organization {
   staffTimeOff    StaffTimeOff[]
   staffExtraHours StaffExtraHours[]
   bookingRules    BookingRules?
+
+  // Needs attention on a customer (DEC-040, C1).
+  contactAttention ContactAttention[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -976,6 +979,10 @@ model StoreAllergen {
   products     ProductAllergen[]
   // Customers' notes that name it (U8). Removing it is refused while any do.
   contactNotes ContactNoteAllergen[]
+
+  // Needs attention Allergy entries that name it (C1). Removing it is
+  // refused while an entry that is still on a record does.
+  contactAttention ContactAttention[]
 
   @@index([storeId])
   @@index([organizationId])
@@ -2411,6 +2418,80 @@ model ContactNoteAllergen {
   @@index([organizationId])
 }
 
+// ContactAttention: one entry on a customer's Needs attention list (DEC-040,
+// C1) — an allergy, a medical note, an access need or anything else the team
+// must know before serving them. One list per person, read by Customer
+// Detail, orders, bookings and Home through one helper (`attentionFor`),
+// which leaves out sensitive entries for anyone without the sensitive
+// permission.
+//
+// An Allergy entry names an allergen from the business's list when it has
+// one (structured, so an order can be checked against a product's
+// "Contains"); without a list it is free text in `label`. A booking-page note
+// or the customer's own note arrives as SUGGESTED and becomes ACTIVE only
+// when staff add it; "Nothing to add" and removal set `removedAt`. Rows are
+// never deleted by the API, so who added what stays readable.
+model ContactAttention {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  kind      AttentionKind
+  // At most 60 characters (the API checks it): what the tag says.
+  label     String
+  // At most 500 characters.
+  detail    String?
+  // Left out of every read for a role without the sensitive permission.
+  sensitive Boolean       @default(false)
+
+  // NoAction, as ContactNoteAllergen: removing an allergen from the list is
+  // refused while an entry still on a record names it.
+  allergenId String?
+  allergen   StoreAllergen? @relation(fields: [allergenId], references: [id], onDelete: NoAction)
+
+  source    AttentionSource @default(STAFF)
+  status    AttentionStatus @default(ACTIVE)
+  // The booking whose note suggested it (C12). The entry outlives the booking.
+  bookingId String?
+  booking   Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  // Users, by id and without a foreign key, as ContactNote: a person who
+  // leaves the team keeps their entries.
+  createdByUserId   String?
+  confirmedByUserId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  removedAt         DateTime?
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([allergenId])
+  @@index([bookingId])
+}
+
+enum AttentionKind {
+  ALLERGY
+  MEDICAL
+  ACCESS
+  OTHER
+}
+
+/// Who put an entry on the record: the team, the booking page's
+/// "Anything we should know?", or the customer on their own account.
+enum AttentionSource {
+  STAFF
+  BOOKING_PAGE
+  CUSTOMER
+}
+
+/// SUGGESTED waits for staff to add it; only ACTIVE entries are read out.
+enum AttentionStatus {
+  SUGGESTED
+  ACTIVE
+}
+
 // SavedView: a per-actor, per-resource named set of list filters (#124). The
 // `filters` payload is the SHAREABLE URL query contract (search/filter/sort/
 // page) — plain JSON, NEVER raw SQL — so a saved view can never smuggle an
@@ -3052,6 +3133,9 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Needs attention: one shared list of what the team must know (DEC-040, C1).
+  attention ContactAttention[]
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -3493,6 +3577,9 @@ model Booking {
 
   // A paid online booking's own invoice (ADR-008).
   invoices Invoice[]
+
+  // A booking-page note waiting to become Needs attention (C1, C12).
+  attentionSuggestions ContactAttention[]
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
