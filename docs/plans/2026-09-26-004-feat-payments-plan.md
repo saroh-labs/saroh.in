@@ -157,7 +157,7 @@ period is still invoiced, and a pay link stays the fallback.
 - Stale-write refusal to copy for drafts: the site editor's draft save carries a `revision` and answers a stale one with a 409 naming `yours` and `current` (`modules/sites/sites.service.ts`, #285; tested in `sites/draft-revision.service.spec.ts`; the revision is read with the id in `site-access.ts`).
 - Invoice lines: `InvoiceLine.gstRate Decimal?` (frozen at issue) is the only rate signal; nothing models exempt versus nil versus 0%.
 - `CustomerSubscription.status` is ACTIVE | PAUSED | CANCELLED; there is no ENDED. Cancel now, and cancel at period end when the renewal applies it, both set CANCELLED (`subscriptions.service.ts`, `subscription-renew.handler.ts`).
-- Seeds: no clinic business is seeded today (a grep of `packages/database/src/seed` finds only the first name "Kavitha"). Units below that verify against "Kavi Dental" need the clinic seed the overview assigns (overview, "Seeds").
+- Seeds: no clinic business is seeded today (a grep of `packages/database/src/seed` finds only the first name "Kavitha"). Units below that verify against "Kavi Dental" need the clinic seed, plan E's E29 (phase 1).
 - Append-only logs with actors to mirror: `OrderEvent` (orders), `StockEntry` (DEC-032), and `modules/audit/audit.service.ts` (`auditMetadata`, operator masking, DEC-035).
 - Tests:
   - unit specs listed explicitly in `apps/api.saroh.in/jest.config.js` `testMatch`;
@@ -592,6 +592,7 @@ lifecycle finding).
 - `pause({weeks: 2|4|8} | {until: null})`: `pausedUntil` is dated in the subscription's timezone (start of that day).
 - The renewal job's next run for a paused subscription is `pausedUntil` when set. When it runs on or after that date, it resumes through the same code as a manual resume, so the billing rules hold: the paid period extends by the days paused, and a new invoice is issued only when the pause outlasted it.
 - A subscription set to end at period end still ends (ADR-007).
+- "Until I resume" is a staff choice only. A customer's own pause from their account (A8) always has an end date: 2, 4 or 8 weeks.
 - With Payments off, a resume past the paid period is refused (ADR-007). The job then leaves it paused, raises it on Home, and writes a RESUME_REFUSED event.
 
 **Test scenarios:**
@@ -862,7 +863,7 @@ lifecycle finding).
 - Edge case: a registered shop's invoice with one line whose `gstRate` is null and the rest 0 → "Tax invoice", not a bill of supply.
 - Edge case: an unregistered business → "Receipt".
 
-**Verification:** the clinic seed's treatment bills (overview, "Seeds") match Saroh Invoice Detail.dc.html; until that seed exists, a Northwind fixture invoice with 0% lines.
+**Verification:** Kavi Dental's exempt treatment invoices (E29: 0% `gstRate`, SAC 9993) match Saroh Invoice Detail.dc.html, read-only; a Northwind fixture invoice with 0% lines for anything that writes.
 
 ---
 
@@ -915,7 +916,7 @@ lifecycle finding).
 **Approach:**
 - Only an ISSUED, unpaid invoice with no PENDING mandate charge (D13) can be sent.
 - **The channel rule, served as one flag** (reconciles F4 and this unit): `email` when the business has a connected email provider and the invoice has a bill-to email; `thread` when A13 exists and the contact has a site account. With a provider and an account, both. With an account and no provider, the thread only. With neither, no Send and a 409 from the API. Home's inline Send reminder (F4) and its confirm copy ("This tells Farah by email" / "…in their account on your site") read the same flag.
-- The send writes a Message (and Delivery) with the invoice id, mints a new pay link (the old one stops working, as with "New link"), and records "Sent to asha@… · 3 Sep" (or "Posted to their account · 3 Sep") on the invoice. The thread post is A14's writer, called from here, so the invoice is enqueued from one place.
+- The send writes a Message (and Delivery) with the invoice id, mints a new pay link (the old one stops working, as with "New link"), and records "Sent to asha@… · 3 Sep" (or "Posted to their account · 3 Sep") on the invoice. The thread post is A14's: the send enqueues one `customer.notify` job (A14's handler writes the thread message), so the invoice is enqueued from one place and A14 adds no invoice enqueue of its own. Before A14 ships, nothing is enqueued and `thread` is never offered.
 - A reminder is the same send with reminder wording, at most one a day per invoice.
 - A revoked email consent → SUPPRESSED for email, and the screen says why; the thread copy is not marketing and still posts (default 10).
 - Saroh's email is never used (default 38), and there is no WhatsApp share (dropped, default 106).
@@ -977,8 +978,8 @@ lifecycle finding).
 
 **Approach:**
 - The trigger is the state change, not the button: staff cancel now, cancel at period end when the renewal applies it, the customer's cancel from their account (A8) when it takes effect, and a subscription's natural end all end in CANCELLED, and each enqueues `mandate.cancel` with the subscription id.
-- A privacy removal cancels every mandate of the contact before the contact is anonymised, and the provider references are cleared from the row afterwards (the row stays, with its status and dates, for the invoice trail).
-- A merge cancels the merged-away contact's mandates. A mandate is never moved to the survivor, because the survivor never authorised it; the survivor's subscription is invoiced with a pay link until they set up autopay themselves.
+- A privacy removal (C11) calls `cancelFor({ contactId }, PRIVACY_REMOVAL)` synchronously, before its transaction: an unsure or failed provider answer refuses the removal with C11's sentence, and a retry is safe because a cancelled mandate is skipped. After the removal the row keeps its status, dates and provider ids (so a late webhook still reconciles) and loses its display hint (C11, the one owner of what removal clears).
+- A merge (C9) cancels the merged-away contact's mandates through `cancelFor({ contactId }, MERGED)`, enqueued as a `mandate.cancel` job after the merge commits. A mandate is never moved to the survivor, because the survivor never authorised it; the survivor's subscription is invoiced with a pay link until they set up autopay themselves.
 - The job is idempotent: a mandate already CANCELLED is skipped. An unsure answer marks it CANCELLED and unconfirmed (never charged again), and the job retries the provider for confirmation on the backoff schedule.
 - The Changes card shows "Autopay cancelled — subscription ended" with actor JOB.
 
@@ -986,7 +987,7 @@ lifecycle finding).
 - Happy path: staff cancel a subscription with an ACTIVE mandate → one `mandate.cancel` job; the provider is asked; the mandate is CANCELLED with reason SUBSCRIPTION_ENDED.
 - Happy path: cancel at period end → nothing happens until the renewal applies it; then the mandate is cancelled.
 - Edge case: the provider times out → CANCELLED, unconfirmed, no charge job is ever enqueued for it, and the job retries confirmation.
-- Integration: privacy removal of a contact with a mandate → the mandate is cancelled before the contact is anonymised, and no provider id is left on the row.
+- Integration: privacy removal of a contact with a mandate → the mandate is cancelled before the contact is anonymised; the display hint is cleared and the provider ids stay. An unsure provider answer → the removal is refused and nothing changes.
 - Integration: a merge → the merged-away contact's mandate is cancelled; the survivor has none.
 - Edge case: the job is delivered twice → the provider is asked once.
 

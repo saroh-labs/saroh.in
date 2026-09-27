@@ -528,8 +528,8 @@ count); `attempt()`.
   Member by default) gets no invoice or renewal rows.
 
 **Verification:** Rye shows its short size; Pulse its overdue renewal; the
-clinic seed (overview, "Seeds") its overdue X-ray invoice, or a Northwind
-fixture until that seed exists. Read-only on Rye and Pulse.
+Kavi Dental (E29, phase 1) its overdue X-ray invoice. Read-only on Rye,
+Pulse and Kavi; anything that writes is checked on a Northwind fixture.
 
 ---
 
@@ -631,9 +631,9 @@ Member.
   never decides on its own that a send is possible.
 - A message-sending action waits 10 seconds before calling the endpoint.
   Undo in that time cancels the call; after it, the toast reads "Sent" with
-  no Undo (default 51). The hold is the shared hold-and-undo helper that G3
-  builds in phase 1 (overview, "Shared files"), reused here and by B6, not a
-  third timer.
+  no Undo (default 51). The hold is G3's `apps/app.saroh.in/lib/hold-undo.ts`
+  (G3 owns it and builds it in phase 1; overview, "Shared files"), reused
+  here and by B6, not a timer of its own.
 - A non-sending action (Mark sent with no message) calls at once, and Undo
   uses the target's own undo (the stage undo within `UNDO_WINDOW_MS`).
   **Once A14 tells customers on handover**, Mark sent is a sending action:
@@ -671,7 +671,7 @@ No-show from Home.
 
 **Requirements:** R5
 
-**Dependencies:** None
+**Dependencies:** None; it lands after F1 and F3 on `home.service.ts` (Order on shared files)
 
 **Phase:** 1
 
@@ -689,6 +689,13 @@ No-show from Home.
   (see Deferred).
 - Without `booking:write` the states show read-only.
 - Coming-up days beyond today move to the Calendar link.
+- **Pick-ups carry the order's own facts.** Each pick-up row reads the
+  order's `fulfilmentType`, `late` and `lateBy` as the order API computes
+  them (B2a's types, B2b's late rule, B17's per-storefront setting); Home
+  never recomputes lateness. While the fulfilment enum is mid-migration
+  (B2a to B2d), Home maps both vocabularies as B1 does, and Home's API
+  serves its old fields beside the new ones for one release (default 130).
+  Before B2b lands, pick-ups show without a late tag.
 
 **Test scenarios:**
 - Happy path: three of today's bookings in order; marking one Arrived tags
@@ -709,7 +716,7 @@ the design.
 
 **Requirements:** R6
 
-**Dependencies:** None
+**Dependencies:** None; it lands after F1, F3 and F5 on `home.service.ts` (Order on shared files)
 
 **Phase:** 1
 
@@ -1367,9 +1374,9 @@ permissions e2e covers the Manager case.
 - Update `docs/patterns/backend-auth-and-access.md` for storefront invites
   needing `member:invite` and joining as "Storefront team" (F16), and for the
   reach rule on roles and extras (F17, F19).
-- Several verifications here name "Kavi Dental". No clinic is seeded today;
-  they use the clinic seed the overview assigns ("Seeds"), or Northwind
-  until it exists.
+- Several verifications here name "Kavi Dental": that is plan E's E29
+  seed, in phase 1. Kavi is read-only in browser checks; writes happen on
+  Northwind.
 - New unit specs go in the explicit `testMatch` in
   `apps/api.saroh.in/jest.config.js`.
 - F10 and F14 migrations pass `db:verify:replay`. The F16 backfill runs after

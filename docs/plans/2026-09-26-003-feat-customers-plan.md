@@ -156,7 +156,7 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
   | `CustomerAccount` (plan A, A1) | `contactId` | — | ADR-011 "Merging and removing", as in C9 | deleted with sessions and pending codes |
   | `CustomerThread` (plan A, A13) | `contactId`, one per contact | — | the survivor's thread absorbs the other's messages | deleted with its messages |
   | `ClassWaitlistEntry` (plan A, A12) | `contactId`, one per contact and class | — | same class: keep the better place | deleted; an offered place passes on |
-  | `PaymentMandate` (plan D, D11) | `contactId` | — | re-point with its subscription | cancelled at the provider, then detached |
+  | `PaymentMandate` (plan D, D11) | `contactId` | — | the merged-away contact's mandates are cancelled through D20's `mandates.service.cancelFor({ contactId }, MERGED)`; never moved, since the survivor never authorised them | cancelled at the provider through D20's `cancelFor({ contactId }, PRIVACY_REMOVAL)`, then detached |
 
   A spec (C9) reads the Prisma DMMF and fails when a relation to `Contact` exists that `merge-plan.ts` or `privacy-removal-plan.ts` doesn't handle. C11 adds a second spec over personal fields that don't hang off `Contact` (store `Customer`, order delivery, message and review addresses). A new table cannot be forgotten: whichever of C9, C11, A12, A13 or D11 lands last adds its rows' rules, and CI fails until it does.
 
@@ -230,12 +230,14 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
   - their normalised emails are equal (only possible across a contact and a store customer, since the contact email is unique), or a contact's email equals another contact's **site account's verified email** (the separate contact A4 makes when the matching contact's email isn't verified, per the user's decision of 2026-09-27); or
   - their normalised phones are equal and **neither has a site account**. A phone typed in the customer's own Me (A5) is not proven by anything, so a phone-only pair with an account holder is never suggested; this keeps someone who types another person's phone from being offered as that person's duplicate (security review). Staff can still merge such a pair deliberately from the ⋯ menu, where C10's account confirmation applies.
 
-  The existing `:contactId/suggestions` endpoint widens to include contacts as well as store customers. There is no stored "Dismiss" this round (deferred, above).
+  `duplicates.ts` is **pure and exported** (normalise and pair, no database access): the suggestions endpoint, E4's new-booking search and E9's treatment email rule all import it, and none keeps its own normaliser. Emails are read through A1's `contact-email.ts`, so a reserved placeholder never pairs.
+
+  The existing `:contactId/suggestions` endpoint widens to include contacts as well as store customers. There is no stored "Dismiss" this round (deferred, above). The one exception is a pair staff already split: when A4's "This isn't them" moves an account off a contact, the account records that contact (`CustomerAccount.unlinkedFromContactId`, A1), and `duplicates.ts` never pairs the two again.
 - **Merge is one serializable-free transaction with row locks**:
   1. Lock both Contact rows in id order (`SELECT … FOR UPDATE`).
   2. Check refusals: either is a tombstone (404 "already merged") or removed (409); the same live plan or the same active course. A site account on both is handled, not refused.
   3. Re-point every relation in the table above, by its merge rule.
-  4. Turn the merged contact into a **tombstone**: `mergedIntoId` = the survivor, `mergedAt`, email set to a reserved placeholder (`merged+<contactId>@removed.invalid`), and name, phone, company and address cleared. Tombstones that already pointed at it re-point to the survivor, so a chain is never more than one hop.
+  4. Turn the merged contact into a **tombstone**: `mergedIntoId` = the survivor, `mergedAt`, email set to a reserved placeholder (`merged+<contactId>@removed.invalid`, built by A1's `contact-email.ts`), and name, phone, company and address cleared. Tombstones that already pointed at it re-point to the survivor, so a chain is never more than one hop.
   5. Give the survivor the chosen name, email and phone (freed by step 4, so the unique email holds), and fill its empty company and address from the merged contact.
   6. Write a timeline event on the survivor and an audit row (`customer.merged`: both ids and per-relation counts; no personal values, DEC-035).
 
@@ -245,7 +247,8 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
   - Reads: `GET :contactId/detail` for a tombstone answers `{ mergedInto: <id> }`, and the app's `/customers/[contactId]` redirects to the survivor. Lists and search leave tombstones out.
   - The tombstone holds ids only, never the discarded values (DEC-035), so it is not a way to undo.
 - **The site account on a merge (ADR-011).** The survivor keeps its account. When the survivor has none, the other contact's account moves to it. Otherwise the other account is retired and its sessions revoked. Two accounts never end up on one contact.
-  - **The retired account stays as a row**, on the tombstone, marked as retired by a merge (not deleted). Its email then still counts against the one-account-per-email rule, so the next sign-in with it can't make a new contact that recreates the duplicate just merged. Plan A's sign-in answers that email with "Sign in with ‹masked survivor email›" (cross-plan note to A1/A4).
+  - **The retired account stays as a row**, on the tombstone, with status `MERGED` and `mergedIntoId` = the survivor's account (A1's columns), not deleted. Its email still counts against the one-account-per-email rule (A1's partial unique index excludes only `REMOVED`), so the next sign-in with it can't make a new contact that recreates the duplicate just merged. Plan A's sign-in (A4) answers that email with "This email now signs in as ‹masked survivor email›" and opens no session.
+  - **A reserved placeholder is never offered as the survivor's email.** When one side's email is a placeholder (A4's separate contact), the choice offers only the real email, or the account's verified email. When the survivor ends up holding the email its site account signs in with, the merge stamps `Contact.emailVerifiedAt` with `STAFF_CONFIRMED` (DEC-049).
   - **The preview names who will see the combined record.** Whenever a site account will see records it could not see before (the other contact's account moving to the survivor, or the survivor's account gaining the other's history), the preview says "‹masked email› signs in on your website and will see everything here", and Merge stays disabled until the merchant ticks "I've checked this email is theirs". If the merchant isn't sure, they can choose "Don't carry the sign-in over": the other account is retired as above instead of moving. This blocks the hand-over the security review found: someone who books with another person's phone and their own email, gets suggested as that person's duplicate, and is merged into their history.
   - When both contacts have accounts, the preview names the email that will stop reaching this record ("‹masked› will be asked to sign in with ‹masked› instead").
 - **Consent on a merge.** Per channel, the more recent answer wins (default 24), with two guards, because a consent row doesn't record the address it was given for:
@@ -256,10 +259,10 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
 - **Threads, waitlists and mandates on a merge.**
   - `CustomerThread` (one per contact, A13): when both have one, the other's messages move into the survivor's thread in time order, keeping their timestamps, authors and read state, and the other thread row is deleted. When only the other has one, it re-points.
   - `ClassWaitlistEntry` (one per contact and class, A12): for the same class, the better place is kept (an `OFFERED` entry wins, then the earlier position) and the other is deleted. When both are `OFFERED`, the other's hold is released and the place passes on through `waitlist.offer`. Different classes re-point.
-  - `PaymentMandate` (D11): re-points to the survivor with its subscription. No provider call is made: the mandate still pays only its own subscription's renewals (D11).
+  - `PaymentMandate` (D11): the merged-away contact's mandates are cancelled through D20's `mandates.service.cancelFor({ contactId }, MERGED)`, after the merge's transaction commits (a `mandate.cancel` job, so a provider timeout never rolls the merge back). A mandate is never moved to the survivor, who never authorised it; the re-pointed subscription is invoiced with a pay link until the survivor sets up autopay (D20, DEC-038 as amended).
 - **Orders and invoices keep what they were placed with.** An order's customer and delivery fields and an invoice's bill-to snapshot are not touched by a merge or a removal.
 - **Privacy removal anonymises in place, everywhere the person's details live.** The contact row stays, so foreign keys hold. It runs under the contact's row lock (so it serialises with a merge and with `resolveContact` writers). It is refused while an order is open or a subscription is live (default 25). It then:
-  - **the contact:** name to null with a `removedAt` stamp, and email to a reserved non-deliverable placeholder unique per contact (`removed+<contactId>@removed.invalid`, since `email` is required and unique per org). Phone, company and address are cleared. Every reader treats a reserved placeholder as no email, through one helper (`isReservedEmail`);
+  - **the contact:** name to null with a `removedAt` stamp, and email to a reserved non-deliverable placeholder unique per contact (`removed+<contactId>@removed.invalid`, since `email` is required and unique per org). Phone, company and address are cleared. Every reader treats a reserved placeholder as no email, through one helper: A1's `contact-email.ts` (`isReservedContactEmail`, `contactEmailForDisplay`, and the placeholder builders), which plan A owns and this plan imports;
   - **what hangs off the contact:** notes, Needs attention and consents deleted; the site account deleted with its sessions and pending codes (ADR-011); the message thread and its messages deleted (A13);
   - **storefront customer records:** each store `Customer` linked to the contact has its email set to `removed+<customerId>@removed.invalid` (unique per store) and its names, phone and address cleared, and the link is deleted. Its orders stay attached to it and read "Removed customer". A store customer also linked to another contact that isn't being removed keeps its details; only this contact's link goes. Anonymising the store record is what stops C2 or a signed-in checkout (G13) finding and re-linking the person by email;
   - **orders:** lines, amounts, status, `deliveryState` (the GST place of supply) and the invoice are kept. The delivery recipient (`deliveryName`, `deliveryPhone`, `deliveryLine1`, `deliveryLine2`, `deliveryCity`, `deliveryPostalCode`) and the order's free-text `notes` are cleared. Every order is closed, since an open one refuses the removal;
@@ -267,7 +270,7 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
   - **messages sent to them:** each `Message` to the contact has its body replaced by "Removed" and `toAddress` by the placeholder; its `Delivery` rows keep their status and lose `error` (a provider error can quote the address). `ReviewInvitation.toAddress` for their orders gets the placeholder;
   - **bookings:** future bookings cancelled through the booking service's cancel, which returns pack credits (default 26); every booking's `bookerName` becomes "Removed customer", `bookerEmail` and `bookerPhone` and the intake note are cleared;
   - **waitlist places** (A12): deleted; an `OFFERED` place is released and passes to the next person;
-  - **autopay mandates** (D11): each mandate not already cancelled is cancelled at the provider through `mandates.service.cancel`, with DEC-026's unsure-answer rule. An unsure or failed answer refuses the removal ("Autopay couldn't be cancelled at Razorpay yet. Try again in a few minutes"); a standing authority to debit must never outlive the person's record. Then the mandate is detached: its display hint (a masked UPI handle or last four digits) is cleared, and the provider's ids stay, so a late webhook still reconciles;
+  - **autopay mandates** (D11): each mandate not already cancelled is cancelled at the provider through D20's `mandates.service.cancelFor({ contactId }, PRIVACY_REMOVAL)`, called synchronously before the transaction, with DEC-026's unsure-answer rule. An unsure or failed answer refuses the removal ("Autopay couldn't be cancelled at Razorpay yet. Try again in a few minutes"); a standing authority to debit must never outlive the person's record. Then the mandate is detached: its display hint (a masked UPI handle or last four digits) is cleared, and the provider's ids stay, so a late webhook still reconciles;
   - **reviews they wrote:** hidden, with `displayName` set to "A customer" and the body cleared; the stars keep counting in the product's rating;
   - **leads and form entries are left as they are** (2026-09-27): they are CRM records (DEC-041);
   - writes an audit row `customer.removed` with ids and counts, no values.
@@ -276,7 +279,7 @@ Allergies are structured note allergens (`ContactNoteAllergen`). A clinic cannot
 - **Hard delete stays** (`contacts.service.ts remove`) for a contact with no orders or invoices, as #384 has it. The ⋯ menu offers "Remove their details (privacy request)…" otherwise, with a line saying why Delete isn't offered.
 - **The address lives on Contact** (`addressLine1`, `addressLine2`, `city`, `state`, `postalCode`, `country`). It is not copied into orders already placed. New order v2 (B13) may prefill from it.
 - **The email change** goes through `contacts.service.ts update`, now accepting `email`. A clash with another contact returns 409 with that contact's id when the caller may read it, so the sheet offers "Merge with ‹name›"; otherwise the 409 is a plain sentence.
-- **Staff edits never change how someone signs in.** On a contact with a site account, a staff email edit changes the contact's email only; the account keeps its verified email, which is where sign-in codes and messages about their orders go (ADR-011). The sheet says so: "They sign in with a•••@gmail.com; messages about their orders go there." The other direction — a customer's own verified change in Me — is plan A's (A5), which updates both (cross-plan note).
+- **Staff edits never change how someone signs in.** A staff email edit clears `Contact.emailVerifiedAt` (DEC-049: staff typing an address proves nothing). On a contact with a site account, it changes the contact's email only; the account keeps its verified email, which is where sign-in codes and messages about their orders go (ADR-011). The sheet says so: "They sign in with a•••@gmail.com; messages about their orders go there." The other direction — a customer's own verified change in Me — is plan A's (A5), which updates both (cross-plan note).
 
 ### Permissions touched
 
@@ -469,8 +472,9 @@ flowchart LR
   - no contact with that email → create one and link it (`reason` `BACKFILL` or `PAYMENT`, `linkedByUserId` null);
   - a contact with that email → leave both and let the suggestion surface. The unique email makes a second contact impossible, and linking silently is what #120 refused. C3 counts them (`unlinkedPaying`) and C4 names them.
 - A contact that is a tombstone or removed never matches: its email is a reserved placeholder.
+- A walk-in (an order with no store customer, or a New order walk-in with no phone or email, default 19) is skipped: there is nobody to make a contact for.
 - Run it as a pure step in the caller's transaction, so no extra lock is needed.
-- `duplicates.ts` pairs contacts as Key Technical Decisions says: email against a store customer's email or another contact's site-account email; phone only when neither contact has a site account. C2 lands before A1's table is guaranteed, so the site-account branches (the account-email pair and the phone guard) are added in C3, which depends on A1; the email-to-store-customer and phone branches ship here.
+- `duplicates.ts` pairs contacts as Key Technical Decisions says: email against a store customer's email or another contact's site-account email; phone only when neither contact has a site account. C2 lands before A1's table is guaranteed, so the site-account branches (the account-email pair and the phone guard) are added in C3, which depends on A1; the email-to-store-customer and phone branches ship here. `duplicates.ts` stays pure and exported, so E4 and E9 import it rather than copying the normaliser. It reads emails through A1's `contact-email.ts` once A1 has landed; before that no placeholder exists.
 
 **Patterns to follow:** `CustomerIdentityLink` creation in `customer-workspace.service.ts`; the backfill layout of `merge-same-products`.
 
@@ -481,7 +485,7 @@ flowchart LR
 - Edge case: two contacts share a phone, not an email, and neither signs in → suggested.
 - Edge case: two contacts share a phone and one has a site account → not suggested.
 - Edge case: a paid store customer whose email matches a tombstone's old address → a new contact (the tombstone holds a placeholder).
-- Edge case: an order that isn't paid → nothing happens.
+- Edge case: an order that isn't paid → nothing happens; a paid walk-in with no customer → nothing happens.
 - Integration: the backfill on the showcase seed; run twice, it changes nothing, and the report counts made, linked and suggested.
 
 **Verification:** Every paid store customer in the seed resolves to a contact or a suggestion. The migration replays (`db:verify:replay`).
@@ -687,7 +691,7 @@ flowchart LR
 
 **Approach:**
 - The email is normalised. The state uses the GST state list when the country is India (`invoices/gst-states.ts`), and an Indian PIN is 6 digits (as in DEC-029).
-- A changed email doesn't touch orders, invoices or consent records.
+- A changed email doesn't touch orders, invoices or consent records. It clears `Contact.emailVerifiedAt` and `emailVerifiedVia` (DEC-049), and never touches the site account's sign-in email.
 - On a contact with a site account, the change leaves the account's verified email alone, and the sheet says "They sign in with ‹masked›; messages about their orders go there" (Key Technical Decisions).
 - The sheet's clash message offers "Merge with ‹name›", which opens C10's dialog. C8 and C10 are both phase 2; if C8 lands first, the clash is a plain sentence until C10.
 
@@ -695,6 +699,7 @@ flowchart LR
 - Happy path: change the email and add an address → saved, and the timeline notes "Details changed".
 - Edge case: the email held by another contact → 409; the sheet names them.
 - Edge case: a contact with a site account → the contact's email changes, the account's doesn't, and the sheet shows the sign-in line.
+- Edge case: a verified contact's email is edited by staff → `emailVerifiedAt` is cleared, so a later first sign-in with the new address makes a separate contact (DEC-049).
 - Edge case: an email that is a tombstone's or removed contact's placeholder domain is refused as invalid.
 - Error path: a PIN "5600" with country India → refused with a sentence.
 
@@ -708,13 +713,13 @@ flowchart LR
 
 **Requirements:** R11, R15 (`customer:merge`)
 
-**Dependencies:** C1, C2; A1 (the account table, phase 1). The rules for `CustomerThread` (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11) are specified here; whichever of C9 and those units lands second implements the rule in `merge-plan.ts`, and the DMMF spec fails CI until it does.
+**Dependencies:** C1, C2; A1 (the account table and `contact-email.ts`, phase 1). The rules for `CustomerThread` (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11, cancelled through D20's `cancelFor`) are specified here; whichever of C9 and those units lands second implements the rule in `merge-plan.ts`, and the DMMF spec fails CI until it does.
 
 **Phase:** 2
 
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` + migration `<ts>_contact_merge_tombstone` (`Contact.mergedIntoId String?` self-relation, `onDelete: Cascade`, `Contact.mergedAt DateTime?`, index `(organizationId, mergedIntoId)`)
-- Create: `apps/api.saroh.in/src/modules/customer-workspace/merge.service.ts`, `merge-plan.ts` (pure: which relations move, by which rule, the consent outcome, the account outcome and the refusals), `merge.dto.ts`, `resolve-contact.ts` (`resolveContact(tx, contactId)`: `FOR SHARE`, one hop through `mergedIntoId`), `reserved-email.ts` (`isReservedEmail`, the placeholder builders shared with C11)
+- Create: `apps/api.saroh.in/src/modules/customer-workspace/merge.service.ts`, `merge-plan.ts` (pure: which relations move, by which rule, the consent outcome, the account outcome and the refusals), `merge.dto.ts`, `resolve-contact.ts` (`resolveContact(tx, contactId)`: `FOR SHARE`, one hop through `mergedIntoId`), and imports A1's `contacts/contact-email.ts` for the placeholders (no reserved-email helper of its own)
 - Modify: `customer-workspace.controller.ts` (`GET :contactId/merge/:otherId/preview`, `POST :contactId/merge/:otherId`; `:contactId/detail` answers `{ mergedInto }` for a tombstone)
 - Modify: `apps/api.saroh.in/src/modules/organizations/{organization-actions,organization-policy,capability-catalogue}.ts` (+ specs): add `customer:merge` (Owner, Admin; not implied by `contact:write`)
 - Modify: the writers that take a contact id from outside the request, to call `resolveContact`: `invoices/order-invoicing.ts` and the payments webhook completion (`payments/*`), `bookings/{reservation,public-bookings.service,bookings.service}.ts` (`reservation.ts` writes `contactId`; `bookings.service.ts` queues `booking.notify` with one), and the `class-packs` and `subscriptions` services where they write by contact id. Plan A's `customer.notify` and `waitlist.offer` handlers and its sign-in `linkOrCreate` call it too (cross-plan note); `resolve-contact.ts` is the shared helper they import
@@ -729,12 +734,13 @@ flowchart LR
   - `CustomerIdentityLink`: re-point, skipping duplicates;
   - `ContactAttention`: re-point, collapsing equal kind, label and allergen (default 24);
   - `ContactNote`: re-point, both kept (default 24);
-  - `CustomerAccount` per ADR-011: the survivor keeps its account; when the survivor has none, the other account moves to it (unless the merchant chose not to carry it over); otherwise the other account is retired, its sessions revoked, and the row kept on the tombstone as retired by a merge;
+  - `CustomerAccount` per ADR-011: the survivor keeps its account; when the survivor has none, the other account moves to it (unless the merchant chose not to carry it over); otherwise the other account is retired: status `MERGED`, `mergedIntoId` = the survivor's account, its sessions revoked, and the row kept on the tombstone;
   - `CustomerThread`: the survivor's thread absorbs the other's messages in time order, and the other thread row is deleted;
   - `ClassWaitlistEntry`: same class → keep the better place (`OFFERED`, then the earlier position), delete the other, release a second hold through `waitlist.offer`; otherwise re-point;
-  - `PaymentMandate`: re-point with its subscription, no provider call;
+  - `PaymentMandate`: after commit, D20's `mandates.service.cancelFor({ contactId: other }, MERGED)`; never moved to the survivor. Whichever of C9 and D20 lands second wires the call;
   - tombstones pointing at the merged contact: re-point to the survivor.
 - Then the merged contact becomes a tombstone (placeholder email, personal fields cleared, `mergedIntoId`, `mergedAt`) **before** the survivor takes the chosen email, so the unique email holds in one transaction.
+- The email choice never offers a reserved placeholder (`isReservedContactEmail`); a placeholder side offers its account's verified email instead. When the survivor's email equals its account's sign-in email after the merge, the contact is stamped `STAFF_CONFIRMED` (DEC-049).
 - It writes a timeline event on the survivor ("Merged with a duplicate") and the audit row.
 - `resolveContact` is the only way a late writer turns an outside contact id into a row to write against. A writer that finds a removed contact refuses as it would today.
 
@@ -752,7 +758,9 @@ flowchart LR
 - Edge case (accounts): both have accounts → B's account is retired, its sessions revoked, and a sign-in with B's email can't make a new account (the row still holds the email).
 - Edge case (threads): both have a thread with messages → one thread, messages in time order, read state kept.
 - Edge case (waitlist): both wait for the same class, B holding an offer → B's offered entry survives on A; A's waiting entry is deleted. Both offered → one hold is released and offered on.
-- Edge case (mandates): B's subscription has a mandate → both re-point to A; no provider call.
+- Edge case (mandates): B's subscription has a mandate → the subscription re-points to A; after commit one `mandate.cancel` job cancels B's mandate at the provider; A has no mandate until they set one up.
+- Edge case (placeholder): A4's separate contact (placeholder email) merged with the contact holding the real email → the email choice offers only the real email; the survivor is stamped `STAFF_CONFIRMED` when that is the account's email.
+- Edge case (retired account): both have accounts → a later sign-in with B's email gets "This email now signs in as a•••@gmail.com" and no session.
 - Edge case: C was merged into B earlier → after B merges into A, C's tombstone points at A.
 - Error path: B in another business → 404. Merging a contact into itself → 400. B is already a tombstone → 404 "already merged". A removed contact → 409.
 - Integration: two merges on the same pair at once → one succeeds, the other 404s on the tombstone.
@@ -783,7 +791,7 @@ flowchart LR
 **Approach:**
 - The flow: from a suggested duplicate (the design's way in), or from ⋯ "Merge with a duplicate…", which searches for the other contact (kept for pairs no rule finds and for C8's clash offer).
 - The preview shows who stays (the older one offered, default 22), a choice of name, email and phone row by row as in the design, what moves as counts, consent per channel, and the refusals.
-- **The site account.** When an account will see records it couldn't see before, the preview says "‹masked email› signs in on your website and will see everything here", with a tick "I've checked this email is theirs" that Merge waits for, and the choice "Don't carry the sign-in over". When both have accounts, it says "‹masked› will be asked to sign in with ‹masked› instead". Emails are masked (first letter and domain) as elsewhere on account screens.
+- **The site account.** The preview always names the sign-in email that will reach the combined record ("Signs in on your website as ‹masked›"). When an account will see records it couldn't see before, the preview says "‹masked email› signs in on your website and will see everything here", with a tick "I've checked this email is theirs" that Merge waits for, and the choice "Don't carry the sign-in over". When both have accounts, it says "‹masked› will be asked to sign in with ‹masked› instead". Emails are masked (first letter and domain) as elsewhere on account screens.
 - The dialog states: "This can't be undone. Orders and invoices keep the details they were placed with."
 - Confirming leads to a toast "Merged. All of ‹name›'s orders, bookings and notes are here now."
 - Suggested duplicates show as a quiet notice on Customer Detail with Merge. There is no Dismiss this round (deferred).
@@ -807,14 +815,14 @@ flowchart LR
 
 **Requirements:** R12, R15 (`customer:remove`)
 
-**Dependencies:** C9 (the relation table, the DMMF spec, `resolveContact` and the reserved-email helper); A1 for the account. The rules for `CustomerThread` (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11) are specified here, and whichever lands second implements its rule in `privacy-removal-plan.ts`; the specs fail CI until it does. The mandate rule calls D11's `mandates.service.cancel`.
+**Dependencies:** C9 (the relation table, the DMMF spec and `resolveContact`); A1 for the account and the reserved-email helper (`contact-email.ts`). The rules for `CustomerThread` (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11) are specified here, and whichever lands second implements its rule in `privacy-removal-plan.ts`; the specs fail CI until it does. The mandate rule calls D20's `mandates.service.cancelFor({ contactId }, PRIVACY_REMOVAL)`; whichever of C11 and D20 lands second wires it.
 
 **Phase:** 2
 
 **Files:**
 - Create: `apps/api.saroh.in/src/modules/customer-workspace/privacy-removal.service.ts`, `privacy-removal-plan.ts` (pure: each relation's rule, and the refusals), `privacy-removal.dto.ts`, `personal-data.ts` (the registry of personal fields outside `Contact`: model, field and removal rule)
 - Modify: `packages/database/prisma/schema.prisma` + migration (`Contact.removedAt`)
-- Modify: `customer-workspace.controller.ts` (`GET :contactId/removal/preview`, `POST :contactId/removal`), `contacts.service.ts` and `customers-list.service.ts` (read `isReservedEmail` as no email; leave removed contacts out), `bookings/bookings.service.ts` (cancel future bookings through the existing path), `customers/customers.service.ts` (the store customer anonymiser), `product-reviews/product-reviews.service.ts` (hide and clear a review's name and body)
+- Modify: `customer-workspace.controller.ts` (`GET :contactId/removal/preview`, `POST :contactId/removal`), `contacts.service.ts` and `customers-list.service.ts` (read A1's `isReservedContactEmail` as no email; leave removed contacts out), `bookings/bookings.service.ts` (cancel future bookings through the existing path), `customers/customers.service.ts` (the store customer anonymiser), `product-reviews/product-reviews.service.ts` (hide and clear a review's name and body)
 - Modify: `apps/api.saroh.in/src/modules/organizations/{organization-actions,organization-policy,capability-catalogue}.ts` (+ specs): add `customer:remove` (Owner, Admin; not implied by `contact:write`)
 - Create: `apps/app.saroh.in/components/customers/detail/remove-details-dialog.tsx`
 - Modify: `components/customers/delete-customer-menu.tsx`, `lib/contacts/removal.ts`
@@ -824,7 +832,7 @@ flowchart LR
 **Approach:**
 - The removal follows Key Technical Decisions, in one transaction under the contact's row lock, except the provider call:
   - refused with an open order or a live subscription (default 25), or while it is a tombstone (404);
-  - **first, outside the transaction, cancels any mandate not already cancelled** at the provider (DEC-026's unsure-answer path). An unsure or failed answer stops here with the sentence, and nothing else changes; a retry is safe, since a cancelled mandate is skipped;
+  - **first, outside the transaction, cancels any mandate not already cancelled** at the provider through D20's `cancelFor({ contactId }, PRIVACY_REMOVAL)` (DEC-026's unsure-answer path). An unsure or failed answer stops here with the sentence, and nothing else changes; a retry is safe, since a cancelled mandate is skipped;
   - then, in the transaction: anonymises the contact; deletes notes, attention, consents, the site account with its sessions and codes, and the message thread; anonymises each linked store `Customer` not linked to another live contact, and deletes the links; clears the delivery recipient and notes on their orders, keeping `deliveryState`; replaces message bodies and recipients, clears `Delivery.error`, and puts the placeholder on their review invitations; cancels future bookings (returning pack credits, default 26) and blanks every booking's booker snapshot and intake note; deletes waitlist places and passes an offered one on; clears the mandate's display hint; hides their reviews and clears the name and body;
   - leaves leads and form entries as they are (2026-09-27), and says so in the preview;
   - writes the `customer.removed` audit with ids and counts, no values.
