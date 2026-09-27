@@ -55,6 +55,7 @@ import {
     editorColumns,
     useEditorViewport,
 } from "@/components/sites/editor/use-editor-viewport";
+import { usePublish } from "@/components/sites/editor/use-publish";
 import { emptySection } from "@/components/sites/empty-section";
 import {
     heldBackSummary,
@@ -77,12 +78,7 @@ import { DraftPreview } from "@/components/sites/section-preview";
 import { StylePanel } from "@/components/sites/style-panel";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { ensureFormForSection } from "@/lib/forms/actions";
-import {
-    getSiteFlags,
-    publishSite,
-    saveDraftSections,
-    updateSiteStyle,
-} from "@/lib/sites/actions";
+import { saveDraftSections, updateSiteStyle } from "@/lib/sites/actions";
 import {
     flagsByScreenPosition,
     insertPosition,
@@ -99,7 +95,6 @@ import type { EditorStatusTone } from "@/lib/sites/editor-status";
 import { editorStatus } from "@/lib/sites/editor-status";
 import { exactDate } from "@/lib/sites/format-date";
 import type { SiteChangeKind } from "@/lib/sites/pending";
-import { describePendingChanges } from "@/lib/sites/pending";
 import type {
     ApprovalOutcome,
     ReviewState,
@@ -247,33 +242,6 @@ export function SiteEditor({
     );
     const [saving, setSaving] = useState(false);
     const router = useRouter();
-    const [publishing, setPublishing] = useState(false);
-    /*
-     * Flags come from the server and settle after each save rather than
-     * updating per keystroke. The spec calls them "quiet until publish", and a
-     * dot that flickers as you type is the opposite of quiet — it also keeps
-     * one implementation of nine rules instead of two that can disagree.
-     */
-    const [siteFlags, setSiteFlags] = useState<SiteFlags>(initialFlags);
-    /*
-     * How many sections publishing would change (#190).
-     *
-     * The SERVER's number, not one this component works out. It is a diff
-     * between the draft and the live publication, and the browser holds only
-     * the page it is editing — so a count computed here would speak for one
-     * page while the button it sits beside publishes the whole site. Refreshed
-     * from each save's response, which is why it is state rather than a prop.
-     *
-     * Null until the site has published once; the button says "Publish site"
-     * in that case and there is no count to give.
-     */
-    const [pendingChanges, setPendingChanges] = useState<number | null>(
-        initialPendingChanges,
-    );
-    const [pendingSiteChanges, setPendingSiteChanges] = useState<
-        SiteChangeKind[] | null
-    >(initialPendingSiteChanges);
-    const [checking, setChecking] = useState(false);
     const {
         comments,
         review,
@@ -284,38 +252,28 @@ export function SiteEditor({
         notedKeys,
         notesByKey,
     } = useEditorReview({ siteId, pageId, initialComments, initialReview });
-    /*
-     * Whether anything is live yet (#288).
-     *
-     * State, not the prop it starts from: after the first publish the button
-     * still read "Publish site" and "Nothing's live yet" stayed above the
-     * preview until a reload, which is the editor telling a merchant their
-     * publish did not happen.
-     *
-     * `router.refresh()` would fix it and cost more than it fixes — it
-     * remounts the editor, dropping the selected section and the scroll
-     * position, so the merchant would lose their place as a reward for
-     * publishing.
-     */
-    const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
-
-    /*
-     * One counter per re-read below. Both fire from several places — every
-     * autosave, opening the check, publishing, a note changing — and nothing
-     * orders their responses, so a slow early read landing after a fast later
-     * one would put back the state from before. Each call takes the next
-     * number and only the newest may write; the same rule `measuring` keeps
-     * for the share image in site settings.
-     */
-    const flagsRequest = useRef(0);
-
-    /** Re-read flags from the server. They settle after a save, not per key. */
-    async function refreshFlags() {
-        const request = ++flagsRequest.current;
-        const next = await getSiteFlags(siteId);
-        if (request !== flagsRequest.current) return;
-        setSiteFlags(next);
-    }
+    const {
+        siteFlags,
+        refreshFlags,
+        pendingSummary,
+        recordSaved,
+        markStylePending,
+        checking,
+        setChecking,
+        publishing,
+        neverPublished,
+        openCheck,
+        onPublish,
+    } = usePublish({
+        siteId,
+        siteName,
+        address,
+        initialFlags,
+        initialNeverPublished,
+        initialPendingChanges,
+        initialPendingSiteChanges,
+        refreshReview,
+    });
 
     const [errorIndex, setErrorIndex] = useState<number | null>(null);
     const initialCount = initialSections.length;
@@ -448,10 +406,6 @@ export function SiteEditor({
      * the style debounce snapshotted the previous look.
      */
     const styleDirty = styleSaving || JSON.stringify(style) !== savedStyleJson;
-    const pendingSummary = describePendingChanges(
-        pendingChanges,
-        pendingSiteChanges,
-    );
 
     function replaceAt(index: number, next: Section) {
         setSections((prev) => prev.map((s, i) => (i === index ? next : s)));
@@ -686,8 +640,10 @@ export function SiteEditor({
             setSaveError(false);
             // The save recounted what publishing would change; take its answer
             // rather than guessing at one from what was just sent.
-            setPendingChanges(res.data.pendingSectionChanges ?? null);
-            setPendingSiteChanges(res.data.pendingSiteChanges ?? null);
+            recordSaved(
+                res.data.pendingSectionChanges ?? null,
+                res.data.pendingSiteChanges ?? null,
+            );
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
             if (!auto) showSuccess("Draft saved.");
@@ -797,11 +753,7 @@ export function SiteEditor({
                         setSavedStyleJson(payloadJson);
                         // A saved style is a change publishing would make;
                         // without this the pill read "Published" (review).
-                        setPendingSiteChanges((prev) =>
-                            prev === null || prev.includes("style")
-                                ? prev
-                                : [...prev, "style"],
-                        );
+                        markStylePending();
                     } else {
                         failedStyleJson.current = payloadJson;
                         showError(res.error);
@@ -816,7 +768,7 @@ export function SiteEditor({
                 .finally(() => setStyleSaving(false));
         }, 700);
         return () => clearTimeout(id);
-    }, [style, savedStyleJson, siteId, styleSaving]);
+    }, [style, savedStyleJson, siteId, styleSaving, markStylePending]);
 
     function resetStyle() {
         // Back to the business's own defaults — which is what the site looked
@@ -830,71 +782,6 @@ export function SiteEditor({
             ),
         };
         setStyle(defaults);
-    }
-
-    /**
-     * Publishing goes through the pre-publish check first — the spec makes it
-     * "its own moment before going live", not a button that fires immediately.
-     * The check itself never refuses: every flag is advisory, so the merchant
-     * can read them and publish anyway from the same screen.
-     */
-    async function openCheck() {
-        if (dirty) {
-            // "Save first" cannot help when everything saveable IS saved and
-            // only unfinished sections are waiting; name what will.
-            showError(
-                onlyHeldBack
-                    ? `Finish or remove ${unfinishedPhrase(heldBack)} before publishing.`
-                    : "You have unsaved changes — save the draft first.",
-            );
-            return;
-        }
-        setChecking(true);
-        // Re-read rather than trusting what was loaded: the merchant may have
-        // been editing for an hour, and a stale check is worse than none.
-        await refreshFlags();
-    }
-
-    async function onPublish() {
-        setPublishing(true);
-        const res = await publishSite(siteId);
-        setPublishing(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        setChecking(false);
-        /*
-         * The live state names the business and its address, per the spec —
-         * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
-         * "Published" leaves the merchant to go and check what happened.
-         */
-        const live =
-            address === null || address === undefined
-                ? `${siteName} is live.`
-                : `${siteName} is live at ${address}.`;
-        showSuccess(
-            // Bypassing is recorded, not prevented (#199) — and said, so the
-            // record is never a surprise in version history later.
-            res.data.bypassed
-                ? `${live} Recorded as published without approval.`
-                : live,
-        );
-        /*
-         * Everything the bar counted just went live, so the count is zero —
-         * set here rather than left for the next autosave to recount, which
-         * never comes if the merchant only opened the editor to publish. The
-         * review state moves too: publishing over a request for changes writes
-         * a bypass record, and the approval line should say so now rather
-         * than after a reload. Flags are re-read for the same reason.
-         */
-        setPendingChanges(0);
-        // The site-level settings went live too.
-        setPendingSiteChanges([]);
-        // Something is live now, so the button stops offering to publish the
-        // site and the "nothing's live yet" line goes (#288).
-        setNeverPublished(false);
-        await Promise.all([refreshFlags(), refreshReview()]);
     }
 
     /**
@@ -1204,7 +1091,9 @@ export function SiteEditor({
                         size="sm"
                         className="wk-press h-8"
                         title="Make these changes live"
-                        onClick={() => void openCheck()}
+                        onClick={() =>
+                            void openCheck({ dirty, onlyHeldBack, heldBack })
+                        }
                         disabled={publishing || dirty || saving || styleDirty}
                     >
                         {publishing
