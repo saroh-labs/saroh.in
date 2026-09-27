@@ -9,7 +9,9 @@ import { demoUser, urls } from "../playwright.config";
  * page — skip a collection and take it back, change plan from the next
  * renewal and keep the current one, pause and resume. Then Plans, a tab of
  * Subscriptions (plan 2026-09-26-004, D3): archive a plan and Undo, the old
- * address landing on the tab, and a Member told they can't open it.
+ * address landing on the tab, and a Member told they can't open it. Then a
+ * plan's own page (D4): its three tabs, Archive and Undo from there, an
+ * unknown plan, and a Member kept out.
  *
  * Every change it makes is undone before it ends, so the demo business is
  * left as it was; desk and phone run one after the other on the same data.
@@ -209,6 +211,92 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await expect(page.getByRole("article", { name: PLAN })).toBeVisible();
     });
 
+    test("a plan's card opens its page: Overview, Subscribers, History (D4)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/billing/subscriptions?tab=plans");
+        await page
+            .getByRole("article", { name: PLAN })
+            .getByRole("link", { name: PLAN, exact: true })
+            .click();
+        await expect(page).toHaveURL(/\/billing\/plans\/[^/?]+$/);
+        await expect(
+            page.getByRole("heading", { level: 1, name: PLAN }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("main").getByText("Open", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Who pays what" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "At a glance" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: "Plans", exact: true }),
+        ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
+
+        await page.getByRole("tab", { name: /^Subscribers/ }).click();
+        await expect(page).toHaveURL(/tab=subscribers/);
+        const panel = page.getByRole("tabpanel");
+        await expect(
+            panel
+                .getByRole("link")
+                .or(panel.getByText("Nobody's on this plan yet")),
+        ).not.toHaveCount(0);
+
+        await page.getByRole("tab", { name: "History" }).click();
+        await expect(page).toHaveURL(/tab=history/);
+        await expect(panel.getByRole("listitem").first()).toBeVisible();
+    });
+
+    test("archive from a plan's page, then Undo opens it again (D4)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/billing/subscriptions?tab=plans");
+        await page
+            .getByRole("article", { name: PLAN })
+            .getByRole("link", { name: PLAN, exact: true })
+            .click();
+        await expect(
+            page.getByRole("heading", { level: 1, name: PLAN }),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "Archive" }).click();
+        try {
+            await expect(
+                page.getByText(/^Archived — nobody new can join/),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("button", { name: "Open to sign-ups" }),
+            ).toBeVisible();
+            await page.getByRole("tab", { name: "History" }).click();
+            await expect(
+                page.getByText("Archived — closed to new sign-ups").first(),
+            ).toBeVisible();
+        } finally {
+            await undo(page);
+        }
+        await expect(
+            page.getByRole("button", { name: "Archive" }),
+        ).toBeVisible();
+        await expect(
+            page.getByText(/^Archived — nobody new can join/),
+        ).toHaveCount(0);
+    });
+
+    test("a plan that isn't there says so (D4)", async ({ page }) => {
+        await signIn(page);
+        await page.goto("/billing/plans/no-such-plan");
+        await expect(
+            page.getByRole("heading", { name: "That plan isn't here" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: "Back to plans" }),
+        ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
+    });
+
     test("a Member is told they can't open it", async ({ page }) => {
         await signIn(page, member);
         await page.goto("/billing/subscriptions?tab=plans");
@@ -218,6 +306,19 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             }),
         ).toBeVisible();
         await expect(page.getByRole("tab", { name: /^Plans/ })).toHaveCount(0);
+        await expect(page.getByRole("main")).not.toContainText("₹");
+    });
+
+    test("a Member is told they can't open a plan's page (D4)", async ({
+        page,
+    }) => {
+        await signIn(page, member);
+        await page.goto("/billing/plans/any-plan");
+        await expect(
+            page.getByRole("heading", {
+                name: /You do not have access to Payments|You can't open this plan/,
+            }),
+        ).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("₹");
     });
 });
