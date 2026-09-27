@@ -1,19 +1,18 @@
-import { Badge } from "@saroh/ui/badge";
-import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-
-import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
-import { EditServiceForm } from "@/components/bookings/edit-service-form";
-import { PageContainer } from "@/components/shared/page-container";
-import { getService, listRules } from "@/lib/services/service";
+import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
+import { ServiceEditor } from "@/components/services/service-editor/service-editor";
+import { loadEditorContext } from "@/lib/services/editor-data";
+import { listRules, readService } from "@/lib/services/service";
+import { showKind } from "@/lib/services/service-editor";
+import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 
+export const metadata = { title: "Service" };
+
 /**
- * Service editor (S4-003). Resolves the service (notFound when missing / not
- * permitted), loads its availability rules, and renders the terms editor plus
- * the AvailabilityRulesEditor. Editing happens client-side; only Save/Archive
- * hit the api.
+ * Bookings › Services › a service (E2): the Service Editor. It opens from
+ * Edit (or View) on a service's card and from the calendar's links. Its own
+ * weekly hours, who takes it and how it is booked each degrade on their
+ * own; a service that can't be read says so rather than "isn't here".
  */
 export default async function ServiceEditorPage({
     params,
@@ -23,56 +22,45 @@ export default async function ServiceEditorPage({
     const { serviceId } = await params;
     await requireSession();
 
-    const service = await getService(serviceId);
-    if (!service) notFound();
-
-    const rules = await listRules(serviceId);
+    const [read, context, rules] = await Promise.all([
+        readService(serviceId),
+        loadEditorContext(),
+        listRules(serviceId),
+    ]);
+    if (!read.ok) {
+        return (
+            <ServiceEditorState
+                state={read.reason}
+                retryHref={`/services/${serviceId}`}
+            />
+        );
+    }
+    if (!context.ok) {
+        return (
+            <ServiceEditorState
+                state={context.forbidden ? "forbidden" : "failed"}
+                retryHref={`/services/${serviceId}`}
+            />
+        );
+    }
+    const service = read.service;
+    const { services, staff, hasPage, canEdit, timezone, currency } =
+        context.context;
+    const usage = await readServiceUsage([service.id], timezone);
 
     return (
-        <PageContainer>
-            <PageHeader
-                breadcrumb={[
-                    <Link
-                        key="services"
-                        href="/services"
-                        className="hover:text-foreground"
-                    >
-                        Services
-                    </Link>,
-                    service.name,
-                ]}
-                title={service.name}
-                description="Set this service's terms and weekly availability."
-                actions={
-                    // The same words as the services list's filters.
-                    <Badge
-                        variant={
-                            service.status === "ACTIVE" ? "success" : "neutral"
-                        }
-                    >
-                        {service.status === "ACTIVE"
-                            ? "Bookable"
-                            : "Not bookable"}
-                    </Badge>
-                }
-            />
-
-            <section className="mb-10">
-                <h2 className="mb-3 text-lg font-medium">Details</h2>
-                <EditServiceForm service={service} />
-            </section>
-
-            <section>
-                <h2 className="mb-1 text-lg font-medium">Availability</h2>
-                <p className="mb-3 text-sm text-muted-foreground">
-                    Weekly windows in {service.timezone}. Visitors can book any
-                    open slot inside these windows.
-                </p>
-                <AvailabilityRulesEditor
-                    serviceId={service.id}
-                    initialRules={rules}
-                />
-            </section>
-        </PageContainer>
+        <ServiceEditor
+            // A different service starts from its own saved values.
+            key={service.id}
+            service={service}
+            rules={rules}
+            staff={staff?.staff ?? null}
+            usage={usage?.[service.id] ?? null}
+            currency={service.currency ?? currency}
+            timezone={timezone}
+            canEdit={canEdit}
+            kindUp={showKind(services, service)}
+            hasPage={hasPage}
+        />
     );
 }

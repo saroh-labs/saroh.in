@@ -60,9 +60,12 @@ function timeToMinutes(value: string): number | null {
 export function AvailabilityRulesEditor({
     serviceId,
     initialRules,
+    disabled = false,
 }: {
     serviceId: string;
     initialRules: AvailabilityRule[];
+    /** Read-only: a role that can't change services sees the windows. */
+    disabled?: boolean;
 }) {
     const router = useRouter();
     const [rows, setRows] = useState<RuleRow[]>(() =>
@@ -72,7 +75,8 @@ export function AvailabilityRulesEditor({
             end: minutesToTime(rule.endMinute),
         })),
     );
-    const [saving, setSaving] = useState(false);
+    const [busy, setSaving] = useState(false);
+    const saving = busy || disabled;
 
     function addRow() {
         setRows((prev) => [
@@ -205,7 +209,7 @@ export function AvailabilityRulesEditor({
                     disabled={saving}
                     className="wk-press"
                 >
-                    {saving ? "Saving…" : "Save availability"}
+                    {busy ? "Saving…" : "Save availability"}
                 </Button>
             </div>
         </div>
