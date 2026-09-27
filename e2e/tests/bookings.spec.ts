@@ -321,9 +321,22 @@ test.describe("bookings calendar", () => {
                 "No service this person takes starts inside the new hours",
             );
             await chip.click();
-            await book.getByRole("radio", { name: "Someone new" }).click();
-            await book.getByLabel("Name").fill("E2E Walk-in");
+            // The shared customer picker (E4): type, then add them new.
+            await book.getByLabel("Find the customer").fill("E2E Walk-in");
+            await book
+                .getByRole("button", {
+                    name: "+ Add \u201cE2E Walk-in\u201d as a new customer",
+                })
+                .click();
+            await expect(book.getByLabel("Name")).toHaveValue("E2E Walk-in");
             await book.getByLabel("Email").fill("e2e.walkin@example.com");
+            await book.getByRole("button", { name: "Add customer" }).click();
+            await expect(
+                book.getByRole("radio", { name: "E2E Walk-in · new" }),
+            ).toBeChecked();
+            await book
+                .getByRole("radio", { name: "Pays at the session" })
+                .click();
             await book.getByRole("button", { name: "Book it" }).click();
             await expect(
                 page.getByText(/^Booked E2E Walk-in with/).first(),
@@ -379,6 +392,57 @@ test.describe("bookings calendar", () => {
                 }
             }
         }
+    });
+});
+
+test.describe("New booking finds the customer (E4)", () => {
+    test("the last 4 digits of a phone find them, +91 or not, and nothing is saved", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const people = (await (
+            await page.request.get(api("/contacts"), { headers: orgHeader })
+        ).json()) as {
+            id: string;
+            firstName: string | null;
+            lastName: string | null;
+            phone: string | null;
+        }[];
+        const withPhone = people.find(
+            (c) =>
+                c.firstName && (c.phone ?? "").replace(/\D/g, "").length >= 10,
+        );
+        test.skip(!withPhone, "Nobody on Pulse has a phone");
+        if (!withPhone) return;
+        const digits = (withPhone.phone ?? "").replace(/\D/g, "").slice(-10);
+        const name = [withPhone.firstName, withPhone.lastName]
+            .filter(Boolean)
+            .join(" ");
+
+        // The search itself: the same person by +91 and without.
+        const ids = async (q: string) =>
+            (
+                (await (
+                    await page.request.get(
+                        api(`/contacts/search?q=${encodeURIComponent(q)}`),
+                        { headers: orgHeader },
+                    )
+                ).json()) as { id: string }[]
+            ).map((r) => r.id);
+        expect(await ids(`+91 ${digits}`)).toContain(withPhone.id);
+        expect(await ids(digits)).toContain(withPhone.id);
+
+        // And in the dialog: typing the last 4 finds and picks them.
+        await page.goto("/bookings");
+        await page.getByRole("button", { name: "New booking" }).first().click();
+        const book = page.getByRole("dialog");
+        await book.getByLabel("Find the customer").fill(digits.slice(-4));
+        const chip = book.getByRole("radio", { name, exact: true });
+        await expect(chip).toBeVisible();
+        await chip.click();
+        await expect(chip).toBeChecked();
+        // Nothing is written until "Book it".
+        await book.getByRole("button", { name: "Close" }).click();
     });
 });
 
