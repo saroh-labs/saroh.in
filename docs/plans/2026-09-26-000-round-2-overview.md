@@ -31,14 +31,14 @@ file name. `DESIGN-NOTES.md` has the reasoning behind them.
 | Epic | Plan | Units | What it delivers |
 |---|---|---|---|
 | A. Customer accounts and messaging on merchant sites | [001](./2026-09-26-001-feat-customer-accounts-plan.md) | 14 | Sign-in by a one-time code sent by email, one account per business (ADR-011); no phone sign-in this round. An account area with bookings, orders and tracking, plan and packs, messages and Me. Credits and packs online, a class waitlist, and customer messages. |
-| B. Orders and fulfilment | [002](./2026-09-26-002-feat-orders-fulfilment-plan.md) | 16 | Richer list API and rows, filters, quick view, bulk kitchen actions, states, Order Detail changes, six fulfilment types with shipping tracking, a pay link for an order, New order v2. |
+| B. Orders and fulfilment | [002](./2026-09-26-002-feat-orders-fulfilment-plan.md) | 17 | Richer list API and rows, filters, quick view, bulk kitchen actions, states, Order Detail changes, six fulfilment types with shipping tracking, a late rule each storefront sets, a pay link for an order, New order v2. |
 | C. Customers | [003](./2026-09-26-003-feat-customers-plan.md) | 14 | The business-wide Customers list and its API, Needs attention, Customer Detail gaps, merge, privacy removal, email and address editing, reviews and packs on the detail. |
 | D. Payments | [004](./2026-09-26-004-feat-payments-plan.md) | 18 | The Plans tab, Plan Detail, and the Plan Editor with drafts and the shared editor shell. Plan and subscription event logs, pause with an end date, and classes from the next renewal. Provider autopay (DEC-038). Invoices: bill of supply, PDF, sending, the source filter and locked states. |
 | E. Bookings, services, packs and calendar | [005](./2026-09-26-005-feat-bookings-packs-calendar-plan.md) | 28 | The Service Editor (visits, deposits, "Either", show on the booking page), time off ranges and business closed, new-booking search, and the booking page's gaps. Packs, Pack Detail and Pack Editor with drafts. The Business Calendar's second pass. |
 | F. Home and Settings | [006](./2026-09-26-006-feat-home-settings-plan.md) | 18 | The Home redesign, Settings' real differences, Team's hidden column, storefront people joining the team, extra permissions per person, and the default bundles of the capability model. |
 | G. Site editor and customer site | [007](./2026-09-26-007-feat-site-editor-customer-site-plan.md) | 21 | The #260 split first, then bound blocks, module pages, header and footer text, Undo toasts, the narrow layout and in-place preview. Customer site v2 without the brand: shop and bag, Prices, On today, open or closed, and nav gated by module. |
 | H. Design system: Brand v2 | [008](./2026-09-26-008-feat-brand-v2-plan.md) | 10 | **The font-leak fix (phase 1).** Then Brand v2 with choice: a font catalogue of pairings and a palette catalogue plus a custom colour, both extensible as data; the brand API and panel, a logo, contrast, starting themes, and existing sites moved across as close as they look. Hindi is later. |
-| | | **139** | |
+| | | **140** | |
 
 **The font fix changes every live site.** On the day H1 ships, every
 merchant site's text moves from Saroh's fonts to a neutral system font stack,
@@ -54,7 +54,7 @@ keeps four product choices for the user (Q1–Q4 below).
 Also written: [the permission matrix](./2026-09-26-permission-matrix.md)
 (DEC-039), and ADR-011.
 
-Unit IDs are per epic (A1…A14, B1…B16, and so on). Each plan's units say
+Unit IDs are per epic (A1…A14, B1…B17, and so on). Each plan's units say
 Goal, Files, Approach, Dependencies, Test scenarios and Verification, and
 none is bigger than one to two days of agent work.
 
@@ -72,7 +72,7 @@ user's answers to the permission matrix's open questions (Q1, Q3, Q4).
 |---|---|
 | H | **H1 font-leak fix** (first, alone, small) |
 | A | A1 identity tables · A2 email codes · A3 site session and sign-in sheet · A4 account ↔ contact linking · A5 account area shell, Home and Me |
-| B | B1 list API · B2 fulfilment types API · B3 rows and tabs · B4 filters, search and export · B5 quick view and row menu · B6 bulk kitchen actions · B7 states and locked cards · B10 shipping panel · B11 pay link for an order |
+| B | B1 list API · B2 fulfilment types API · B3 rows and tabs · B4 filters, search and export · B5 quick view and row menu · B6 bulk kitchen actions · B7 states and locked cards · B10 shipping panel · B11 pay link for an order · B17 late after, per storefront |
 | C | C1 Needs attention API · C2 a contact for every paying customer · C3 customers list API · C4 Customers list screen · C5 Needs attention on the detail · C6 Reviews tab · C7 packs on the detail · C8 edit email and address · C14 copy and phone polish |
 | D | D1 plan API · D2 plan events · D3 Plans tab · D4 Plan Detail · D5 drafts API · D6 editor shell · D7 Plan Editor · D8 pause with an end date · D9 subscription events · D10 classes from the next renewal · D18 invoices source filter and locked states |
 | E | E1 service fields · E2 Service Editor · E3 time off and business closed · E4 new-booking search · E5 peek, locked state and copy · E7 Where and the intake note · E11 UPI/card checkout on the booking page · E14 pack drafts · E21 calendar copy, range and shortcuts · E28 keyboard grid and day sheet |
@@ -118,7 +118,7 @@ decides them, so they are phase 2.
   `customer:sensitive` (matrix Q2).
 - **The draft helper and editor shell** (D5, D6) come before D7, E14 and E18,
   and later the course editor.
-- **Fulfilment types** (B2) come before B10, B12, B13, A7 (Track) and G13.
+- **Fulfilment types** (B2) come before B10, B12, B13, B17, A7 (Track) and G13.
 - **Visits** (E9) come before B14 and A6.
 - **The pay link for an order** (B11) comes before B13 and E4.
 - **Messages** (A13, A14) come before F2, F4 (Reply), D17 (the account-thread
@@ -199,12 +199,14 @@ it.
 13. The refund sheet keeps "Or another amount". It is capped at what is refundable, needs a reason, is not tied to lines and returns no stock.
 14. Tabs are All · Open · Refunded; cancelled orders stay under All.
 15. A product lists the fulfilment types it allows (by default, every type its storefront offers), and an order offers only types every item allows.
-16. Late rules per type follow the design's values and can't yet be set per business:
-    - Pick-up: 2 hours after it was placed. Today's rule is 20 minutes, a kitchen-counter rule.
-    - Local delivery: 24 hours.
-    - Shipping: 48 hours.
-    - Digital: never late.
-    - Appointments: judged by their visits.
+16. **Decided (user, 2026-09-27; DEC-045):** when an order counts as late is a per-storefront setting, measured from when it was placed — "Mark pick-up orders late after [N] hours" — in hours, with minutes allowed for counter businesses. One setting per fulfilment type the storefront offers:
+    - Pick-up: 2 hours by default. A café-like storefront may set 20 minutes (today's counter wait).
+    - Local delivery: 24 hours by default.
+    - Shipping: 48 hours by default.
+    - Digital: never late, with no setting.
+    - Appointments: judged by their visits, with no setting.
+
+    Every storefront, existing ones included, starts on the defaults (plan B, B17).
 17. Changing how an order is fulfilled charges or refunds the difference in delivery on the order (a supplementary invoice or a credit note).
 18. The existing Collect becomes Pick-up and Delivery becomes Local delivery; the `trackingUrl` stays as the optional link.
 19. New order's walk-in customer needs no contact; one is made only if a phone or email is typed.
@@ -395,5 +397,3 @@ it.
     (proposed: yes, for those that never changed their Member role).
 - **Saroh's own billing** (Settings › Plan & billing): when, and in which
   plan.
-- **The Pick-up late rule** (default 16): the design's 2 hours, or today's
-  20 minutes.

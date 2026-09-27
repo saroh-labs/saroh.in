@@ -94,8 +94,14 @@ the design.
   - Digital: Paid → Sent.
   - Appointment in person and Appointment online: Booked → Attended, by
     their visits.
-- R4. Each type has a late rule (default 16), computed by the API and shown
-  as "Late" in words, never colour alone.
+- R4. **When an order counts as late is a storefront setting** (default 16,
+  decided 2026-09-27): one "Mark ‹type› orders late after N" per fulfilment
+  type the storefront offers — Pick-up, Local delivery and Shipping — in
+  hours, with minutes allowed for a counter. Defaults are 2 hours, 24 hours
+  and 48 hours. Digital is never late, and appointments are judged by their
+  visits. `late` is computed by the API from the order's storefront's setting
+  and shown as "Late" in words, never colour alone, on the Orders list, the
+  quick view and Order Detail.
 - R5. Shipping records the courier's name and the tracking number, with an
   optional link. Saroh never books a courier.
 - R6. How an order is fulfilled can change until handover. The change charges
@@ -150,7 +156,6 @@ the design.
 - No draft orders (not designed; overview "Later").
 - No per-business renaming of steps (DESIGN-NOTES "Not yet"); the step words
   are the type's.
-- No per-business late rules; the type's rule applies (default 16).
 - Abandoned (unpaid online) orders stay hidden from the list, as decided in
   DESIGN-NOTES.
 - Messages to the customer (Ready, a changed fulfilment, a pay link sent)
@@ -162,7 +167,7 @@ the design.
 ### Deferred to Follow-Up Work
 
 - A variant switch on an existing line in Edit (DESIGN-NOTES "Not yet").
-- Per-business step names and late rules.
+- Per-business step names. (Late rules are per storefront, B17.)
 - Returns as their own flow (today: "Put N back in stock" on a refund,
   DEC-032).
 - The public shop's choice of fulfilment type at checkout: plan G (G13) uses
@@ -283,7 +288,8 @@ the design.
     their visits (B14 and plan E's E9), and they reach DELIVERED when the last
     visit is attended.
 - **One rules module per type.** `orders/fulfilment.ts`, pure, holds each
-  type's steps, handover stage, late rule, ticket name and done word. It is
+  type's steps, handover stage, default late threshold, ticket name and done
+  word. It is
   mirrored in the app's `lib/orders/fulfilment.ts`, kept in step by a shared
   test table in both specs — the pattern of `invoice-number.ts` ↔
   `numbering.ts`. The API computes `late` and `lateBy` for rows. The app
@@ -300,10 +306,15 @@ the design.
   Moving to HANDED_TO_COURIER on a Shipping order asks for the courier and
   number but doesn't require them. A missing number shows "No tracking number
   yet" with Add.
-- **Late is the API's.** `late` is computed at read time from `placedAt` (or
-  `paidAt` for online orders), the type's rule and the business's time zone
-  (DEC-033). It is never stored. Defaults 16 and the design's `lateH` are in
-  the Open Questions below.
+- **Late is the API's, and its threshold is the storefront's.** `late` is
+  computed at read time from `placedAt` (or `paidAt` for online orders), the
+  threshold the order's storefront sets for its type (B17; the type's default
+  until set) and the business's time zone (DEC-033). It is never stored.
+  Thresholds are stored in minutes on `StoreSettings`
+  (`pickupLateAfterMinutes`, `localDeliveryLateAfterMinutes`,
+  `shippingLateAfterMinutes`), defaulting to 120, 1,440 and 2,880 (default
+  16). Changing one re-labels open orders on the next read, and nothing is
+  rewritten.
 - **Changing fulfilment** runs in one transaction under the order's row lock:
   - check the new type against every item's allowed types (B12, or
     everything before B12 ships);
@@ -394,6 +405,7 @@ the design.
 | See sensitive Needs attention | — | C1 interim: `contact:write` | → `customer:sensitive` (C13, per matrix Q2) |
 | Sell rail rows | the module | gated on their own reads (B16, matrix W-1) | `order:read`, `store:read`, `contact:read` |
 | Set a product's allowed types | `store:write` | unchanged | `store:write` |
+| Set when a storefront's orders are late (B17) | — | new setting | `store:write` |
 
 ---
 
@@ -410,20 +422,12 @@ the design.
   order, and the order writes are split where a business would grant one
   without another. The Member keeps `order:stage` without money until F18
   applies the new Member bundle (matrix Q1).
-
-### Needs the user's eye (found while planning)
-
-- **Late rule values** (default 16, corrected in the overview to the
-  design). The design's `FULFIL.lateH` in `saroh-fixtures.js` says:
-  - Pick-up: 2 hours after placing;
-  - Local delivery: 24 hours;
-  - Shipping: 48 hours;
-  - Digital: never.
-
-  **This plan builds the rule table in one place (`orders/fulfilment.ts`)
-  and uses these values.** The Pick-up value matters most to confirm. Today's
-  20-minute wait (`WAIT_TARGET_MIN`) is a kitchen-counter rule, and the
-  design's 2 hours is an any-business rule.
+- **When an order is late** (default 16; user, 2026-09-27): a storefront
+  setting per fulfilment type it offers, measured from when the order was
+  placed. Defaults: Pick-up 2 hours, Local delivery 24 hours, Shipping 48
+  hours; a café-like storefront can set 20 minutes. Digital is never late,
+  and appointments are judged by their visits. Built in B17, read by B2's
+  rule.
 
 ### Deferred to Implementation
 
@@ -499,10 +503,13 @@ flowchart LR
   E9[(E9 visits API)] --> B14[B14 Visits card]
   B2 --> B14
   B1 --> B16[B16 permission pass]
+  B2 --> B17[B17 late after, per storefront]
+  B17 --> B3
+  B17 --> B8
 ```
 
-Phase 1: B1, B2, B3, B4, B5, B6, B7, B10, B11. Phase 2: B8, B9, B12, B13,
-B14, B15, B16.
+Phase 1: B1, B2, B3, B4, B5, B6, B7, B10, B11, B17. Phase 2: B8, B9, B12,
+B13, B14, B15, B16.
 
 ---
 
@@ -601,7 +608,8 @@ type, and shipping records the courier and number.
 - Create:
   - `packages/database/prisma/migrations/<ts>_order_fulfilment_types/migration.sql`;
   - `apps/api.saroh.in/src/modules/orders/fulfilment.ts` (the rule table:
-    steps, handover, late rule, ticket, done word, stage moves);
+    steps, handover, default late threshold, ticket, done word, stage
+    moves);
   - `apps/app.saroh.in/lib/orders/fulfilment.ts` (the mirror).
 - Modify:
   - `apps/api.saroh.in/src/modules/orders/order-stage.ts` (`STAGE_MOVES`
@@ -631,8 +639,9 @@ type, and shipping records the courier and number.
   - Digital: NEW → SENT (DELIVERED).
   - Appointments: no stage moves.
 - The undo window and event writing are unchanged.
-- The late rule takes (type, placedAt, now, zone) and returns
-  `{late, lateBy}`; the values are in Open Questions.
+- The late rule takes (type, placedAt, now, zone, the storefront's
+  thresholds) and returns `{late, lateBy}`. Until B17 lands, the thresholds
+  are the type defaults in `fulfilment.ts` (default 16).
 - The courier name and number are accepted on the HANDED_TO_COURIER move and
   on `PATCH :orderId`, which stays open after handover for these two fields
   only.
@@ -651,8 +660,9 @@ move tables and undo behaviour before changing `order-stage.ts`.
 - Edge case: an existing COLLECT order reads as PICKUP with identical steps
   and history after the migration.
 - Edge case: Digital skips Preparing; an unpaid Digital order can't be Sent.
-- Edge case: late is true only past the type's rule, in the business's zone;
-  Digital and appointments are never late.
+- Edge case: late is true only past the storefront's threshold for the type
+  (the default when none is set), in the business's zone; Digital and
+  appointments are never late.
 - Error path: a move not in the type's table → 409 with the step words; a
   courier name over 80 characters → 400.
 - Integration: `db:verify:replay` passes; the seeds produce one order per
@@ -1338,6 +1348,56 @@ one.
 
 ---
 
+### B17. Late after, per storefront
+
+**Goal:** Each storefront decides when its orders count as late, per
+fulfilment type it offers, and every order surface reads it (default 16,
+decided 2026-09-27; DEC-045).
+
+**Requirements:** R4
+
+**Dependencies:** B2
+
+**Phase:** 1
+
+**Files:**
+- Modify: `packages/database/prisma/schema.prisma` (`StoreSettings.pickupLateAfterMinutes Int @default(120)`, `localDeliveryLateAfterMinutes Int @default(1440)`, `shippingLateAfterMinutes Int @default(2880)`), with a migration
+- Modify: `apps/api.saroh.in/src/modules/stores/{dto,stores.service,stores.controller}.ts` (read and save the three thresholds with the storefront's settings, under `store:write` like the rest of them)
+- Modify: `apps/api.saroh.in/src/modules/orders/{fulfilment,order-read,orders.service}.ts` (the late rule reads the order's storefront's thresholds; the list loads them once per storefront in the page)
+- Modify: `apps/app.saroh.in/components/stores/store-settings-form.tsx` (a "When is an order late?" group: one "Mark ‹type› orders late after [N] [hours ▾]" row per type the storefront offers, hours or minutes)
+- Modify: `apps/app.saroh.in/lib/orders/fulfilment.ts` (the mirror shows the storefront's value in copy, never decides)
+- Test: `apps/api.saroh.in/src/modules/orders/fulfilment.spec.ts`, `stores/stores.service.spec.ts`, `e2e/tests/storefront-settings.spec.ts`
+
+**Approach:**
+- Stored in minutes; the field shows hours, and minutes when the value isn't
+  a whole number of hours. Bounds: 5 minutes to 30 days, whole minutes.
+- A row shows only for a type the storefront offers (collection for
+  Pick-up; local delivery; shipping). Digital and appointments have no row:
+  Digital is never late, and an appointment follows its visits.
+- Every existing storefront starts on the defaults (2 h, 24 h, 48 h); the
+  field's help says "A café counter often uses 20 minutes".
+- The Orders list, the quick view, Order Detail's header, Home's late rows
+  and the calendar's "late order" chip all read the API's `late` and
+  `lateBy`, so none of them changes to follow the setting.
+- The save is audited like other storefront settings.
+
+**Test scenarios:**
+- Happy path: set Pick-up to 20 minutes → a pick-up order placed 25 minutes
+  ago reads "Late · 5 min" on the list and on Order Detail.
+- Happy path: set Shipping to 72 hours → a shipping order 50 hours old is no
+  longer late.
+- Edge case: a storefront that offers no shipping shows no Shipping row, and
+  its value keeps the default.
+- Edge case: two storefronts with different Pick-up thresholds in one list
+  page each use their own.
+- Error path: 0 minutes, 3 minutes, 31 days or a fraction → 400 with a
+  sentence; another business's storefront → 404.
+
+**Verification:** Side by side with the Storefront Settings design's
+fulfilment section; `db:verify:replay` passes.
+
+---
+
 ## System-Wide Impact
 
 - **Interaction graph:**
@@ -1377,7 +1437,7 @@ one.
 | Risk | Mitigation |
 |------|------------|
 | The enum rename breaks readers that compare strings (`"COLLECT"`) | grep every reader; characterization tests on `order-stage.ts` and `lifecycle.ts`; the mirror test table |
-| Late rule values disagree between the overview and the design | One table; the user confirms (Open Questions) before B3 ships the "Late" words |
+| A counter storefront that relied on today's 20-minute wait sees orders go "Late" only after 2 hours | B17's field says "A café counter often uses 20 minutes", and the release note names the setting |
 | The goodwill amount opens a client-sent amount on refunds | Accepted only with no lines and a reason, capped under the order lock; the DTO note is rewritten |
 | Bulk moves deadlock | One transaction per order, never several order locks at once |
 | A pay link paid after cancel | Recorded as owed back (`CAPTURED_NEEDS_REFUND`), as for invoices |

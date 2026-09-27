@@ -72,7 +72,7 @@ The calendar's first pass (U17) reads one month of items. It shows no money, no 
 - Anything a signed-in customer does belongs to plan A: credits online (A10), buying packs (A11), the waitlist (A12), recognition and double-booking (A9), and moves and cancels from the account (A6).
 - No rooms or resources (ADR-008). "Chair 2" in the designs is display text on the staff member or booking.
 - No payouts and no expenses on the calendar (DESIGN-NOTES "Calendar, second pass").
-- No per-business late rules or step names.
+- No per-business step names. When an order is late is a storefront setting (plan B, B17); the calendar reads the API's `late` flag.
 
 ### Deferred to Follow-Up Work
 
