@@ -188,6 +188,31 @@ describe("Home F1 sources (DB)", () => {
                 subtotal: "4000",
             })
         ).id;
+        // A cancelled booking's pay link, paid anyway (K-1): still issued and
+        // past due, but the customer is owed the money back — never chased.
+        const owedBack = await invoice(orgId, {
+            source: "BOOKING",
+            billToName: "Owed Back",
+        });
+        const intent = await prisma.paymentIntent.create({
+            data: {
+                organizationId: orgId,
+                invoiceId: owedBack.id,
+                provider: "RAZORPAY",
+                amountCents: 400000,
+                currency: "INR",
+                status: "SUCCEEDED",
+            },
+        });
+        await prisma.paymentAttempt.create({
+            data: {
+                organizationId: orgId,
+                paymentIntentId: intent.id,
+                provider: "RAZORPAY",
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: { invoiceStatus: "CANCELLED_BOOKING" },
+            },
+        });
         // Never overdue: a draft, a credit note, and an order's own invoice.
         await invoice(orgId, { status: "DRAFT", issuedAt: null });
         await invoice(orgId, { kind: "CREDIT_NOTE" });

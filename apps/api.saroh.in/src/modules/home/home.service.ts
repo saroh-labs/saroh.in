@@ -16,7 +16,14 @@ import type {
     HomeUnavailable,
 } from "./home-model";
 import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
-import { failedRenewals, overdueInvoices } from "./home-money-sources";
+import type { RefundReason } from "./home-money-sources";
+import {
+    failedRenewals,
+    overdueInvoices,
+    refundReason,
+    refundReasonWords,
+    refundsOwedTitle,
+} from "./home-money-sources";
 import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
 import { readOpenOrders } from "./home-open-orders";
@@ -213,6 +220,8 @@ export class HomeService {
         const skip = <T>(value: T): Promise<T> => Promise.resolve(value);
 
         const noEvidence = { count: 0, evidence: [] as HomeEvidence[] };
+        const noRefunds: typeof noEvidence & { reason?: RefundReason } =
+            noEvidence;
         const canReadInvoices = holds(input, "invoice:read");
         const canReadSubscriptions = holds(input, "subscription:read");
         const stockChecks = this.stockChecks;
@@ -311,9 +320,9 @@ export class HomeService {
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Payments to refund" },
                       () => this.refundsOwed(input.organizationId),
-                      noEvidence,
+                      noRefunds,
                   )
-                : skip(noEvidence),
+                : skip(noRefunds),
             // Renewals that haven't been paid, and invoices past due (F1).
             // Like refunds owed, they show wherever Payments is available:
             // the money is owed whether or not a provider is connected
@@ -456,10 +465,7 @@ export class HomeService {
         if (owed.count > 0) {
             actions.push({
                 code: "PAYMENTS_REFUNDS_OWED",
-                title:
-                    owed.count === 1
-                        ? "Refund a payment taken on a settled invoice"
-                        : `Refund ${owed.count} payments taken on settled invoices`,
+                title: refundsOwedTitle(owed.count, owed.reason),
                 href:
                     owed.count === 1 && owed.evidence[0]
                         ? owed.evidence[0].href
@@ -586,9 +592,12 @@ export class HomeService {
      * first. A refund the provider has reported (or one Saroh started)
      * takes the row off the list.
      */
-    private async refundsOwed(
-        organizationId: string,
-    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
+    private async refundsOwed(organizationId: string): Promise<{
+        count: number;
+        evidence: HomeEvidence[];
+        /** The oldest row's reason, for the action's title. */
+        reason?: RefundReason;
+    }> {
         const where = {
             organizationId,
             invoiceId: { not: null },
@@ -611,24 +620,28 @@ export class HomeService {
                         select: {
                             id: true,
                             number: true,
-                            status: true,
                             billToName: true,
                         },
+                    },
+                    attempts: {
+                        where: { status: CAPTURED_NEEDS_REFUND },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { rawResponse: true },
                     },
                 },
             }),
         ]);
         const evidence: HomeEvidence[] = [];
+        let reason: RefundReason | undefined;
         for (const row of rows) {
             if (!row.invoice) continue;
-            const after =
-                row.invoice.status === "VOID"
-                    ? "Paid online after it was voided"
-                    : row.invoice.status === "ISSUED"
-                      ? // Still unpaid on paper: a booking's pay link paid
-                        // after the booking was cancelled (K-1).
-                        "Paid online after its booking was cancelled"
-                      : "Paid online after it was already paid";
+            // Why, as recorded when the money came (K-1): the invoice's
+            // status now can't tell a cancelled booking's pay link from an
+            // invoice never paid.
+            const why = refundReason(row.attempts[0]?.rawResponse);
+            reason ??= why;
+            const after = refundReasonWords(why);
             evidence.push({
                 id: row.id,
                 title: row.invoice.number ?? "Invoice",
@@ -641,7 +654,7 @@ export class HomeService {
                 href: `/billing/invoices/${row.invoice.id}`,
             });
         }
-        return { count, evidence };
+        return { count, evidence, reason };
     }
 
     /** The next confirmed bookings from now, each in the zone it was made in. */

@@ -298,6 +298,14 @@ describe("overdueInvoices", () => {
                 // A draft is never overdue.
                 status: "ISSUED",
                 dueAt: { lt: NOW },
+                // Never chase a customer who is owed money back (K-1).
+                paymentIntents: {
+                    none: {
+                        attempts: {
+                            some: { status: "CAPTURED_NEEDS_REFUND" },
+                        },
+                    },
+                },
                 OR: [
                     { subscriptionId: null },
                     { subscription: { is: { status: "CANCELLED" } } },
