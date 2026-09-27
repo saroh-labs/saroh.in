@@ -134,6 +134,7 @@ export function EditorTopBar({
     const publishHint = publishTitle({
         publishing,
         dirty: dirty || saving || styleDirty,
+        saveError,
         onlyHeldBack,
         heldBack,
         neverPublished,
@@ -241,7 +242,10 @@ export function EditorTopBar({
                             siteId={siteId}
                             pages={pages}
                             activePageId={pageId}
-                            dirty={dirty}
+                            // The look, the name and the footer too: a
+                            // page switch drops whatever has not gone out
+                            // yet (review G-3).
+                            dirty={dirty || saving || styleDirty}
                             unfinished={
                                 onlyHeldBack
                                     ? unfinishedPhrase(heldBack)

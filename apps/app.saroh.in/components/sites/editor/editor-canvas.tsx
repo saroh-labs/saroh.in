@@ -147,7 +147,10 @@ export function EditorCanvas({
     selectedChrome: FixedPart | null;
     selectChrome: (part: FixedPart) => void;
     notesByKey: Map<string, number>;
-    /** Work not yet saved, which holds a page switch back. */
+    /**
+     * Work not yet saved — the page, the look, the name or the footer —
+     * which holds a page switch back (review G-3).
+     */
     dirty: boolean;
     onlyHeldBack: boolean;
     heldBack: HeldBackSection[];

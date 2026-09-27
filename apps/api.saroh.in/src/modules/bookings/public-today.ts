@@ -10,11 +10,11 @@ import { DateTime } from "luxon";
 import type { PublicOpeningDay } from "../sites/public-visit.service";
 import { publicWeek } from "../sites/public-visit.service";
 import { appointmentsOpen } from "./appointments-open";
-import type { Interval } from "./availability";
+import { closedDates, closuresAhead } from "./closed-dates";
 import type { PublicDays } from "./public-booking-page";
 import { offeredOnSite, publicDays } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
-import { businessTimezone, loadClosures } from "./staff-availability";
+import { businessTimezone } from "./staff-availability";
 
 /**
  * "On today" on a merchant's home page (G18, R15): the next classes and the
@@ -39,9 +39,6 @@ export const TODAY_ITEMS = 4;
 /** Page views per visitor per minute, as the Visit us read allows. */
 const READS_PER_WINDOW = 120;
 const READ_WINDOW_MS = 60_000;
-
-/** How far ahead a closure can move "Closed · opens …": a week and a day. */
-const CLOSED_LOOKAHEAD_DAYS = 8;
 
 /** One row of On today. */
 export interface TodayItem {
@@ -155,46 +152,6 @@ export function pickToday(
     return picked;
 }
 
-const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
-
-/**
- * The days from today on which a closure covers the WHOLE of the business's
- * hours (E3), in its zone. A closure of an afternoon leaves the day open:
- * the line says when the door opens, and the booking page already takes
- * those hours out of its times.
- */
-export function closedDates(
-    week: readonly PublicOpeningDay[] | null,
-    closures: readonly Interval[],
-    zone: string,
-    now: Date,
-    days: number = CLOSED_LOOKAHEAD_DAYS,
-): string[] {
-    if (!week || closures.length === 0) return [];
-    const first = DateTime.fromJSDate(now, { zone }).startOf("day");
-    const out: string[] = [];
-    // Yesterday too: its overnight hours may still be running.
-    for (let i = -1; i < days; i += 1) {
-        const day = first.plus({ days: i });
-        const entry = week.find((d) => d.day === WEEKDAYS[day.weekday - 1]);
-        if (!entry || entry.closed) continue;
-        const at = (clock: string) => {
-            const [h = 0, m = 0] = clock.split(":").map(Number);
-            return day.set({ hour: h, minute: m });
-        };
-        const open = at(entry.open);
-        let close = at(entry.close);
-        if (close <= open) close = close.plus({ days: 1 });
-        const from = open.toMillis();
-        const to = close.toMillis();
-        const shut = closures.some(
-            (c) => c.startAt.getTime() <= from && c.endAt.getTime() >= to,
-        );
-        if (shut) out.push(day.toISODate() ?? "");
-    }
-    return out.filter(Boolean);
-}
-
 /**
  * The public today read for a site (G18).
  *
@@ -247,12 +204,8 @@ export class PublicTodayService {
                     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                     select: { settings: { select: { openingHours: true } } },
                 }),
-                loadClosures(
-                    prisma,
-                    organizationId,
-                    start.toJSDate(),
-                    start.plus({ days: CLOSED_LOOKAHEAD_DAYS }).toJSDate(),
-                ),
+                // The same closures, read the same way, as Visit us (G-2).
+                closuresAhead(prisma, organizationId, zone, now),
             ]);
             const hours = publicWeek(store?.settings?.openingHours);
             const shut = closedDates(hours, closures, zone, now);

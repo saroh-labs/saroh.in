@@ -1,7 +1,8 @@
 import type { PublicOpeningDay } from "../sites/public-visit.service";
+import { closedDates } from "./closed-dates";
 import type { PublicDays } from "./public-booking-page";
 import type { TodayItem } from "./public-today";
-import { closedDates, pickToday, TODAY_ITEMS, todayRows } from "./public-today";
+import { pickToday, TODAY_ITEMS, todayRows } from "./public-today";
 
 /**
  * On today (G18): the rows are the booking page's own starts for today,

@@ -106,6 +106,19 @@ describe("visitUs (G8)", () => {
         expect(screen.getByText("Closed · opens Tue 7am")).toBeTruthy();
     });
 
+    it("says closed on a closure day, as the hero does (review G-2)", () => {
+        render(
+            <VisitUsSection
+                content={content}
+                // Friday is open by the week, but the business closed it.
+                visit={{ ...RYE, closedDates: ["2026-09-25"] }}
+                now={FRIDAY_6PM}
+            />,
+        );
+        expect(screen.getByText("Closed · opens Sat 7am")).toBeTruthy();
+        expect(screen.queryByText(/Open now/)).toBeNull();
+    });
+
     it("hides the hours row when none are saved, and says nothing false", () => {
         const { container } = render(
             <VisitUsSection
@@ -226,6 +239,14 @@ describe("isPublicVisit", () => {
         ).toBe(true);
         expect(isPublicVisit({ ...RYE, hours: "Mon–Fri" })).toBe(false);
         expect(isPublicVisit({ ...RYE, source: "somewhere" })).toBe(false);
+        // closedDates is optional (G-2): with or without, never malformed.
+        expect(isPublicVisit({ ...RYE, closedDates: ["2026-09-25"] })).toBe(
+            true,
+        );
+        expect(isPublicVisit({ ...RYE, closedDates: "2026-09-25" })).toBe(
+            false,
+        );
+        expect(isPublicVisit({ ...RYE, closedDates: [25] })).toBe(false);
         expect(isPublicVisit(null)).toBe(false);
     });
 });

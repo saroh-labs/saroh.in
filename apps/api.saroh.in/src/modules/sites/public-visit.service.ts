@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { closedDates, closuresAhead } from "../bookings/closed-dates";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { businessTimezone } from "../bookings/staff-availability";
 
@@ -34,6 +35,13 @@ export interface PublicVisit {
     hours: PublicOpeningDay[] | null;
     /** The business's zone (DEC-033); India when none is set. */
     timezone: string;
+    /**
+     * Days ahead (from today) on which the business is closed for the whole
+     * of its hours (E3) — the public today read's list, worked out by the
+     * same helper (`closed-dates.ts`), so Visit us never says "Open now" on
+     * a day the hero says is closed (review G-2).
+     */
+    closedDates: string[];
 }
 
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -162,6 +170,7 @@ export class PublicVisitService {
         siteId: string,
         storeId: string | undefined,
         callerHash: string | undefined,
+        now: Date = new Date(),
     ): Promise<PublicVisit> {
         // Keyed on the visitor, like the other public reads; a caller the
         // platform gives no address for shares one bucket per site.
@@ -183,6 +192,12 @@ export class PublicVisitService {
 
         return runInOrgContext(organizationId, async () => {
             const timezone = await businessTimezone(prisma, organizationId);
+            const closures = await closuresAhead(
+                prisma,
+                organizationId,
+                timezone,
+                now,
+            );
             const shop = await prisma.store.findFirst({
                 where: {
                     organizationId,
@@ -199,24 +214,35 @@ export class PublicVisitService {
                 },
             });
             if (shop) {
+                const hours = publicWeek(shop.settings?.openingHours);
                 return {
                     source: "storefront",
                     storeId: shop.id,
                     name: shop.name,
                     address: said(shop.settings?.address),
                     phone: null,
-                    hours: publicWeek(shop.settings?.openingHours),
+                    hours,
                     timezone,
+                    closedDates: closedDates(hours, closures, timezone, now),
                 };
             }
             // A named store that isn't this business's open shop: never
             // served, and never swapped for another place.
             if (storeId !== undefined) notFound();
-            return this.business(
+            const fallback = await this.business(
                 organizationId,
                 site.organization.name,
                 timezone,
             );
+            return {
+                ...fallback,
+                closedDates: closedDates(
+                    fallback.hours,
+                    closures,
+                    timezone,
+                    now,
+                ),
+            };
         });
     }
 
@@ -230,7 +256,7 @@ export class PublicVisitService {
         organizationId: string,
         name: string,
         timezone: string,
-    ): Promise<PublicVisit> {
+    ): Promise<Omit<PublicVisit, "closedDates">> {
         const [profile, first] = await Promise.all([
             prisma.businessProfile.findUnique({
                 where: { organizationId },

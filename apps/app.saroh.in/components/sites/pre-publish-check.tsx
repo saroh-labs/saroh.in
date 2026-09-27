@@ -93,6 +93,7 @@ export function PrePublishCheck({
     flags,
     awaitingNavigation,
     publishing,
+    unsaved,
     neverPublished,
     pendingSummary,
     pendingKnown,
@@ -106,6 +107,12 @@ export function PrePublishCheck({
     flags: Flag[];
     awaitingNavigation: FlagType[];
     publishing: boolean;
+    /**
+     * Work not saved yet — the page, the look, the name or the footer.
+     * Publishing now would put live what was saved before it, not what is
+     * on screen, so the button waits (review G-1).
+     */
+    unsaved: boolean;
     /** Never-published sites say "Publish site", not "Publish changes". */
     neverPublished: boolean;
     /**
@@ -177,7 +184,12 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         size="sm"
-                        disabled={publishing}
+                        disabled={publishing || unsaved}
+                        title={
+                            unsaved
+                                ? "Saving your changes — publish is available in a moment"
+                                : undefined
+                        }
                         onClick={onPublish}
                         className="h-8 px-3"
                     >

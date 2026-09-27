@@ -12,10 +12,19 @@ export type ChromeKind = "name" | "footer";
 const AUTOSAVE_MS = 700;
 
 /**
+ * How long a value that failed waits before it is tried again, attempt by
+ * attempt; the last repeats. A failed name or footer is unsaved work, and
+ * Publish waits for it, so it may not simply stop (review G-4) — but a 400
+ * must not go out every pause either.
+ */
+export const CHROME_RETRY_MS = [5_000, 15_000, 30_000, 60_000] as const;
+
+/**
  * One text setting saved on its own clock, the way the look is
- * (`use-editor-style.ts`): after a pause, one save at a time, and a value
- * that failed is not retried until it changes, or a 400 would retry every
- * pause with a toast each time.
+ * (`use-editor-style.ts`): after a pause, one save at a time. A value that
+ * failed says so ("Not saved"), with one toast, and is tried again on its
+ * own after a growing pause ({@link CHROME_RETRY_MS}) until it saves or the
+ * merchant changes it.
  */
 function useAutosavedText({
     value,
@@ -35,7 +44,11 @@ function useAutosavedText({
 }) {
     const [saved, setSaved] = useState(initial);
     const [saving, setSaving] = useState(false);
-    const failed = useRef<string | null>(null);
+    // The value that last failed, and how many times it has in a row.
+    const [failure, setFailure] = useState<{
+        value: string;
+        attempts: number;
+    } | null>(null);
     // The newest save and callback, without restarting the pause on a render.
     const saveRef = useRef(save);
     const onSavedRef = useRef(onSaved);
@@ -46,31 +59,45 @@ function useAutosavedText({
 
     useEffect(() => {
         if (!enabled || saving || value === saved) return;
-        if (failed.current === value) return;
+        const retrying = failure?.value === value ? failure.attempts : 0;
+        const wait =
+            retrying === 0
+                ? AUTOSAVE_MS
+                : CHROME_RETRY_MS[
+                      Math.min(retrying, CHROME_RETRY_MS.length) - 1
+                  ];
         const id = setTimeout(() => {
             setSaving(true);
+            const failed = (message: string) => {
+                // One toast per value: a retry that fails again says
+                // nothing new, and the bar still reads "Not saved".
+                if (retrying === 0) showError(message);
+                setFailure({ value, attempts: retrying + 1 });
+            };
             saveRef
                 .current(value)
                 .then((res) => {
                     if (res.ok) {
-                        failed.current = null;
+                        setFailure(null);
                         setSaved(value);
                         onSavedRef.current();
                     } else {
-                        failed.current = value;
-                        showError(res.error);
+                        failed(res.error);
                     }
                 })
-                .catch(() => {
-                    failed.current = value;
-                    showError(unreachable);
-                })
+                .catch(() => failed(unreachable))
                 .finally(() => setSaving(false));
-        }, AUTOSAVE_MS);
+        }, wait);
         return () => clearTimeout(id);
-    }, [value, saved, saving, enabled, unreachable]);
+    }, [value, saved, saving, enabled, unreachable, failure]);
 
-    return { saved, saving, dirty: saving || (enabled && value !== saved) };
+    return {
+        saved,
+        saving,
+        dirty: saving || (enabled && value !== saved),
+        /** The value on screen failed to save and waits to be tried again. */
+        failed: enabled && !saving && failure?.value === value,
+    };
 }
 
 /**
@@ -112,7 +139,7 @@ export function useSiteChrome({
         save: (value) => updateSiteSettings(siteId, { name: value }),
         onSaved: () => onSaved("name"),
         unreachable:
-            "Could not reach Saroh. The name is still here and will save with your next change.",
+            "Could not reach Saroh. The name is still here, and saving will try again shortly.",
     });
     // Read once: a footer richer than one line is Website settings' to edit.
     const [field] = useState(() => footerLineField(footerPreview));
@@ -128,7 +155,7 @@ export function useSiteChrome({
             updateSiteFooter(siteId, footerFromLine(value, format)),
         onSaved: () => onSaved("footer"),
         unreachable:
-            "Could not reach Saroh. The footer is still here and will save with your next change.",
+            "Could not reach Saroh. The footer is still here, and saving will try again shortly.",
     });
 
     const saving = nameSave.saving || footerSave.saving;
@@ -159,6 +186,8 @@ export function useSiteChrome({
                 : footerPreview,
         chromeSaving: saving,
         chromeDirty: dirty,
+        /** A name or footer that did not save: the bar says "Not saved". */
+        chromeFailed: nameSave.failed || footerSave.failed,
     };
 }
 

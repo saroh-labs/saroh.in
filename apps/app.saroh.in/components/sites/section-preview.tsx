@@ -258,7 +258,9 @@ export function DraftPreview({
 
     return (
         <div
-            className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
+            // The merchant's body face, as the live site's body sets it: the
+            // page on the canvas never reads in the workspace's own font.
+            className={`${PREVIEW_SCOPE} bg-[hsl(var(--site-bg))] font-site-body text-[hsl(var(--site-fg))]`}
             /*
              * A link on this page is the merchant's link to THEIR site:
              * "/about" means their /about, not Saroh's. So it never navigates
