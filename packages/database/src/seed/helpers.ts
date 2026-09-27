@@ -734,3 +734,35 @@ export async function balanceStockLog(
         WHERE (e."total" IS NULL OR e."total" <> s."onHand")
           AND (${scope}::text IS NULL OR s."organizationId" = ${scope}::text)`;
 }
+
+/**
+ * Which ways each storefront's orders leave (`StoreSettings.fulfilmentTypes`,
+ * DEC-045), by the rule the migration's backfill used
+ * (`20261009130001_store_fulfilment_types`): PICKUP where collection is on,
+ * LOCAL_DELIVERY where it has taken a delivery, SHIPPING where shipping is
+ * on. The seeds write settings and orders after that backfill ran on an
+ * empty database, so they apply it once their orders exist. Idempotent.
+ * The legacy DELIVERY word and LOCAL_DELIVERY both count as a delivery.
+ */
+export async function syncStorefrontFulfilmentTypes(
+    prisma: Db,
+): Promise<number> {
+    return prisma.$executeRaw`
+        UPDATE "StoreSettings" s
+        SET "fulfilmentTypes" = ARRAY(
+            SELECT t::"OrderFulfilment"
+            FROM (
+                SELECT 1 AS pos, 'PICKUP' AS t WHERE s."collectionEnabled"
+                UNION ALL
+                SELECT 2, 'LOCAL_DELIVERY'
+                WHERE EXISTS (
+                    SELECT 1 FROM "Order" o
+                    WHERE o."storeId" = s."storeId"
+                      AND o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY')
+                )
+                UNION ALL
+                SELECT 3, 'SHIPPING' WHERE s."shippingEnabled"
+            ) offered
+            ORDER BY pos
+        )`;
+}

@@ -19,6 +19,7 @@ import {
     hashPassword,
     id,
     publishSeedPost,
+    syncStorefrontFulfilmentTypes,
     utcDay,
     writeSite,
 } from "../helpers";
@@ -199,6 +200,8 @@ export async function seedShowcase(
     // Every shelf the showcase set opens its stock log (#513), counted by
     // each business's owner at the seed's (past) now.
     await balanceStockLog(prisma, { at: now });
+    // Which ways each storefront offers, now its orders exist (B2a).
+    await syncStorefrontFulfilmentTypes(prisma);
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
