@@ -1,5 +1,7 @@
 "use server";
 
+import type { UnlinkedPage } from "./list";
+import { getUnlinkedCustomers } from "./list-service";
 import type { CustomerInput, CustomerResult } from "./service";
 import {
     createCustomer as createCustomerApi,
@@ -26,4 +28,15 @@ export async function updateCustomer(
 
 export async function deleteCustomer(storeId: string, customerId: string) {
     return deleteCustomerApi(storeId, customerId);
+}
+
+/**
+ * A page of the paying store customers no contact holds yet, for the
+ * Customers list's review sheet (C4). `null` when it couldn't be read.
+ */
+export async function loadUnlinkedCustomers(
+    store: string | null,
+    page: number,
+): Promise<UnlinkedPage | null> {
+    return getUnlinkedCustomers(store, page);
 }
