@@ -12,6 +12,8 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
+import type { PauseOption } from "@/lib/subscriptions/pause";
+import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
 import { money } from "@/lib/subscriptions/view";
 
@@ -38,6 +40,7 @@ export function ActionSheet({
     step,
     onClose,
     busy,
+    pauseOptions,
     pauseNote,
     plans,
     currentPlanId,
@@ -50,11 +53,13 @@ export function ActionSheet({
     step: Step | null;
     onClose: () => void;
     busy: boolean;
-    pauseNote: string;
+    /** 2, 4 or 8 weeks, and "Until I resume" (D8). */
+    pauseOptions: readonly PauseOption[];
+    pauseNote: (option: PauseOption | undefined) => string;
     plans: readonly Plan[];
     currentPlanId: string;
     switchNote: string;
-    onPause: () => void;
+    onPause: (option: PauseOption) => void;
     onSwitch: (planId: string) => void;
     cancel: {
         /** Ends with the period (Undo keeps it), or only today is possible. */
@@ -79,6 +84,7 @@ export function ActionSheet({
                         </DialogTitle>
                         {step === "pause" ? (
                             <PauseBody
+                                options={pauseOptions}
                                 note={pauseNote}
                                 busy={busy}
                                 onClose={onClose}
@@ -116,27 +122,65 @@ function Footer({ children }: { children: React.ReactNode }) {
     );
 }
 
+/**
+ * How long: 2, 4 or 8 weeks, each saying the day it restarts on its own,
+ * or until someone resumes it (D8). The design's pills, 4 weeks picked.
+ */
 function PauseBody({
+    options,
     note,
     busy,
     onClose,
     onPause,
 }: {
-    note: string;
+    options: readonly PauseOption[];
+    note: (option: PauseOption | undefined) => string;
     busy: boolean;
     onClose: () => void;
-    onPause: () => void;
+    onPause: (option: PauseOption) => void;
 }) {
+    const [key, setKey] = useState(DEFAULT_PAUSE);
+    const picked = options.find((o) => o.key === key) ?? options[0];
     return (
         <>
-            <DialogDescription className="text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
-                {note}
+            <div
+                role="radiogroup"
+                aria-label="How long to pause"
+                className="flex flex-wrap gap-1.5"
+            >
+                {options.map((o) => {
+                    const on = o.key === picked.key;
+                    return (
+                        <button
+                            key={o.key}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => setKey(o.key)}
+                            className={cn(
+                                "h-[34px] rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
+                                on
+                                    ? "border-foreground bg-foreground font-semibold text-background"
+                                    : "border-border bg-card font-medium text-foreground/75 hover:border-border-strong",
+                            )}
+                        >
+                            {o.label}
+                        </button>
+                    );
+                })}
+            </div>
+            <DialogDescription className="mt-2.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
+                {note(picked)}
             </DialogDescription>
             <Footer>
                 <Button variant="outline" className={BTN} onClick={onClose}>
                     Keep going
                 </Button>
-                <Button className={BTN} disabled={busy} onClick={onPause}>
+                <Button
+                    className={BTN}
+                    disabled={busy}
+                    onClick={() => onPause(picked)}
+                >
                     {busy ? "Pausing…" : "Pause"}
                 </Button>
             </Footer>

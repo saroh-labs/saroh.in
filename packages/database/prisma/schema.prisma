@@ -4807,6 +4807,10 @@ model CustomerSubscription {
   // Everything done to it, newest last (D9).
   events SubscriptionEvent[]
 
+  // A pause's end date (D8): the start of that day in its timezone. The
+  // renewal job resumes it then; null pauses until someone resumes it.
+  pausedUntil DateTime?
+
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))

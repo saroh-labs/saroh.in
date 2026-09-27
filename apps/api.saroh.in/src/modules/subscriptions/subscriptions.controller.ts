@@ -28,6 +28,7 @@ import {
     ListPlansQueryDto,
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
+    PauseSubscriptionDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -158,8 +159,9 @@ export class SubscriptionsController {
     pause(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
+        @Body() dto: PauseSubscriptionDto,
     ) {
-        return this.subscriptions.pause(ctx, id);
+        return this.subscriptions.pause(ctx, id, dto);
     }
 
     @Post(":subscriptionId/resume")

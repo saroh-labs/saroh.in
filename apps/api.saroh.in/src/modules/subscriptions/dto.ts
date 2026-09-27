@@ -172,6 +172,32 @@ export class ChangePlanDto {
     planId!: string;
 }
 
+/**
+ * A pause's lengths with an end date (D8, default 30): the only choices a
+ * customer has from their own account (A8), and staff's besides "Until I
+ * resume".
+ */
+export const PAUSE_WEEKS = [2, 4, 8] as const;
+export type PauseWeeks = (typeof PAUSE_WEEKS)[number];
+
+/**
+ * How long to pause (D8). `weeks` pauses for 2, 4 or 8 weeks from today;
+ * `until` names the day it resumes (YYYY-MM-DD, in the subscription's
+ * timezone), or null to pause until someone resumes it. Both are staff's:
+ * a customer's own pause (A8) takes `weeks` only. An empty body is the
+ * open-ended pause every earlier client sent.
+ */
+export class PauseSubscriptionDto {
+    @IsOptional()
+    @IsIn(PAUSE_WEEKS, { message: "Pause for 2, 4 or 8 weeks" })
+    weeks?: PauseWeeks;
+
+    @IsOptional()
+    @ValidateIf((_, v) => v !== null)
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A resume date is YYYY-MM-DD" })
+    until?: string | null;
+}
+
 export class CancelSubscriptionDto {
     /** `periodEnd` lets the paid period run out; `now` ends it today. */
     @IsIn(["now", "periodEnd"])

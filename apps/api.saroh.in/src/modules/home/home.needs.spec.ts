@@ -368,6 +368,10 @@ describe("HomeService needs", () => {
         const orders = over.orders ?? [];
         const invoices = over.invoices ?? [];
         const db = {
+            // D8's paused-subscriptions source: Payments on, so it has nothing.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             order: {
                 count: jest.fn().mockResolvedValue(orders.length),
                 findMany: jest.fn().mockResolvedValue(orders),

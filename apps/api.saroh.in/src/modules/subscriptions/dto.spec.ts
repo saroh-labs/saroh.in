@@ -11,6 +11,7 @@ import {
     ChangePlanDto,
     CollectionScheduleDto,
     ListPlanEventsQueryDto,
+    PauseSubscriptionDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -150,6 +151,32 @@ describe("what skipping and changing plan accept", () => {
 
     it("needs the plan to move to", async () => {
         expect(await refused(ChangePlanDto, {})).toContain("planId");
+    });
+});
+
+describe("what a pause accepts (D8)", () => {
+    it("takes 2, 4 or 8 weeks, a date, null, or nothing at all", async () => {
+        for (const body of [
+            { weeks: 2 },
+            { weeks: 4 },
+            { weeks: 8 },
+            { until: "2026-10-20" },
+            { until: null },
+            {},
+        ]) {
+            expect(await refused(PauseSubscriptionDto, body)).toEqual([]);
+        }
+    });
+
+    it("refuses any other length, or a date that isn't YYYY-MM-DD", async () => {
+        for (const weeks of [1, 3, 6, 12, "4"]) {
+            expect(await refused(PauseSubscriptionDto, { weeks })).toContain(
+                "weeks",
+            );
+        }
+        expect(
+            await refused(PauseSubscriptionDto, { until: "20 Oct" }),
+        ).toContain("until");
     });
 });
 
