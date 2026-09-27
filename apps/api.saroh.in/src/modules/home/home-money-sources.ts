@@ -82,6 +82,36 @@ const LIVE_SUBSCRIPTION = {
 } satisfies Prisma.CustomerSubscriptionWhereInput;
 
 /**
+ * Each subscription's latest period invoice — the last ISSUED or PAID one
+ * by issue date, the rule Subscription Detail's failed charge uses — as
+ * subscription id → invoice id. The failed-renewal row speaks for that one
+ * invoice; any other unpaid invoice of a live subscription is listed as an
+ * overdue invoice instead.
+ */
+async function latestPeriodInvoices(
+    db: Db,
+    organizationId: string,
+    subscriptionIds: readonly string[],
+): Promise<Map<string | null, string>> {
+    const ids = Array.from(new Set(subscriptionIds));
+    if (ids.length === 0) return new Map();
+    const latest = await db.invoice.findMany({
+        where: {
+            organizationId,
+            subscriptionId: { in: ids },
+            status: { in: ["ISSUED", "PAID"] },
+        },
+        orderBy: [
+            { issuedAt: { sort: "desc", nulls: "last" } },
+            { id: "desc" },
+        ],
+        distinct: ["subscriptionId"],
+        select: { id: true, subscriptionId: true },
+    });
+    return new Map(latest.map((l) => [l.subscriptionId, l.id]));
+}
+
+/**
  * Failed renewals — the one source for them (overview, "Failed renewals on
  * Home"). A live subscription whose latest period invoice is unpaid, and
  * either past due or carrying a RENEWAL_FAILED or MANDATE_LIMIT_LOW event
@@ -142,23 +172,11 @@ export async function failedRenewals(
     );
     if (owed.length === 0) return null;
 
-    const subscriptionIds = Array.from(
-        new Set(owed.map((i) => i.subscriptionId)),
+    const latestOf = await latestPeriodInvoices(
+        db,
+        organizationId,
+        owed.map((i) => i.subscriptionId),
     );
-    const latest = await db.invoice.findMany({
-        where: {
-            organizationId,
-            subscriptionId: { in: subscriptionIds },
-            status: { in: ["ISSUED", "PAID"] },
-        },
-        orderBy: [
-            { issuedAt: { sort: "desc", nulls: "last" } },
-            { id: "desc" },
-        ],
-        distinct: ["subscriptionId"],
-        select: { id: true, subscriptionId: true },
-    });
-    const latestOf = new Map(latest.map((l) => [l.subscriptionId, l.id]));
     const current = owed.filter((i) => latestOf.get(i.subscriptionId) === i.id);
     if (current.length === 0) return null;
 
@@ -243,17 +261,47 @@ export async function overdueInvoices(
     organizationId: string,
     now: Date,
 ): Promise<HomeAction | null> {
-    const where = {
+    const pastDue = {
         organizationId,
         ...OWED_WHERE,
         status: "ISSUED",
         dueAt: { lt: now },
+    } satisfies Prisma.InvoiceWhereInput;
+
+    // A live subscription's past-due invoices that are NOT its latest period
+    // invoice: the failed-renewal row speaks only for the latest, so an
+    // older one left unpaid after a later one was paid would otherwise show
+    // nowhere (H-2). Listed here, as the money owed that it is.
+    const live = await db.invoice.findMany({
+        where: {
+            ...pastDue,
+            subscriptionId: { not: null },
+            subscription: { is: LIVE_SUBSCRIPTION },
+        },
+        select: { id: true, subscriptionId: true },
+    });
+    const latestOf = await latestPeriodInvoices(
+        db,
+        organizationId,
+        live.flatMap((i) => (i.subscriptionId ? [i.subscriptionId] : [])),
+    );
+    const olderOfLive = live
+        .filter(
+            (i) =>
+                i.subscriptionId !== null &&
+                latestOf.get(i.subscriptionId) !== i.id,
+        )
+        .map((i) => i.id);
+
+    const where = {
+        ...pastDue,
         // Spelled out rather than `NOT: { subscription: … }`: in SQL, NOT of
         // a match on a null subscriptionId is null, not true, and would drop
         // every invoice that has no subscription at all.
         OR: [
             { subscriptionId: null },
             { subscription: { is: { status: "CANCELLED" } } },
+            ...(olderOfLive.length > 0 ? [{ id: { in: olderOfLive } }] : []),
         ],
     } satisfies Prisma.InvoiceWhereInput;
 

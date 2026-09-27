@@ -305,6 +305,58 @@ describe("readyChecklist", () => {
         ]);
     });
 
+    it("ticks a first product only when there is one, not for a storefront alone (H-5)", () => {
+        // Commerce reads ready with a storefront and no products.
+        const facts = { products: 0, services: 0, sites: 1, sitesNotLive: 0 };
+        const empty = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [mod("COMMERCE")],
+        });
+        expect(empty.left.map((i) => i.key)).toEqual(["catalogue"]);
+
+        const listed = readyChecklist({
+            settings: { ...settled, setup: { ...facts, products: 1 } },
+            modules: [mod("COMMERCE")],
+        });
+        expect(listed.left).toEqual([]);
+
+        // A service is enough when the business books too.
+        const booked = readyChecklist({
+            settings: { ...settled, setup: { ...facts, services: 1 } },
+            modules: [mod("COMMERCE"), mod("APPOINTMENTS")],
+        });
+        expect(booked.left).toEqual([]);
+    });
+
+    it("ticks Publish only while every site is live, as Home says (H-6)", () => {
+        // Published once, then taken down: readiness still reads ACTIVE.
+        const facts = { products: 1, services: 0, sites: 1, sitesNotLive: 1 };
+        const down = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [mod("WEBSITE")],
+        });
+        expect(down.left).toEqual([
+            expect.objectContaining({ key: "site", href: "/sites" }),
+        ]);
+
+        const live = readyChecklist({
+            settings: { ...settled, setup: { ...facts, sitesNotLive: 0 } },
+            modules: [mod("WEBSITE")],
+        });
+        expect(live.left).toEqual([]);
+
+        const none = readyChecklist({
+            settings: {
+                ...settled,
+                setup: { ...facts, sites: 0, sitesNotLive: 0 },
+            },
+            modules: [mod("WEBSITE")],
+        });
+        expect(none.left).toEqual([
+            expect.objectContaining({ key: "site", href: "/sites/new" }),
+        ]);
+    });
+
     it("leaves out what it could not read, rather than call it done", () => {
         const r = readyChecklist({
             settings: {

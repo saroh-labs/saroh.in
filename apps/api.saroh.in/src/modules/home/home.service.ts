@@ -3,11 +3,6 @@ import { prisma } from "@saroh/database";
 
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
-import {
-    LATE_THRESHOLD_SELECT,
-    lateThresholdsOf,
-} from "../orders/late-thresholds";
-import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
@@ -23,7 +18,8 @@ import type {
 import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
 import { failedRenewals, overdueInvoices } from "./home-money-sources";
 import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
-import { openOrderWords } from "./home-order-rows";
+import type { OpenOrders } from "./home-open-orders";
+import { readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { readToday, todayScope } from "./home-today";
@@ -138,7 +134,6 @@ export class HomeService {
         // emitting an action for a module the actor cannot see.
         const views = await this.availability.listViews(input);
         const actions: HomeAction[] = [];
-        const unavailable: HomeUnavailable[] = [];
 
         // Setup / attention actions straight from module readiness.
         for (const view of views) {
@@ -195,72 +190,233 @@ export class HomeService {
         // The business's days: "Due today" on an order, "was due 14 Sep".
         const zone = await this.businessZone(input.organizationId);
         const numbers: HomeNumber[] = [];
-        let upcoming: HomeBooking[] = [];
 
-        if (available.has("CRM")) {
-            numbers.push(
-                ...(await this.attempt(
-                    { moduleKey: "CRM", label: "Customer numbers" },
-                    () => this.crmNumbers(input.organizationId, canReadLeads),
-                    [],
-                    unavailable,
-                )),
-            );
-        }
+        /*
+         * Every source below is independent of the others, so they are read
+         * at once rather than one after another (H-4): Home is read on every
+         * navigation (the rail's badges), and some twenty-five serial reads
+         * made each one wait on the sum of them. Each keeps its own guard —
+         * one failing is named and the rest still render — and each records
+         * its failure in its own slot, so `unavailable` lists the parts in
+         * the same order however the reads finish.
+         */
+        const slots: HomeUnavailable[][] = [];
+        const guard = <T>(
+            source: HomeUnavailable,
+            read: () => Promise<T>,
+            fallback: T,
+        ): Promise<T> => {
+            const slot: HomeUnavailable[] = [];
+            slots.push(slot);
+            return this.attempt(source, read, fallback, slot);
+        };
+        const skip = <T>(value: T): Promise<T> => Promise.resolve(value);
 
-        if (active.has("CRM") && canReadLeads) {
-            const overdue = await this.attempt(
-                { moduleKey: "CRM", label: "Overdue follow-ups" },
-                () => this.overdueFollowUps(input.organizationId, now),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-            if (overdue.count > 0) {
-                actions.push({
-                    code: "CRM_OVERDUE_FOLLOWUPS",
-                    title: `Follow up on ${overdue.count} overdue lead${overdue.count === 1 ? "" : "s"}`,
-                    href: "/leads",
-                    severity: "OVERDUE",
-                    moduleKey: "CRM",
-                    count: overdue.count,
-                    evidence: overdue.evidence,
-                });
-            }
+        const noEvidence = { count: 0, evidence: [] as HomeEvidence[] };
+        const canReadInvoices = holds(input, "invoice:read");
+        const canReadSubscriptions = holds(input, "subscription:read");
+        const stockChecks = this.stockChecks;
+        const scope = todayScope(input, available);
+
+        const [
+            crmNumbers,
+            overdue,
+            open,
+            schedule,
+            today,
+            lastDay,
+            owed,
+            renewals,
+            waiting,
+            overdueInvoiceAction,
+            short,
+            notLive,
+        ] = await Promise.all([
+            available.has("CRM")
+                ? guard(
+                      { moduleKey: "CRM", label: "Customer numbers" },
+                      () => this.crmNumbers(input.organizationId, canReadLeads),
+                      [] as HomeNumber[],
+                  )
+                : skip([] as HomeNumber[]),
+            active.has("CRM") && canReadLeads
+                ? guard(
+                      { moduleKey: "CRM", label: "Overdue follow-ups" },
+                      () => this.overdueFollowUps(input.organizationId, now),
+                      noEvidence,
+                  )
+                : skip(noEvidence),
+            available.has("COMMERCE")
+                ? guard<OpenOrders>(
+                      { moduleKey: "COMMERCE", label: "Open orders" },
+                      () =>
+                          readOpenOrders(this.db, input.organizationId, {
+                              now,
+                              zone,
+                              // An order's money is `order:read`'s;
+                              // `order:stage` moves it without seeing it
+                              // (DEC-024).
+                              money: holds(input, "order:read"),
+                          }),
+                      noEvidence,
+                  )
+                : skip<OpenOrders>(noEvidence),
+            available.has("APPOINTMENTS")
+                ? guard(
+                      { moduleKey: "APPOINTMENTS", label: "Schedule" },
+                      async () => {
+                          const [next, total] = await Promise.all([
+                              this.upcomingBookings(input.organizationId, now),
+                              this.db.booking.count({
+                                  where: {
+                                      organizationId: input.organizationId,
+                                      status: "CONFIRMED",
+                                      startAt: { gte: now },
+                                  },
+                              }),
+                          ]);
+                          return { upcoming: next, total };
+                      },
+                      { upcoming: [] as HomeBooking[], total: 0 },
+                  )
+                : skip({ upcoming: [] as HomeBooking[], total: 0 }),
+            // The business's day, in its zone (F5): bookings, classes,
+            // pick-ups.
+            scope
+                ? guard(
+                      {
+                          moduleKey: scope.bookings
+                              ? "APPOINTMENTS"
+                              : "COMMERCE",
+                          label: "Today",
+                      },
+                      () => readToday(this.db, input, scope, { now, zone }),
+                      null,
+                  )
+                : skip(null),
+            // The greeting's clock and the last 24 hours (F6), in the same
+            // zone.
+            guard(
+                { moduleKey: "HOME", label: "The last 24 hours" },
+                () => readLastDay(this.db, input, available, { now, zone }),
+                lastDayHeader(now, zone),
+            ),
+            // Money taken through an invoice's pay link after the invoice
+            // was already paid or voided (U13). The customer is owed it
+            // back, so it is ATTENTION: already wrong, and only the merchant
+            // can put it right. Shown wherever Payments is available — a
+            // business that has since disconnected its provider still owes
+            // the refund — and only to people who can read invoices.
+            available.has("PAYMENTS") && canReadInvoices
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Payments to refund" },
+                      () => this.refundsOwed(input.organizationId),
+                      noEvidence,
+                  )
+                : skip(noEvidence),
+            // Renewals that haven't been paid, and invoices past due (F1).
+            // Like refunds owed, they show wherever Payments is available:
+            // the money is owed whether or not a provider is connected
+            // today. Each asks for its own read, so a role holding one sees
+            // only that one.
+            available.has("PAYMENTS") && canReadSubscriptions
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Failed renewals" },
+                      () =>
+                          failedRenewals(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              canReadInvoices,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            // Pauses that ended with Payments off (D8): shown because
+            // Payments is off, so not gated on it.
+            canReadSubscriptions
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Paused subscriptions" },
+                      () =>
+                          pausesWaitingOnPayments(
+                              this.db,
+                              input.organizationId,
+                              now,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            available.has("PAYMENTS") && canReadInvoices
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Overdue invoices" },
+                      () => overdueInvoices(this.db, input.organizationId, now),
+                      null,
+                  )
+                : skip(null),
+            // Shelves short for open orders (F1): the Stock screen's own
+            // checks.
+            available.has("COMMERCE") &&
+            holds(input, "store:read") &&
+            stockChecks
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Stock" },
+                      () =>
+                          stockShort(
+                              this.db,
+                              stockChecks,
+                              input.organizationId,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            // Websites that aren't live (F1). Not for a Reviewer: they are
+            // asked to look at named sites, and their Home is its own view
+            // (F9).
+            available.has("WEBSITE") &&
+            holds(input, "site:read") &&
+            input.organizationRole !== "REVIEWER"
+                ? guard(
+                      { moduleKey: "WEBSITE", label: "Website" },
+                      () => sitesNotLive(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
+        ]);
+        const unavailable = slots.flat();
+
+        numbers.push(...crmNumbers);
+
+        if (overdue.count > 0) {
+            actions.push({
+                code: "CRM_OVERDUE_FOLLOWUPS",
+                title: `Follow up on ${overdue.count} overdue lead${overdue.count === 1 ? "" : "s"}`,
+                href: "/leads",
+                severity: "OVERDUE",
+                moduleKey: "CRM",
+                count: overdue.count,
+                evidence: overdue.evidence,
+            });
         }
 
         if (available.has("COMMERCE")) {
-            const open = await this.attempt(
-                { moduleKey: "COMMERCE", label: "Open orders" },
-                () =>
-                    this.openOrders(input.organizationId, {
-                        now,
-                        zone,
-                        // An order's money is `order:read`'s; `order:stage`
-                        // moves it without seeing it (DEC-024).
-                        money: holds(input, "order:read"),
-                    }),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-
             if (open.count > 0) {
                 numbers.push({
                     key: "OPEN_ORDERS",
                     label: "Open orders",
                     value: open.count,
                     // The SCREEN that shows them, not the section above it.
-                    // The rail badges whatever href an OVERDUE action carries,
-                    // so pointing this at "/commerce" put the count on Sell
-                    // and sent the merchant to a list of storefronts to hunt
-                    // for orders one storefront at a time.
+                    // The rail badges whatever href an OVERDUE action
+                    // carries, so pointing this at "/commerce" put the count
+                    // on Sell and sent the merchant to a list of storefronts
+                    // to hunt for orders one storefront at a time.
                     href: "/commerce/orders",
                     moduleKey: "COMMERCE",
                 });
             }
 
-            // The ACTION, unlike the number, still requires ACTIVE: telling a
-            // merchant to fulfil orders through a module that is not ready is
-            // sending them at a door that does not open.
+            // The ACTION, unlike the number, still requires ACTIVE: telling
+            // a merchant to fulfil orders through a module that is not ready
+            // is sending them at a door that does not open.
             if (active.has("COMMERCE")) {
                 if (open.count > 0) {
                     actions.push({
@@ -271,6 +427,7 @@ export class HomeService {
                         moduleKey: "COMMERCE",
                         count: open.count,
                         evidence: open.evidence,
+                        ...(open.moreTone ? { moreTone: open.moreTone } : {}),
                     });
                 } else {
                     actions.push({
@@ -285,172 +442,44 @@ export class HomeService {
             }
         }
 
-        if (available.has("APPOINTMENTS")) {
-            const schedule = await this.attempt(
-                { moduleKey: "APPOINTMENTS", label: "Schedule" },
-                async () => ({
-                    upcoming: await this.upcomingBookings(
-                        input.organizationId,
-                        now,
-                    ),
-                    total: await this.db.booking.count({
-                        where: {
-                            organizationId: input.organizationId,
-                            status: "CONFIRMED",
-                            startAt: { gte: now },
-                        },
-                    }),
-                }),
-                { upcoming: [], total: 0 },
-                unavailable,
-            );
-            upcoming = schedule.upcoming;
-            const total = schedule.total;
-            if (total > 0) {
-                numbers.push({
-                    key: "UPCOMING_BOOKINGS",
-                    label: "Upcoming bookings",
-                    value: total,
-                    href: "/bookings",
-                    moduleKey: "APPOINTMENTS",
-                });
-            }
+        const upcoming = schedule.upcoming;
+        if (schedule.total > 0) {
+            numbers.push({
+                key: "UPCOMING_BOOKINGS",
+                label: "Upcoming bookings",
+                value: schedule.total,
+                href: "/bookings",
+                moduleKey: "APPOINTMENTS",
+            });
         }
 
-        // The business's day, in its zone (F5): bookings, classes, pick-ups.
-        const scope = todayScope(input, available);
-        const today = scope
-            ? await this.attempt(
-                  {
-                      moduleKey: scope.bookings ? "APPOINTMENTS" : "COMMERCE",
-                      label: "Today",
-                  },
-                  () => readToday(this.db, input, scope, { now, zone }),
-                  null,
-                  unavailable,
-              )
-            : null;
-
-        // The greeting's clock and the last 24 hours (F6), in the same zone.
-        const lastDay = await this.attempt(
-            { moduleKey: "HOME", label: "The last 24 hours" },
-            () => readLastDay(this.db, input, available, { now, zone }),
-            lastDayHeader(now, zone),
-            unavailable,
-        );
-
-        // Money taken through an invoice's pay link after the invoice was
-        // already paid or voided (U13). The customer is owed it back, so it
-        // is ATTENTION: already wrong, and only the merchant can put it right.
-        // Shown wherever Payments is available — a business that has since
-        // disconnected its provider still owes the refund — and only to
-        // people who can read invoices.
-        const canReadInvoices = holds(input, "invoice:read");
-        if (available.has("PAYMENTS") && canReadInvoices) {
-            const owed = await this.attempt(
-                { moduleKey: "PAYMENTS", label: "Payments to refund" },
-                () => this.refundsOwed(input.organizationId),
-                { count: 0, evidence: [] },
-                unavailable,
-            );
-            if (owed.count > 0) {
-                actions.push({
-                    code: "PAYMENTS_REFUNDS_OWED",
-                    title:
-                        owed.count === 1
-                            ? "Refund a payment taken on a settled invoice"
-                            : `Refund ${owed.count} payments taken on settled invoices`,
-                    href:
-                        owed.count === 1 && owed.evidence[0]
-                            ? owed.evidence[0].href
-                            : "/billing/invoices",
-                    severity: "ATTENTION",
-                    moduleKey: "PAYMENTS",
-                    count: owed.count,
-                    evidence: owed.evidence,
-                });
-            }
+        if (owed.count > 0) {
+            actions.push({
+                code: "PAYMENTS_REFUNDS_OWED",
+                title:
+                    owed.count === 1
+                        ? "Refund a payment taken on a settled invoice"
+                        : `Refund ${owed.count} payments taken on settled invoices`,
+                href:
+                    owed.count === 1 && owed.evidence[0]
+                        ? owed.evidence[0].href
+                        : "/billing/invoices",
+                severity: "ATTENTION",
+                moduleKey: "PAYMENTS",
+                count: owed.count,
+                evidence: owed.evidence,
+            });
         }
-
-        // Renewals that haven't been paid, and invoices past due (F1). Like
-        // refunds owed, they show wherever Payments is available: the money
-        // is owed whether or not a provider is connected today. Each asks
-        // for its own read, so a role holding one sees only that one.
-        if (available.has("PAYMENTS") && holds(input, "subscription:read")) {
-            const renewals = await this.attempt(
-                { moduleKey: "PAYMENTS", label: "Failed renewals" },
-                () =>
-                    failedRenewals(
-                        this.db,
-                        input.organizationId,
-                        now,
-                        canReadInvoices,
-                    ),
-                null,
-                unavailable,
-            );
-            if (renewals) actions.push(renewals);
-        }
-        // Pauses that ended with Payments off (D8): shown because Payments
-        // is off, so not gated on it.
-        if (holds(input, "subscription:read")) {
-            const waiting = await this.attempt(
-                { moduleKey: "PAYMENTS", label: "Paused subscriptions" },
-                () =>
-                    pausesWaitingOnPayments(this.db, input.organizationId, now),
-                null,
-                unavailable,
-            );
-            if (waiting) actions.push(waiting);
-        }
-        if (available.has("PAYMENTS") && canReadInvoices) {
-            const overdue = await this.attempt(
-                { moduleKey: "PAYMENTS", label: "Overdue invoices" },
-                () => overdueInvoices(this.db, input.organizationId, now),
-                null,
-                unavailable,
-            );
-            if (overdue) actions.push(overdue);
-        }
-
-        // Shelves short for open orders (F1): the Stock screen's own checks.
-        const stockChecks = this.stockChecks;
-        if (
-            available.has("COMMERCE") &&
-            holds(input, "store:read") &&
-            stockChecks
-        ) {
-            const short = await this.attempt(
-                { moduleKey: "COMMERCE", label: "Stock" },
-                () => stockShort(this.db, stockChecks, input.organizationId),
-                null,
-                unavailable,
-            );
-            if (short) actions.push(short);
-        }
-
-        // Websites that aren't live (F1). Not for a Reviewer: they are asked
-        // to look at named sites, and their Home is its own view (F9).
-        if (
-            available.has("WEBSITE") &&
-            holds(input, "site:read") &&
-            input.organizationRole !== "REVIEWER"
-        ) {
-            const notLive = await this.attempt(
-                { moduleKey: "WEBSITE", label: "Website" },
-                () => sitesNotLive(this.db, input.organizationId),
-                null,
-                unavailable,
-            );
-            if (notLive) {
-                // It names the sites, so readiness's general "Publish your
-                // site to go live" would say the same thing twice.
-                const setup = actions.findIndex(
-                    (a) => a.code === "WEBSITE_SETUP",
-                );
-                if (setup >= 0) actions.splice(setup, 1);
-                actions.push(notLive);
-            }
+        if (renewals) actions.push(renewals);
+        if (waiting) actions.push(waiting);
+        if (overdueInvoiceAction) actions.push(overdueInvoiceAction);
+        if (short) actions.push(short);
+        if (notLive) {
+            // It names the sites, so readiness's general "Publish your site
+            // to go live" would say the same thing twice.
+            const setup = actions.findIndex((a) => a.code === "WEBSITE_SETUP");
+            if (setup >= 0) actions.splice(setup, 1);
+            actions.push(notLive);
         }
 
         if (active.has("INSIGHTS")) {
@@ -548,70 +577,6 @@ export class HomeService {
                     ? { tag: overdueTag(row.dueAt, now), tone: "bad" as const }
                     : {}),
             })),
-        };
-    }
-
-    /**
-     * Unfulfilled orders, oldest first — longest wait is the biggest problem.
-     * Each says what to do with it and whether it is late (F3); its money
-     * only to someone who reads orders.
-     */
-    private async openOrders(
-        organizationId: string,
-        view: { now: Date; zone: string; money: boolean },
-    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
-        const where = {
-            organizationId,
-            // The same constant Sell -> Orders resolves a row's standing
-            // from, so the number badged here and the tab there cannot drift.
-            status: { in: [...UNFULFILLED_STATUSES] },
-        };
-
-        const [count, rows] = await Promise.all([
-            this.db.order.count({ where }),
-            this.db.order.findMany({
-                where,
-                orderBy: { createdAt: "asc" },
-                take: EVIDENCE_LIMIT,
-                include: {
-                    customer: true,
-                    // Its storefront's late thresholds (B17), so a Late tag
-                    // here is the one Orders shows.
-                    store: {
-                        select: {
-                            settings: { select: LATE_THRESHOLD_SELECT },
-                        },
-                    },
-                },
-            }),
-        ]);
-
-        return {
-            count,
-            evidence: rows.map((row) => {
-                const who = personName(row.customer);
-                return {
-                    id: row.id,
-                    title: row.orderId,
-                    subtitle: who,
-                    at: row.createdAt.toISOString(),
-                    // Decimal in MAJOR units on the row; the wire contract is
-                    // minor units, so it is converted once here rather than in
-                    // each client.
-                    amountMinor: view.money
-                        ? Math.round(Number(row.total) * 100)
-                        : null,
-                    currency: view.money ? row.currency : null,
-                    href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
-                    ...openOrderWords(
-                        row,
-                        who,
-                        view.now,
-                        view.zone,
-                        lateThresholdsOf(row.store.settings),
-                    ),
-                };
-            }),
         };
     }
 

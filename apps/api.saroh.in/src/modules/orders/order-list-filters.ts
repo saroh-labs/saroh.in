@@ -11,6 +11,7 @@ import {
     storedValuesOf,
 } from "./fulfilment";
 import { LATE_THRESHOLD_COLUMNS } from "./late-thresholds";
+import { openSql, realOrderSql } from "./open-orders";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -163,11 +164,10 @@ export function paymentStandingOf(
 /**
  * Open: the goods have not reached the customer and the order is neither
  * cancelled nor refunded in full (the Open tab; default 14). A shipped order
- * is still open until it is delivered.
+ * is still open until it is delivered. One definition with Home's
+ * (`open-orders.ts`).
  */
-export function openSql(): Prisma.Sql {
-    return Prisma.sql`(o.status IN ('PENDING', 'PROCESSING', 'SHIPPED') AND o."paymentStatus" <> 'REFUNDED')`;
-}
+export { openSql };
 
 /**
  * Late: an open order not yet handed over, placed longer ago than the
@@ -203,7 +203,7 @@ export function orderConditions(
 ): Prisma.Sql {
     const and: Prisma.Sql[] = [
         Prisma.sql`o."organizationId" = ${organizationId}`,
-        Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`,
+        realOrderSql(),
     ];
     // Each narrows within the organization; none can widen past it, so a
     // storefront or product from another business simply matches nothing.

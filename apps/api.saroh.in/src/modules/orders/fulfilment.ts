@@ -431,10 +431,20 @@ export function fulfilmentView(
  * A stored list read as the storefront's ways, in table order: a legacy
  * word is read as its type, and anything that isn't a storefront's own way
  * is left out.
+ *
+ * Given the row's two toggles, an empty list is read from them instead
+ * (O-3): the image before B2a, still serving while the migration deploys,
+ * creates a settings row without the column, which takes its `[]` default
+ * rather than the backfill. A list saved empty on purpose turned both
+ * toggles off with it (`fulfilmentPatch`), so it still reads as none.
  */
 export function storefrontTypesOf(
     stored: readonly string[],
+    toggles?: { collectionEnabled: boolean; shippingEnabled: boolean },
 ): StorefrontFulfilmentType[] {
+    if (stored.length === 0 && toggles) {
+        return storefrontTypesFrom({ ...toggles, localDelivery: false });
+    }
     const types = new Set(stored.map(typeOf));
     return STOREFRONT_FULFILMENT_TYPES.filter((t) => types.has(t));
 }

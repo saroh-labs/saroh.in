@@ -44,6 +44,30 @@ describe("listOrderRows", () => {
         expect(result.counts.open).toBe(1);
     });
 
+    it("reads an older API's bare array as one page, not a crash (O-2)", async () => {
+        // An API rolled back past B1 answers every order, unpaged.
+        getJson.mockResolvedValue([
+            { id: "o1", status: "PENDING", standing: "UNFULFILLED" },
+            { id: "o2", status: "SHIPPED", standing: "FULFILLED" },
+            { id: "o3", status: "DELIVERED", standing: "FULFILLED" },
+            {
+                id: "o4",
+                status: "DELIVERED",
+                standing: "REFUNDED",
+                payment: "REFUNDED",
+            },
+        ]);
+        const all = await listOrderRows();
+        expect(all.rows.map((r) => r.id)).toEqual(["o1", "o2", "o3", "o4"]);
+        expect(all.counts).toEqual({ all: 4, open: 2, refunded: 1 });
+        expect(all.nextCursor).toBeNull();
+
+        const open = await listOrderRows({ tab: "open" });
+        expect(open.rows.map((r) => r.id)).toEqual(["o1", "o2"]);
+        // listAllOrderRows stops rather than asking for a next page.
+        expect((await listAllOrderRows()).complete).toBe(true);
+    });
+
     it("reads a missing list as an empty page", async () => {
         getJson.mockResolvedValue(null);
         expect(await listOrderRows()).toEqual({

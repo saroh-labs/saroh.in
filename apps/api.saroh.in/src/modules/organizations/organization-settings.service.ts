@@ -56,6 +56,13 @@ export interface OrganizationSettings {
      * ISO. Derived, never typed — `null` until the first order.
      */
     tradingSince: string | null;
+    /**
+     * What the take-money checklist ticks (H-5, H-6), as facts rather than
+     * read off module readiness: a storefront with no products is not a
+     * first product, and a site that was published once and taken down is
+     * not live. Derived, never typed.
+     */
+    setup: SetupFacts;
     /** GST (ADR-008). The GSTIN is `profile.taxId`. */
     tax: TaxSettingsView;
     /**
@@ -68,6 +75,18 @@ export interface OrganizationSettings {
      * served from and the library object it is; null until one is set.
      */
     logo: { url: string; mediaId: string | null } | null;
+}
+
+/** The checklist's facts ({@link OrganizationSettings.setup}). */
+export interface SetupFacts {
+    /** Products not archived: drafts count, as "Add your first product". */
+    products: number;
+    /** Bookable services not archived. */
+    services: number;
+    /** Websites not deleted. */
+    sites: number;
+    /** Of those, the ones with nothing published now (never, or taken down). */
+    sitesNotLive: number;
 }
 
 /** What the settings read selects from the profile. */
@@ -346,6 +365,7 @@ export class OrganizationSettingsService {
                 ),
             ),
             tradingSince: await this.firstOrderAt(ctx.organizationId),
+            setup: await this.setupFacts(ctx.organizationId),
         };
     }
 
@@ -456,6 +476,7 @@ export class OrganizationSettingsService {
                 ),
             ),
             tradingSince: await this.firstOrderAt(organizationId),
+            setup: await this.setupFacts(organizationId),
         };
     }
 
@@ -485,6 +506,28 @@ export class OrganizationSettingsService {
             MONTH: last(keys.MONTH),
             NEVER: last(keys.NEVER),
         };
+    }
+
+    /** What the take-money checklist ticks, counted now. */
+    private async setupFacts(organizationId: string): Promise<SetupFacts> {
+        const site = { organizationId, deletedAt: null };
+        const [products, services, sites, sitesNotLive] = await Promise.all([
+            prisma.product.count({
+                where: { organizationId, status: { not: "ARCHIVED" } },
+            }),
+            prisma.service.count({
+                where: {
+                    organizationId,
+                    deletedAt: null,
+                    status: { not: "ARCHIVED" },
+                },
+            }),
+            prisma.site.count({ where: site }),
+            prisma.site.count({
+                where: { ...site, currentPublicationId: null },
+            }),
+        ]);
+        return { products, services, sites, sitesNotLive };
     }
 
     /** The earliest order in the business, across every storefront. */

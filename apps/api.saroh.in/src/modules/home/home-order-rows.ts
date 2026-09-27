@@ -112,6 +112,9 @@ function dueTag(deadline: Date, now: Date, zone: string): string {
 /** What to do with the order, by how it reaches the customer. */
 function headline(order: OpenOrderFacts, who: string): string {
     const n = orderNumber(order.orderId);
+    // Open until delivered (the Orders list's Open tab), but nothing left
+    // to send: say where it is rather than asking for it to be sent again.
+    if (order.status === "SHIPPED") return `Order ${n} is on its way to ${who}`;
     if (order.fulfilment && typeOf(order.fulfilment) === "PICKUP") {
         return order.stage === "READY"
             ? `Hand over order ${n} to ${who}`

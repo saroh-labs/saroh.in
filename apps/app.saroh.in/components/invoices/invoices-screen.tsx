@@ -22,12 +22,13 @@ import {
     INVOICE_TABS,
     invoicePill,
     owedSummary,
+    paidSinceRows,
     sourceLine,
     whenLine,
     withCorrectionsUnder,
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
-import { isSince, withoutSince } from "@/lib/views/since";
+import { withoutSince } from "@/lib/views/since";
 
 /** The business's GST standing, for the line under the title. */
 export interface InvoiceBusinessTax {
@@ -62,6 +63,7 @@ export function InvoicesScreen({
     tax,
     initialTab,
     paidSince = null,
+    paidSinceInvoices = null,
 }: {
     businessName: string;
     invoices: Invoice[];
@@ -76,6 +78,12 @@ export function InvoicesScreen({
      * from then on — the money Home added up, a credit note never.
      */
     paidSince?: Date | null;
+    /**
+     * The API's own read of those (`?paidSince=`, H-7), which finds an old
+     * invoice paid today; null when it couldn't answer, and the list on
+     * hand is filtered instead.
+     */
+    paidSinceInvoices?: Invoice[] | null;
 }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -94,14 +102,10 @@ export function InvoicesScreen({
     }
 
     const { owed, overdue, overdueCount } = owedSummary(invoices);
-    const rows = withCorrectionsUnder(invoices);
+    const rows = withCorrectionsUnder(
+        paidSinceRows(invoices, paidSinceInvoices, paidSince),
+    );
     const shown = rows.filter((i) => {
-        if (
-            paidSince &&
-            (i.kind === "CREDIT_NOTE" || !isSince(i.paidAt, paidSince))
-        ) {
-            return false;
-        }
         if (inTab(i, tab)) return true;
         // A correction follows its invoice into whichever tab shows it.
         const parent = i.related

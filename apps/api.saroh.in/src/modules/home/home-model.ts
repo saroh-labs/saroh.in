@@ -70,6 +70,12 @@ export interface HomeAction {
     /** The action's own tag, when it is one row rather than a list of them. */
     tag?: string;
     tone?: HomeTone;
+    /**
+     * The worst of what `count` holds past `evidence` — "bad" when any of the
+     * rows "N more" stands for is late — so that row ranks with its worst,
+     * not with the last row shown. Absent, it ranks beside the last row.
+     */
+    moreTone?: HomeTone;
 }
 
 /**

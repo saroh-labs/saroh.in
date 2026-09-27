@@ -201,7 +201,12 @@ describe("readSince", () => {
         ]);
         const since = new Date(SINCE);
         expect(client.order.count).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", createdAt: { gte: since } },
+            where: {
+                organizationId: "org_1",
+                createdAt: { gte: since },
+                // Real orders only, as the Orders list counts them (H-3).
+                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
+            },
         });
         expect(client.booking.count).toHaveBeenCalledWith({
             where: {
@@ -342,6 +347,8 @@ describe("HomeService: the header", () => {
             invoice: { ...empty, ...client.invoice },
             paymentIntent: empty,
             site: empty,
+            // Open orders' one raw read: none open.
+            $queryRaw: jest.fn().mockResolvedValue([]),
             businessProfile: {
                 findUnique: jest.fn().mockResolvedValue({ timezone: ZONE }),
             },

@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { apiFetch, orgBase } from "@/lib/api/http";
 
 /**
@@ -203,7 +205,15 @@ const EMPTY: HomeModel = {
     lastDay: null,
 };
 
-export async function getHome(projectId?: string): Promise<HomeModel> {
+/**
+ * Home's read model, once per request (H-4). The app shell reads it on every
+ * page for the rail's badges, and Home's page reads it again for itself;
+ * `cache()` makes the two one `GET /home` in the same render. A failed read
+ * is cached as the rejection, which each caller handles as it did.
+ */
+export const getHome = cache(readHome);
+
+async function readHome(projectId?: string): Promise<HomeModel> {
     const base = await orgBase();
     if (!base) return EMPTY;
     const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";

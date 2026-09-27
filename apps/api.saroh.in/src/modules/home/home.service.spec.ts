@@ -254,6 +254,35 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
 
         expect(home.unavailable).toEqual([]);
     });
+
+    it("reads the sources at once, not one after another (H-4)", async () => {
+        const service = build(ACTIVE_ALL, { orders: [OPEN_ORDER] });
+        const db = (
+            service as unknown as {
+                db: Record<string, { count: jest.Mock }>;
+            }
+        ).db;
+        // Open orders answer only once the schedule — a later source — has
+        // been asked for. Read in turn, open orders would wait on a read
+        // that is never made; read at once, both are in flight together.
+        let scheduleAsked!: () => void;
+        const asked = new Promise<void>((resolve) => (scheduleAsked = resolve));
+        db.booking.count.mockImplementation(() => {
+            scheduleAsked();
+            return Promise.resolve(1);
+        });
+        db.order.count.mockImplementation(async () => {
+            await asked;
+            return 1;
+        });
+        const home = await Promise.race([
+            service.build(INPUT),
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("read in turn")), 1000),
+            ),
+        ]);
+        expect(home.unavailable).toEqual([]);
+    });
 });
 
 describe("HomeService ranking", () => {
