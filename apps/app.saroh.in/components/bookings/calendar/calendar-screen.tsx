@@ -19,6 +19,7 @@ import type {
     BookingsCalendar,
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
+import { runsClasses } from "@/lib/services/booking-calendar";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import {
     addDays,
@@ -200,11 +201,18 @@ export function CalendarScreen({
               ? first.booking.service.currency
               : first.session.service.currency) ?? null)
         : null;
+    // The week's totals cover all seven days, even on a phone, where the list
+    // under them shows one day at a time.
     const summary = `${live.length} ${live.length === 1 ? "booking" : "bookings"}${
+        layout === "week" ? " this week" : ""
+    }${
         value !== null && currencyCode
             ? ` · ${formatMoney(value, currencyCode)} booked`
             : ""
     }`;
+
+    // The legend follows the business (runsClasses).
+    const hasClasses = runsClasses(services, calendar);
 
     const peekBlock = peek
         ? ((layout === "week" ? week.flatMap((d) => d.blocks) : dayBlocks).find(
@@ -527,7 +535,7 @@ export function CalendarScreen({
                     </span>
                     {newBooking}
                 </div>
-                <Legend canBook={can.book} canOpen={can.hours} />
+                <Legend classes={hasClasses} />
                 {staff === null ? (
                     <PartialNotice className="mb-3">
                         Hours and time off could not be loaded, so free times
@@ -690,18 +698,20 @@ function NavLink({
     );
 }
 
-function Legend({ canBook, canOpen }: { canBook: boolean; canOpen: boolean }) {
+function Legend({ classes }: { classes: boolean }) {
     const sw = "inline-block h-2.5 w-3.5 rounded-[3px]";
     return (
         <ul className="mb-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[11.5px] text-muted-foreground">
             <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn(sw, "bg-diary-one")} />
-                One-to-one
+                {classes ? "One-to-one" : "Appointment"}
             </li>
-            <li className="inline-flex items-center gap-1.5">
-                <span aria-hidden className={cn(sw, "bg-diary-class")} />
-                Class
-            </li>
+            {classes ? (
+                <li className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className={cn(sw, "bg-diary-class")} />
+                    Class
+                </li>
+            ) : null}
             <li className="inline-flex items-center gap-1.5">
                 <span
                     aria-hidden
@@ -710,7 +720,7 @@ function Legend({ canBook, canOpen }: { canBook: boolean; canOpen: boolean }) {
                         "border border-dashed border-success-subtle-foreground bg-success-subtle",
                     )}
                 />
-                {canBook ? "Free — click to book or block" : "Free"}
+                Free
             </li>
             <li className="inline-flex items-center gap-1.5">
                 <span
@@ -720,7 +730,7 @@ function Legend({ canBook, canOpen }: { canBook: boolean; canOpen: boolean }) {
                         "bg-[repeating-linear-gradient(135deg,transparent_0_3px,hsl(var(--border-strong))_3px_4px)]",
                     )}
                 />
-                {canOpen ? "Closed — click to open hours" : "Closed"}
+                Closed
             </li>
             <li className="inline-flex items-center gap-1.5">
                 <span

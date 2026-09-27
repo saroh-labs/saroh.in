@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BookingsCalendar, DiaryBooking } from "./booking-calendar";
-import { flattenCalendar } from "./booking-calendar";
+import { flattenCalendar, runsClasses } from "./booking-calendar";
 
 function booking(id: string, startAt: string): DiaryBooking {
     return {
@@ -73,5 +73,46 @@ describe("flattenCalendar", () => {
             "c2",
             "b3",
         ]);
+    });
+});
+
+describe("runsClasses", () => {
+    const empty = { diaries: [] };
+
+    it("is true for a business with a service of more than one place", () => {
+        expect(runsClasses([{ capacity: 1 }, { capacity: 12 }], empty)).toBe(
+            true,
+        );
+    });
+
+    it("is false for a clinic of one-to-ones, so the legend has no Class", () => {
+        expect(runsClasses([{ capacity: 1 }, { capacity: 1 }], empty)).toBe(
+            false,
+        );
+        expect(runsClasses([], empty)).toBe(false);
+    });
+
+    it("counts a class already on the calendar", () => {
+        const withClass = {
+            diaries: [
+                {
+                    person: null,
+                    bookings: [],
+                    classes: [
+                        {
+                            key: "k",
+                            service: booking("x", "").service,
+                            startAt: "2026-09-02T01:00:00.000Z",
+                            endAt: "2026-09-02T01:45:00.000Z",
+                            staff: null,
+                            capacity: 12,
+                            taken: 0,
+                            bookings: [],
+                        },
+                    ],
+                },
+            ],
+        };
+        expect(runsClasses([{ capacity: 1 }], withClass)).toBe(true);
     });
 });

@@ -40,8 +40,42 @@ interface Diary {
         status: string;
         outcome: string | null;
         bookerName: string | null;
+        bookerPhone: string | null;
         startAt: string;
+        contact: { id: string; firstName: string | null } | null;
     }[];
+}
+
+/** An upcoming one-to-one with a person and a contact, within the week. */
+async function upcomingWithContact(request: APIRequestContext) {
+    const from = new Date().toISOString();
+    const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    return (await diaries(request, from, to))
+        .filter((d) => d.person)
+        .flatMap((d) => d.bookings)
+        .find(
+            (b) =>
+                b.status === "CONFIRMED" &&
+                !b.outcome &&
+                b.bookerName &&
+                b.contact,
+        );
+}
+
+/** Open a booking's peek from the agenda of its day. */
+async function openPeek(
+    page: Page,
+    booking: { startAt: string; bookerName: string | null },
+) {
+    const day = new Date(Date.parse(booking.startAt) + IST_OFFSET_MS)
+        .toISOString()
+        .slice(0, 10);
+    await page.goto(`/bookings?date=${day}&layout=agenda`);
+    await page
+        .getByRole("button", { name: new RegExp(booking.bookerName ?? "") })
+        .first()
+        .click();
+    return page.getByRole("dialog");
 }
 
 async function diaries(request: APIRequestContext, from: string, to: string) {
@@ -72,6 +106,88 @@ test.describe("bookings calendar", () => {
         ).toBeVisible();
         await expect(
             page.getByText(/Customers can book/).first(),
+        ).toBeVisible();
+    });
+
+    test("the legend follows the business: a gym that runs classes shows Class", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/bookings");
+        const legend = page.getByRole("listitem");
+        await expect(legend.filter({ hasText: /^One-to-one$/ })).toBeVisible();
+        await expect(legend.filter({ hasText: /^Class$/ })).toBeVisible();
+        await expect(legend.filter({ hasText: /^Free$/ })).toBeVisible();
+        await page.goto("/bookings?layout=week");
+        await expect(page.getByText(/bookings? this week/)).toBeVisible();
+    });
+
+    test("the peek shows Needs attention and opens the customer's page", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const found = await upcomingWithContact(page.request);
+        test.skip(!found?.contact, "No upcoming booking with a contact");
+        if (!found?.contact) return;
+        const contactId = found.contact.id;
+
+        // An Allergy entry for this test only, taken off again afterwards.
+        const made = await page.request.post(
+            api(`/customers/${contactId}/attention`),
+            {
+                headers: orgHeader,
+                data: { kind: "ALLERGY", label: "E2E sesame" },
+            },
+        );
+        test.skip(!made.ok(), "The contact already has an allergy entry");
+        const entry = (await made.json()) as { id: string };
+        try {
+            const sheet = await openPeek(page, found);
+            await expect(sheet.getByText("Needs attention")).toBeVisible();
+            await expect(sheet.getByText(/Allergy: E2E sesame/)).toBeVisible();
+            await sheet.getByRole("link", { name: /^Open .+'s page$/ }).click();
+            await expect(page).toHaveURL(new RegExp(`/customers/${contactId}`));
+        } finally {
+            await page.request.delete(
+                api(`/customers/${contactId}/attention/${entry.id}`),
+                { headers: orgHeader },
+            );
+        }
+    });
+
+    test("a booking with no phone says where to add one", async ({ page }) => {
+        await signIn(page);
+        const from = new Date().toISOString();
+        const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+        const candidates = (await diaries(page.request, from, to))
+            .filter((d) => d.person)
+            .flatMap((d) => d.bookings)
+            .filter(
+                (b) =>
+                    b.status === "CONFIRMED" &&
+                    b.bookerName &&
+                    b.contact &&
+                    !b.bookerPhone,
+            );
+        let found: (typeof candidates)[number] | undefined;
+        for (const b of candidates) {
+            const res = await page.request.get(
+                api(`/contacts/${b.contact?.id}`),
+                { headers: orgHeader },
+            );
+            if (
+                res.ok() &&
+                !((await res.json()) as { phone: string | null }).phone
+            ) {
+                found = b;
+                break;
+            }
+        }
+        test.skip(!found, "Every upcoming booking has a phone in the seed");
+        if (!found) return;
+        const sheet = await openPeek(page, found);
+        await expect(
+            sheet.getByText("No phone yet — add it on their page"),
         ).toBeVisible();
     });
 
