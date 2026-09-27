@@ -9,6 +9,7 @@
 import { HttpException, NotFoundException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { isRlsTestMode } from "../../../test/rls-mode";
 import { PublicTodayService } from "../bookings/public-today";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { PublicVisit } from "./public-visit.service";
@@ -323,116 +324,128 @@ describe("public visit read (G8)", () => {
      * reads as a role WITHOUT BYPASSRLS (the test connection is a superuser,
      * which RLS never binds).
      */
-    describe("with RLS enforcement on, as a role that cannot bypass it", () => {
-        const ROLE = "saroh_g8_rls_probe";
+    // Installs the migrations' policies and a probe role itself, which needs
+    // a superuser. In RLS mode (TEST_RLS=on) the whole suite already runs as
+    // the NOBYPASSRLS role on a schema built from the migrations, so this
+    // group is what every spec there checks, and it could not set itself up.
+    (isRlsTestMode() ? describe.skip : describe)(
+        "with RLS enforcement on, as a role that cannot bypass it",
+        () => {
+            const ROLE = "saroh_g8_rls_probe";
 
-        beforeAll(async () => {
-            await prisma.$executeRawUnsafe(`DO $$ BEGIN
+            beforeAll(async () => {
+                await prisma.$executeRawUnsafe(`DO $$ BEGIN
                 CREATE ROLE ${ROLE} NOLOGIN NOBYPASSRLS;
             EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-            await prisma.$executeRawUnsafe(
-                `GRANT USAGE ON SCHEMA public TO ${ROLE}`,
-            );
-            await prisma.$executeRawUnsafe(
-                `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${ROLE}`,
-            );
-            await prisma.$executeRawUnsafe(
-                `ALTER TABLE "Store" ENABLE ROW LEVEL SECURITY`,
-            );
-            await prisma.$executeRawUnsafe(
-                `DROP POLICY IF EXISTS "org_isolation" ON "Store"`,
-            );
-            await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "Store"
+                await prisma.$executeRawUnsafe(
+                    `GRANT USAGE ON SCHEMA public TO ${ROLE}`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${ROLE}`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "Store" ENABLE ROW LEVEL SECURITY`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "Store"`,
+                );
+                await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "Store"
                 USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
                        OR "organizationId" = current_setting('app.current_organization_id', true))`);
-            await prisma.$executeRawUnsafe(
-                `ALTER TABLE "StoreSettings" ENABLE ROW LEVEL SECURITY`,
-            );
-            await prisma.$executeRawUnsafe(
-                `DROP POLICY IF EXISTS "org_isolation" ON "StoreSettings"`,
-            );
-            await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "StoreSettings"
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "StoreSettings" ENABLE ROW LEVEL SECURITY`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "StoreSettings"`,
+                );
+                await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "StoreSettings"
                 USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
                        OR EXISTS (SELECT 1 FROM "Store" p WHERE p."id" = "StoreSettings"."storeId"
                                   AND p."organizationId" = current_setting('app.current_organization_id', true)))`);
-        });
+            });
 
-        afterAll(async () => {
-            for (const table of ["Store", "StoreSettings"]) {
+            afterAll(async () => {
+                for (const table of ["Store", "StoreSettings"]) {
+                    await prisma.$executeRawUnsafe(
+                        `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                    );
+                    await prisma.$executeRawUnsafe(
+                        `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
+                    );
+                }
                 await prisma.$executeRawUnsafe(
-                    `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                    `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${ROLE}`,
                 );
                 await prisma.$executeRawUnsafe(
-                    `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
+                    `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
                 );
+                await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
+            });
+
+            /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */
+            async function asProbe<T>(
+                orgId: string,
+                fn: () => Promise<T>,
+            ): Promise<T> {
+                const before = process.env.RLS_ENFORCEMENT;
+                // eslint-disable-next-line no-restricted-properties -- the proxy reads this live
+                process.env.RLS_ENFORCEMENT = "on";
+                try {
+                    // The proxy opens the transaction, sets the organization and
+                    // runs every prisma call inside `fn` on it.
+                    return await runInOrgContext(orgId, () =>
+                        prisma.$transaction(async (tx) => {
+                            await tx.$executeRawUnsafe(
+                                `SET LOCAL ROLE ${ROLE}`,
+                            );
+                            return fn();
+                        }),
+                    );
+                } finally {
+                    // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                    if (before === undefined)
+                        delete process.env.RLS_ENFORCEMENT;
+                    // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                    else process.env.RLS_ENFORCEMENT = before;
+                }
             }
-            await prisma.$executeRawUnsafe(
-                `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${ROLE}`,
-            );
-            await prisma.$executeRawUnsafe(
-                `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
-            );
-            await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
-        });
 
-        /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */
-        async function asProbe<T>(
-            orgId: string,
-            fn: () => Promise<T>,
-        ): Promise<T> {
-            const before = process.env.RLS_ENFORCEMENT;
-            // eslint-disable-next-line no-restricted-properties -- the proxy reads this live
-            process.env.RLS_ENFORCEMENT = "on";
-            try {
-                // The proxy opens the transaction, sets the organization and
-                // runs every prisma call inside `fn` on it.
-                return await runInOrgContext(orgId, () =>
-                    prisma.$transaction(async (tx) => {
-                        await tx.$executeRawUnsafe(`SET LOCAL ROLE ${ROLE}`);
-                        return fn();
+            it("serves site A's own shop", async () => {
+                const visit = await asProbe(rye.organizationId, () =>
+                    visits.read(rye.siteId, hillRoad, "visitor"),
+                );
+                expect(visit.storeId).toBe(hillRoad);
+                expect(visit.hours).toEqual(WEEK);
+            });
+
+            it("hides another business's stores with no app filter at all", async () => {
+                const seen = await asProbe(rye.organizationId, async () => ({
+                    stores: await prisma.store.findMany({
+                        select: { id: true },
                     }),
+                    settings: await prisma.storeSettings.findMany({
+                        select: { storeId: true },
+                    }),
+                }));
+                const storeIds = seen.stores.map((s) => s.id);
+                expect(storeIds).toContain(hillRoad);
+                expect(storeIds).not.toContain(otherShop);
+                expect(seen.settings.map((s) => s.storeId)).not.toContain(
+                    otherShop,
                 );
-            } finally {
-                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
-                if (before === undefined) delete process.env.RLS_ENFORCEMENT;
-                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
-                else process.env.RLS_ENFORCEMENT = before;
-            }
-        }
+            });
 
-        it("serves site A's own shop", async () => {
-            const visit = await asProbe(rye.organizationId, () =>
-                visits.read(rye.siteId, hillRoad, "visitor"),
-            );
-            expect(visit.storeId).toBe(hillRoad);
-            expect(visit.hours).toEqual(WEEK);
-        });
-
-        it("hides another business's stores with no app filter at all", async () => {
-            const seen = await asProbe(rye.organizationId, async () => ({
-                stores: await prisma.store.findMany({ select: { id: true } }),
-                settings: await prisma.storeSettings.findMany({
-                    select: { storeId: true },
-                }),
-            }));
-            const storeIds = seen.stores.map((s) => s.id);
-            expect(storeIds).toContain(hillRoad);
-            expect(storeIds).not.toContain(otherShop);
-            expect(seen.settings.map((s) => s.storeId)).not.toContain(
-                otherShop,
-            );
-        });
-
-        it("refuses site B's store in site A's context, where the app filter alone would admit it", async () => {
-            // The service's own filter names site B's business, so only RLS
-            // (bound to Rye) stands between this read and Pulse's shop.
-            await expectNotFound(
-                asProbe(rye.organizationId, () =>
-                    visits.read(other.siteId, otherShop, "visitor"),
-                ),
-            );
-        });
-    });
+            it("refuses site B's store in site A's context, where the app filter alone would admit it", async () => {
+                // The service's own filter names site B's business, so only RLS
+                // (bound to Rye) stands between this read and Pulse's shop.
+                await expectNotFound(
+                    asProbe(rye.organizationId, () =>
+                        visits.read(other.siteId, otherShop, "visitor"),
+                    ),
+                );
+            });
+        },
+    );
 });
 
 describe("publicWeek and registeredAddress", () => {
