@@ -9,6 +9,7 @@
 import { HttpException, NotFoundException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { PublicTodayService } from "../bookings/public-today";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { PublicVisit } from "./public-visit.service";
 import {
@@ -138,6 +139,7 @@ describe("public visit read (G8)", () => {
             phone: null,
             hours: WEEK as PublicVisit["hours"],
             timezone: "Asia/Kolkata",
+            closedDates: [],
         });
     });
 
@@ -146,6 +148,7 @@ describe("public visit read (G8)", () => {
         expect(Object.keys(visit).sort()).toEqual(
             [
                 "address",
+                "closedDates",
                 "hours",
                 "name",
                 "phone",
@@ -213,6 +216,7 @@ describe("public visit read (G8)", () => {
                 phone: null,
                 hours: WEEK as PublicVisit["hours"],
                 timezone: "Asia/Kolkata",
+                closedDates: [],
             });
         });
 
@@ -237,6 +241,52 @@ describe("public visit read (G8)", () => {
                 visits.read(clinic.siteId, onlineOnly, "visitor"),
             );
         });
+    });
+
+    it("names a closure day as the hero's line does (review G-2)", async () => {
+        const closing = await business("Closed Day Bakery", {
+            timezone: "Asia/Kolkata",
+        });
+        const shop = await storefront(closing.organizationId, "Counter", {
+            kind: "SHOP",
+            address: "3 Bake Street",
+            openingHours: WEEK,
+        });
+        // A Wednesday, 11:00 in Kolkata: open by the week, shut by a closure
+        // that covers the whole day.
+        const now = new Date("2026-09-30T05:30:00Z");
+        await prisma.businessClosure.create({
+            data: {
+                organizationId: closing.organizationId,
+                startAt: new Date("2026-09-29T18:30:00Z"),
+                endAt: new Date("2026-09-30T18:30:00Z"),
+                allDay: true,
+            },
+        });
+        const visit = await visits.read(closing.siteId, shop, "visitor", now);
+        expect(visit.closedDates).toEqual(["2026-09-30"]);
+        // The hero reads the same list for the same moment.
+        const hero = await new PublicTodayService(
+            new FixedWindowRateLimiter(1_000),
+        ).read(closing.siteId, "visitor", now);
+        expect(visit.closedDates).toEqual(hero.closedDates);
+        // The business-profile fallback carries it too.
+        await prisma.store.update({
+            where: { id: shop },
+            data: { deletedAt: new Date() },
+        });
+        await storefront(closing.organizationId, "Online", {
+            kind: "ONLINE",
+            openingHours: WEEK,
+        });
+        const fallback = await visits.read(
+            closing.siteId,
+            undefined,
+            "visitor",
+            now,
+        );
+        expect(fallback.source).toBe("business");
+        expect(fallback.closedDates).toEqual(["2026-09-30"]);
     });
 
     it("reads a malformed week as no hours saved", async () => {
