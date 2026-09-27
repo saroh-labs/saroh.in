@@ -2,6 +2,7 @@ import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { paidSinceFilter } from "../invoices/invoice-state";
+import { realOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeLastDay, HomeSinceItem } from "./home-model";
 import { holds } from "./home-model";
 import { businessDay } from "./home-today";
@@ -120,7 +121,12 @@ export async function readSince(
     const since = new Date(sinceIso);
     const newSince = { organizationId, createdAt: { gte: since } };
     const [orders, bookings, reviews, money] = await Promise.all([
-        scope.orders ? db.order.count({ where: newSince }) : 0,
+        // Real orders only, as the Orders list its link opens counts them:
+        // an abandoned online checkout (placed online, never paid) is not
+        // a new order.
+        scope.orders
+            ? db.order.count({ where: { ...newSince, ...realOrderWhere() } })
+            : 0,
         // Confirmed: a hold still waiting on payment, or one let go, isn't
         // a booking anyone will turn up for.
         scope.bookings
@@ -178,7 +184,11 @@ export async function isFresh(
 ): Promise<boolean> {
     const where = { organizationId };
     const [order, booking, paid] = await Promise.all([
-        db.order.findFirst({ where, select: { id: true } }),
+        // An abandoned online checkout is not a sale.
+        db.order.findFirst({
+            where: { ...where, ...realOrderWhere() },
+            select: { id: true },
+        }),
         db.booking.findFirst({ where, select: { id: true } }),
         db.invoice.findFirst({
             where: { organizationId, paidAt: { not: null } },

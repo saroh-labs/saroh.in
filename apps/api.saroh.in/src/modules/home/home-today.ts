@@ -14,7 +14,7 @@ import {
     LATE_THRESHOLD_SELECT,
     lateThresholdsOf,
 } from "../orders/late-thresholds";
-import { UNFULFILLED_STATUSES } from "../orders/order-standing";
+import { openOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeToday, HomeTodayItem } from "./home-model";
 import { holds, personName } from "./home-model";
 import { orderNumber } from "./home-order-rows";
@@ -345,8 +345,9 @@ async function pickUpRows(
     );
     return db.order.findMany({
         where: {
-            organizationId,
-            status: { in: [...UNFULFILLED_STATUSES] },
+            // Open as the Orders list's Open tab reads it: never refunded,
+            // never an abandoned online checkout.
+            ...openOrderWhere(organizationId),
             stage: { in: ["NEW", "PREPARING", "READY"] },
             fulfilment: { in: storedValuesOf(["PICKUP"]) },
             createdAt: {
