@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-import { siteColors } from "@saroh/site-blocks/tailwind-preset";
+import { siteColors, siteFontFamily } from "@saroh/site-blocks/tailwind-preset";
 
 import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
 
@@ -32,6 +32,12 @@ const config = {
             colors: {
                 ...sharedConfig.theme?.extend?.colors,
                 site: siteColors,
+            },
+            // font-site-heading and font-site-body: the merchant's type, never
+            // Saroh's faces (H1).
+            fontFamily: {
+                ...sharedConfig.theme?.extend?.fontFamily,
+                ...siteFontFamily,
             },
         },
     },

@@ -465,7 +465,7 @@ export default function BookingFlow({
                     <p className="text-site-accent text-xs font-semibold uppercase tracking-[0.14em]">
                         {kicker(services)}
                     </p>
-                    <h1 className="font-display mt-2.5 text-balance text-[clamp(34px,6vw,56px)] font-semibold leading-[1.02] tracking-[-0.035em]">
+                    <h1 className="font-site-heading mt-2.5 text-balance text-[clamp(34px,6vw,56px)] font-semibold leading-[1.02] tracking-[-0.035em]">
                         Book your next session
                     </h1>
                     <p className="mt-3 text-[14.5px] opacity-70">
@@ -479,7 +479,7 @@ export default function BookingFlow({
                 <div className="grid min-w-0 flex-[999_1_460px] grid-cols-[minmax(0,1fr)] gap-3.5">
                     {!page.open || services.length === 0 ? (
                         <div className={card}>
-                            <h2 className="font-display text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
+                            <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
                                 Online booking isn&apos;t open right now
                             </h2>
                             <p className="text-site-body mt-2 text-sm">
@@ -630,7 +630,7 @@ export function BookingUnavailable({ business }: { business: string }) {
     return (
         <div className="bg-site-bg mx-auto max-w-[1060px] px-5 py-16">
             <div className={cn(card, "max-w-xl")}>
-                <h1 className="font-display text-site-fg text-[26px] font-semibold tracking-[-0.03em]">
+                <h1 className="font-site-heading text-site-fg text-[26px] font-semibold tracking-[-0.03em]">
                     We couldn&apos;t open the booking page
                 </h1>
                 <p className="text-site-body mt-2 text-sm">

@@ -34,7 +34,7 @@ export function PayingCard({
             <h2
                 ref={headingRef}
                 tabIndex={-1}
-                className="font-display text-site-fg text-[26px] font-semibold tracking-[-0.03em] outline-none"
+                className="font-site-heading text-site-fg text-[26px] font-semibold tracking-[-0.03em] outline-none"
             >
                 Pay {phase.price} to confirm your place
             </h2>

@@ -1,18 +1,5 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-
-const fontSans = localFont({
-    src: "../../../packages/ui/fonts/Geist-latin.woff2",
-    display: "swap",
-    variable: "--font-sans",
-});
-
-const fontDisplay = localFont({
-    src: "../../../packages/ui/fonts/BricolageGrotesque-latin.woff2",
-    display: "swap",
-    variable: "--font-display",
-});
 
 export const metadata: Metadata = {
     title: "Saroh app",
@@ -29,12 +16,15 @@ export default function RootLayout({
         // merchants' sites, which carry their own `--site-*` themes; the few
         // Saroh-drawn surfaces here (404, error, checkout chrome) stay as they
         // were rather than taking Saroh's Ink & Saffron onto someone else's shop.
+        //
+        // No font is loaded here, on purpose (H1). This layout used to load
+        // Saroh's Geist and Bricolage Grotesque for every request, so every
+        // merchant's site was set in Saroh's typography. The body takes the
+        // merchant's `--site-font-body`, which falls back to a neutral system
+        // stack where no SiteTheme is mounted. Gate G7 fails the build if a
+        // Saroh face comes back.
         <html lang="en" data-skin="mono">
-            <body
-                className={`${fontSans.variable} ${fontDisplay.variable} font-sans`}
-            >
-                {children}
-            </body>
+            <body className="font-site-body">{children}</body>
         </html>
     );
 }
