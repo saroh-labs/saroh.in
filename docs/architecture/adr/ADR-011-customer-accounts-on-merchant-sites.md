@@ -1,6 +1,6 @@
 # ADR-011 — Customer accounts on merchant sites
 
-**Status:** Accepted — 2026-09-26 (DEC-037); amended 2026-09-27 (email only this round, §6; linking only to a verified contact email, DEC-049; the per-site switch, the signed relay and RLS on customer routes); implementation pending
+**Status:** Accepted — 2026-09-26 (DEC-037); amended 2026-09-27 (email only this round, §6; linking only to a verified contact email, DEC-049; sign-in always on for every site with no guest booking; the signed relay and RLS on customer routes); implementation pending
 **Supersedes in part:** [ADR-008](./ADR-008-operations-staff-gst-kitchen.md) §2 "The public booking page" (the limits on credits online, buying packs online, a waitlist, customer recognition, sign-in and customer messages) and §3 "Not sending email or SMS" (for sign-in codes and for messages sent through a business's own provider)
 **Amends:** DEC-011 (Saroh's own email also sends a site's sign-in codes) · ADR-008 §2 "One read of a customer" (merge, DEC-042)
 **Builds on:** [ADR-001](./ADR-001-organization-tenant-root.md) (Organization is the tenant root) · [ADR-007](./ADR-007-subscriptions-invoices-classes.md) (the Contact is the person) · ADR-009 (merchant sites run on `apps/saroh.app`, and customer-facing server routes call the API) · DEC-027 (client addresses behind proxies)
@@ -36,7 +36,10 @@ Decided with the user on 2026-09-27:
 - **A first sign-in links to an existing contact only when that contact's
   email is verified** (DEC-049). Otherwise the customer gets a separate
   contact and staff are shown the pair to merge.
-- **The merchant turns accounts on, per site.** Saroh never does.
+- **Sign-in is always on for every merchant site.** There are no guest
+  users: no guest booking, no guest checkout, no guest fallback, and no
+  switch for the merchant to turn. (This replaces an earlier draft in which
+  the merchant turned accounts on per site.)
 
 ## 2. Decisions
 
@@ -82,11 +85,20 @@ Decided with the user on 2026-09-27:
   cannot be used to spray codes at addresses. **The per-business hourly
   ceiling counts only destinations new to the business**, so returning
   customers are never stopped by it; a daily ceiling on all codes protects
-  the sender, and both start lower for a new business. Past half the hourly
-  ceiling the sheet asks for a bot challenge. **No limit a visitor did not
-  cause stops a booking**: when one refuses a code, the booking page books
-  them as a guest instead. Codes are refused while the business is suspended
-  or closing (`assertOrganizationOpen`).
+  the sender, and both start lower for a new business. **No limit a visitor
+  did not cause refuses them a code.** Past the per-destination daily limit,
+  or past half the business's hourly ceiling, a code needs a bot challenge
+  and may wait up to 10 minutes after the previous one; past a business
+  ceiling, codes still go to visitors who pass the challenge and Saroh is
+  alerted. Only the visitor's own per-address limits refuse, and they say
+  when to try again. Codes are refused while the business is suspended or
+  closing (`assertOrganizationOpen`).
+- **When a code can't be sent**, the sheet says "We couldn't send your code
+  — try again in a few minutes" with the business's phone number, and the
+  booking is not taken. There is no guest fallback.
+- **The code email is critical**, since without it nobody can book online.
+  It goes from a dedicated sending stream, is retried within the request,
+  and every failed send is counted and alerts Saroh within minutes.
 - **Email codes go through Saroh's own identity email**, the sender that
   already sends workspace sign-in codes, with the business's name in the
   display name and body ("Your code for Kavi Dental"). This widens DEC-011's
@@ -133,17 +145,17 @@ Decided with the user on 2026-09-27:
   `*.saroh.app` site as the same site, so `SameSite=Lax` alone does not
   separate two merchants.
 
-### Accounts are switched on per site, by the merchant
+### Sign-in is always on, on every site
 
-- **Each site has its own switch**, "Let customers sign in on your site",
-  off for every existing site. Only someone who may publish the site can
-  turn it on, and its confirm says what changes for their customers. Saroh
-  never turns it on for a merchant.
-- **It takes effect at once**: the API and the booking page read it live,
-  not from the published snapshot. Turning it off brings guest booking back
-  on the next page load.
-- With it on, the booking page asks for a code at the last step instead of
-  the guest form, except when a code cannot be sent (see Limits).
+- **Every merchant site asks for sign-in** at the last step of booking or
+  buying. There is no per-site setting and no merchant switch, and the guest
+  details form goes.
+- **Every site moves at once** when customer accounts ship (plan A, A9). A
+  release note and a notice to every merchant go out beforehand, saying from
+  which date their customers will confirm their email with a code.
+- **The anonymous booking route closes in two releases**: it keeps serving
+  for the release that moves the booking page to sign-in, so a page loaded
+  before the deploy still books, and refuses from the next.
 - The invoice pay page (`saroh.app/pay/<token>`, ADR-007) stays a token link
   that needs no sign-in.
 
@@ -180,8 +192,9 @@ Decided with the user on 2026-09-27:
   contact's verified mark and stops suggesting the pair.
 - **An online order placed while signed in** makes or reuses the storefront's
   `Customer` for that account and links it to the account's Contact as a
-  confirmed identity link — verified by the code, so no "possible match" step.
-  A guest order (where one is still allowed) behaves as today.
+  confirmed identity link (reason `SITE_ACCOUNT`, no staff user) — verified
+  by the code, so no "possible match" step. There are no guest orders on a
+  merchant site.
 - **What the customer sees is an allow-list**: their bookings, orders and
   their steps, their plan, packs and credits, invoices and receipts, their
   messages and the details they gave. Never staff notes, never a
@@ -217,10 +230,12 @@ Merging two contacts (DEC-042) with accounts:
 - The surviving contact keeps its account. When the survivor has no account,
   the other account moves to it; otherwise the other account is retired as
   **`MERGED`**, pointing at the survivor's account, and its sessions revoked.
-- **A retired account's email still signs in, to the survivor's account.**
-  Its email stays reserved, so a later sign-in with it reaches the merged
-  history instead of making a new contact and a new duplicate. The merge
-  preview names it ("asha@… will sign in to this customer").
+- **A retired account keeps its row and its email.** Its email stays
+  reserved, so a later sign-in with it cannot make a new contact and
+  recreate the duplicate. A correct code for it opens no session and answers
+  "This email now signs in as ‹masked survivor email›".
+- **The merge preview names the account** that will see the combined record,
+  and the merge waits for staff to confirm that email is the person's.
 - A reserved placeholder email is never chosen as the survivor's email. When
   the survivor ends with the account's email, it is marked verified.
 - Two accounts never end up on one contact, and a verified value never ends up
@@ -275,7 +290,7 @@ for the law — issued invoices and their bill-to — is kept.
 - Not a customer app or push notifications.
 - Not social sign-in or passwords.
 - Not a way for one business to see another's customers.
-- Not a replacement for guest checkout on the invoice pay page.
+- Not a sign-in wall on the invoice pay page: it stays a token link (ADR-007).
 
 ## 6. SMS and phone sign-in
 

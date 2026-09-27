@@ -83,9 +83,10 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   (DEC-032). The storefront the site sells from is chosen by the merchant
   or shown to them, never picked silently.
 - R11. A bag and checkout that turn into an order at the storefront, paid
-  online. The customer signs in at the last step (plan A, defaults 2 and 3).
-  A site without customer accounts, or without a way to take payment,
-  offers "Ask about ordering" instead of a checkout.
+  online. The customer signs in at the last step (plan A, defaults 2 and 3);
+  sign-in is always on, with no guest checkout. A site whose storefront has
+  no payment provider, or is paused, offers "Ask about ordering" instead of
+  a checkout.
 - R12. Module pages — Shop/Book, Prices, Journal, Contact — sit beside
   free-form pages (DEC-046). They appear only for modules that are on, and
   each list section has display options:
@@ -143,9 +144,11 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   still open there).
 - Corner and button styles; removing "Runs on Saroh" (overview "Later").
 - A second website per business (ADR-006 stands for websites).
-- Guest checkout. Where accounts are on, sign-in is asked for at the last
-  step (default 3). Where they are not yet on (per-site rollout, default
-  71), the shop shows "Ask about ordering" and has no checkout (G13).
+- Guest checkout. Sign-in is always on for every merchant site (user,
+  2026-09-27; defaults 3 and 71): checkout asks for sign-in at the last step
+  on every site, with no guest path and no fallback. "Ask about ordering" is
+  only for a storefront with no payment provider or one that is paused
+  (G13).
 - New-site setup with templates (G21, R17): the Brand track, after H9.
 - Pay-at-pickup on the shop. The site takes online payment only; staff take
   counter payments in the workspace.
@@ -369,12 +372,12 @@ there is no public catalogue endpoint. Staff-made orders are paid through
   (unpaid online) order stays hidden from Orders, as B1 says, takes no
   invoice number, and is closed after 24 hours. A late payment for a closed
   order is refunded by `reserveOnPayment` (DEC-032).
-- **Checkout needs customer accounts on the site.** The checkout is offered
-  only where plan A's per-site accounts switch is on (read live through
-  A2's options read, not from the snapshot), a provider is connected and
-  the storefront isn't paused. Anywhere else, the product page and bag
-  offer **"Ask about ordering"**, which opens the site's enquiry form with
-  the product named. No guest checkout is built.
+- **Checkout is signed in, on every site.** Sign-in is always on (user,
+  2026-09-27), so the checkout is offered wherever a payment provider is
+  connected and the storefront isn't paused. Where either fails, the
+  product page and bag offer **"Ask about ordering"**, which opens the
+  site's enquiry form with the product named. No guest checkout is built,
+  and there is no "site without accounts" path.
 - **Public shop, bag and checkout endpoints run in the site's tenant
   context and are rate-limited per visitor.** Each resolves the Site, and
   so its organization, first. It then runs in `runInOrgContext(organizationId)`,
@@ -408,7 +411,7 @@ No new action. Everything maps to today's keys (see the permission matrix §2, "
 | Open the editor | `section:write`; without it, `/sites/:id` redirects to `/review` (#275) |
 | Comment and approve | `site:comment`, `site:approve` (unchanged) |
 | Public reads (Visit us, Journal, Plans, catalogue, product page) | none; the organization is derived from the Site, the read runs in that organization's RLS context, and only published, live records are served |
-| Checkout (quote and start) | a signed-in customer session (plan A) on a site with accounts on; the quote alone needs none. Rate-limited per visitor address and, for start, per account |
+| Checkout (quote and start) | a signed-in customer session (plan A); the quote alone needs none. Rate-limited per visitor address and, for start, per account |
 | Media upload for the text-block photo | `media:write` (unchanged) |
 
 ---
@@ -424,9 +427,10 @@ No new action. Everything maps to today's keys (see the permission matrix §2, "
 - "Runs on Saroh" stays in the footer (default 67).
 - Which services a Book page lists follows each service's "Show on booking
   page" (default 43, plan E1).
-- Checkout signs in at the last step, and guest checkout ends where accounts
-  are on (defaults 2 and 3). Where accounts are not on yet, the shop offers
-  "Ask about ordering" and no checkout (2026-09-27).
+- Checkout signs in at the last step on every site; there is no guest
+  checkout and no merchant switch (defaults 2, 3 and 71; user, 2026-09-27).
+  "Ask about ordering" remains only for no payment provider or a paused
+  storefront.
 - How `/book` and `/shop` relate to the Book and Shop module pages: they are
   dedicated routes at reserved paths, and a module page supplies their
   sections and menu entry (Key Technical Decisions).
@@ -493,8 +497,8 @@ flowchart LR
   D5[[D5 drafts: published-only]] --> G9[G9 Plans block]
   G11[G11 sells-from + catalogue + /shop] --> G12[G12 Product grid]
   G11 --> G13[G13 bag + checkout]
-  A3[[A3 site session + accounts switch]] --> G13
-  B2[[B2 fulfilment types]] --> G13
+  A3[[A3 site session + sign-in sheet]] --> G13
+  B2[[B2c fulfilment types writable]] --> G13
   G8 --> G14[G14 module pages: contract + API + reserved paths]
   G10 --> G14
   G12 --> G14
@@ -834,8 +838,14 @@ closes 9pm" and Get directions, all read live.
   (DEC-034). The phone is the business profile's public phone. The time
   zone is the business's (DEC-033), India when none is set.
 - This is the one public read of the business's place and hours. E6's
-  booking-page header should reuse it and `opening-hours.ts` rather than
-  extend `public-booking-page.ts` with its own copy (cross-plan note to E).
+  booking-page header reuses it (`GET public/sites/:siteId/visit/:storeId`,
+  and `GET public/sites/:siteId/visit` with no store) and `opening-hours.ts`
+  rather than extend `public-booking-page.ts` with its own copy.
+- **With no `SHOP` storefront** (a clinic that sells nothing), the read with
+  no store id falls back to the business profile: the registered address,
+  the business's hours and its public phone. The Visit us block still binds
+  a storefront and renders nothing without one; the fallback is for E6's
+  header facts. E9 reads `Site.storefrontId` (G11) for its storefront rule.
 - `opening-hours.ts` is pure and test-first. It covers DST, overnight hours
   and a closed day.
 - The panel says "Address lives on the storefront (Sell › Storefronts);
@@ -1094,9 +1104,9 @@ online order, the shop offers "Ask about ordering" instead.
 
 **Requirements:** R11
 
-**Dependencies:** G11, A3 (site session, sign-in sheet and the per-site
-accounts switch A2's options read reports), B2 (fulfilment types), and the
-round-1 `reserveOnPayment` · **Phase:** 2
+**Dependencies:** G11, A3 (site session, sign-in sheet and the signed
+relay), B2c (the new fulfilment types writable, and `StoreSettings.fulfilmentTypes`
+read from it), and the round-1 `reserveOnPayment` · **Phase:** 2
 
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` (`Order.placedOnline
@@ -1135,8 +1145,6 @@ round-1 `reserveOnPayment` · **Phase:** 2
 **Approach:**
 - **When the checkout is offered.** The options read says yes only when all
   of these hold:
-  - plan A's accounts switch is on for this site, read live, not from the
-    snapshot;
   - the site sells from a storefront (G11);
   - a payment provider is connected for that storefront;
   - the storefront isn't paused (`pausedAt`).
@@ -1144,32 +1152,46 @@ round-1 `reserveOnPayment` · **Phase:** 2
   Otherwise there is no bag. The product page's action is **"Ask about
   ordering"**, which opens the site's enquiry form with the product and
   variant named in the message, so every site with a shop has a working
-  action. The editor tells the merchant why ("Turn on customer accounts to
-  take orders online" or "Connect payments to take orders online"). Guest
-  checkout is not built.
+  action. The editor tells the merchant why ("Connect payments to take
+  orders online" or "Your storefront is paused"). Sign-in is always on, so
+  there is no accounts condition; guest checkout is not built.
 - **The bag** holds listing and variant ids and quantities only. The quote
   re-reads prices, the GST rules (DEC-023), fulfilment types and "can
   sell" from the server, and ignores any amount from the client. Lines that
   can't be sold now are shown as such before paying.
 - **Sign-in at the last step** ("Last step: confirm it's you", plan A,
   default 2). Starting needs the customer session. saroh.app's server
-  action forwards it in `x-customer-session`, with `x-site-host` (plan A's
-  session transport).
+  action forwards it in `x-customer-session`, with the signed
+  `x-saroh-relay` header (plan A's session transport); `CustomerSessionGuard`
+  runs the request in the business's RLS context. When a code can't be sent,
+  the sheet says "We couldn't send your code — try again in a few minutes"
+  with the business's phone number and the bag is kept; there is no guest
+  checkout (A2, A9).
+- **Fulfilment types and the delivery fee.** The checkout offers the types
+  in `StoreSettings.fulfilmentTypes` (B2c) that every item allows (default
+  15). G13 brings the shop's delivery fee model: a flat fee per storefront
+  for Local delivery and for Shipping, saved on the storefront settings and
+  added to the order's `shipping` when the type is chosen. B9 prefills a
+  change of fulfilment from it.
 - **Start creates an unpaid online order, following the round-1 pattern:**
   - In one transaction at the sells-from storefront, the server makes the
     order: status PENDING, `paymentStatus` UNPAID and `placedOnline`. Each
     line is priced from its listing, and no line has a `stockRow`, so
     nothing is held. The order's fulfilment type is one every item allows
-    (default 15, B2's rules), with the delivery fields when it is Local
+    (default 15, B2a's rules), with the delivery fields when it is Local
     delivery or Shipping. It belongs to the signed-in account's contact and
-    its store customer (ADR-011). The timeline says "by the customer".
+    its store customer (ADR-011); a new identity link between them carries
+    `reason SITE_ACCOUNT` and `linkedByUserId null` (C2's schema). The
+    timeline says "by the customer".
   - Its intent is then made through `createIntentInternal`, as
     `createIntentForOrder` does. The amount comes only from `order.total`,
     so a tampered client can't change what is charged.
   - The idempotency key comes from the checkout sheet, so a double tap or a
     retry returns the same order and intent, not a second order.
 - **The success webhook** (`applySuccess`), for a `placedOnline` order,
-  calls `reserveOnPayment(tx, { organizationId, orderId, paymentIntentId })`
+  reads the order's contact through C9's `resolveContact` once C9 has
+  landed (a checkout that raced a merge lands on the survivor), then calls
+  `reserveOnPayment(tx, { organizationId, orderId, paymentIntentId })`
   first, in reserve.ts's lock order (the intent, then the order, then the
   rows).
   - **HELD:** the order moves to PAID, `paidAt` is set, and
@@ -1215,11 +1237,13 @@ round-1 `reserveOnPayment` · **Phase:** 2
   paid order.
 - Edge case: start twice with the same idempotency key → one order, one
   intent.
-- Edge case: a site with accounts off → no bag; the product page shows "Ask
-  about ordering", which opens the enquiry with the product named; the
-  start endpoint refuses (403) even if called directly.
-- Edge case: accounts on but no provider connected, or the storefront
-  paused → "Ask about ordering", and nothing is created.
+- Edge case: no provider connected, or the storefront paused → no bag; the
+  product page shows "Ask about ordering", which opens the enquiry with the
+  product named; the start endpoint refuses (403) even if called directly,
+  and nothing is created.
+- Edge case: the code email can't be sent → the sheet's "couldn't send"
+  sentence with the business's phone; the bag is kept and no order is
+  created.
 - Edge case: an abandoned checkout older than 24 hours → CANCELLED by the
   job; a payment arriving afterwards → refused and refunded.
 - Error path: a tampered amount or quantity in the request is ignored or
@@ -1594,10 +1618,10 @@ module); D12 for autopay on Join when it lands · **Phase:** 2
   at once; "UPI Autopay or card" shows only once D12 is live and the
   provider supports it (DEC-038).
 - Buy is plan A's A11 flow.
-- Join and Buy need a signed-in customer, so they follow G13's rule: on a
-  site without customer accounts, or with Payments off, they become "Ask
-  about joining" or "Ask about this pack", which open the enquiry form with
-  the plan or pack named.
+- Join and Buy need a signed-in customer; sign-in is always on, so every
+  site offers them. With Payments off (no provider connected) they become
+  "Ask about joining" or "Ask about this pack", which open the enquiry form
+  with the plan or pack named.
 - An unpaid online join makes its first invoice before payment. It follows
   whatever A11 settles for unpaid online invoices, including the security
   review's ask that they take no GST number until paid and that open
@@ -1610,7 +1634,7 @@ module); D12 for autopay on Join when it lands · **Phase:** 2
 - Happy path: Pulse shows Try a class, 2 memberships and 2 packs.
 - Edge case: a Draft pack, or one with pending changes → the published values
   only.
-- Edge case: a site with accounts off → "Ask about joining" instead of Join.
+- Edge case: the code email can't be sent at Join → the sign-in sheet's "couldn't send" sentence with the business's phone; nothing is subscribed.
 - Error path: Join with Payments off → no Join button, and "Ask about joining"
   instead.
 
@@ -1712,7 +1736,7 @@ four steps.
 | A checkout race oversells | `reserveOnPayment` with automatic refund (DEC-032) |
 | A module page 404s shared links when a module turns off | "This isn't available right now" page, not a 404 |
 | Saroh's brand reaches a site through a new component | `check:blocks` in CI; H1 removes the fonts first |
-| Plan A or B slips and blocks G13 | G11–G13 ship together in phase 2, so no product page is live without an action. If A3 is late, the shop's designed state for a site without accounts ("Ask about ordering", G13) is what every site gets. It is not an interim state to remove later |
+| Plan A or B slips and blocks G13 | G11–G13 ship together in phase 2, so no product page is live without an action. If A3 is late, G13 waits for it: there is no checkout without sign-in, and the shop's "Ask about ordering" state (no provider, or a paused storefront) is what a site shows until then |
 | A dedicated route hides a merchant's page | Reserved paths refuse new pages there. A free-form page already live at `/shop` is still served until moved. One at `/book` is shadowed already and is now flagged. Nothing is moved automatically |
 | The site sells from the wrong storefront | Set on its own only with one candidate, and named in the editor. Otherwise the merchant picks, and the shop stays quiet until they do |
 | A script fills a business's Orders with unpaid checkouts | Unpaid online orders are hidden and closed after 24 hours, take no invoice number, and are capped per account and per visitor address |
@@ -1729,8 +1753,8 @@ four steps.
   if the split teaches something.
 - Add each new public route to `module-annotations.spec.ts`.
 - `saroh-product.md` "Websites" also records the reserved page paths
-  (`/book`, `/shop`, `/checkout`) and "Ask about ordering" on sites without
-  customer accounts.
+  (`/book`, `/shop`, `/checkout`) and "Ask about ordering" where no payment
+  provider is connected or the storefront is paused.
 - Release note for G14: a page that sat at `/book` was never visible, and
   the editor now says so.
 - Every schema change gets RLS where rows carry an organization and passes

@@ -30,8 +30,11 @@ bookings and invoices land in their account, and go out through the
 business's own connected email provider.
 
 **Phase 1 is one finished flow: sign in at the last step of booking**
-(A1–A4 and A9, user, 2026-09-27). A merchant turns accounts on for a site, a
-customer books with a code, and the booking lands on their customer record.
+(A1–A4 and A9, user, 2026-09-27). **Sign-in is always on for every merchant
+site** (user, 2026-09-27): there is no merchant switch, no guest booking, no
+guest checkout and no guest fallback. A customer books with a code, and the
+booking lands on their customer record. When A9 ships, every site moves to
+sign-in at once, with a release note and a notice to merchants beforehand.
 The account area (A5) ships in phase 2 with the pages it points at (A6–A8,
 A13), so no customer meets a half-built account.
 
@@ -61,13 +64,13 @@ phone on the booking.
 - R1. A customer signs in on a merchant's site with a six-digit code sent by email. There is no phone sign-in this round. One flow serves new and returning people, and it never reveals whether an account existed.
 - R2. An account belongs to one business (`organizationId`), links to exactly one Contact, and is never a Better Auth `User`.
 - R3. The session is a host-only `__Host-` cookie on the site's own host. The API accepts it only for the business that host resolves to; a token from another site gets a 401. Every customer route runs under the database's row-level security for that business.
-- R4. Codes and tokens are stored only as hashes. Codes expire and allow few tries. Limits apply per destination, per client address (the visitor's, relayed by the site's server under a signature) and per business, and the durable ones count database rows. No limit someone else can exhaust stops a customer from booking. Codes are refused while the business is suspended or closing.
+- R4. Codes and tokens are stored only as hashes. Codes expire and allow few tries. Limits apply per destination, per client address (the visitor's, relayed by the site's server under a signature) and per business, and the durable ones count database rows. No limit someone else can exhaust stops a customer from booking, and a customer who hits a limit is told when they can try again. Codes are refused while the business is suspended or closing. When a code can't be sent, the customer sees "We couldn't send your code — try again in a few minutes" with the business's phone number, and no booking is taken; there is no guest fallback. The code email is critical: it goes from a dedicated sending stream, and every send failure raises an alert.
 - R5. A first sign-in links the account to an existing contact **only when that contact's email is verified** (DEC-049). Otherwise the account gets a separate contact and the pair is suggested to staff; Saroh never merges on its own. The merchant can undo a link ("This isn't them").
 - R6. The account area follows the business's modules, with a bottom tab bar on phones. It holds Home, Bookings, Orders, Plan, Messages and Me, and shows only an allow-list of the customer's own data, never staff notes.
 - R7. From the account, a customer can move a one-to-one booking to a free time with the same person, and cancel under the free-cancellation rule. A move never extends the free-cancellation or refund window. A class is moved on the site's booking page ("Moving: …").
 - R8. Orders show their steps from the order's fulfilment type (Track), along with receipts.
 - R9. From the account, a customer can see their plan, pause it for a set length and resume it, cancel it at period end (offered "pause instead"), and pay a failed invoice through its pay link. Default 8.
-- R10. Signing in is asked for at the last step of booking or buying; browsing is open. The booking form fills in from the account, and a double booking of the same slot by the same person is refused. Accounts are switched on per site by the merchant, never by Saroh. Defaults 2 and 3.
+- R10. Signing in is asked for at the last step of booking or buying; browsing is open. The booking form fills in from the account, and a double booking of the same slot by the same person is refused. **Sign-in is always on for every merchant site**: there is no per-site or merchant switch, and no guest booking or guest checkout (user, 2026-09-27). Defaults 2, 3 and 71.
 - R11. A signed-in customer can spend a class credit online, under the same rules as at the desk (it covers the service, a class is left, it is valid when the class starts, and the late-cancel rule applies).
 - R12. A signed-in customer can buy a published class pack online. The purchase is recorded only when the payment succeeds, on the terms shown when they started paying.
 - R13. A full class offers "Join the waitlist". A freed place is offered to the first person in line and held for a while, then passed to the next. Default 9.
@@ -216,12 +219,14 @@ phone on the booking.
 
 ## Key Technical Decisions
 
-- **Three tables, one family, and three columns** (A1):
+- **Three tables and three columns** (A1):
   - `CustomerAccount` (organizationId, contactId unique, email, emailVerifiedAt, status ACTIVE|BLOCKED|MERGED|REMOVED, mergedIntoId, linkedAt, lastSignedInAt);
   - `CustomerSignInCode` (organizationId, destinationHash, codeHash, expiresAt, attempts, consumedAt, retiredAt, clientHash, newDestination);
   - `CustomerSession` (organizationId, accountId, siteId, tokenHash unique, expiresAt, lastSeenAt, revokedAt, userAgent summary);
   - `Contact.emailVerifiedAt` and `Contact.emailVerifiedVia` (SIGN_IN_CODE | ORDER_CONFIRMATION | BOOKING_CONFIRMATION | STAFF_CONFIRMED), both nullable;
-  - `Site.customerAccountsEnabled Boolean @default(false)`.
+  - `CustomerAccount.unlinkedFromContactId`, nullable: the contact staff said "This isn't them" about (A4), so C2's suggestions never pair the two again.
+
+  There is no `Site` column: sign-in is always on (user, 2026-09-27), so nothing is switched per site.
 
   A partial unique index on `CustomerAccount (organizationId, email)` applies where status is not REMOVED, so a MERGED account keeps its email reserved (see Merging below). No phone column is added this round; phone sign-in adds one with its own migration.
 - **Account ↔ contact linking (A4, DEC-049).** `Contact.email` is required and
@@ -229,13 +234,16 @@ phone on the booking.
   first verified sign-in with no account for that email:
   - **no contact holds the email** → create one with the real email, stamped verified (`SIGN_IN_CODE`), and link it;
   - **the contact holding it has a verified email and no account** → link it;
-  - **the contact holding it is unverified, or already has an account under another email** → create a **separate contact** and link the account to it. The separate contact cannot take the email, so its `Contact.email` is a **reserved placeholder**, `account+<contactId>@account.invalid`, the same shape as C11's `removed+<contactId>@removed.invalid`. The verified email lives on `CustomerAccount.email`. The pair (separate contact, contact holding the email) is surfaced to staff through C2's computed suggestions, which pair a contact's account email with other contacts' emails. Staff merge it (C9/C10); nothing is linked automatically.
+  - **the contact holding it is unverified, or already has an account under another email** → create a **separate contact** and link the account to it. The separate contact cannot take the email, so its `Contact.email` is a **reserved placeholder**, `account+<contactId>@account.invalid`, the same family as C9's `merged+<contactId>@removed.invalid` and C11's `removed+<contactId>@removed.invalid`. The verified email lives on `CustomerAccount.email`. The pair (separate contact, contact holding the email) is surfaced to staff through C2's computed suggestions, which pair a contact's account email with other contacts' emails. Staff merge it (C9/C10); nothing is linked automatically.
 
-  Every reader of `Contact.email` goes through one helper
-  (`contact-email.ts`: `isReservedContactEmail`, `contactEmailForDisplay`),
-  which treats a reserved placeholder as "no email" and, for display, shows
-  the account's email instead. Communications refuse to send to a reserved
-  address. A4 writes no suggestion row: suggestions are computed (plan C).
+  Every reader of `Contact.email` goes through **one helper module, owned by
+  A1**: `contacts/contact-email.ts` (`reservedAccountEmail`,
+  `reservedMergedEmail`, `reservedRemovedEmail`, `isReservedContactEmail`,
+  `contactEmailForDisplay`). It treats every reserved placeholder (the
+  `account.invalid` and `removed.invalid` domains) as "no email" and, for
+  display, shows the account's email instead. C2, C8, C9 and C11 import it and
+  keep no copy. Communications refuse to send to a reserved address. A4 writes
+  no suggestion row: suggestions are computed (C2's pure `duplicates.ts`).
 - **What makes a contact's email verified.** A sign-in code proven for it (A4),
   or a transactional confirmation of an online order or booking that the
   contact made with that email, accepted by the business's email provider
@@ -257,14 +265,17 @@ phone on the booking.
   only, so a direct caller cannot skip the site's `Origin` check or pick its
   own address. The relayed address is what the per-address limiter counts and
   what `CustomerSignInCode.clientHash` stores (hashed with `hashClientIp`).
-- **Limits come from rows, and none can shut a business's booking.**
-  - Per destination and client address: a resend no sooner than 30 s, at most 5 an hour and 10 a day (default 5), counted from `CustomerSignInCode` rows with the same `destinationHash` and `clientHash`.
-  - Per destination overall: at most 20 a day across addresses, so an inbox cannot be flooded.
-  - Per client address: `FixedWindowRateLimiter` keyed by the relayed address.
-  - Per business, **only for new destinations** (an email with no ACTIVE or MERGED account, flagged `newDestination` on the row): a ceiling per hour, lower for a business in its first 14 days. Returning customers never count against it and are never stopped by it.
-  - Per business per day, a ceiling on all site codes, for the sender's reputation; also lower for a new business.
-  - Once a business passes half its hourly new-destination ceiling, the sign-in sheet asks for a bot challenge (Cloudflare Turnstile) before sending.
-  - **Fallback.** When a code is refused by a limit the visitor did not cause (the destination-wide limit or either business ceiling), the API answers 429 with `reason: "busy"`, and the booking flow continues as a guest booking (today's form). An attacker can slow sign-ups; they cannot stop bookings.
+- **Limits come from rows, slow abuse, and never lock a real customer out.**
+  With sign-in always on and no guest form, a refused code is a refused
+  booking, so no limit can be one that someone else exhausts for a customer.
+  - **Per email per visitor address:** a resend no sooner than 30 s, at most 5 an hour and 10 a day (default 5), counted from `CustomerSignInCode` rows with the same `destinationHash` and `clientHash`. Only the visitor's own requests count. *Recovery:* the sheet says when the next code can go ("Try again in 12 minutes"), and the last code sent stays valid for its 10 minutes.
+  - **Per email across addresses:** 20 a day (default 5), so an inbox cannot be flooded. Past it the email is **not refused**: every further code needs the bot challenge and waits 10 minutes after the previous one. *Recovery:* a customer whose inbox someone else is flooding still gets a code within 10 minutes; the flooder gets at most 6 an hour.
+  - **Per visitor address:** `FixedWindowRateLimiter` keyed by the relayed address, set generously because offices and mobile networks share addresses. *Recovery:* it answers with its retry time.
+  - **Per business, only for new destinations** (an email with no ACTIVE or MERGED account, flagged `newDestination` on the row): a ceiling per hour, lower for a business in its first 14 days. Past half of it the sheet asks new emails for a bot challenge (Cloudflare Turnstile); past all of it codes still go to anyone who passes the challenge, and Saroh is alerted. Returning customers never count against it and are never challenged by it.
+  - **Per business per day, all site codes** (the sender's reputation), lower for a new business: past it, the challenge for every request and an alert; never a refusal.
+  - **What can refuse a code:** only the visitor's own per-address limits (with a retry time), a failed or missing challenge, a suspended or closing business, and the email not being sent. Nothing refuses a code because of what someone else did.
+- **When a code can't be sent** (the email provider refuses or times out after retries), the API answers 503 with `reason: "unavailable"`. The sheet says "We couldn't send your code — try again in a few minutes" and "Or call ‹Business› on ‹phone›" (the business's public phone, left out when there is none). The booking is not taken, and the hold runs out as usual. **There is no guest fallback** (user, 2026-09-27).
+- **The code email is critical** (A2). It goes out on its own sending stream and address on Saroh's identity domain, through a transactional provider with delivery reports, with two quick retries inside the request. Every failed send is logged (no address, no code) and counted, and an alert fires when failures pass a low threshold in a few minutes (the alerting follows `devops-observability.md`; tracked with #103). A bounce or complaint on the stream is recorded against the business's ceilings.
 - **One sign-in endpoint pair** under `public/site-accounts/`: `codes` (request) and `sessions` (verify). The API resolves the relayed host to a Site and Organization (the same lookup as `by-hostname`) and never takes an organization id from the body. The rest of the handler runs inside `runInOrgContext(organizationId)`.
 - **Session transport.** The site's server routes read the `__Host-saroh_session` cookie and forward the token in an `x-customer-session` header, with the signed relay header. `CustomerSessionGuard` checks the relay signature, resolves the host, hashes the token and loads the session. It checks that the session's organization and site match the host's resolution and that it is neither expired nor revoked, then attaches `request.customerContext {organizationId, siteId, accountId, contactId}`. Sliding renewal writes `lastSeenAt` at most once an hour. Default 6.
 - **Customer routes run under RLS** (A3). `OrgRlsInterceptor` reads
@@ -276,8 +287,8 @@ phone on the booking.
 - **No workspace crossover.** The customer routes never read Better Auth cookies, and `BetterAuthGuard` never reads `x-customer-session`.
 - **Origin.** State-changing site routes are Next.js server actions or route handlers in `apps/saroh.app`. They check `Origin` against the served host before calling the API. The check is mandatory and tested on every one: until `saroh.app` is on the Public Suffix List, `SameSite=Lax` does not separate one merchant's site from another's.
 - **Email changes (A5).** A customer changes their email in Me with a code sent to the new address. The new email must be free among the business's accounts. On success: the account's email changes; the Contact's email changes with it when the Contact held the old one and no other contact holds the new one (and stays verified); otherwise the Contact keeps what it had and the pair shows in suggestions. The customer always sees the same neutral answer. **Every other session of the account is revoked**, and Saroh's identity sender tells the old address that the sign-in email was changed. A staff edit of a contact's email (C8) never changes the sign-in email.
-- **The switch is per site, read live** (A9). `Site.customerAccountsEnabled` is set by `PUT organizations/:org/sites/:siteId/customer-accounts`, gated by `site:publish` because it changes the public site at once, with no publish. The options read and the booking flow read it live, never from the publication snapshot. It is off for every existing site; Saroh never turns it on.
-- **Guest booking with accounts on.** With the switch on, the booking flow asks for sign-in instead of the guest details form (default 3). The anonymous API route stays open: it has no site to check (a service belongs to a business, not a site), guest booking is today's behaviour rather than a hole, and the fallback above needs it.
+- **Sign-in is always on** (A9; user, 2026-09-27). Every merchant site's booking flow asks for a code at the last step. There is no setting, no merchant switch and no guest details form (defaults 3 and 71). When A9 ships, every site moves at once; a release note and a notice to merchants go out beforehand (Documentation / Operational Notes).
+- **The anonymous booking route closes in two releases.** `POST public/services/:serviceId/book` keeps serving for the one release in which A9 moves the booking page to the signed-in route, so a page loaded before the deploy still books; the next release makes it refuse (410 "Sign in to book"). Staff bookings in the workspace are unaffected. The shop's checkout (G13) is signed-in from the start and has no anonymous route.
 - **An allow-list serializer** (`customer-view.ts`) is the only way customer data leaves the API. Its tests assert that staff notes, Needs attention staff wording, other attendees and internal ids beyond opaque references never appear.
 - **Spending a credit and buying a pack reuse the desk's rules.** `redeem-pack.ts` is called with a customer context. Buying goes through the invoice payment path: a `DRAFT` pack invoice with the pack's terms snapshotted, issued and turned into a `PackPurchase` in `applySuccess`, idempotent per intent. Prices always come from the server.
 - **The waitlist** is a `ClassWaitlistEntry` table (organizationId, sessionKey: service + startsAt, contactId, position, status WAITING|OFFERED|ACCEPTED|EXPIRED|LEFT, offeredUntil). A freed place (cancel, release, hold expiry) enqueues `waitlist.offer`. The offer is a hold on the place, reusing booking-hold, so capacity counts stay correct. Accepting books it; expiry passes it on.
@@ -291,7 +302,6 @@ phone on the booking.
 
 | Action | Who | Used by | Change |
 |---|---|---|---|
-| `site:publish` | Owner, Admin | Turning customer accounts on or off for a site (A9) | Existing; reused because the switch changes the live site with no publish |
 | `message:read` | Owner, Admin (custom grantable) | Customer Detail Messages tab, Home "Reply" row | Existing; reads customer threads |
 | `message:write` | Owner, Admin | Replying to a customer | Existing |
 | `contact:write` | Owner, Admin | "This isn't them" (unlink an account) | Existing; relabelled "Edit customers and contacts" in C13 (DEC-039) |
@@ -313,6 +323,7 @@ No new staff action is added in this epic.
 - Linking only to a verified contact email; a separate contact otherwise (DEC-049, user, 2026-09-27).
 - No "Remove my details" in Me (user, 2026-09-27).
 - Phase 1 is A1–A4 and A9 (user, 2026-09-27).
+- Sign-in is always on for every merchant site: no merchant switch, no guest booking or checkout, and no guest fallback (user, 2026-09-27, superseding the earlier per-site switch).
 - The separate contact's email is a reserved placeholder; the verified email lives on the account (this deepening, following C11's shape).
 
 ### Deferred to Implementation
@@ -336,7 +347,7 @@ sequenceDiagram
     B->>S: email (sign-in sheet)
     S->>S: check Origin; sign relay {visitor address, host, ts}
     S->>A: POST public/site-accounts/codes {email} + x-saroh-relay
-    A->>A: verify relay; host → Site → Org (live switch on?)
+    A->>A: verify relay; host → Site → Org (published?)
     A->>A: runInOrgContext(org): limits; store hashed code; send email
     B->>S: code
     S->>A: POST public/site-accounts/sessions {email, code} + x-saroh-relay
@@ -353,7 +364,7 @@ sequenceDiagram
 flowchart TD
   V[Verified sign-in, email e] --> Q1{Account with e?}
   Q1 -- ACTIVE --> SI[Sign in to it]
-  Q1 -- MERGED --> SV[Sign in to the survivor account]
+  Q1 -- MERGED --> SV["'This email now signs in as ‹masked survivor›'; no session"]
   Q1 -- none --> Q2{Contact holding e?}
   Q2 -- none --> N[New contact with e, verified; link]
   Q2 -- "yes, verified, no account" --> L[Link it]
@@ -377,15 +388,17 @@ erDiagram
 ## Phases
 
 - **Phase 1 (one finished flow: sign in to book):** A1, A2, A3, A4, A9.
-  At the end of phase 1 a merchant can switch accounts on for a site; a
-  customer books with an email code; the booking lands on their customer
+  At the end of phase 1 every merchant site asks for sign-in at the last
+  step of booking; a customer books with an email code; the booking lands on their customer
   record, linked or suggested as a duplicate; the merchant sees "Signs in on
   your website" and can undo a link. The header's account entry stays hidden.
 - **Phase 2:** A5 (the account area) with A6, A7, A8 and A13; then A10,
   A11, A12 and A14.
 
 Ship order in phase 1: A1 → A2 → A3 → A4 → A9. A4 also waits on C2
-(computed suggestions), which lands first in phase 1.
+(computed suggestions), and lands after C1 → C2 → C3 on
+`customer-workspace.controller.ts`. A9 lands on the booking flow after H1,
+E7 and E11 (overview, "Shared files").
 
 ---
 
@@ -397,7 +410,7 @@ flowchart LR
   A2 --> A3[A3 site session, RLS, sign-in sheet]
   A1 --> A4[A4 account ↔ contact]
   C2[C2 suggestions] --> A4
-  A3 --> A9[A9 switch + sign-in to book]
+  A3 --> A9[A9 sign-in to book]
   A4 --> A9
   A9 --> A5[A5 account shell, Home, Me]
   C1[C1 attention] --> A5
@@ -405,7 +418,7 @@ flowchart LR
   E8[E8 deposits] --> A6
   E9[E9 visits] --> A6
   A5 --> A7[A7 orders + Track]
-  B2[B2 fulfilment types] --> A7
+  B2[B2a/B2c fulfilment types] --> A7
   A5 --> A8[A8 plan and packs]
   D8[D8 pause end date] --> A8
   A9 --> A10[A10 credits online]
@@ -420,44 +433,44 @@ flowchart LR
 
 ### A1. Customer identity tables
 
-**Goal:** The schema for per-business customer accounts, sign-in codes and sessions, the contact's verified-email stamp and the per-site switch.
+**Goal:** The schema for per-business customer accounts, sign-in codes and sessions, the contact's verified-email stamp, and the one helper every reader of a contact's email uses.
 
 **Requirements:** R2, R4, R5, R10
 
 **Dependencies:** None · **Phase:** 1
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (CustomerAccount, CustomerSignInCode, CustomerSession; relations from Organization, Contact and Site; `Contact.emailVerifiedAt`, `Contact.emailVerifiedVia`; `Site.customerAccountsEnabled`)
+- Modify: `packages/database/prisma/schema.prisma` (CustomerAccount, CustomerSignInCode, CustomerSession; relations from Organization, Contact and Site; `Contact.emailVerifiedAt`, `Contact.emailVerifiedVia`; `CustomerAccount.unlinkedFromContactId`)
 - Create: `packages/database/prisma/migrations/<ts>_customer_accounts/migration.sql`
 - Create: `apps/api.saroh.in/src/modules/site-accounts/site-accounts.module.ts`, `customer-account.repository.ts`
-- Create: `apps/api.saroh.in/src/modules/contacts/contact-email.ts` (`reservedAccountEmail(contactId)`, `isReservedContactEmail`, `contactEmailForDisplay`), shared with C11's placeholder
+- Create: `apps/api.saroh.in/src/modules/contacts/contact-email.ts` (`reservedAccountEmail`, `reservedMergedEmail`, `reservedRemovedEmail`, `isReservedContactEmail`, `contactEmailForDisplay`): the one owner of the placeholders; C2, C8, C9 and C11 import it
 - Test: `apps/api.saroh.in/src/modules/site-accounts/customer-account.db.spec.ts`, `modules/contacts/contact-email.spec.ts`
 
 **Approach:**
 - Every new table has a required `organizationId`, RLS and an `org_isolation` policy.
 - Composite foreign keys tie `(contactId, organizationId)`, `(accountId, organizationId)` and `(mergedIntoId, organizationId)` together.
 - Partial unique indexes: `CustomerAccount (organizationId, email)` where status ≠ REMOVED, and one account per contact where status ≠ REMOVED.
-- `Site.customerAccountsEnabled` defaults to false, so every existing site is off.
+- A merge-retired account keeps its row with status MERGED and `mergedIntoId` (C9), and stays in the unique-email index, which excludes only REMOVED.
 - Declare everything in `schema.prisma`.
 - Deleting a Contact cascades to its account and sessions. Removal in C11 is the normal path; the cascade is the backstop.
-- `contact-email.ts` recognises both reserved shapes (`account+…@account.invalid`, `removed+…@removed.invalid`).
+- `contact-email.ts` builds and recognises every reserved shape (`account+…@account.invalid`, `merged+…@removed.invalid`, `removed+…@removed.invalid`) by its reserved domain.
 
 **Patterns to follow:** `20260923150000_products_v2` (RLS); the partial unique indexes (`Invoice_one_per_order`).
 
 **Test scenarios:**
 - Happy path: create an account for a contact; a second live account for the same contact is refused.
 - Edge case: the same email is allowed in two businesses and refused twice in one; a REMOVED account frees its email; a MERGED account keeps it reserved.
-- Edge case: `isReservedContactEmail` is true for both placeholder shapes and false for a real `.in` address.
+- Edge case: `isReservedContactEmail` is true for all three placeholder shapes and false for a real `.in` address.
 - Error path: an account pointing at another business's contact is rejected by the database.
 - Integration: `db:verify:replay` passes; inside `runInOrgContext` the policy hides another business's rows (the request-path check is A3's).
 
-**Verification:** The migration replays from empty; existing sites read `customerAccountsEnabled = false`.
+**Verification:** The migration replays from empty; no `Site` column is added.
 
 ---
 
 ### A2. Sign-in codes by email, with limits and the signed relay
 
-**Goal:** Request and verify a one-time code for a site, sent by Saroh's identity email in the business's name, with limits no outsider can use to stop bookings.
+**Goal:** Request and verify a one-time code for a site, sent reliably by Saroh's identity email in the business's name, with limits no outsider can use to stop a customer booking, and an alert whenever a code can't be sent.
 
 **Requirements:** R1, R4
 
@@ -471,13 +484,14 @@ flowchart LR
 **Approach:**
 - `site-relay.ts` verifies `x-saroh-relay` (HMAC over visitor address, host and timestamp; 60-second window; constant-time compare) and yields `{host, clientHash}`. Every site-accounts route refuses a missing, stale or forged relay with 401.
 - `POST public/site-accounts/codes {email, challenge?}`:
-  - resolve the relayed host to its Site and Organization (404 when unknown, when the site is unpublished, or when `customerAccountsEnabled` is off);
+  - resolve the relayed host to its Site and Organization (404 when unknown or unpublished);
   - run the rest inside `runInOrgContext(organizationId)`;
   - apply `assertOrganizationOpen`;
   - normalise the email;
-  - apply `code-limits.ts` (the limits in Key Technical Decisions) and the per-address limiter; ask for the challenge once the business is past half its new-destination ceiling;
+  - apply `code-limits.ts` (the limits in Key Technical Decisions) and the per-address limiter; ask for the challenge past half the business's new-destination ceiling, past its daily ceiling, and for an email past 20 codes a day;
   - retire earlier live codes, store HMACs and the relayed `clientHash`, flag `newDestination`, and send;
-  - answer the same 202 shape for known and unknown emails. A limit the caller caused → 429 with `retryAfter`; a limit they did not cause → 429 with `reason: "busy"` (the booking flow's fallback, A9).
+  - send with two quick retries; a send that still fails → 503 `reason: "unavailable"`, a structured error log (no address, no code) and the send-failure counter the alert reads;
+  - answer the same 202 shape for known and unknown emails. The caller's own per-address limit → 429 with `retryAfter`. No other limit refuses: past a ceiling someone else may have caused, the answer asks for the challenge or gives a wait (`retryAfter` of at most 10 minutes), never a refusal.
 - `POST public/site-accounts/sessions {email, code}`:
   - verify with a constant-time compare;
   - increment attempts, and kill the code at 5;
@@ -487,7 +501,7 @@ flowchart LR
 - `sender-name.ts` cleans the business name for the display name and subject: strips control characters, URLs and domain-like runs, cuts to 40 characters, HTML-escapes for the body, and falls back to the site's host when nothing is left.
 - The email's display name is "‹Business› via Saroh" (default 4) and the subject is "Your code for ‹Business›"; the copy says nothing else is sent from this address except a notice if the sign-in email changes.
 - There is no SMS port, no channel field and no phone input. A body that carries a phone, a host, an organization id or an unknown field is refused (400), so nothing can half-enable a phone path or pick a business.
-- `GET public/site-accounts/options` (relayed host) says whether accounts are on for the site, read live from `Site.customerAccountsEnabled`.
+- `GET public/site-accounts/options` (relayed host) says whether the challenge is needed now and gives the business's public phone for the "couldn't send" line. There is no on/off: every published site takes sign-in.
 
 **Patterns to follow:** `public-invoices.service.ts` (keyed limiters, caller hash, `runInOrgContext` after resolving); `sendVerificationOtpEmail`.
 
@@ -495,16 +509,17 @@ flowchart LR
 - Happy path: request, then verify, gives a session token; verifying a destination with no account creates one.
 - Edge case: a resend inside 30 s → 429 with retry-after; the 6th code in an hour from one address → 429; a new code kills the old one.
 - Edge case: the response for a known email equals the one for an unknown email.
-- Edge case: codes for a returning customer's email are sent while the business's new-destination ceiling is exhausted.
-- Edge case: past the new-destination ceiling → 429 `busy` for a new email; past half of it → the challenge is required, and a missing or failed challenge → 400.
-- Edge case: the 21st code for one email in a day, spread over many addresses → 429 `busy`, not a per-address error.
+- Edge case: codes for a returning customer's email are sent, with no challenge, while the business's new-destination ceiling is exhausted.
+- Edge case: past half the new-destination ceiling → the challenge is required for a new email, and a missing or failed challenge → 400; past the whole ceiling → a code still goes to a visitor who passes the challenge, and the alert fires.
+- Edge case: the 21st code for one email in a day, spread over many addresses → not refused: the challenge is required and the code goes out 10 minutes after the previous one; a customer on a fresh address gets their code within 10 minutes.
+- Error path: the email transport fails three times → 503 `unavailable`, the failure is counted and alerted, and no code row is left live.
 - Edge case: a business name "Bank Alert www.example.com\n" → the display name has no URL or newline and is at most 40 characters.
-- Error path: 5 wrong codes → the code is dead; an expired code → 400; a suspended business → 403 with no send; an unknown host or a site with accounts off → 404.
+- Error path: 5 wrong codes → the code is dead; an expired code → 400; a suspended business → 403 with no send; an unknown or unpublished host → 404.
 - Error path: no relay header, a stale timestamp, or a header signed with another secret → 401; the limiter counts the relayed address, never the caller's.
 - Error path: a body with a `phone`, `channel`, `host` or `organizationId` field → 400.
 - Integration: logs contain neither the code nor the destination nor the relayed address.
 
-**Verification:** A code email arrives on the local stack (the fake transport) for a Northwind site with accounts on, from the site-codes sender, and sign-in works.
+**Verification:** A code email arrives on the local stack (the fake transport) for a Northwind site, from the site-codes sender, and sign-in works; with the fake transport set to fail, the send-failure alert's metric moves.
 
 ---
 
@@ -560,14 +575,16 @@ flowchart LR
 - Test: `site-accounts/account-linking.service.db.spec.ts`, `site-accounts/unlink-plan.spec.ts`, `customer-workspace/customer-detail.service.spec.ts`
 
 **Approach:**
-- `linkOrCreate(tx, org, email, name?)` follows the rule in Key Technical Decisions and the second diagram. It locks the contact holding the email (if any) before deciding, so two first sign-ins for one email make one account.
+- `linkOrCreate(tx, org, email, name?)` follows the rule in Key Technical Decisions and the second diagram. It locks the contact holding the email (if any) before deciding, so two first sign-ins for one email make one account. Once C9 lands, the contact it links to is read through C9's `resolveContact` (C9 adds the call), so a sign-in racing a merge lands on the survivor.
+- **A merge-retired email.** When the email belongs to an account with status MERGED (C9), a correct code opens no session and answers "This email now signs in as ‹masked survivor email›" (first letter and domain). Nothing is created.
+- A4 writes no `CustomerIdentityLink`. Where a signed-in flow does (G13's checkout), the link carries `reason SITE_ACCOUNT` and `linkedByUserId null` (C2's schema).
 - A verified link or a new contact stamps `Contact.emailVerifiedAt` (`SIGN_IN_CODE`). A separate contact is never stamped on the contact holding the email: the code proves the inbox, not that the person is that contact.
 - The separate contact gets `source` `site-account`, a blank name until the customer gives one, and the reserved placeholder email. Customer Detail and every other reader shows the account's email through `contactEmailForDisplay`.
 - A4 writes no suggestion row. C2's `duplicates.ts` pairs a contact's account email with other contacts' emails, so the pair appears on its own.
 - **"This isn't them"** (audited `customer.account.unlink`, `contact:write`):
   - moves the account to a new separate contact (placeholder email) and revokes its sessions;
   - moves every record the account made since `linkedAt` to it, listed in `unlink-plan.ts`: in phase 1, bookings with `customerAccountId` (A9); later units add theirs (orders and identity links made while signed in, thread messages the customer wrote, waitlist entries, mandates), each with a test;
-  - clears the old contact's `emailVerifiedAt`, and records a C2 dismissal for the pair so it is not suggested again;
+  - clears the old contact's `emailVerifiedAt`, and sets the account's `unlinkedFromContactId` to the old contact, so C2's `duplicates.ts` never suggests the pair again (there is no general dismissal table this round, default 92);
   - the confirm shows the counts that move ("2 bookings they made online move with them").
 
 **Test scenarios:**
@@ -576,7 +593,8 @@ flowchart LR
 - Edge case: Farah exists with that email, unverified (typed by staff) → a separate contact with a placeholder email; Farah is unchanged and unstamped; the pair appears in C2's suggestions; nothing of Farah's is readable through the account.
 - Edge case: the contact holding the email already has an account under another email → a separate contact and a suggestion; accounts are never joined by matching.
 - Edge case: two first sign-ins for one new email at once → one contact, one account.
-- Edge case: unlink after one online booking → the booking moves to the new contact, the old contact loses its stamp, and the pair is dismissed.
+- Edge case: unlink after one online booking → the booking moves to the new contact, the old contact loses its stamp, and the pair is never suggested again.
+- Edge case: a correct code for an email whose account was retired by a merge → no session, and the answer names the masked survivor email.
 - Error path: unlinking from another business → 404; a Member without `contact:write` → 403.
 
 **Verification:** On Northwind, a sign-in with a staff-typed email shows two customers side by side in suggestions; a sign-in with a new email shows one verified customer with the badge.
@@ -595,7 +613,7 @@ flowchart LR
 - Create: `apps/api.saroh.in/src/modules/site-accounts/{account.controller.ts,account-home.service.ts,customer-view.ts,email-change.service.ts}`
 - Modify: `apps/api.saroh.in/src/common/email.ts` (the "sign-in email changed" notice)
 - Create: `apps/saroh.app/app/[domain]/account/{layout,page,me/page}.tsx`, `packages/site-blocks/src/account/{tab-bar,account-home,me}.tsx`
-- Modify: `apps/saroh.app/app/[domain]/layout.tsx` (the header's Sign in / account entry, only when the site's switch is on)
+- Modify: `apps/saroh.app/app/[domain]/layout.tsx` (the header's Sign in / account entry, on every site; G17's account slot)
 - Test: `site-accounts/customer-view.spec.ts` (allow-list), `site-accounts/account.controller.db.spec.ts`, `site-accounts/email-change.service.db.spec.ts`, `e2e/tests/site-account.spec.ts`
 
 **Approach:**
@@ -630,19 +648,19 @@ flowchart LR
 **Dependencies:** A5, A9; E8 (deposit rule); E9 for treatments shown as visits · **Phase:** 2
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (`Booking.freeCancelUntil DateTime?`), with a migration that fills it for future bookings from each service's rule
+- `Booking.freeCancelUntil` is E8's column (a dependency): E8 writes it at booking and owns `isLateCancel`; A6 adds no schema
 - Create: `apps/api.saroh.in/src/modules/site-accounts/account-bookings.service.ts`
-- Modify: `apps/api.saroh.in/src/modules/bookings/{bookings.service.ts,reservation.ts,booking-rules.ts}` (move and cancel with an actor of type customer; history "by the customer"; cancel reads `freeCancelUntil`)
+- Modify: `apps/api.saroh.in/src/modules/bookings/{bookings.service.ts,reservation.ts,booking-rules.ts}` (move and cancel with an actor of type customer; history "by the customer"; a customer move keeps `freeCancelUntil`, and cancel reads it through E8's `isLateCancel`)
 - Create: `packages/site-blocks/src/account/{bookings-list,move-sheet}.tsx`, `apps/saroh.app/app/[domain]/account/bookings/page.tsx`
 - Test: `site-accounts/account-bookings.service.db.spec.ts`, `bookings/booking-rules.spec.ts`, `e2e/tests/site-account.spec.ts`
 
 **Approach:**
 - The lists are Coming up · Past · Cancelled.
-- `freeCancelUntil` is set when a booking is made, from its start and the service's free-cancellation rule. **A move never changes it.** A staff move may reset it on purpose; a customer move never does.
+- `freeCancelUntil` is set by E8 when a booking is made. **A customer move never changes it** (nor does a staff move, E8).
 - A customer move inside the late window is refused: "Call ‹business› to change this".
 - A one-to-one Move opens free times over the next days with the same staff member, using the same serializable re-check as the desk.
 - A class moves through the booking page with a "Moving: ‹class›" banner, and its credit moves with it.
-- Cancel follows the free-cancellation rule against `freeCancelUntil`: before it a pack credit returns and a deposit follows E8's refund; after it the late cancel keeps the credit and the deposit (ADR-008).
+- Cancel follows the free-cancellation rule against `freeCancelUntil`: before it a pack credit returns and a deposit is refunded once, through E8's refund path; after it the late cancel keeps the credit and the deposit (ADR-008). A treatment's visit never refunds on its own: money comes back only through the order's refund (B9, default 112).
 - A treatment shows its visits: done, today, booked, and to book, with "Book visit N" once E9 and E10 exist.
 
 **Test scenarios:**
@@ -661,7 +679,7 @@ flowchart LR
 
 **Requirements:** R8
 
-**Dependencies:** A5, B2 · **Phase:** 2
+**Dependencies:** A5, B2a (the per-type steps the API serves), B2c (the new types written) · **Phase:** 2
 
 **Files:**
 - Create: `apps/api.saroh.in/src/modules/site-accounts/account-orders.service.ts`
@@ -671,7 +689,8 @@ flowchart LR
 
 **Approach:**
 - Orders are read through the account's contact's confirmed identity links, plus orders placed while signed in (G13).
-- The steps come from B2's per-type step list: ✓ done, ● now, ○ next. Each step has its line (for example "At the counter — show #1019", or the courier name and tracking number).
+- The steps are read from the API (B2a's per-type step list), never rebuilt on the site: ✓ done, ● now, ○ next.
+- A service line (E9's `OrderItem.serviceId`, a treatment) shows the service and its visits rather than a product. Each step has its line (for example "At the counter — show #1019", or the courier name and tracking number).
 - A refunded order reads "Refunded · money back in 5–7 days".
 - "Message the business" opens the thread (A13).
 
@@ -702,7 +721,7 @@ flowchart LR
 - Show the plan, the price paid, the next renewal and classes left.
 - Pause offers 2, 4 or 8 weeks. "Until I resume" stays a staff choice (D8); a customer's pause always has an end date. When the business turns "Members can pause from their account" off, the pause button is gone.
 - Cancel is at period end, with "Pause instead" offered first when pausing is allowed.
-- A failed or overdue invoice shows "Pay now", which opens its pay link (a new link is minted server-side; the customer never sees an old one).
+- A failed or overdue invoice shows "Pay now", which opens its pay link (a new link is minted server-side; the customer never sees an old one). While a mandate charge is PENDING on the invoice (D13), "Pay now" is hidden and the API answers 409 "Autopay charge in progress".
 - The packs section shows balances and expiry.
 - There is no plan change (default 8), and no autopay until D12.
 - Every action finds the subscription by id **and** the context's contact.
@@ -713,47 +732,51 @@ flowchart LR
 - Edge case: pausing turned off for the business → no pause button, and a pause post → 403.
 - Error path: another customer's subscription id in the same business → 404 for pause, resume and cancel.
 - Error path: Payments off → pause and cancel still work, and "Pay now" is hidden (no invoice).
+- Error path: a mandate charge is PENDING → no "Pay now", and a pay-link request → 409.
 
 **Verification:** The subscription events (D9) record the customer as the actor.
 
 ---
 
-### A9. The site's accounts switch; sign-in at the last step of booking; recognition; double booking
+### A9. Sign-in at the last step of booking; recognition; double booking
 
-**Goal:** A merchant turns customer accounts on for a site. The booking page then asks for a code at the last step, fills in from the account, refuses a double booking, and falls back to a guest booking when codes cannot be sent.
+**Goal:** Every merchant site's booking page asks for a code at the last step, fills in from the account and refuses a double booking. There is no guest booking: when a code can't be sent, the customer is told to try again in a few minutes and given the business's phone number, and no booking is taken.
 
-**Requirements:** R10, R4 (the fallback)
+**Requirements:** R10, R4 (when a code can't be sent)
 
-**Dependencies:** A3, A4 · **Phase:** 1
+**Dependencies:** A3, A4. On the booking-flow files it lands after H1, E7 and E11 (overview, "Shared files") · **Phase:** 1
 
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` (`Booking.customerAccountId`, nullable, composite FK with the organization), with a migration
-- Modify: `apps/api.saroh.in/src/modules/sites/{sites.controller.ts,sites.service.ts}` (`PUT :siteId/customer-accounts {enabled}`, `site:publish`, audited `site.customer_accounts.changed`)
 - Create: `apps/api.saroh.in/src/modules/site-accounts/account-bookings.controller.ts` (`POST public/site-accounts/bookings`, behind `CustomerSessionGuard`)
-- Modify: `apps/api.saroh.in/src/modules/bookings/public-bookings.service.ts` (`bookOnline` takes an optional customer context; the booker comes from the account's contact; the same-person double-booking check)
+- Modify: `apps/api.saroh.in/src/modules/bookings/public-bookings.service.ts` (`bookOnline` takes a customer context; the booker comes from the account's contact; the same-person double-booking check)
+- Modify: `apps/api.saroh.in/src/modules/bookings/public-bookings.controller.ts` (the anonymous `:serviceId/book` answers 410 "Sign in to book" from the release after A9; see Approach)
 - Modify: `packages/site-blocks/src/booking-flow/{booking-flow.tsx,flow-state.ts,api.ts,steps/details-step.tsx,steps/pay-step.tsx,steps/done-card.tsx}`
 - Create: `apps/saroh.app/app/[domain]/book/actions.ts` (the signed-in book, through the site's server with the cookie and relay)
-- Modify: `apps/saroh.app/app/[domain]/book/page.tsx` (reads the options live)
-- Modify: `apps/app.saroh.in/components/sites/site-settings.tsx` ("Let customers sign in on your site", with its confirm), `apps/app.saroh.in/lib/sites/*` (the action)
-- Test: `bookings/public-booking.db.spec.ts`, `site-accounts/account-bookings.controller.db.spec.ts`, `sites/sites.service.spec.ts`, `packages/site-blocks/src/booking-flow/booking-flow.test.tsx`, `e2e/tests/public-booking.spec.ts`
+- Modify: `apps/saroh.app/app/[domain]/book/page.tsx` (reads the options: the challenge and the business's phone)
+- Test: `bookings/public-booking.db.spec.ts`, `bookings/public-bookings.controller.spec.ts`, `site-accounts/account-bookings.controller.db.spec.ts`, `packages/site-blocks/src/booking-flow/booking-flow.test.tsx`, `e2e/tests/public-booking.spec.ts`
 
 **Approach:**
-- **The switch.** Site settings gain "Let customers sign in on your site", off by default and never turned on by Saroh. Its confirm says what changes: "Customers will confirm their email with a code when they book. People who book as guests today will be asked to sign in." Turning it off restores guest booking at once. It is read live by the options read and the booking page; it is not in the publication.
-- "Continue to sign in" appears after the time is chosen. The booking completes right after verifying, with the hold kept across the sign-in. A signed-in visitor sees "Booking as ‹name› · Not you?" instead of the details form.
+- **Sign-in is always on** (user, 2026-09-27). There is no site setting, no merchant switch and no guest details form on any site.
+- "Continue to sign in" appears after the time is chosen. Sign-in replaces only the name, email and phone fields: E7's "Where" and "Anything we should know?" stay on the step. The booking completes right after verifying, with the hold kept across the sign-in. A signed-in visitor sees "Booking as ‹name› · Not you?" instead of the details form.
 - The signed-in book goes through `book/actions.ts` → `POST public/site-accounts/bookings`, which calls `bookOnline` with the account's contact and sets `customerAccountId`.
-- With the switch on, the flow does not offer the guest details form (default 3), **except as the fallback**: when the code request answers `busy`, the sheet says "We can't send a code right now — you can still book" and the flow returns to the guest details form. The anonymous API route stays as it is (Key Technical Decisions).
+- **When a code can't be sent** (`reason: "unavailable"`, A2), the sheet says "We couldn't send your code — try again in a few minutes" and "Or call ‹Business› on ‹phone›" (the business's public phone, as the booking page's header shows it, default 113; the line is left out when there is none). No booking is taken, and the hold runs out as usual. There is no guest fallback. A limit the visitor caused shows its own wait ("Try again in 4 minutes"); a challenge, when asked for, shows in the sheet.
+- **The anonymous route closes in two releases.** The A9 release moves the booking page to the signed-in route and keeps `POST public/services/:serviceId/book` serving, so a page loaded before the deploy still books. The next release makes it answer 410 "Sign in to book", and a test pins that no site code calls it. Staff bookings in the workspace are unaffected.
+- **Every site moves at once.** On the day A9 ships, every merchant site's booking page asks for sign-in. A release note and a notice to merchants (email and a workspace banner) go out at least a week before, saying from which date customers confirm their email with a code when they book. The date lives in the notice, never in product copy.
 - A same person, same slot booking (confirmed or pending) → 409 "You're already booked for this".
 - The done card says where the booking lives until A5: "We've saved this to your details with ‹Business›."
 
 **Test scenarios:**
-- Happy path: the merchant turns the switch on → the site's booking page asks for sign-in; choose a time → sign in → booked, and the booking is on the account's contact in Customer Detail with `customerAccountId` set.
-- Happy path: the merchant turns the switch off → the guest form is back on the next page load, with no publish.
+- Happy path: on a Northwind site, choose a time → sign in → booked, and the booking is on the account's contact in Customer Detail with `customerAccountId` set.
+- Happy path: a visitor already signed in sees "Booking as ‹name› · Not you?" and books with no code.
 - Edge case: the hold expires while signing in → the sheet says the time went and offers the next one.
-- Edge case: the code request answers `busy` → the guest form appears and the booking is made as a guest.
+- Edge case: the code email fails to send (the fake transport set to fail) → the sheet shows the sentence and the business's phone; no booking is made; the send-failure alert's counter moves.
+- Edge case: a business with no public phone → the sentence alone.
+- Edge case: no page on any site renders the guest details form.
 - Error path: a second booking of the same slot by the same account → 409; the signed-in book route with a token from another site → 401.
-- Error path: a Member without `site:publish` → 403 on the switch; a Reviewer does not see it.
+- Error path (the release after A9): the anonymous book route → 410 "Sign in to book".
 
-**Verification:** Book Pulse Fitness and Book Kavi Dental flows match the designs' sign-in step on a Northwind site with the switch on; the switch's confirm reads as above.
+**Verification:** Book Pulse Fitness and Book Kavi Dental flows match the designs' sign-in step, checked by writing on a Northwind site only; Pulse and Kavi are opened read-only.
 
 ---
 
@@ -827,7 +850,7 @@ flowchart LR
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` (ClassWaitlistEntry), with a migration
 - Create: `apps/api.saroh.in/src/modules/bookings/{waitlist.service.ts,waitlist-offer.handler.ts}`
-- Modify: `bookings/{bookings.service.ts,booking-hold.ts,release-holds.handler.ts}` (enqueue `waitlist.offer` when a place frees), `jobs/job-handler.registry.ts`, `site-accounts/unlink-plan.ts`
+- Modify: `bookings/{bookings.service.ts,booking-hold.ts,release-holds.handler.ts}` (enqueue `waitlist.offer` when a place frees), `jobs/job-handler.registry.ts`, `site-accounts/unlink-plan.ts`, and C9's `merge-plan.ts` / C11's `privacy-removal-plan.ts` when they landed first (the waitlist rules are C9's and C11's)
 - Modify: `packages/site-blocks/src/booking-flow/steps/sessions.tsx` ("Full · Join the waitlist"), `apps/app.saroh.in/components/bookings/booking-detail.tsx` (waitlist on the class)
 - Test: `bookings/waitlist.service.db.spec.ts`, `bookings/waitlist-offer.handler.spec.ts`
 
@@ -837,6 +860,7 @@ flowchart LR
 - The offer is a thread message (A13) and a transactional send (A14) when available.
 - Accepting books through the normal path, with a credit or payment. Expiry offers the next person.
 - No offers are made inside 1 hour of the start.
+- The `waitlist.offer` handler reads its contact through C9's `resolveContact`, so an offer queued before a merge reaches the survivor. A merge and a removal follow C9's and C11's waitlist rules.
 
 **Test scenarios:**
 - Happy path: A is full, B joins, a place frees → B is offered it, accepts and is booked.
@@ -861,7 +885,7 @@ flowchart LR
 - Modify: `packages/database/prisma/schema.prisma` (CustomerThread, CustomerThreadMessage), with a migration
 - Create: `apps/api.saroh.in/src/modules/site-accounts/{threads.service.ts,account-messages.controller.ts}`, `apps/api.saroh.in/src/modules/customer-workspace/threads.controller.ts`
 - Create: `packages/site-blocks/src/account/messages.tsx`, `apps/saroh.app/app/[domain]/account/messages/page.tsx`
-- Modify: `apps/app.saroh.in/components/customers/detail/detail-screen.tsx` (a Messages tab), `apps/app.saroh.in/lib/customer-workspace/{service,actions}.ts`, `site-accounts/unlink-plan.ts`
+- Modify: `apps/app.saroh.in/components/customers/detail/detail-screen.tsx` (a Messages tab), `apps/app.saroh.in/lib/customer-workspace/{service,actions}.ts`, `site-accounts/unlink-plan.ts`, and C9's `merge-plan.ts` / C11's `privacy-removal-plan.ts` when they landed first (the thread rules are C9's and C11's)
 - Test: `site-accounts/threads.service.db.spec.ts`, `e2e/tests/customer-detail.spec.ts`
 
 **Approach:**
@@ -870,6 +894,7 @@ flowchart LR
 - The body is plain text with a length cap and is never rendered as HTML.
 - The unread dot clears on open.
 - A customer asking for their details to be removed writes here or asks in person; staff act with privacy removal (C11).
+- A merge absorbs the other thread into the survivor's, and a removal deletes it (C9, C11).
 
 **Test scenarios:**
 - Happy path: the customer writes, staff reply, and the customer sees the reply.
@@ -901,6 +926,7 @@ flowchart LR
 - When the send of an order or booking confirmation is accepted by the provider, and the contact made that order or booking online with that email, the contact's `emailVerifiedAt` is stamped (`ORDER_CONFIRMATION` or `BOOKING_CONFIRMATION`, DEC-049).
 - A contact without an account gets nothing new, and copy says so ("They'll see it when they sign in on your site").
 - The job is idempotent per event id. `booking.notify` stops dead-lettering.
+- The handler reads its contact through C9's `resolveContact`, so a job queued before a merge reaches the survivor; a removed contact gets nothing.
 
 **Test scenarios:**
 - Happy path: Ready → after the delay, a thread message, plus an email through the business's Resend connection.
@@ -936,7 +962,6 @@ promises a text until it ships.
 
 - **Interaction graph:**
   - public bookings (holds, book, pay step, the signed-in book route);
-  - sites (the switch);
   - class packs (redeem, sell);
   - subscriptions (pause, cancel actors);
   - webhooks `applySuccess` (pack purchases);
@@ -947,13 +972,13 @@ promises a text until it ships.
   - jobs (two new handlers);
   - customer workspace (badge, unlink, Messages tab);
   - `apps/saroh.app` layout, routes and the relay signer.
-- **Error propagation:** every account block reads on its own and names a failure. Sign-in errors are plain sentences ("That code didn't match", "Too many codes — try again in N minutes", "We can't send a code right now — you can still book").
+- **Error propagation:** every account block reads on its own and names a failure. Sign-in errors are plain sentences ("That code didn't match", "Too many codes — try again in N minutes", "We couldn't send your code — try again in a few minutes", with the business's phone).
 - **State lifecycle risks:**
   - sessions revoked on sign-out, email change, unlink, removal and merge (C9, C11);
   - waitlist offers hold capacity and must expire, so the sweep reuses `release-holds.handler.ts`;
   - codes pile up, so a cleanup job deletes consumed or expired rows older than 30 days, and stale pack drafts after 24 hours;
   - a separate contact carries a placeholder email until merged; every reader must use `contact-email.ts`.
-- **API surface parity:** the anonymous booking route stays for every site; with the switch on, the flow uses it only as the fallback.
+- **API surface parity:** the anonymous booking route serves for one release after A9 (for pages loaded before the deploy), then answers 410. Every site books through the signed-in route.
 - **Integration coverage:**
   - a cross-site token (401), and a forged or missing relay (401);
   - a customer route under RLS enforcement over a `NOBYPASSRLS` role;
@@ -981,13 +1006,14 @@ promises a text until it ships.
 | A separate contact's placeholder email reaches a send or an export | One helper for every reader; communications refuse reserved addresses; A1's helper tests |
 | Every existing customer's first sign-in makes a duplicate until staff merge | Expected at launch (nothing is verified yet). Suggestions surface each pair; merging ships in phase 2 (C9/C10), and phase 1 records the booking on the separate contact, where staff can see it |
 | The per-address limit counts saroh.app's server | The signed relay header carries the visitor's address; unsigned calls are refused |
-| Anyone exhausts a business's code ceiling, or a customer's destination limit, to block booking | The business ceiling counts only new destinations; returning customers are never stopped by it; a challenge past half the ceiling; when a limit the visitor didn't cause refuses a code, the flow books as a guest |
+| Anyone exhausts a business's code ceiling, or a customer's destination limit, to block booking | No limit refuses a code because of someone else: past the per-email or business ceilings the answer is a challenge or a wait of at most 10 minutes, and Saroh is alerted; returning customers never count against the business ceiling; only the visitor's own per-address limit refuses, with its retry time |
+| The code email fails, and with no guest form nobody can book online | A dedicated sending stream with retries; every failure is counted and alerted (#103); the sheet gives the business's phone number; the failure is visible to Saroh within minutes, not to merchants a day later |
 | Code spraying hurts the sender's reputation | Durable per-destination and per-business limits, a daily ceiling that starts low for new businesses, a cleaned business name, and a sending stream separate from workspace sign-in mail |
 | A customer moves a booking to reset the free-cancel window and get a deposit back | `freeCancelUntil` is fixed at booking; a customer move inside the late window is refused |
-| Accounts change a live site's booking without the merchant choosing it | The switch is off for every site, turned on only by the merchant, and its confirm says what changes |
+| Every site's booking changes on one day without the merchant choosing it | The user's decision (2026-09-27): sign-in is always on. A release note and a merchant notice go out at least a week before A9 ships, and the notice says what customers will see |
 | Waitlist offers double-book a place | Offers are holds counted by the serializable capacity check |
 | Copy promising messages before A14 ships | Honest copy stays until the send exists (R17) |
-| A customer without email can't sign in | Email only this round (default 1); with the switch off they book as today, and phone sign-in is a later decision |
+| A customer without email can't sign in, so can't book online | Email only this round (default 1): they book by phone or in person, as the "couldn't send" line and the notice say; phone sign-in is a later decision |
 
 ---
 
@@ -995,7 +1021,9 @@ promises a text until it ships.
 
 - Update `docs/patterns/backend-auth-and-access.md` with the `CustomerSessionGuard`, `customerContext` (read by the RLS interceptor), relay signature and `customer-view` rules once A3 lands.
 - Update `docs/patterns/backend-jobs.md` known gaps: `booking.notify` is handled after A14.
-- Add to `docs/architecture/ENVIRONMENT.md` (names only) with A2: the code-hash secret, `SITE_RELAY_SECRET` (both the API and `apps/saroh.app`), and the challenge keys.
+- Add to `docs/architecture/ENVIRONMENT.md` (names only) with A2: the code-hash secret, `SITE_RELAY_SECRET` (both the API and `apps/saroh.app`), and the Turnstile site and secret keys.
+- **Before A9 ships:** a release note and a notice to every merchant (email and a workspace banner), at least a week ahead, that customers will confirm their email with a code when they book on their site. Merchant sites have no switch; the notice says so.
+- **The code-send alert** is set up with A2, before A9 ships: failures of the site-codes stream page whoever is on call (tracked with #103).
 - Submit `saroh.app` to the Public Suffix List's private section; until it is listed, the `Origin` check is the only thing between sibling sites.
 - New unit specs go into the explicit `testMatch` of `apps/api.saroh.in/jest.config.js`.
 - Browser checks write only on Northwind's site; Rye, Pulse and Kavi demo sites stay read-only.
