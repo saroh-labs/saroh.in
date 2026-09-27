@@ -330,7 +330,11 @@ export class CustomersListService {
     ): Promise<UnlinkedPage> {
         authorize(ctx, "contact:read");
         const organizationId = ctx.organizationId;
-        if (query.store) await this.requireStore(organizationId, query.store);
+        // Who paid at a storefront is about orders, as `list`'s filter is.
+        if (query.store) {
+            authorize(ctx, "order:read");
+            await this.requireStore(organizationId, query.store);
+        }
         const orders = allows(ctx, "order:read");
         const page = query.page ?? 1;
         const cte = unlinkedCte(organizationId, query.store);
