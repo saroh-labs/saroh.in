@@ -1,6 +1,6 @@
-import type { BusinessOrder } from "@/lib/orders/business-service";
+import type { OrderRow } from "@/lib/orders/business-service";
 
-const STANDING_WORD: Record<BusinessOrder["standing"], string> = {
+const STANDING_WORD: Record<OrderRow["standing"], string> = {
     UNFULFILLED: "Unfulfilled",
     FULFILLED: "Fulfilled",
     REFUNDED: "Refunded",
@@ -19,7 +19,7 @@ function cell(value: string | number): string {
  * list the merchant is looking at, storefront filter and all. Money is the
  * decimal the API sent, beside its currency, so a sheet can sum it.
  */
-export function ordersToCsv(orders: BusinessOrder[]): string {
+export function ordersToCsv(orders: OrderRow[]): string {
     const header = [
         "Order",
         "Placed",

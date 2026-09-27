@@ -25,6 +25,8 @@ import type {
     UpdateOrderDto,
 } from "./dto";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
+import type { OrderListQuery } from "./order-list";
+import { listOrderRows } from "./order-list";
 import {
     fromCents,
     priceOrderLines,
@@ -83,11 +85,10 @@ export class OrdersService {
      * without becoming a way to read someone else's. `storeId` here only
      * NARROWS that set, so a tampered value can at worst return nothing.
      *
-     * Returns the whole set rather than a page or a filtered slice: the tabs
-     * and the search on this screen are applied over loaded rows by the shared
-     * data view, which is the right trade at a merchant's volumes and is what
-     * makes switching tabs instant. When a business outgrows one page this is
-     * where the cursor goes, and the screen's contract does not change.
+     * The route's answer WITHOUT `v=2`: the whole set, unpaged, exactly as
+     * before B1, kept for one release so an app deployed before the API
+     * keeps working. The paged, filtered list is {@link listRows}; B2d
+     * removes this once every caller is on it.
      */
     async listForOrganization(
         organizationId: string,
@@ -98,6 +99,8 @@ export class OrdersService {
             where: {
                 organizationId,
                 ...(filter?.storeId ? { storeId: filter.storeId } : {}),
+                // An abandoned checkout is not an order (plan B, B1).
+                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
             },
             orderBy: { createdAt: "desc" },
             include: {
@@ -107,6 +110,23 @@ export class OrdersService {
             },
         });
         return orders.map((o) => serializeOrganizationOrder(o, view));
+    }
+
+    /**
+     * The Orders list, v2 (plan B, B1): filtered, paged and counted by the
+     * API, with money only for `order:read` and a customer's phone and email
+     * only for `contact:read`. Scoped like {@link listForOrganization}: every
+     * filter narrows inside the organization. See `order-list.ts`.
+     *
+     * `listForOrganization` answers the route without `v=2` for one release,
+     * so an app deployed before this API keeps working (B2d removes it).
+     */
+    listRows(
+        organizationId: string,
+        query: OrderListQuery,
+        view: { money: boolean; contact: boolean },
+    ) {
+        return listOrderRows(organizationId, query, view);
     }
 
     async get(storeId: string, orderId: string, userId: string) {

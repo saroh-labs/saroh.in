@@ -1,0 +1,239 @@
+import "reflect-metadata";
+
+import { BadRequestException, ValidationPipe } from "@nestjs/common";
+
+import { validationPipeOptions } from "../../common/validation";
+import { ListOrdersQuery } from "./dto";
+import {
+    computedConditions,
+    dayRange,
+    fulfilmentTypeOf,
+    lateSql,
+    orderConditions,
+    paymentStandingOf,
+    searchSql,
+    storedFulfilments,
+    tabCondition,
+    ts,
+} from "./order-list-filters";
+
+/**
+ * The Orders list's filters (plan B, B1), without a database: what each one
+ * turns into, and the rules that decide what a caller may search. The SQL
+ * itself runs in `order-list.db.spec.ts`.
+ */
+
+describe("fulfilment words", () => {
+    it("reads the stored legacy words as their types", () => {
+        expect(fulfilmentTypeOf("COLLECT")).toBe("PICKUP");
+        expect(fulfilmentTypeOf("DELIVERY")).toBe("LOCAL_DELIVERY");
+        expect(fulfilmentTypeOf("SHIPPING")).toBe("SHIPPING");
+        expect(fulfilmentTypeOf("APPOINTMENT_ONLINE")).toBe(
+            "APPOINTMENT_ONLINE",
+        );
+    });
+
+    it("matches a type's legacy word too, until B2d drops it", () => {
+        expect(storedFulfilments(["PICKUP"]).sort()).toEqual([
+            "COLLECT",
+            "PICKUP",
+        ]);
+        expect(storedFulfilments(["DELIVERY"]).sort()).toEqual([
+            "DELIVERY",
+            "LOCAL_DELIVERY",
+        ]);
+        expect(storedFulfilments(["SHIPPING"])).toEqual(["SHIPPING"]);
+        expect(storedFulfilments(["COLLECT", "SHIPPING"]).sort()).toEqual([
+            "COLLECT",
+            "PICKUP",
+            "SHIPPING",
+        ]);
+    });
+});
+
+describe("dayRange — days in the business's zone", () => {
+    it("starts the 1st at midnight IST, so 00:30 IST on the 1st is on the 1st", () => {
+        const { gte, lt } = dayRange(
+            "2026-09-01",
+            "2026-09-01",
+            "Asia/Kolkata",
+        );
+        expect(gte?.toISOString()).toBe("2026-08-31T18:30:00.000Z");
+        expect(lt?.toISOString()).toBe("2026-09-01T18:30:00.000Z");
+        const halfPastMidnight = new Date("2026-08-31T19:00:00.000Z");
+        expect(halfPastMidnight >= gte! && halfPastMidnight < lt!).toBe(true);
+    });
+
+    it("takes either end alone", () => {
+        expect(dayRange("2026-09-01", undefined, "UTC")).toEqual({
+            gte: new Date("2026-09-01T00:00:00.000Z"),
+            lt: undefined,
+        });
+        expect(dayRange(undefined, "2026-09-01", "UTC")).toEqual({
+            gte: undefined,
+            lt: new Date("2026-09-02T00:00:00.000Z"),
+        });
+    });
+
+    it("refuses a range that ends before it starts, and a day that isn't one", () => {
+        expect(() => dayRange("2026-09-02", "2026-09-01", "UTC")).toThrow(
+            BadRequestException,
+        );
+        expect(() => dayRange("2026-02-30", undefined, "UTC")).toThrow(
+            BadRequestException,
+        );
+    });
+});
+
+describe("paymentStandingOf — the row's payment word", () => {
+    it.each([
+        ["PAID", 61000, 0, "PAID"],
+        ["UNPAID", 0, 0, "UNPAID"],
+        ["FAILED", 0, 0, "UNPAID"],
+        ["PAID", 61000, 12000, "PARTLY_REFUNDED"],
+        ["PAID", 61000, 61000, "REFUNDED"],
+        ["REFUNDED", 0, 0, "REFUNDED"],
+    ] as const)(
+        "%s, took %d, gave back %d → %s",
+        (status, took, back, word) => {
+            expect(paymentStandingOf(status, took, back)).toBe(word);
+        },
+    );
+});
+
+describe("the search", () => {
+    const text = (s: { sql: string }) => s.sql.replace(/\s+/g, " ");
+
+    it("finds an order number or a name, and nothing else, without contact:read", () => {
+        const s = searchSql("9876543210", { contact: false });
+        expect(text(s)).toContain(`o."orderId" ILIKE`);
+        expect(text(s)).toContain("firstName");
+        expect(text(s)).not.toContain("email");
+        expect(text(s)).not.toContain("phone");
+    });
+
+    it("adds email and the phone's digits with contact:read", () => {
+        const s = searchSql("+91 98765 43210", { contact: true });
+        expect(text(s)).toContain("c.email ILIKE");
+        expect(text(s)).toContain("regexp_replace");
+        expect(s.values).toContain("%919876543210%");
+    });
+
+    it("drops a leading # and takes % and _ literally", () => {
+        const s = searchSql("#10_4%", { contact: false });
+        expect(s.values[0]).toBe("%10\\_4\\%%");
+    });
+
+    it("never matches a phone on fewer than three digits", () => {
+        const s = searchSql("98", { contact: true });
+        expect(text(s)).not.toContain("regexp_replace");
+    });
+});
+
+describe("the conditions", () => {
+    const text = (s: { sql: string }) => s.sql.replace(/\s+/g, " ");
+
+    it("always scopes to the organization and leaves out abandoned checkouts", () => {
+        const s = orderConditions("org_1", {}, { contact: false }, {});
+        expect(text(s)).toContain(`o."organizationId" = ?`);
+        expect(text(s)).toContain(
+            `NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`,
+        );
+        expect(s.values).toEqual(["org_1"]);
+    });
+
+    it("narrows by storefront, customer, product, step and type as text", () => {
+        const s = orderConditions(
+            "org_1",
+            {
+                storeId: "s1",
+                customerId: "c1",
+                productId: "p1",
+                stage: ["READY"],
+                fulfilment: ["SHIPPING"],
+            },
+            { contact: false },
+            {},
+        );
+        expect(text(s)).toContain(`o."storeId" =`);
+        expect(text(s)).toContain(`o."customerId" =`);
+        expect(text(s)).toContain(`FROM "OrderItem" oi`);
+        expect(text(s)).toContain("o.stage::text = ANY");
+        expect(text(s)).toContain("o.fulfilment::text = ANY");
+        expect(s.values).toEqual(
+            expect.arrayContaining(["s1", "c1", "p1", ["READY"], ["SHIPPING"]]),
+        );
+    });
+
+    it("binds dates as the UTC wall-clock Prisma stores, never through the session zone", () => {
+        const s = ts(new Date("2026-09-01T00:30:00.000Z"));
+        expect(s.sql).toBe("?::timestamp");
+        expect(s.values).toEqual(["2026-09-01T00:30:00.000"]);
+    });
+
+    it("reads payment, late and the tab from the computed columns", () => {
+        expect(text(computedConditions({}))).toBe("TRUE");
+        const s = computedConditions({ payment: "UNPAID", late: true });
+        expect(text(s)).toContain("m.payment =");
+        expect(text(s)).toContain("m.late =");
+        expect(tabCondition("open").sql).toBe("m.open");
+        expect(tabCondition("refunded").sql).toBe("m.payment = 'REFUNDED'");
+        expect(tabCondition(undefined).sql).toBe("TRUE");
+    });
+
+    it("gives every type with a late rule its default threshold", () => {
+        const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
+        expect(s.values).toEqual(
+            expect.arrayContaining([
+                "COLLECT",
+                120,
+                "DELIVERY",
+                1440,
+                "SHIPPING",
+                2880,
+            ]),
+        );
+        expect(s.values).not.toContain("DIGITAL");
+    });
+});
+
+describe("ListOrdersQuery", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const parse = (value: Record<string, unknown>) =>
+        pipe.transform(value, {
+            type: "query",
+            metatype: ListOrdersQuery,
+        }) as Promise<ListOrdersQuery>;
+
+    it("takes repeated and comma lists, in any case", async () => {
+        const q = await parse({
+            v: "2",
+            stage: ["new", "ready"],
+            fulfilment: "pickup,shipping",
+            payment: "unpaid",
+            tab: "Open",
+        });
+        expect(q.stage).toEqual(["NEW", "READY"]);
+        expect(q.fulfilment).toEqual(["PICKUP", "SHIPPING"]);
+        expect(q.payment).toBe("UNPAID");
+        expect(q.tab).toBe("open");
+    });
+
+    it("treats a blank storefront as every storefront", async () => {
+        const q = await parse({ storeId: "" });
+        expect(q.storeId).toBeUndefined();
+    });
+
+    it.each([
+        { stage: "SHIPPED" },
+        { fulfilment: "COURIER" },
+        { payment: "SOMETIMES" },
+        { tab: "abandoned" },
+        { late: "yes" },
+        { from: "1 Sep" },
+        { v: "3" },
+        { attention: "true" },
+    ])("refuses %o", async (value) => {
+        await expect(parse(value)).rejects.toThrow(BadRequestException);
+    });
+});
