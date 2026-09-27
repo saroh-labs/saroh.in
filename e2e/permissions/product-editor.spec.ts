@@ -114,8 +114,16 @@ test("the description isn't unsaved when the editor opens", async ({
 }) => {
     await scenario(context, "STOCK");
     await page.goto(EDIT);
+    // The saved description, in the editor, with its toolbar — not the empty
+    // box it stayed when the toolbar's state waited on a transaction that a
+    // description already in Tiptap's spelling never makes.
+    const description = page.getByRole("textbox", { name: "Description" });
+    await expect(description).toBeVisible();
+    await expect(description).toHaveAttribute("contenteditable", "false");
+    await expect(description).toContainText("Baked each morning.");
+    await expect(description.getByRole("listitem")).toHaveText("Long ferment");
     await expect(
-        page.getByRole("textbox", { name: "Description" }),
+        page.getByRole("toolbar", { name: "Formatting" }),
     ).toBeVisible();
     await expect(page.getByText("All changes saved")).toBeVisible();
     await expect(

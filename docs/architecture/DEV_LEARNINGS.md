@@ -539,6 +539,34 @@ transaction with `docChanged`. Anything that feeds a Tiptap editor's HTML
 into a dirty check should ignore updates that didn't change the document.
 **Category**: frontend · `apps/app.saroh.in/components/commerce/product-sections/description-editor.tsx` · `frontend-forms.md`
 
+## Forms — the description editor never loaded after the Unsaved fix
+
+**Problem**: After the fix above (`bae5e936`), the product editor's
+Description stayed an empty box: no toolbar, no text, no contenteditable.
+The console showed only Tiptap's "Next.js detected. `immediatelyRender`
+defaults to false" warning.
+**Root cause**: Two things together. Tiptap 3.31 sees `window.next` and,
+unless told otherwise, returns null from `useEditor` on the first render
+and makes the editor in an effect. `useEditorState`, called beside it, builds
+its store around the editor it is first given — null — and its snapshot
+moves on to the real editor only at that editor's next `transaction` or
+`update` event. The component drew the toolbar and `EditorContent` only once
+the state was non-null, so nothing mounted that could make a transaction.
+The stray `update` from `setEditable(editable)` had been the only thing
+waking it; passing `false` there removed it.
+**Fix**: `immediatelyRender: true` (the editor is loaded with
+`next/dynamic`, `ssr: false`, so there is no server pass to mismatch), and
+the toolbar and its `useEditorState` moved into a child that mounts only
+once there is an editor — the shape `components/sites/rich-text-editor.tsx`
+already had. Never call `useEditorState` beside a `useEditor` that can
+return null. In the product page's Edit description sheet, which React
+hides while a lazy part loads, the effects disconnect long enough for
+`useEditor` to destroy its editor and make another on reconnect; the
+surface's effects reconnect first, holding the destroyed one, and
+`getHTML` threw on its missing schema. They skip a destroyed editor, and
+the surface is keyed by editor instance so a new one gets a fresh store.
+**Category**: frontend · Tiptap · `apps/app.saroh.in/components/commerce/product-sections/description-editor.tsx`
+
 ## Database — Load more skipped a product in the Needs you view (#534)
 
 **Problem**: On the Products list's Needs you view, restocking the last row

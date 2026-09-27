@@ -74,19 +74,27 @@ export function StockSection({
         defaultWarn === null ? DEFAULT_WARN : String(defaultWarn),
     );
     const counting = stockCounting(product);
-    const loadedKey = JSON.stringify([fromProduct, counting]);
+    // Track stock (#515): the business tracks stock, or this section isn't
+    // drawn, so the product's own switch decides.
+    const tracked = product.stockTracked;
+    const loadedKey = JSON.stringify([fromProduct, counting, tracked]);
     const [base, setBase] = useState(fromProduct);
     const [draft, setDraft] = useState(fromProduct);
     const [seen, setSeen] = useState(loadedKey);
+    const [seenTracked, setSeenTracked] = useState(tracked);
     // Add stock, or Count each variant; kept through its save until the
     // product comes back counted the new way, so the layout doesn't flicker.
     const [opened, setOpened] = useState(false);
     const [openedSaved, setOpenedSaved] = useState(false);
     if (seen !== loadedKey) {
         setSeen(loadedKey);
+        setSeenTracked(tracked);
         setBase(fromProduct);
+        // Track stock flipped: every shelf is at 0 now, off or on, so
+        // nothing in the draft carries over — merged, a count left in it
+        // reads as typed and comes back Unsaved.
         setDraft(
-            same(draft, base)
+            seenTracked !== tracked || same(draft, base)
                 ? fromProduct
                 : mergeDraft(fromProduct, base, draft),
         );
@@ -96,9 +104,6 @@ export function StockSection({
 
     const hasVariants = product.variants.length > 0;
     const layout = stockLayout(counting, hasVariants, opened);
-    // Track stock (#515): the business tracks stock, or this section isn't
-    // drawn, so the product's own switch decides.
-    const tracked = product.stockTracked;
     const dirty = tracked && (!same(draft, base) || (opened && !openedSaved));
     const splitting = switchesToVariants(counting, layout);
 
@@ -183,10 +188,12 @@ export function StockSection({
                 productName={product.name}
                 tracked={tracked}
                 control={control}
-                onTurnedOff={() => {
-                    setDraft(base);
-                    setOpened(false);
-                }}
+                // Not `setDraft(base)`: the `base` it closed over is the
+                // count from before the switch, and React applied it after
+                // the refreshed product had reset the section to 0 — a
+                // stale 3 in the draft, hidden while untracked, came back
+                // Unsaved when Track stock went on again.
+                onTurnedOff={() => setOpened(false)}
             />
         );
     const head = (

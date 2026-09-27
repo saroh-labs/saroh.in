@@ -3,6 +3,7 @@ import { Card } from "@saroh/ui/card";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { customFieldText, onTheShop } from "@/lib/products/overview-rules";
 import { detailTag, NOT_FILLED_IN } from "@/lib/products/overview-words";
+import { untrackedDetail } from "@/lib/products/tracking";
 
 import { CardHead, DetailRow } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
@@ -69,7 +70,7 @@ export function ProductDetailsCard({
                     {stock ? (
                         <DetailRow label="Stock">
                             {stock === "untracked"
-                                ? "Not tracked · always available"
+                                ? untrackedDetail(product.storefronts ?? [])
                                 : stock === "tracked-per-storefront"
                                   ? "Tracked · counted per storefront"
                                   : "Tracked"}

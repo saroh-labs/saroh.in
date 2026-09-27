@@ -18,6 +18,7 @@ import { demoUser, urls } from "../playwright.config";
 
 const ORG = "seed_org";
 const STORE = "seed_store";
+const ONLINE = "seed_store_online";
 const NW: Storefront = { organizationId: ORG, storeId: STORE };
 const COUNT = 7;
 
@@ -145,6 +146,60 @@ test.describe("product page — Overview and Stock", () => {
             await expect(page.getByText("7 → 5")).toBeVisible();
         } finally {
             if (id) await putBack(page.request, id);
+            await removeProducts(page.request, NW, name);
+        }
+    });
+
+    test("the Stock tab's badge says the same on every tab", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const name = `E2E Low Badge Crate ${testInfo.project.name}`;
+
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+
+        let id: string | undefined;
+        try {
+            id = await takeProduct(page.request, NW, name, {
+                price: "120.00",
+                status: "PUBLISHED",
+            });
+            await putBack(page.request, id);
+            // Fine at the shop (7, warning at 2); sold Online too, where
+            // two are left at a warning level of two — low there only.
+            const listed = await page.request.put(
+                `${urls.API_URL}/organizations/${ORG}/products/${id}/listings/${ONLINE}`,
+                { headers: orgHeader, data: {} },
+            );
+            expect(listed.ok()).toBe(true);
+            const low = await page.request.put(
+                `${urls.API_URL}/stores/${ONLINE}/products/${id}/inventory`,
+                { headers: orgHeader, data: { quantity: 2, lowStockAlert: 2 } },
+            );
+            expect(low.ok()).toBe(true);
+
+            // Overview and Stock load every storefront's shelves; the other
+            // tabs fell back to the shop's own count, and lost the badge.
+            for (const tab of ["overview", "stock", "orders", "photos"]) {
+                await page.goto(
+                    `/commerce/products/${id}?storefront=${STORE}&tab=${tab}`,
+                );
+                await expect(
+                    page
+                        .getByRole("navigation", { name: "Product sections" })
+                        .getByRole("link", { name: /^Stock/ }),
+                ).toContainText("1 low");
+            }
+        } finally {
+            if (id) {
+                // Online stops selling it (its shelf stays, as a shelf does).
+                await page.request.delete(
+                    `${urls.API_URL}/organizations/${ORG}/products/${id}/listings/${ONLINE}`,
+                    { headers: orgHeader },
+                );
+                await putBack(page.request, id);
+            }
             await removeProducts(page.request, NW, name);
         }
     });

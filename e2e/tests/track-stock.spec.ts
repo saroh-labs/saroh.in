@@ -108,6 +108,10 @@ test.describe("Track stock and Sold out", () => {
             await expect(
                 page.getByText("Sold out — marked by hand"),
             ).toBeVisible();
+            // The Details row agrees with the card.
+            await expect(
+                page.getByText("Not tracked · sold out, marked by hand"),
+            ).toBeVisible();
             await page.getByRole("button", { name: "Mark available" }).click();
             await expect(page.getByText(/^Available again at /)).toBeVisible();
             await expect(
@@ -127,6 +131,63 @@ test.describe("Track stock and Sold out", () => {
             ).toHaveAttribute("aria-checked", "true");
         } finally {
             // As it was found: tracked, counted at 7. Then out of the way.
+            if (id) await putBack(page.request, id);
+            await removeProducts(page.request, NW, name);
+        }
+    });
+
+    test("track stock off and on again in the editor starts the count at 0", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const name = `E2E Jute Twine ${testInfo.project.name}`;
+
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+
+        let id: string | undefined;
+        try {
+            id = await takeProduct(page.request, NW, name, {
+                price: "90.00",
+                status: "PUBLISHED",
+            });
+            await putBack(page.request, id);
+
+            await page.goto(
+                `/commerce/products/${id}/edit?storefront=${STORE}#sec-stock`,
+            );
+            const stock = page.getByRole("region", { name: "Stock" });
+            const onHand = stock.getByRole("spinbutton", {
+                name: "Quantity on hand",
+            });
+            await expect(onHand).toHaveValue(String(COUNT));
+            const track = page.getByRole("switch", {
+                name: "Track stock for this product",
+            });
+
+            await track.click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Stop tracking" })
+                .click();
+            await expect(track).toHaveAttribute("aria-checked", "false");
+
+            await track.click();
+            await expect(
+                page.getByText(
+                    "It starts at 0, so the shop says Sold out until you count it.",
+                ),
+            ).toBeVisible();
+            await expect(track).toHaveAttribute("aria-checked", "true");
+            // The shelf the API started at 0 — not the count from before
+            // the switch went off, held over as an unsaved edit.
+            await expect(onHand).toHaveValue("0");
+            await expect(stock.getByText("Unsaved")).toHaveCount(0);
+            await expect(
+                page.getByRole("button", { name: "Save stock" }),
+            ).toHaveCount(0);
+            await expect(page.getByText("All changes saved")).toBeVisible();
+        } finally {
             if (id) await putBack(page.request, id);
             await removeProducts(page.request, NW, name);
         }

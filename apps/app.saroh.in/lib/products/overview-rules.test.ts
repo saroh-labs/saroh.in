@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { productHref, productTabOf } from "./links";
 import type { OverviewOrder, ProductPlacement } from "./overview-rules";
+import { stockBadge } from "./overview-rules";
 import {
     accessLine,
     availability,
@@ -15,6 +16,28 @@ import {
     websiteSummary,
     whereItSells,
 } from "./overview-words";
+
+describe("the Stock tab's badge", () => {
+    const totals = { onHand: 0, promised: 0, canSell: 0, lowCount: 1 };
+    const at = (short: number, low: number) => ({
+        needs: { short, low },
+        totals,
+    });
+
+    it("says short before low, and nothing when all is well", () => {
+        expect(stockBadge(at(1, 1), true)).toBe("1 short");
+        expect(stockBadge(at(0, 2), true)).toBe("2 low");
+        expect(stockBadge(at(0, 0), true)).toBeNull();
+    });
+
+    it("says nothing for a product that doesn't count stock", () => {
+        expect(stockBadge(at(1, 1), false)).toBeNull();
+    });
+
+    it("falls back to this storefront's low count from an older API", () => {
+        expect(stockBadge({ totals }, true)).toBe("1 low");
+    });
+});
 
 describe("the product page's tabs", () => {
     it("opens Stock for the old ?tab=variants", () => {
