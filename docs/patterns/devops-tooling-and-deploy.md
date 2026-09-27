@@ -101,5 +101,14 @@ audit that blocks on critical advisories; plus integration tests,
   It does not go through the automatic push-to-deploy. Rollback is
   restoring the snapshot. The same file records how long each migration takes
   and which table locks it holds.
+- **Current** — **An enum value is changed by expand and contract, never
+  renamed in place.** The order fulfilment types (DEC-045, plan B) ship in
+  three releases — add the values (in a migration of their own; Postgres
+  can't use a value in the transaction that adds it) while still writing the
+  old ones, then switch writes and backfill, then drop the old values — each
+  rolled back by deploying the previous tag. The ordered checklist, each
+  migration's locks and timing, and each release's rollback are in
+  `docs/architecture/ORDER_FULFILMENT_ROLLOUT.md` (B2a writes it; B2c and
+  B2d keep it up).
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.
