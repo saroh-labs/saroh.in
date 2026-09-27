@@ -97,7 +97,10 @@
   order's invoice, a credit note and an edit's correction say). Writes go
   through `invoices/order-invoicing.ts` on the caller's transaction:
   `ensureOrderInvoice` (order row lock, then the partial unique index
-  `Invoice_one_per_order`), `creditNoteForRefund` (unique on
+  `Invoice_one_per_order`; under that lock it also gives the paying store
+  customer a contact, `customer-workspace/ensure-contact.ts`, C2 — no lock
+  of its own, and `ON CONFLICT DO NOTHING` so it never fails a payment),
+  `creditNoteForRefund` (unique on
   `paymentRefundId`, so the refund path and the refund webhook make one),
   `correctOrderInvoiceForEdit`, `invoiceSupersededPayment`,
   `creditRestOfOrder`. Lock order: order, intent, invoice — the webhook
