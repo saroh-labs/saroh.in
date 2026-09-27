@@ -39,6 +39,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "bookings/bookings.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
     "staff/staff.controller.ts": "APPOINTMENTS",
+    // E3: business closures and the time-off preview.
+    "staff/closures.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
@@ -143,6 +145,12 @@ const NEVER: Record<string, string> = {
     // shop's address and hours stay true whichever modules are on.
     "sites/public-sites.controller.ts":
         "published sites, and the business's place and hours",
+    // A customer signs in on a merchant's site (ADR-011): sign-in is always
+    // on, so it must not vanish with a module switch.
+    "site-accounts/sign-in.controller.ts":
+        "customer sign-in on a published site — no organization context",
+    "site-accounts/sessions.controller.ts":
+        "a signed-in customer's session on a published site",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
