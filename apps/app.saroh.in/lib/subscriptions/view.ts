@@ -175,18 +175,60 @@ export function failWhy(
 
 /**
  * A paused one, in a few words: "Paused until 17 Oct" when it resumes on
- * its own (D8), else "Paused since 5 Sep".
+ * its own (D8), "Pause ended 17 Oct" once that day has come and it is
+ * still paused, else "Paused since 5 Sep".
  */
 export function pausedText(
     sub: Pick<Subscription, "pausedAt" | "pausedUntil" | "timezone">,
     now: Date,
 ): string {
     if (sub.pausedUntil) {
-        return `Paused until ${dayText(sub.pausedUntil, sub.timezone, now)}`;
+        const day = dayText(sub.pausedUntil, sub.timezone, now);
+        return pauseHasEnded(sub, now)
+            ? `Pause ended ${day}`
+            : `Paused until ${day}`;
     }
     return sub.pausedAt
         ? `Paused since ${dayText(sub.pausedAt, sub.timezone, now)}`
         : "Paused";
+}
+
+/** Paused with an end date that has come: the job hasn't resumed it yet. */
+function pauseHasEnded(
+    sub: Pick<Subscription, "pausedUntil">,
+    now: Date,
+): boolean {
+    return (
+        sub.pausedUntil !== null &&
+        new Date(sub.pausedUntil).getTime() <= now.getTime()
+    );
+}
+
+/**
+ * The detail's sentence about a pause. Once its end date has come and it
+ * is still paused, it says why (review S-2): one that ended inside its
+ * paid period only waits for the hourly check; one that outlasted it
+ * restarts with a new invoice, which needs Payments on — the job leaves
+ * it paused while Payments is off.
+ */
+function pausedLine(
+    sub: Pick<
+        Subscription,
+        "pausedAt" | "pausedUntil" | "timezone" | "currentPeriodEnd"
+    >,
+    now: Date,
+): string {
+    if (!sub.pausedUntil) return `${pausedText(sub, now)}.`;
+    const day = dayText(sub.pausedUntil, sub.timezone, now);
+    if (!pauseHasEnded(sub, now)) {
+        return `Paused until ${day} · resumes on its own.`;
+    }
+    const extendsPeriod =
+        new Date(sub.pausedUntil).getTime() <=
+        new Date(sub.currentPeriodEnd).getTime();
+    return extendsPeriod
+        ? `Pause ended ${day} · resumes at the next hourly check.`
+        : `Pause ended ${day} · restarts with a new invoice once Payments is on.`;
 }
 
 /** A row's line under the status: when it next charges, or why it stopped. */
@@ -331,9 +373,7 @@ export function headline(
             pill,
             big: "—",
             when: "",
-            line: sub.pausedUntil
-                ? `Paused until ${d(sub.pausedUntil)} · resumes on its own. Nothing is charged while paused.`
-                : `${pausedText(sub, now)}. Nothing is charged while paused.`,
+            line: `${pausedLine(sub, now)} Nothing is charged while paused.`,
         };
     }
     if (tab === "cancelled") {

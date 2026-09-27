@@ -161,6 +161,30 @@ describe("making a pay link", () => {
             "This invoice changed. Reload it.",
         );
     });
+
+    it("makes it on the caller's transaction when given one", async () => {
+        const own = {
+            invoice: {
+                findFirst: jest.fn().mockResolvedValue(row()),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            merchantPaymentProvider: {
+                count: jest.fn().mockResolvedValue(1),
+            },
+        };
+        const { token } = await service.createPayLinkInTx(
+            own as never,
+            owner,
+            "inv_1",
+        );
+        expect(own.invoice.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { payTokenHash: hashPayToken(token) },
+            }),
+        );
+        expect(db.invoice.findFirst).not.toHaveBeenCalled();
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
 });
 
 describe("revoking a pay link", () => {

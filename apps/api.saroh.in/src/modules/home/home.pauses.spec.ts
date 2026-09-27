@@ -18,6 +18,7 @@ function db(opts: { paymentsOff: boolean; rows?: unknown[]; count?: number }) {
                 .mockResolvedValue(opts.paymentsOff ? { id: "m_1" } : null),
         },
         customerSubscription: {
+            fields: { currentPeriodEnd: "currentPeriodEnd-field" },
             count: jest.fn().mockResolvedValue(opts.count ?? rows.length),
             findMany: jest.fn().mockResolvedValue(rows),
         },
@@ -49,8 +50,8 @@ describe("pauses waiting on Payments", () => {
             where: {
                 organizationId: "org_1",
                 status: "PAUSED",
-                pausedUntil: { lte: NOW },
-                currentPeriodEnd: { lte: NOW },
+                // Ended after the paid period, compared column to column.
+                pausedUntil: { lte: NOW, gt: "currentPeriodEnd-field" },
                 cancelAtPeriodEnd: false,
             },
         });

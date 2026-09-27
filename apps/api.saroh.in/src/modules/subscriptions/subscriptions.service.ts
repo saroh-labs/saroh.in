@@ -40,6 +40,7 @@ import type {
     SkipCollectionDto,
     SubscribeDto,
 } from "./dto";
+import type { PauseEnded } from "./pause-until";
 import {
     pausedEventData,
     pauseEnd,
@@ -598,27 +599,35 @@ export class SubscriptionsService {
      * Paused inside a period already invoiced: that period's end moves later
      * by the whole days paused, and the renewal day moves with it. An undo
      * within the same day therefore changes nothing. Paused past the end of
-     * that period: a new period starts today, with its invoice. `days`, when
-     * given, is how many days the pause took (a pause with an end date
-     * counts its calendar days, D8); otherwise they are counted to now.
+     * that period: a new period starts today, with its invoice.
+     *
+     * A resume by hand decides from now. A pause's end date (D8) passes
+     * `ended`, which decides from the dates instead, so a late run lands
+     * where an on-time one would: `days` is how many calendar days the
+     * pause took, `extends` whether its end came on or before the period's
+     * end, and `on` the day a restart's new period starts.
      */
     private async resumeLocked(
         tx: Tx,
         sub: SubscriptionRow,
         log: SubscriptionEventLog,
-        opts: { now: Date; createdByUserId: string | null; days?: number },
+        opts: {
+            now: Date;
+            createdByUserId: string | null;
+            ended?: PauseEnded;
+        },
     ): Promise<void> {
         const { id } = sub;
-        const { now } = opts;
+        const { now, ended } = opts;
         const pausedAt = sub.pausedAt ?? now;
         // A resume, by hand or on its own, ends the pause and its end date.
         const resumed = { pausedAt: null, pausedUntil: null };
 
-        if (now < sub.currentPeriodEnd) {
+        if (ended ? ended.extends : now < sub.currentPeriodEnd) {
             // Calendar days in its own zone, so a pause across a clock
             // change is not a day short.
             const days =
-                opts.days ??
+                ended?.days ??
                 Math.floor(
                     DateTime.fromJSDate(now, { zone: sub.timezone }).diff(
                         DateTime.fromJSDate(pausedAt, {
@@ -678,7 +687,9 @@ export class SubscriptionsService {
         // A new period starts today: that is the next renewal, so a plan
         // change booked for it takes effect here.
         const terms = await this.nextTerms(tx, sub);
-        const anchor = DateTime.fromJSDate(now, { zone: sub.timezone })
+        const anchor = DateTime.fromJSDate(ended?.on ?? now, {
+            zone: sub.timezone,
+        })
             .startOf("day")
             .toJSDate();
         const period = periodContaining(
@@ -1081,25 +1092,29 @@ export class SubscriptionsService {
         id: string,
     ): Promise<{ invoiceId: string; token: string }> {
         authorize(ctx, "subscription:write");
-        const row = await prisma.customerSubscription.findFirst({
-            where: { id, organizationId: ctx.organizationId },
-            select: SUBSCRIPTION_SELECT,
-        });
-        if (!row) notFound("Subscription");
-        const invoices = await this.invoicesFor(ctx.organizationId, [id]);
-        const failed = failedCharge(row, invoices.get(id), new Date());
-        if (!failed) {
-            throw new ConflictException(
-                "The latest charge is not overdue, so there is nothing to retry.",
+        // One transaction under the subscription's lock: the link and its
+        // RETRIED commit together, and a refused link records nothing.
+        return prisma.$transaction(async (tx) => {
+            const row = await this.lock(tx, ctx.organizationId, id);
+            const invoices = await this.invoicesFor(
+                ctx.organizationId,
+                [id],
+                tx,
             );
-        }
-        const { token } = await this.invoices.createPayLink(ctx, failed.id);
-        // The link is the invoice's own write, so this is recorded once it
-        // is made; a refused link records nothing.
-        await prisma.$transaction(async (tx) => {
+            const failed = failedCharge(row, invoices.get(id), new Date());
+            if (!failed) {
+                throw new ConflictException(
+                    "The latest charge is not overdue, so there is nothing to retry.",
+                );
+            }
+            const { token } = await this.invoices.createPayLinkInTx(
+                tx,
+                ctx,
+                failed.id,
+            );
             await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
+            return { invoiceId: failed.id, token };
         });
-        return { invoiceId: failed.id, token };
     }
 
     /**
@@ -1167,11 +1182,11 @@ export class SubscriptionsService {
             });
             // A pause whose end date has come resumes (D8).
             if (sub && pauseHasEnded(sub, now)) {
-                return resumeWhenDue(tx, sub, now, (log, days) =>
+                return resumeWhenDue(tx, sub, now, (log, ended) =>
                     this.resumeLocked(tx, sub, log, {
                         now,
                         createdByUserId: null,
-                        days,
+                        ended,
                     }),
                 );
             }
@@ -1598,10 +1613,11 @@ export class SubscriptionsService {
     private async invoicesFor(
         organizationId: string,
         subscriptionIds: string[],
+        db: Tx = prisma,
     ): Promise<Map<string, SubscriptionInvoices>> {
         const byId = new Map<string, SubscriptionInvoices>();
         if (subscriptionIds.length === 0) return byId;
-        const rows: InvoiceRowLite[] = await prisma.invoice.findMany({
+        const rows: InvoiceRowLite[] = await db.invoice.findMany({
             where: {
                 organizationId,
                 status: { in: ["ISSUED", "PAID"] },

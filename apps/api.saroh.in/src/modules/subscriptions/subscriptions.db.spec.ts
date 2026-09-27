@@ -9,6 +9,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { pausesWaitingOnPayments } from "../home/home-pause-sources";
 import { InvoicesService } from "../invoices/invoices.service";
 import {
+    RENEW_BATCH,
     SUBSCRIPTION_RENEW_TYPE,
     SubscriptionRenewHandler,
 } from "./subscription-renew.handler";
@@ -980,5 +981,177 @@ describe("a pause with an end date (D8, real database)", () => {
         expect(
             await pausesWaitingOnPayments(prisma, off.organizationId, on),
         ).toBeNull();
+    });
+});
+
+describe("the job and pauses it has to decide from dates (review S-3, S-4)", () => {
+    const HOUR = 60 * 60 * 1000;
+    const DAY = 24 * HOUR;
+
+    it("extends a pause that ended inside the period, though the job only runs after the period's end", async () => {
+        const s = await service.subscribe(org, {
+            contactId: await person(),
+            planId,
+            timezone: "UTC",
+        });
+        const paused = await service.pause(org, s.id, { weeks: 4 });
+        const until = new Date(paused.pausedUntil!);
+        const periodEnd = new Date(s.currentPeriodEnd);
+        expect(until <= periodEnd).toBe(true);
+
+        // The job was down: it gets there a day after the period ended.
+        await handler.renewDue(new Date(periodEnd.getTime() + DAY));
+
+        const after = await service.get(org, s.id);
+        expect(after.status).toBe("ACTIVE");
+        expect(
+            new Date(after.currentPeriodEnd).getTime() - periodEnd.getTime(),
+        ).toBe(28 * DAY);
+        // Still covered by the first invoice: no restart.
+        expect(await invoicesOf(s.id)).toHaveLength(1);
+    });
+
+    it("doesn't let pauses already refused for Payments pin the batch ahead of a due renewal", async () => {
+        const off = await makeOrg("parked-pauses");
+        await prisma.organizationModule.create({
+            data: {
+                organizationId: off.organizationId,
+                moduleKey: "PAYMENTS",
+                status: "DISABLED",
+            },
+        });
+        const plan = await service.createPlan(off, {
+            name: "Monthly",
+            price: "1200",
+            currency: "INR",
+            interval: "MONTH",
+        });
+        const now = new Date();
+        const count = RENEW_BATCH + 5;
+        const contacts = await prisma.contact.createManyAndReturn({
+            data: Array.from({ length: count }, (_, i) => ({
+                organizationId: off.organizationId,
+                email: `parked-${i}@example.com`,
+            })),
+            select: { id: true },
+        });
+        // Paid to 30 days ago, paused to yesterday: each would restart
+        // billing, and each was refused already. Their periods ended
+        // before the due renewal's, so they sort ahead of it.
+        const parked = await prisma.customerSubscription.createManyAndReturn({
+            data: contacts.map((c) => ({
+                organizationId: off.organizationId,
+                planId: plan.id,
+                contactId: c.id,
+                status: "PAUSED",
+                price: "1200",
+                currency: "INR",
+                interval: "MONTH",
+                timezone: "UTC",
+                anchorAt: new Date(now.getTime() - 60 * DAY),
+                currentPeriodStart: new Date(now.getTime() - 60 * DAY),
+                currentPeriodEnd: new Date(now.getTime() - 30 * DAY),
+                pausedAt: new Date(now.getTime() - 45 * DAY),
+                pausedUntil: new Date(now.getTime() - DAY),
+            })),
+            select: { id: true },
+        });
+        await prisma.subscriptionEvent.createMany({
+            data: parked.map((p) => ({
+                organizationId: off.organizationId,
+                subscriptionId: p.id,
+                kind: "RESUME_REFUSED",
+                actorKind: "JOB",
+                data: { reason: "PAYMENTS_OFF" },
+            })),
+        });
+
+        const due = await service.subscribe(org, {
+            contactId: await person(),
+            planId,
+        });
+        await makeDue(due.id);
+
+        const renewOne = jest.spyOn(service, "renewOne");
+        try {
+            // Nothing left waiting: the next run is the usual hour away.
+            await expect(handler.renewDue(now)).resolves.toBe(false);
+            const asked = new Set(renewOne.mock.calls.map((c) => c[0]));
+            expect(asked.has(due.id)).toBe(true);
+            expect(parked.some((p) => asked.has(p.id))).toBe(false);
+        } finally {
+            renewOne.mockRestore();
+        }
+        expect(await invoicesOf(due.id)).toHaveLength(2);
+        // Still one refusal each: nothing was written twice.
+        expect(
+            await prisma.subscriptionEvent.count({
+                where: {
+                    organizationId: off.organizationId,
+                    kind: "RESUME_REFUSED",
+                },
+            }),
+        ).toBe(count);
+    });
+});
+
+describe("retrying a failed charge (review S-5, real database)", () => {
+    it("makes the pay link and records RETRIED together, and neither when the link is refused", async () => {
+        const shop = await makeOrg("retry-charge");
+        const plan = await service.createPlan(shop, {
+            name: "Monthly",
+            price: "1200",
+            currency: "INR",
+            interval: "MONTH",
+        });
+        const s = await service.subscribe(shop, {
+            contactId: (
+                await prisma.contact.create({
+                    data: {
+                        organizationId: shop.organizationId,
+                        email: "retry@example.com",
+                    },
+                })
+            ).id,
+            planId: plan.id,
+        });
+        await prisma.invoice.updateMany({
+            where: { subscriptionId: s.id },
+            data: { dueAt: new Date(Date.now() - 86_400_000) },
+        });
+        const retried = () =>
+            prisma.subscriptionEvent.count({
+                where: { subscriptionId: s.id, kind: "RETRIED" },
+            });
+        const tokenHash = async () =>
+            (
+                await prisma.invoice.findFirstOrThrow({
+                    where: { subscriptionId: s.id },
+                })
+            ).payTokenHash;
+
+        // No provider connected: the link is refused, and nothing is said.
+        await expect(service.retryPayment(shop, s.id)).rejects.toThrow(
+            "Connect a payment provider",
+        );
+        expect(await retried()).toBe(0);
+        expect(await tokenHash()).toBeNull();
+
+        await prisma.merchantPaymentProvider.create({
+            data: {
+                organizationId: shop.organizationId,
+                provider: "RAZORPAY",
+                encryptedCredentials: "x",
+                credentialsIv: "x",
+                credentialsAuthTag: "x",
+            },
+        });
+        const { invoiceId, token } = await service.retryPayment(shop, s.id);
+        expect(token).toBeTruthy();
+        expect(await tokenHash()).not.toBeNull();
+        const events = await prisma.subscriptionEvent.findMany({
+            where: { subscriptionId: s.id, kind: "RETRIED" },
+        });
+        expect(events).toEqual([expect.objectContaining({ invoiceId })]);
     });
 });

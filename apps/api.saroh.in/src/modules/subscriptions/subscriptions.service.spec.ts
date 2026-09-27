@@ -28,7 +28,7 @@ jest.mock("@saroh/database", () => {
             delete: jest.fn(),
             deleteMany: jest.fn(),
         },
-        invoice: { findFirst: jest.fn() },
+        invoice: { findFirst: jest.fn(), findMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
     };
     return {
@@ -86,10 +86,10 @@ const owner: OrganizationContext = {
 const member: OrganizationContext = { ...owner, role: "MEMBER" };
 
 const issueInTx = jest.fn();
-const createPayLink = jest.fn();
+const createPayLinkInTx = jest.fn();
 const service = new SubscriptionsService({
     issueInTx,
-    createPayLink,
+    createPayLinkInTx,
 } as unknown as InvoicesService);
 
 const decimal = (s: string) => ({ toString: () => s });
@@ -164,6 +164,9 @@ beforeEach(() => {
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
     tx.invoice!.findFirst!.mockResolvedValue(null);
+    tx.invoice!.findMany!.mockResolvedValue([]);
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.subscriptionEvent!.create!.mockResolvedValue({});
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
     issueInTx.mockResolvedValue({ id: "inv_new", number: "INV-0001" });
 });
@@ -1822,20 +1825,53 @@ describe("a failed charge", () => {
     });
 
     it("retries by making a new pay link for that invoice", async () => {
-        db.invoice!.findMany!.mockResolvedValue([paid, overdue]);
-        createPayLink.mockResolvedValue({ token: "tok" });
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        createPayLinkInTx.mockResolvedValue({ token: "tok" });
         await expect(service.retryPayment(owner, "sub_1")).resolves.toEqual({
             invoiceId: "inv_1",
             token: "tok",
         });
-        expect(createPayLink).toHaveBeenCalledWith(owner, "inv_1");
+        expect(createPayLinkInTx).toHaveBeenCalledWith(tx, owner, "inv_1");
+    });
+
+    it("makes the link and records RETRIED on one transaction, under the subscription's lock (review S-5)", async () => {
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        const order: string[] = [];
+        tx.$queryRaw.mockImplementation(() => {
+            order.push("lock");
+            return Promise.resolve([]);
+        });
+        createPayLinkInTx.mockImplementation((t: unknown) => {
+            order.push(t === tx ? "link in tx" : "link outside");
+            return Promise.resolve({ token: "tok" });
+        });
+        tx.subscriptionEvent!.create!.mockImplementation(
+            (args: { data: { kind: string } }) => {
+                order.push(args.data.kind);
+                return Promise.resolve({});
+            },
+        );
+        await service.retryPayment(owner, "sub_1");
+        expect(db.$transaction).toHaveBeenCalledTimes(1);
+        expect(order).toEqual(["lock", "link in tx", "RETRIED"]);
+    });
+
+    it("records no RETRIED when the link is refused", async () => {
+        tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        createPayLinkInTx.mockRejectedValue(
+            new ConflictException("Connect a payment provider"),
+        );
+        await expect(service.retryPayment(owner, "sub_1")).rejects.toThrow(
+            "Connect a payment provider",
+        );
+        expect(tx.subscriptionEvent!.create).not.toHaveBeenCalled();
     });
 
     it("has nothing to retry when the latest charge is not overdue", async () => {
         await expect(
             service.retryPayment(owner, "sub_1"),
         ).rejects.toBeInstanceOf(ConflictException);
-        expect(createPayLink).not.toHaveBeenCalled();
+        expect(createPayLinkInTx).not.toHaveBeenCalled();
     });
 
     it("refuses a Member a retry", async () => {
@@ -2250,6 +2286,52 @@ describe("pause with an end date (D8)", () => {
                     data: { extendedDays: 28 },
                 }),
             ]);
+        });
+
+        it("extends the same way when the job only gets to it after the period's end (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks(),
+            );
+            await expect(
+                service.renewOne("sub_1", at("2026-11-02T08:00:00Z")),
+            ).resolves.toBe("resumed");
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                status: "ACTIVE",
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("extends a pause ending the moment the period does (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    pausedUntil: at("2026-11-01T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-11-01T00:30:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({ currentPeriodEnd: at("2026-12-02T00:00:00Z") });
+            expect(issueInTx).not.toHaveBeenCalled();
+        });
+
+        it("starts a restart's period on the pause's end date, not the day the job runs (review S-3)", async () => {
+            tx.customerSubscription!.findUnique!.mockResolvedValue(
+                pausedFourWeeks({
+                    currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+                }),
+            );
+            await service.renewOne("sub_1", at("2026-10-31T09:00:00Z"));
+            expect(
+                tx.customerSubscription!.update!.mock.calls[0]![0].data,
+            ).toMatchObject({
+                anchorAt: at("2026-10-29T00:00:00Z"),
+                currentPeriodStart: at("2026-10-29T00:00:00Z"),
+                currentPeriodEnd: at("2026-11-29T00:00:00Z"),
+            });
+            expect(issueInTx).toHaveBeenCalledTimes(1);
         });
 
         it("takes the row lock before it reads", async () => {
