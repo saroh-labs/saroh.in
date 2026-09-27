@@ -68,9 +68,13 @@ components/shared/             app shell, navigation, command menu
   `components/<domain>/`. Several domains in one app: `components/shared/`.
   Another app would need it and it is product-agnostic: `packages/ui`. A block
   on a merchant's site: `packages/site-blocks`, never an app.
-- **Adopted** — **Split big components along their panels.** Gap:
-  `site-editor.tsx` is 1,548 lines; its sibling `pages-panel`, `style-panel`,
-  `review-panel` and `section-fields/` show where the rest goes.
+- **Current** — **Split big components along their panels.** The site
+  editor is the worked example (#260): `site-editor.tsx` only composes, its
+  state lives in hooks in `components/sites/editor/` (`use-editor-draft`,
+  `-style`, `-selection`, `-viewport`, `-review`, `use-publish`) and its
+  drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
+  `inspector-host`). A new editor panel or piece of editor state goes there,
+  not back into `site-editor.tsx`.
 
 ## The other apps
 
