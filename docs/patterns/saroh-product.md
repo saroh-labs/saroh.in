@@ -26,7 +26,10 @@ pattern files refer back here.
   ATTENTION, then OVERDUE, then SETUP, then SUGGESTION — computed in
   `apps/api.saroh.in/src/modules/home` and rendered through
   `lib/home/service.ts`. The most consequential thing goes first; not a
-  dashboard of equal tiles.
+  dashboard of equal tiles. **Needs you** (round 2, F3) draws it flat: one
+  row per thing to do, ranked by what has gone wrong — late, then blocked,
+  then due, then setting up (`home-needs.ts`) — each with a tag whose words
+  say what its tone colours. Suggestions stay off it.
 - **Current** — A source that fails to load degrades into a named notice; it
   never becomes a zero or a false "nothing to do"
   (`.agents/skills/saroh-product-states/SKILL.md`).
