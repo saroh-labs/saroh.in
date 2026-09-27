@@ -15,16 +15,22 @@ import type { Prisma } from "@saroh/database";
  *   someone. Every further code needs the bot challenge and waits 10
  *   minutes after the previous one, so the real customer still gets one
  *   within 10 minutes and the flooder at most 6 an hour.
- * - **The business, for emails new to it:** past half its hourly ceiling a
- *   new email needs the challenge; past all of it codes still go to anyone
- *   who passes, and Saroh is alerted. Returning customers never count and
- *   are never challenged by it.
+ * - **The business, for emails new to it:** past half its hourly ceiling
+ *   every code needs the challenge, for a returning customer too: whether
+ *   one is asked for must never say whether the email has an account.
+ *   Past all of it codes still go to anyone who passes, and Saroh is
+ *   alerted. Only new emails count towards it.
  * - **The business, every code today** (the sender's reputation): past it,
  *   the challenge for everyone and an alert; never a refusal.
+ * - **Wrong codes for one email:** past 25 failed tries in a day someone is
+ *   guessing. Every further code for that email needs the challenge (each
+ *   code allows only 5 tries, so this caps the guessing) and Saroh is
+ *   alerted.
+ * - **One visitor address, busy:** past the in-process per-address limit
+ *   (the service keeps it, per business) a code needs the challenge rather
+ *   than being refused: offices and mobile networks share addresses.
  *
- * The per-address request limiter (in-process, keyed by the relayed
- * address) sits in front of this in the service. Every count here is of
- * `CustomerSignInCode` rows, so it holds across API instances and restarts.
+ * Every count here is of `CustomerSignInCode` rows, so it holds across API instances and restarts.
  * The ceilings are starting values, tuned from the first weeks' rows.
  */
 export const CODE_TTL_MS = 10 * 60_000;
@@ -39,6 +45,8 @@ export const OWN_PER_HOUR = 5;
 export const OWN_PER_DAY = 10;
 export const DESTINATION_PER_DAY = 20;
 export const FLOOD_WAIT_MS = 10 * MINUTE;
+/** Failed tries at one email's codes in a day before each code needs the challenge. */
+export const DESTINATION_FAILED_TRIES_PER_DAY = 25;
 
 /** A business this young gets the lower ceilings. */
 export const NEW_BUSINESS_MS = 14 * DAY;
@@ -73,13 +81,15 @@ export interface CodeCounts {
     destinationToday: number;
     /** The newest code for this email from any address. */
     destinationLatest: Date | null;
+    /** Wrong tries at this email's codes, from any address, today. */
+    destinationFailedToday: number;
     /** The business's codes to new emails in the last hour. */
     businessNewLastHour: number;
     /** The business's codes of any kind today. */
     businessToday: number;
 }
 
-export type CeilingAlert = "new-destinations" | "daily";
+export type CeilingAlert = "new-destinations" | "daily" | "failed-tries";
 
 export type CodeDecision =
     /** The visitor's own limit: 429, with when to try again. */
@@ -105,6 +115,8 @@ export function decideCodeRequest(input: {
     counts: CodeCounts;
     newDestination: boolean;
     ceilings: Ceilings;
+    /** The visitor's address is past the in-process per-address limit. */
+    addressBusy?: boolean;
     now: Date;
 }): CodeDecision {
     const { counts, newDestination, ceilings } = input;
@@ -151,19 +163,27 @@ export function decideCodeRequest(input: {
     }
 
     // 3. The business's ceilings: the challenge and an alert, never a refusal.
+    // Past half the new-email ceiling the challenge is for every email, so
+    // it never tells a known email from an unknown one.
     const alerts: CeilingAlert[] = [];
-    let challenge = flooded;
-    if (newDestination) {
-        if (counts.businessNewLastHour * 2 >= ceilings.newDestinationsPerHour) {
-            challenge = true;
-        }
-        if (counts.businessNewLastHour >= ceilings.newDestinationsPerHour) {
-            alerts.push("new-destinations");
-        }
+    let challenge = flooded || input.addressBusy === true;
+    if (counts.businessNewLastHour * 2 >= ceilings.newDestinationsPerHour) {
+        challenge = true;
+    }
+    if (
+        newDestination &&
+        counts.businessNewLastHour >= ceilings.newDestinationsPerHour
+    ) {
+        alerts.push("new-destinations");
     }
     if (counts.businessToday >= ceilings.codesPerDay) {
         challenge = true;
         alerts.push("daily");
+    }
+    // 4. Someone guessing at this email's codes.
+    if (counts.destinationFailedToday >= DESTINATION_FAILED_TRIES_PER_DAY) {
+        challenge = true;
+        alerts.push("failed-tries");
     }
     return { kind: "send", challenge, alerts };
 }
@@ -221,7 +241,7 @@ export async function loadCodeCounts(
 ): Promise<CodeCounts> {
     const { organizationId, destinationHash, clientHash, now } = input;
     const dayAgo = new Date(now.getTime() - DAY);
-    const [own, destinationToday, destinationLatest, business] =
+    const [own, destinationToday, destinationLatest, tries, business] =
         await Promise.all([
             db.customerSignInCode.findMany({
                 where: {
@@ -244,12 +264,27 @@ export async function loadCodeCounts(
                 orderBy: { createdAt: "desc" },
                 select: { createdAt: true },
             }),
+            // Every try counts, the right one included: take the used codes'
+            // right tries back off to leave the wrong ones.
+            db.customerSignInCode.aggregate({
+                where: {
+                    organizationId,
+                    destinationHash,
+                    createdAt: { gt: dayAgo },
+                },
+                _sum: { attempts: true },
+                _count: { consumedAt: true },
+            }),
             loadBusinessCounts(db, organizationId, now),
         ]);
     return {
         own: own.map((row) => row.createdAt),
         destinationToday,
         destinationLatest: destinationLatest?.createdAt ?? null,
+        destinationFailedToday: Math.max(
+            0,
+            (tries._sum.attempts ?? 0) - tries._count.consumedAt,
+        ),
         ...business,
     };
 }
