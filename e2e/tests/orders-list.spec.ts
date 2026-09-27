@@ -274,8 +274,8 @@ test.describe("orders list", () => {
             await expect(page).toHaveURL(/tab=open/);
             // The pill says the step in words on either layout; the desk
             // grid adds the bar, itself said in words.
-            const top = rows[0];
-            const step = top?.steps?.[top.stepIndex ?? 0]?.label;
+            const top = rows.at(0);
+            const step = top?.steps?.at(top.stepIndex ?? 0)?.label;
             if (top && step) {
                 await expect(
                     orders(page)
