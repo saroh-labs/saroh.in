@@ -15,6 +15,7 @@ import { Controller, Get, UseGuards, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { prisma } from "@saroh/database";
 
+import { isRlsTestMode } from "../../../test/rls-mode";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -347,96 +348,107 @@ describe("the customer session on a site", () => {
     });
 });
 
-describe("row-level security on a customer route", () => {
-    const TABLES = ["Contact", "CustomerAccount"];
+// Installs the migrations' policies and a probe role itself, which needs
+// a superuser. In RLS mode (TEST_RLS=on) the whole suite already runs as
+// the NOBYPASSRLS role on a schema built from the migrations, so this
+// group is what every spec there checks, and it could not set itself up.
+(isRlsTestMode() ? describe.skip : describe)(
+    "row-level security on a customer route",
+    () => {
+        const TABLES = ["Contact", "CustomerAccount"];
 
-    beforeAll(async () => {
-        await prisma.$executeRawUnsafe(`DO $$ BEGIN
+        beforeAll(async () => {
+            await prisma.$executeRawUnsafe(`DO $$ BEGIN
             CREATE ROLE ${PROBE_ROLE} NOLOGIN NOBYPASSRLS;
         EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-        await prisma.$executeRawUnsafe(
-            `GRANT USAGE ON SCHEMA public TO ${PROBE_ROLE}`,
-        );
-        await prisma.$executeRawUnsafe(
-            `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${PROBE_ROLE}`,
-        );
-        for (const table of TABLES) {
             await prisma.$executeRawUnsafe(
-                `ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`,
+                `GRANT USAGE ON SCHEMA public TO ${PROBE_ROLE}`,
             );
             await prisma.$executeRawUnsafe(
-                `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${PROBE_ROLE}`,
             );
-            await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "${table}"
+            for (const table of TABLES) {
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                );
+                await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "${table}"
                 USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
                        OR "organizationId" = current_setting('app.current_organization_id', true))`);
-        }
-    });
-
-    afterAll(async () => {
-        for (const table of TABLES) {
-            await prisma.$executeRawUnsafe(
-                `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
-            );
-            await prisma.$executeRawUnsafe(
-                `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
-            );
-        }
-        await prisma.$executeRawUnsafe(
-            `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${PROBE_ROLE}`,
-        );
-        await prisma.$executeRawUnsafe(
-            `REVOKE USAGE ON SCHEMA public FROM ${PROBE_ROLE}`,
-        );
-        await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${PROBE_ROLE}`);
-    });
-
-    it("runs in the session's business, and sees none of another business's customers", async () => {
-        const kavi = await business("Kavi");
-        const pulse = await business("Pulse");
-        const { token } = await signIn(kavi.host);
-        await signIn(pulse.host);
-
-        const before = process.env.RLS_ENFORCEMENT;
-        // eslint-disable-next-line no-restricted-properties -- the proxy reads this live
-        process.env.RLS_ENFORCEMENT = "on";
-        try {
-            const res = await call("GET", "/test-only/customer-rls", {
-                host: kavi.host,
-                token,
-            });
-            expect(res.status).toBe(200);
-            const seen = res.body as {
-                customer: string;
-                context: string | null;
-                accountOrgs: string[];
-                contactOrgs: string[];
-            };
-            expect(seen.customer).toBe(kavi.organizationId);
-            expect(seen.context).toBe(kavi.organizationId);
-            expect(seen.accountOrgs.length).toBeGreaterThan(0);
-            expect(seen.contactOrgs.length).toBeGreaterThan(0);
-            expect(
-                seen.accountOrgs.every((org) => org === kavi.organizationId),
-            ).toBe(true);
-            expect(
-                seen.contactOrgs.every((org) => org === kavi.organizationId),
-            ).toBe(true);
-        } finally {
-            // eslint-disable-next-line no-restricted-properties -- restore what the test changed
-            if (before === undefined) delete process.env.RLS_ENFORCEMENT;
-            // eslint-disable-next-line no-restricted-properties -- restore what the test changed
-            else process.env.RLS_ENFORCEMENT = before;
-        }
-
-        // Pulse's customers are really there: only RLS kept them out.
-        const all = await prisma.customerAccount.findMany({
-            where: {
-                organizationId: {
-                    in: [kavi.organizationId, pulse.organizationId],
-                },
-            },
+            }
         });
-        expect(new Set(all.map((a) => a.organizationId)).size).toBe(2);
-    });
-});
+
+        afterAll(async () => {
+            for (const table of TABLES) {
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
+                );
+            }
+            await prisma.$executeRawUnsafe(
+                `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${PROBE_ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(
+                `REVOKE USAGE ON SCHEMA public FROM ${PROBE_ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${PROBE_ROLE}`);
+        });
+
+        it("runs in the session's business, and sees none of another business's customers", async () => {
+            const kavi = await business("Kavi");
+            const pulse = await business("Pulse");
+            const { token } = await signIn(kavi.host);
+            await signIn(pulse.host);
+
+            const before = process.env.RLS_ENFORCEMENT;
+            // eslint-disable-next-line no-restricted-properties -- the proxy reads this live
+            process.env.RLS_ENFORCEMENT = "on";
+            try {
+                const res = await call("GET", "/test-only/customer-rls", {
+                    host: kavi.host,
+                    token,
+                });
+                expect(res.status).toBe(200);
+                const seen = res.body as {
+                    customer: string;
+                    context: string | null;
+                    accountOrgs: string[];
+                    contactOrgs: string[];
+                };
+                expect(seen.customer).toBe(kavi.organizationId);
+                expect(seen.context).toBe(kavi.organizationId);
+                expect(seen.accountOrgs.length).toBeGreaterThan(0);
+                expect(seen.contactOrgs.length).toBeGreaterThan(0);
+                expect(
+                    seen.accountOrgs.every(
+                        (org) => org === kavi.organizationId,
+                    ),
+                ).toBe(true);
+                expect(
+                    seen.contactOrgs.every(
+                        (org) => org === kavi.organizationId,
+                    ),
+                ).toBe(true);
+            } finally {
+                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                if (before === undefined) delete process.env.RLS_ENFORCEMENT;
+                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                else process.env.RLS_ENFORCEMENT = before;
+            }
+
+            // Pulse's customers are really there: only RLS kept them out.
+            const all = await prisma.customerAccount.findMany({
+                where: {
+                    organizationId: {
+                        in: [kavi.organizationId, pulse.organizationId],
+                    },
+                },
+            });
+            expect(new Set(all.map((a) => a.organizationId)).size).toBe(2);
+        });
+    },
+);

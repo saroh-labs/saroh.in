@@ -77,10 +77,17 @@ const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
  */
 async function publishButton(page: Page) {
     const publish = page.getByRole("button", { name: /^Publish/ }).first();
-    if (onPhone(page) && !(await publish.isVisible())) {
-        await page
-            .getByRole("button", { name: "Status, view and publish" })
-            .click();
+    if (onPhone(page)) {
+        // Pressed until it opens: a press before hydration (just after a
+        // load or a reload) does nothing.
+        await expect(async () => {
+            if (!(await publish.isVisible())) {
+                await page
+                    .getByRole("button", { name: "Status, view and publish" })
+                    .click();
+            }
+            await expect(publish).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
     }
     await expect(publish).toBeVisible();
     return publish;
@@ -299,12 +306,47 @@ test.describe("the editor's status after a reload (G2)", () => {
         const publishTitle = async () => {
             const publish = await publishButton(page);
             const title = await publish.getAttribute("title");
-            if (onPhone(page)) await page.keyboard.press("Escape");
+            if (onPhone(page)) {
+                await page.keyboard.press("Escape");
+                /*
+                 * Until the menu is gone. Read while it was still closing,
+                 * the next poll saw Publish visible, skipped opening the
+                 * menu, and asked for the title of a button that then left
+                 * the page: the read waited out the whole poll, which
+                 * reported the "Saving" it had read a moment after the
+                 * toggle (the phone's failure in CI after #687).
+                 */
+                await expect(publish).toBeHidden();
+            }
             return title;
         };
+        const NOTHING = "Nothing has changed since the last publish";
+
+        /*
+         * Start from a draft that matches what is live, with the first block
+         * showing. A run that stopped half way leaves that block hidden in
+         * the draft, and a retry that flipped it again would only put it
+         * back — "Nothing has changed", correctly — and fail for the first
+         * run's reason, not its own.
+         */
+        const first = await inspectorToggle(page);
+        // Pressed is "Hidden" (the label carries an icon, so not its text).
+        if ((await first.getAttribute("aria-pressed")) === "true") {
+            await first.click();
+        }
+        await closeOverlays(page);
+        await expect
+            .poll(publishTitle, { timeout: 30_000 })
+            .not.toMatch(/^Saving/);
+        if ((await publishTitle()) !== NOTHING) {
+            await publishFromEditor(page);
+            await expect.poll(publishTitle, { timeout: 30_000 }).toBe(NOTHING);
+        }
 
         // One block's visibility flips; the autosave counts it.
-        await (await inspectorToggle(page)).click();
+        const toggle = await inspectorToggle(page);
+        await expect(toggle).toHaveAccessibleName("Visible");
+        await toggle.click();
         await closeOverlays(page);
         await expect
             .poll(publishTitle, { timeout: 30_000 })
@@ -323,8 +365,6 @@ test.describe("the editor's status after a reload (G2)", () => {
             timeout: 30_000,
         });
         await publishFromEditor(page);
-        await expect
-            .poll(publishTitle, { timeout: 30_000 })
-            .toBe("Nothing has changed since the last publish");
+        await expect.poll(publishTitle, { timeout: 30_000 }).toBe(NOTHING);
     });
 });
