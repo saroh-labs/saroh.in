@@ -22,6 +22,7 @@ import {
     AddExtraHoursDto,
     AddTimeOffDto,
     CreateStaffDto,
+    RemoveOffDto,
     ReplaceStaffHoursDto,
     SetStaffServicesDto,
     UpdateBookingRulesDto,
@@ -128,6 +129,17 @@ export class StaffController {
         @Body() dto: AddTimeOffDto,
     ): Promise<{ staff: StaffView; affected: BookingBrief[] }> {
         return this.staff.addTimeOff(ctx, staffId, dto);
+    }
+
+    /** Several rows of time off at once — a range shown as one line (E3). */
+    @Post(":staffId/time-off/remove")
+    @HttpCode(200)
+    removeTimeOffMany(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("staffId") staffId: string,
+        @Body() dto: RemoveOffDto,
+    ): Promise<StaffView> {
+        return this.staff.removeTimeOffMany(ctx, staffId, dto.ids);
     }
 
     @Delete(":staffId/time-off/:timeOffId")

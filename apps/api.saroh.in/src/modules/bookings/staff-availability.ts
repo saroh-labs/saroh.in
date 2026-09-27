@@ -17,6 +17,7 @@ type Db = Pick<
     | "staffHours"
     | "staffExtraHours"
     | "staffTimeOff"
+    | "businessClosure"
     | "booking"
 >;
 
@@ -85,12 +86,34 @@ export function dateOnly(date: Date): string {
 }
 
 /**
+ * When the whole business is closed over `[from, to)`, padded a day either
+ * side (E3). Nobody can be booked then, on any service.
+ */
+export async function loadClosures(
+    db: Pick<Db, "businessClosure">,
+    organizationId: string,
+    from: Date,
+    to: Date,
+): Promise<Interval[]> {
+    return db.businessClosure.findMany({
+        where: {
+            organizationId,
+            startAt: { lt: new Date(to.getTime() + 2 * DAY) },
+            endAt: { gt: new Date(from.getTime() - 2 * DAY) },
+        },
+        select: { startAt: true, endAt: true },
+    });
+}
+
+/**
  * Everything the engine needs for these people over `[from, to)` — padded a
- * day either side, like the engine's own windows. `excludeBookingId` leaves
- * out a booking being moved, so it does not collide with itself.
+ * day either side, like the engine's own windows. The business's closures
+ * count as everyone's time off (E3). `excludeBookingId` leaves out a booking
+ * being moved, so it does not collide with itself.
  */
 export async function loadPeople(
     db: Db,
+    organizationId: string,
     staffIds: string[],
     from: Date,
     to: Date,
@@ -99,7 +122,7 @@ export async function loadPeople(
     if (staffIds.length === 0) return [];
     const padFrom = new Date(from.getTime() - 2 * DAY);
     const padTo = new Date(to.getTime() + 2 * DAY);
-    const [hours, extra, off, busy] = await Promise.all([
+    const [hours, extra, off, busy, closed] = await Promise.all([
         db.staffHours.findMany({
             where: { staffId: { in: staffIds } },
             select: {
@@ -139,6 +162,7 @@ export async function loadPeople(
             },
             select: { staffId: true, startAt: true, endAt: true },
         }),
+        loadClosures(db, organizationId, from, to),
     ]);
     const pick = <T extends { staffId: string | null }>(
         rows: T[],
@@ -160,7 +184,7 @@ export async function loadPeople(
             startMinute: r.startMinute,
             endMinute: r.endMinute,
         })),
-        timeOff: pick(off, id).map(interval),
+        timeOff: [...pick(off, id).map(interval), ...closed.map(interval)],
         busy: pick(busy, id).map(interval),
     }));
 }
