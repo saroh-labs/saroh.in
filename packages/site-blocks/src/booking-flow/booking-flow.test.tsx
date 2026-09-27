@@ -580,3 +580,233 @@ describe("the booking page (U19)", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("Where and anything we should know (E7)", () => {
+    const KAVI: BookingPageData = {
+        ...PAGE,
+        businessName: "Kavi Dental",
+        services: [
+            {
+                ...PAGE.services[0],
+                id: "svc_consult",
+                name: "Video consultation",
+                online: false,
+                where: "EITHER",
+                staff: ["Dr Kavitha Rao"],
+            },
+            {
+                ...PAGE.services[0],
+                id: "svc_clean",
+                name: "Cleaning",
+                online: false,
+                where: "IN_PERSON",
+                staff: ["Dr Kavitha Rao"],
+            },
+        ],
+    };
+    const KAVI_DAYS = {
+        ...ONE_DAYS,
+        days: ONE_DAYS.days.map((d) => ({
+            ...d,
+            starts: d.starts.map((s) => ({
+                ...s,
+                staffId: "staff_kavitha",
+                staffName: "Dr Kavitha Rao",
+            })),
+        })),
+    };
+    const LINK = "https://meet.example.com/kavi";
+
+    async function chooseAt(service: RegExp) {
+        fireEvent.click(screen.getByRole("radio", { name: service }));
+        const time = await screen.findByRole("radio", {
+            name: "07:00 with Dr Kavitha Rao",
+        });
+        fireEvent.click(time);
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Rahul Iyer" },
+        });
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "rahul@example.in" },
+        });
+    }
+
+    function bookBody(): Record<string, unknown> {
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        return JSON.parse(post?.init?.body as string) as Record<
+            string,
+            unknown
+        >;
+    }
+
+    it("asks Where for a service offered either way, and books a Video call with its link", async () => {
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(KAVI_DAYS)
+                : json(
+                      booked({
+                          serviceName: "Video consultation",
+                          online: true,
+                          meetingUrl: LINK,
+                      }),
+                      201,
+                  ),
+        );
+        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        await chooseAt(/Video consultation/);
+
+        const where = screen.getByRole("radiogroup", { name: "Where" });
+        const clinic = screen.getByRole("radio", { name: "At Kavi Dental" });
+        const video = screen.getByRole("radio", { name: "Video call" });
+        expect(where).toContainElement(clinic);
+        // In person until they say otherwise.
+        expect(clinic).toHaveAttribute("aria-checked", "true");
+        fireEvent.click(video);
+        expect(video).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByText("The link to join shows here once you're booked."),
+        ).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("Anything we should know?"), {
+            target: { value: "  I take blood thinners  " },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        await screen.findByRole("heading", { name: "You're booked, Rahul." });
+        expect(bookBody()).toMatchObject({
+            locationType: "ONLINE",
+            intakeNote: "I take blood thinners",
+        });
+        // The confirmation says where it happens, and hands over the link.
+        expect(
+            screen.getByText(/^Video consultation · Video call · Sun 20 Sep/),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: LINK })).toHaveAttribute(
+            "href",
+            LINK,
+        );
+        // Nothing promises a message Saroh doesn't send.
+        expect(document.body.textContent).not.toMatch(
+            /on its way|we'll text|we'll email/i,
+        );
+    });
+
+    it("never asks Where for an In person service, and says it's at the clinic", async () => {
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(KAVI_DAYS)
+                : json(booked({ serviceName: "Cleaning" }), 201),
+        );
+        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        await chooseAt(/Cleaning/);
+
+        expect(
+            screen.queryByRole("radiogroup", { name: "Where" }),
+        ).not.toBeInTheDocument();
+        // The note is asked of every booking.
+        expect(
+            screen.getByLabelText("Anything we should know?"),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+
+        await screen.findByRole("heading", { name: "You're booked, Rahul." });
+        const body = bookBody();
+        expect(body).not.toHaveProperty("locationType");
+        // An empty note isn't sent.
+        expect(body).not.toHaveProperty("intakeNote");
+        expect(
+            screen.getByText(/^Cleaning · At Kavi Dental · Sun 20 Sep/),
+        ).toBeInTheDocument();
+    });
+
+    it("says nothing about where for a business that only meets in person", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} />);
+        await chooseOneToOne();
+        expect(
+            screen.queryByRole("radiogroup", { name: "Where" }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        expect(
+            screen.getByText(/^Personal training · Sun 20 Sep/),
+        ).toBeInTheDocument();
+    });
+
+    it("caps the note at 1,000 characters", async () => {
+        serve(() => json(KAVI_DAYS));
+        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        await chooseAt(/Cleaning/);
+        expect(
+            screen.getByLabelText("Anything we should know?"),
+        ).toHaveAttribute("maxLength", "1000");
+    });
+
+    it("pays now for a Video call: the link arrives with the confirmation", async () => {
+        let holdState = "HELD";
+        serve((url) => {
+            if (url.endsWith("/days")) return json(KAVI_DAYS);
+            if (url.endsWith("/book")) {
+                return json(
+                    booked({
+                        serviceName: "Video consultation",
+                        online: true,
+                        state: "HELD",
+                        holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                        payToken: "tok_1",
+                    }),
+                    201,
+                );
+            }
+            if (url.endsWith("/payment-intent")) {
+                return json({
+                    provider: "RAZORPAY",
+                    providerIntentId: "order_1",
+                    amountCents: 120_000,
+                    currency: "INR",
+                    publicKey: null,
+                    clientParams: {},
+                });
+            }
+            return json({
+                state: holdState,
+                holdExpiresAt: null,
+                booking: {
+                    online: true,
+                    meetingUrl: holdState === "CONFIRMED" ? LINK : null,
+                },
+            });
+        });
+        render(<BookingFlow page={KAVI} apiUrl={API} />);
+        await chooseAt(/Video consultation/);
+        fireEvent.click(screen.getByRole("radio", { name: "Video call" }));
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+        );
+        await screen.findByText("Razorpay checkout opens here");
+        expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
+
+        holdState = "CONFIRMED";
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(4_500);
+        });
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "You're booked, Rahul." }),
+            ).toBeInTheDocument(),
+        );
+        expect(screen.getByRole("link", { name: LINK })).toBeInTheDocument();
+    });
+});

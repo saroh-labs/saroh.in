@@ -13,9 +13,11 @@ import type {
     BookingDay,
     BookingPageData,
     BookingStart,
+    BookingWhere,
     BookResult,
 } from "./model";
 import {
+    asksWhere,
     dateIn,
     dateText,
     formatMoney,
@@ -23,6 +25,7 @@ import {
     phoneProblem,
     rulesText,
     timeIn,
+    whereText,
 } from "./model";
 import { DetailsStep } from "./steps/details-step";
 import { DoneCard } from "./steps/done-card";
@@ -89,6 +92,9 @@ export default function BookingFlow({
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phoneNo, setPhoneNo] = useState("");
+    // Where, for a service offered either way, and the note (E7).
+    const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
+    const [note, setNote] = useState("");
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<"NOW" | "DESK" | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
@@ -170,6 +176,10 @@ export default function BookingFlow({
         if (next !== pay) attemptKey.current = null;
         setPayChoice(next);
     };
+    const pickWhere = (next: BookingWhere) => {
+        if (next !== where) attemptKey.current = null;
+        setWhere(next);
+    };
 
     // ── What is chosen ──────────────────────────────────────────────────
 
@@ -207,6 +217,13 @@ export default function BookingFlow({
               : canPayNow
                 ? "NOW"
                 : "DESK";
+
+    const asks = asksWhere(service);
+    /** What the booking page asks beyond the time, as the API takes it. */
+    const extras = {
+        ...(asks ? { locationType: where } : {}),
+        ...(note.trim() ? { intakeNote: note.trim() } : {}),
+    };
 
     const emailOk = looksLikeEmail(email);
     const phoneError = phoneProblem(phoneNo);
@@ -267,9 +284,18 @@ export default function BookingFlow({
                         return p;
                     }
                     if (state === "CONFIRMED") {
+                        // Confirmed, the booking carries its link to join
+                        // when it is online (E7).
+                        const standing = result.value.booking;
                         return {
                             kind: "done",
-                            booking: p.booking,
+                            booking: standing
+                                ? {
+                                      ...p.booking,
+                                      online: standing.online,
+                                      meetingUrl: standing.meetingUrl,
+                                  }
+                                : p.booking,
                             paid: true,
                             price: p.price,
                             when: p.when,
@@ -317,6 +343,7 @@ export default function BookingFlow({
             idempotencyKey: attemptKey.current,
             staffId: chosenStart.staffId ?? undefined,
             pay,
+            ...extras,
         });
         setSubmitting(false);
         if (!result.ok) {
@@ -388,6 +415,7 @@ export default function BookingFlow({
                 idempotencyKey: deskKey.current,
                 staffId: chosenStart.staffId ?? undefined,
                 pay: "DESK",
+                ...extras,
             });
             if (result.ok && result.value.state === "CONFIRMED") {
                 deskKey.current = null;
@@ -435,6 +463,8 @@ export default function BookingFlow({
         setDate(null);
         setStart(null);
         setPayChoice(null);
+        setWhere("IN_PERSON");
+        setNote("");
         setTouched(false);
         setSubmitError(null);
         wanted.current = null;
@@ -492,6 +522,16 @@ export default function BookingFlow({
                             phase={phase}
                             headingRef={headingRef}
                             business={page.businessName}
+                            where={
+                                service
+                                    ? whereText(
+                                          service,
+                                          phase.booking,
+                                          services,
+                                          page.businessName,
+                                      )
+                                    : null
+                            }
                             rules={page.rules}
                             onAgain={bookAnother}
                         />
@@ -566,6 +606,11 @@ export default function BookingFlow({
                                     onName={setName}
                                     onEmail={setEmail}
                                     onPhone={setPhoneNo}
+                                    asksWhere={asks}
+                                    where={where}
+                                    note={note}
+                                    onWhere={pickWhere}
+                                    onNote={setNote}
                                 />
                             ) : null}
 
