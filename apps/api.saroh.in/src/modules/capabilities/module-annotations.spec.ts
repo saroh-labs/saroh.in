@@ -151,6 +151,10 @@ const NEVER: Record<string, string> = {
         "customer sign-in on a published site — no organization context",
     "site-accounts/sessions.controller.ts":
         "a signed-in customer's session on a published site",
+    // A9: booking signed in. Appointments being off is checked per service
+    // (`appointmentsOpen`), as on the anonymous route.
+    "site-accounts/account-bookings.controller.ts":
+        "a signed-in customer booking on a published site — Appointments checked per service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
