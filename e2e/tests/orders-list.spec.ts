@@ -29,6 +29,8 @@ interface Row {
     fulfilmentType: string;
     late?: boolean;
     total?: string;
+    steps?: { label: string }[];
+    stepIndex?: number;
 }
 interface ListPage {
     rows: Row[];
@@ -69,6 +71,13 @@ async function list(page: Page, org: string, query = ""): Promise<ListPage> {
 /** The list the page draws at this width: the desk grid or the phone cards. */
 const orders = (page: Page) =>
     page.getByRole("list", { name: "Orders" }).locator("visible=true");
+
+/**
+ * Whether the page draws the phone cards (under 760px). The card, as the
+ * design draws it, has the pill, the fulfilment in words and the age, and no
+ * step bar: the bar and its "Step 2 of 4 · …" are the desk grid's.
+ */
+const cards = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
 const tab = (page: Page, name: string) =>
     page.getByRole("navigation", { name: "Orders" }).getByRole("link", {
@@ -162,9 +171,15 @@ test.describe("orders list", () => {
             .getByRole("listitem")
             .filter({ hasText: `#${order.orderId}` });
         await expect(row.getByText(/^Late · /)).toBeVisible();
-        await expect(
-            row.getByRole("img", { name: /^Step \d of \d · Pick-up/ }),
-        ).toBeVisible();
+        if (cards(page)) {
+            await expect(
+                row.getByText("Pick-up", { exact: true }),
+            ).toBeVisible();
+        } else {
+            await expect(
+                row.getByRole("img", { name: /^Step \d of \d · Pick-up/ }),
+            ).toBeVisible();
+        }
     });
 
     test("pages by the cursor, and back", async ({ page }) => {
@@ -187,7 +202,9 @@ test.describe("orders list", () => {
         await expect(page).not.toHaveURL(/cursor=/);
     });
 
-    test("one storefront names none on its rows", async ({ page }) => {
+    test("rows name their storefront only when there are several", async ({
+        page,
+    }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
         const { rows } = await list(page, NORTHWIND);
@@ -196,11 +213,16 @@ test.describe("orders list", () => {
         await page.goto("/commerce/orders");
         const filter = page.getByRole("button", { name: /Storefront filter/ });
         const row = orders(page).getByRole("listitem").first();
-        if ((await filter.count()) === 0) {
-            // One storefront: nothing to tell apart.
-            await expect(row).not.toContainText(rows.at(0)?.store.name ?? "");
+        // Counting the filter before the list is drawn counts nothing.
+        await expect(row).toBeVisible();
+        const storeName = rows.at(0)?.store.name ?? "";
+        if ((await filter.count()) === 0 || cards(page)) {
+            // One storefront: nothing to tell apart. The phone card, as the
+            // design draws it, never has the line; the filter tells them
+            // apart there.
+            await expect(row).not.toContainText(storeName);
         } else {
-            await expect(row).toContainText(rows.at(0)?.store.name ?? "");
+            await expect(row).toContainText(storeName);
         }
     });
 
@@ -249,11 +271,25 @@ test.describe("orders list", () => {
             // Money is left out by the API, not hidden by the screen.
             expect(rows.every((r) => r.total === undefined)).toBe(true);
             await tab(page, "Open").click();
-            await expect(
-                orders(page)
-                    .getByRole("img", { name: /^Step \d+ of \d+ · / })
-                    .first(),
-            ).toBeVisible();
+            await expect(page).toHaveURL(/tab=open/);
+            // The pill says the step in words on either layout; the desk
+            // grid adds the bar, itself said in words.
+            const top = rows[0];
+            const step = top?.steps?.[top.stepIndex ?? 0]?.label;
+            if (top && step) {
+                await expect(
+                    orders(page)
+                        .getByRole("listitem")
+                        .filter({ hasText: `#${top.orderId}` }),
+                ).toContainText(step);
+            }
+            if (!cards(page)) {
+                await expect(
+                    orders(page)
+                        .getByRole("img", { name: /^Step \d+ of \d+ · / })
+                        .first(),
+                ).toBeVisible();
+            }
         }
         await page.close();
     });
