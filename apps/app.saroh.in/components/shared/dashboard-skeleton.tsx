@@ -1,12 +1,12 @@
 import { Skeleton } from "@saroh/ui/skeleton";
 
 /**
- * Loading shape for Home — a stat band above ranked action blocks.
+ * Loading shape for Home — the greeting, then the ranked rows of Needs you.
  *
  * Home is the app's landing route, so this is the first thing most sessions
- * paint. It mirrors `NumbersBand` + `NeedsYou` rather than showing generic rows,
- * because the whole point of Home is the RANKING, and a skeleton that implies a
- * flat list misrepresents the page it precedes.
+ * paint. It mirrors `HomeHeader` + `NeedsYou` rather than showing generic
+ * rows, because the whole point of Home is the RANKING, and a skeleton that
+ * implies a grid of tiles misrepresents the page it precedes.
  */
 export function DashboardSkeleton() {
     return (
@@ -15,21 +15,15 @@ export function DashboardSkeleton() {
             aria-busy="true"
             aria-label="Loading"
         >
-            <div className="mb-6 space-y-2">
-                <Skeleton className="h-8 w-32" />
-                <Skeleton className="h-4 w-96" />
+            <div className="mb-5 space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-56" />
+                <Skeleton className="h-4 w-80" />
             </div>
 
-            <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-[4.75rem] rounded-md" />
-                ))}
-            </div>
-
-            <Skeleton className="mb-3 h-3.5 w-24" />
-            <div className="space-y-3">
+            <div className="space-y-2.5">
                 {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-24 w-full rounded-md" />
+                    <Skeleton key={i} className="h-[58px] w-full rounded-xl" />
                 ))}
             </div>
         </main>

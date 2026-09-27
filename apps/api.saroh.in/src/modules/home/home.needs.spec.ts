@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { flattenNeeds, placedWords } from "./home-needs";
@@ -403,7 +404,11 @@ describe("HomeService needs", () => {
                 ? jest.fn().mockRejectedValue(new Error("mid-migration"))
                 : jest.fn().mockResolvedValue([]),
         };
-        return new HomeService(availability, db as never, stockChecks as never);
+        return new HomeService(
+            availability,
+            quietLastDay(db) as never,
+            stockChecks as never,
+        );
     }
 
     const OWNER = {

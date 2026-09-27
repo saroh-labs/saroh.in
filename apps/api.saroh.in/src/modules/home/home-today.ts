@@ -4,10 +4,9 @@ import { DateTime } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { attentionFor } from "../customer-workspace/attention-read";
-import {
-    DEFAULT_LATE_AFTER_MINUTES,
-    fulfilmentTypeOf,
-} from "../orders/order-list-filters";
+import type { FulfilmentType } from "../orders/fulfilment";
+import { typeOf } from "../orders/fulfilment";
+import { DEFAULT_LATE_AFTER_MINUTES } from "../orders/order-list-filters";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import type { HomeInput, HomeToday, HomeTodayItem } from "./home-model";
 import { holds, personName } from "./home-model";
@@ -233,9 +232,22 @@ const STAGE_WORDS: Record<string, string> = {
     READY: "Ready",
 };
 
+/**
+ * The type a stored fulfilment value means, in either vocabulary (B2a's
+ * `typeOf`), or null for a value it doesn't know: one odd order leaves
+ * Today's pick-ups, never the whole column.
+ */
+function fulfilmentTypeOf(stored: string): FulfilmentType | null {
+    try {
+        return typeOf(stored);
+    } catch {
+        return null;
+    }
+}
+
 /** Minutes after placing a pick-up is due, by its type's default (DEC-045). */
 function readyAfter(fulfilment: string): number {
-    return DEFAULT_LATE_AFTER_MINUTES[fulfilmentTypeOf(fulfilment)] ?? 120;
+    return DEFAULT_LATE_AFTER_MINUTES[fulfilment] ?? 120;
 }
 
 /** The longest any order type waits, so the read reaches back far enough. */

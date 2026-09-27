@@ -1,3 +1,4 @@
+import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { HomeService } from "./home.service";
 
@@ -112,7 +113,11 @@ function build(views: View[], fixture: Fixture = {}) {
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const stockChecks = { openShort: jest.fn().mockResolvedValue([]) };
-    return new HomeService(availability, db as never, stockChecks as never);
+    return new HomeService(
+        availability,
+        quietLastDay(db) as never,
+        stockChecks as never,
+    );
 }
 
 const INPUT = { organizationId: "org_1", organizationRole: "OWNER" as const };

@@ -144,6 +144,34 @@ export interface HomeToday {
     items: HomeTodayItem[];
 }
 
+/** What a Last 24 hours figure counts (F6). */
+export type HomeSinceKind = "ORDERS" | "BOOKINGS" | "REVIEWS" | "PAYMENTS";
+
+/**
+ * One figure of "Last 24 hours" (F6). Money in minor units beside its
+ * currency; `href` opens exactly the rows it counts. See `lib/home/last-day.ts`.
+ */
+export interface HomeSinceItem {
+    kind: HomeSinceKind;
+    count: number;
+    amountMinor: number | null;
+    currency: string | null;
+    href: string;
+}
+
+/** The greeting's clock and the last 24 hours, in the business's zone (F6). */
+export interface HomeLastDay {
+    zone: string;
+    /** `2026-09-18`, the business's date. */
+    date: string;
+    partOfDay: "morning" | "afternoon" | "evening";
+    /** ISO instant the window opens. */
+    since: string;
+    /** Nothing sold, booked or paid yet: "Welcome", and no strip. */
+    fresh: boolean;
+    items: HomeSinceItem[];
+}
+
 export interface HomeModel {
     actions: HomeAction[];
     primaryAction: HomeAction | null;
@@ -158,6 +186,8 @@ export interface HomeModel {
     needsTotal: number;
     /** Today (F5); null when the viewer reads none of it, or it failed. */
     today: HomeToday | null;
+    /** The header (F6); null from an API that predates it. */
+    lastDay: HomeLastDay | null;
 }
 
 const EMPTY: HomeModel = {
@@ -170,6 +200,7 @@ const EMPTY: HomeModel = {
     needs: [],
     needsTotal: 0,
     today: null,
+    lastDay: null,
 };
 
 export async function getHome(projectId?: string): Promise<HomeModel> {
@@ -182,7 +213,12 @@ export async function getHome(projectId?: string): Promise<HomeModel> {
     }
     const read = (await res.json()) as HomeModel;
     // An API from before F5 sends no `today`: no column, not an empty day.
-    const model: HomeModel = { ...read, today: read.today ?? null };
+    // One from before F6 sends no `lastDay`: a plain greeting, no strip.
+    const model: HomeModel = {
+        ...read,
+        today: read.today ?? null,
+        lastDay: read.lastDay ?? null,
+    };
     // An API from before F3 sends no `needs`. Say the list couldn't be read,
     // never "Nothing needs you", while the two deploys cross.
     if (!Array.isArray(model.needs)) {
