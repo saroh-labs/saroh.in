@@ -606,3 +606,206 @@ describe("a plan's figures and name (D1, real database)", () => {
         ).rejects.toMatchObject({ status: 404 });
     });
 });
+
+describe("a plan's history (D2, real database)", () => {
+    const MONTHLY = {
+        name: "Monthly",
+        price: "1200",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+
+    /** A business run by a named person, so the history can name them. */
+    async function namedOrg(slug: string): Promise<OrganizationContext> {
+        const ctx = await makeOrg(slug);
+        const user = await prisma.user.create({
+            data: {
+                email: `${slug}-${process.pid}@example.com`,
+                name: "Priya",
+            },
+        });
+        return { ...ctx, userId: user.id };
+    }
+
+    const rows = (planId: string) =>
+        prisma.subscriptionPlanEvent.findMany({
+            where: { planId },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+
+    it("records a price change from ₹1,200 to ₹1,500 as one PRICE_CHANGED, read newest first by name", async () => {
+        const gym = await namedOrg("plan-events-price");
+        const plan = await service.createPlan(gym, MONTHLY);
+        await service.updatePlan(gym, plan.id, { price: "1500" });
+
+        const saved = await rows(plan.id);
+        expect(saved.map((e) => e.kind)).toEqual(["CREATED", "PRICE_CHANGED"]);
+        expect(saved[1]).toMatchObject({
+            organizationId: gym.organizationId,
+            actorKind: "TEAM",
+            actorUserId: gym.userId,
+            changes: { price: ["1200.00", "1500.00"] },
+        });
+
+        const page = await service.planEvents(gym, plan.id, {});
+        expect(page.events.map((e) => e.kind)).toEqual([
+            "PRICE_CHANGED",
+            "CREATED",
+        ]);
+        expect(page.events[0]!.actor).toEqual({
+            kind: "TEAM",
+            userId: gym.userId,
+            name: "Priya",
+        });
+        expect(page.nextCursor).toBeNull();
+        expect(page.earlierUnrecorded).toBe(false);
+    });
+
+    it("records nothing for a save that changes nothing", async () => {
+        const shop = await namedOrg("plan-events-same");
+        const plan = await service.createPlan(shop, MONTHLY);
+        await service.updatePlan(shop, plan.id, {
+            name: "Monthly",
+            price: "1200.00",
+            classesPerMonth: null,
+        });
+        expect((await rows(plan.id)).map((e) => e.kind)).toEqual(["CREATED"]);
+    });
+
+    it("records nothing for a save refused for its name, nor for a create refused", async () => {
+        const studio = await namedOrg("plan-events-refused");
+        await service.createPlan(studio, MONTHLY);
+        const other = await service.createPlan(studio, {
+            ...MONTHLY,
+            name: "Annual",
+        });
+        await expect(
+            service.updatePlan(studio, other.id, {
+                name: "monthly",
+                price: "999",
+            }),
+        ).rejects.toMatchObject({ status: 409 });
+        await expect(service.createPlan(studio, MONTHLY)).rejects.toMatchObject(
+            { status: 409 },
+        );
+        const all = await prisma.subscriptionPlanEvent.findMany({
+            where: { organizationId: studio.organizationId },
+        });
+        expect(all.map((e) => e.kind)).toEqual(["CREATED", "CREATED"]);
+        // The refused save changed nothing either.
+        expect((await service.getPlan(studio, other.id)).price).toBe("1200.00");
+    });
+
+    it("records an archive and a sale again, and nothing for a repeat", async () => {
+        const shop = await namedOrg("plan-events-archive");
+        const plan = await service.createPlan(shop, MONTHLY);
+        await service.setPlanStatus(shop, plan.id, "ARCHIVED");
+        await service.setPlanStatus(shop, plan.id, "ARCHIVED");
+        await service.setPlanStatus(shop, plan.id, "ACTIVE");
+        const saved = await rows(plan.id);
+        expect(saved.map((e) => [e.kind, e.changes])).toEqual([
+            ["CREATED", expect.anything()],
+            ["ARCHIVED", { status: ["ACTIVE", "ARCHIVED"] }],
+            ["RESTORED", { status: ["ARCHIVED", "ACTIVE"] }],
+        ]);
+    });
+
+    it("chains the before and after of two changes made at once", async () => {
+        const rush = await namedOrg("plan-events-race");
+        const plan = await service.createPlan(rush, MONTHLY);
+        await Promise.all([
+            service.updatePlan(rush, plan.id, { price: "1300" }),
+            service.updatePlan(rush, plan.id, { price: "1400" }),
+        ]);
+        const changes = (await rows(plan.id))
+            .filter((e) => e.kind === "PRICE_CHANGED")
+            .map((e) => (e.changes as { price: [string, string] }).price);
+        expect(changes).toHaveLength(2);
+        // Whichever ran second saw what the first saved.
+        expect(changes[0]![0]).toBe("1200.00");
+        expect(changes[1]![0]).toBe(changes[0]![1]);
+        expect((await service.getPlan(rush, plan.id)).price).toBe(
+            changes[1]![1],
+        );
+    });
+
+    it("pages the history by the last event read", async () => {
+        const shop = await namedOrg("plan-events-pages");
+        const plan = await service.createPlan(shop, MONTHLY);
+        for (const price of ["1300", "1400", "1500", "1600"]) {
+            await service.updatePlan(shop, plan.id, { price });
+        }
+        const first = await service.planEvents(shop, plan.id, { limit: 2 });
+        const second = await service.planEvents(shop, plan.id, {
+            limit: 2,
+            cursor: first.nextCursor!,
+        });
+        const third = await service.planEvents(shop, plan.id, {
+            limit: 2,
+            cursor: second.nextCursor!,
+        });
+        const afters = [...first.events, ...second.events, ...third.events].map(
+            (e) => e.changes.price?.[1],
+        );
+        expect(afters).toEqual([
+            "1600.00",
+            "1500.00",
+            "1400.00",
+            "1300.00",
+            "1200.00",
+        ]);
+        expect(third.nextCursor).toBeNull();
+    });
+
+    it("says earlier changes weren't recorded for a plan made before the history", async () => {
+        const shop = await namedOrg("plan-events-older");
+        const older = await prisma.subscriptionPlan.create({
+            data: {
+                organizationId: shop.organizationId,
+                name: "Loaf a week",
+                price: "1800",
+                currency: "INR",
+                interval: "MONTH",
+            },
+        });
+        expect(await service.planEvents(shop, older.id, {})).toEqual({
+            events: [],
+            nextCursor: null,
+            earlierUnrecorded: true,
+        });
+        await service.updatePlan(shop, older.id, { classesPerMonth: 4 });
+        const page = await service.planEvents(shop, older.id, {});
+        expect(page.events.map((e) => e.kind)).toEqual(["CLASSES_CHANGED"]);
+        expect(page.earlierUnrecorded).toBe(true);
+    });
+
+    it("answers another business's plan's history with a 404, and refuses its events as a cursor", async () => {
+        const a = await namedOrg("plan-events-a");
+        const b = await namedOrg("plan-events-b");
+        const mine = await service.createPlan(a, MONTHLY);
+        const theirs = await service.createPlan(b, MONTHLY);
+        await expect(service.planEvents(b, mine.id, {})).rejects.toMatchObject({
+            status: 404,
+        });
+        const [mineEvent] = await rows(mine.id);
+        await expect(
+            service.planEvents(b, theirs.id, { cursor: mineEvent!.id }),
+        ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("refuses an event naming another business's plan", async () => {
+        const a = await namedOrg("plan-events-fk-a");
+        const b = await namedOrg("plan-events-fk-b");
+        const mine = await service.createPlan(a, MONTHLY);
+        await expect(
+            prisma.subscriptionPlanEvent.create({
+                data: {
+                    organizationId: b.organizationId,
+                    planId: mine.id,
+                    kind: "RENAMED",
+                    actorKind: "TEAM",
+                },
+            }),
+        ).rejects.toThrow();
+    });
+});

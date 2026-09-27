@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             updateMany: jest.fn(),
         },
+        subscriptionPlanEvent: { create: jest.fn() },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -910,14 +911,21 @@ describe("a plan's name and classes (D1)", () => {
                 Promise.resolve(
                     args.where.name
                         ? other
-                        : { name: PLAN.name, status: "ACTIVE" },
+                        : { ...PLAN, classesPerMonth: null },
                 ),
         );
     }
 
     beforeEach(() => {
         clashWith(null);
-        tx.subscriptionPlan!.create!.mockResolvedValue({ id: "plan_1" });
+        tx.subscriptionPlan!.create!.mockImplementation(
+            (args: { data: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "plan_1",
+                    status: "ACTIVE",
+                    ...args.data,
+                }),
+        );
     });
 
     it("saves classes a month on create", async () => {
@@ -1031,6 +1039,179 @@ describe("a plan's name and classes (D1)", () => {
         await expect(service.createPlan(member, WHOLE)).rejects.toBeInstanceOf(
             ForbiddenException,
         );
+    });
+});
+
+// — D2: every plan change is recorded ————————————————————————————————
+
+describe("a plan's history (D2)", () => {
+    const WHOLE = {
+        name: "Monthly",
+        price: "1500",
+        currency: "INR",
+        interval: "MONTH" as const,
+    };
+    const operator: OrganizationContext = {
+        ...owner,
+        userId: "op_1",
+        roleKey: "platform-operator",
+    };
+    const events = () =>
+        tx.subscriptionPlanEvent!.create!.mock.calls.map(([a]) => a.data);
+
+    /** The plan as the save finds it; any lookup by name finds no clash. */
+    function planIs(over: Record<string, unknown> = {}) {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? null
+                        : { ...PLAN, classesPerMonth: null, ...over },
+                ),
+        );
+    }
+
+    beforeEach(() => {
+        planIs();
+        tx.subscriptionPlan!.create!.mockImplementation(
+            (args: { data: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "plan_1",
+                    status: "ACTIVE",
+                    ...args.data,
+                }),
+        );
+    });
+
+    it("records a new plan as CREATED, every field from nothing, by who made it", async () => {
+        await service.createPlan(owner, { ...WHOLE, classesPerMonth: 8 });
+        expect(events()).toEqual([
+            {
+                organizationId: "org_1",
+                planId: "plan_1",
+                kind: "CREATED",
+                actorKind: "TEAM",
+                actorUserId: "user_1",
+                changes: {
+                    name: [null, "Monthly"],
+                    price: [null, "1500.00"],
+                    currency: [null, "INR"],
+                    interval: [null, "MONTH"],
+                    classesPerMonth: [null, 8],
+                    status: [null, "ACTIVE"],
+                },
+            },
+        ]);
+    });
+
+    it("records a price change from ₹1,200 to ₹1,500 as one PRICE_CHANGED", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1500" });
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "PRICE_CHANGED",
+                changes: { price: ["1200.00", "1500.00"] },
+            }),
+        ]);
+    });
+
+    it("names each kind of edit, and UPDATED for more than one at once", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 8 });
+        await service.updatePlan(owner, "plan_1", { name: "Standard" });
+        await service.updatePlan(owner, "plan_1", { description: "Gym" });
+        await service.updatePlan(owner, "plan_1", { interval: "YEAR" });
+        await service.updatePlan(owner, "plan_1", {
+            name: "Standard",
+            price: "1500",
+        });
+        expect(events().map((e) => e.kind)).toEqual([
+            "CLASSES_CHANGED",
+            "RENAMED",
+            "DESCRIPTION_CHANGED",
+            "PRICE_CHANGED",
+            "UPDATED",
+        ]);
+        expect(events()[4].changes).toEqual({
+            name: ["Monthly membership", "Standard"],
+            price: ["1200.00", "1500.00"],
+        });
+    });
+
+    it("records nothing for a save that changes nothing", async () => {
+        await service.updatePlan(owner, "plan_1", {
+            name: PLAN.name,
+            price: "1200.00",
+            classesPerMonth: null,
+        });
+        expect(tx.subscriptionPlanEvent!.create).not.toHaveBeenCalled();
+    });
+
+    it("records nothing when the save is refused", async () => {
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? { id: "plan_9", name: "Standard" }
+                        : { ...PLAN, classesPerMonth: null },
+                ),
+        );
+        await expect(
+            service.updatePlan(owner, "plan_1", { name: "standard" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.updatePlan(owner, "plan_x", { price: "1" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(tx.subscriptionPlanEvent!.create).not.toHaveBeenCalled();
+    });
+
+    it("locks the plan before reading what it was", async () => {
+        await service.updatePlan(owner, "plan_1", { price: "1500" });
+        expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.subscriptionPlan!.findFirst!.mock.invocationCallOrder[0]!,
+        );
+    });
+
+    it("records an archive and a sale again, and nothing when the status stays", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            name: PLAN.name,
+            status: "ACTIVE",
+        });
+        await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
+        await service.setPlanStatus(owner, "plan_1", "ACTIVE");
+        tx.subscriptionPlan!.findFirst!.mockImplementation(
+            (args: { where: { name?: unknown } }) =>
+                Promise.resolve(
+                    args.where.name
+                        ? null
+                        : { name: PLAN.name, status: "ARCHIVED" },
+                ),
+        );
+        await service.setPlanStatus(owner, "plan_1", "ACTIVE");
+        await service.setPlanStatus(owner, "plan_1", "ARCHIVED");
+        expect(events()).toEqual([
+            expect.objectContaining({
+                kind: "ARCHIVED",
+                changes: { status: ["ACTIVE", "ARCHIVED"] },
+            }),
+            expect.objectContaining({
+                kind: "RESTORED",
+                changes: { status: ["ARCHIVED", "ACTIVE"] },
+            }),
+        ]);
+    });
+
+    it("records a Saroh operator's change as OPERATOR", async () => {
+        await service.updatePlan(operator, "plan_1", { price: "1500" });
+        expect(events()[0]).toMatchObject({
+            actorKind: "OPERATOR",
+            actorUserId: "op_1",
+        });
+    });
+
+    it("is read with subscription:read, which a Member lacks", async () => {
+        await expect(
+            service.planEvents(member, "plan_1", {}),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
 

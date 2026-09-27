@@ -221,6 +221,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/subscription-renew.handler.spec.ts",
         // D1: a plan's monthly figure and who pays what.
         "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
+        // D2: what a plan change records, and reading its history.
+        "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

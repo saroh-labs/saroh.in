@@ -265,6 +265,16 @@
   currency and interval — a new interval starts its chain where the old
   period ended. Undo clears it; cancelling now drops it; archived plans are
   refused.
+- **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
+  write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
+  KEY UPDATE, after the name lock), reads what it was, and writes one
+  `SubscriptionPlanEvent` in the same transaction, with
+  `{ field: [before, after] }` for the fields that changed
+  (`plan-events.ts`). A save that
+  changes nothing, or is refused, writes none. The log is append-only; an
+  operator's change reads as Saroh support (DEC-035). There is no backfill:
+  a plan without a CREATED event says "Earlier changes weren't recorded"
+  (`earlierUnrecorded`).
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.

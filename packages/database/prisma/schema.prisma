@@ -271,6 +271,9 @@ model Organization {
 
   // Days or hours the whole business is closed (E3).
   businessClosures BusinessClosure[]
+
+  // Every change to a plan, append-only (plan 2026-09-26-004, D2).
+  subscriptionPlanEvents SubscriptionPlanEvent[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -4661,7 +4664,43 @@ model SubscriptionPlan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Every change to it, newest last (D2).
+  events SubscriptionPlanEvent[]
+
+  // The composite key its events point at, so an event can't name another
+  // business's plan.
+  @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+// One change to a plan: who made it, when, and each changed field's value
+// before and after (plan 2026-09-26-004, D2). Append-only: nothing updates
+// or deletes a row; it goes only with its plan (a draft deleted, D5).
+model SubscriptionPlanEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // CREATED | PUBLISHED | PRICE_CHANGED | CLASSES_CHANGED | RENAMED |
+  // DESCRIPTION_CHANGED | UPDATED | ARCHIVED | RESTORED | DRAFT_DISCARDED
+  // (PLAN_EVENT_KINDS in plan-events.ts).
+  kind        String
+  // TEAM | JOB | OPERATOR. An operator's change reads as Saroh support
+  // (DEC-035).
+  actorKind   String
+  // Who made it. Not a foreign key: someone who leaves the team keeps their
+  // changes in the history. Null for the job.
+  actorUserId String?
+
+  // { field: [before, after] }, plan fields only; money as "1500.00".
+  changes Json @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, planId, createdAt])
 }
 
 // A person on a plan. Invoiced forward, one invoice per period; "overdue" is
