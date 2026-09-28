@@ -30,8 +30,12 @@ export async function pausesWaitingOnPayments(
     const where = {
         organizationId,
         status: "PAUSED",
-        pausedUntil: { lte: now },
-        currentPeriodEnd: { lte: now },
+        // Ended after its paid period: the job restarts those, and one
+        // ending on or before it extends, needing no Payments (review S-3).
+        pausedUntil: {
+            lte: now,
+            gt: db.customerSubscription.fields.currentPeriodEnd,
+        },
         // One set to end just ends, which needs no Payments.
         cancelAtPeriodEnd: false,
     } satisfies Prisma.CustomerSubscriptionWhereInput;

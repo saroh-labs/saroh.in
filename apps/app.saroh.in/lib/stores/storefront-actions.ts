@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { StorefrontInput } from "./storefronts";
 import {
     closeStorefront as closeStorefrontApi,
+    dismissLateRuleNotice as dismissLateRuleNoticeApi,
     updateStorefront as updateStorefrontApi,
 } from "./storefronts";
 
@@ -28,5 +29,12 @@ export async function updateStorefront(
 export async function closeStorefront(storeId: string) {
     const res = await closeStorefrontApi(storeId);
     if (res.ok) revalidatePath("/", "layout");
+    return res;
+}
+
+/** Put Orders' one-time late notice away for a storefront (B17). */
+export async function dismissLateRuleNotice(storeId: string) {
+    const res = await dismissLateRuleNoticeApi(storeId);
+    if (res.ok) revalidatePath("/commerce/orders");
     return res;
 }

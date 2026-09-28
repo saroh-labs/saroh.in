@@ -263,7 +263,10 @@ export async function seed(): Promise<void> {
     });
     await assertHeldStock(prisma, org.id);
     // Which ways each storefront offers, now its orders exist (B2a).
-    await syncStorefrontFulfilmentTypes(prisma);
+    await syncStorefrontFulfilmentTypes(prisma, [
+        org.id,
+        ...Object.values(sideOrgIds),
+    ]);
     await report(prisma, org.id);
 }
 

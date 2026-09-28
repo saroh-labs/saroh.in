@@ -30,6 +30,8 @@ import type { SiteStyleOptions } from "@/lib/sites/style";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
+    // The site's menu (G17) asks where it is.
+    usePathname: () => "/sites",
 }));
 
 const actions = vi.hoisted(() => ({
@@ -584,16 +586,181 @@ describe("SiteEditor shell", () => {
         expect(rows).toHaveLength(1);
     });
 
-    it("full-screen preview hides the editor and Escape returns", () => {
+    /*
+     * G5 changed this: Preview was a full-screen overlay with its own copy
+     * of the page ("Escape to return"). It is now the same canvas with the
+     * editing tools put away, and the top bar stays.
+     */
+    it("Preview puts the editing tools away in place, and Escape returns", () => {
         render();
+        const blocksBefore = $$("[data-block-index]").length;
+        expect(blocksBefore).toBeGreaterThan(0);
         click(button("Preview"));
-        expect(button("Escape to return")).toBeTruthy();
+
+        // The same canvas, with no block outlines or labels on it.
+        expect($("[data-previewing]")).not.toBeNull();
+        expect($$("[data-block-index]")).toHaveLength(0);
+        expect(() => button(/^Hero block, 1 of/)).toThrow();
+        expect(() => button("Header, on every page")).toThrow();
+        expect(host.textContent).toContain("Welcome in");
+        // The rail and inspector are away, kept mounted, and the bar stays.
+        const aside = $("aside");
+        expect(aside?.closest("[hidden]")).not.toBeNull();
+        expect(button("Editing").getAttribute("aria-pressed")).toBe("true");
+        expect(button("Publish")).toBeTruthy();
+        expect(host.textContent).toContain(
+            "This is your site with the draft. Try it; nothing is live until you publish.",
+        );
+        // No window bar round the site.
+        expect(host.textContent).not.toContain("flour.saroh.app/");
+
         act(() => {
             window.dispatchEvent(
                 new KeyboardEvent("keydown", { key: "Escape" }),
             );
         });
-        expect(() => button("Escape to return")).toThrow();
+        expect($("[data-previewing]")).toBeNull();
+        expect($$("[data-block-index]")).toHaveLength(blocksBefore);
+        expect($("aside")?.closest("[hidden]")).toBeNull();
+        expect(button("Preview").getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("Back to editing leaves Preview, with the block still selected", () => {
+        render();
+        click(button("Our story"));
+        click(button("Preview"));
+        click(button(/^Back to editing/));
+        expect($("[data-previewing]")).toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+    });
+
+    it("keeps the device and zoom in Preview", () => {
+        render();
+        click(button("Show at phone width"));
+        click(button("Preview"));
+        expect(frame().style.maxWidth).toBe("23.4375rem");
+        expect(frame().style.transform).toBe("scale(1)");
+        // Still switchable from the bar while previewing.
+        click(button("Show at tablet width"));
+        expect(frame().style.maxWidth).toBe("48rem");
+        expect($("[data-previewing]")).not.toBeNull();
+        expect(button("Zoom").textContent).toContain("100%");
+    });
+
+    it("opens a page linked from the site's menu in Preview, and stays in Preview", () => {
+        const contact: SitePage = {
+            id: "p-contact",
+            path: "/contact",
+            title: "Contact",
+            isHome: false,
+            hidden: false,
+        };
+        const props = render({
+            pages: [...PAGES, contact],
+            navigation: { items: [{ pageId: "p-contact" }] },
+        });
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        const link = $$("header a").find((a) => a.textContent === "Contact");
+        if (!link) throw new Error("No Contact link in the menu");
+        // A real click, which can be cancelled, as a browser's is.
+        act(() => link.click());
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).toHaveBeenCalledWith(
+            `/sites/${props.siteId}?page=p-contact`,
+        );
+
+        // The route remounts the editor on that page (it is keyed on it).
+        act(() => {
+            root.render(
+                <SiteEditor key="p-contact" {...props} pageId="p-contact" />,
+            );
+        });
+        expect(button(/^Page: Contact\./)).toBeTruthy();
+        expect($("[data-previewing]")).not.toBeNull();
+
+        // Only that once: the next time this page opens, it opens editing.
+        act(() => {
+            root.render(
+                <SiteEditor key="again" {...props} pageId="p-contact" />,
+            );
+        });
+        expect($("[data-previewing]")).toBeNull();
+        opened.mockRestore();
+    });
+
+    /** A page whose one block is a hero with a button to `href`. */
+    function withButton(href: string): Partial<Props> {
+        return {
+            initialSections: [
+                {
+                    key: "s1",
+                    type: "hero",
+                    contractVersion: 1,
+                    content: {
+                        heading: "Welcome in",
+                        cta: { label: "Go", href, style: "primary" },
+                    },
+                },
+            ],
+        };
+    }
+
+    /** Click a link as a browser does: the click can be cancelled. */
+    function pressLink(text: string) {
+        const link = $$("a").find((a) => a.textContent.trim() === text);
+        if (!link) throw new Error(`No link ${text}`);
+        act(() => link.click());
+    }
+
+    it("sends a link to another site to a new tab in Preview", () => {
+        render(withButton("https://example.com"));
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).toHaveBeenCalledWith(
+            "https://example.com",
+            "_blank",
+            "noopener",
+        );
+        expect(push).not.toHaveBeenCalled();
+        opened.mockRestore();
+    });
+
+    it("opens a page a button links to in Preview, not a tab", () => {
+        const { siteId } = render(withButton("/about"));
+        click(button("Preview"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        opened.mockRestore();
+    });
+
+    it("selects the block, and opens nothing, when a link is clicked while editing", () => {
+        const { siteId } = render(withButton("/about"));
+        const opened = vi.spyOn(window, "open").mockReturnValue(null);
+        pressLink("Go");
+        expect(opened).not.toHaveBeenCalled();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        opened.mockRestore();
+    });
+
+    it("stays on the page, and says why, when a page is linked while a save is due", async () => {
+        const { siteId } = render(withButton("/about"));
+        // An edit that has not gone out yet: the autosave is still waiting.
+        const heading = Array.from(
+            document.querySelectorAll<HTMLInputElement>("input"),
+        ).find((i) => i.value === "Welcome in");
+        if (!heading) throw new Error("No heading field");
+        type(heading, "Welcome back");
+        click(button("Preview"));
+        pressLink("Go");
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Save this page before opening another.",
+        );
+        await wait(5000);
     });
 
     it("removes a block at once, and Undo puts it back in its place with its content", () => {
@@ -817,6 +984,52 @@ describe("SiteEditor shell", () => {
         expect(actions.getReviewState).toHaveBeenCalled();
     });
 
+    it("closes the Undo when the check opens, so Publish never misses a restored block (review G-1)", async () => {
+        render();
+        click(button("Remove"));
+        const removed = lastUndoId();
+        // Saved, so Publish is open while the Undo toast is still up.
+        await wait(1500);
+        expect(button("Publish").disabled).toBe(false);
+
+        await press(button("Publish"));
+        expect(toast.dismissToast).toHaveBeenCalledWith(removed);
+        // An Undo pressed now does nothing: the draft is the one checked.
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("3 blocks");
+        const go = Array.from(
+            document.querySelectorAll<HTMLButtonElement>("button"),
+        ).filter((b) => b.textContent.startsWith("Publish"));
+        expect(go[go.length - 1].disabled).toBe(false);
+    });
+
+    it("keeps the check's Publish waiting while a change is unsaved (review G-1)", async () => {
+        render();
+        click(button("Header"));
+        await press(button("Publish"));
+        // The check's own Publish: the last one, after the bar's.
+        const check = () => {
+            const last = Array.from(
+                document.querySelectorAll<HTMLButtonElement>("button"),
+            )
+                .filter((b) => b.textContent.startsWith("Publish"))
+                .at(-1);
+            if (!last) throw new Error("No Publish in the check");
+            return last;
+        };
+        expect(check().disabled).toBe(false);
+
+        type(field("Site name"), "Rye & Co.");
+        expect(check().disabled).toBe(true);
+        await press(check());
+        expect(actions.publishSite).not.toHaveBeenCalled();
+
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteSettings).toHaveBeenCalled();
+        expect(check().disabled).toBe(false);
+    });
+
     it("asks for a review and reads the state back", async () => {
         actions.getReviewState.mockResolvedValue({ ...REVIEW, pending: true });
         render();
@@ -989,7 +1202,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(actions.updateSiteFooter).not.toHaveBeenCalled();
     });
 
-    it("says so when the footer does not save, and does not retry it", async () => {
+    it("says Not saved when the footer does not save, and tries again after a pause (review G-4)", async () => {
         actions.updateSiteFooter.mockResolvedValue({
             ok: false,
             error: "Could not save the footer.",
@@ -1002,9 +1215,351 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(toast.showError).toHaveBeenCalledWith(
             "Could not save the footer.",
         );
+        // Not every pause: the same value waits before it goes again.
         await wait(1500);
         expect(actions.updateSiteFooter).toHaveBeenCalledTimes(1);
-        // Still unsaved, so Publish still waits.
+        // Still unsaved, so Publish still waits — and says why, not "in a
+        // moment", and the pill says Not saved.
         expect(button("Publish").disabled).toBe(true);
+        expect(button("Publish").title).toBe(
+            "Not saved — publish waits until your changes save",
+        );
+        expect($("[role=status]")?.textContent).toBe("Not saved");
+
+        // It goes again on its own, without a second toast.
+        await wait(5000);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(2);
+        expect(toast.showError).toHaveBeenCalledTimes(1);
+
+        // And once it saves, Publish is free.
+        actions.updateSiteFooter.mockResolvedValue({
+            ok: true,
+            data: { id: "site" },
+        });
+        await wait(15_000);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(3);
+        expect(button("Publish").disabled).toBe(false);
+        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+    });
+
+    /** A page whose one block is a hero with a button to /about. */
+    const LINKED: Partial<Props> = {
+        initialSections: [
+            {
+                key: "s1",
+                type: "hero",
+                contractVersion: 1,
+                content: {
+                    heading: "Welcome in",
+                    cta: { label: "Go", href: "/about", style: "primary" },
+                },
+            },
+        ],
+    };
+
+    /** Click the hero's button to /about, as a browser does. */
+    function pressGo() {
+        const link = $$("a").find((a) => a.textContent.trim() === "Go");
+        if (!link) throw new Error("No link Go");
+        act(() => link.click());
+    }
+
+    it("stays on the page when a page is linked in Preview before the name saves (review G-3)", async () => {
+        const { siteId } = render(LINKED);
+        click(button("Header"));
+        type(field("Site name"), "Rye & Co.");
+        click(button("Preview"));
+        // Inside the pause, before the name has gone out.
+        pressGo();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        expect(toast.showError).toHaveBeenCalledWith(
+            "Save this page before opening another.",
+        );
+
+        // Once it has saved, the page opens.
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteSettings).toHaveBeenCalledTimes(1);
+        pressGo();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+    });
+
+    it("stays on the page when a page is linked in Preview before the footer saves (review G-3)", async () => {
+        const { siteId } = render(LINKED);
+        click(button("Footer"));
+        type(field("Footer line"), "Hill Road");
+        click(button("Preview"));
+        pressGo();
+        expect(push).not.toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+        await wait(700);
+        await wait(0);
+        expect(actions.updateSiteFooter).toHaveBeenCalledTimes(1);
+        pressGo();
+        expect(push).toHaveBeenCalledWith(`/sites/${siteId}?page=p-about`);
+    });
+});
+
+/*
+ * The narrow layout (round 2, G4). jsdom has no media queries, so the window's
+ * width is played here: `matchMedia` answers `max-width` queries from it, and
+ * a resize tells the editor's listeners, as a browser does on a rotation.
+ */
+describe("SiteEditor narrow and phone (G4)", () => {
+    let width = 1440;
+    const listeners = new Set<() => void>();
+
+    function atWidth(px: number) {
+        width = px;
+        vi.stubGlobal(
+            "matchMedia",
+            vi.fn((query: string) => ({
+                get matches() {
+                    const max = /max-width:\s*([\d.]+)px/.exec(query);
+                    return max ? width <= Number(max[1]) : false;
+                },
+                addEventListener: (_: string, fn: () => void) =>
+                    listeners.add(fn),
+                removeEventListener: (_: string, fn: () => void) =>
+                    listeners.delete(fn),
+            })),
+        );
+    }
+
+    function resizeTo(px: number) {
+        act(() => {
+            width = px;
+            listeners.forEach((fn) => fn());
+        });
+    }
+
+    const sheet = () => $("[role=dialog]");
+    const focused = () =>
+        document.activeElement?.getAttribute("aria-label") ??
+        document.activeElement?.textContent;
+
+    function escape() {
+        act(() => {
+            (document.activeElement ?? document.body).dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+            );
+        });
+    }
+
+    beforeEach(() => listeners.clear());
+
+    it("keeps the rail and gives the page the inspector's column, opening nothing by itself", () => {
+        atWidth(1000);
+        render();
+        expect($("[data-layout]")?.dataset.layout).toBe("narrow");
+        expect($("[aria-label='Resize the block list']")).not.toBeNull();
+        expect($("[aria-label='Resize the inspector']")).toBeNull();
+        // The remembered selection stays outlined; no sheet covers the page.
+        expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
+        expect(sheet()).toBeNull();
+        expect($("aside[aria-label=Inspector]")).toBeNull();
+        // The bar keeps every action, and the whole review has a way in.
+        expect(button("Publish")).toBeTruthy();
+        expect(button("Feedback")).toBeTruthy();
+    });
+
+    it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
+        atWidth(1000);
+        render();
+        click(button(/^Hero block, 2 of 2/));
+
+        const open = sheet();
+        expect(
+            open?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(open?.getAttribute("aria-modal")).toBe("true");
+        expect(button("Move block down").disabled).toBe(true);
+        // Focus starts on Close, at the top of the sheet.
+        expect(focused()).toBe("Close the block panel");
+
+        click(button("Close the block panel"));
+        await wait(0);
+        expect(sheet()).toBeNull();
+        // Still selected, and focus is on its label on the page.
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+        expect(focused()).toBe("Hero block, 2 of 2, selected");
+    });
+
+    it("keeps Tab inside the sheet, and Escape closes it back to the block", async () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        const open = sheet();
+        if (!open) throw new Error("No sheet");
+        const tabbable = Array.from(
+            open.querySelectorAll<HTMLElement>(
+                "button:not([disabled]),input,select,textarea,a[href]",
+            ),
+        );
+        const last = tabbable.at(-1);
+        if (!last) throw new Error("Nothing to tab to");
+        act(() => last.focus());
+        act(() => {
+            last.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+            );
+        });
+        expect(focused()).toBe("Close the block panel");
+
+        escape();
+        await wait(0);
+        expect(sheet()).toBeNull();
+        expect(focused()).toBe("Hero block, 2 of 2, selected");
+    });
+
+    it("edits a block in the sheet, and the page follows", () => {
+        atWidth(1000);
+        render();
+        click(button("Header"));
+        expect(sheet()?.textContent).toContain(
+            "On every page — can't be removed or moved",
+        );
+        type(field("Site name"), "Rye & Co.");
+        expect(canvasHome()?.getAttribute("aria-label")).toBe(
+            "Rye & Co. — home",
+        );
+    });
+
+    it("puts the sheet away on Remove, and Undo brings the block back to it", () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        click(button("Remove"));
+        // A sheet about nothing would be in the way.
+        expect(sheet()).toBeNull();
+        expect(host.textContent).toContain("3 blocks");
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Hero taken off this page",
+            expect.any(Function),
+            { duration: 10_000 },
+        );
+
+        act(() => undoFrom(0));
+        expect(host.textContent).toContain("4 blocks");
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+        expect(sheet()?.textContent).toContain("Remove");
+    });
+
+    it("opens the whole site's feedback from the bar", () => {
+        atWidth(1000);
+        render({ initialReview: { ...REVIEW, openNotes: 2 } });
+        click(button(/^Feedback/));
+        const tab = sheet()?.querySelector("[role=tab][aria-selected=true]");
+        expect(tab?.textContent).toContain("Feedback");
+        expect(button(/^Whole site/).textContent).toContain("2");
+    });
+
+    it("puts the sheet away for Preview, and does not bring it back after", () => {
+        atWidth(1000);
+        render();
+        click(button("Our story"));
+        expect(sheet()).not.toBeNull();
+        click(button("Preview"));
+        expect(sheet()).toBeNull();
+        expect($("[data-previewing]")).not.toBeNull();
+        // The rail is away and kept mounted, as on a desk (G5).
+        expect($("aside")?.closest("[hidden]")).not.toBeNull();
+        click(button(/^Back to editing/));
+        expect(sheet()).toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+    });
+
+    it("pads the canvas as the design does when narrow", () => {
+        atWidth(1000);
+        render();
+        const canvas = canvasOf(frame());
+        expect(canvas.className).toContain("px-3.5");
+        expect(canvas.className).not.toContain("p-6");
+    });
+
+    it("folds the bar into one menu on a phone, and moves the rail to the foot", () => {
+        atWidth(390);
+        render();
+        expect($("[data-layout]")?.dataset.layout).toBe("phone");
+        // The page switcher and the way out stay; the rest is in the menu.
+        expect(button(/^Page: Home/)).toBeTruthy();
+        expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
+        expect(() => button("Publish")).toThrow();
+        expect($("[role=status]")).toBeNull();
+        expect($("[role=group][aria-label='Preview width']")).toBeNull();
+
+        click(button("Status, view and publish"));
+        expect(document.querySelector("[role=status]")?.textContent).toBe(
+            "Published",
+        );
+        expect(button("Publish").disabled).toBe(false);
+        // No hover on a phone: what Publish does is written out.
+        expect(document.body.textContent).toContain(
+            "Nothing has changed since the last publish",
+        );
+        for (const d of ["desktop", "tablet", "phone"]) {
+            expect(button(`Show at ${d} width`)).toBeTruthy();
+        }
+        expect(button("Share for review")).toBeTruthy();
+
+        // The rail is a bar at the foot, not a column.
+        expect($("[aria-label='Resize the block list']")).toBeNull();
+        expect($("[role=tablist][aria-label='Editor panels']")).toBeNull();
+        const bar = $("nav[aria-label='Edit this page']");
+        expect(
+            Array.from(bar?.querySelectorAll("button") ?? []).map(
+                (b) => b.textContent,
+            ),
+        ).toEqual(["Page", "Add", "Brand", "Feedback"]);
+    });
+
+    it("opens the rail from the foot, and a block chosen there opens its fields", () => {
+        atWidth(390);
+        render();
+        click(button("Page"));
+        expect(sheet()?.textContent).toContain("4 blocks");
+        click(button("Our story"));
+        // One sheet at a time: the rail makes way for the block's fields.
+        expect($$("[role=dialog]")).toHaveLength(1);
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(button("Move block down").disabled).toBe(true);
+    });
+
+    it("adds a block from the foot's Add, and opens it", () => {
+        atWidth(390);
+        render();
+        click(button("Add"));
+        const tile = Array.from(
+            sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
+        ).find((b) => b.textContent.includes("Contact"));
+        if (!tile) throw new Error("No Contact tile");
+        click(tile);
+        expect($$("[data-block-index]")).toHaveLength(3);
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+    });
+
+    it("keeps the selection and the open fields when a phone turns on its side", () => {
+        atWidth(390);
+        render();
+        click(button(/^Hero block, 2 of 2/));
+        expect(sheet()).not.toBeNull();
+
+        resizeTo(844);
+        expect($("[data-layout]")?.dataset.layout).toBe("narrow");
+        expect(
+            sheet()?.querySelector("aside[aria-label=Inspector]"),
+        ).not.toBeNull();
+        expect(button("Our story").getAttribute("aria-current")).toBe("true");
+
+        // Back on a desk the inspector is a column again, with the block.
+        resizeTo(1440);
+        expect(sheet()).toBeNull();
+        expect($("aside[aria-label=Inspector]")).not.toBeNull();
+        expect(button("Move block down").disabled).toBe(true);
     });
 });

@@ -34,6 +34,7 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
 import {
     adjustReservation,
     applyInventoryTransition,
@@ -119,6 +120,8 @@ export class OrderKitchenService {
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
+            // Its storefront's late thresholds (B17), as the list reads them.
+            lateThresholds: lateThresholdsOf(order.store.settings),
             // The refund sheet's "Put N back in stock" (a money reader's).
             ...(money
                 ? { returnable: await returnableUnits(prisma, order.id) }
@@ -874,7 +877,13 @@ const CLEARED_ADDRESS = {
 
 /** What Order Detail reads — see order-read.ts. */
 const READ_INCLUDE = {
-    store: { select: { id: true, name: true } },
+    store: {
+        select: {
+            id: true,
+            name: true,
+            settings: { select: LATE_THRESHOLD_SELECT },
+        },
+    },
     customer: {
         select: {
             id: true,

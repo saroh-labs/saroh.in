@@ -298,6 +298,14 @@ describe("overdueInvoices", () => {
                 // A draft is never overdue.
                 status: "ISSUED",
                 dueAt: { lt: NOW },
+                // Never chase a customer who is owed money back (K-1).
+                paymentIntents: {
+                    none: {
+                        attempts: {
+                            some: { status: "CAPTURED_NEEDS_REFUND" },
+                        },
+                    },
+                },
                 OR: [
                     { subscriptionId: null },
                     { subscription: { is: { status: "CANCELLED" } } },
@@ -339,6 +347,11 @@ function shortCheck(over: Partial<StockCheck> = {}): StockCheck {
 
 describe("stockShort", () => {
     const tracking = (on: boolean | null) => ({
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
+        },
         businessProfile: {
             findUnique: jest
                 .fn()
@@ -493,6 +506,11 @@ function home(
                     createdAt: new Date("2026-09-01T00:00:00.000Z"),
                 })),
             ),
+        },
+        storeSettings: {
+            aggregate: jest
+                .fn()
+                .mockResolvedValue({ _max: { pickupLateAfterMinutes: null } }),
         },
         businessProfile: {
             findUnique: jest

@@ -23,7 +23,12 @@
  * It takes no lock. Two payments for one customer at once both try to make
  * the contact; the unique email makes the second wait for the first, and it
  * then finds the first's link. A contact made with `ON CONFLICT DO NOTHING`
- * means a failure here can never roll back a payment.
+ * never fails on a taken email; anything else that goes wrong in the payment
+ * path (a lock it waits too long for) is caught there, in a savepoint, and
+ * the payment goes on (`customer-workspace/ensure-contact.ts`, review C-3).
+ *
+ * "Paid" is an order paid for, refunded since or not — the rule the
+ * Customers list counts paying customers by.
  *
  * Emails are read through a normaliser the caller passes: the API passes
  * `customer-workspace/duplicates.ts`'s `normaliseEmail`, which reads
@@ -168,16 +173,38 @@ export interface PayingCustomerContactsReport {
 }
 
 /**
- * Every paying store customer without a link, per business, each business
- * in its own transaction. Idempotent: a second run finds the ones it made
- * linked, and the ones it left still held, and changes nothing.
+ * An order that was paid for, whether or not it was refunded since — the
+ * rule the Customers list counts paying customers by (`PAID_ORDER` in
+ * `customers-list.sql.ts`), so the backfill links everyone the list's
+ * "not linked yet" notice names (review C-4).
+ */
+const PAID_STATUSES = ["PAID", "REFUNDED"];
+
+/**
+ * How many store customers one transaction links. Small, so each backfill
+ * transaction holds its locks for a moment: a payment that makes a contact
+ * for the same email never waits long behind it (review C-3).
+ */
+export const BACKFILL_BATCH_SIZE = 50;
+
+/** Each batch's transaction: a minute to run, ten seconds to get a connection. */
+const BATCH_TRANSACTION = { timeout: 60_000, maxWait: 10_000 } as const;
+
+/**
+ * Every paying store customer without a link, per business, a small batch
+ * per transaction. Idempotent: a second run finds the ones it made linked,
+ * and the ones it left still held, and changes nothing.
  */
 export async function backfillPayingCustomerContacts(
     prisma: PrismaClient,
     normaliseEmail: EmailNormaliser = normaliseBackfillEmail,
+    batchSize: number = BACKFILL_BATCH_SIZE,
 ): Promise<PayingCustomerContactsReport> {
     const orgs = await prisma.order.findMany({
-        where: { paymentStatus: "PAID", organizationId: { not: null } },
+        where: {
+            paymentStatus: { in: PAID_STATUSES },
+            organizationId: { not: null },
+        },
         distinct: ["organizationId"],
         select: { organizationId: true },
         orderBy: { organizationId: "asc" },
@@ -191,22 +218,44 @@ export async function backfillPayingCustomerContacts(
     };
     for (const { organizationId } of orgs) {
         if (!organizationId) continue;
-        const outcomes = await prisma.$transaction(
-            async (tx) => {
-                const customers = await tx.customer.findMany({
-                    where: {
-                        orders: {
-                            some: { organizationId, paymentStatus: "PAID" },
+        let seen = 0;
+        // Oldest first, so of two storefronts' customers with one email the
+        // first to exist gets the contact. A cursor, not a re-read, walks
+        // them: the ones left for staff stay unlinked and would come back.
+        let after: { id: string; createdAt: Date } | undefined;
+        for (;;) {
+            const batch = await prisma.customer.findMany({
+                where: {
+                    orders: {
+                        some: {
+                            organizationId,
+                            paymentStatus: { in: PAID_STATUSES },
                         },
-                        identityLinks: { none: {} },
                     },
-                    select: { id: true },
-                    orderBy: { createdAt: "asc" },
-                });
+                    identityLinks: { none: {} },
+                    ...(after
+                        ? {
+                              OR: [
+                                  { createdAt: { gt: after.createdAt } },
+                                  {
+                                      createdAt: after.createdAt,
+                                      id: { gt: after.id },
+                                  },
+                              ],
+                          }
+                        : {}),
+                },
+                select: { id: true, createdAt: true },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                take: batchSize,
+            });
+            if (batch.length === 0) break;
+            after = batch[batch.length - 1];
+            // Up to `batchSize` customers' links in one transaction: Prisma's
+            // 5-second default aborts every run on a slow connection.
+            const outcomes = await prisma.$transaction(async (tx) => {
                 const out: PayingLinkOutcome[] = [];
-                // Oldest first, so of two storefronts' customers with one
-                // email the first to exist gets the contact.
-                for (const { id } of customers) {
+                for (const { id } of batch) {
                     out.push(
                         await linkPayingCustomer(
                             tx,
@@ -220,17 +269,17 @@ export async function backfillPayingCustomerContacts(
                     );
                 }
                 return out;
-            },
-            { timeout: 120_000 },
-        );
-        if (outcomes.length === 0) continue;
-        report.organizations += 1;
-        report.unlinked += outcomes.length;
-        for (const o of outcomes) {
-            if (o === "made") report.made += 1;
-            if (o === "suggested") report.suggested += 1;
-            if (o === "skipped") report.skipped += 1;
+            }, BATCH_TRANSACTION);
+            seen += outcomes.length;
+            report.unlinked += outcomes.length;
+            for (const o of outcomes) {
+                if (o === "made") report.made += 1;
+                if (o === "suggested") report.suggested += 1;
+                if (o === "skipped") report.skipped += 1;
+            }
+            if (batch.length < batchSize) break;
         }
+        if (seen > 0) report.organizations += 1;
     }
     return report;
 }

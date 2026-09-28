@@ -52,6 +52,12 @@ export interface PublicVisit {
     hours: OpeningHoursDay[] | null;
     /** The business's zone (DEC-033); India when none is set. */
     timezone: string;
+    /**
+     * Days (`YYYY-MM-DD` in the zone) the business is closed for the whole
+     * of its hours (E3) — the list the hero's line reads (review G-2).
+     * Optional: an API from before it read as no closures.
+     */
+    closedDates?: string[];
 }
 
 export function isPublicVisit(value: unknown): value is PublicVisit {
@@ -64,7 +70,10 @@ export function isPublicVisit(value: unknown): value is PublicVisit {
         (v.address === null || typeof v.address === "string") &&
         (v.phone === null || typeof v.phone === "string") &&
         (v.hours === null || isOpeningWeek(v.hours)) &&
-        typeof v.timezone === "string"
+        typeof v.timezone === "string" &&
+        (v.closedDates === undefined ||
+            (Array.isArray(v.closedDates) &&
+                v.closedDates.every((d) => typeof d === "string")))
     );
 }
 
@@ -208,7 +217,13 @@ export default function VisitUsSection({
     const showHours = content.showHours !== false;
     const hours = showHours ? weekSummary(place.hours) : null;
     const status = showHours
-        ? openState(place.hours, now ?? new Date(), place.timezone)
+        ? // A closure day reads closed here as it does in the hero (G-2).
+          openState(
+              place.hours,
+              now ?? new Date(),
+              place.timezone,
+              place.closedDates,
+          )
         : null;
     const address = said(place.address);
     const directions =

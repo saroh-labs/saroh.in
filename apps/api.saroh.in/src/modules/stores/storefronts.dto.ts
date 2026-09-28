@@ -2,16 +2,27 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
     ArrayMinSize,
+    ArrayUnique,
     IsArray,
     IsBoolean,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
     ValidateNested,
 } from "class-validator";
+
+import type { StorefrontFulfilmentType } from "../orders/fulfilment";
+import { STOREFRONT_FULFILMENT_TYPES } from "../orders/fulfilment";
+import {
+    LATE_AFTER_MAX_MINUTES,
+    LATE_AFTER_MIN_MINUTES,
+} from "../orders/late-thresholds";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -45,6 +56,34 @@ export class OpeningHoursDay {
 
     @IsBoolean()
     closed!: boolean;
+}
+
+const LATE_MIN_MESSAGE = `An order can be late after ${LATE_AFTER_MIN_MINUTES} minutes at the soonest`;
+const LATE_MAX_MESSAGE = "An order can be late after 30 days at the most";
+const LATE_INT_MESSAGE = "Late after is a whole number of minutes";
+
+/**
+ * When a storefront's orders count as late (B17; default 16), in whole
+ * minutes from when each was placed: 5 minutes to 30 days.
+ */
+export class LateAfterMinutesDto {
+    @IsOptional()
+    @IsInt({ message: LATE_INT_MESSAGE })
+    @Min(LATE_AFTER_MIN_MINUTES, { message: LATE_MIN_MESSAGE })
+    @Max(LATE_AFTER_MAX_MINUTES, { message: LATE_MAX_MESSAGE })
+    PICKUP?: number;
+
+    @IsOptional()
+    @IsInt({ message: LATE_INT_MESSAGE })
+    @Min(LATE_AFTER_MIN_MINUTES, { message: LATE_MIN_MESSAGE })
+    @Max(LATE_AFTER_MAX_MINUTES, { message: LATE_MAX_MESSAGE })
+    LOCAL_DELIVERY?: number;
+
+    @IsOptional()
+    @IsInt({ message: LATE_INT_MESSAGE })
+    @Min(LATE_AFTER_MIN_MINUTES, { message: LATE_MIN_MESSAGE })
+    @Max(LATE_AFTER_MAX_MINUTES, { message: LATE_MAX_MESSAGE })
+    SHIPPING?: number;
 }
 
 /**
@@ -134,4 +173,25 @@ export class UpdateStorefrontDto {
     @IsString()
     @MaxLength(32)
     checkoutProvider?: string | null;
+
+    /**
+     * The ways this storefront's orders leave (B17's chips): any of PICKUP,
+     * LOCAL_DELIVERY and SHIPPING. Replaces the collection and delivery
+     * toggles, which the API keeps in step for one release.
+     */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(STOREFRONT_FULFILMENT_TYPES.length)
+    @ArrayUnique({ message: "Each way an order leaves is listed once" })
+    @IsIn(STOREFRONT_FULFILMENT_TYPES, {
+        each: true,
+        message: "An order leaves by Pick-up, Local delivery or Shipping",
+    })
+    fulfilmentTypes?: StorefrontFulfilmentType[];
+
+    /** When its orders count as late, per type; only the ones sent change. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => LateAfterMinutesDto)
+    lateAfterMinutes?: LateAfterMinutesDto;
 }

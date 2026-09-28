@@ -443,10 +443,20 @@ export function fulfilmentView(
  * A stored list read as the storefront's ways, in table order: a legacy
  * word is read as its type, and anything that isn't a storefront's own way
  * is left out.
+ *
+ * Given the row's two toggles, an empty list is read from them instead
+ * (O-3): the image before B2a, still serving while the migration deploys,
+ * creates a settings row without the column, which takes its `[]` default
+ * rather than the backfill. A list saved empty on purpose turned both
+ * toggles off with it (`fulfilmentPatch`), so it still reads as none.
  */
 export function storefrontTypesOf(
     stored: readonly string[],
+    toggles?: { collectionEnabled: boolean; shippingEnabled: boolean },
 ): StorefrontFulfilmentType[] {
+    if (stored.length === 0 && toggles) {
+        return storefrontTypesFrom({ ...toggles, localDelivery: false });
+    }
     const types = new Set(stored.map(typeOf));
     return STOREFRONT_FULFILMENT_TYPES.filter((t) => types.has(t));
 }
@@ -459,9 +469,9 @@ export const NEW_STOREFRONT_TYPES: StorefrontFulfilmentType[] = ["SHIPPING"];
 
 /**
  * The ways a storefront offers, from its two toggles and whether it has
- * ever delivered — the rule the backfill used (20261009130001), kept in
- * step on every save until B17's chips replace the toggles. Always in
- * table order.
+ * ever delivered — the rule the backfill used (20261009130001), applied
+ * when an app from before B17's chips saves a toggle. Always in table
+ * order.
  */
 export function storefrontTypesFrom(settings: {
     collectionEnabled: boolean;
@@ -489,8 +499,8 @@ export function storedValuesOf(values: readonly string[]): OrderFulfilment[] {
 
 /**
  * When a storefront's orders count as late, in minutes from when each was
- * placed, per way it offers (default 16; DEC-045). B17 stores these on the
- * storefront's settings; until then every storefront uses the defaults.
+ * placed, per way it offers (default 16; DEC-045). Each storefront sets its
+ * own on its settings (B17); `late-thresholds.ts` reads them.
  */
 export type LateThresholds = Readonly<Record<StorefrontFulfilmentType, number>>;
 
@@ -587,13 +597,20 @@ export function lateOf(
 }
 
 /**
- * Each stored value's default late threshold in minutes, for a query that
- * judges late in SQL (the Orders list): the types that are ever late, under
- * both vocabularies. B17's per-storefront setting replaces the defaults.
+ * The stored values that are ever late, each with the storefront type whose
+ * threshold it reads, under both vocabularies — for a query that judges late
+ * in SQL (the Orders list). Digital and appointments are never here.
  */
-export function defaultLateThresholds(): [OrderFulfilment, number][] {
-    return ORDER_FULFILMENTS.flatMap((v): [OrderFulfilment, number][] => {
-        const minutes = FULFILMENT_RULES[typeOf(v)].lateAfterMinutes;
-        return minutes === null ? [] : [[v, minutes]];
-    });
+export function lateStoredValues(): [
+    OrderFulfilment,
+    StorefrontFulfilmentType,
+][] {
+    return ORDER_FULFILMENTS.flatMap(
+        (v): [OrderFulfilment, StorefrontFulfilmentType][] => {
+            const type = typeOf(v);
+            return FULFILMENT_RULES[type].lateAfterMinutes === null
+                ? []
+                : [[v, type as StorefrontFulfilmentType]];
+        },
+    );
 }

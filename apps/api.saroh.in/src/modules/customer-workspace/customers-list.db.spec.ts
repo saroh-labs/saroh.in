@@ -7,6 +7,8 @@
  */
 import { prisma } from "@saroh/database";
 
+import { analyzeAsOwner } from "../../../test/analyze";
+
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import {
@@ -482,6 +484,37 @@ describe("Customers list (DB)", () => {
         });
     });
 
+    it("leaves out a payer with no usable email, whom no link can come for (review C-4)", async () => {
+        const blank = await makeStoreCustomer(org, online, "  ", "Walk-in");
+        await makeOrder(org, online, blank, { total: "80" });
+        const anonymised = await makeStoreCustomer(
+            org,
+            online,
+            `gone-${next()}@removed.invalid`,
+        );
+        await makeOrder(org, online, anonymised, { total: "90" });
+        // Another business's paying store customer, never linked, is never
+        // counted here (review C-2).
+        const elsewhere = await makeStore(otherOrg, "Elsewhere shop");
+        const theirs = await makeStoreCustomer(
+            otherOrg,
+            elsewhere,
+            `theirs-${next()}@example.com`,
+        );
+        await makeOrder(otherOrg, elsewhere, theirs, { total: "70" });
+
+        expect((await list.list(ctx, {})).unlinkedPaying).toBe(1);
+        const sheet = await list.unlinked(ctx, {});
+        expect(sheet.rows.map((r) => r.customerId)).toEqual([unlinkedCustomer]);
+
+        await prisma.order.deleteMany({
+            where: { customerId: { in: [blank, anonymised, theirs] } },
+        });
+        await prisma.customer.deleteMany({
+            where: { id: { in: [blank, anonymised, theirs] } },
+        });
+    });
+
     it("narrows to who bought at a storefront, and refuses another business's", async () => {
         expect(idsOf(await list.list(ctx, { store: online }))).toEqual([ravi]);
         const market_ = await list.list(ctx, { store: market });
@@ -632,8 +665,14 @@ describe("Customers list paging (DB)", () => {
         });
 
         // What autovacuum does after a bulk load: without statistics the
-        // planner guesses a handful of rows and nests loops over 5,000.
-        await prisma.$executeRawUnsafe("ANALYZE");
+        // planner guesses a handful of rows and nests loops over 5,000. As
+        // the owner: under TEST_RLS the suite's role may not analyze, and its
+        // ANALYZE was silently skipped (test/analyze.ts).
+        analyzeAsOwner();
+        const [stats] = await prisma.$queryRaw<{ rows: number }[]>`
+            SELECT reltuples::int AS rows FROM pg_class
+            WHERE oid = '"Contact"'::regclass`;
+        expect(stats.rows).toBeGreaterThanOrEqual(n);
 
         const started = Date.now();
         const page = await list.list(ctx, {});

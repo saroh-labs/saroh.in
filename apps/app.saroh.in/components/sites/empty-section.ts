@@ -131,12 +131,9 @@ export function emptySection(type: SectionType): Section {
                 key: newKey(),
                 type,
                 contractVersion: 1,
-                content: {
-                    title: "Book a time",
-                    submitLabel: "Confirm booking",
-                    successMessage:
-                        "You're booked — we've sent a confirmation to your email.",
-                },
+                // No submitLabel or successMessage: the block has drawn
+                // neither since A9.
+                content: { title: "Book a time" },
             };
     }
 }

@@ -134,7 +134,7 @@ function fromEvidence(
 
 /** How a source's evidence reads as rows; absent, the action is one row. */
 interface Rower {
-    rank: (ev: HomeEvidence) => Rank;
+    rank: (ev: Pick<HomeEvidence, "tone">) => Rank;
     row: (action: HomeAction, ev: HomeEvidence, zone: string) => HomeNeed;
     /** "3 more open orders", for what the source counted but didn't send. */
     more: (n: number) => string;
@@ -308,6 +308,10 @@ function rowsOf(action: HomeAction, zone: string): Ranked[] {
     const hidden = (action.count ?? evidence.length) - evidence.length;
     if (hidden > 0) {
         const last = rows[rows.length - 1];
+        // Ranked with the worst thing it stands for when the source says so
+        // (a late order past the five shown is still late); else beside the
+        // source's last row, so "3 more" follows its own.
+        const tone = action.moreTone ?? last.need.tone;
         rows.push({
             need: {
                 ...base(action, `${action.code}:more`),
@@ -317,11 +321,10 @@ function rowsOf(action: HomeAction, zone: string): Ranked[] {
                 currency: null,
                 amountIn: null,
                 tag: null,
-                tone: last.need.tone,
+                tone,
                 href: action.href,
             },
-            // Beside the source's last row, so "3 more" follows its own.
-            rank: last.rank,
+            rank: action.moreTone ? rower.rank({ tone }) : last.rank,
             source,
             things: hidden,
         });

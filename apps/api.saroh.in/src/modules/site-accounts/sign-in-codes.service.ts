@@ -68,8 +68,20 @@ export interface SignInOptions {
     challenge: { required: boolean; siteKey: string | null };
 }
 
-/** The in-process per-address limits, set generously: offices and mobile
- * networks share addresses. The durable limits are the rows (code-limits). */
+/**
+ * The in-process limits, set generously. Neither refuses a customer for what
+ * someone else did (offices and mobile networks share addresses, and one
+ * address visits many businesses' sites):
+ *
+ * - code requests are counted per business and visitor address, and past
+ *   the limit a code needs the challenge rather than being refused — when
+ *   Turnstile is configured. Without it that challenge could not be asked,
+ *   so past the limit the address waits out the window (429 `limit`);
+ * - verify tries are counted per business, email and visitor address — only
+ *   the visitor's own tries at their own email — and past it they wait.
+ *
+ * The durable limits are the rows (code-limits).
+ */
 const CODE_REQUESTS_PER_ADDRESS = 30;
 const VERIFY_TRIES_PER_ADDRESS = 60;
 const ADDRESS_WINDOW_MS = 10 * 60_000;
@@ -190,11 +202,19 @@ export class SignInCodesService {
                 email,
             );
 
-            if (!this.codeLimiter.take(relay.clientHash, now.getTime())) {
+            const addressKey = `${site.organizationId}:${relay.clientHash}`;
+            const addressBusy = !this.codeLimiter.take(
+                addressKey,
+                now.getTime(),
+            );
+            if (addressBusy && !this.challenge.configured) {
+                // No challenge to ask, so the limit is a refusal: the one
+                // hard stop on one address asking this business for code
+                // after code (A-2).
                 throw limited(
                     "limit",
                     this.codeLimiter.retryAfterSeconds(
-                        relay.clientHash,
+                        addressKey,
                         now.getTime(),
                     ),
                 );
@@ -217,6 +237,7 @@ export class SignInCodesService {
                 }),
                 newDestination,
                 ceilings: ceilingsFor(site.businessCreatedAt, now),
+                addressBusy,
                 now,
             });
             if (decision.kind !== "send") {
@@ -248,20 +269,18 @@ export class SignInCodesService {
         return runInOrgContext(site.organizationId, async () => {
             await assertOrganizationOpen(site.organizationId);
             const now = new Date();
-            if (!this.verifyLimiter.take(relay.clientHash, now.getTime())) {
-                throw limited(
-                    "limit",
-                    this.verifyLimiter.retryAfterSeconds(
-                        relay.clientHash,
-                        now.getTime(),
-                    ),
-                );
-            }
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
                 site.organizationId,
                 email,
             );
+            const tries = `${site.organizationId}:${destinationHash}:${relay.clientHash}`;
+            if (!this.verifyLimiter.take(tries, now.getTime())) {
+                throw limited(
+                    "limit",
+                    this.verifyLimiter.retryAfterSeconds(tries, now.getTime()),
+                );
+            }
             await this.consume(
                 site.organizationId,
                 destinationHash,

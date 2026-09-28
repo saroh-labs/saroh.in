@@ -7,6 +7,10 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
             findMany: jest.fn(),
             upsert: jest.fn(),
+            create: jest.fn(),
+        },
+        organization: {
+            findUnique: jest.fn(),
         },
         featureFlagOverride: {
             findUnique: jest.fn(),
@@ -27,6 +31,7 @@ jest.mock("@saroh/database", () => {
     return { prisma };
 });
 
+import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { FeatureFlagService } from "./feature-flags.service";
@@ -35,6 +40,8 @@ import { FLAG_KEYS, FlagKey } from "./flags";
 const flagFindUnique = prisma.featureFlag.findUnique as jest.Mock;
 const flagFindMany = prisma.featureFlag.findMany as jest.Mock;
 const flagUpsert = prisma.featureFlag.upsert as jest.Mock;
+const flagCreate = prisma.featureFlag.create as jest.Mock;
+const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const overrideFindUnique = prisma.featureFlagOverride.findUnique as jest.Mock;
 const overrideFindMany = prisma.featureFlagOverride.findMany as jest.Mock;
 const overrideUpsert = prisma.featureFlagOverride.upsert as jest.Mock;
@@ -42,6 +49,13 @@ const auditCreate = prisma.featureFlagAudit.create as jest.Mock;
 const adminAuditCreate = prisma.adminAuditEvent.create as jest.Mock;
 const adminAuditFindUnique = prisma.adminAuditEvent.findUnique as jest.Mock;
 const overrideDelete = prisma.featureFlagOverride.delete as jest.Mock;
+
+// setOverride looks up the organization and the flag's global row first. By
+// default both exist; a test that needs otherwise says so.
+beforeEach(() => {
+    orgFindUnique.mockResolvedValue({ id: "org_1" });
+    flagFindUnique.mockResolvedValue({ key: "registered" });
+});
 
 describe("FeatureFlagService.isEnabled — precedence", () => {
     const service = new FeatureFlagService();
@@ -230,6 +244,65 @@ describe("FeatureFlagService.setOverride", () => {
                 actorUserId: "user_1",
             },
         });
+    });
+
+    it("registers a never-configured flag off, audited, before its first override", async () => {
+        overrideFindUnique.mockResolvedValue(null);
+        flagFindUnique.mockResolvedValue(null);
+
+        await service.setOverride(
+            FlagKey.ORG_AUTHORIZATION,
+            "org_1",
+            true,
+            "user_1",
+        );
+
+        expect(flagCreate).toHaveBeenCalledWith({
+            data: { key: FlagKey.ORG_AUTHORIZATION, enabledByDefault: false },
+        });
+        expect(flagCreate.mock.invocationCallOrder[0]).toBeLessThan(
+            overrideUpsert.mock.invocationCallOrder[0],
+        );
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                flagKey: FlagKey.ORG_AUTHORIZATION,
+                organizationId: null,
+                previousValue: null,
+                newValue: false,
+                actorUserId: "user_1",
+            }),
+        });
+        expect(auditCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves an existing global default alone", async () => {
+        overrideFindUnique.mockResolvedValue(null);
+        flagFindUnique.mockResolvedValue({ key: FlagKey.ORG_AUTHORIZATION });
+
+        await service.setOverride(
+            FlagKey.ORG_AUTHORIZATION,
+            "org_1",
+            true,
+            "user_1",
+        );
+
+        expect(flagCreate).not.toHaveBeenCalled();
+        expect(auditCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers 404 for an organization that does not exist, writing nothing", async () => {
+        orgFindUnique.mockResolvedValue(null);
+
+        await expect(
+            service.setOverride(
+                FlagKey.ORG_AUTHORIZATION,
+                "org_missing",
+                true,
+                "user_1",
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(overrideUpsert).not.toHaveBeenCalled();
+        expect(auditCreate).not.toHaveBeenCalled();
     });
 });
 

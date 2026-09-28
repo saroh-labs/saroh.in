@@ -131,7 +131,11 @@ describe("the job's resume on the end date", () => {
 
     it("resumes through the manual resume, as the job, with the 28 days it took", async () => {
         await expect(run(paused())).resolves.toBe("resumed");
-        expect(resume).toHaveBeenCalledWith(expect.any(Function), 28);
+        expect(resume).toHaveBeenCalledWith(expect.any(Function), {
+            days: 28,
+            extends: true,
+            on: at("2026-10-29T00:00:00Z"),
+        });
         // The log it hands over records as the job.
         await resume.mock.calls[0]![0]("RESUMED", {
             data: { extendedDays: 28 },
@@ -157,6 +161,47 @@ describe("the job's resume on the end date", () => {
         }
         expect(resume).not.toHaveBeenCalled();
         expect(tx.subscriptionEvent.create).not.toHaveBeenCalled();
+    });
+
+    describe("decides from the dates, not when the job runs (review S-3)", () => {
+        it("extends a pause ending on the period's last moment", async () => {
+            const onTheEnd = paused({
+                currentPeriodEnd: at("2026-10-29T00:00:00Z"),
+            });
+            await expect(run(onTheEnd)).resolves.toBe("resumed");
+            expect(resume.mock.calls[0]![1]).toMatchObject({ extends: true });
+        });
+
+        it("extends one ending inside the period though the job runs after it, even with Payments off", async () => {
+            tx.organizationModule.findFirst.mockResolvedValue({ id: "m_1" });
+            const late = at("2026-11-03T05:00:00Z");
+            await expect(
+                resumeWhenDue(tx as never, paused(), late, resume),
+            ).resolves.toBe("resumed");
+            expect(resume.mock.calls[0]![1]).toEqual({
+                days: 28,
+                extends: true,
+                on: at("2026-10-29T00:00:00Z"),
+            });
+            expect(tx.subscriptionEvent.create).not.toHaveBeenCalled();
+        });
+
+        it("restarts one ending after the period on its end date, however late the job", async () => {
+            const outlasted = paused({
+                currentPeriodEnd: at("2026-10-15T00:00:00Z"),
+            });
+            for (const when of [now, at("2026-11-02T09:00:00Z")]) {
+                resume.mockClear();
+                await expect(
+                    resumeWhenDue(tx as never, outlasted, when, resume),
+                ).resolves.toBe("resumed");
+                expect(resume.mock.calls[0]![1]).toEqual({
+                    days: 28,
+                    extends: false,
+                    on: at("2026-10-29T00:00:00Z"),
+                });
+            }
+        });
     });
 
     it("still resumes inside the paid period while Payments is off", async () => {

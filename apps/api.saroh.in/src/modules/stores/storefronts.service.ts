@@ -16,16 +16,23 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
-import type { StorefrontFulfilmentType } from "../orders/fulfilment";
-import {
-    NEW_STOREFRONT_TYPES,
-    storefrontTypesFrom,
-    storefrontTypesOf,
+import type {
+    LateThresholds,
+    StorefrontFulfilmentType,
 } from "../orders/fulfilment";
+import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "../orders/fulfilment";
+import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
 import { openingHoursText } from "./opening-hours-text";
+import type { LateRuleNotice } from "./storefront-fulfilment";
+import {
+    fulfilmentChanges,
+    fulfilmentPatch,
+    lateRuleNotices,
+    typesAfterToggles,
+} from "./storefront-fulfilment";
 import type { OpeningHoursDay, UpdateStorefrontDto } from "./storefronts.dto";
 
 /** What the schema falls back to before a storefront ever saves settings. */
@@ -82,10 +89,16 @@ export interface StorefrontSettings extends StorefrontSummary {
     collectionEnabled: boolean;
     /**
      * The ways this storefront's orders leave (DEC-045): PICKUP,
-     * LOCAL_DELIVERY and SHIPPING, in that order. Follows the collection and
-     * shipping toggles until B17's chips replace them.
+     * LOCAL_DELIVERY and SHIPPING, in that order. Set by the chips (B17);
+     * the collection and delivery toggles follow it for one release.
      */
     fulfilmentTypes: StorefrontFulfilmentType[];
+    /**
+     * When its orders count as late, in minutes from when each was placed,
+     * per way (B17): every type, offered or not, so a type turned back on
+     * keeps what it had.
+     */
+    lateAfterMinutes: LateThresholds;
     tipsEnabled: boolean;
     guestCheckout: boolean;
     /** ISO, when paused; `null` while taking payments. */
@@ -230,8 +243,9 @@ export class StorefrontsService {
                 (settings?.openingHours as OpeningHoursDay[] | null) ?? null,
             collectionEnabled: settings?.collectionEnabled ?? false,
             fulfilmentTypes: settings
-                ? storefrontTypesOf(settings.fulfilmentTypes)
+                ? storefrontTypesOf(settings.fulfilmentTypes, settings)
                 : NEW_STOREFRONT_TYPES,
+            lateAfterMinutes: lateThresholdsOf(settings),
             tipsEnabled: settings?.tipsEnabled ?? false,
             guestCheckout: settings?.guestCheckout ?? true,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
@@ -361,24 +375,24 @@ export class StorefrontsService {
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
                 : {}),
-            // Which ways it offers follows the two toggles (B2a) until B17
-            // gives them their own chips; a local delivery it offered stays.
-            ...(dto.collectionEnabled !== undefined ||
-            dto.shippingEnabled !== undefined
+            // Which ways it offers follows the toggle an app from before
+            // B17's chips saves (B2a) — only the one it sent (O-4). The
+            // chips, when sent, decide instead (below).
+            ...((dto.collectionEnabled !== undefined ||
+                dto.shippingEnabled !== undefined) &&
+            dto.fulfilmentTypes === undefined
                 ? {
-                      fulfilmentTypes: storefrontTypesFrom({
-                          collectionEnabled:
-                              dto.collectionEnabled ??
-                              current.collectionEnabled,
-                          shippingEnabled:
-                              dto.shippingEnabled ?? current.shippingEnabled,
-                          localDelivery:
-                              current.fulfilmentTypes.includes(
-                                  "LOCAL_DELIVERY",
-                              ),
-                      }),
+                      fulfilmentTypes: typesAfterToggles(
+                          current.fulfilmentTypes,
+                          {
+                              collectionEnabled: dto.collectionEnabled,
+                              shippingEnabled: dto.shippingEnabled,
+                          },
+                      ),
                   }
                 : {}),
+            // The chips and the thresholds (B17), with the toggles in step.
+            ...fulfilmentPatch(dto),
         };
 
         await prisma.$transaction(async (tx) => {
@@ -410,7 +424,83 @@ export class StorefrontsService {
         if (dto.openingHours !== undefined && actorUserId) {
             await this.recordHours(organizationId, actorUserId, current, saved);
         }
+        if (
+            (dto.fulfilmentTypes !== undefined ||
+                dto.lateAfterMinutes !== undefined) &&
+            actorUserId
+        ) {
+            await this.recordFulfilment(
+                organizationId,
+                actorUserId,
+                current,
+                saved,
+            );
+        }
         return saved;
+    }
+
+    /**
+     * How the ways or the late thresholds changed, in Settings › Activity
+     * (B17), as words: "Pick-up late after: 2 hours → 20 minutes". A save
+     * that left them as they were records nothing.
+     */
+    private async recordFulfilment(
+        organizationId: string,
+        actorUserId: string,
+        before: StorefrontSettings,
+        after: StorefrontSettings,
+    ): Promise<void> {
+        const changes = recordableChanges(fulfilmentChanges(before, after));
+        if (changes.length === 0) return;
+        await this.audit?.record({
+            action: AuditAction.StorefrontFulfilmentUpdate,
+            actorUserId,
+            organizationId,
+            targetType: "storefront",
+            targetId: after.id,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: changes.map((c) => c.field),
+                storefront: after.name,
+                changes: changes as unknown as Prisma.InputJsonArray,
+            },
+        });
+    }
+
+    /**
+     * The storefronts whose Orders should tell them the new Pick-up default
+     * (B17's one-time notice): recent pick-up orders, still on 2 hours, not
+     * dismissed.
+     */
+    lateRuleNotices(organizationId: string): Promise<LateRuleNotice[]> {
+        return lateRuleNotices(prisma, organizationId, new Date());
+    }
+
+    /**
+     * Dismiss the notice for one of the business's storefronts, for everyone
+     * there. Dismissing twice keeps the first time; another business's
+     * storefront is a 404.
+     */
+    async dismissLateRuleNotice(
+        organizationId: string,
+        storeId: string,
+    ): Promise<void> {
+        const current = await this.get(organizationId, storeId);
+        await prisma.storeSettings.upsert({
+            where: { storeId },
+            // Created carrying what it already reads as, as `update` does.
+            create: {
+                storeId,
+                currency: current.currency,
+                fulfilmentTypes: current.fulfilmentTypes,
+                lateRuleNoticeDismissedAt: new Date(),
+            },
+            update: {},
+        });
+        await prisma.storeSettings.updateMany({
+            where: { storeId, lateRuleNoticeDismissedAt: null },
+            data: { lateRuleNoticeDismissedAt: new Date() },
+        });
     }
 
     /**

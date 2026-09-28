@@ -62,6 +62,15 @@ export function shownNeeds(
 }
 
 /**
+ * "See all 14": the rows it opens, not `needsTotal` (H-8). A "3 more" row
+ * counts as three things in the heading's total but is one row here, so the
+ * total promised more rows than the list then showed.
+ */
+export function seeAllLabel(needs: readonly HomeNeed[]): string {
+    return `See all ${needs.length}`;
+}
+
+/**
  * Which state Needs you is in.
  *
  * - `list`: there is something to do.

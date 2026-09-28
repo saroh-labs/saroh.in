@@ -368,6 +368,128 @@ describe("A contact for every paying customer (DB, C2)", () => {
             expect(normaliseBackfillEmail(email)).toBe(normaliseEmail(email));
         }
     });
+
+    // After the backfill test above, whose counts read every unlinked payer.
+
+    it("never fails a payment: a lock it waits too long for skips the contact (review C-3)", async () => {
+        const cust = await customer("held-lock@example.com", { phone: null });
+        const o = await order(cust.id);
+
+        // Another transaction is making a contact with the same email and
+        // hasn't committed: making ours waits on it.
+        let release!: () => void;
+        const released = new Promise<void>((r) => (release = r));
+        let holding!: () => void;
+        const held = new Promise<void>((r) => (holding = r));
+        const blocker = prisma
+            .$transaction(
+                async (tx) => {
+                    await tx.contact.create({
+                        data: {
+                            organizationId: orgId,
+                            email: "held-lock@example.com",
+                        },
+                    });
+                    holding();
+                    await released;
+                    throw new Error("the other transaction gives up");
+                },
+                { timeout: 30_000 },
+            )
+            .catch(() => undefined);
+        await held;
+
+        const started = Date.now();
+        const invoice = await prisma.$transaction(
+            async (tx) => {
+                await tx.order.update({
+                    where: { id: o.id },
+                    data: { paymentStatus: "PAID" },
+                });
+                const made = await ensureOrderInvoice(tx, o.id, {
+                    method: "RECORDED",
+                });
+                // The lock_timeout went with the savepoint.
+                const [{ lock_timeout }] = await tx.$queryRaw<
+                    { lock_timeout: string }[]
+                >`SELECT current_setting('lock_timeout') AS lock_timeout`;
+                expect(lock_timeout).toBe("0");
+                return made;
+            },
+            { timeout: 20_000 },
+        );
+        release();
+        await blocker;
+
+        // The payment went through, a little late, without the contact.
+        expect(Date.now() - started).toBeLessThan(10_000);
+        expect(invoice?.created).toBe(true);
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: o.id } }))
+                .paymentStatus,
+        ).toBe("PAID");
+        expect(await linksOf(cust.id)).toEqual([]);
+
+        // Their next payment makes it.
+        const again = await order(cust.id);
+        await pay(again.id);
+        expect(await linksOf(cust.id)).toEqual([
+            expect.objectContaining({ reason: "PAYMENT" }),
+        ]);
+    }, 30_000);
+
+    it("puts lock_timeout back after making the contact (review C-3)", async () => {
+        const cust = await customer("timeout-back@example.com", {
+            phone: null,
+        });
+        const o = await order(cust.id, "PAID");
+        const after = await prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '7s'`);
+            await ensureContactForPaidOrder(tx, o);
+            const [row] = await tx.$queryRaw<{ lock_timeout: string }[]>`
+                SELECT current_setting('lock_timeout') AS lock_timeout`;
+            return row.lock_timeout;
+        });
+        expect(after).toBe("7s");
+        expect(await linksOf(cust.id)).toHaveLength(1);
+    });
+
+    it("backfills a customer whose only paid order was refunded, a small batch at a time (review C-3, C-4)", async () => {
+        const refunded = await customer("refunded-only@example.com", {
+            phone: null,
+        });
+        await order(refunded.id, "REFUNDED");
+        const later = await customer("batch-later@example.com", {
+            phone: null,
+        });
+        await order(later.id, "PAID");
+
+        // One store customer per transaction: the ones left for staff stay
+        // unlinked and must not be walked again.
+        const report = await backfillPayingCustomerContacts(
+            prisma,
+            normaliseEmail,
+            1,
+        );
+        expect(report.made).toBe(2);
+        expect(await linksOf(refunded.id)).toEqual([
+            expect.objectContaining({ reason: "BACKFILL" }),
+        ]);
+        expect(await linksOf(later.id)).toEqual([
+            expect.objectContaining({ reason: "BACKFILL" }),
+        ]);
+
+        const again = await backfillPayingCustomerContacts(
+            prisma,
+            normaliseEmail,
+            1,
+        );
+        expect(again).toEqual({
+            ...report,
+            unlinked: report.unlinked - 2,
+            made: 0,
+        });
+    });
 });
 
 describe("Duplicate contacts (DB, C2)", () => {

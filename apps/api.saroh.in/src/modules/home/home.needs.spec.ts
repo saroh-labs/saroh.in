@@ -15,6 +15,7 @@ const ZONE = "Asia/Kolkata";
 const NOW = new Date("2026-09-18T04:00:00.000Z");
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const MIN = 60_000;
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
 function ev(over: Partial<HomeEvidence> & { id: string }): HomeEvidence {
@@ -229,6 +230,39 @@ describe("flattenNeeds", () => {
         expect(needsTotal).toBe(8);
     });
 
+    it("ranks 'N more' with the worst it stands for: a late order hidden past five is still late (H-1)", () => {
+        // Five due orders shown; the source says a late one is among the
+        // three it didn't send.
+        const due = [1, 2, 3, 4, 5].map((n) => ({ ...dueOrder, id: `d${n}` }));
+        const orders: HomeAction = {
+            ...ORDERS,
+            count: 8,
+            evidence: due,
+            moreTone: "bad",
+        };
+        const { needs } = flattenNeeds([INVOICES, orders], ZONE);
+        const more = needs.find((n) => n.id === "COMMERCE_OPEN_ORDERS:more");
+        expect(more).toMatchObject({
+            title: "3 more open orders",
+            tone: "bad",
+        });
+        // Rank 1 with the overdue invoice, and ahead of it (orders first),
+        // not rank 3 with the due orders it followed.
+        expect(needs[0].id).toBe("COMMERCE_OPEN_ORDERS:more");
+        expect(needs[1].code).toBe("PAYMENTS_OVERDUE_INVOICES");
+
+        // Nothing late among them: it ranks as due.
+        const calm = flattenNeeds(
+            [INVOICES, { ...orders, moreTone: "due" }],
+            ZONE,
+        ).needs;
+        expect(calm[0].code).toBe("PAYMENTS_OVERDUE_INVOICES");
+        expect(calm.at(-1)).toMatchObject({
+            id: "COMMERCE_OPEN_ORDERS:more",
+            tone: "due",
+        });
+    });
+
     it("counts a one-row source as one thing, however many it names", () => {
         expect(flattenNeeds([STOCK], ZONE).needsTotal).toBe(1);
     });
@@ -312,6 +346,47 @@ describe("openOrderWords", () => {
         });
     });
 
+    it("goes by the storefront's own threshold, in minutes under an hour (B17)", () => {
+        const counter = { PICKUP: 20, LOCAL_DELIVERY: 1440, SHIPPING: 2880 };
+        const pickup = order({
+            fulfilment: "PICKUP",
+            createdAt: ago(25 * MIN),
+        });
+        expect(openOrderWords(pickup, "Dev", NOW, ZONE, counter)).toMatchObject(
+            { tag: "Late · 25 min", tone: "bad" },
+        );
+        // The default two hours: not late yet, due today.
+        expect(openOrderWords(pickup, "Dev", NOW, ZONE)).toMatchObject({
+            tag: "Due today",
+            tone: "due",
+        });
+        const slow = { PICKUP: 120, LOCAL_DELIVERY: 1440, SHIPPING: 72 * 60 };
+        const shipping = order({
+            fulfilment: "SHIPPING",
+            createdAt: ago(50 * HOUR),
+        });
+        expect(openOrderWords(shipping, "Dev", NOW, ZONE).tone).toBe("bad");
+        expect(openOrderWords(shipping, "Dev", NOW, ZONE, slow)).toMatchObject({
+            tone: "due",
+            tag: "Due tomorrow",
+        });
+    });
+
+    it("never calls a shipped or refunded order late, as Orders wouldn't", () => {
+        const shipped = order({ status: "SHIPPED", createdAt: ago(5 * DAY) });
+        expect(openOrderWords(shipped, "Dev", NOW, ZONE).tag).toBeUndefined();
+        // Open until delivered, as the Orders list's Open tab counts it, but
+        // never asked to be sent again.
+        expect(openOrderWords(shipped, "Dev", NOW, ZONE).headline).toBe(
+            "Order #1042 is on its way to Dev",
+        );
+        const refunded = order({
+            paymentStatus: "REFUNDED",
+            createdAt: ago(5 * DAY),
+        });
+        expect(openOrderWords(refunded, "Dev", NOW, ZONE).tag).toBeUndefined();
+    });
+
     it("asks for the hand-over once a pick-up is ready", () => {
         const ready = order({ fulfilment: "COLLECT", stage: "READY" });
         expect(openOrderWords(ready, "Dev", NOW, ZONE).headline).toBe(
@@ -389,6 +464,11 @@ describe("HomeService needs", () => {
                 count: jest.fn().mockResolvedValue(0),
                 findMany: jest.fn().mockResolvedValue([]),
             },
+            storeSettings: {
+                aggregate: jest.fn().mockResolvedValue({
+                    _max: { pickupLateAfterMinutes: null },
+                }),
+            },
             businessProfile: {
                 findUnique: jest
                     .fn()
@@ -427,6 +507,7 @@ describe("HomeService needs", () => {
         paymentStatus: "PAID",
         stage: "NEW",
         fulfilment: "DELIVERY",
+        store: { settings: null },
         customer: { firstName: "Anika", lastName: "Rao", email: "a@x.in" },
     };
     const overdueInvoice = {

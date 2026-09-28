@@ -1891,10 +1891,21 @@ model StoreSettings {
 
   // The physical ways this storefront's orders leave (DEC-045): only
   // PICKUP, LOCAL_DELIVERY and SHIPPING are ever stored here; Digital and the
-  // appointment types follow the product. Kept in step with
-  // `collectionEnabled` and `shippingEnabled` until B17 replaces those two
-  // toggles with a chip set.
+  // appointment types follow the product. Set by B17's chips, which keep
+  // `collectionEnabled` (Pick-up) and `shippingEnabled` (any delivery) in
+  // step; a save of either toggle from an older app still updates it.
   fulfilmentTypes OrderFulfilment[] @default([])
+
+  // When this storefront's open orders count as late, in minutes from when
+  // each was placed, per way it offers (B17; default 16, DEC-045). Bounds
+  // (5 minutes to 30 days) are the API's. Never stored on an order: a change
+  // re-labels open orders on the next read.
+  pickupLateAfterMinutes        Int       @default(120)
+  localDeliveryLateAfterMinutes Int       @default(1440)
+  shippingLateAfterMinutes      Int       @default(2880)
+  // When the one-time "Pick-up orders now count as late after 2 hours"
+  // notice on Orders was dismissed for this storefront (B17).
+  lateRuleNoticeDismissedAt     DateTime?
 }
 
 model StoreFeatures {
@@ -2437,6 +2448,9 @@ model CustomerIdentityLink {
 
   @@unique([contactId, customerId])
   @@index([organizationId])
+  // "Is this store customer linked?" (review C-2): the unlinked payers, the
+  // payment path and the backfill all ask it by the customer.
+  @@index([customerId])
 }
 
 /// Why a store customer is linked to a contact (C2, DEC-041).
@@ -3696,6 +3710,21 @@ model Booking {
   // A booking-page note waiting to become Needs attention (C1, C12).
   attentionSuggestions ContactAttention[]
 
+  // The booking page's "Anything we should know?" (E7): at most 1,000
+  // characters, CHECKed. Sensitive: served only to someone who may see
+  // sensitive Needs attention, never in a list read, kept out of logs and
+  // out of the snapshot. C12 turns it into a Needs attention suggestion.
+  intakeNote String?
+
+  // The customer's site account when they booked it signed in (A9,
+  // ADR-011). The contact is still the booker; this says the account made
+  // it, so "This isn't them" (A4) moves it with the account. A single-column
+  // key (PostgreSQL 14 has no column-list SET NULL, and a composite SET NULL
+  // would null the required organization): RLS and the reservation code keep
+  // the account within the booking's business.
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -3715,6 +3744,8 @@ model Booking {
   @@index([status, holdExpiresAt])
   // The whole-business calendar's month: every booking in a date range.
   @@index([organizationId, startAt])
+  // What an account booked (the double-booking check, and unlinking).
+  @@index([customerAccountId, startAt])
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
@@ -5257,6 +5288,9 @@ model CustomerAccount {
   lastSignedInAt DateTime?
 
   sessions CustomerSession[]
+
+  // Bookings made signed in (A9).
+  bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

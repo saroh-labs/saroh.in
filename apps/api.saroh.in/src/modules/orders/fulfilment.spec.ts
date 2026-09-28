@@ -3,7 +3,6 @@ import { BadRequestException } from "@nestjs/common";
 import type { FulfilmentType } from "./fulfilment";
 import {
     DEFAULT_LATE_THRESHOLDS,
-    defaultLateThresholds,
     FULFILMENT_RULES,
     FULFILMENT_TYPES,
     fulfilmentView,
@@ -13,6 +12,7 @@ import {
     LATE_STATUSES,
     lateAfterMinutesOf,
     lateOf,
+    lateStoredValues,
     legacyWord,
     movesFor,
     shipsToAddress,
@@ -350,6 +350,36 @@ describe("a storefront's ways", () => {
             storefrontTypesOf(["SHIPPING", "DELIVERY", "DIGITAL", "PICKUP"]),
         ).toEqual(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]);
     });
+
+    it("read an empty list from the toggles, as a row the old image made (O-3)", () => {
+        // The image before B2a creates a row without the column: `[]`.
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: true,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["PICKUP", "SHIPPING"]);
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: false,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["SHIPPING"]);
+        // Saved empty on purpose: both toggles went off with it.
+        expect(
+            storefrontTypesOf([], {
+                collectionEnabled: false,
+                shippingEnabled: false,
+            }),
+        ).toEqual([]);
+        // A stored list is read as stored, whatever the toggles say.
+        expect(
+            storefrontTypesOf(["LOCAL_DELIVERY"], {
+                collectionEnabled: true,
+                shippingEnabled: true,
+            }),
+        ).toEqual(["LOCAL_DELIVERY"]);
+    });
 });
 
 describe("the late rule (DEC-045, default 16)", () => {
@@ -504,13 +534,13 @@ describe("the late rule (DEC-045, default 16)", () => {
         ).toBe(false);
     });
 
-    it("gives the list's SQL the same defaults and steps, under both vocabularies", () => {
-        expect(Object.fromEntries(defaultLateThresholds())).toEqual({
-            COLLECT: 120,
-            DELIVERY: 1440,
-            PICKUP: 120,
-            LOCAL_DELIVERY: 1440,
-            SHIPPING: 2880,
+    it("gives the list's SQL each stored value's type and the same steps, under both vocabularies", () => {
+        expect(Object.fromEntries(lateStoredValues())).toEqual({
+            COLLECT: "PICKUP",
+            DELIVERY: "LOCAL_DELIVERY",
+            PICKUP: "PICKUP",
+            LOCAL_DELIVERY: "LOCAL_DELIVERY",
+            SHIPPING: "SHIPPING",
         });
         expect(LATE_STAGES).toEqual(["NEW", "PREPARING", "READY"]);
         expect(LATE_STATUSES).toEqual(["PENDING", "PROCESSING"]);

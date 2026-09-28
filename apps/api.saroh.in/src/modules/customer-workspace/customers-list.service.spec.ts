@@ -254,6 +254,14 @@ describe("CustomersListService.unlinked", () => {
         );
     });
 
+    it("refuses the storefront filter without order:read, as the list does (review C-5)", async () => {
+        const { service, db } = make();
+        await expect(
+            service.unlinked(ctx(["contact:read"]), { store: "s1" }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(db.$queryRaw).not.toHaveBeenCalled();
+    });
+
     it("names the contact holding their email, and leaves order figures out without order:read", async () => {
         const { service, db } = make();
         db.$queryRaw.mockImplementation((...args: unknown[]) => {

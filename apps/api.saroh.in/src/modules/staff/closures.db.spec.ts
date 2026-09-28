@@ -227,6 +227,43 @@ describe("business closed (real database)", () => {
         expect(kept.status).toBe("CONFIRMED");
     });
 
+    it("names a booking in a part-day range however many fall outside its hours (K-4)", async () => {
+        // A thousand mornings between the range's first and last afternoon:
+        // inside its bounds, outside its hours. Read soonest-first and then
+        // filtered, they crowded out the afternoon booking.
+        const morning = at(4, 9);
+        await prisma.booking.createMany({
+            data: Array.from({ length: 1_000 }, () => ({
+                organizationId: org.organizationId,
+                serviceId: walkInId,
+                startAt: morning,
+                endAt: new Date(morning.getTime() + 3_600_000),
+                timezone: "UTC",
+                snapshot: {},
+            })),
+        });
+        const afternoon = at(5, 15);
+        const inRange = await prisma.booking.create({
+            data: {
+                organizationId: org.organizationId,
+                serviceId: walkInId,
+                startAt: afternoon,
+                endAt: new Date(afternoon.getTime() + 3_600_000),
+                timezone: "UTC",
+                snapshot: {},
+            },
+        });
+
+        const preview = await closures.preview(org, {
+            fromDate: date(3),
+            toDate: date(5),
+            startMinute: 14 * 60,
+            endMinute: 18 * 60,
+        });
+
+        expect(preview.affected.map((b) => b.id)).toEqual([inRange.id]);
+    });
+
     it("refuses a booking by hand, or a move, into a closure", async () => {
         const c = await contact();
         const made = await bookings.bookByHand(org, walkInId, {

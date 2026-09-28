@@ -8,7 +8,7 @@ import { storedValuesOf } from "./fulfilment";
 import {
     computedConditions,
     dayRange,
-    DEFAULT_LATE_AFTER_MINUTES,
+    lateSettingsJoin,
     lateSql,
     orderConditions,
     paymentStandingOf,
@@ -41,14 +41,18 @@ describe("fulfilment words (read through fulfilment.ts, B2a)", () => {
         ]);
     });
 
-    it("judges late by each type's default, under both words (default 16)", () => {
-        expect(DEFAULT_LATE_AFTER_MINUTES).toEqual({
-            COLLECT: 120,
-            PICKUP: 120,
-            DELIVERY: 1440,
-            LOCAL_DELIVERY: 1440,
-            SHIPPING: 2880,
-        });
+    it("judges late by the type's storefront column, under both words (B17)", () => {
+        const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
+        for (const column of [
+            'ss."pickupLateAfterMinutes"',
+            'ss."localDeliveryLateAfterMinutes"',
+            'ss."shippingLateAfterMinutes"',
+        ]) {
+            expect(s.sql).toContain(column);
+        }
+        expect(lateSettingsJoin().sql).toBe(
+            'LEFT JOIN "StoreSettings" ss ON ss."storeId" = o."storeId"',
+        );
     });
 });
 
@@ -166,6 +170,17 @@ describe("the conditions", () => {
         );
     });
 
+    it("narrows to orders placed since an instant, bound as the stored wall-clock", () => {
+        const s = orderConditions(
+            "org_1",
+            { since: new Date("2026-09-26T10:15:00.000Z") },
+            { contact: false },
+            {},
+        );
+        expect(text(s)).toContain(`o."createdAt" >= ?::timestamp`);
+        expect(s.values).toContain("2026-09-26T10:15:00.000");
+    });
+
     it("binds dates as the UTC wall-clock Prisma stores, never through the session zone", () => {
         const s = ts(new Date("2026-09-01T00:30:00.000Z"));
         expect(s.sql).toBe("?::timestamp");
@@ -182,7 +197,7 @@ describe("the conditions", () => {
         expect(tabCondition(undefined).sql).toBe("TRUE");
     });
 
-    it("gives every type with a late rule its default threshold", () => {
+    it("falls back to each type's default for a storefront without settings", () => {
         const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
         expect(s.values).toEqual(
             expect.arrayContaining([
@@ -220,6 +235,12 @@ describe("ListOrdersQuery", () => {
         expect(q.tab).toBe("open");
     });
 
+    it("takes since as an ISO instant, and a blank one as none", async () => {
+        const q = await parse({ since: "2026-09-26T10:15:00.000Z" });
+        expect(q.since).toBe("2026-09-26T10:15:00.000Z");
+        expect((await parse({ since: "" })).since).toBeUndefined();
+    });
+
     it("treats a blank storefront as every storefront", async () => {
         const q = await parse({ storeId: "" });
         expect(q.storeId).toBeUndefined();
@@ -232,6 +253,8 @@ describe("ListOrdersQuery", () => {
         { tab: "abandoned" },
         { late: "yes" },
         { from: "1 Sep" },
+        { since: "yesterday" },
+        { since: "2026-02-30T10:00:00Z" },
         { v: "3" },
         { attention: "true" },
     ])("refuses %o", async (value) => {

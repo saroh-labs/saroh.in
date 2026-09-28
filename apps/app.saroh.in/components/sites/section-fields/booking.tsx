@@ -24,9 +24,9 @@ import { ServicesLoadNotice } from "./services-load-notice";
  * a repo standard of 400 — and which every new block type had to edit. Adding a
  * block is now adding a file.
  *
- * Moved verbatim: this is the same markup, in the same order, with the same
- * handlers. The refactor changes where the code lives and nothing about what it
- * does.
+ * No "Submit button label" or "Success message": the block has drawn
+ * neither since A9, when booking moved to the booking page (`/book`) and its
+ * sign-in. A stored section may still carry them; they are kept, not edited.
  */
 export function BookingFields({
     section,
@@ -100,21 +100,7 @@ export function BookingFields({
                     value={c.description ?? ""}
                     onChange={(e) => patch({ description: e.target.value })}
                     rows={2}
-                    placeholder="Pick a slot that suits you and we'll confirm by email."
-                />
-            </Field>
-            <Field label="Submit button label">
-                <Input
-                    value={c.submitLabel ?? ""}
-                    onChange={(e) => patch({ submitLabel: e.target.value })}
-                    placeholder="Confirm booking"
-                />
-            </Field>
-            <Field label="Success message">
-                <Input
-                    value={c.successMessage ?? ""}
-                    onChange={(e) => patch({ successMessage: e.target.value })}
-                    placeholder="You're booked — check your email."
+                    placeholder="Pick a time that suits you."
                 />
             </Field>
         </div>

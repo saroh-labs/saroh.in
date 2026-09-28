@@ -130,8 +130,84 @@ describe("counting and moving", () => {
         });
     });
 
-    it("moves nothing by default until a unit adds its mover", async () => {
-        expect(await countUnlinkMoves(tx, scope)).toEqual(new Map());
+    it("moves bookings the account made, and their invoices, by default (A9, review C-1)", () => {
+        expect(UNLINK_MOVERS.map((m) => [m.key, m.model])).toEqual([
+            ["bookings", "Booking"],
+            ["invoices", "Booking"],
+        ]);
+    });
+
+    it("counts and moves only what the account made on that contact since it linked", async () => {
+        const booking = {
+            count: jest.fn().mockResolvedValue(2),
+            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        };
+        const invoice = {
+            count: jest.fn().mockResolvedValue(0),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        };
+        const db = { booking, invoice } as unknown as Prisma.TransactionClient;
+        const where = {
+            organizationId: "org_1",
+            customerAccountId: "acc_1",
+            contactId: "c_farah",
+            createdAt: { gte: scope.since },
+        };
+
+        expect((await countUnlinkMoves(db, scope)).get("bookings")).toBe(2);
+        expect(booking.count).toHaveBeenCalledWith({ where });
+
+        await applyUnlinkMoves(db, { ...scope, toContactId: "c_new" });
+        expect(booking.updateMany).toHaveBeenCalledWith({
+            where,
+            data: { contactId: "c_new" },
+        });
+    });
+
+    it("moves the invoices billing those bookings, and their corrections, off the contact being left (review C-1)", async () => {
+        const invoice = {
+            count: jest.fn().mockResolvedValue(1),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        };
+        const booking = {
+            count: jest.fn().mockResolvedValue(1),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        };
+        const db = { booking, invoice } as unknown as Prisma.TransactionClient;
+        const theirBooking = (on: string[]) => ({
+            organizationId: "org_1",
+            customerAccountId: "acc_1",
+            contactId: { in: on },
+            createdAt: { gte: scope.since },
+        });
+
+        const counts = await countUnlinkMoves(db, scope);
+        expect(counts.get("invoices")).toBe(1);
+        expect(invoice.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                contactId: "c_farah",
+                OR: [
+                    { booking: theirBooking(["c_farah"]) },
+                    { relatedInvoice: { booking: theirBooking(["c_farah"]) } },
+                ],
+            },
+        });
+
+        await applyUnlinkMoves(db, { ...scope, toContactId: "c_new" });
+        // The bookings may already sit on the new contact.
+        const both = theirBooking(["c_farah", "c_new"]);
+        expect(invoice.updateMany).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                contactId: "c_farah",
+                OR: [{ booking: both }, { relatedInvoice: { booking: both } }],
+            },
+            data: { contactId: "c_new" },
+        });
+        expect(unlinkSentence(unlinkMoves(UNLINK_MOVERS, counts))).toBe(
+            "1 booking and 1 invoice they made online move with them.",
+        );
     });
 });
 

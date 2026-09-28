@@ -235,6 +235,40 @@ describe("webhook success on an invoice intent", () => {
         expect(paidInvoice).toBeLessThan(paidBooking ?? 0);
     });
 
+    it("owes back a pay link paid after its booking was cancelled (K-1)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            source: "BOOKING",
+            bookingId: "bk_1",
+        });
+        // The intent's lock, the invoice's, then the booking's: cancelled.
+        queryRaw
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{ status: "CANCELLED" }]);
+
+        const result = await deliver(bodyOf());
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(queryRaw).toHaveBeenCalledTimes(3);
+        // The money was taken, so the intent succeeded - but the invoice
+        // stays issued for the business to void, the booking untouched.
+        expect(intentUpdate).toHaveBeenCalledWith({
+            where: { id: "pi_inv_1" },
+            data: { status: "SUCCEEDED" },
+        });
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(markBookingPaidInTx).not.toHaveBeenCalled();
+        expect(attemptCreate).toHaveBeenCalledTimes(1);
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: { invoiceStatus: "CANCELLED_BOOKING" },
+            }),
+        });
+    });
+
     it("leaves bookings alone for any other invoice", async () => {
         intentFindFirst.mockResolvedValue({ ...INTENT });
         invoiceFindFirst.mockResolvedValue({

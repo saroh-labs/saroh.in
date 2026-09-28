@@ -7,6 +7,7 @@ jest.mock("@saroh/database", () => {
         prisma: {
             customerSubscription: { findMany: jest.fn() },
             job: { create: jest.fn(), count: jest.fn() },
+            $queryRaw: jest.fn(),
         },
     };
 });
@@ -25,6 +26,7 @@ import type { SubscriptionsService } from "./subscriptions.service";
 const findMany = prisma.customerSubscription.findMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
+const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 
 const renewOne = jest.fn();
 const handler = new SubscriptionRenewHandler({
@@ -44,6 +46,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers({ now: new Date("2026-10-01T02:00:00Z") });
     findMany.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([]);
     jobCreate.mockResolvedValue({});
     renewOne.mockResolvedValue("renewed");
 });
@@ -141,6 +144,19 @@ describe("subscription.renew", () => {
             expect.stringContaining('"resumed":1,"refused":1'),
         );
         log.mockRestore();
+    });
+
+    it("leaves out pauses already refused for Payments being off (review S-4)", async () => {
+        const now = new Date("2026-10-01T02:00:00Z");
+        queryRaw.mockResolvedValue([{ id: "parked_1" }, { id: "parked_2" }]);
+        await handler.handle(JOB);
+        expect(queryRaw).toHaveBeenCalledTimes(1);
+        const ors = findMany.mock.calls[0]![0].where.OR;
+        expect(ors[2]).toEqual({
+            status: "PAUSED",
+            pausedUntil: { lte: now },
+            id: { notIn: ["parked_1", "parked_2"] },
+        });
     });
 
     it("schedules the next run an hour on", async () => {

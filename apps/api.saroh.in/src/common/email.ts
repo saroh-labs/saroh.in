@@ -1,11 +1,12 @@
 import type { Transporter } from "nodemailer";
 import nodemailer from "nodemailer";
 
-import { env } from "../env";
+import { declaredNodeEnv, env } from "../env";
 import {
     codeSenderName,
     codeSubject,
 } from "../modules/site-accounts/sender-name";
+import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -459,6 +460,22 @@ const SITE_CODES_FROM_ADDRESS = env.SITE_CODES_EMAIL_FROM ?? "codes@saroh.in";
  * credentials. Either way a transport of its own with short timeouts, so a
  * stuck provider answers inside the request and the caller can retry.
  */
+/**
+ * Whether the code stream's own SMTP connection starts in TLS (review M-3).
+ * `SITE_CODES_SMTP_SECURE` says so outright; unset, the port decides: 465
+ * is implicit TLS, anything else (587, 25, 2525) starts plain and upgrades
+ * with STARTTLS. Never `SMTP_SECURE`: that belongs to the identity stream,
+ * whose port may differ, and a TLS hello on 587 fails every send.
+ */
+export function siteCodesSmtpSecure(
+    port: number,
+    secure: string | undefined,
+): boolean {
+    if (secure === "true") return true;
+    if (secure === "false") return false;
+    return port === 465;
+}
+
 function getSiteCodesTransporter(): Transporter | null {
     const own = env.SITE_CODES_SMTP_HOST !== undefined;
     const host = own
@@ -472,10 +489,14 @@ function getSiteCodesTransporter(): Transporter | null {
         ? env.SITE_CODES_SMTP_PASS
         : (env.SMTP_PASS ?? env.USER_PASSWORD);
     if (!host || !user || !pass) return null;
+    const portNumber = port ? Number(port) : 465;
     return nodemailer.createTransport({
         host,
-        port: port ? Number(port) : 465,
-        secure: env.SMTP_SECURE !== "false",
+        port: portNumber,
+        // The identity fallback connects exactly as the identity transport does.
+        secure: own
+            ? siteCodesSmtpSecure(portNumber, env.SITE_CODES_SMTP_SECURE)
+            : env.SMTP_SECURE !== "false",
         auth: { user, pass },
         connectionTimeout: 5_000,
         greetingTimeout: 5_000,
@@ -496,8 +517,12 @@ const siteCodesTransporter = getSiteCodesTransporter();
  * booking that cannot be made: the caller retries and alerts. Nothing here
  * logs the address or the code outside development.
  *
- * With no SMTP, development prints the code (the fake transport), or fails
- * every send when `SITE_CODES_EMAIL_FAKE=fail`; anywhere else nothing left.
+ * With no SMTP, development prints the code (the fake transport) and leaves
+ * it in the temp-directory outbox a local browser test reads
+ * (`site-code-outbox.ts`), or fails every send when
+ * `SITE_CODES_EMAIL_FAKE=fail`. Outside development the fake runs only when
+ * `SITE_CODES_EMAIL_FAKE` names it, and never in production; anywhere else
+ * nothing left.
  */
 export async function sendSiteSignInCodeEmail(
     to: string,
@@ -505,11 +530,14 @@ export async function sendSiteSignInCodeEmail(
 ): Promise<EmailOutcome> {
     const { code, businessName, minutes } = details;
     if (!siteCodesTransporter) {
-        if (env.NODE_ENV === "development") {
+        // NODE_ENV as declared, not the schema's default (review A-4).
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
             if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
             console.info(
                 `[Site sign-in code] (no SMTP) ${to} for ${businessName}: code ${code}`,
             );
+            // Where a browser test on this machine picks it up (A9).
+            writeSiteCodeOutbox(to, code);
             return "sent";
         }
         return "not-configured";

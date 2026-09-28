@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ZOOMS } from "@/components/sites/editor-constants";
 import {
     CANVAS_PADDING,
+    CANVAS_PADDING_NARROW,
     editorColumns,
     fitScaleFor,
+    narrowColumns,
     zoomScaleFor,
 } from "@/components/sites/editor/use-editor-viewport";
 
@@ -26,6 +28,18 @@ describe("fitScaleFor", () => {
 
     it("fits a tablet frame (768px) into a canvas narrower than it", () => {
         expect(fitScaleFor("tablet", 600)).toBe(552 / 768);
+    });
+
+    it("fits to the whole canvas in Preview, which has no padding (G5)", () => {
+        expect(fitScaleFor("phone", 300, 0)).toBe(300 / 375);
+        expect(fitScaleFor("desktop", 300, 0)).toBe(1);
+    });
+
+    it("fits to the design's narrower padding below the desk width (G4)", () => {
+        expect(CANVAS_PADDING_NARROW).toBe(28);
+        expect(fitScaleFor("phone", 300, CANVAS_PADDING_NARROW)).toBe(
+            272 / 375,
+        );
     });
 
     it("reports more than 1 for a canvas wider than the frame", () => {
@@ -56,5 +70,11 @@ describe("editorColumns", () => {
         expect(editorColumns(232, 320)).toBe(
             "min(232px, calc((100vw - 20rem - 2px) * 0.4203)) 1px minmax(20rem,1fr) 1px min(320px, calc((100vw - 20rem - 2px) * 0.5797))",
         );
+    });
+});
+
+describe("narrowColumns", () => {
+    it("shares the width between the rail and the page only (G4)", () => {
+        expect(narrowColumns(232)).toBe("min(232px, 40vw) 1px minmax(0,1fr)");
     });
 });

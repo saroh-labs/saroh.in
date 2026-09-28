@@ -1,7 +1,7 @@
 /**
  * Open now, and when next, from a place's week (G8, R15).
  *
- * THE ONE COPY. The Visit us block, the header's "Open now · closes 9pm"
+ * THE ONE COPY. The Visit us block, the hero's "Open now · closes 9pm"
  * (G18) and the booking page's header facts (E6) all say whether a business
  * is open, and three rules would be three answers to one question. Pure, so
  * the rule is tested without a clock, a zone database or a page.
@@ -90,11 +90,11 @@ function minutes(clock: string): number {
     return Number(h) * 60 + Number(m);
 }
 
-/** The weekday and minute of the day at `now` on the zone's wall clock. */
+/** The weekday, date and minute of the day at `now` on the zone's wall clock. */
 function wallClock(
     now: Date,
     timeZone: string,
-): { day: Weekday; minute: number } {
+): { day: Weekday; date: string; minute: number } {
     let parts: Intl.DateTimeFormatPart[];
     try {
         parts = zoneFormat(timeZone).formatToParts(now);
@@ -106,17 +106,28 @@ function wallClock(
     const day = (part("weekday") ?? "Mon").slice(0, 3).toUpperCase() as Weekday;
     // `h23` still says "24" for midnight in some engines.
     const hour = Number(part("hour") ?? "0") % 24;
-    return { day, minute: hour * 60 + Number(part("minute") ?? "0") };
+    const date = `${part("year") ?? "1970"}-${part("month") ?? "01"}-${part("day") ?? "01"}`;
+    return { day, date, minute: hour * 60 + Number(part("minute") ?? "0") };
 }
 
 function zoneFormat(timeZone: string): Intl.DateTimeFormat {
     return new Intl.DateTimeFormat("en-US", {
         timeZone,
         weekday: "short",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
     });
+}
+
+/** A `YYYY-MM-DD` moved by whole days, read as a calendar date (no zone). */
+function addDays(date: string, by: number): string {
+    const d = new Date(`${date}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + by);
+    return d.toISOString().slice(0, 10);
 }
 
 /** The entry for a day, or nothing when the day is closed or not in the week. */
@@ -140,18 +151,27 @@ function shift(day: Weekday, by: number): Weekday {
  * Whether the place is open at `now`, and when it closes or next opens.
  * `null` when there is nothing true to say: no week saved, or a week in
  * which every day is closed.
+ *
+ * `closedDates` are days (`YYYY-MM-DD` in the zone) the business has marked
+ * closed (E3, G18): each reads as a closed day, so the line never says
+ * "Open now" on a holiday or "opens Mon" when Monday is shut.
  */
 export function openState(
     week: readonly OpeningHoursDay[] | null | undefined,
     now: Date,
     timeZone: string,
+    closedDates: readonly string[] = [],
 ): OpenState | null {
     if (!week || week.length === 0) return null;
     if (!WEEK.some((day) => openDay(week, day))) return null;
 
-    const { day, minute } = wallClock(now, timeZone);
-    const today = openDay(week, day);
-    const yesterday = openDay(week, shift(day, -1));
+    const { day, date, minute } = wallClock(now, timeZone);
+    const shut = new Set(closedDates);
+    /** A day's hours, unless that date is closed. */
+    const hoursOn = (weekday: Weekday, ahead: number) =>
+        shut.has(addDays(date, ahead)) ? null : openDay(week, weekday);
+    const today = hoursOn(day, 0);
+    const yesterday = hoursOn(shift(day, -1), -1);
 
     // Last night's hours still running past midnight.
     if (
@@ -181,7 +201,7 @@ export function openState(
     // next opening of a place that opens one day a week.
     for (let ahead = 1; ahead <= 7; ahead++) {
         const next = shift(day, ahead);
-        const d = openDay(week, next);
+        const d = hoursOn(next, ahead);
         if (d)
             return {
                 open: false,

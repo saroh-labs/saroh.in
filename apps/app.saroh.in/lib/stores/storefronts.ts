@@ -1,6 +1,7 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 import type { StorefrontAllowance } from "@/lib/business-limits";
+import type { StorefrontFulfilmentType } from "./fulfilment-types";
 
 /**
  * Sell → Storefronts: every storefront in the business and the settings that
@@ -33,6 +34,17 @@ export interface OpeningHoursDay {
     closed: boolean;
 }
 
+/** The physical ways a storefront's orders leave (DEC-045), in table order. */
+// The ways a storefront offers live in a module with no server code, so a
+// client component can read them without pulling this API client in.
+export {
+    STOREFRONT_FULFILMENT_TYPES,
+    type StorefrontFulfilmentType,
+} from "./fulfilment-types";
+
+/** When a storefront's orders count as late, in minutes, per way (B17). */
+export type LateAfterMinutes = Record<StorefrontFulfilmentType, number>;
+
 export interface StorefrontProvider {
     provider: string;
     status: string;
@@ -58,6 +70,13 @@ export interface StorefrontSettings extends StorefrontSummary {
     address: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
+    /**
+     * The ways its orders leave (B17's chips). Absent from an API that
+     * predates them, when the screen shows the old toggles instead.
+     */
+    fulfilmentTypes?: StorefrontFulfilmentType[];
+    /** When its orders count as late, per way; absent from an older API. */
+    lateAfterMinutes?: LateAfterMinutes;
     tipsEnabled: boolean;
     guestCheckout: boolean;
     pausedAt: string | null;
@@ -83,8 +102,50 @@ export type StorefrontInput = Partial<
         | "tipsEnabled"
         | "guestCheckout"
         | "checkoutProvider"
-    > & { paused: boolean }
+        | "fulfilmentTypes"
+    > & { paused: boolean; lateAfterMinutes: Partial<LateAfterMinutes> }
 >;
+
+/** A storefront Orders tells about the new Pick-up default (B17). */
+export interface LateRuleNotice {
+    storeId: string;
+    name: string;
+    pickupLateAfterMinutes: number;
+}
+
+export interface LateRuleNotices {
+    notices: LateRuleNotice[];
+    /** May change the setting (`store:write`); else told who can. */
+    canChange: boolean;
+}
+
+/**
+ * The storefronts whose Orders should show the one-time notice. `null` when
+ * it cannot be read — the notice is a nicety, so Orders shows without it.
+ */
+export async function getLateRuleNotices(): Promise<LateRuleNotices | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/storefronts/late-rule-notices`);
+        if (!res.ok) return null;
+        return (await res.json()) as LateRuleNotices;
+    } catch {
+        return null;
+    }
+}
+
+/** Dismiss the notice for one storefront, for everyone who works there. */
+export async function dismissLateRuleNotice(
+    storeId: string,
+): Promise<CrmResult<object>> {
+    return mutate<object>(
+        `/storefronts/${encodeURIComponent(storeId)}/late-rule-notice/dismiss`,
+        "POST",
+        {},
+        "Could not put that notice away.",
+    );
+}
 
 /**
  * How many storefronts the business has and how many its plan allows

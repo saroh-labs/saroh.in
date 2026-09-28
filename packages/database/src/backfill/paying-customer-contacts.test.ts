@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { PrismaClient } from "@prisma/client";
+
 import {
+    backfillPayingCustomerContacts,
     linkPayingCustomer,
     normaliseBackfillEmail,
 } from "./paying-customer-contacts";
@@ -158,5 +161,32 @@ describe("normaliseBackfillEmail", () => {
         expect(normaliseBackfillEmail("merged+c1@removed.invalid")).toBeNull();
         expect(normaliseBackfillEmail("REMOVED+c1@Removed.Invalid")).toBeNull();
         expect(normaliseBackfillEmail(null)).toBeNull();
+    });
+});
+
+describe("backfillPayingCustomerContacts", () => {
+    it("gives each batch's transaction a minute, not Prisma's 5-second default", async () => {
+        const $transaction = vi.fn().mockResolvedValue(["made"]);
+        const prisma = {
+            order: {
+                findMany: vi
+                    .fn()
+                    .mockResolvedValue([{ organizationId: "org_1" }]),
+            },
+            customer: {
+                findMany: vi
+                    .fn()
+                    .mockResolvedValue([{ id: "c1", createdAt: new Date() }]),
+            },
+            $transaction,
+        } as unknown as PrismaClient;
+
+        const report = await backfillPayingCustomerContacts(prisma);
+
+        expect($transaction).toHaveBeenCalledWith(expect.any(Function), {
+            timeout: 60_000,
+            maxWait: 10_000,
+        });
+        expect(report.made).toBe(1);
     });
 });

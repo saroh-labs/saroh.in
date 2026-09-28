@@ -282,6 +282,12 @@ export function orderBySql(sort: CustomerSort): Prisma.Sql {
  * Store customers who have paid and whom no contact holds (C2 left them for
  * the merchant: a contact already held their email). `storeId` narrows to
  * those who paid at that storefront. Follow with `SELECT … FROM u`.
+ *
+ * Driven from the business's own paid orders, so it never reads another
+ * business's store customers (review C-2). A store customer with no usable
+ * email (blank, or a reserved placeholder) is left out: C2 makes no contact
+ * for them and nobody holds their email, so no link is coming — they are a
+ * walk-in, as the list treats one (review C-4).
  */
 export function unlinkedCte(
     organizationId: string,
@@ -290,18 +296,22 @@ export function unlinkedCte(
     const atStore = storeId
         ? Prisma.sql`AND o."storeId" = ${storeId}`
         : Prisma.empty;
-    return Prisma.sql`WITH u AS (
+    return Prisma.sql`WITH paid AS (
+        SELECT o."customerId" AS id, COUNT(*)::int AS orders,
+            MAX(o."createdAt") AS last_at
+        FROM "Order" o
+        WHERE o."organizationId" = ${organizationId}
+          AND o."customerId" IS NOT NULL
+          AND ${PAID_ORDER} ${atStore}
+        GROUP BY o."customerId"
+    ), u AS (
         SELECT cu.id, cu."firstName", cu."lastName", cu.email, cu.phone,
             cu."storeId", paid.orders AS paid_orders, paid.last_at
-        FROM "Customer" cu
-        JOIN LATERAL (
-            SELECT COUNT(*)::int AS orders, MAX(o."createdAt") AS last_at
-            FROM "Order" o
-            WHERE o."customerId" = cu.id
-              AND o."organizationId" = ${organizationId}
-              AND ${PAID_ORDER} ${atStore}
-        ) paid ON paid.orders > 0
-        WHERE NOT EXISTS (
+        FROM paid
+        JOIN "Customer" cu ON cu.id = paid.id
+        WHERE btrim(COALESCE(cu.email, '')) <> ''
+          AND NOT ${reservedEmail(Prisma.sql`cu.email`)}
+          AND NOT EXISTS (
             SELECT 1 FROM "CustomerIdentityLink" l
             WHERE l."customerId" = cu.id
               AND l."organizationId" = ${organizationId}

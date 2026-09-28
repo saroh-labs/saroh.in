@@ -246,6 +246,15 @@ createServer((req, res) => {
             ],
             meta: { organizationId: "org_1" },
         });
+    // The Orders list (B7): a business with none yet, or a read that failed.
+    if (path.endsWith("/orders"))
+        return scenario === "orders-failure"
+            ? reply(500, { error: "fixture" })
+            : reply(200, {
+                  rows: [],
+                  counts: { all: 0, open: 0, refunded: 0 },
+                  nextCursor: null,
+              });
     if (path.endsWith("/settings"))
         return reply(scenario === "failure" ? 500 : 403, { error: "fixture" });
     if (path.endsWith("/sites/site_1"))

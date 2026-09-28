@@ -3,7 +3,7 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
-import { pauseEndedWhere } from "./pause-until";
+import { pauseEndedWhere, refusedPauseIds } from "./pause-until";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 import type { RenewOutcome } from "./subscriptions.service";
 import { SubscriptionsService } from "./subscriptions.service";
@@ -41,7 +41,8 @@ export const RENEW_ROUNDS = 25;
  *
  * A pause with an end date (D8) is picked up on that date and resumed, as a
  * manual resume would. A resume that would restart billing with Payments off
- * is refused and left paused (`pause-until.ts`).
+ * is refused and left paused (`pause-until.ts`), and once refused it is not
+ * fetched again until Payments is back on.
  */
 @Injectable()
 export class SubscriptionRenewHandler {
@@ -77,6 +78,9 @@ export class SubscriptionRenewHandler {
      */
     async renewDue(now: Date): Promise<boolean> {
         const seen: string[] = [];
+        // Pauses already refused for Payments being off would sort first
+        // every time and change nothing, so they sit out (review S-4).
+        const refused = await refusedPauseIds(prisma, now);
         const counts: Record<RenewOutcome | "failed", number> = {
             renewed: 0,
             advanced: 0,
@@ -110,8 +114,8 @@ export class SubscriptionRenewHandler {
                             cancelAtPeriodEnd: true,
                         },
                         // A pause whose end date has come resumes (D8) —
-                        // with Payments off too, which may refuse it.
-                        pauseEndedWhere(now),
+                        // with Payments off too, which may refuse it once.
+                        pauseEndedWhere(now, refused),
                     ],
                 },
                 orderBy: { currentPeriodEnd: "asc" },

@@ -5,7 +5,25 @@ vi.mock("next/headers", () => ({
     headers: vi.fn(),
 }));
 
-import { codeResult, optionsResult, sessionAnswer } from "./sign-in";
+import {
+    codeCallFailed,
+    codeResult,
+    optionsResult,
+    sessionAnswer,
+} from "./sign-in";
+
+describe("codeCallFailed (review M-1)", () => {
+    it("tells the customer the code couldn't be sent when this server can't sign the relay", () => {
+        expect(codeCallFailed("unconfigured")).toEqual({
+            ok: false,
+            reason: "unavailable",
+        });
+        expect(codeCallFailed("unreachable")).toEqual({
+            ok: false,
+            reason: "error",
+        });
+    });
+});
 
 /**
  * What each of the API's sign-in answers means to the sheet (round-2 plan
@@ -103,10 +121,11 @@ describe("sessionAnswer", () => {
             reason: "merged",
             signsInAs: "f•••@example.in",
         });
-        expect(sessionAnswer(403, {})).toEqual({
-            ok: false,
-            reason: "blocked",
-        });
+        expect(
+            sessionAnswer(403, {
+                error: { statusCode: 403, details: { reason: "blocked" } },
+            }),
+        ).toEqual({ ok: false, reason: "blocked" });
         expect(
             sessionAnswer(429, {
                 details: { reason: "limit", retryAfter: 90 },
@@ -115,6 +134,25 @@ describe("sessionAnswer", () => {
         expect(sessionAnswer(502, null)).toEqual({
             ok: false,
             reason: "error",
+        });
+    });
+});
+
+describe("sessionAnswer — a business that isn't taking sign-ins (review A-7)", () => {
+    it("reads a 403 without the blocked reason as closed, not as the customer blocked", () => {
+        // The API's lifecycle gate: ORGANIZATION_NOT_ACTIVE, no details.
+        expect(
+            sessionAnswer(403, {
+                error: {
+                    code: "FORBIDDEN",
+                    statusCode: 403,
+                    message: "This business is suspended",
+                },
+            }),
+        ).toEqual({ ok: false, reason: "closed" });
+        expect(sessionAnswer(403, null)).toEqual({
+            ok: false,
+            reason: "closed",
         });
     });
 });
@@ -151,5 +189,50 @@ describe("optionsResult", () => {
     it("refuses a shape it doesn't know", () => {
         expect(optionsResult(null)).toBe(null);
         expect(optionsResult({ businessName: "Kavi" })).toBe(null);
+    });
+});
+
+/**
+ * The API wraps every error in its envelope (`AllExceptionsFilter`):
+ * `{ error: { code, message, statusCode, correlationId, details } }`. The
+ * reasons live at `error.details`, and each one must still be read there
+ * (A9: the booking page's sign-in runs against the real API).
+ */
+describe("answers in the API's error envelope", () => {
+    const envelope = (status: number, details: Record<string, unknown>) => ({
+        error: {
+            code: "ERROR",
+            message: "Words for Saroh, not for the customer",
+            statusCode: status,
+            correlationId: "cid_1",
+            details,
+        },
+    });
+
+    it("reads a challenge, a wait and a code that couldn't be sent", () => {
+        expect(
+            codeResult(
+                400,
+                envelope(400, { reason: "challenge", siteKey: "0x4AAA" }),
+            ),
+        ).toEqual({ ok: false, reason: "challenge", siteKey: "0x4AAA" });
+        expect(
+            codeResult(429, envelope(429, { reason: "wait", retryAfter: 540 })),
+        ).toEqual({ ok: false, reason: "wait", retryAfterSeconds: 540 });
+        expect(
+            codeResult(503, envelope(503, { reason: "unavailable" })),
+        ).toEqual({ ok: false, reason: "unavailable" });
+    });
+
+    it("tells a wrong code from an expired one, and reads a merge", () => {
+        expect(
+            sessionAnswer(400, envelope(400, { reason: "invalid" })),
+        ).toEqual({ ok: false, reason: "invalid" });
+        expect(
+            sessionAnswer(400, envelope(400, { reason: "expired" })),
+        ).toEqual({ ok: false, reason: "expired" });
+        expect(
+            sessionAnswer(409, envelope(409, { signsInAs: "f…@example.in" })),
+        ).toEqual({ ok: false, reason: "merged", signsInAs: "f…@example.in" });
     });
 });

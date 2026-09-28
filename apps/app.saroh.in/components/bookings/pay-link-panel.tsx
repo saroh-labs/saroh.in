@@ -77,7 +77,9 @@ export function PayLinkPanel({
                     </div>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                         Send it to them however you talk. The booking shows
-                        unpaid until they pay, and cancelling it stops the link.
+                        unpaid until they pay. Cancelling it stops the link; a
+                        payment they&apos;d already started shows on Home as one
+                        to refund.
                     </p>
                 </>
             ) : (

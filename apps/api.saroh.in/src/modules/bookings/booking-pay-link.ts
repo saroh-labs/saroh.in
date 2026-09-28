@@ -82,6 +82,7 @@ export async function bookingPayLinkInTx(
             id: true,
             status: true,
             paidWith: true,
+            courseEnrollmentId: true,
             startAt: true,
             timezone: true,
             contactId: true,
@@ -108,6 +109,13 @@ export async function bookingPayLinkInTx(
     if (booking.status === "PENDING") {
         throw new ConflictException(
             "This booking is waiting on the customer's own online payment.",
+        );
+    }
+    // A course's session is paid for with the course, on its enrolment's
+    // invoice (ADR-007); a link per session would charge for it twice.
+    if (booking.courseEnrollmentId) {
+        throw new ConflictException(
+            "This session is part of a course, so it's paid for with the course.",
         );
     }
     if (booking.paidWith && PAID_ALREADY.includes(booking.paidWith)) {

@@ -385,4 +385,33 @@ describe("Stock checks (DB)", () => {
         );
         expect(next.checks.map((c) => c.key)).not.toContain(ended);
     });
+
+    it("Home's short read, filtered in SQL, is the list's open SHORT checks (H-4)", async () => {
+        // Below zero and promised: short by what is promised. Below zero and
+        // promised nothing: not short. Covered exactly: not short.
+        const below = await track(await product("Bagel", null), 0);
+        await prisma.stockLevel.update({
+            where: { id: below },
+            data: { onHand: -2, promised: 1 },
+        });
+        const oversold = await track(await product("Muffin", null), 0);
+        await prisma.stockLevel.update({
+            where: { id: oversold },
+            data: { onHand: -1 },
+        });
+        const covered = await track(await product("Scone", null), 4);
+        await prisma.stockLevel.update({
+            where: { id: covered },
+            data: { promised: 4 },
+        });
+
+        const shortKeys = (await checks.list(owner())).checks
+            .filter((c) => c.kind === "SHORT")
+            .map((c) => c.key)
+            .sort();
+        const home = await checks.openShort(orgId);
+        expect(home.map((c) => c.key).sort()).toEqual(shortKeys);
+        expect(shortKeys).toContain(`short:${below}`);
+        expect(shortKeys).not.toContain(`short:${covered}`);
+    });
 });

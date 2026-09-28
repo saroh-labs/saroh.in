@@ -296,7 +296,8 @@ describe("the kitchen flow (real database)", () => {
         const order = await paidOrder();
         const read = await kitchen.read(member, order.id);
         expect(read.money).toBeNull();
-        expect(JSON.stringify(read)).not.toContain("610");
+        // The amount, not the digits: a cuid can hold "610" by chance.
+        expect(JSON.stringify(read)).not.toContain("610.00");
         expect((await kitchen.read(owner, order.id)).money?.total).toBe(
             "610.00",
         );

@@ -13,7 +13,10 @@ export interface AdminFlagView {
      * The global default. `null` means NO FeatureFlag row exists yet — which is
      * not the same as `false`: the flag has never been configured, and
      * `isEnabled` fails closed for it. The distinction matters to an operator
-     * deciding whether a rollout has been started at all.
+     * deciding whether a rollout has been started at all. The first
+     * organization override registers the row as `false` (with an audit row
+     * saying so), because an override can't exist without it: from then on
+     * the rollout has started, and the card reads "Off" plus that override.
      */
     enabledByDefault: boolean | null;
     overrides: {

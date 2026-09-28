@@ -1,4 +1,4 @@
-import { env } from "../../env";
+import { declaredNodeEnv, env } from "../../env";
 
 /**
  * The two server secrets site sign-in needs (round-2 plan A, A2), read at
@@ -11,7 +11,11 @@ import { env } from "../../env";
  *
  * Development and test fall back to fixed, public values so a fresh clone
  * signs in with nothing set. That is an allowlist of environments
- * (`devops-environments-and-flags.md`): anywhere else a missing secret
+ * (`devops-environments-and-flags.md`), and of environments the process was
+ * *told* it runs in: `NODE_ENV` must say `development` or `test` itself
+ * (the dev scripts set it; Jest sets `test`). The schema's `development`
+ * default does not count, so a production host with no `NODE_ENV` is not
+ * mistaken for a laptop (review A-4). Anywhere else a missing secret
  * throws, and the request is a logged 500 rather than a site signing
  * relays with a value anyone can read here.
  */
@@ -20,8 +24,11 @@ const DEV_RELAY_SECRET =
 const DEV_CODE_SECRET =
     "saroh-dev-insecure-site-code-secret-not-for-production";
 
-function devFallbackAllowed(): boolean {
-    return env.NODE_ENV === "development" || env.NODE_ENV === "test";
+/** Whether the public fallbacks may stand in, for `NODE_ENV` as declared. */
+export function devFallbackAllowed(
+    nodeEnv: string | undefined = declaredNodeEnv,
+): boolean {
+    return nodeEnv === "development" || nodeEnv === "test";
 }
 
 function resolve(value: string | undefined, name: string, dev: string): string {

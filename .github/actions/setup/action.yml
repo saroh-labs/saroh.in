@@ -1,0 +1,95 @@
+name: Set up the workspace
+description: >-
+  pnpm, Node from .nvmrc, the dependency install, the Prisma client, and this
+  job's Turbo cache. Every CI job starts the same way, so it lives in one place.
+
+inputs:
+  turbo-cache:
+    description: >-
+      Name of this job's Turbo cache. Each job keeps its own, keyed by commit and
+      restored from the newest earlier one, so a task whose inputs didn't change
+      replays instead of running. Empty skips the cache.
+    required: false
+    default: ""
+  prisma:
+    description: Generate the Prisma client (anything that builds or tests @saroh/database needs it).
+    required: false
+    default: "true"
+  playwright:
+    description: Install Chromium for Playwright, from a cache when the version is unchanged.
+    required: false
+    default: "false"
+  next-cache:
+    description: >-
+      Keep the Next apps' incremental build cache (.next/cache) between runs of
+      this job, so a build recompiles what changed rather than everything.
+      Uses the turbo-cache name.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.9.0
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Prisma generate
+      if: inputs.prisma == 'true'
+      shell: bash
+      run: pnpm --filter @saroh/database generate
+
+    # Turbo's local cache (.turbo/cache). Restored from the newest run of the
+    # same job and saved under this commit, so an unchanged package's lint,
+    # typecheck, test or build is replayed from cache rather than run again.
+    - name: Turbo cache
+      if: inputs.turbo-cache != ''
+      uses: actions/cache@v4
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-
+
+    # Turbo replays a build whose inputs are unchanged; when they did change,
+    # Next's own cache still skips recompiling the modules that didn't.
+    - name: Next build cache
+      if: inputs.next-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: apps/*/.next/cache
+        key: next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        restore-keys: |
+          next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+    # The browser binary is ~150 MB; keyed on the lockfile so it is downloaded
+    # again only when Playwright's version moves. The system libraries it needs
+    # (`--with-deps`) are apt packages and are installed every time.
+    - name: Playwright browser cache
+      if: inputs.playwright == 'true'
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright browser
+      if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm --filter @saroh/e2e install:browsers
+
+    - name: Install Playwright system libraries
+      if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: pnpm --filter @saroh/e2e exec playwright install-deps chromium

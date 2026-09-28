@@ -661,3 +661,17 @@ and then answers in about 90ms (`customers-list.db.spec.ts`). Any timing
 spec over bulk-inserted rows needs the same, or it measures the planner's
 guess rather than the query.
 **Category**: database · tests · `apps/api.saroh.in/src/modules/customer-workspace/customers-list.db.spec.ts`
+
+## Database — Force on for one business answered 500 on a fresh database
+
+**Problem**: In the admin console, Force on for one business answered
+"Internal server error" on production's first day, for every flag.
+**Root cause**: `FeatureFlagOverride.flagKey` is a foreign key to
+`FeatureFlag.key`, and a flag nobody has set globally has no row: the seed
+makes those rows in dev, and a fresh production database never ran the seed.
+The unit spec mocks Prisma, so no foreign key was ever checked.
+**Fix**: `setOverride` registers a missing flag off for everyone first, with
+its own audit row, and answers 404 for an unknown business
+(`feature-flags.service.db.spec.ts`). A path that only works on a seeded
+database needs a real-database spec that starts without the seed.
+**Category**: database · tests · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`

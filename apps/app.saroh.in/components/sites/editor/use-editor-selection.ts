@@ -1,12 +1,15 @@
+import { showError } from "@saroh/ui/toast";
+import { useRouter } from "next/navigation";
 import { useMemo, useSyncExternalStore } from "react";
 
+import { carryPreview } from "@/components/sites/editor/use-editor-viewport";
 import {
     getPlace,
     placeOnServer,
     setPlace,
     subscribe,
 } from "@/lib/sites/editor-prefs";
-import type { Section } from "@/lib/sites/service";
+import type { Section, SitePage } from "@/lib/sites/service";
 
 export type EditorRailTab = "sections" | "style";
 export type EditorInspectorTab = "block" | "feedback";
@@ -82,6 +85,58 @@ export function useEditorSelection({
 }
 
 export type EditorSelection = ReturnType<typeof useEditorSelection>;
+
+/**
+ * Why another page can't be opened yet, or null when it can.
+ *
+ * The editor autosaves, but "autosaves" is not "has saved". Leaving a page
+ * mid-flight would lose whatever had not gone out yet, and the merchant would
+ * have no way to know it happened.
+ */
+export function leavePageMessage(
+    dirty: boolean,
+    /** What is held back from saving ("the Contact block"), if anything. */
+    unfinished?: string,
+): string | null {
+    if (!dirty) return null;
+    return unfinished
+        ? `Finish or remove ${unfinished} before opening another page.`
+        : "Save this page before opening another.";
+}
+
+/**
+ * Open one of the site's pages from the canvas (G5): in Preview, a link to a
+ * page opens it in the editor, as the page menu does, and Preview stays on.
+ */
+export function useOpenPage({
+    siteId,
+    pageId,
+    dirty,
+    unfinished,
+    onSamePage,
+}: {
+    siteId: string;
+    pageId: string;
+    dirty: boolean;
+    unfinished?: string;
+    /** The link was to the page already open. */
+    onSamePage: () => void;
+}) {
+    const router = useRouter();
+    return (page: SitePage) => {
+        if (page.id === pageId) {
+            onSamePage();
+            return;
+        }
+        const blocked = leavePageMessage(dirty, unfinished);
+        if (blocked !== null) {
+            showError(blocked);
+            return;
+        }
+        carryPreview(siteId, page.id);
+        router.push(`/sites/${siteId}?page=${page.id}`);
+    };
+}
 
 /** The selected section and its index, together. */
 export interface ActiveSection {

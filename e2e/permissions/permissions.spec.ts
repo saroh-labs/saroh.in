@@ -203,3 +203,100 @@ test("a denied module explains access instead of saying it is off", async ({
         }),
     ).toBeVisible();
 });
+
+test("someone who can't read or stage orders sees the locked card", async ({
+    page,
+    context,
+}) => {
+    // A Reviewer holds neither `order:read` nor `order:stage` (B7).
+    await scenario(context, "REVIEWER");
+    await page.goto("/commerce/orders");
+    await expect(
+        page.getByRole("heading", { name: "Orders", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("heading", {
+            name: "You do not have access to this",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role in Permission tests is Reviewer, which covers one website and nothing about the business around it. Orders are not part of it.",
+        ),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "The rail does not offer Sell to this role, so you have reached it by address. Ask an Owner or Admin of Permission tests if you need it.",
+        ),
+    ).toBeVisible();
+    // A denial, not a failure: nothing to retry, and no tabs.
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
+        0,
+    );
+    await expect(page.getByText("Couldn't load orders")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Orders" })).toHaveCount(
+        0,
+    );
+
+    // Order Detail's locked card, from a deep link.
+    await page.goto("/commerce/orders/ord_1");
+    await expect(
+        page.getByRole("heading", {
+            name: "You can't open orders",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role is Reviewer, which can see the website but not this. An owner or admin can change that in Team.",
+        ),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("link", { name: "Back to Home", exact: true }),
+    ).toBeVisible();
+});
+
+test("a failed Orders read says so, and is never an empty list", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "orders-failure");
+    await page.goto("/commerce/orders");
+    await expect(
+        page.getByRole("heading", {
+            name: "Couldn't load orders",
+            exact: true,
+        }),
+    ).toBeVisible();
+    // Announced as an alert, not drawn as an empty list.
+    await expect(
+        page.getByRole("alert").filter({
+            hasText:
+                "Orders that were placed are still there and nothing has been changed",
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("button", { name: "Try again", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("No orders yet")).toHaveCount(0);
+    // No tabs or counts around the message: none of them would be true.
+    await expect(page.getByRole("navigation", { name: "Orders" })).toHaveCount(
+        0,
+    );
+});
+
+test("a business with no orders yet is empty, not failed", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "MEMBER");
+    await page.goto("/commerce/orders");
+    await expect(
+        page.getByRole("heading", { name: "No orders yet", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Couldn't load orders")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
+        0,
+    );
+});

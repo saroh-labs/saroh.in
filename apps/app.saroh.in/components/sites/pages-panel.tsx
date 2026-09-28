@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
 import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
 
@@ -62,17 +63,10 @@ export function PagesPanel({
 
     function open(pageId: string) {
         if (pageId === activePageId) return;
-        /*
-         * The editor autosaves, but "autosaves" is not "has saved". Leaving a
-         * page mid-flight would lose whatever had not gone out yet, and the
-         * merchant would have no way to know it happened.
-         */
-        if (dirty) {
-            showError(
-                unfinished
-                    ? `Finish or remove ${unfinished} before opening another page.`
-                    : "Save this page before opening another.",
-            );
+        // Not while this page has work that hasn't gone out yet.
+        const blocked = leavePageMessage(dirty, unfinished);
+        if (blocked !== null) {
+            showError(blocked);
             return;
         }
         router.push(`/sites/${siteId}?page=${pageId}`);

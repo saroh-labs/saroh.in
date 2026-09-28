@@ -2,27 +2,49 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
+import type {
+    SignedInCustomer,
+    SignInApi,
+    SignInOptions,
+} from "../account/api";
+import { SignInSheet } from "../account/sign-in-sheet";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { cn } from "../lib/utils";
-import type { Result } from "./api";
-import { book, fetchDays, fetchHold, releaseHold, startPayment } from "./api";
-import { kicker, newKey, usePhone, zoneName } from "./flow-helpers";
+import type { BookSignedIn, Result } from "./api";
+import {
+    fetchDays,
+    fetchHold,
+    OFFLINE_RESULT,
+    releaseHold,
+    startPayment,
+} from "./api";
+import {
+    kicker,
+    newKey,
+    nextChosenText,
+    nextFreeStart,
+    usePhone,
+    zoneName,
+} from "./flow-helpers";
 import type { DaysState, Phase } from "./flow-state";
+import { findInitialStart, INITIAL_TIME_GONE } from "./initial-start";
 import type {
     BookingDay,
     BookingPageData,
     BookingStart,
+    BookingWhere,
     BookResult,
+    HoldView,
 } from "./model";
 import {
+    asksWhere,
     dateIn,
     dateText,
     formatMoney,
-    looksLikeEmail,
-    phoneProblem,
     rulesText,
     timeIn,
+    whereText,
 } from "./model";
 import { DetailsStep } from "./steps/details-step";
 import { DoneCard } from "./steps/done-card";
@@ -41,11 +63,20 @@ import { PhoneBar, SummaryAside } from "./summary";
  * booking beside it (a bar pinned to the bottom on a phone), and a
  * confirmation with add-to-calendar and the cancel rule.
  *
+ * Sign-in is always on (A9, ADR-011): the last step is "Continue to sign
+ * in", which opens the sign-in sheet, and the booking is made the moment
+ * the code checks — the time and everything chosen stay as they were. A
+ * customer already signed in reads "Booking as ‹name› · Not you?" and books
+ * with no code. There is no guest form and no guest fallback: when a code
+ * can't be sent, the sheet says so with the business's phone and nothing is
+ * booked. The booking goes through the site's server (`account.book`), with
+ * the session; the same person twice in one session is refused.
+ *
  * Pay now holds the place for 15 minutes while the booker pays through the
  * business's own provider; the page watches the hold and confirms when the
- * provider's webhook does. Pay at the desk books it outright. There is no
- * customer recognition and no credits online (ADR-008): packs and
- * memberships are used at the desk or by the team in the calendar.
+ * provider's webhook does. Pay at the desk books it outright. No credits
+ * online yet (A10): packs and memberships are used at the desk or by the
+ * team in the calendar.
  *
  * Drawn from `--site-*` only (gate G2): the merchant's palette, never
  * Saroh's. Nothing here promises an email or a text — Saroh sends neither.
@@ -57,21 +88,54 @@ const POLL_MS = 4_000;
 /** A booking that came back not standing: a replayed hold that was let go. */
 const TIME_GONE = "That time has gone. Pick another one.";
 
+/** The hold couldn't be let go, so it may still stand (K-2). */
+const LEAVE_HOLD_FAILED =
+    "We couldn't let go of the time we're holding for you. Try again.";
+
 /** Class sessions shown before "Show more". */
 const SESSIONS_SHOWN = 10;
 
+/** The session ended between drawing the page and booking. */
+const SIGNED_OUT = "Your sign-in has ended. Sign in again to book.";
+
+/**
+ * Signing in on the business's site (A9): always on, never a guest path.
+ * The app that draws the page passes its server actions in, since the
+ * session lives in a host-only cookie only the site's server can read.
+ */
+export interface BookingAccount {
+    /** Who is signed in on this site as the page was drawn, or null. */
+    customer: SignedInCustomer | null;
+    /** What the sheet needs: the business, its phone, the challenge. */
+    options: SignInOptions;
+    /** Ask for a code, and check it. */
+    signIn: SignInApi;
+    /** Book, with the session. */
+    book: BookSignedIn;
+    /** "Not you?": sign out of this site. */
+    signOut: () => Promise<{ ok: boolean }>;
+}
+
 export interface BookingFlowProps {
     page: BookingPageData;
+    /** Sign-in and booking with it, through the site's server (A9). */
+    account: BookingAccount;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
     /** A service to open on (`?service=`), when it is one the page offers. */
     initialServiceId?: string | null;
+    /** With it, a day and time to choose (`?date=&start=`, On today, G18). */
+    initialDate?: string | null;
+    initialStart?: string | null;
 }
 
 export default function BookingFlow({
     page,
+    account,
     apiUrl = DEFAULT_API_URL,
     initialServiceId = null,
+    initialDate = null,
+    initialStart = null,
 }: BookingFlowProps) {
     const phone = usePhone();
     const ids = useId();
@@ -84,11 +148,18 @@ export default function BookingFlow({
     const [daysState, setDaysState] = useState<DaysState>(
         first ? { kind: "loading", serviceId: first.id } : { kind: "idle" },
     );
-    const [date, setDate] = useState<string | null>(null);
+    const [date, setDate] = useState<string | null>(first ? initialDate : null);
     const [start, setStart] = useState<BookingStart | null>(null);
+    // Who is signed in (A9), and a name for an account that has none.
+    const [customer, setCustomer] = useState<SignedInCustomer | null>(
+        account.customer,
+    );
     const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [phoneNo, setPhoneNo] = useState("");
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
+    // Where, for a service offered either way, and the note (E7).
+    const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
+    const [note, setNote] = useState("");
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<"NOW" | "DESK" | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
@@ -109,6 +180,9 @@ export default function BookingFlow({
     const leavingRef = useRef(false);
     const [leaving, setLeaving] = useState(false);
     const headingRef = useRef<HTMLHeadingElement>(null);
+    // The start that went while they signed in: the next free one after it
+    // is chosen once the times are read again (A9).
+    const offerAfter = useRef<string | null>(null);
 
     const service = services.find((s) => s.id === serviceId) ?? null;
     const zone =
@@ -142,6 +216,29 @@ export default function BookingFlow({
         if (firstId) loadDays(firstId);
     }, [firstId, loadDays]);
 
+    // A time linked to from On today (G18): chosen once its days arrive, if
+    // still free; gone, the page opens on the day and says so.
+    const linked = useRef(
+        first && initialDate && initialStart
+            ? { date: initialDate, time: initialStart }
+            : null,
+    );
+    const firstIsClass = first?.kind === "class";
+    useEffect(() => {
+        const want = linked.current;
+        if (!want || daysState.kind !== "ready") return;
+        linked.current = null;
+        if (daysState.serviceId !== firstId) return;
+        const found = findInitialStart(
+            daysState.days,
+            want.date,
+            want.time,
+            firstIsClass,
+        );
+        if (found) setStart(found);
+        else setSubmitError(INITIAL_TIME_GONE);
+    }, [daysState, firstId, firstIsClass]);
+
     const pickService = (id: string) => {
         if (id === serviceId) return;
         setServiceId(id);
@@ -169,6 +266,10 @@ export default function BookingFlow({
     const pickPay = (next: "NOW" | "DESK") => {
         if (next !== pay) attemptKey.current = null;
         setPayChoice(next);
+    };
+    const pickWhere = (next: BookingWhere) => {
+        if (next !== where) attemptKey.current = null;
+        setWhere(next);
     };
 
     // ── What is chosen ──────────────────────────────────────────────────
@@ -208,16 +309,25 @@ export default function BookingFlow({
                 ? "NOW"
                 : "DESK";
 
-    const emailOk = looksLikeEmail(email);
-    const phoneError = phoneProblem(phoneNo);
-    const whoOk = name.trim().length > 1 && emailOk && !phoneError;
+    const asks = asksWhere(service);
+    /** What the booking page asks beyond the time, as the API takes it. */
+    const extras = {
+        ...(asks ? { locationType: where } : {}),
+        ...(note.trim() ? { intakeNote: note.trim() } : {}),
+    };
+
+    // A name is asked for only while the account has none (A9).
+    const asksName = !customer?.name;
+    const whoOk = !asksName || name.trim().length > 1;
+    const bookerName = (customer?.name ?? name).trim();
+    const bookerFirst = bookerName.split(/\s+/)[0] ?? "";
 
     const block = !service
         ? "Pick what you'd like to book."
         : !chosenStart
           ? "Pick a time."
           : !whoOk
-            ? "Add your name and email."
+            ? "Add your name."
             : "";
 
     const whenText = chosenStart
@@ -229,13 +339,20 @@ export default function BookingFlow({
     const dueLabel =
         pay === "NOW" ? "To pay now" : price ? "Pay at the desk" : "To pay";
     const due = price ?? formatMoney(0, service?.currency ?? "INR") ?? "₹0";
-    const confirmLabel =
-        pay === "NOW"
-            ? `Pay ${price ?? ""} and book`
-            : price
-              ? "Book — pay at the desk"
-              : "Book";
-    const barLabel = pay === "NOW" ? "Pay and book" : "Book";
+    // Not signed in yet, the last step is signing in (A9, the Customer Site
+    // design's "Continue to sign in"); the booking follows the code.
+    const confirmLabel = !customer
+        ? "Continue to sign in"
+        : pay === "NOW"
+          ? `Pay ${price ?? ""} and book`
+          : price
+            ? "Book — pay at the desk"
+            : "Book";
+    const barLabel = !customer
+        ? "Continue to sign in"
+        : pay === "NOW"
+          ? "Pay and book"
+          : "Book";
     const rules = rulesText(page.rules);
 
     // ── Watching a hold ─────────────────────────────────────────────────
@@ -255,7 +372,11 @@ export default function BookingFlow({
                     if (result.status === 404) {
                         setPhase((p) =>
                             p.kind === "paying" && p.token === payingToken
-                                ? { kind: "expired", when: p.when }
+                                ? {
+                                      kind: "expired",
+                                      when: p.when,
+                                      checkoutPaid: p.checkoutPaid,
+                                  }
                                 : p,
                         );
                     }
@@ -267,17 +388,30 @@ export default function BookingFlow({
                         return p;
                     }
                     if (state === "CONFIRMED") {
+                        // Confirmed, the booking carries its link to join
+                        // when it is online (E7).
+                        const standing = result.value.booking;
                         return {
                             kind: "done",
-                            booking: p.booking,
+                            booking: standing
+                                ? {
+                                      ...p.booking,
+                                      online: standing.online,
+                                      meetingUrl: standing.meetingUrl,
+                                  }
+                                : p.booking,
                             paid: true,
                             price: p.price,
                             when: p.when,
-                            first: name.trim().split(/\s+/)[0] ?? "",
+                            first: bookerFirst,
                         };
                     }
                     if (state === "RELEASED" || state === "CANCELLED") {
-                        return { kind: "expired", when: p.when };
+                        return {
+                            kind: "expired",
+                            when: p.when,
+                            checkoutPaid: p.checkoutPaid,
+                        };
                     }
                     return p;
                 });
@@ -287,47 +421,122 @@ export default function BookingFlow({
             clearInterval(clock);
             clearInterval(poll);
         };
-    }, [apiUrl, payingToken, name]);
+    }, [apiUrl, payingToken, bookerFirst]);
 
     // Each new screen puts focus on its heading, so a screen reader hears it.
     useEffect(() => {
         if (phase.kind !== "choose") headingRef.current?.focus();
     }, [phase.kind]);
 
-    /** The time chosen is gone: say so, and show what is left. */
-    const timeGone = (id: string, message: string) => {
+    /**
+     * The time chosen is gone: say so, and show what is left — and, when it
+     * went while they signed in, choose the next free one (`offerNext`).
+     */
+    const timeGone = (id: string, message: string, offerNext?: string) => {
         setPhase({ kind: "choose" });
         setSubmitError(message);
         attemptKey.current = null;
         setStart(null);
+        offerAfter.current = offerNext ?? null;
         loadDays(id);
     };
+
+    // After a time went while signing in: the next free one, chosen.
+    useEffect(() => {
+        const after = offerAfter.current;
+        if (!after || daysState.kind !== "ready") return;
+        if (daysState.serviceId !== serviceId) return;
+        offerAfter.current = null;
+        const next = nextFreeStart(daysState.days, after, isClass);
+        if (!next) return;
+        setDate(dateIn(next.startAt, daysState.days.timezone));
+        setStart(next);
+        setSubmitError(nextChosenText(next, daysState.days.timezone));
+    }, [daysState, serviceId, isClass]);
+
+    /** The name to send: only for an account that has none yet. */
+    const nameFor = (who: SignedInCustomer) =>
+        !who.name && name.trim() ? { bookerName: name.trim() } : {};
 
     const confirm = async () => {
         setTouched(true);
         if (block || !service || !chosenStart || submitting) return;
+        // Not signed in: the sheet, and the booking once the code checks.
+        if (!customer) {
+            setSubmitError(null);
+            setSheetOpen(true);
+            return;
+        }
+        await submit(customer, false);
+    };
+
+    /** Signed in from the sheet: book straight away, on what was chosen. */
+    const signedIn = (who: SignedInCustomer) => {
+        setCustomer(who);
+        void submit(who, true);
+    };
+
+    /** "Not you?": sign out, and ask again at the last step. */
+    const notYou = async () => {
+        if (signingOut) return;
+        setSigningOut(true);
+        const out = await account
+            .signOut()
+            .catch(() => ({ ok: false }) as const);
+        setSigningOut(false);
+        if (!out.ok) {
+            setSubmitError("We couldn't sign you out. Try again.");
+            return;
+        }
+        setCustomer(null);
+        setName("");
+        setSubmitError(null);
+        attemptKey.current = null;
+    };
+
+    const submit = async (who: SignedInCustomer, justSignedIn: boolean) => {
+        if (!service || !chosenStart) return;
         setSubmitting(true);
         setSubmitError(null);
         attemptKey.current ??= newKey();
-        const result = await book(apiUrl, service.id, {
-            startAt: chosenStart.startAt,
-            bookerName: name.trim(),
-            bookerEmail: email.trim(),
-            bookerPhone: phoneNo.trim() || undefined,
-            idempotencyKey: attemptKey.current,
-            staffId: chosenStart.staffId ?? undefined,
-            pay,
-        });
+        const result = await account
+            .book({
+                serviceId: service.id,
+                startAt: chosenStart.startAt,
+                ...nameFor(who),
+                idempotencyKey: attemptKey.current,
+                staffId: chosenStart.staffId ?? undefined,
+                pay,
+                ...extras,
+            })
+            .catch((): Result<BookResult> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === "already-booked") {
+                // Theirs already: nothing to pick again, nothing to retry.
+                attemptKey.current = null;
+                setSubmitError(result.message);
+                return;
+            }
+            if (result.status === 401) {
+                attemptKey.current = null;
+                setCustomer(null);
+                setSubmitError(SIGNED_OUT);
+                return;
+            }
             // Taken meanwhile: show what is left, and a fresh attempt.
-            if (result.status === 409) timeGone(service.id, result.message);
-            else setSubmitError(result.message);
+            if (result.status === 409) {
+                timeGone(
+                    service.id,
+                    result.message,
+                    justSignedIn ? chosenStart.startAt : undefined,
+                );
+            } else setSubmitError(result.message);
             return;
         }
         attemptKey.current = null;
         const booking = result.value;
-        const firstName = name.trim().split(/\s+/)[0] ?? "";
+        const firstName = (who.name ?? name).trim().split(/\s+/)[0] ?? "";
         if (booking.state === "HELD" && booking.payToken) {
             const token = booking.payToken;
             setPhase({
@@ -373,22 +582,66 @@ export default function BookingFlow({
         setLeaving(true);
         const held = phase;
         try {
-            await releaseHold(apiUrl, held.token);
+            const released = await releaseHold(apiUrl, held.token).catch(
+                (): Result<HoldView> => OFFLINE_RESULT,
+            );
+            // Paid a moment ago: the place is theirs, so say so — never
+            // book it again at the desk or send them back to choose.
+            if (released.ok && released.value.state === "CONFIRMED") {
+                const standing = released.value.booking;
+                setPhase({
+                    kind: "done",
+                    booking: standing
+                        ? {
+                              ...held.booking,
+                              online: standing.online,
+                              meetingUrl: standing.meetingUrl,
+                          }
+                        : held.booking,
+                    paid: true,
+                    price: held.price,
+                    when: held.when,
+                    first: bookerFirst,
+                });
+                return;
+            }
+            // The hold may still stand: booking at the desk now would only
+            // be refused as theirs already, so stay here and say it (K-2).
+            if (
+                then === "desk" &&
+                (!released.ok || released.value.state === "HELD")
+            ) {
+                setPhase((p) =>
+                    p.kind === "paying" && p.token === held.token
+                        ? {
+                              ...p,
+                              payError: released.ok
+                                  ? LEAVE_HOLD_FAILED
+                                  : released.message,
+                          }
+                        : p,
+                );
+                return;
+            }
             if (then !== "desk" || !service || !chosenStart) {
                 backToChoosing();
                 return;
             }
             setPayChoice("DESK");
             deskKey.current ??= newKey();
-            const result: Result<BookResult> = await book(apiUrl, service.id, {
-                startAt: chosenStart.startAt,
-                bookerName: name.trim(),
-                bookerEmail: email.trim(),
-                bookerPhone: phoneNo.trim() || undefined,
-                idempotencyKey: deskKey.current,
-                staffId: chosenStart.staffId ?? undefined,
-                pay: "DESK",
-            });
+            const result: Result<BookResult> = customer
+                ? await account
+                      .book({
+                          serviceId: service.id,
+                          startAt: chosenStart.startAt,
+                          ...nameFor(customer),
+                          idempotencyKey: deskKey.current,
+                          staffId: chosenStart.staffId ?? undefined,
+                          pay: "DESK",
+                          ...extras,
+                      })
+                      .catch((): Result<BookResult> => OFFLINE_RESULT)
+                : { ok: false, status: 401, message: SIGNED_OUT };
             if (result.ok && result.value.state === "CONFIRMED") {
                 deskKey.current = null;
                 setPhase({
@@ -397,7 +650,7 @@ export default function BookingFlow({
                     paid: false,
                     price,
                     when: held.when,
-                    first: name.trim().split(/\s+/)[0] ?? "",
+                    first: bookerFirst,
                 });
                 return;
             }
@@ -435,6 +688,8 @@ export default function BookingFlow({
         setDate(null);
         setStart(null);
         setPayChoice(null);
+        setWhere("IN_PERSON");
+        setNote("");
         setTouched(false);
         setSubmitError(null);
         wanted.current = null;
@@ -492,6 +747,16 @@ export default function BookingFlow({
                             phase={phase}
                             headingRef={headingRef}
                             business={page.businessName}
+                            where={
+                                service
+                                    ? whereText(
+                                          service,
+                                          phase.booking,
+                                          services,
+                                          page.businessName,
+                                      )
+                                    : null
+                            }
                             rules={page.rules}
                             onAgain={bookAnother}
                         />
@@ -502,13 +767,27 @@ export default function BookingFlow({
                             zone={zone}
                             headingRef={headingRef}
                             serviceName={service?.name ?? ""}
+                            business={page.businessName}
+                            booker={{
+                                name: bookerName,
+                                email: customer?.email ?? "",
+                            }}
                             busy={leaving}
                             onDesk={() => void leaveHold("desk")}
                             onBack={() => void leaveHold("choose")}
+                            onPaid={() =>
+                                setPhase((p) =>
+                                    p.kind === "paying"
+                                        ? { ...p, checkoutPaid: true }
+                                        : p,
+                                )
+                            }
                         />
                     ) : phase.kind === "expired" ? (
                         <ExpiredCard
                             when={phase.when}
+                            business={page.businessName}
+                            checkoutPaid={phase.checkoutPaid}
                             headingRef={headingRef}
                             onAgain={backToChoosing}
                         />
@@ -557,15 +836,17 @@ export default function BookingFlow({
                                 <DetailsStep
                                     ids={ids}
                                     business={page.businessName}
+                                    customer={customer}
                                     name={name}
-                                    email={email}
-                                    phoneNo={phoneNo}
                                     touched={touched}
-                                    emailOk={emailOk}
-                                    phoneError={phoneError}
+                                    signingOut={signingOut}
                                     onName={setName}
-                                    onEmail={setEmail}
-                                    onPhone={setPhoneNo}
+                                    onNotYou={() => void notYou()}
+                                    asksWhere={asks}
+                                    where={where}
+                                    note={note}
+                                    onWhere={pickWhere}
+                                    onNote={setNote}
                                 />
                             ) : null}
 
@@ -595,7 +876,11 @@ export default function BookingFlow({
                     <SummaryAside
                         serviceName={service?.name ?? null}
                         whenText={whenText}
-                        name={name}
+                        name={
+                            bookerName !== ""
+                                ? bookerName
+                                : (customer?.email ?? "")
+                        }
                         hasService={!!service}
                         confirmLabel={confirmLabel}
                         rules={rules}
@@ -618,6 +903,15 @@ export default function BookingFlow({
                     {...summary}
                 />
             ) : null}
+
+            <SignInSheet
+                open={sheetOpen}
+                onClose={() => setSheetOpen(false)}
+                options={account.options}
+                api={account.signIn}
+                purpose="book"
+                onSignedIn={signedIn}
+            />
         </div>
     );
 }

@@ -355,6 +355,29 @@ describe("a pause with an end date (D8)", () => {
         );
         expect(pausedText({ ...open, pausedAt: null }, NOW)).toBe("Paused");
     });
+
+    describe("once its end date has come and it is still paused (review S-2)", () => {
+        const later = new Date("2026-10-16T09:00:00Z");
+
+        it("says it outlasted the paid period and waits for Payments, not that it resumes on its own", () => {
+            // Paid to 1 Oct, so resuming starts a new period with its invoice.
+            expect(headline(paused, null, later).line).toBe(
+                "Pause ended 16 Oct · restarts with a new invoice at the next hourly check, or once Payments is on if it's off. Nothing is charged while paused.",
+            );
+            expect(pausedText(paused, later)).toBe("Pause ended 16 Oct");
+            expect(rowWhen(paused, later).text).toBe("Pause ended 16 Oct");
+        });
+
+        it("says one that ended inside its paid period only waits for the next check", () => {
+            const inside = {
+                ...paused,
+                currentPeriodEnd: "2026-10-31T18:30:00.000Z",
+            };
+            expect(headline(inside, null, later).line).toBe(
+                "Pause ended 16 Oct · resumes at the next hourly check. Nothing is charged while paused.",
+            );
+        });
+    });
 });
 
 describe("headline", () => {

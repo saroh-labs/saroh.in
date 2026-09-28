@@ -20,6 +20,9 @@ jest.mock("@saroh/database", () => {
         },
         order: { findFirst: jest.fn() },
         invoiceSequence: { findMany: jest.fn().mockResolvedValue([]) },
+        product: { count: jest.fn().mockResolvedValue(0) },
+        service: { count: jest.fn().mockResolvedValue(0) },
+        site: { count: jest.fn().mockResolvedValue(0) },
     };
     return {
         prisma: {
@@ -120,6 +123,32 @@ describe("OrganizationSettingsService", () => {
                     }),
                 }),
             );
+        });
+
+        it("sends the checklist's facts: products, services, sites and those not live (H-5, H-6)", async () => {
+            (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
+            (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
+            (prisma.site.count as jest.Mock)
+                .mockResolvedValueOnce(2)
+                .mockResolvedValueOnce(1);
+            expect((await service.get(ctx())).setup).toEqual({
+                products: 0,
+                services: 2,
+                sites: 2,
+                sitesNotLive: 1,
+            });
+            // Archived never counts; a site is live only while something
+            // is published on it now.
+            expect(prisma.product.count).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1", status: { not: "ARCHIVED" } },
+            });
+            expect(prisma.site.count).toHaveBeenLastCalledWith({
+                where: {
+                    organizationId: "org_1",
+                    deletedAt: null,
+                    currentPublicationId: null,
+                },
+            });
         });
 
         it("derives trading-since from the first order in the business", async () => {

@@ -3,6 +3,7 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 import type { EmailOutcome } from "../../common/email";
 import { sendSiteSignInCodeEmail } from "../../common/email";
 import { structuredLogger } from "../../common/logging/structured-logger";
+import type { CeilingAlert } from "./code-limits";
 
 /**
  * Getting a sign-in code out, and telling Saroh when it doesn't (ADR-011;
@@ -73,10 +74,13 @@ export class SiteCodeAlerts {
         return this.failures.filter((t) => now - t < FAILURE_WINDOW_MS).length;
     }
 
-    /** A business is past a ceiling: codes still go, Saroh should look. */
+    /**
+     * A business is past a ceiling, or one email's codes are being guessed
+     * at (`failed-tries`): codes still go, Saroh should look.
+     */
     ceilingPassed(
         organizationId: string,
-        ceiling: "new-destinations" | "daily",
+        ceiling: CeilingAlert,
         now: number = Date.now(),
     ): void {
         if (!this.firstInHour(`${ceiling}:${organizationId}`, now)) return;

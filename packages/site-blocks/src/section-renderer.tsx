@@ -70,14 +70,21 @@ export default function SectionRenderer({
     bookHref?: string;
     /**
      * The site being shown, for the blocks that read its business's live
-     * data by site (Visit us, G8). Undefined where no site is live — the
+     * data by site (Visit us, G8; the hero's On today, G18). Undefined where no site is live — the
      * editor's canvas — and those blocks then say what they will show.
      */
     siteId?: string | null;
 }) {
     switch (section.type) {
         case "hero":
-            return <HeroSection content={section.content as RenderedHero} />;
+            return (
+                <HeroSection
+                    content={section.content as RenderedHero}
+                    apiUrl={apiUrl}
+                    bookHref={bookHref}
+                    siteId={siteId}
+                />
+            );
         case "richText":
             return (
                 <RichTextSection

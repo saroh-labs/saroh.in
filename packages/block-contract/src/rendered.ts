@@ -124,6 +124,8 @@ const renderedHero = z.object({
     subheading: z.string().optional(),
     cta: renderedCtaSchema.optional(),
     image: renderedImageSchema.optional(),
+    /** "On today" beside the headline (G18); read live, never stored. */
+    onToday: z.boolean().optional(),
 });
 
 /**

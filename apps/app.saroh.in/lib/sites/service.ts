@@ -211,6 +211,10 @@ export interface BookingContent {
     serviceId?: string;
     title?: string;
     description?: string;
+    /**
+     * Not drawn since A9 and not edited: booking finishes on the booking
+     * page. Kept because stored sections may still carry them.
+     */
     submitLabel?: string;
     successMessage?: string;
 }

@@ -8,7 +8,16 @@ import { HomeService } from "./home.service";
  * that came in through a pay link after the invoice was already paid or
  * voided is owed back, and Home is where a merchant is told what is wrong.
  */
-const OWED = {
+type Owed = {
+    id: string;
+    amountCents: number;
+    currency: string;
+    updatedAt: Date;
+    invoice: { id: string; number: string; billToName: string };
+    attempts: { rawResponse: unknown }[];
+};
+
+const OWED: Owed = {
     id: "pi_1",
     amountCents: 120000,
     currency: "INR",
@@ -16,12 +25,18 @@ const OWED = {
     invoice: {
         id: "inv_1",
         number: "INV-0004",
-        status: "VOID",
         billToName: "Asha Rao",
     },
+    // What the webhook recorded when the money came (webhooks.service).
+    attempts: [{ rawResponse: { invoiceStatus: "VOID" } }],
 };
 
-function build(rows: (typeof OWED)[], count = rows.length) {
+/** OWED, with the reason the webhook recorded. */
+function owedFor(invoiceStatus: unknown): Owed {
+    return { ...OWED, attempts: [{ rawResponse: { invoiceStatus } }] };
+}
+
+function build(rows: Owed[], count = rows.length) {
     const availability = {
         listViews: jest.fn().mockResolvedValue([
             {
@@ -89,11 +104,68 @@ describe("HomeService refunds owed on invoices", () => {
         });
     });
 
+    it("reads the reason the webhook recorded, not the invoice's status now (K-1)", async () => {
+        const { service, db } = build([owedFor("CANCELLED_BOOKING")]);
+        const home = await service.build(OWNER);
+        expect(home.primaryAction?.title).toBe(
+            "Refund a payment taken after its booking was cancelled",
+        );
+        expect(home.primaryAction?.evidence?.[0]?.subtitle).toBe(
+            "Asha Rao · Paid online after its booking was cancelled",
+        );
+        // The newest CAPTURED_NEEDS_REFUND attempt is where it was recorded.
+        expect(db.paymentIntent.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                select: expect.objectContaining({
+                    attempts: {
+                        where: { status: "CAPTURED_NEEDS_REFUND" },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { rawResponse: true },
+                    },
+                }) as unknown,
+            }),
+        );
+    });
+
+    it.each([
+        [
+            "RELEASED_HOLD",
+            "Refund a payment taken after its booking's hold ran out",
+            "Paid online after its booking's hold ran out",
+        ],
+        [
+            "PAID",
+            "Refund a payment taken on a settled invoice",
+            "Paid online after it was already paid",
+        ],
+        [
+            "MISSING",
+            "Refund a payment a customer is owed",
+            "Paid online when it couldn't take the payment",
+        ],
+        [
+            undefined,
+            "Refund a payment a customer is owed",
+            "Paid online when it couldn't take the payment",
+        ],
+    ])(
+        "words a payment recorded as %s truthfully",
+        async (recorded, title, why) => {
+            const { service } = build([owedFor(recorded)]);
+            const home = await service.build(OWNER);
+            expect(home.primaryAction?.title).toBe(title);
+            expect(home.primaryAction?.evidence?.[0]?.subtitle).toBe(
+                `Asha Rao · ${why}`,
+            );
+        },
+    );
+
     it("points at the invoice list when there are several", async () => {
         const { service } = build([OWED], 3);
         const home = await service.build(OWNER);
         expect(home.primaryAction?.title).toBe(
-            "Refund 3 payments taken on settled invoices",
+            "Refund 3 payments customers are owed",
         );
         expect(home.primaryAction?.href).toBe("/billing/invoices");
     });

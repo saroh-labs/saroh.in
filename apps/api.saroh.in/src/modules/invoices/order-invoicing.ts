@@ -182,8 +182,9 @@ export async function ensureOrderInvoice(
     opts: { at?: Date; method?: string | null; reference?: string | null } = {},
 ): Promise<{ id: string; number: string | null; created: boolean } | null> {
     await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
-    // Whoever paid gets a contact, in this transaction (DEC-041, C2). Before
-    // the invoice check, so a second payment on an order still links them.
+    // Whoever paid gets a contact, in this transaction (DEC-041, C2), under
+    // a savepoint that never fails the payment (review C-3). Before the
+    // invoice check, so a second payment on an order still links them.
     const payer = await tx.order.findUnique({
         where: { id: orderId },
         select: { organizationId: true, customerId: true, paymentStatus: true },

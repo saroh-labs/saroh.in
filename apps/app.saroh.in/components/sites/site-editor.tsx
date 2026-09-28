@@ -1,12 +1,11 @@
 "use client";
 
 import { AddSectionDialog } from "@/components/sites/add-section-dialog";
-import { PanelDivider } from "@/components/sites/editor-chrome";
 import {
     canvasChromeFor,
     EditorCanvas,
-    FullScreenPreview,
 } from "@/components/sites/editor/editor-canvas";
+import { EditorPanels } from "@/components/sites/editor/editor-panels";
 import { EditorRail } from "@/components/sites/editor/editor-rail";
 import { EditorTopBar } from "@/components/sites/editor/editor-top-bar";
 import { InspectorHost } from "@/components/sites/editor/inspector-host";
@@ -14,37 +13,32 @@ import type { SiteEditorProps } from "@/components/sites/editor/site-editor-prop
 import { useAddBlock } from "@/components/sites/editor/use-add-block";
 import { useEditorDraft } from "@/components/sites/editor/use-editor-draft";
 import { useEditorJumps } from "@/components/sites/editor/use-editor-jumps";
+import {
+    useEditorLayout,
+    useEditorSheets,
+} from "@/components/sites/editor/use-editor-layout";
 import { useEditorReview } from "@/components/sites/editor/use-editor-review";
 import {
     activeSection,
     useEditorSelection,
 } from "@/components/sites/editor/use-editor-selection";
 import { useEditorStyle } from "@/components/sites/editor/use-editor-style";
-import {
-    editorColumns,
-    useEditorViewport,
-} from "@/components/sites/editor/use-editor-viewport";
+import { useEditorViewport } from "@/components/sites/editor/use-editor-viewport";
 import { usePublish } from "@/components/sites/editor/use-publish";
 import { useSiteChrome } from "@/components/sites/editor/use-site-chrome";
 import { useUndo } from "@/components/sites/editor/use-undo";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
-import {
-    PANEL_DEFAULT,
-    PANEL_MAX,
-    PANEL_MIN,
-    RAIL_DEFAULT,
-    RAIL_MAX,
-    RAIL_MIN,
-} from "@/lib/sites/editor-prefs";
 import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
  * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
  * state. Since #260 this only composes: the state lives in the hooks in
  * `editor/` (draft, style, header and footer text, selection, viewport,
- * review, publish, adding a block, jumping to a note) and the drawing in its
- * panels (top bar, rail, canvas, inspector host).
+ * review, publish, adding a block, jumping to a note, the layout for the
+ * window and its sheets) and the drawing in its panels (top bar, rail,
+ * canvas, inspector host), which `EditorPanels` lays out for a desk, a narrow
+ * window or a phone (G4).
  */
 export function SiteEditor({
     siteId,
@@ -89,16 +83,19 @@ export function SiteEditor({
         onSaved: publish.markSitePending,
     });
     const initialCount = initialSections.length;
-    const selection = useEditorSelection({
-        siteId,
-        sectionCount: initialCount,
-    });
-    const { setSelectedIndex, setRail, setInspector } = selection;
+    const placed = useEditorSelection({ siteId, sectionCount: initialCount });
+    const layout = useEditorLayout();
     const viewport = useEditorViewport({
         siteId,
+        pageId,
         sectionCount: initialCount,
-        initialScrollTop: selection.place.scrollTop,
+        initialScrollTop: placed.place.scrollTop,
+        narrow: layout !== "wide",
     });
+    // Below the desk width, choosing something opens its sheet (G4).
+    const sheets = useEditorSheets(placed, layout, viewport.previewing);
+    const { selection } = sheets;
+    const { setSelectedIndex, setRail, setInspector } = selection;
     const draft = useEditorDraft({
         siteId,
         pageId,
@@ -120,6 +117,12 @@ export function SiteEditor({
     const { style } = siteStyle;
     // Remove, move, hide and reset act at once and offer Undo (G3).
     const edits = useUndo({ ...draft, ...siteStyle, setSelectedIndex });
+    /*
+     * Anything not saved yet: the page, the look, the name or the footer.
+     * Opening another page drops it, and publishing would miss it (G-1, G-3).
+     */
+    const unsaved =
+        dirty || draft.saving || siteStyle.styleDirty || chrome.chromeDirty;
 
     const add = useAddBlock({
         insertSection: draft.insertSection,
@@ -131,7 +134,7 @@ export function SiteEditor({
     const { jumpToNote, jumpToFlag } = useEditorJumps({
         siteId,
         pageId,
-        dirty,
+        dirty: unsaved,
         sections,
         setRail,
         setSelectedIndex,
@@ -154,93 +157,87 @@ export function SiteEditor({
         pages,
         footer: chrome.footer,
     });
-    const preview = { siteId, address, sections, pages, style, styleOptions };
 
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
-        <div className="flex h-screen flex-col bg-background text-foreground">
+        <div className="flex h-dvh flex-col bg-background text-foreground">
             <EditorTopBar
-                {...{ siteId, address, pages, pageId }}
+                {...{ siteId, address, pages, pageId, layout }}
                 siteName={chrome.displayName}
                 {...draft}
                 // Site settings saved on their own clock: the look, the name
                 // and the footer. Publish waits for all three.
                 styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
                 styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
+                saveError={draft.saveError || chrome.chromeFailed}
                 {...review}
                 {...publish}
+                openCheck={(ready) => {
+                    // An Undo pressed behind the check would change the
+                    // draft being published (G-1).
+                    if (!ready.dirty) edits.settleUndo();
+                    return publish.openCheck(ready);
+                }}
                 {...viewport}
+                openFeedback={() => setInspector("feedback")}
             />
 
-            <div
-                className="grid min-h-0 flex-1 lg:grid-cols-[var(--editor-cols)]"
-                style={
-                    {
-                        // Blocks, the page, the inspector (#340); see
-                        // `editorColumns` for how the widths are shared.
-                        "--editor-cols": editorColumns(
-                            viewport.railWidth,
-                            viewport.panelWidth,
-                        ),
-                    } as React.CSSProperties
+            <EditorPanels
+                {...{ layout, viewport, sheets, selection }}
+                {...add}
+                dialogOpen={lookFor !== null || browsing}
+                hasSubject={
+                    active !== null || selection.selectedChrome !== null
                 }
-            >
-                <EditorRail
-                    {...selection}
-                    {...siteStyle}
-                    {...draft}
-                    {...edits}
-                    styleOptions={styleOptions}
-                    {...add}
-                    flagsBySection={flagsBySection}
-                    notedKeys={review.notedKeys}
-                />
-
-                <PanelDivider
-                    label="Resize the block list"
-                    width={viewport.railWidth}
-                    min={RAIL_MIN}
-                    max={RAIL_MAX}
-                    reset={RAIL_DEFAULT}
-                    onResize={viewport.setRailWidth}
-                    onNudge={viewport.nudgeRail}
-                />
-
-                <EditorCanvas
-                    {...viewport}
-                    {...selection}
-                    {...preview}
-                    conflict={draft.conflict}
-                    neverPublished={publish.neverPublished}
-                    canvasChrome={canvasChrome}
-                    notesByKey={review.notesByKey}
-                />
-
-                <PanelDivider
-                    label="Resize the inspector"
-                    width={viewport.panelWidth}
-                    min={PANEL_MIN}
-                    max={PANEL_MAX}
-                    reset={PANEL_DEFAULT}
-                    onResize={viewport.setPanelWidth}
-                    onNudge={viewport.nudgePanel}
-                    panelSide="right"
-                />
-
-                <InspectorHost
-                    {...{ siteId, pageId, pages, styleOptions }}
-                    {...selection}
-                    {...draft}
-                    {...edits}
-                    {...review}
-                    style={style}
-                    active={active}
-                    fixedText={chrome}
-                    jumpToNote={jumpToNote}
-                    activeFlags={activeFlags}
-                    unreadableSections={unreadableSections}
-                />
-            </div>
+                openNotes={review.openNotes}
+                rail={
+                    <EditorRail
+                        {...selection}
+                        {...siteStyle}
+                        {...draft}
+                        {...edits}
+                        styleOptions={styleOptions}
+                        {...add}
+                        flagsBySection={flagsBySection}
+                        notedKeys={review.notedKeys}
+                    />
+                }
+                canvas={
+                    <EditorCanvas
+                        {...viewport}
+                        {...selection}
+                        {...draft}
+                        {...{
+                            siteId,
+                            pageId,
+                            address,
+                            pages,
+                            style,
+                            styleOptions,
+                        }}
+                        // Holds a page switch back (G-3).
+                        dirty={unsaved}
+                        neverPublished={publish.neverPublished}
+                        canvasChrome={canvasChrome}
+                        notesByKey={review.notesByKey}
+                    />
+                }
+                inspector={
+                    <InspectorHost
+                        {...{ siteId, pageId, pages, styleOptions }}
+                        {...selection}
+                        {...draft}
+                        {...edits}
+                        {...review}
+                        style={style}
+                        active={active}
+                        fixedText={chrome}
+                        jumpToNote={jumpToNote}
+                        activeFlags={activeFlags}
+                        unreadableSections={unreadableSections}
+                    />
+                }
+            />
 
             {/*
              * The pre-publish check (below) is rendered inside the editor
@@ -248,15 +245,6 @@ export function SiteEditor({
              * behind it — the merchant goes back to exactly the editing state
              * they left, including unsaved selection and scroll.
              */}
-            {viewport.fullScreen ? (
-                <FullScreenPreview
-                    {...preview}
-                    device={viewport.device}
-                    setFullScreen={viewport.setFullScreen}
-                    canvasChrome={canvasChrome}
-                />
-            ) : null}
-
             {/*
              * Choosing a look before the block goes in (#267). Keyed on the
              * block so each opening starts on that block's looks.
@@ -282,6 +270,7 @@ export function SiteEditor({
                     flags={publish.siteFlags.flags}
                     awaitingNavigation={publish.siteFlags.awaitingNavigation}
                     publishing={publish.publishing}
+                    unsaved={unsaved}
                     neverPublished={publish.neverPublished}
                     pendingSummary={publish.pendingSummary}
                     pendingKnown={publish.pendingKnown}

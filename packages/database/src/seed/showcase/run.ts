@@ -214,7 +214,10 @@ export async function seedShowcase(
     // each business's owner at the seed's (past) now.
     await balanceStockLog(prisma, { at: now });
     // Which ways each storefront offers, now its orders exist (B2a).
-    await syncStorefrontFulfilmentTypes(prisma);
+    await syncStorefrontFulfilmentTypes(
+        prisma,
+        businesses.map((b) => b.id),
+    );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);

@@ -82,6 +82,7 @@ const BOOKING = {
     organizationId: "org_1",
     status: "CONFIRMED",
     paidWith: null,
+    courseEnrollmentId: null as string | null,
     startAt: START,
     timezone: "Asia/Kolkata",
     contactId: "c_1",
@@ -191,6 +192,15 @@ describe("BookingsService.payLink (E4)", () => {
         await expect(
             new BookingsService().payLink(ctx(), "bk_1", NOW),
         ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("refuses a course session's booking: the course is paid for once (K-3)", async () => {
+        wire({ courseEnrollmentId: "enr_1" });
+        await expect(
+            new BookingsService().payLink(ctx(), "bk_1", NOW),
+        ).rejects.toThrow("paid for with the course");
+        expect(invoiceCreate).not.toHaveBeenCalled();
+        expect(invoiceUpdate).not.toHaveBeenCalled();
     });
 
     it("says to connect a provider when none is, before writing anything", async () => {

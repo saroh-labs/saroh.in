@@ -4,11 +4,14 @@ import { DateTime, IANAZone } from "luxon";
 
 import type { ListTab, PaymentStanding } from "./dto";
 import {
-    defaultLateThresholds,
+    DEFAULT_LATE_THRESHOLDS,
     LATE_STAGES,
     LATE_STATUSES,
+    lateStoredValues,
     storedValuesOf,
 } from "./fulfilment";
+import { LATE_THRESHOLD_COLUMNS } from "./late-thresholds";
+import { openSql, realOrderSql } from "./open-orders";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -31,17 +34,13 @@ export type { ListTab, PaymentStanding } from "./dto";
 export type { FulfilmentType } from "./fulfilment";
 
 /**
- * When an open order counts as late, in minutes from when it was placed, per
- * stored fulfilment value: each type's default from `fulfilment.ts`
- * (default 16: 2 h, 24 h, 48 h), under its legacy word too until B2d. Digital
- * and appointments are never late here: Digital never is, and appointments go
- * by their visits.
- *
- * TODO(B17): the storefront's own thresholds replace these defaults, read
- * through a join on `StoreSettings` in {@link lateSql}.
+ * The join that gives the list's query each order's storefront's settings
+ * row as `ss`, which {@link lateSql} reads the thresholds from (B17). A
+ * function, not a constant, so importing this file builds no SQL.
  */
-export const DEFAULT_LATE_AFTER_MINUTES: Readonly<Record<string, number>> =
-    Object.fromEntries(defaultLateThresholds());
+export function lateSettingsJoin(): Prisma.Sql {
+    return Prisma.sql`LEFT JOIN "StoreSettings" ss ON ss."storeId" = o."storeId"`;
+}
 
 /** The list's filters once the query string is validated (dto.ts). */
 export interface OrderListFilter {
@@ -56,6 +55,8 @@ export interface OrderListFilter {
     /** A calendar day, YYYY-MM-DD, in the business's zone. */
     from?: string;
     to?: string;
+    /** Only orders placed at or after this instant (`?since=`, F6). */
+    since?: Date;
     q?: string;
 }
 
@@ -163,21 +164,23 @@ export function paymentStandingOf(
 /**
  * Open: the goods have not reached the customer and the order is neither
  * cancelled nor refunded in full (the Open tab; default 14). A shipped order
- * is still open until it is delivered.
+ * is still open until it is delivered. One definition with Home's
+ * (`open-orders.ts`).
  */
-export function openSql(): Prisma.Sql {
-    return Prisma.sql`(o.status IN ('PENDING', 'PROCESSING', 'SHIPPED') AND o."paymentStatus" <> 'REFUNDED')`;
-}
+export { openSql };
 
 /**
- * Late: an open order not yet handed over, placed longer ago than its type's
- * threshold (DEC-045: the clock starts at placed, paid or not). Never stored;
- * `now` is bound so a page and its counts use one clock.
+ * Late: an open order not yet handed over, placed longer ago than the
+ * threshold its storefront sets for its type (B17; DEC-045: the clock starts
+ * at placed, paid or not). Reads the settings row {@link lateSettingsJoin}
+ * joins, and a storefront without one reads the defaults, as `lateOf` does.
+ * Never stored; `now` is bound so a page and its counts use one clock.
  */
 export function lateSql(now: Date): Prisma.Sql {
-    const whens = Object.entries(DEFAULT_LATE_AFTER_MINUTES).map(
-        ([stored, minutes]) => Prisma.sql`WHEN ${stored} THEN ${minutes}::int`,
-    );
+    const whens = lateStoredValues().map(([stored, type]) => {
+        const column = Prisma.raw(`ss."${LATE_THRESHOLD_COLUMNS[type]}"`);
+        return Prisma.sql`WHEN ${stored} THEN COALESCE(${column}, ${DEFAULT_LATE_THRESHOLDS[type]}::int)`;
+    });
     const threshold = Prisma.sql`(CASE o.fulfilment::text ${Prisma.join(whens, " ")} END)`;
     // The same open-and-not-handed-over lists `lateOf` reads for one order.
     return Prisma.sql`(o.status::text = ANY(${[...LATE_STATUSES]})
@@ -200,7 +203,7 @@ export function orderConditions(
 ): Prisma.Sql {
     const and: Prisma.Sql[] = [
         Prisma.sql`o."organizationId" = ${organizationId}`,
-        Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`,
+        realOrderSql(),
     ];
     // Each narrows within the organization; none can widen past it, so a
     // storefront or product from another business simply matches nothing.
@@ -223,6 +226,9 @@ export function orderConditions(
     }
     if (range.gte) and.push(Prisma.sql`o."createdAt" >= ${ts(range.gte)}`);
     if (range.lt) and.push(Prisma.sql`o."createdAt" < ${ts(range.lt)}`);
+    if (filter.since) {
+        and.push(Prisma.sql`o."createdAt" >= ${ts(filter.since)}`);
+    }
     if (filter.q?.trim()) and.push(searchSql(filter.q, view));
     return Prisma.join(and, " AND ");
 }
