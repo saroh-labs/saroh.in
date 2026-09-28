@@ -191,6 +191,36 @@ export function allows(ctx: OrganizationContext, action: OrgAction): boolean {
 }
 
 /**
+ * The actions in `actions` this actor does not hold themselves — empty when
+ * every one is within their reach.
+ *
+ * The reach rule (DEC-039, F19): nobody grants a power they don't hold, and
+ * nobody changes a role or a person that can do more than they can. Members
+ * (who can be put in which role), roles (what a role may be given) and, next,
+ * a person's extra permissions all ask this one question, so the answer can
+ * never differ between them.
+ *
+ * Implied holds count, because `allows` reads the actor's resolved set: an
+ * actor with `store:write` holds `inventory:write`. Pass the target's
+ * RESOLVED set too (`resolveCapabilities`), so a role is judged on everything
+ * it would let someone do, not only on what was ticked.
+ */
+export function outOfReach(
+    ctx: OrganizationContext,
+    actions: Iterable<OrgAction>,
+): OrgAction[] {
+    return [...new Set(actions)].filter((a) => !allows(ctx, a));
+}
+
+/** Whether every action in `actions` is one this actor holds themselves. */
+export function withinReach(
+    ctx: OrganizationContext,
+    actions: Iterable<OrgAction>,
+): boolean {
+    return outOfReach(ctx, actions).length === 0;
+}
+
+/**
  * What a role may do, given what the organization has stored for it.
  *
  * Three cases, and the third is the one that matters:

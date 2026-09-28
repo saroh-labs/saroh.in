@@ -122,7 +122,7 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "member:role:update",
         group: "team",
         label: "Change what a role can do",
-        note: "Includes inventing roles. Someone with this can widen their own reach.",
+        note: "Includes inventing roles. Someone with this can grant only what they hold themselves.",
     },
     {
         action: "project:access:manage",

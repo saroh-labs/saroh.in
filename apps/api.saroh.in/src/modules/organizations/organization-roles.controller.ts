@@ -27,8 +27,9 @@ import { CreateRoleDto, UpdateRoleDto } from "./roles.dto";
  *
  * Reading needs `member:read` — the same floor that shows the roster, because
  * knowing what a colleague's role lets them do is part of working alongside
- * them. Writing needs `member:role:update`, the one permission the catalogue
- * warns about: whoever holds it can widen their own reach.
+ * them. Writing needs `member:role:update`, and the service bounds it by the
+ * writer's reach (F19): a role gets only what the writer holds, and a role
+ * that can do more than the writer is not theirs to change or remove.
  *
  * Not module-gated. Roles are how a business decides who may touch what, and
  * a module switch must never be able to lock the owner out of that.
@@ -63,7 +64,7 @@ export class OrganizationRolesController {
     @HttpCode(201)
     create(@OrgContext() ctx: OrganizationContext, @Body() dto: CreateRoleDto) {
         authorize(ctx, "member:role:update");
-        return this.roles.create(ctx.organizationId, dto);
+        return this.roles.create(ctx, dto);
     }
 
     @Patch(":key")
@@ -73,7 +74,7 @@ export class OrganizationRolesController {
         @Body() dto: UpdateRoleDto,
     ) {
         authorize(ctx, "member:role:update");
-        return this.roles.update(ctx.organizationId, key, dto);
+        return this.roles.update(ctx, key, dto);
     }
 
     @Delete(":key")
@@ -83,6 +84,6 @@ export class OrganizationRolesController {
         @Param("key") key: string,
     ): Promise<void> {
         authorize(ctx, "member:role:update");
-        await this.roles.remove(ctx.organizationId, key);
+        await this.roles.remove(ctx, key);
     }
 }
