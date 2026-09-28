@@ -21,8 +21,9 @@ export function ChangeCard({
     onRefund,
     onFulfilment,
     onCancel,
+    note,
 }: {
-    /** May change orders (`order:write`). */
+    /** May change orders (`order:edit`, B16). */
     canEdit: boolean;
     /** The order is still New (the API says). */
     editable: boolean;
@@ -39,14 +40,17 @@ export function ChangeCard({
     onRefund: () => void;
     onFulfilment?: () => void;
     onCancel?: () => void;
+    /** What can change on it, where its type says otherwise (a treatment, B14). */
+    note?: string;
 }) {
     const editNote = !canEdit
-        ? "Changing items is for owners and admins."
-        : editable
-          ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
-          : fulfilment === null
-            ? "Items are locked now that preparing has started. How it's fulfilled can still change until it's handed over."
-            : "Preparing has started — refund what is wrong and add a new order.";
+        ? "Your role can't change orders."
+        : (note ??
+          (editable
+              ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
+              : fulfilment === null
+                ? "Items are locked now that preparing has started. How it's fulfilled can still change until it's handed over."
+                : "Preparing has started — refund what is wrong and add a new order."));
     return (
         <Panel aria-labelledby="od-change">
             <PanelTitle id="od-change" className="mb-2.5">

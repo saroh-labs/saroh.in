@@ -16,9 +16,10 @@ import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
-import { courseSeatsHeld } from "./course-seats";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
+import { seatsHeld } from "./held-seats";
 import { depositCents } from "./service-fields";
+import { acceptWaitlistInTx } from "./waitlist-queue";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -432,13 +433,18 @@ export async function reserveInTx(
         });
         // Seats an open course still holds count as taken (ADR-007) —
         // other courses' seats, for a course's own booking: its unsold
-        // seats are the ones it is filling.
-        const held = await courseSeatsHeld(
+        // seats are the ones it is filling. So does a place held for
+        // someone on the waitlist (A12), except for that person, who takes
+        // it by booking it.
+        const held = await seatsHeld(
             tx,
             serviceId,
             clear.startAt,
             clear.endAt,
-            course?.courseId,
+            {
+                exceptCourseId: course?.courseId,
+                exceptContactId: by.account?.contactId ?? null,
+            },
         );
         if (confirmed + held >= service.capacity) {
             throw new ConflictException("This slot is fully booked");
@@ -528,10 +534,19 @@ export async function reserveInTx(
         },
     });
 
+    // A place they were waiting for, or held for them, is taken (A12).
+    await acceptWaitlistInTx(tx, {
+        serviceId,
+        startAt,
+        contactId: contact.id,
+        bookingId: booking.id,
+        now: new Date(),
+    });
+
     // Where the history starts. No `fromStartAt`: there was no before.
     // The actor is whoever made it by hand; a booker who did it
     // themselves leaves it empty.
-    await tx.bookingEvent.create({
+    const booked = await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId,
@@ -542,14 +557,15 @@ export async function reserveInTx(
         select: { id: true },
     });
 
-    // A course session's booking is not notified: nothing sends these yet,
-    // and one enrolment would queue a dead letter per session (ADR-007).
+    // A course session's booking is not notified one by one: one enrolment
+    // books every session (ADR-007).
     if (course) return booking;
+    // A pay-now hold is confirmed, and told, once it is paid
+    // (`booking-hold.ts`).
+    if (booking.status !== "CONFIRMED") return booking;
 
-    // Transactional outbox: a committed booking always has a queued
-    // notification job. The handler never landed: the worker dead-letters
-    // booking.notify until one is registered (see
-    // jobs/job-consumers.spec.ts).
+    // Transactional outbox: a committed booking always has its notice
+    // queued. A14's `booking-notify.handler.ts` tells the customer.
     await tx.job.create({
         data: {
             organizationId,
@@ -558,6 +574,8 @@ export async function reserveInTx(
                 bookingId: booking.id,
                 serviceId,
                 contactId: contact.id,
+                reason: "booked",
+                eventId: booked.id,
             },
         },
     });
@@ -587,7 +605,10 @@ async function releaseOwnHoldInTx(
         startAt,
         now,
     );
-    if (hold) await releaseHoldInTx(tx, hold, now);
+    // Nothing frees: they are booking this very session again.
+    if (hold) {
+        await releaseHoldInTx(tx, hold, now, null, { freesPlace: false });
+    }
 }
 
 /**

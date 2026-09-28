@@ -24,13 +24,17 @@ import type { OrderRead } from "./read";
  * One page of the orders the list is narrowed to, for the CSV (B4). Export
  * walks the API's cursor from the browser a page per call, so a long list
  * never waits on one request that reads everything, and the button can
- * say how far it has got.
+ * say how far it has got. Each page says it is for the export, which the
+ * API asks `order:export` of (B16).
  */
 export async function loadOrdersExportPage(
     params: OrderListParams,
 ): Promise<ApiResult<OrderListPage>> {
     try {
-        return { ok: true, data: await listOrderRows(params) };
+        return {
+            ok: true,
+            data: await listOrderRows({ ...params, export: true }),
+        };
     } catch (error) {
         unstable_rethrow(error);
         return {

@@ -14,7 +14,7 @@ import {
     loadTaxProfile,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
-import { allows, authorize } from "../organizations/organization-policy";
+import { authorize } from "../organizations/organization-policy";
 import {
     DIFFERENCE_KEY_PREFIX,
     supersedeOpenDifferenceIntents,
@@ -35,9 +35,9 @@ import {
 } from "./fulfilment";
 import type { ChangeFulfilmentDto } from "./order-change.dto";
 import { fulfilmentNote, tellOrderCustomer } from "./order-customer-note";
-import { lockOrder } from "./order-kitchen.service";
 import { isServiceLine } from "./order-line";
 import { fromCents, toCents, withGstRates } from "./order-pricing";
+import { lockOrder } from "./order-stage-write";
 
 /** What a change of how an order is fulfilled did. */
 export interface FulfilmentChangeOutcome {
@@ -64,8 +64,9 @@ export interface FulfilmentChangeOutcome {
 
 /**
  * "Change how it's fulfilled…" on Order Detail (round-2 B9, option B;
- * R6, default 17). `order:write`; moving money on a paid order also takes
- * `payment:manage`.
+ * R6, default 17). `order:edit` (B16); moving money on a paid order also
+ * takes `order:refund`, the order's money power (`payment:manage` implies
+ * it).
  *
  * Allowed until handover, in one transaction under the order's row lock:
  * the new way must be one every item allows (B12) and, for Pick-up, Local
@@ -96,7 +97,7 @@ export class OrderFulfilmentChangeService {
         orderId: string,
         dto: ChangeFulfilmentDto,
     ): Promise<FulfilmentChangeOutcome> {
-        authorize(ctx, "order:write");
+        authorize(ctx, "order:edit");
         const newShippingCents = toCents(dto.shipping);
 
         const result = await prisma.$transaction(async (tx) => {
@@ -263,12 +264,8 @@ export class OrderFulfilmentChangeService {
                   })
                 : [];
             const byHand = paid && payments.length === 0;
-            if (
-                paid &&
-                differenceCents !== 0 &&
-                !allows(ctx, "payment:manage")
-            ) {
-                authorize(ctx, "payment:manage");
+            if (paid && differenceCents !== 0) {
+                authorize(ctx, "order:refund");
             }
             // What to take or hand back comes from the ledger (as an edit's
             // does): an earlier edit's charge may never have been paid, and

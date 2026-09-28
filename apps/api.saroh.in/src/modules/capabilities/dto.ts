@@ -7,6 +7,26 @@ import {
     MaxLength,
 } from "class-validator";
 
+import type { ModuleKey } from "./module-registry";
+import type {
+    DeactivationBlocker,
+    DeactivationImpactItem,
+} from "./readiness/module-readiness.port";
+
+/**
+ * `GET /organizations/:id/modules/:moduleKey/impact` (F13): what turning the
+ * module off touches, read now. `goesWith` are the modules that are on and
+ * need it, in the order they go off; `items` are the module's lines and
+ * theirs; `blockers` refuse the change and are never overridable.
+ */
+export interface ModuleImpactView {
+    moduleKey: ModuleKey;
+    enabled: boolean;
+    goesWith: ModuleKey[];
+    items: DeactivationImpactItem[];
+    blockers: DeactivationBlocker[];
+}
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 

@@ -13,9 +13,11 @@ const QUIET: Record<string, Table> = {
     order: { count: 0, findFirst: null },
     booking: { count: 0, findFirst: null },
     invoice: { findFirst: null, groupBy: [] },
-    productReview: { count: 0 },
+    productReview: { count: 0, findMany: [] },
     organizationModule: { findFirst: null },
     customerSubscription: { count: 0, findMany: [] },
+    // F2: no booking-page note waiting (`home-people-sources.ts`).
+    contactAttention: { count: 0, findMany: [] },
 };
 
 type Rows = (args?: unknown) => Promise<{ id: string }[]>;

@@ -659,7 +659,7 @@ describe("lists and what is owed", () => {
         expect(where).toEqual({
             organizationId: "org_1",
             // A pay-now hold's unnumbered draft is not the business's (U19).
-            NOT: { source: "BOOKING", number: null },
+            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
             status: "ISSUED",
             dueAt: { lt: expect.any(Date) },
             contactId: "c_1",
@@ -675,7 +675,7 @@ describe("lists and what is owed", () => {
         // months ago and paid this morning is still found.
         expect(where).toEqual({
             organizationId: "org_1",
-            NOT: { source: "BOOKING", number: null },
+            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
             paidAt: { gte: new Date(since) },
             kind: { not: "CREDIT_NOTE" },
         });

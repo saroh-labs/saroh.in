@@ -96,6 +96,35 @@ describe("capability catalogue", () => {
     });
 });
 
+describe("the split order powers (B16)", () => {
+    it("labels each part in the owner's words, in Sell, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["order:create", "Take new orders"],
+            ["order:edit", "Change orders after they're placed"],
+            ["order:refund", "Refund and cancel orders"],
+            ["order:export", "Export orders"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("sell");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("relabels the kitchen's power, keeping its key", () => {
+        expect(CAPABILITY_BY_ACTION.get("order:stage")?.label).toBe(
+            "Move orders through their steps and print",
+        );
+    });
+
+    it("says what the old umbrella includes, for roles saved before the split", () => {
+        const write = CAPABILITY_BY_ACTION.get("order:write");
+        expect(write?.note).toContain("Take new orders");
+        expect(write?.note).toContain("Change orders after they're placed");
+        expect(write?.note).toContain("Export orders");
+    });
+});
+
 describe("Count and move stock (#513)", () => {
     it("is on the list, grantable, with a label an owner reads", () => {
         const stock = CAPABILITY_BY_ACTION.get("inventory:write");

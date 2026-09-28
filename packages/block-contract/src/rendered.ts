@@ -309,6 +309,21 @@ const renderedPlans = z.object({
 });
 
 /**
+ * `productGrid`, as published (G12): nothing resolves at publish. The
+ * products are read when the page is served, at the site's storefront.
+ */
+const renderedProductGrid = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    source: z.enum(["newest", "collection", "picked"]).optional(),
+    collectionId: z.string().optional(),
+    productIds: z.array(z.string()).optional(),
+    count: z.number().int().optional(),
+    showPrices: z.boolean().optional(),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -337,6 +352,7 @@ export const RENDERED_SCHEMAS = {
     visitUs: renderedVisitUs,
     journal: renderedJournal,
     plans: renderedPlans,
+    productGrid: renderedProductGrid,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -357,6 +373,7 @@ export type RenderedServicesList = RenderedContent<"servicesList">;
 export type RenderedVisitUs = RenderedContent<"visitUs">;
 export type RenderedJournal = RenderedContent<"journal">;
 export type RenderedPlans = RenderedContent<"plans">;
+export type RenderedProductGrid = RenderedContent<"productGrid">;
 
 /**
  * Validate rendered content for a block type.

@@ -9,6 +9,7 @@ import type {
     RenderedHero,
     RenderedJournal,
     RenderedPlans,
+    RenderedProductGrid,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -27,6 +28,8 @@ import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
 import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
+import type { ProductGridFeed } from "./blocks/product-grid";
+import ProductGridSection from "./blocks/product-grid";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -66,6 +69,7 @@ export default function SectionRenderer({
     siteId,
     journal,
     plans,
+    productGrid,
 }: {
     section: Section;
     /**
@@ -94,6 +98,12 @@ export default function SectionRenderer({
      * block reads them itself and says why when there are none.
      */
     plans?: PlansFeed;
+    /**
+     * This section's products, read by the page that serves the site (G12),
+     * for a Product grid. Undefined on the editor's canvas, where the block
+     * reads them itself and says why when there are none.
+     */
+    productGrid?: ProductGridFeed;
 }) {
     switch (section.type) {
         case "hero":
@@ -178,6 +188,15 @@ export default function SectionRenderer({
                     siteId={siteId}
                 />
             );
+        case "productGrid":
+            return (
+                <ProductGridSection
+                    content={section.content as RenderedProductGrid}
+                    feed={productGrid}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -227,6 +246,7 @@ export function PageSections({
     siteId,
     journal,
     plans,
+    productGrids,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
@@ -239,6 +259,11 @@ export function PageSections({
     journal?: JournalFeed;
     /** The business's plans on sale, for the Plans block (G9). */
     plans?: PlansFeed;
+    /**
+     * Each Product grid's products (G12), by the section's index in
+     * `sections`: every grid asks for its own.
+     */
+    productGrids?: readonly (ProductGridFeed | undefined)[];
 }) {
     return (
         <>
@@ -252,6 +277,7 @@ export function PageSections({
                         siteId={siteId}
                         journal={journal}
                         plans={plans}
+                        productGrid={productGrids?.[i]}
                     />
                 );
                 return style === undefined ? (

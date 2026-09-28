@@ -8,14 +8,16 @@ import type { ProductBlockReader } from "./website-pages";
 import {
     PRODUCT_BLOCKS,
     pagesShowing,
+    readProductGrid,
     websitePagesFor,
     websitePagesForCollections,
 } from "./website-pages";
 
 /**
- * "Shown on the website" (#516) reads the live snapshot's sections. No block
- * can show a product yet (#473), so today the answer is always empty; the
- * scanner itself is checked with a stand-in block.
+ * "Shown on the website" (#516) reads the live snapshot's sections. With no
+ * block handed in (the shop not open) the answer is always empty; the
+ * scanner itself is checked with a stand-in block, and the Product grid's
+ * own reader (G12) on its own.
  */
 describe("website pages that show a product", () => {
     const productsBlock: ProductBlockReader = (content) => {
@@ -63,8 +65,7 @@ describe("website pages that show a product", () => {
         ],
     };
 
-    it("no block can show a product yet", () => {
-        expect(Object.keys(PRODUCT_BLOCKS)).toHaveLength(0);
+    it("with no block handed in, nothing shows a product", () => {
         expect(
             pagesShowing(snapshot, { productId: "p1", collectionIds: [] }),
         ).toEqual([]);
@@ -152,5 +153,67 @@ describe("website pages that show a product", () => {
             showsProducts: true,
             pages: [],
         });
+    });
+});
+
+/** G12 — how a Product grid's published content says what it shows. */
+describe("the Product grid's reach", () => {
+    it("is the one block that shows products", () => {
+        expect(Object.keys(PRODUCT_BLOCKS)).toEqual(["productGrid"]);
+    });
+
+    it("names the products it picked, in order", () => {
+        expect(
+            readProductGrid({ source: "picked", productIds: ["p2", "p1", 3] }),
+        ).toEqual({ productIds: ["p2", "p1"], collectionIds: [] });
+    });
+
+    it("names the collection it shows", () => {
+        expect(
+            readProductGrid({
+                source: "collection",
+                collectionId: "col_breads",
+                productIds: ["p9"],
+            }),
+        ).toEqual({ productIds: [], collectionIds: ["col_breads"] });
+    });
+
+    it("names nothing for the newest, or content it can't read", () => {
+        for (const content of [
+            {},
+            { productIds: ["p1"] },
+            { source: "newest", collectionId: "col_breads" },
+            null,
+            "grid",
+        ]) {
+            expect(readProductGrid(content)).toEqual({
+                productIds: [],
+                collectionIds: [],
+            });
+        }
+    });
+
+    it("finds the live page whose grid picked the product", () => {
+        const snapshot = {
+            pages: [
+                {
+                    path: "/",
+                    title: "Home",
+                    sections: [
+                        {
+                            type: "productGrid",
+                            content: { source: "picked", productIds: ["p1"] },
+                        },
+                    ],
+                },
+            ],
+        };
+        expect(
+            pagesShowing(
+                snapshot,
+                { productId: "p1", collectionIds: [] },
+                PRODUCT_BLOCKS,
+            ),
+        ).toEqual([{ path: "/", title: "Home" }]);
     });
 });

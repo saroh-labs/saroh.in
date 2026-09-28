@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { BookingPackControl } from "@/components/bookings/booking-pack-control";
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
+import { ClassWaitlist } from "@/components/bookings/class-waitlist";
 import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
@@ -17,6 +18,7 @@ import {
     refundLine,
     refundPolicyLine,
 } from "@/lib/services/booking-money";
+import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 
@@ -36,6 +38,7 @@ export function BookingDetailView({
     packs,
     canRefund = false,
     canReadOrder = false,
+    waitlist,
 }: {
     booking: BookingDetail;
     /** `payment:manage`: may refund money a late cancel keeps (E8). */
@@ -53,6 +56,11 @@ export function BookingDetailView({
         usable: { id: string; label: string }[];
         canWrite: boolean;
     };
+    /**
+     * The class's waitlist for this session (A12), read by the page for a
+     * class still to come; null when the read failed. Absent: not a class.
+     */
+    waitlist?: ClassWaitlistRow[] | null;
 }) {
     const { service, contact, timezone } = booking;
     const cancelled = booking.status === "CANCELLED";
@@ -271,6 +279,10 @@ export function BookingDetailView({
                         canWrite={packs.canWrite}
                     />
                 </section>
+            ) : null}
+
+            {waitlist !== undefined ? (
+                <ClassWaitlist rows={waitlist} timezone={timezone} />
             ) : null}
 
             <section className="mt-6 rounded-lg border border-border p-5">

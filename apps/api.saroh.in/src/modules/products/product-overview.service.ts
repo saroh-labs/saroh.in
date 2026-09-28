@@ -6,6 +6,7 @@ import { toMoneyString } from "../../common/money";
 import type { ProductPlacement } from "../collections/collections.service";
 import { productPlacement } from "../collections/collections.service";
 import { discountState } from "../discounts/discount-state";
+import { orderPartyName } from "../orders/walk-in";
 import type { OrgAction } from "../organizations/organization-policy";
 import { productLines } from "../stock/product-lines";
 import type { ProductScope } from "./product-access";
@@ -36,7 +37,8 @@ export type Panel<T> =
 export interface OverviewOrder {
     id: string;
     orderNumber: string;
-    customerId: string;
+    /** Null for a walk-in (B13), named by `customer` with no link. */
+    customerId: string | null;
     customer: string;
     status: string;
     open: boolean;
@@ -350,6 +352,7 @@ export class ProductOverviewService {
                                 email: true,
                             },
                         },
+                        walkInName: true,
                         items: {
                             where: { productId },
                             select: {
@@ -375,10 +378,8 @@ export class ProductOverviewService {
                 id: o.id,
                 orderNumber: o.orderId,
                 customerId: o.customerId,
-                customer:
-                    [o.customer.firstName, o.customer.lastName]
-                        .filter(Boolean)
-                        .join(" ") || o.customer.email,
+                // A walk-in (B13) reads as the name they gave.
+                customer: orderPartyName(o, { label: true }),
                 status: o.status,
                 open: OPEN_STATUSES.includes(o.status),
                 createdAt: o.createdAt,

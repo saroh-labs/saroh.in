@@ -18,13 +18,22 @@ jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
         $queryRaw: jest.fn(),
-        classPack: { create: jest.fn(), updateMany: jest.fn() },
+        $executeRaw: jest.fn(),
+        classPack: {
+            create: jest.fn(),
+            updateMany: jest.fn(),
+            findFirst: jest.fn(),
+            findUniqueOrThrow: jest.fn(),
+        },
         classPackService: { createMany: jest.fn(), deleteMany: jest.fn() },
         packPurchase: {
             create: jest.fn(),
             findFirst: jest.fn(),
             findMany: jest.fn(),
+            count: jest.fn(),
         },
+        packEvent: { create: jest.fn() },
+        service: { findFirst: jest.fn() },
         packRedemption: {
             count: jest.fn(),
             findUnique: jest.fn(),
@@ -45,7 +54,9 @@ jest.mock("@saroh/database", () => {
             },
             packPurchase: { findFirst: jest.fn(), findMany: jest.fn() },
             contact: { findFirst: jest.fn() },
-            service: { count: jest.fn() },
+            service: { count: jest.fn(), findFirst: jest.fn() },
+            membership: { findMany: jest.fn() },
+            user: { findMany: jest.fn() },
             organizationModule: { findFirst: jest.fn() },
             booking: { findFirst: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -100,6 +111,18 @@ const PACK = {
     status: "ACTIVE",
     createdAt: new Date("2026-09-01T00:00:00Z"),
     services: [{ service: { id: "svc_1", name: "Vinyasa" } }],
+    kind: "CLASSES",
+    firstPackOnly: false,
+};
+/** The pack as the editor's select reads it (the event's before and after). */
+const PACK_ROW = {
+    ...PACK,
+    pendingChanges: null,
+    pendingChangedAt: null,
+    draftRevision: 0,
+    revisedAt: null,
+    revisedById: null,
+    services: [{ serviceId: "svc_1" }],
 };
 const PURCHASE = {
     id: "pp_1",
@@ -128,6 +151,11 @@ beforeEach(() => {
     db.packPurchase!.findFirst!.mockResolvedValue(PURCHASE);
     db.packPurchase!.findMany!.mockResolvedValue([]);
     tx.classPack!.create!.mockResolvedValue({ id: "pack_1" });
+    tx.classPack!.findFirst!.mockResolvedValue(PACK);
+    tx.classPack!.findUniqueOrThrow!.mockResolvedValue(PACK_ROW);
+    tx.packPurchase!.count!.mockResolvedValue(0);
+    tx.service!.findFirst!.mockResolvedValue({ id: "svc_1", capacity: 20 });
+    db.service!.findFirst!.mockResolvedValue({ id: "svc_1", capacity: 20 });
     tx.packPurchase!.create!.mockResolvedValue({ id: "pp_1" });
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
     db.organizationModule!.findFirst!.mockResolvedValue(null);
@@ -234,9 +262,11 @@ describe("selling a pack", () => {
         await expect(
             service.sell(owner, "pack_x", { contactId: "c_1" }),
         ).rejects.toBeInstanceOf(NotFoundException);
-        expect(db.classPack!.findFirst).toHaveBeenCalledWith({
-            where: { id: "pack_x", organizationId: "org_1" },
-        });
+        expect(db.classPack!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "pack_x", organizationId: "org_1" },
+            }),
+        );
         db.classPack!.findFirst!.mockResolvedValue(PACK);
         db.contact!.findFirst!.mockResolvedValue(null);
         await expect(
@@ -312,6 +342,9 @@ describe("the packs list", () => {
             // Live: time and classes left.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: future,
                 _count: { redemptions: 3 },
@@ -319,6 +352,9 @@ describe("the packs list", () => {
             // Used up.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: future,
                 _count: { redemptions: 10 },
@@ -326,13 +362,21 @@ describe("the packs list", () => {
             // Expired.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: new Date("2026-01-01T00:00:00Z"),
                 _count: { redemptions: 0 },
             },
         ]);
         const [view] = await service.listPacks(owner, {});
-        expect(view).toMatchObject({ sold: 3, activeHolders: 1 });
+        expect(view).toMatchObject({
+            sold: 3,
+            activeHolders: 1,
+            people: 1,
+            takings: [{ currency: "INR", amount: "6600.00" }],
+        });
         expect(db.packPurchase!.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { organizationId: "org_1", packId: { in: ["pack_1"] } },
@@ -357,7 +401,11 @@ describe("the purchases list", () => {
                 where: {
                     organizationId: "org_1",
                     contactId: "c_1",
-                    pack: { services: { some: { serviceId: "svc_1" } } },
+                    // A class: only Classes packs that cover it (E13).
+                    pack: {
+                        kind: "CLASSES",
+                        services: { some: { serviceId: "svc_1" } },
+                    },
                 },
             }),
         );
@@ -487,7 +535,11 @@ describe("using a pack on a booking already made", () => {
                     organizationId: "org_1",
                     contactId: "c_1",
                     expiresAt: { gt: BOOKING.startAt },
-                    pack: { services: { some: { serviceId: "svc_1" } } },
+                    // Covering the class, and a Classes pack (E13).
+                    pack: {
+                        kind: "CLASSES",
+                        services: { some: { serviceId: "svc_1" } },
+                    },
                 },
                 orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
             }),
@@ -679,6 +731,243 @@ describe("drafts in the packs list (E14)", () => {
         expect(clean).toMatchObject({
             hasPendingChanges: false,
             pendingChangedAt: null,
+        });
+    });
+});
+
+describe("kind, first pack only, paid by and the reads (E13)", () => {
+    const deskReader: OrganizationContext = {
+        organizationId: "org_1",
+        userId: "user_2",
+        role: "MEMBER",
+        roleKey: "front-desk",
+        actions: resolveCapabilities("front-desk", ["pack:read"]),
+    };
+
+    it("records how the desk was paid, on the purchase and in a SOLD event", async () => {
+        db.packPurchase!.findFirst!.mockResolvedValue({
+            ...PURCHASE,
+            paidBy: "UPI",
+        });
+        const view = await service.sell(owner, "pack_1", {
+            contactId: "c_1",
+            paidBy: "UPI",
+        });
+        expect(tx.packPurchase!.create!.mock.calls[0]![0].data.paidBy).toBe(
+            "UPI",
+        );
+        expect(tx.packEvent!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                packId: "pack_1",
+                purchaseId: "pp_1",
+                kind: "SOLD",
+                actorKind: "TEAM",
+                actorUserId: "user_1",
+                details: {
+                    price: "4500.00",
+                    currency: "INR",
+                    credits: 10,
+                    paidBy: "UPI",
+                },
+            }),
+        });
+        expect(view.paidBy).toBe("UPI");
+    });
+
+    it("sells from an app that doesn't say how it was paid, recording none", async () => {
+        await service.sell(owner, "pack_1", { contactId: "c_1" });
+        expect(
+            tx.packPurchase!.create!.mock.calls[0]![0].data.paidBy,
+        ).toBeNull();
+    });
+
+    it("refuses a first-pack-only pack to someone who has had one: 409 'Only for a first pack'", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({
+            ...PACK,
+            firstPackOnly: true,
+        });
+        tx.packPurchase!.count!.mockResolvedValue(1);
+        await expect(
+            service.sell(owner, "pack_1", { contactId: "c_1" }),
+        ).rejects.toMatchObject({
+            response: { message: "Only for a first pack" },
+        });
+        // Serialised per person, and counted by the pack's kind.
+        expect(tx.$executeRaw).toHaveBeenCalled();
+        expect(tx.packPurchase!.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                contactId: "c_1",
+                pack: { kind: "CLASSES" },
+            },
+        });
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+    });
+
+    it("sells a first-pack-only pack to someone who never had one", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({
+            ...PACK,
+            firstPackOnly: true,
+        });
+        await service.sell(owner, "pack_1", { contactId: "c_1" });
+        expect(tx.packPurchase!.create).toHaveBeenCalled();
+    });
+
+    it("refuses selling a pack that became a draft since the page loaded", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({
+            ...PACK,
+            status: "DRAFT",
+        });
+        await expect(
+            service.sell(owner, "pack_1", { contactId: "c_1" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+    });
+
+    it("words a one-to-one pack's invoice line in sessions", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({
+            ...PACK,
+            name: "5 PT sessions",
+            credits: 5,
+            kind: "ONE_TO_ONE",
+        });
+        await service.sell(owner, "pack_1", { contactId: "c_1" });
+        expect(issueInTx.mock.calls[0]![2].lines[0].description).toBe(
+            "5 PT sessions · 5 sessions",
+        );
+    });
+
+    it("refuses a validity under 7 days: 400", async () => {
+        await expect(
+            service.createPack(owner, {
+                name: "Trial",
+                credits: 2,
+                validityDays: 6,
+                price: "500",
+                currency: "INR",
+                serviceIds: ["svc_1"],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(tx.classPack!.create).not.toHaveBeenCalled();
+    });
+
+    it("makes a pack of the kind asked for, and records CREATED", async () => {
+        await service.createPack(owner, {
+            name: "5 PT sessions",
+            credits: 5,
+            validityDays: 90,
+            price: "5500",
+            currency: "INR",
+            serviceIds: ["svc_1"],
+            kind: "ONE_TO_ONE",
+            firstPackOnly: true,
+        });
+        expect(tx.classPack!.create!.mock.calls[0]![0].data).toMatchObject({
+            kind: "ONE_TO_ONE",
+            firstPackOnly: true,
+        });
+        expect(tx.packEvent!.create!.mock.calls[0]![0].data.kind).toBe(
+            "CREATED",
+        );
+    });
+
+    it("refuses changing the kind of a pack that has been sold: 409", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({ status: "ACTIVE" });
+        tx.packPurchase!.count!.mockResolvedValue(3);
+        await expect(
+            service.updatePack(owner, "pack_1", { kind: "ONE_TO_ONE" }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "kind" } },
+        });
+        expect(tx.classPack!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("changes the kind of a pack nobody has bought, and records the change", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({ status: "ACTIVE" });
+        tx.classPack!.findUniqueOrThrow!.mockResolvedValueOnce(
+            PACK_ROW,
+        ).mockResolvedValueOnce({ ...PACK_ROW, kind: "ONE_TO_ONE" });
+        await service.updatePack(owner, "pack_1", { kind: "ONE_TO_ONE" });
+        expect(tx.classPack!.updateMany!.mock.calls[0]![0].data.kind).toBe(
+            "ONE_TO_ONE",
+        );
+        expect(tx.packEvent!.create!.mock.calls[0]![0].data).toMatchObject({
+            kind: "CHANGED",
+            details: { kind: ["CLASSES", "ONE_TO_ONE"] },
+        });
+    });
+
+    it("records ARCHIVED", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({ status: "ACTIVE" });
+        await service.setPackStatus(owner, "pack_1", "ARCHIVED");
+        expect(tx.packEvent!.create!.mock.calls[0]![0].data.kind).toBe(
+            "ARCHIVED",
+        );
+    });
+
+    it("gives Sales, with amounts and methods, to a role with pack:read and no payment:read", async () => {
+        db.packPurchase!.findMany!.mockResolvedValue([
+            {
+                id: "pp_1",
+                credits: 10,
+                price: decimal("4500"),
+                currency: "INR",
+                paidBy: "UPI",
+                createdAt: new Date("2026-09-22T00:00:00Z"),
+                createdByUserId: "user_1",
+                contact: PURCHASE.contact,
+                invoices: [{ id: "inv_1" }],
+                events: [{ actorKind: "TEAM", actorUserId: "user_1" }],
+            },
+        ]);
+        db.user!.findMany!.mockResolvedValue([{ id: "user_1", name: "Neha" }]);
+        const [sale] = await service.listSales(deskReader, "pack_1");
+        expect(sale).toEqual({
+            purchaseId: "pp_1",
+            contact: { id: "c_1", name: "Asha" },
+            soldAt: "2026-09-22T00:00:00.000Z",
+            credits: 10,
+            price: "4500.00",
+            currency: "INR",
+            paidBy: "UPI",
+            soldBy: { kind: "TEAM", userId: "user_1", name: "Neha" },
+            // No invoice:read, so no link to a page they can't open.
+            invoiceId: null,
+        });
+    });
+
+    it("refuses Pack Detail's reads without pack:read, and Extend without pack:write: 403", async () => {
+        const reviewer: OrganizationContext = { ...owner, role: "REVIEWER" };
+        for (const read of [
+            () => service.getPack(reviewer, "pack_1"),
+            () => service.listHolders(reviewer, "pack_1"),
+            () => service.listUsed(reviewer, "pack_1", {}),
+            () => service.listSales(reviewer, "pack_1"),
+            () => service.listEvents(reviewer, "pack_1", {}),
+        ]) {
+            await expect(read()).rejects.toBeInstanceOf(ForbiddenException);
+        }
+        await expect(
+            service.extend(deskReader, "pp_1", { days: 7, reason: "Away" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("answers another business's pack with a 404 on every read", async () => {
+        db.classPack!.findFirst!.mockResolvedValue(null);
+        await expect(service.listSales(owner, "pack_x")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(db.packPurchase!.findMany).not.toHaveBeenCalled();
+    });
+
+    it("lists packs with their kind, first-pack-only and classes left", async () => {
+        const [view] = await service.listPacks(owner, {});
+        expect(view).toMatchObject({
+            kind: "CLASSES",
+            firstPackOnly: false,
+            creditsLeft: 0,
+            people: 0,
+            takings: [],
         });
     });
 });

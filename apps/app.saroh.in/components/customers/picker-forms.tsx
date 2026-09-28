@@ -9,7 +9,13 @@ import type {
     CustomerSearchResult,
     NewCustomerDraft,
 } from "@/lib/customers/picker";
-import { EMAIL, resultLabel } from "@/lib/customers/picker";
+import {
+    EMAIL,
+    resultLabel,
+    WALK_IN_PHONE_ERROR,
+    walkInCopy,
+    walkInPhone,
+} from "@/lib/customers/picker";
 
 /**
  * The customer picker's small inline forms (E4): someone new, a walk-in
@@ -138,7 +144,11 @@ export function NewCustomerForm({
     );
 }
 
-/** A walk-in: a name, and a phone if they give one. No record is made. */
+/**
+ * A walk-in: a name, and a phone if they give one. A name alone makes no
+ * record; a phone keeps them as a customer (B13b), which the line under the
+ * fields and the button both say.
+ */
 export function WalkInForm({
     initial,
     onUse,
@@ -151,9 +161,32 @@ export function WalkInForm({
     const ids = { name: useId(), phone: useId() };
     const [name, setName] = useState(initial.name);
     const [phone, setPhone] = useState(initial.phone);
+    const [error, setError] = useState<string | null>(null);
     const ready = name.trim().length > 0;
+    const copy = walkInCopy(phone);
+
+    function use() {
+        if (!ready) return;
+        if (walkInPhone(phone) === "short") {
+            setError(WALK_IN_PHONE_ERROR);
+            return;
+        }
+        setError(null);
+        onUse({ name: name.trim(), phone: phone.trim() });
+    }
+
     return (
-        <div role="group" aria-label="Walk-in" className={BOX}>
+        <div
+            role="group"
+            aria-label="Walk-in"
+            className={BOX}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    use();
+                }
+            }}
+        >
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                     <Label htmlFor={ids.name} className={LABEL}>
@@ -175,12 +208,29 @@ export function WalkInForm({
                         id={ids.phone}
                         type="tel"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => {
+                            setPhone(e.target.value);
+                            setError(null);
+                        }}
                         autoComplete="off"
+                        aria-invalid={error ? true : undefined}
+                        aria-describedby={`${ids.phone}-hint`}
                         className={FIELD}
                     />
                 </div>
             </div>
+            <p
+                id={`${ids.phone}-hint`}
+                role={error ? "alert" : undefined}
+                aria-live={error ? undefined : "polite"}
+                className={
+                    error
+                        ? "text-[11.5px] font-medium text-destructive-subtle-foreground"
+                        : "text-[11.5px] text-muted-foreground"
+                }
+            >
+                {error ?? copy.hint}
+            </p>
             <div className="flex justify-end gap-2">
                 <Button
                     type="button"
@@ -190,15 +240,8 @@ export function WalkInForm({
                 >
                     Cancel
                 </Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    disabled={!ready}
-                    onClick={() =>
-                        onUse({ name: name.trim(), phone: phone.trim() })
-                    }
-                >
-                    Use walk-in
+                <Button type="button" size="sm" disabled={!ready} onClick={use}>
+                    {copy.action}
                 </Button>
             </div>
         </div>

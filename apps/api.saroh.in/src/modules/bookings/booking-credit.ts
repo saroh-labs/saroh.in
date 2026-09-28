@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { classPacksOn } from "../class-packs/class-packs-on";
+import { purchasesPayingFor } from "../class-packs/pack-kind";
 import { CREDIT_GONE, redeemPackInTx } from "../class-packs/redeem-pack";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import {
@@ -162,7 +163,9 @@ async function packCredit(
         where: {
             ...who,
             expiresAt: { gt: startAt },
-            pack: { services: { some: { serviceId: service.id } } },
+            // Covers the service and is of its kind (E13): what the desk's
+            // `redeemPackInTx` would spend.
+            ...purchasesPayingFor(service),
         },
         // The desk's order (`redeemPackInTx`): the soonest to run out.
         orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],

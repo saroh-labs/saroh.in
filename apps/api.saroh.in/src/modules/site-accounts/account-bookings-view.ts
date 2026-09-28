@@ -124,7 +124,15 @@ export interface AccountCancelResult {
     kept: { amount: string; currency: string } | null;
     /** A visit of a treatment: its money is on the order. */
     order: boolean;
+    /**
+     * The business is told (A14): the cancel happened now, and its notice
+     * to the team is queued. False when it was already cancelled.
+     */
+    told: boolean;
 }
+
+/** A move, and whether the business is told of it (A14). */
+export type AccountMoveResult = AccountBookingRow & { told: boolean };
 
 // ---- Serializers ------------------------------------------------------------
 
@@ -287,6 +295,7 @@ export function treatmentView(
 export function cancelResultView(
     row: AccountBookingRow,
     result: CancelMoney,
+    told = false,
 ): AccountCancelResult {
     return {
         booking: row,
@@ -304,5 +313,6 @@ export function cancelResultView(
               }
             : null,
         order: Boolean(result.treatmentOrderId),
+        told,
     };
 }

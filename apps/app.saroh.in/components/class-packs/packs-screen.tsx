@@ -1,73 +1,71 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@saroh/ui/dropdown-menu";
+import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { MoreHorizontal, Ticket } from "lucide-react";
+import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
+import { Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
-import { DataView } from "@/components/shared/data-view/data-view";
-import type {
-    DataColumn,
-    DataFilter,
-} from "@/components/shared/data-view/types";
 import { setPackArchived } from "@/lib/class-packs/actions";
-import type { ClassPack } from "@/lib/class-packs/service";
-import { invoiceMoney } from "@/lib/invoices/money";
+import type { PackListItem } from "@/lib/class-packs/pack-cards";
+import { orderForList, packCard } from "@/lib/class-packs/pack-cards";
+import type { MembershipPlan } from "@/lib/class-packs/packs-page";
+import type { HeldPack } from "@/lib/class-packs/sell-words";
 
 import { ClassPacksTabs } from "./class-packs-tabs";
+import { MembershipsNote } from "./memberships-note";
+import { PackCard } from "./pack-card";
 import { SellPackDialog } from "./sell-pack-dialog";
 
-const FILTERS: DataFilter<ClassPack>[] = [
-    {
-        id: "on-sale",
-        label: "On sale",
-        predicate: (p) => p.status === "ACTIVE",
-    },
-    {
-        id: "archived",
-        label: "Archived",
-        predicate: (p) => p.status === "ARCHIVED",
-    },
-];
+/** An Undo toast lasts ten seconds (round-2 default 136). */
+const UNDO_MS = 10_000;
+const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 
-/** "48 sold · 31 still live", or "Not sold yet". */
-function soldLine(p: ClassPack): string {
-    if (p.sold === 0) return "Not sold yet";
-    return `${p.sold} sold · ${p.activeHolders} still live`;
+/** Archived, with who keeps what: the toast Undo sits beside. */
+function archiveToast(pack: PackListItem, archived: boolean): string {
+    if (!archived) return `${pack.name} is on sale again.`;
+    const people = pack.people ?? pack.activeHolders;
+    return people > 0
+        ? `${pack.name} archived. Nobody new can buy it; ${people} ${people === 1 ? "person keeps" : "people keep"} their classes until their dates.`
+        : `${pack.name} archived. Nobody new can buy it.`;
 }
 
-const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
-
 /**
- * Class packs, after the "Saroh Billing and Classes" design: each pack, its
- * classes, how long it lasts, what it is usable on and its price, with how
- * many were sold and how many are still live under its name. What was bought
- * is frozen at the sale, so a change here never rewrites someone's classes.
+ * Bookings › Packs (round-2 E15, after "Saroh Packs"): one card per pack —
+ * kind, price, terms, first-pack-only, Draft or "Changes not published",
+ * what it sold and what is still to use — with Sell at the desk on each.
+ * What was bought is frozen at the sale, so a change here never rewrites
+ * anyone's classes. "Who holds one" stays a tab away.
  */
 export function PacksScreen({
     packs,
     contacts,
+    held,
     canWrite,
+    canSell,
     invoicesOnSale,
-    initialFilterId,
+    summary,
+    rules,
+    memberships,
     openSell,
 }: {
-    packs: ClassPack[];
+    packs: PackListItem[];
     contacts: ContactOption[];
+    /** The purchases the page read, for first-pack-only and "Has 4 left". */
+    held: HeldPack[];
     canWrite: boolean;
+    canSell: boolean;
     invoicesOnSale: boolean;
-    initialFilterId?: string;
+    /** "12 classes still owed to 5 people · …". */
+    summary: string;
+    /** How a booking spends a class, and when a cancel gives it back. */
+    rules: string;
+    /** Live membership plans; null or empty draws no note. */
+    memberships: MembershipPlan[] | null;
     /** Opened from ⌘K's "Sell a pack". */
     openSell: boolean;
 }) {
@@ -75,6 +73,8 @@ export function PacksScreen({
     const [selling, setSelling] = useState<{ packId?: string } | null>(
         openSell ? {} : null,
     );
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [, start] = useTransition();
 
     function onSellOpenChange(open: boolean) {
         if (open) return;
@@ -85,146 +85,118 @@ export function PacksScreen({
         router.replace(url.pathname + url.search, { scroll: false });
     }
 
-    const columns: DataColumn<ClassPack>[] = [
-        {
-            id: "pack",
-            header: "Pack",
-            priority: "primary",
-            sortValue: (p) => p.name.toLowerCase(),
-            cell: (p) => (
-                <span className="block min-w-0">
-                    <span
-                        className={
-                            p.status === "ARCHIVED"
-                                ? "block truncate font-medium text-muted-foreground"
-                                : "block truncate font-medium"
-                        }
-                    >
-                        {p.name}
-                    </span>
-                    <span className="block truncate text-[11.5px] text-muted-foreground">
-                        {soldLine(p)}
-                    </span>
-                </span>
-            ),
-        },
-        {
-            id: "classes",
-            header: "Classes",
-            priority: "secondary",
-            numeric: true,
-            width: "90px",
-            sortValue: (p) => p.credits,
-            cell: (p) => p.credits,
-        },
-        {
-            id: "valid",
-            header: "Valid for",
-            priority: "secondary",
-            width: "112px",
-            sortValue: (p) => p.validityDays,
-            cell: (p) => days(p.validityDays),
-        },
-        {
-            id: "usable",
-            header: "Usable on",
-            priority: "detail",
-            cell: (p) => (
-                <span className="block truncate text-[12.5px]">
-                    {p.services.map((s) => s.name).join(", ")}
-                </span>
-            ),
-        },
-        {
-            id: "price",
-            header: "Price",
-            priority: "detail",
-            numeric: true,
-            money: true,
-            width: "118px",
-            sortValue: (p) => Number(p.price),
-            cell: (p) => invoiceMoney(p.price, p.currency),
-        },
-        {
-            id: "status",
-            header: "Status",
-            priority: "secondary",
-            width: "100px",
-            cell: (p) =>
-                p.status === "ARCHIVED" ? (
-                    <Badge variant="neutral">Archived</Badge>
-                ) : (
-                    <Badge variant="success">On sale</Badge>
-                ),
-        },
-    ];
+    function setArchived(pack: PackListItem, archived: boolean) {
+        setBusyId(pack.id);
+        start(async () => {
+            const res = await setPackArchived(pack.id, archived);
+            setBusyId(null);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            router.refresh();
+            // One Undo on screen at a time: an older one would undo the
+            // wrong pack.
+            dismissToasts();
+            showUndo(
+                archiveToast(pack, archived),
+                () =>
+                    start(async () => {
+                        const back = await setPackArchived(pack.id, !archived);
+                        if (!back.ok) showError(back.error);
+                        router.refresh();
+                    }),
+                { duration: UNDO_MS },
+            );
+        });
+    }
+
+    const ordered = orderForList(packs);
 
     return (
         <>
             <PageHeader
+                breadcrumb={[
+                    <Link
+                        key="bookings"
+                        href="/bookings"
+                        className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                        Bookings
+                    </Link>,
+                    "Packs",
+                ]}
                 title="Class packs"
-                className="mb-0"
-                actions={
-                    canWrite ? (
-                        <>
-                            <Button onClick={() => setSelling({})}>
-                                Sell a pack
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <Link href="/class-packs/new">
-                                    New class pack
-                                </Link>
-                            </Button>
-                        </>
-                    ) : undefined
+                description={
+                    <span className="block max-w-[720px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
+                        {rules}
+                    </span>
                 }
+                actions={
+                    <span className="text-[12.5px] text-muted-foreground">
+                        {summary}
+                    </span>
+                }
+                className="mb-0"
             />
             <ClassPacksTabs current="packs" />
-            <DataView
-                viewId="class-packs"
-                rows={packs}
-                columns={columns}
-                rowKey={(p) => p.id}
-                rowHref={
-                    canWrite ? (p) => `/class-packs/${p.id}/edit` : undefined
-                }
-                rowActions={
-                    canWrite
-                        ? (p) => (
-                              <RowActions
-                                  pack={p}
-                                  onSell={() => setSelling({ packId: p.id })}
-                              />
-                          )
-                        : undefined
-                }
-                modes={["table", "list"]}
-                hideModeToggle
-                filters={FILTERS}
-                initialFilterId={initialFilterId}
-                noun={{ one: "pack", other: "packs" }}
-                searchPlaceholder="Search packs"
-                searchableColumnIds={["pack"]}
-                emptyState={{
-                    icon: <Ticket />,
-                    title: "No class packs yet",
-                    note: "A pack is a number of classes for a price, used within so many days — ten classes in ninety days, say. Sell one, and each booking paid with it takes a class off.",
-                    action: canWrite ? (
-                        <Button asChild>
-                            <Link href="/class-packs/new">New class pack</Link>
-                        </Button>
-                    ) : undefined,
-                }}
-            />
-            <p className="max-w-[68ch] text-pretty text-[12px] text-muted-foreground">
-                {invoicesOnSale
-                    ? "Selling a pack issues its invoice at once. "
-                    : ""}
-                Classes come off when one is booked with it and go back if the
-                booking is cancelled.
-            </p>
 
-            {canWrite && selling ? (
+            <div className="flex flex-wrap items-center gap-2.5">
+                <p className="flex-[1_1_280px] text-pretty text-[13px] text-foreground/80">
+                    Changing a pack only changes what&apos;s sold next. Packs
+                    people already have keep their classes, price and dates.
+                </p>
+                {canWrite ? (
+                    <>
+                        <Button asChild className={BUTTON}>
+                            <Link href="/class-packs/new">New pack</Link>
+                        </Button>
+                        <Button asChild variant="outline" className={BUTTON}>
+                            <Link href="/class-packs/new?kind=one-to-one">
+                                New one-to-one pack
+                            </Link>
+                        </Button>
+                    </>
+                ) : null}
+            </div>
+
+            {ordered.length === 0 ? (
+                <EmptyState
+                    icon={<Ticket />}
+                    title="No packs yet"
+                    description="A pack is a number of classes for one price, used within a set time. Customers see it when they book a class."
+                    action={
+                        canWrite ? (
+                            <Button asChild>
+                                <Link href="/class-packs/new">New pack</Link>
+                            </Button>
+                        ) : undefined
+                    }
+                />
+            ) : (
+                <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))]">
+                    {ordered.map((p) => (
+                        <li key={p.id} className="min-w-0">
+                            <PackCard
+                                card={packCard(p, canWrite)}
+                                canWrite={canWrite}
+                                canSell={canSell}
+                                busy={busyId === p.id}
+                                onSell={() => setSelling({ packId: p.id })}
+                                onArchive={() =>
+                                    setArchived(p, p.status !== "ARCHIVED")
+                                }
+                            />
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {memberships && memberships.length > 0 ? (
+                <MembershipsNote plans={memberships} />
+            ) : null}
+
+            {canSell && selling ? (
                 <SellPackDialog
                     open
                     onOpenChange={onSellOpenChange}
@@ -232,55 +204,9 @@ export function PacksScreen({
                     packs={packs}
                     initialPackId={selling.packId}
                     invoicesOnSale={invoicesOnSale}
+                    held={held}
                 />
             ) : null}
         </>
-    );
-}
-
-/** Sell, edit, archive or put back on sale. Holders keep using an archived pack. */
-function RowActions({ pack, onSell }: { pack: ClassPack; onSell: () => void }) {
-    const router = useRouter();
-    const archived = pack.status === "ARCHIVED";
-
-    async function setArchived(next: boolean) {
-        const res = await setPackArchived(pack.id, next);
-        if (!res.ok) return showError(res.error);
-        router.refresh();
-        if (next) {
-            showUndo(
-                `${pack.name} is archived — no new sales. Anyone holding one keeps using it.`,
-                () => void setArchived(false),
-            );
-        } else {
-            showSuccess(`${pack.name} is on sale again`);
-        }
-    }
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${pack.name}`}
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-                {!archived ? (
-                    <DropdownMenuItem onSelect={onSell}>
-                        Sell this pack
-                    </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem asChild>
-                    <Link href={`/class-packs/${pack.id}/edit`}>Edit</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void setArchived(!archived)}>
-                    {archived ? "Put it back on sale" : "Archive"}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
     );
 }

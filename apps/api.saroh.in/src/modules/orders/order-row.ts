@@ -1,4 +1,9 @@
 import { fromMinor, toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention, OrderAttentionTag } from "./order-attention";
@@ -10,6 +15,7 @@ import type { OrderReadDto } from "./order-read";
 import { amountDueCents } from "./order-read";
 import type { OrderStage } from "./order-stage";
 import { orderStanding } from "./order-standing";
+import { walkInOf } from "./walk-in";
 
 /**
  * One row of the Orders list (plan B, B1) — built here and only here, so the
@@ -49,6 +55,11 @@ export interface OrderRowDto extends FulfilmentView, LateView {
         /** Only with `contact:read`. */
         phone?: string | null;
     } | null;
+    /**
+     * A walk-in (B13): no customer record, only the name they gave, and
+     * their phone (only with `contact:read`). Null when `customer` is set.
+     */
+    walkIn: { name: string; phone: string | null } | null;
     status: string;
     paymentStatus: string;
     stage: string;
@@ -88,7 +99,9 @@ export interface OrderRowDto extends FulfilmentView, LateView {
 export interface RawOrderRow {
     id: string;
     orderId: string;
-    customerId: string;
+    customerId: string | null;
+    walkInName?: string | null;
+    walkInPhone?: string | null;
     status: string;
     paymentStatus: string;
     stage: string;
@@ -165,6 +178,10 @@ export function serializeOrderRow(
         .filter(Boolean)
         .join(" ")
         .trim();
+    // Their details were removed for a privacy request (C11): the order
+    // stays, under "Removed customer", with no email to show.
+    const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
 
     return {
         id: order.id,
@@ -177,18 +194,25 @@ export function serializeOrderRow(
             ),
         ),
         store: order.store,
-        customer: order.customer
-            ? {
-                  id: order.customerId,
-                  name: customerName || null,
-                  ...(view.contact
-                      ? {
-                            email: order.customer.email,
-                            phone: order.customer.phone,
-                        }
-                      : {}),
-              }
-            : null,
+        customer:
+            order.customer && order.customerId
+                ? {
+                      id: order.customerId,
+                      name: removed
+                          ? REMOVED_CUSTOMER_NAME
+                          : customerName || null,
+                      ...(view.contact
+                          ? {
+                                // Never a placeholder (B13b).
+                                ...(removed || !shownEmail
+                                    ? {}
+                                    : { email: shownEmail }),
+                                phone: order.customer.phone,
+                            }
+                          : {}),
+                  }
+                : null,
+        walkIn: walkInOf(order, view.contact),
         status: order.status,
         paymentStatus: order.paymentStatus,
         stage: order.stage,
@@ -246,7 +270,9 @@ export function quickViewOf(
     read: OrderReadDto,
     view: Pick<RowView, "contact">,
 ): OrderReadDto {
-    if (view.contact || !read.customer) return read;
+    if (view.contact) return read;
+    const walkIn = read.walkIn ? { ...read.walkIn, phone: null } : null;
+    if (!read.customer) return { ...read, walkIn };
     const { phone: _phone, email: _email, ...customer } = read.customer;
-    return { ...read, customer: { ...customer, phone: null } };
+    return { ...read, customer: { ...customer, phone: null }, walkIn };
 }

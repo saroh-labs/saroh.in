@@ -61,21 +61,32 @@ export function listWords(words: readonly string[]): string {
     return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
+/** Said when the API couldn't be asked what turning it off touches. */
+export const IMPACT_UNREAD = "We couldn't count what this touches right now.";
+
 /**
  * What turning a module off changes, said when someone asks to ("Turn off
- * Appointments? …"). Only what this screen knows to be true — the modules
- * that go with it and the rows that leave the rail. A module with neither
- * (it works in the background) gets no sentence rather than an invented
- * consequence, and so goes off without being asked about.
+ * Appointments? …"). First the API's lines, with real counts (F13: "3
+ * upcoming bookings stay booked; the booking page stops taking new ones"),
+ * then what this screen knows itself: the modules that go with it and the
+ * rows that leave the rail. It ends "Nothing is deleted". A module with
+ * none of these (it works in the background) gets no sentence rather than
+ * an invented consequence, and so goes off without being asked about.
  */
 export function offImpact({
     rows,
     dependents,
+    lines = [],
 }: {
     /** The rail rows that leave: this module's and its dependents'. */
     rows: readonly string[];
     /** Labels of the modules that turn off with it. */
     dependents: readonly string[];
+    /**
+     * The API's sentences, each already a sentence; null when the API
+     * couldn't be asked, which is said rather than passed over.
+     */
+    lines?: readonly string[] | null;
 }): string | null {
     const parts: string[] = [];
     if (dependents.length > 0) {
@@ -88,9 +99,13 @@ export function offImpact({
             `${listWords(rows)} ${rows.length === 1 ? "leaves" : "leave"} the rail`,
         );
     }
-    if (parts.length === 0) return null;
     const said = parts.join(", and ");
-    return `${said.charAt(0).toUpperCase()}${said.slice(1)}. Nothing is deleted.`;
+    const sentences = [
+        ...(lines ?? [IMPACT_UNREAD]),
+        ...(said ? [`${said.charAt(0).toUpperCase()}${said.slice(1)}.`] : []),
+    ];
+    if (sentences.length === 0) return null;
+    return `${sentences.join(" ")} Nothing is deleted.`;
 }
 
 /**
@@ -117,4 +132,26 @@ const SETUP_ACTION: Record<string, string> = {
 
 export function setupActionLabel(code: string): string | null {
     return SETUP_ACTION[code] ?? null;
+}
+
+/** The button beside something that refuses a turn-off, by its code. */
+const REFUSAL_ACTION: Record<string, string> = {
+    COMMERCE_OPEN_ORDERS: "Go to Orders",
+};
+
+export function refusalActionLabel(code: string): string | null {
+    return REFUSAL_ACTION[code] ?? null;
+}
+
+/**
+ * The modules Saroh has rolled out (DEC-057). One whose rollout is off is
+ * never shown to the business, in Settings or anywhere else; the business's
+ * own setting and its data are kept.
+ */
+export function rolledOut<T extends Pick<ModuleView, "blockers">>(
+    modules: readonly T[],
+): T[] {
+    return modules.filter(
+        (m) => !m.blockers.some((b) => b.code === "ROLLOUT_DISABLED"),
+    );
 }

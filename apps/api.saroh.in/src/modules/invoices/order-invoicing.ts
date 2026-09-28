@@ -224,6 +224,7 @@ export async function ensureOrderInvoice(
             customer: {
                 select: { firstName: true, lastName: true, email: true },
             },
+            walkInName: true,
             items: {
                 orderBy: { id: "asc" },
                 select: {

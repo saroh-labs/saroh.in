@@ -118,6 +118,8 @@ export class PublicOrderPayService {
                     orderId: true,
                     organization: { select: { name: true } },
                     customer: { select: { firstName: true } },
+                    // A walk-in (B13) is greeted by the name they gave.
+                    walkInName: true,
                     items: {
                         orderBy: { id: "asc" },
                         select: {
@@ -142,7 +144,9 @@ export class PublicOrderPayService {
                 select: { style: true },
             });
             const status = payLinkStanding(order);
-            const first = order.customer.firstName?.trim() ?? "";
+            const first = order.customer
+                ? (order.customer.firstName?.trim() ?? "")
+                : (order.walkInName?.trim().split(/\s+/)[0] ?? "");
             return {
                 businessName: order.organization.name,
                 orderNumber: order.orderId,

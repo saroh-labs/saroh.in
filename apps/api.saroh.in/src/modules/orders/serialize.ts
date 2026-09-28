@@ -1,4 +1,5 @@
 import { toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { OrderLineKind } from "./order-line";
 import { lineKind, lineName } from "./order-line";
 
@@ -34,7 +35,10 @@ export interface OrderItemDto {
 export interface OrderSummaryDto {
     id: string;
     orderId: string;
-    customerId: string;
+    /** Null for a walk-in (B13), who is named by `walkInName` instead. */
+    customerId: string | null;
+    /** A walk-in's name (B13); null on every order with a customer. */
+    walkInName: string | null;
     status: string;
     paymentStatus: string;
     total: string;
@@ -76,7 +80,8 @@ interface RawCustomer {
 interface RawSummary {
     id: string;
     orderId: string;
-    customerId: string;
+    customerId: string | null;
+    walkInName?: string | null;
     status: string;
     paymentStatus: string;
     total: DecimalLike;
@@ -127,12 +132,19 @@ export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
         id: order.id,
         orderId: order.orderId,
         customerId: order.customerId,
+        walkInName: order.walkInName ?? null,
         status: order.status,
         paymentStatus: order.paymentStatus,
         total: toMoneyString(order.total),
         currency: order.currency,
         createdAt: order.createdAt,
-        customer: order.customer ?? null,
+        // Never a placeholder email (a walk-in kept by phone, B13b).
+        customer: order.customer
+            ? {
+                  ...order.customer,
+                  email: contactEmailForDisplay(order.customer.email) ?? "",
+              }
+            : null,
     };
 }
 

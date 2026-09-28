@@ -54,6 +54,12 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: "/billing/subscriptions?tab=plans",
         linkLabel: "Open Plans",
     },
+    productGrid: {
+        reads: "Reads the catalogue. Stays current on its own.",
+        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products sold where the site sells from show.",
+        href: "/commerce/products",
+        linkLabel: "Open Products",
+    },
     booking: {
         reads: "Reads your services and their availability live, so a visitor can only book what you actually offer.",
         notice: "Which services can be booked, and when, follow Services and your opening hours — change them there, and this block follows.",

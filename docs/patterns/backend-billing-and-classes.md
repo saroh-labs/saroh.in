@@ -261,7 +261,8 @@
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
 - **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
-  an unnumbered booking invoice out of the invoice list and customer paper.
+  an unnumbered booking invoice — and an unnumbered online pack draft
+  (A11, below) — out of the invoice list and customer paper.
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
   CONFIRMED with `paidWith` DESK. A class credit online is below (A10,
@@ -391,11 +392,35 @@
   field too (a sorted id list; `sameValue` compares lists): a draft's are
   written to `ClassPackService` directly, a live pack's wait in the pending
   set, and sales and redemptions keep reading the published ones until
-  Publish. There are no pack events yet (E13 adds `PackEvent`), so who
-  moved the revision is kept on the pack itself (`revisedAt`,
-  `revisedById`; null for an operator, named Saroh support). E13 adds the
-  kind and first-pack-only fields to `PACK_DRAFT_FIELDS` and owns the kind
-  lock at publish.
+  Publish. Who moved the revision is kept on the pack itself (`revisedAt`,
+  `revisedById`; null for an operator, named Saroh support). Draft
+  autosaves record no event.
+- **A pack's kind, first pack only, paid by, extensions and history**
+  (round-2 E13, defaults 45 and 46; `class-packs/pack-kind.ts`).
+  `ClassPack.kind` is CLASSES (pays for classes, `capacity > 1`) or
+  ONE_TO_ONE (`capacity` 1). Every read that offers or spends a pack for a
+  booking — `redeemPackInTx`, New booking's `purchases?serviceId=`, and the
+  customer's credit online (`booking-credit.ts`) — filters with
+  `purchasesPayingFor(service)`, so what is offered is what is spent. The
+  kind is locked once sold: the old `PATCH` is a 409 on `kind`; an autosave
+  keeps a pending kind change and lists it in `problems`, and Publish
+  refuses it. Validity is at least 7 days. A `firstPackOnly` pack is sold
+  only to someone with no earlier purchase of a pack of its kind
+  (`first-pack.ts`: an advisory lock per person on the sale's transaction,
+  after `resolveContact`; A11's online sale calls it too). The sale holds
+  the pack FOR SHARE, so a publish or kind change waits for it.
+  `PackPurchase.paidBy` records how the desk was paid (CASH, UPI, CARD,
+  BANK, ONLINE, NONE; null before E13) and never restricts how anyone pays
+  (DEC-059). An extension adds 1–30 days to `expiresAt` under the
+  purchase's FOR UPDATE lock (the redeem lock), with a reason, as a
+  `PackExtension` row; a pack with nothing left can't be extended, and an
+  expired one can if the new date is still to come. Every create, publish,
+  change, sale, extension, archive and restore writes one `PackEvent` in
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
+  reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
+  `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);
+  only an invoice id needs `invoice:read`.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one
@@ -423,6 +448,20 @@
   without `invoice:read`. No backfill: without a SUBSCRIBED event the read
   says `earlierUnrecorded`. Home's failed-renewal source reads its
   RENEWAL_FAILED and MANDATE_LIMIT_LOW events (F1, written by D13).
+- **A mandate ends with its subscription, a privacy removal or a merge**
+  (round-2 D20, DEC-038). A `PaymentMandate` belongs to one subscription.
+  Every write that moves a subscription to CANCELLED calls
+  `cancelMandatesInTx` (`payments/mandate-cancel-job.ts`) in its own
+  transaction, after its event: the live mandates are marked CANCELLED at
+  once — never charged again — with a MANDATE_CANCELLED event (actor JOB,
+  `data.reason`), and a `mandate.cancel` job asks the provider after
+  commit, so a provider timeout never undoes the cancel. A new path to
+  CANCELLED must call it too. A merge does the same for the merged-away
+  contact's mandates (never moved to the survivor). A privacy removal
+  (C11) calls `MandatesService.cancelFor({ organizationId, contactId },
+"PRIVACY_REMOVAL")` before its transaction and refuses while
+  `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
+  "being confirmed" (DEC-026); a confirmed row is never asked again.
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.
@@ -469,6 +508,23 @@
   (`reserve`'s `retryOnce`), so two tabs spending the last class get one
   booking and one "no classes left". The booking reads at the desk exactly
   as a desk-made one (`paidWith`, the redemption, the money).
+- **A pack bought online** (round-2 A11, ADR-011;
+  `class-packs/{pack-checkout,public-pack-purchase.service}.ts`). Only a
+  signed-in customer, at `public/site-accounts/me/packs`, only an ACTIVE
+  pack (a draft or archived one is a 404), and only while Class packs is
+  rolled out and on (`packs-offered.ts`, DEC-057). Starting makes a DRAFT
+  invoice (source PACK, no number) priced from the pack on the server, with
+  its terms snapshotted in `Invoice.packTerms`, and an intent through the
+  invoice payment path on a provider whose window can open. The webhook
+  (`applyInvoiceSuccess` → `completePackDraftInTx`, under the intent's and
+  the invoice's locks) makes the `PackPurchase` from the snapshot — expiry
+  counted from the payment — and numbers the invoice PAID (`ONLINE`), so a
+  pack changed or archived meanwhile still sells on the terms shown; a
+  second payment on it, or one on a discarded draft, is
+  `CAPTURED_NEEDS_REFUND`. The same pack on the same terms reuses its
+  draft; changed terms void the old one; at most three packs wait at once.
+  The hold sweep voids drafts unpaid after 24 hours
+  (`discardStalePackDrafts`), so no abandoned attempt ever takes a number.
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).

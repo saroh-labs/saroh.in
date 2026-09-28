@@ -76,7 +76,7 @@ export async function replaceRules(
 
 export async function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean } = {},
+    options: { returnCredit?: boolean; closesClass?: boolean } = {},
 ) {
     return cancelBookingApi(bookingId, options);
 }

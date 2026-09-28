@@ -79,7 +79,7 @@ function makeService(
     discounts: DiscountsService | null = new DiscountsService(),
 ) {
     const stores = {
-        writableOrganization: jest.fn().mockResolvedValue({ organizationId }),
+        orderWriteOrganization: jest.fn().mockResolvedValue({ organizationId }),
     } as unknown as StoresService;
     const activation = {
         firstOrderCreated: jest.fn().mockResolvedValue(undefined),
@@ -107,7 +107,13 @@ beforeEach(() => {
     db.inventory!.findUnique!.mockResolvedValue(null);
     db.order!.count!.mockResolvedValue(0);
     db.order!.create!.mockResolvedValue({ id: "o_1", items: [] });
-    db.storeSettings!.findUnique!.mockResolvedValue({ currency: "INR" });
+    // A storefront offering all three ways (B13 checks a named way).
+    db.storeSettings!.findUnique!.mockResolvedValue({
+        currency: "INR",
+        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        collectionEnabled: true,
+        shippingEnabled: true,
+    });
     db.discount!.findUnique!.mockResolvedValue(MARKETDAY);
     db.discountRedemption!.count!.mockResolvedValue(3);
 });

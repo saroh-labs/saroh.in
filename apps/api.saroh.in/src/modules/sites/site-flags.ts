@@ -22,7 +22,17 @@
  * wrong in the merchant's own terms, not the schema's.
  */
 
+import type { PageKind } from "@saroh/database";
 import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
+
+import {
+    isModulePageKind,
+    reservedAgainst,
+    reservedPathFor,
+} from "./page-kinds";
+
+/** The shop's address, whose page is `checkShop`'s to flag. */
+const SHOP_ROOT = "/shop";
 
 /**
  * The nine types, spelled out even where the data to detect them does not exist
@@ -44,7 +54,10 @@ export type FlagType =
     | "reservedAddress"
     // The checkout (G13): the site sells from a storefront that can't take
     // an online order now, so its shop offers "Ask about ordering".
-    | "shopCantTakeOrders";
+    | "shopCantTakeOrders"
+    // A Product grid (G12) that will show nothing, or less than was
+    // picked, because what it names isn't on sale at the storefront.
+    | "productsNotOnSale";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -77,6 +90,10 @@ export interface FlagPageInput {
     title: string;
     /** A hidden page is not on the live site (#197). */
     hidden: boolean;
+    /** FREE, or the module page this is (G14). Absent means FREE. */
+    kind?: string;
+    /** "Show in menu" (G14). Absent means on. */
+    inMenu?: boolean;
     sections: { type: string; content: unknown; hidden: boolean }[];
 }
 
@@ -551,9 +568,20 @@ export function checkSite(site: FlagSiteInput): Flag[] {
             });
         }
     }
+    /*
+     * A page the merchant took out of the menu ("Show in menu" off, G14) is
+     * out of it on purpose, and a module page joins the menu on its own, so
+     * neither is "not in the menu" by mistake.
+     */
+    const menuDecided = (page: FlagPageInput) =>
+        page.inMenu === false || isModulePageKind(page.kind);
     if (site.navigation) {
         for (const page of visible) {
-            if (page.path !== "/" && !inMenu.has(page.id)) {
+            if (
+                page.path !== "/" &&
+                !inMenu.has(page.id) &&
+                !menuDecided(page)
+            ) {
                 flags.push({
                     type: "pageNotInNavigation",
                     message: `"${page.title}" is not in the menu, so visitors can only reach it by typing its address.`,
@@ -563,7 +591,9 @@ export function checkSite(site: FlagSiteInput): Flag[] {
                 });
             }
         }
-    } else if (visible.length > 1) {
+    } else if (
+        visible.filter((p) => p.path !== "/" && !menuDecided(p)).length > 0
+    ) {
         flags.push({
             type: "pageNotInNavigation",
             message:
@@ -571,6 +601,28 @@ export function checkSite(site: FlagSiteInput): Flag[] {
             pageId: null,
             sectionIndex: null,
             field: null,
+        });
+    }
+
+    /*
+     * A free-form page at an address a route owns (G14): /book and what is
+     * under it, /checkout and what is under it. The route answers there, so
+     * visitors never see the page; it is flagged, never moved, so the
+     * merchant picks its new address. (A page at /shop is the shop's
+     * question, `checkShop`: it is still served there.)
+     */
+    for (const page of visible) {
+        const reserved = reservedPathFor(page.path);
+        if (!reserved || reserved.root === SHOP_ROOT) continue;
+        if (!reservedAgainst(page.path, (page.kind ?? "FREE") as PageKind)) {
+            continue;
+        }
+        flags.push({
+            type: "reservedAddress",
+            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its address so visitors can reach it.`,
+            pageId: page.id,
+            sectionIndex: null,
+            field: "path",
         });
     }
 
@@ -611,7 +663,7 @@ export interface ShopFlagInput {
     /** Open storefronts that list a published product. */
     candidates: number;
     /** The site's pages, to find one at the shop's address. */
-    pages: { id: string; path: string; hidden: boolean }[];
+    pages: { id: string; path: string; hidden: boolean; kind?: string }[];
     /** Whether a path is the shop's address or under it. */
     isShopPath: (path: string) => boolean;
     /**
@@ -656,6 +708,8 @@ export function checkShop(input: ShopFlagInput): Flag[] {
     }
     for (const page of input.pages) {
         if (page.hidden || !input.isShopPath(page.path)) continue;
+        // The Shop page (G14) is the shop's own, at its own address.
+        if (page.kind === "SHOP" && page.path === SHOP_ROOT) continue;
         flags.push({
             type: "reservedAddress",
             message: `${page.path} is where your shop lives. This page keeps showing there for now. Change its address so the shop can open.`,

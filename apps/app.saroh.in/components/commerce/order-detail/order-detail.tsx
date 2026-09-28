@@ -6,13 +6,13 @@ import { useState } from "react";
 
 import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
-import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
+import { readyNoticeText } from "@/lib/messages/notice-reach";
 import { shipmentOf } from "@/lib/orders/courier";
 import {
     allergenWords,
     allergyCheck,
-    eventText,
     goesToAddress,
     isOpen,
     kitchenStanding,
@@ -23,6 +23,13 @@ import {
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
+import { orderTimelineSteps } from "@/lib/orders/timeline-steps";
+import {
+    isAppointment,
+    TREATMENT_CHANGE_NOTE,
+    visitsHow,
+    visitsStanding,
+} from "@/lib/orders/visits";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
@@ -42,23 +49,30 @@ import { actionClass } from "./parts";
 import { PayLinkBlock, usePayLink } from "./pay-link";
 import { RefundPanel } from "./refund-panel";
 import { KitchenStepper } from "./stepper";
-import type { TimelineStep } from "./timeline";
 import { OrderTimeline } from "./timeline";
 import { useArrival } from "./use-arrival";
 import type { Panel } from "./use-kitchen";
 import { useKitchen } from "./use-kitchen";
 import { useOrderChanges } from "./use-order-changes";
+import { VisitsSection } from "./visits-card";
+import { VisitsNextAction } from "./visits-next";
+import { NoCustomerCard } from "./walk-in-card";
 
 export interface OrderPermissions {
-    /** Move kitchen stages (`order:stage`) — a Member may. */
+    /** Move steps and print (`order:stage`) — a Member may. */
     stage: boolean;
-    /** Change items, address, cancel, record a payment (`order:write`). */
-    write: boolean;
-    /** Refund (`payment:manage`). */
+    /**
+     * Change items, address, how it's fulfilled, and record a payment by
+     * hand (`order:edit`, B16).
+     */
+    edit: boolean;
+    /** Make or replace its pay link (`order:create` or `order:edit`). */
+    payLink: boolean;
+    /** Refund and cancel (`order:refund`, B16). */
     refund: boolean;
     /**
      * A provider can open the checkout window, so a pay link can be made
-     * (B11, DEC-054). Making one also takes `write`.
+     * (B11, DEC-054). Making one also takes `payLink`.
      */
     payOnline?: boolean;
     /** May connect a provider in Settings (`payment:manage`). */
@@ -69,6 +83,10 @@ export interface OrderPermissions {
      * nothing about them rather than "No phone". Unknown reads as true.
      */
     contact?: boolean;
+    /** Opens a visit's booking (`booking:read`, B14). */
+    bookingRead?: boolean;
+    /** "Book visit N" (`booking:write`, B14). */
+    bookingWrite?: boolean;
 }
 
 const STANDING: Record<string, { label: string; tone: PillTone }> = {
@@ -123,20 +141,30 @@ export function OrderDetail({
     const clock = useClock(30_000);
 
     const number = `#${order.orderId}`;
-    const first = firstName(order.customer?.name);
+    const first = firstName(order.customer?.name ?? order.walkIn?.name);
     const currency = order.money?.currency ?? "INR";
     const format = (n: number) => formatMoneyMajor(n, currency) ?? String(n);
     const kitchenSteps = stepsOf(order);
-    const standing = STANDING[kitchenStanding(order)];
     const refundedFull = order.refundStanding === "REFUNDED";
+    // A treatment is fulfilled by its visits (B14): no kitchen stages.
+    const appointment = isAppointment(order);
+    const visits = appointment ? order.visits : undefined;
+    const now = new Date(clock ?? Date.parse(order.updatedAt));
+    const zone = visits?.service.timezone ?? "UTC";
+    const standing = appointment
+        ? visitsStanding(visits, refundedFull, order.status === "CANCELLED")
+        : STANDING[kitchenStanding(order)];
     const unpaid =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "FAILED" ||
             (order.paymentStatus === "UNPAID" && order.stage === "NEW"));
     const next: KitchenStage | null =
-        can.stage && !unpaid ? (order.next.stages[0] ?? null) : null;
+        can.stage && !unpaid && !appointment
+            ? (order.next.stages[0] ?? null)
+            : null;
     const open = isOpen(order);
-    const age = open && clock !== null ? waiting(order, clock) : null;
+    const age =
+        open && clock !== null && !appointment ? waiting(order, clock) : null;
     const delivery = goesToAddress(order);
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
@@ -174,7 +202,7 @@ export function OrderDetail({
                 !order.money?.recordedByHand &&
                 !order.placedOnline)) &&
         Number(order.money?.due ?? 0) > 0;
-    const linkable = can.write && owed;
+    const linkable = can.payLink && owed;
     const changes = useOrderChanges({
         order,
         first,
@@ -183,7 +211,7 @@ export function OrderDetail({
         setPanel,
         startHold: kitchen.startHold,
         onOwed:
-            can.write && can.payOnline && !order.placedOnline
+            can.payLink && can.payOnline && !order.placedOnline
                 ? payLink.ask
                 : undefined,
     });
@@ -205,6 +233,11 @@ export function OrderDetail({
             number={number}
             standing={standing}
             age={age}
+            how={
+                appointment
+                    ? visitsHow(order.fulfilmentLabel, visits, zone, now)
+                    : undefined
+            }
         >
             {order.ticketName ? (
                 <Button
@@ -216,7 +249,7 @@ export function OrderDetail({
                     Print {order.ticketName.toLowerCase()}
                 </Button>
             ) : null}
-            {can.write ? (
+            {can.edit || can.refund ? (
                 <OrderActions
                     storeId={order.store.id}
                     orderId={order.id}
@@ -226,6 +259,8 @@ export function OrderDetail({
                     pending={menu}
                     onPendingChange={setMenu}
                     withCancel={change.cancel === undefined}
+                    canRecord={can.edit}
+                    canRefund={can.refund}
                 />
             ) : null}
             {next && !hold ? (
@@ -238,6 +273,17 @@ export function OrderDetail({
                     {STEP_LABEL[next]}
                 </Button>
             ) : null}
+            {visits && !refundedFull ? (
+                <VisitsNextAction
+                    orderId={order.id}
+                    orderNumber={order.orderId}
+                    visits={visits}
+                    first={first}
+                    canMark={can.stage}
+                    canBook={can.bookingWrite ?? false}
+                    now={now}
+                />
+            ) : null}
             {!open && !hold ? (
                 <span className="text-[13px] font-semibold text-success-subtle-foreground">
                     Nothing left to do
@@ -246,40 +292,12 @@ export function OrderDetail({
         </OrderHeading>
     );
 
-    const steps: TimelineStep[] = [
-        ...order.events.map((e) => ({
-            key: e.id,
-            what: eventText(e, (c) => formatMoney(c, currency)),
-            at: e.at,
-            who: e.actor?.name ? firstName(e.actor.name) : null,
-        })),
-        ...(payments?.intents ?? [])
-            .filter((i) => i.status === "SUCCEEDED")
-            .map((i) => ({
-                key: `pay-${i.id}`,
-                what: `Paid by ${providerName(i.provider)}`,
-                at: i.createdAt,
-                who: null,
-            })),
-        {
-            key: "placed",
-            what: order.placedOnline
-                ? `Ordered on your website, from ${order.store.name}`
-                : `Placed at ${order.store.name}`,
-            at: order.placedAt,
-            // The customer placed it themselves at the site's checkout (G13).
-            who: order.placedOnline
-                ? "by the customer"
-                : order.customer
-                  ? first
-                  : null,
-        },
-    ].sort((a, b) => b.at.localeCompare(a.at));
+    const steps = orderTimelineSteps(order, payments, currency, firstName);
 
     const money = order.money;
     const remaining = money ? Number(money.paid) - Number(money.refunded) : 0;
     const refundBlock: string | null = !can.refund
-        ? "Refunds are for owners and admins."
+        ? "Your role can't refund orders."
         : refundedFull
           ? "Refunded in full."
           : !money || remaining <= 0
@@ -323,7 +341,7 @@ export function OrderDetail({
                     <PaymentBanner
                         failed={order.paymentStatus === "FAILED"}
                         first={first}
-                        canRecord={can.write}
+                        canRecord={can.edit}
                         onCash={() => setMenu({ kind: "payment", to: "PAID" })}
                         onSendLink={
                             linkable && can.payOnline ? payLink.ask : undefined
@@ -331,14 +349,25 @@ export function OrderDetail({
                         sending={payLink.busy}
                     />
                 ) : null}
-                <KitchenStepper
-                    steps={kitchenSteps}
-                    stage={order.stage}
-                    refunded={refundedFull}
-                    next={hold ? null : next}
-                    busy={busy}
-                    onAdvance={advance}
-                />
+                {appointment ? (
+                    <VisitsSection
+                        visits={visits ?? null}
+                        refunded={refundedFull}
+                        first={first}
+                        attention={order.attention}
+                        canOpenBooking={can.bookingRead ?? false}
+                        now={now}
+                    />
+                ) : (
+                    <KitchenStepper
+                        steps={kitchenSteps}
+                        stage={order.stage}
+                        refunded={refundedFull}
+                        next={hold ? null : next}
+                        busy={busy}
+                        onAdvance={advance}
+                    />
+                )}
                 {hold?.kind === "refund" ? (
                     <HoldCard
                         hold={hold}
@@ -367,7 +396,7 @@ export function OrderDetail({
                         hold={hold}
                         title={(s) => `Marking ready in ${s}s`}
                         note="Leave this page and it's marked ready straight away. Undo is only here."
-                        body={`Nothing is sent to ${first} — the step shows on the order.`}
+                        body={readyNoticeText(order.customerNotice, first)}
                         nowLabel="Mark now"
                         onUndo={() =>
                             kitchen.cancelHold(
@@ -455,7 +484,7 @@ export function OrderDetail({
                                 refundTo={refundTo}
                                 remaining={remaining}
                                 linkable={
-                                    can.write &&
+                                    can.payLink &&
                                     (can.payOnline ?? false) &&
                                     !order.placedOnline
                                 }
@@ -464,9 +493,9 @@ export function OrderDetail({
                                 onClose={() => setPanel(null)}
                             />
                         ) : null}
-                        {can.write || can.refund ? (
+                        {can.edit || can.refund ? (
                             <ChangeCard
-                                canEdit={can.write}
+                                canEdit={can.edit}
                                 editable={order.next.editable}
                                 canRefund={refundBlock}
                                 fulfilment={change.fulfilment}
@@ -479,6 +508,11 @@ export function OrderDetail({
                                 onRefund={() => setPanel("refund")}
                                 onFulfilment={() => setPanel("fulfilment")}
                                 onCancel={() => setPanel("cancel")}
+                                note={
+                                    appointment
+                                        ? TREATMENT_CHANGE_NOTE
+                                        : undefined
+                                }
                             />
                         ) : null}
                         <OrderTimeline steps={steps} />
@@ -488,10 +522,16 @@ export function OrderDetail({
                             <CustomerCard
                                 customer={order.customer}
                                 href={customerHref ?? "/commerce/customers"}
+                                // A treatment's Needs attention is on its
+                                // Visits card (B14).
                                 notes={
-                                    notes === "unavailable" ? null : noteList
+                                    notes === "unavailable" || appointment
+                                        ? null
+                                        : noteList
                                 }
-                                attention={order.attention}
+                                attention={
+                                    appointment ? undefined : order.attention
+                                }
                                 contact={can.contact ?? true}
                                 address={delivery ? addressText : null}
                                 deliveryPhone={
@@ -504,15 +544,20 @@ export function OrderDetail({
                                 orderNote={order.notes}
                             />
                         ) : (
-                            <p className="rounded-xl border border-border bg-card px-4 py-[13px] text-[12.5px] text-muted-foreground">
-                                This customer&apos;s record is gone. The order
-                                keeps what was bought.
-                            </p>
+                            <NoCustomerCard
+                                walkIn={order.walkIn ?? null}
+                                contact={can.contact ?? true}
+                                address={delivery ? addressText : null}
+                                shipment={shipment}
+                                onChangeTracking={() => setPanel("tracking")}
+                                orderNote={order.notes}
+                            />
                         )}
                         {money ? (
                             <MoneyCard
                                 money={money}
                                 delivery={delivery}
+                                appointment={appointment}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}
                                 invoices={order.invoices}

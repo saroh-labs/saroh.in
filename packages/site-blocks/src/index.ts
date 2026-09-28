@@ -19,6 +19,7 @@ export {
     BlockFixturePreview,
     SAMPLE_PLANS,
     SAMPLE_POSTS,
+    SAMPLE_PRODUCTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
@@ -52,6 +53,13 @@ export {
     plansOf,
 } from "./blocks/plans";
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
+export {
+    PRODUCT_GRID_TITLE,
+    default as ProductGridSection,
+    productCardsOf,
+    productGridQuery,
+} from "./blocks/product-grid";
+export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
@@ -155,6 +163,19 @@ export type {
     CreditFor,
     SignedInBookRequest,
 } from "./booking-flow/api";
+// A full class's waitlist (A12): the site's server actions join, leave and
+// read it with the session, and answer the page in the page's own terms.
+export {
+    isWaitlistJoined,
+    isWaitlistLeft,
+    isWaitlistPlaces,
+} from "./booking-flow/waitlist";
+export type {
+    WaitlistApi,
+    WaitlistJoined,
+    WaitlistPlaces,
+    WaitlistSession,
+} from "./booking-flow/waitlist";
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.
@@ -236,6 +257,17 @@ export type {
     PlanChangeResult,
     PlanTabProps,
 } from "./account/plan-tab";
+// A11: buying a class pack from the Plan tab.
+export { BuyPackSheet } from "./account/buy-pack-sheet";
+export type {
+    AccountPackAttempt,
+    AccountPackCheckout,
+    AccountPackOnSale,
+    AccountPacksOnSale,
+    PackResult,
+    PacksApi,
+    PlanPacksShop,
+} from "./account/packs-api";
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
 export type { TrackLookup } from "./account/track-sheet";
 

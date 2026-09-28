@@ -37,6 +37,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // A12: a class's waitlist, for the team.
+    "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
     "staff/staff.controller.ts": "APPOINTMENTS",
     // E3: business closures and the time-off preview.
@@ -158,6 +160,10 @@ const NEVER: Record<string, string> = {
     // (`appointmentsOpen`), as on the anonymous route.
     "site-accounts/account-bookings.controller.ts":
         "a signed-in customer booking on a published site — Appointments checked per service",
+    // A12: joining a full class's waitlist from the booking page, checked
+    // per service like booking (`loadBookableService`).
+    "site-accounts/account-waitlist.controller.ts":
+        "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
     // A5: the customer's account area. It lists only the modules the
     // business has rolled out and on (`account-home.service.ts`), and must
     // stay reachable whichever are off: Me, receipts and sign-out.
@@ -173,6 +179,10 @@ const NEVER: Record<string, string> = {
         "a signed-in customer's own orders — the tab follows Commerce, dark with the account area",
     "site-accounts/account-plan.controller.ts":
         "a signed-in customer's own plans and packs — the tab follows what's on sale, dark with the account area",
+    // A11: buying a class pack from the account. The service answers 404
+    // unless Class packs is rolled out and switched on (DEC-057, E12).
+    "class-packs/account-packs.controller.ts":
+        "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.

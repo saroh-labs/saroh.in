@@ -29,6 +29,7 @@ import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { realOrderWhere } from "../orders/open-orders";
 import type { OrderLineKind } from "../orders/order-line";
 import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
+import { hasCustomer } from "../orders/walk-in";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
@@ -513,6 +514,7 @@ export class CustomerDetailService {
                 source: true,
                 createdAt: true,
                 mergedIntoId: true,
+                removedAt: true,
                 // The one that signs in; a merged or removed one does not.
                 customerAccounts: {
                     where: { status: { in: ["ACTIVE", "BLOCKED"] } },
@@ -526,7 +528,10 @@ export class CustomerDetailService {
                 },
             },
         });
-        if (!contact) throw new NotFoundException("Contact not found");
+        // Removed for a privacy request (C11): there is no one left to show.
+        if (!contact || contact.removedAt) {
+            throw new NotFoundException("Contact not found");
+        }
         // A merge's tombstone holds ids only (DEC-042); `read` sends the
         // page on to the survivor.
         if (contact.mergedIntoId) {
@@ -850,7 +855,8 @@ export class CustomerDetailService {
             linkId: l.id,
             customerId: l.customer.id,
             name: personName(l.customer),
-            email: l.customer.email,
+            // Never a placeholder (a walk-in kept by phone, B13b).
+            email: contactEmailForDisplay(l.customer.email) ?? "",
             storefront: l.customer.store,
             linkedAt: l.createdAt.toISOString(),
         }));
@@ -961,7 +967,8 @@ export class CustomerDetailService {
                 currency: p.currency,
                 sum: p._sum.total,
             })),
-            rows: rows.map((o) => ({
+            // Read by the person's customers, so never a walk-in (B13).
+            rows: rows.filter(hasCustomer).map((o) => ({
                 id: o.id,
                 number: o.orderId,
                 placedAt: o.createdAt.toISOString(),

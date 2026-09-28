@@ -11,7 +11,13 @@ import {
     describeItem,
     itemsTotal,
 } from "@/lib/calendar/layers";
-import { toMajor, wholeMoney } from "@/lib/calendar/money";
+import type { CalendarCash } from "@/lib/calendar/money";
+import {
+    dayMoney,
+    groupMoney,
+    toMajor,
+    wholeMoney,
+} from "@/lib/calendar/money";
 import type { ProblemCan } from "@/lib/calendar/problems";
 import { problemAction, problemOf } from "@/lib/calendar/problems";
 import type { Shortcut } from "@/lib/calendar/range";
@@ -39,7 +45,8 @@ const LAYER_HOME: Record<LayerKey, string> = {
  * on a phone — one body, so the three cannot say different things. A day
  * from today offers what can be made on it (E21), and a named problem —
  * a failed renewal, a late order, an overdue invoice, a no-show — shows
- * its fix beside it (E22).
+ * its fix beside it (E22). For a role that reads money (E23) the day
+ * says what came in, went out and is due, and each layer what it took.
  */
 export function DayPanel({
     day,
@@ -51,6 +58,7 @@ export function DayPanel({
     heading,
     shortcuts = [],
     can,
+    money = null,
 }: {
     day: CalendarDay;
     layers: LayerStyle[];
@@ -64,7 +72,11 @@ export function DayPanel({
     shortcuts?: Shortcut[];
     /** The fixes this person may make to a named problem (E22). */
     can: ProblemCan;
+    /** `payment:read` only (E23): the month's money. Null: none drawn. */
+    money?: CalendarCash | null;
 }) {
+    const entries = money?.shown.filter((e) => e.date === day.date) ?? [];
+    const cash = money ? dayMoney(entries, money.currency) : null;
     const n = dayCount(day, layers, off);
     // A shop's renewals are subscriptions; a diary's, memberships.
     const shop = layers.some((l) => l.key === "orders");
@@ -88,6 +100,35 @@ export function DayPanel({
                     ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`
                     : ""}
             </p>
+            {cash ? (
+                <div className="mb-1 flex flex-wrap gap-x-3.5 border-y border-foreground/10 pb-2.5 pt-2 text-[12.5px]">
+                    <span>
+                        <span className="text-muted-foreground">In </span>
+                        <strong className="font-semibold tabular-nums">
+                            {cash.in}
+                        </strong>
+                    </span>
+                    <span>
+                        <span className="text-muted-foreground">Out </span>
+                        <strong className="font-semibold tabular-nums text-destructive-subtle-foreground">
+                            {cash.out}
+                        </strong>
+                    </span>
+                    {cash.due ? (
+                        <span>
+                            <span className="text-muted-foreground">Due </span>
+                            <strong className="font-semibold tabular-nums">
+                                {cash.due}
+                            </strong>
+                        </span>
+                    ) : null}
+                    {cash.why ? (
+                        <span className="basis-full text-[11.5px] text-muted-foreground">
+                            {cash.why}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
             {shortcuts.length > 0 ? (
                 <div className="mb-1 mt-2 flex flex-wrap gap-1.5">
                     {shortcuts.map((s) => (
@@ -122,7 +163,18 @@ export function DayPanel({
             {groups.map((layer) => {
                 const cell = day.layers[layer.key];
                 if (!cell) return null;
-                const total = itemsTotal(cell.items, cell.count, currency);
+                // With money: what the layer took, is due and failed (E23);
+                // without, the amounts the items carry (a booking's price).
+                const total = money
+                    ? groupMoney(
+                          entries.filter((e) => e.layer === layer.key),
+                          money.currency,
+                      )
+                    : null;
+                const sum =
+                    total === null
+                        ? itemsTotal(cell.items, cell.count, currency)
+                        : null;
                 const more =
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
@@ -137,9 +189,13 @@ export function DayPanel({
                             />
                             {layer.label} · {cell.count}
                             <span className="flex-1" />
-                            {total !== null && currency ? (
+                            {total ? (
                                 <span className="font-medium normal-case tabular-nums tracking-normal">
-                                    {wholeMoney(total, currency)}
+                                    {total}
+                                </span>
+                            ) : sum !== null && currency ? (
+                                <span className="font-medium normal-case tabular-nums tracking-normal">
+                                    {wholeMoney(sum, currency)}
                                 </span>
                             ) : null}
                         </h3>

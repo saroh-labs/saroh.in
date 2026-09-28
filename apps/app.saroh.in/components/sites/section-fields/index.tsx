@@ -12,6 +12,7 @@ import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
 import { JournalFields } from "./journal";
 import { PlansFields } from "./plans";
+import { ProductGridFields } from "./product-grid";
 import { RichTextFields } from "./rich-text";
 import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
@@ -177,6 +178,15 @@ function perTypeFields({
         case "plans":
             return (
                 <PlansFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "productGrid":
+            return (
+                <ProductGridFields
                     section={section}
                     pages={pages}
                     services={services}

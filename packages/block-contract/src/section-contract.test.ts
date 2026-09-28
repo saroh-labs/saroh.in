@@ -392,6 +392,7 @@ describe("per-section padding override (#189)", () => {
         visitUs: {},
         journal: {},
         plans: {},
+        productGrid: {},
     };
 
     it("is accepted on every section type", () => {
@@ -527,5 +528,85 @@ describe("ctaHref", () => {
         expect(ctaHref({ kind: "url", href: "/contact" }, resolve)).toBe(
             "/contact",
         );
+    });
+});
+
+/** G12 — the Product grid stores which products by id, never a product. */
+describe("productGrid v1", () => {
+    it("is valid with nothing set, so a just-added block saves", () => {
+        expect(parseSectionContent("productGrid", 1, {}).success).toBe(true);
+    });
+
+    it("keeps a title, a source, a collection, a count and the switch", () => {
+        const parsed = parseSectionContent("productGrid", 1, {
+            title: "  Breads ",
+            source: "collection",
+            collectionId: " col_breads ",
+            count: 4,
+            showPrices: false,
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            title: "Breads",
+            source: "collection",
+            collectionId: "col_breads",
+            count: 4,
+            showPrices: false,
+        });
+    });
+
+    it("keeps picked products in the merchant's order", () => {
+        const parsed = parseSectionContent("productGrid", 1, {
+            source: "picked",
+            productIds: ["p_3", "p_1", "p_2"],
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            source: "picked",
+            productIds: ["p_3", "p_1", "p_2"],
+        });
+    });
+
+    it("saves a source whose products are still to be chosen", () => {
+        expect(
+            parseSectionContent("productGrid", 1, { source: "collection" })
+                .success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("productGrid", 1, {
+                source: "picked",
+                productIds: [],
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses another source, a product picked twice, or too many", () => {
+        expect(
+            parseSectionContent("productGrid", 1, { source: "random" }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("productGrid", 1, {
+                productIds: ["p_1", "p_1"],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("productGrid", 1, {
+                productIds: Array.from({ length: 13 }, (_, i) => `p_${i}`),
+            }).success,
+        ).toBe(false);
+    });
+
+    it("refuses a count outside 1 to 12, or not whole", () => {
+        for (const count of [0, 13, 2.5, "4"]) {
+            expect(
+                parseSectionContent("productGrid", 1, { count }).success,
+            ).toBe(false);
+        }
+    });
+
+    it("never stores a product itself, so a price can't go stale", () => {
+        const parsed = parseSectionContent("productGrid", 1, {
+            title: "Shop",
+            products: [{ name: "Copied loaf", price: "99.00" }],
+        });
+        expect(parsed.success && parsed.data).toEqual({ title: "Shop" });
     });
 });

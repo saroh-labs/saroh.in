@@ -23,6 +23,7 @@ import {
     quickPayment,
     quickSteps,
 } from "@/lib/orders/row-menu";
+import { quickVisitsText } from "@/lib/orders/visits";
 
 import { useOrderStep } from "./use-order-step";
 
@@ -248,7 +249,11 @@ function QuickViewBody({ order }: { order: OrderRead }) {
             ? `/customers/${encodeURIComponent(c.contactId)}`
             : customerHref(order.store.id, c.id)
         : null;
-    const reach = c ? [c.phone, c.email].filter(Boolean).join(" · ") : "";
+    // A walk-in (B13) has no record to open: their name and phone only.
+    const walkIn = !c ? (order.walkIn ?? null) : null;
+    const reach = c
+        ? [c.phone, c.email].filter(Boolean).join(" · ")
+        : (walkIn?.phone ?? "");
 
     return (
         <>
@@ -361,6 +366,8 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                         >
                             {c.name ?? c.email ?? "Customer"}
                         </Link>
+                    ) : walkIn ? (
+                        <span>Walk-in · {walkIn.name}</span>
                     ) : (
                         <span>Their record is gone</span>
                     )}
@@ -392,7 +399,12 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                 {appointment ? (
                     <>
                         <dt className="text-muted-foreground">Visits</dt>
-                        <dd>Marked on the full page, as each one happens.</dd>
+                        <dd>
+                            {order.visits
+                                ? `${quickVisitsText(order.visits, order.visits.service.timezone, new Date())}. `
+                                : null}
+                            Marked on the full page, as each one happens.
+                        </dd>
                     </>
                 ) : null}
             </dl>

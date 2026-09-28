@@ -16,15 +16,13 @@ import { maskEmail } from "../site-accounts/account-linking.service";
  * that names a contact can't be forgotten. `CustomerThread` (A13) has its
  * row: the survivor's thread absorbs the other's messages in time order,
  * and the other thread row is deleted (`site-accounts/thread-store.ts`,
- * `absorbThread`). The rules for `ClassWaitlistEntry` (A12) and
- * `PaymentMandate` (D11) are in the customers plan; whichever of those
- * units lands after C9 adds its row here and its move in the service:
- * - `ClassWaitlistEntry`: same class, the better place stays (OFFERED, then
- *   the earlier position); a second hold is released through
- *   `waitlist.offer`; different classes re-point;
- * - `PaymentMandate`: never moved; cancelled after commit through D20's
- *   `mandates.service.cancelFor({ contactId: other }, MERGED)` (the seam is
- *   `MergeService.afterCommit`).
+ * `absorbThread`). `PaymentMandate` (D20) has its row: never moved, the
+ * merged contact's are cancelled in the merge's transaction
+ * (`payments/mandate-cancel-job.ts`, `cancelMandatesInTx`) and at the
+ * provider by the `mandate.cancel` job after commit. `ClassWaitlistEntry`
+ * (A12) has its row: same class, the better place stays (OFFERED, then the
+ * earlier position); a second hold is released through `waitlist.offer`;
+ * different classes re-point (`bookings/waitlist-merge.ts`).
  */
 
 export type MergeSide = "survivor" | "other";
@@ -49,7 +47,11 @@ export type MergeRuleKind =
     /** Tombstones of the merged contact point at the survivor instead. */
     | "tombstones"
     /** One thread: the survivor's absorbs the other's messages (A13). */
-    | "absorb-thread";
+    | "absorb-thread"
+    /** Never moved: the merged contact's autopay is cancelled (D20). */
+    | "cancel-mandates"
+    /** Moves; one place per class's line, the better one kept (A12). */
+    | "waitlist";
 
 export interface MergeRule {
     kind: MergeRuleKind;
@@ -119,6 +121,14 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
     "CustomerThread.contactId": {
         kind: "absorb-thread",
         note: "One thread: the survivor's takes the other's messages in time order (A13).",
+    },
+    "PaymentMandate.contactId": {
+        kind: "cancel-mandates",
+        note: "Autopay isn't moved: the survivor never authorised it, so it is cancelled (D20).",
+    },
+    "ClassWaitlistEntry.contactId": {
+        kind: "waitlist",
+        note: "Places in line follow them; in one class the better place stays, and a second held place goes to the next in line (A12).",
     },
 };
 

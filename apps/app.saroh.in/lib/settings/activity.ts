@@ -12,7 +12,12 @@ import {
     recordedChanges,
     text,
 } from "./activity-changes";
-import { customerPlace, detailsWhat, mergedWhat } from "./activity-customers";
+import {
+    customerPlace,
+    detailsWhat,
+    mergedWhat,
+    removedWhat,
+} from "./activity-customers";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -54,6 +59,7 @@ export const ACTIVITY_ACTIONS = [
     "profile.update",
     "storefront.hours.update",
     "storefront.fulfilment.update",
+    "storefront.same-email.update",
     "organization.module.enabled",
     "organization.module.disabled",
     "organization.plan.changed",
@@ -70,6 +76,7 @@ export const ACTIVITY_ACTIONS = [
     "business.stock-tracking.off",
     "customer.merged",
     "customer.details.changed",
+    "customer.removed",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -227,6 +234,23 @@ export function activityLine(
                 },
             );
         }
+        case "storefront.same-email.update": {
+            // Customers who share an email linked on their own, or not (C15).
+            const where = text(meta.storefront);
+            const after = recordedChanges(meta)?.find(
+                (c) => c.field === "linkSameEmailCustomers",
+            )?.after;
+            const what =
+                after === true
+                    ? "turned on linking customers who share an email"
+                    : after === false
+                      ? "turned off linking customers who share an email"
+                      : "changed how customers who share an email are linked";
+            return line(`${what}${where ? ` at ${where}` : ""}`, {
+                label: "Storefronts",
+                href: STOREFRONTS_HREF(event.targetId),
+            });
+        }
         case "organization.module.enabled":
             return line(
                 `switched on ${moduleName(meta, event.targetId)}`,
@@ -318,6 +342,9 @@ export function activityLine(
             return line(mergedWhat(meta), customerPlace(event.targetId));
         case "customer.details.changed":
             return line(detailsWhat(meta), customerPlace(event.targetId));
+        // Their page is gone (C11): the line leads to the list.
+        case "customer.removed":
+            return line(removedWhat(meta), customerPlace(null));
         default:
             return null;
     }

@@ -45,6 +45,12 @@ jest.mock("@saroh/database", () => {
         // A storefront to sell treatments from (E10) unless a test says not.
         store: { findFirst: jest.fn().mockResolvedValue({ id: "store_1" }) },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        // The class waitlist (A12): nobody in line, no place held.
+        classWaitlistEntry: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         course: { findFirst: jest.fn().mockResolvedValue(null) },
         packRedemption: {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -263,6 +269,7 @@ describe("BookingsService — bookings management", () => {
             status: "CONFIRMED",
         });
         bookingUpdate.mockResolvedValue({ id: "bk_1", status: "CANCELLED" });
+        eventCreate.mockResolvedValueOnce({ id: "ev_cancel" });
 
         const res = await service.cancelBooking(ctx(), "bk_1");
 
@@ -271,11 +278,22 @@ describe("BookingsService — bookings management", () => {
         expect(arg.where).toEqual({ id: "bk_1" });
         expect(arg.data.status).toBe("CANCELLED");
         expect(arg.data.cancelledAt).toBeInstanceOf(Date);
-        // Nothing was paid online for it, so nothing is refunded or kept.
+        // Nothing was paid online for it, so nothing is refunded or kept;
+        // the customer is told (A14), keyed to the cancel's event.
         expect(res).toEqual({
             id: "bk_1",
             status: "CANCELLED",
             money: { refund: null, kept: null },
+            told: true,
+        });
+        expect(jobCreate.mock.calls[0][0].data).toMatchObject({
+            organizationId: "org_SVC",
+            type: "booking.notify",
+            payload: {
+                bookingId: "bk_1",
+                reason: "cancelled",
+                eventId: "ev_cancel",
+            },
         });
     });
 

@@ -56,8 +56,12 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     crumbs?: ReactNode;
     /** The header's title: the name typed so far, or "New plan". */
     titleOf: (values: V, record: EditorRecord<V> | null) => string;
-    /** Every rule the values break; any stops Publish and marks its field. */
-    problemsOf: (values: V) => EditorProblem[];
+    /**
+     * Every rule the values break; any stops Publish and marks its field.
+     * The record is what the server last answered (null before the first
+     * save), for a rule that compares with what is live.
+     */
+    problemsOf: (values: V, record: EditorRecord<V> | null) => EditorProblem[];
     /** Why the values can't be saved at all yet ("Add a name to save the draft"). */
     blockerOf: (values: V) => string | null;
     /** "price ₹1,200 → ₹1,500 for new sign-ups", one per change. */
@@ -70,6 +74,11 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     hrefFor: (id: string) => string;
     /** The record's own page ("View plan"). */
     viewHrefFor: (id: string) => string;
+    /**
+     * Whether "View" shows for this record; every saved record when left
+     * out. The Pack Editor shows "View pack" only once it is live (E18).
+     */
+    viewable?: (record: EditorRecord<V>) => boolean;
     /** Where Delete draft goes. */
     afterDeleteHref: string;
     /** The toast after Publish ("Monthly is open for sign-ups."). */
@@ -111,6 +120,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         fieldLabels,
         hrefFor,
         viewHrefFor,
+        viewable,
         afterDeleteHref,
         publishedMessage,
         aside,
@@ -135,7 +145,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         message: string;
     } | null>(null);
 
-    const problems = problemsOf(values);
+    const problems = problemsOf(values, record);
     const blocker = blockerOf(values);
     const actions = shellActions({ save, record, problems, busy });
     const pill = statePill(record, copy);
@@ -284,7 +294,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 busy={busy}
                 canEdit={canEdit}
                 view={
-                    record
+                    record && (viewable?.(record) ?? true)
                         ? {
                               href: viewHrefFor(record.id),
                               label: copy.viewLabel,

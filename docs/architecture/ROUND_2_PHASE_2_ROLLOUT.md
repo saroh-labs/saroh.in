@@ -517,6 +517,45 @@ handler); its refund stays PENDING on the order, where Try again sends it.
 Rollback: deploy the previous API and workspace; addresses saved meanwhile
 stay in the columns, unread.
 
+## D20: a mandate ends with its subscription (wave 5; live before D13, CP-5)
+
+**Migration** `20261016110000_payment_mandates`: the `PaymentMandate` table
+(RLS `org_isolation`, one ACTIVE per subscription), as far as D20 needs it;
+D11 adds its set-up and charge columns. Additive. Nothing creates a mandate
+until D12, and `supportsMandates` stays false in production until D11 and
+D19 pass a Razorpay test-mode run, so the table is empty at release.
+
+- Every move of a subscription to CANCELLED (staff cancel now, a cancel at
+  period end when the renewal or a resume applies it, a customer's own
+  cancel when it takes effect) and a merge mark its live mandates CANCELLED
+  in the same transaction and queue a `mandate.cancel` job that asks the
+  provider after commit.
+- **CP-5:** this is in production before D13's charging merges, so no
+  mandate can be charged after its subscription ends.
+
+### Verify
+
+No live mandate outlives what it was for (expect 0):
+
+```sql
+SELECT count(*) FROM "PaymentMandate" m
+JOIN "CustomerSubscription" s ON s.id = m."subscriptionId"
+JOIN "Contact" c ON c.id = m."contactId"
+WHERE m.status IN ('PENDING', 'ACTIVE', 'PAUSED')
+  AND (s.status = 'CANCELLED' OR c."mergedIntoId" IS NOT NULL);
+```
+
+A cancel still being confirmed with the provider is
+`status = 'CANCELLED' AND "cancelConfirmedAt" IS NULL`; a `mandate.cancel`
+job FAILED beside one means the provider never answered, and it needs a
+look in the provider's dashboard.
+
+### Rollback
+
+Deploy the previous API. A `mandate.cancel` job left PENDING dead-letters on
+the old image (no handler); its mandate is already CANCELLED in Saroh and is
+never charged. The table stays; the old image never reads it.
+
 ## Date-range indexes (review follow-up)
 
 **Migration** `20261015100000_calendar_range_indexes`: `Order

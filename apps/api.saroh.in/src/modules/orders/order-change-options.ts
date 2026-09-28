@@ -80,7 +80,7 @@ export async function changeOptionsFor(
         customerThreadOpen(
             db,
             organizationId,
-            order.customer.identityLinks[0]?.contactId ?? null,
+            order.customer?.identityLinks[0]?.contactId ?? null,
         ),
     ]);
     const cancelled = order.status === "CANCELLED";

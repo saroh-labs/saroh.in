@@ -5,6 +5,7 @@ import { IsBoolean } from "class-validator";
 
 import { validationPipeOptions } from "../../common/validation";
 import {
+    CreatePageDto,
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
@@ -157,6 +158,62 @@ describe("the settings PATCH body's name (G6)", () => {
     ])("refuses %s with a 400", async (_label, body) => {
         await expect(
             pipe.transform(body, asBody(UpdateSiteSettingsDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("the page create body (G14)", () => {
+    it("takes a free-form page as it always did: title and path, no kind", async () => {
+        await expect(
+            pipe.transform(
+                { title: " About ", path: "/about" },
+                asBody(CreatePageDto),
+            ),
+        ).resolves.toMatchObject({ title: "About", path: "/about" });
+    });
+
+    it("still needs a title and a path for a free-form page", async () => {
+        await expect(
+            pipe.transform({ title: "About" }, asBody(CreatePageDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            pipe.transform(
+                { kind: "FREE", path: "/about" },
+                asBody(CreatePageDto),
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("takes a module page by its kind alone, and checks what else it is sent", async () => {
+        await expect(
+            pipe.transform({ kind: "BOOK" }, asBody(CreatePageDto)),
+        ).resolves.toMatchObject({ kind: "BOOK" });
+        await expect(
+            pipe.transform(
+                { kind: "CONTACT", path: "Contact Us" },
+                asBody(CreatePageDto),
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            pipe.transform(
+                { kind: "PRICES", inMenu: "false" },
+                asBody(CreatePageDto),
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("refuses a kind that isn't one", async () => {
+        await expect(
+            pipe.transform({ kind: "BLOG" }, asBody(CreatePageDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("takes Show in menu on a page update, as a real boolean only", async () => {
+        await expect(
+            pipe.transform({ inMenu: false }, asBody(UpdatePageDto)),
+        ).resolves.toMatchObject({ inMenu: false });
+        await expect(
+            pipe.transform({ inMenu: "false" }, asBody(UpdatePageDto)),
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 });

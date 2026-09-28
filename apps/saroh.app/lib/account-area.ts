@@ -7,6 +7,7 @@ import type {
     AccountHomeData,
     AccountNote,
     AccountOrder,
+    AccountPacksOnSale,
     AccountPlanTab,
     AccountReceipt,
     AccountThread,
@@ -15,6 +16,7 @@ import type {
 } from "@saroh/site-blocks";
 
 import { bookingsResult, isBookingRow } from "./account-bookings-shape";
+import { packsOnSaleResult } from "./account-packs-shape";
 import {
     homeResult,
     isAccountView,
@@ -93,6 +95,16 @@ export async function getAccountHome(): Promise<AccountHomeData | null> {
 export async function getPlanTab(): Promise<AccountPlanTab | null> {
     const read = await readJson("me/plan");
     return read.ok ? planTabResult(read.body) : null;
+}
+
+/**
+ * The packs on sale to buy online from the Plan tab (A11), or null when
+ * they couldn't be read — the tab then offers no "Buy a pack", as with an
+ * API from before A11.
+ */
+export async function getPacksOnSale(): Promise<AccountPacksOnSale | null> {
+    const read = await readJson("me/packs");
+    return read.ok ? packsOnSaleResult(read.body) : null;
 }
 
 export async function getReceipts(): Promise<AccountBlock<AccountReceipt[]>> {

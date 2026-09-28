@@ -49,6 +49,32 @@ export const moduleMutationResponseSchema = z.object({
     data: moduleViewSchema,
 });
 
+/**
+ * `GET /modules/:key/impact` (F13): what turning a module off touches, with
+ * real counts. `count` is null when the API couldn't read it (the message
+ * says so) and absent when there is nothing to count, or the viewer may not
+ * read it. The messages are the API's sentences; blockers still refuse.
+ */
+export const moduleImpactSchema = z.object({
+    moduleKey: z.string(),
+    enabled: z.boolean(),
+    goesWith: z.array(z.string()),
+    items: z.array(
+        z.object({
+            code: z.string(),
+            moduleKey: z.string(),
+            count: z.number().int().nullable().optional(),
+            message: z.string(),
+        }),
+    ),
+    blockers: z.array(moduleBlockerSchema),
+});
+export type ModuleImpact = z.infer<typeof moduleImpactSchema>;
+
+export const moduleImpactResponseSchema = z.object({
+    data: moduleImpactSchema,
+});
+
 /** Decode a `GET /modules` response into the module list. */
 export function decodeModuleList(raw: unknown): ModuleView[] {
     return moduleListSchema.parse(raw).data;

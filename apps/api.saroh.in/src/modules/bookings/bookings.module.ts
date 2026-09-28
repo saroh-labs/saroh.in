@@ -12,7 +12,12 @@ import { PaymentsModule } from "../payments/payments.module";
 import { AccountBookingsTabController } from "../site-accounts/account-bookings-tab.controller";
 import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
 import { AccountBookingsService } from "../site-accounts/account-bookings.service";
+import { AccountWaitlistController } from "../site-accounts/account-waitlist.controller";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import {
+    BOOKING_NOTIFY_TYPE,
+    BookingNotifyHandler,
+} from "./booking-notify.handler";
 import { BookingsController } from "./bookings.controller";
 import { BookingsService } from "./bookings.service";
 import {
@@ -25,6 +30,12 @@ import {
     RELEASE_HOLDS_TYPE,
     ReleaseHoldsHandler,
 } from "./release-holds.handler";
+import {
+    WAITLIST_OFFER_TYPE,
+    WaitlistOfferHandler,
+} from "./waitlist-offer.handler";
+import { WaitlistController } from "./waitlist.controller";
+import { WaitlistService } from "./waitlist.service";
 
 const CHAIN_CHECK_MS = 15 * 60 * 1000;
 
@@ -41,7 +52,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * A signed-in customer books through {@link AccountBookingsController}
  * (round-2 A9), on the same service and limiter, and moves and cancels
  * their own bookings through {@link AccountBookingsTabController} (A6), on
- * the same writes as the team's.
+ * the same writes as the team's. A full class's waitlist (A12) is joined
+ * from the booking page ({@link AccountWaitlistController}), read by the
+ * team ({@link WaitlistController}), and offered by `waitlist.offer`.
  */
 @Module({
     imports: [
@@ -51,8 +64,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         JobsModule,
         // Sends a cancel's refund of money paid online (E8).
         PaymentsModule,
-        // The customer session guard for signed-in booking (A9), and the
-        // account area's switch (A6).
+        // The customer session guard for signed-in booking (A9), the
+        // account area's switch (A6), and the customer notices
+        // `booking.notify` delegates to (A14).
         SiteAccountsModule,
     ],
     controllers: [
@@ -61,6 +75,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicBookingPageController,
         AccountBookingsController,
         AccountBookingsTabController,
+        AccountWaitlistController,
+        WaitlistController,
     ],
     providers: [
         BookingsService,
@@ -68,6 +84,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicTodayService,
         AccountBookingsService,
         ReleaseHoldsHandler,
+        BookingNotifyHandler,
+        WaitlistService,
+        WaitlistOfferHandler,
         OrganizationGuard,
     ],
     exports: [BookingsService],
@@ -78,15 +97,22 @@ export class BookingsModule implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly releaseHolds: ReleaseHoldsHandler,
+        private readonly bookingNotify: BookingNotifyHandler,
+        private readonly waitlistOffer: WaitlistOfferHandler,
     ) {}
 
     /**
-     * Registers the hold release sweep (U19) and starts its chain — the
+     * Registers `booking.notify` (A14) and the hold release sweep (U19),
+     * and starts the sweep's chain — the
      * renewal job's shape (ADR-007): never under test, where no worker runs,
      * and never throwing, so a database not up yet cannot stop the boot.
      */
     async onModuleInit(): Promise<void> {
         this.registry.register(RELEASE_HOLDS_TYPE, this.releaseHolds.handle);
+        // Tells the customer, and the team, about a booking (A14).
+        this.registry.register(BOOKING_NOTIFY_TYPE, this.bookingNotify.handle);
+        // Offers a freed place in a class to the first in line (A12).
+        this.registry.register(WAITLIST_OFFER_TYPE, this.waitlistOffer.handle);
         if (env.NODE_ENV === "test") return;
         await this.releaseHolds.schedule(new Date());
         this.chainCheck = setInterval(() => {

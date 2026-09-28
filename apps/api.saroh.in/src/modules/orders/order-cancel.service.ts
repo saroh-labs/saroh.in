@@ -52,8 +52,9 @@ type Tx = Prisma.TransactionClient;
 
 /**
  * "Cancel order…" on Order Detail (round-2 B9, R7): a refund in full, and
- * the order kept as cancelled. `order:write`; money going back also takes
- * `payment:manage`. Refused from its handover on — "Refund it instead".
+ * the order kept as cancelled. `order:refund` (B16, matrix §2): a cancel is
+ * a refund in full, so it is one power whether or not anything was paid.
+ * Refused from its handover on — "Refund it instead".
  *
  * - Nothing paid (or the payment failed): cancelled at once, its promised
  *   stock back on the shelf.
@@ -80,7 +81,7 @@ export class OrderCancelService {
         orderId: string,
         dto: CancelOrderDto,
     ): Promise<CancelOutcome> {
-        authorize(ctx, "order:write");
+        authorize(ctx, "order:refund");
         const reason = dto.reason?.trim() ? dto.reason.trim() : null;
 
         const first = await prisma.$transaction(async (tx) => {
@@ -101,7 +102,6 @@ export class OrderCancelService {
             // Nothing to hand back online: cancelled now.
             let byHand: CancelOutcome["byHand"] = null;
             if (order.paymentStatus === "PAID") {
-                authorize(ctx, "payment:manage");
                 assertPaymentTransition("PAID", "REFUNDED");
                 await tx.order.update({
                     where: { id: order.id },
@@ -138,7 +138,6 @@ export class OrderCancelService {
             };
         }
 
-        authorize(ctx, "payment:manage");
         if (!this.payments) {
             throw new ServiceUnavailableException(
                 "Refunds aren't available right now. Nothing was cancelled.",

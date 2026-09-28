@@ -21,8 +21,8 @@ const MAX_PAGES = 400;
  * search, the storefront and the filters, not only the page on screen — as
  * a CSV built in the browser. It walks the API's cursor a page per request,
  * saying how many it has read, so a long export shows it is working and no
- * single request reads everything. Stays under `order:read` until B16
- * (the page hides it from the kitchen's view).
+ * single request reads everything. `order:export` (B16): the list draws it
+ * only for someone who holds it, and the API asks it of every page.
  */
 export function OrderExport({
     query,

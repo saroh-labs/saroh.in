@@ -1,6 +1,6 @@
 import { PurchasesScreen } from "@/components/class-packs/purchases-screen";
 import { PageContainer } from "@/components/shared/page-container";
-import { canWritePacks } from "@/lib/class-packs/access";
+import { canSellPacks } from "@/lib/class-packs/access";
 import {
     getSellingTerms,
     listPacks,
@@ -25,7 +25,8 @@ export default async function PackPurchasesPage({
         resolveActiveOrganization(),
         searchParams,
     ]);
-    const canWrite = canWritePacks(organization);
+    // The only write here is selling one (E26: `pack:sell`).
+    const canWrite = canSellPacks(organization);
     const [contacts, terms] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         getSellingTerms(),

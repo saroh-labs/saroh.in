@@ -3,12 +3,13 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { mintPayToken } from "../invoices/pay-token";
 import { assertPaymentsOn } from "../invoices/payments-on";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { payLinkProvider } from "../payments/pay-link-provider";
 import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
 
@@ -29,39 +30,58 @@ import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
 @Injectable()
 export class OrderPayLinkService {
     /**
-     * Mint the order's pay link and return its token. `order:write` until
-     * B16 splits it (`order:create` / `order:edit`). Another business's
-     * order is a 404; one that can't be paid, or no provider to take it, a
-     * 409.
+     * Mint the order's pay link and return its token. `order:create` or
+     * `order:edit` (B16, matrix §2): whoever takes orders makes their pay
+     * links, and whoever changes them makes a new one, which stops the old.
+     * Another business's order is a 404; one that can't be paid, or no
+     * provider to take it, a 409.
      */
     async make(
         ctx: OrganizationContext,
         orderId: string,
         now: Date = new Date(),
     ): Promise<{ token: string; payLinkCreatedAt: Date }> {
-        authorize(ctx, "order:write");
+        if (!allows(ctx, "order:create") && !allows(ctx, "order:edit")) {
+            // The refusal names the power that replaces a link.
+            authorize(ctx, "order:edit");
+        }
         await assertPaymentsOn(prisma, ctx.organizationId, "make a pay link");
-        return prisma.$transaction(async (tx) => {
-            // The order's row lock: a cancel, a payment recorded by hand and
-            // a new link on one order take turns.
-            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} AND "organizationId" = ${ctx.organizationId} FOR UPDATE`;
-            const order = await tx.order.findFirst({
-                where: { id: orderId, organizationId: ctx.organizationId },
-                select: PAY_LINK_ORDER_SELECT,
-            });
-            if (!order) throw new NotFoundException("Order not found");
-            const refusal = payLinkRefusal(order);
-            if (refusal) throw new ConflictException(refusal);
-            // A provider that can open the checkout window, or a 409 naming
-            // what to connect or fix.
-            await payLinkProvider(tx, ctx.organizationId, order.storeId);
-
-            const { token, tokenHash } = mintPayToken();
-            await tx.order.update({
-                where: { id: order.id },
-                data: { payTokenHash: tokenHash, payLinkCreatedAt: now },
-            });
-            return { token, payLinkCreatedAt: now };
-        });
+        return prisma.$transaction((tx) =>
+            issueOrderPayLinkInTx(tx, ctx.organizationId, orderId, now),
+        );
     }
+}
+
+/**
+ * The pay link's one writer: Order Detail's "Make a pay link" above, and
+ * New order's "Send a payment link" (B13), which makes the order and its
+ * link in one transaction, so a link that can't be made makes no order.
+ * The caller has authorized and checked that payments are on.
+ */
+export async function issueOrderPayLinkInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    orderId: string,
+    now: Date = new Date(),
+): Promise<{ token: string; payLinkCreatedAt: Date }> {
+    // The order's row lock: a cancel, a payment recorded by hand and a new
+    // link on one order take turns.
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+    const order = await tx.order.findFirst({
+        where: { id: orderId, organizationId },
+        select: PAY_LINK_ORDER_SELECT,
+    });
+    if (!order) throw new NotFoundException("Order not found");
+    const refusal = payLinkRefusal(order);
+    if (refusal) throw new ConflictException(refusal);
+    // A provider that can open the checkout window, or a 409 naming what to
+    // connect or fix.
+    await payLinkProvider(tx, organizationId, order.storeId);
+
+    const { token, tokenHash } = mintPayToken();
+    await tx.order.update({
+        where: { id: order.id },
+        data: { payTokenHash: tokenHash, payLinkCreatedAt: now },
+    });
+    return { token, payLinkCreatedAt: now };
 }

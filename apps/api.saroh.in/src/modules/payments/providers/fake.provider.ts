@@ -1,13 +1,15 @@
 import type {
+    CancelMandateInput,
     CreateOrderIntentInput,
     CreateOrderIntentResult,
     FindRefundInput,
+    MandateCapability,
     MerchantProvider,
     ProviderFactory,
     RefundInput,
     RefundResult,
 } from "./provider.port";
-import { RefundCallError } from "./provider.port";
+import { MandateCallError, RefundCallError } from "./provider.port";
 
 /**
  * Deterministic, network-free provider for tests/dev (S5-002).
@@ -26,6 +28,43 @@ export class FakeMerchantProvider implements MerchantProvider {
         outcome: "REFUSED" | "UNKNOWN";
         madeAnyway: boolean;
     }[] = [];
+
+    /** Every mandate cancel asked for, answered or not (D20). */
+    readonly mandateCancelCalls: CancelMandateInput[] = [];
+    /** The mandates the provider has cancelled, by their provider id. */
+    readonly cancelledMandates = new Set<string>();
+    private readonly mandateCancelFailures: {
+        outcome: "REFUSED" | "UNKNOWN";
+        madeAnyway: boolean;
+    }[] = [];
+
+    /**
+     * Autopay mandates (D11's capability; D20 needs only cancel). Cancelling
+     * one already cancelled answers as a success, as a real provider's
+     * cancel does.
+     */
+    readonly mandates: MandateCapability = {
+        cancel: (input) => {
+            this.mandateCancelCalls.push(input);
+            if (this.cancelledMandates.has(input.providerMandateId)) {
+                return Promise.resolve();
+            }
+            const failure = this.mandateCancelFailures.shift();
+            if (failure?.madeAnyway) {
+                this.cancelledMandates.add(input.providerMandateId);
+            }
+            if (failure) {
+                return Promise.reject(
+                    new MandateCallError(
+                        "fake mandate cancel failed",
+                        failure.outcome,
+                    ),
+                );
+            }
+            this.cancelledMandates.add(input.providerMandateId);
+            return Promise.resolve();
+        },
+    };
 
     constructor(readonly name = "RAZORPAY") {}
 
@@ -96,6 +135,21 @@ export class FakeMerchantProvider implements MerchantProvider {
         opts: { madeAnyway?: boolean } = {},
     ): void {
         this.refundFailures.push({ outcome, madeAnyway: !!opts.madeAnyway });
+    }
+
+    /**
+     * Make the next mandate cancel fail: `REFUSED` cancels nothing;
+     * `UNKNOWN` cancels nothing unless `madeAnyway` — the cancel went
+     * through while the answer was lost.
+     */
+    failNextMandateCancel(
+        outcome: "REFUSED" | "UNKNOWN",
+        opts: { madeAnyway?: boolean } = {},
+    ): void {
+        this.mandateCancelFailures.push({
+            outcome,
+            madeAnyway: !!opts.madeAnyway,
+        });
     }
 }
 

@@ -14,6 +14,7 @@ import {
     shareImages,
 } from "@/lib/publication";
 import { getPlansFeed } from "@/lib/site-plans";
+import { getProductGridFeeds } from "@/lib/site-product-grids";
 
 /**
  * Tenant sub-page (S2-006).
@@ -116,11 +117,12 @@ export default async function SitePostPage({
         notFound();
     }
 
-    // The Journal's posts (G10) and the plans on sale (G9), each read only
-    // when the page draws its block.
-    const [journal, plans] = await Promise.all([
+    // The Journal's posts (G10), the plans on sale (G9) and each Product
+    // grid's products (G12), each read only when the page draws its block.
+    const [journal, plans, productGrids] = await Promise.all([
         getJournalFeed(page.sections, snapshot, siteId),
         getPlansFeed(page.sections, snapshot, siteId),
+        getProductGridFeeds(page.sections, siteId),
     ]);
 
     return (
@@ -131,6 +133,7 @@ export default async function SitePostPage({
             siteId={siteId}
             journal={journal}
             plans={plans}
+            productGrids={productGrids}
         />
     );
 }

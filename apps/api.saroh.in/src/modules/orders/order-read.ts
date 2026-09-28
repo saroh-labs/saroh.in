@@ -1,13 +1,23 @@
 import { toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
+import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
+import type { RawOrderInvoice } from "./order-invoice-title";
+import { orderInvoiceTitle } from "./order-invoice-title";
 import type { OrderLineKind } from "./order-line";
 import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
+import type { OrderVisitsDto } from "./order-visits";
+import { walkInOf } from "./walk-in";
 
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14): the
@@ -166,6 +176,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         /** When their first order was placed. */
         firstOrderAt: Date | null;
     } | null;
+    /**
+     * A walk-in (B13): someone served at the counter with no customer
+     * record, so `customer` is null. Their phone, like a customer's own,
+     * only with `contact:read`. Null on every order with a customer.
+     */
+    walkIn: { name: string; phone: string | null } | null;
     /** Null when no address was ever given. */
     deliveryAddress: DeliveryAddressDto | null;
     notes: string | null;
@@ -207,6 +223,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * the screen says so rather than showing nothing.
      */
     attention?: OrderAttention | null;
+    /**
+     * A treatment's visits (B14, E9): the Visits card and what the header
+     * offers next. Absent on an order that isn't one; null when they
+     * couldn't be read, so the card says so.
+     */
+    visits?: OrderVisitsDto | null;
 }
 
 export interface OrderInvoiceDto {
@@ -215,6 +237,11 @@ export interface OrderInvoiceDto {
     /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY */
     kind: string;
     status: string;
+    /**
+     * What the paper is called (D15, `invoice-title.ts`): a registered
+     * business's paper whose every line is exempt is a "Bill of supply".
+     */
+    title: InvoiceTitle;
 }
 
 export interface RawOrderRead {
@@ -238,6 +265,8 @@ export interface RawOrderRead {
     courierName: string | null;
     trackingNumber: string | null;
     payLinkCreatedAt?: Date | null;
+    walkInName?: string | null;
+    walkInPhone?: string | null;
     deliveryName: string | null;
     deliveryPhone: string | null;
     deliveryLine1: string | null;
@@ -246,7 +275,7 @@ export interface RawOrderRead {
     deliveryState: string | null;
     deliveryPostalCode: string | null;
     store: { id: string; name: string };
-    invoices?: OrderInvoiceDto[];
+    invoices?: RawOrderInvoice[];
     customer: {
         id: string;
         email: string;
@@ -327,7 +356,7 @@ export interface RawOrderRead {
 }
 
 export interface ReadOptions {
-    /** The caller holds a money read (`payment:read`). */
+    /** The caller holds a money read (`order:read` or `payment:read`). */
     money: boolean;
     /** The caller holds `order:read` (the pay link's date). */
     fullRead: boolean;
@@ -423,12 +452,17 @@ export function serializeOrderRead(
         postalCode: order.deliveryPostalCode,
     };
     const hasAddress = Object.values(address).some((v) => v !== null);
-    const name = order.customer
-        ? [order.customer.firstName, order.customer.lastName]
-              .filter(Boolean)
-              .join(" ")
-              .trim()
-        : "";
+    // Their details were removed for a privacy request (C11).
+    const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
+    const name = removed
+        ? REMOVED_CUSTOMER_NAME
+        : order.customer
+          ? [order.customer.firstName, order.customer.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+          : "";
 
     return {
         id: order.id,
@@ -467,13 +501,21 @@ export function serializeOrderRead(
                   id: order.customer.id,
                   name: name || null,
                   phone: opts.contact ? order.customer.phone : null,
-                  ...(opts.contact ? { email: order.customer.email } : {}),
+                  // Never a placeholder: a walk-in kept by their phone
+                  // (B13b) has no email to show.
+                  ...(opts.contact && !removed && shownEmail
+                      ? { email: shownEmail }
+                      : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
                   orderCount: order.customer._count?.orders ?? 1,
                   firstOrderAt: order.customer.orders?.[0]?.createdAt ?? null,
               }
             : null,
+        walkIn: walkInOf(
+            { ...order, customerId: order.customer?.id ?? null },
+            opts.contact,
+        ),
         deliveryAddress: hasAddress ? address : null,
         notes: order.notes,
         trackingUrl: order.trackingUrl,
@@ -554,6 +596,7 @@ export function serializeOrderRead(
                   number: i.number,
                   kind: i.kind,
                   status: i.status,
+                  title: orderInvoiceTitle(i, opts.now),
               }))
             : null,
         money: opts.money

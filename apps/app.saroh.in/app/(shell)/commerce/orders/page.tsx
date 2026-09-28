@@ -6,7 +6,11 @@ import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
 import { env } from "@/env";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
-import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
+import {
+    orderPowers,
+    ordersAccess,
+    ordersLockedCopy,
+} from "@/lib/orders/access";
 import {
     getOrderFilterOptions,
     listOrderRows,
@@ -19,6 +23,7 @@ import {
 } from "@/lib/orders/list-query";
 import { storefrontShareUrl } from "@/lib/orders/share";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { listCataloguePage } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -76,11 +81,23 @@ export default async function OrdersPage({
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // What this person may do to orders, each the power its endpoint asks
+    // (B16): what they can't do isn't drawn.
+    const powers = orderPowers(organization);
     const payOnline =
-        may("order:write") && access.money
+        powers.payLink && access.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
-    const [page, stores, openByStore, filterOptions, canPayOnline] =
+    // New order (B13) is for someone who may take orders (`order:create`),
+    // in a business that sells things: one whose catalogue is only
+    // appointments books them in Bookings. A read that fails keeps the
+    // button.
+    const sellsProducts = powers.create
+        ? listCataloguePage({ limit: 1 })
+              .then((p) => p === null || p.total > 0)
+              .catch(() => true)
+        : Promise.resolve(false);
+    const [page, stores, openByStore, filterOptions, canPayOnline, sells] =
         await Promise.all([
             listOrderRows(orderListParams(query)),
             storesRead,
@@ -91,6 +108,7 @@ export default async function OrdersPage({
             // What the filter bar offers (B4); null leaves its menus out.
             getOrderFilterOptions(query.product ?? undefined),
             payOnline,
+            sellsProducts,
         ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
@@ -124,13 +142,23 @@ export default async function OrdersPage({
                 kitchen={!access.money}
                 filterOptions={filterOptions}
                 shareUrl={shareUrl}
+                newOrder={
+                    sells
+                        ? {
+                              // The old New order page and the calendar's
+                              // "New order" land here with ?new=1.
+                              openOnArrival: params.new === "1",
+                              canSearch: may("contact:read"),
+                          }
+                        : null
+                }
                 can={{
                     // Without resolved actions a Member still stages (DEC-024).
-                    stage: organization?.actions
-                        ? may("order:stage")
-                        : organization?.role !== "REVIEWER",
-                    write: may("order:write"),
-                    refund: may("payment:manage"),
+                    stage: powers.stage,
+                    create: powers.create,
+                    payLink: powers.payLink,
+                    refund: powers.refund,
+                    export: powers.export,
                     payOnline: canPayOnline,
                 }}
             />

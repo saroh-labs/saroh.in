@@ -76,6 +76,13 @@ export const refundOrder = {
     org: process.env.E2E_REFUND_ORG,
 };
 
+/**
+ * The run has its own seeded database (CI), so a spec may write on the
+ * showcase businesses, which are film sets everywhere else (B14's Kavi
+ * Dental visits).
+ */
+export const ownSeededDatabase = Boolean(process.env.CI);
+
 export const demoUser = {
     email: "demo@saroh.dev",
     password: "demo-password-123",

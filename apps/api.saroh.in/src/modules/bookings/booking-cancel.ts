@@ -17,6 +17,10 @@ import {
     loadBookingRules,
     refundsAutomatically,
 } from "./booking-rules";
+import {
+    closeSessionWaitlistInTx,
+    offerFreedPlaceInTx,
+} from "./waitlist-queue";
 
 /*
  * Cancelling a booking (U3, E8, E9, E30), whoever cancels it: the team from
@@ -53,8 +57,12 @@ export interface CancelMoney {
 
 export const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
 
-/** A cancelled booking, and what happened to its money. */
-export type CancelledBooking = Booking & { money: CancelMoney };
+/**
+ * A cancelled booking, and what happened to its money. `told`: the cancel
+ * happened now and its notice is queued (A14's `booking.notify`, which
+ * tells the customer, and the team when the customer cancelled it).
+ */
+export type CancelledBooking = Booking & { money: CancelMoney; told: boolean };
 
 /** Who is cancelling, as the booking's history and the refund rule need. */
 export interface CancelActor {
@@ -92,16 +100,20 @@ export interface CancelActor {
  * cancel's transaction and sent after commit, under the row's id.
  *
  * A pay-now hold (PENDING) is released rather than cancelled (#508).
+ *
+ * The place it frees goes to the class's waitlist (A12, `waitlist.offer`)
+ * — unless `closesClass`: the team is cancelling the whole class, so its
+ * line is closed instead and nobody is offered a place in it.
  */
 export async function cancelFoundBooking(
     found: Booking,
     actor: CancelActor,
     now: Date,
-    options: { returnCredit?: boolean },
+    options: { returnCredit?: boolean; closesClass?: boolean },
     send: (refundId: string) => Promise<RefundStatus>,
 ): Promise<CancelledBooking> {
     if (found.status === "CANCELLED") {
-        return { ...found, money: NOTHING_MOVED };
+        return { ...found, money: NOTHING_MOVED, told: false };
     }
     const { organizationId } = actor;
     const rules = await loadBookingRules(prisma, organizationId);
@@ -119,13 +131,23 @@ export async function cancelFoundBooking(
         const booking =
             (await tx.booking.findUnique({ where: { id: found.id } })) ?? found;
         if (booking.status === "CANCELLED") {
-            return { booking, money: NOTHING_MOVED, send: null };
+            return { booking, money: NOTHING_MOVED, send: null, told: false };
         }
         // A pay-now hold nobody has paid: let it go as the booker would,
         // so its draft invoice is voided and its pay link stops working.
         // A payment that lands after is recorded as owed back.
         if (booking.status === "PENDING") {
-            await releaseHoldInTx(tx, booking.id, now, actor.userId);
+            await releaseHoldInTx(tx, booking.id, now, actor.userId, {
+                freesPlace: !options.closesClass,
+            });
+            if (options.closesClass) {
+                await closeSessionWaitlistInTx(tx, {
+                    organizationId,
+                    serviceId: booking.serviceId,
+                    startAt: booking.startAt,
+                    now,
+                });
+            }
             return {
                 booking:
                     (await tx.booking.findUnique({
@@ -133,6 +155,7 @@ export async function cancelFoundBooking(
                     })) ?? booking,
                 money: NOTHING_MOVED,
                 send: null,
+                told: false,
             };
         }
         const inTime = !isLateCancel(booking, now, rules);
@@ -174,10 +197,22 @@ export async function cancelFoundBooking(
                 : await bookingPaymentInTx(tx, organizationId, booking.id);
         // A pay link sent for it (E4) stops working with the place.
         await retirePayLinkInTx(tx, booking.id);
+        // The place is free: offered to the first in line, or, when the
+        // whole class is being cancelled, the line is closed (A12).
+        const session = {
+            organizationId,
+            serviceId: booking.serviceId,
+            startAt: booking.startAt,
+        };
+        if (options.closesClass) {
+            await closeSessionWaitlistInTx(tx, { ...session, now });
+        } else {
+            await offerFreedPlaceInTx(tx, session);
+        }
         // The slot it was cancelled OUT of, so the history reads as a
         // sequence rather than a list of states with the times missing.
         // No actor is the customer themselves ("by the customer").
-        await tx.bookingEvent.create({
+        const event = await tx.bookingEvent.create({
             data: {
                 bookingId: booking.id,
                 organizationId,
@@ -187,6 +222,26 @@ export async function cancelFoundBooking(
             },
             select: { id: true },
         });
+        // The outbox, as a booking and a move: A14's `booking.notify`
+        // tells the customer, and the team when the customer cancelled.
+        // A course's sessions are not told one by one (ADR-007).
+        const told = !booking.courseEnrollmentId;
+        if (told) {
+            await tx.job.create({
+                data: {
+                    organizationId,
+                    type: "booking.notify",
+                    payload: {
+                        bookingId: booking.id,
+                        serviceId: booking.serviceId,
+                        contactId: booking.contactId,
+                        reason: "cancelled",
+                        eventId: event.id,
+                    },
+                },
+                select: { id: true },
+            });
+        }
         const money: CancelMoney = {
             refund: reserved
                 ? {
@@ -204,13 +259,14 @@ export async function cancelFoundBooking(
             booking: cancelled,
             money,
             send: reserved?.reservedNow ? reserved.refundId : null,
+            told,
         };
     });
     // Phase two, after commit: the provider, under the row's id.
     if (done.send && done.money.refund) {
         done.money.refund.status = await send(done.send);
     }
-    return { ...done.booking, money: done.money };
+    return { ...done.booking, money: done.money, told: done.told };
 }
 
 /**

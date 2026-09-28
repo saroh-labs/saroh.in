@@ -1895,7 +1895,7 @@ export const PRANA: ShowcaseBusiness = {
                     hero(
                         "Yoga at your pace, in the studio or at home",
                         "A small studio in HSR Layout with classes from six in the morning, live online classes for the days you cannot come in, and courses for beginners.",
-                        { label: "Book a free intro", href: "/book" },
+                        { label: "Book a free intro", href: "/intro" },
                     ),
                     {
                         type: "features",
@@ -1983,7 +1983,8 @@ export const PRANA: ShowcaseBusiness = {
                 ],
             },
             {
-                path: "/book",
+                // Not /book, the booking page's address (G14).
+                path: "/intro",
                 title: "Free intro",
                 sections: [
                     hero(
@@ -2226,7 +2227,9 @@ export const CAREPOINT: ShowcaseBusiness = {
                 ],
             },
             {
-                path: "/book",
+                // Not /book, the booking page's address (G14); the home
+                // page's "Book an appointment" still opens /book itself.
+                path: "/appointments",
                 title: "Book",
                 sections: [
                     hero(

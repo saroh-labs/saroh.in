@@ -17,7 +17,13 @@ import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels } from "@/lib/contacts/panels";
 import type { Holdings } from "@/lib/contacts/removal";
 import { getContact } from "@/lib/contacts/service";
-import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
+import {
+    contactEmail,
+    contactName,
+    formatValue,
+    isRemovedContact,
+    LEAD_STATUS,
+} from "@/lib/crm/format";
 import { formatStatus } from "@/lib/format/status";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadStatus } from "@/lib/leads/service";
@@ -61,15 +67,19 @@ export default async function ContactDetailPage({
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
-    const canEdit = can("contact:write");
+    // Removed for a privacy request (C11): their leads stay, and the page
+    // opens for them, but nothing can put details back.
+    const removed = isRemovedContact(contact);
+    const canEdit = can("contact:write") && !removed;
+    const email = contactEmail(contact.email);
     const seesLeads = can("lead:read");
     const holdings = await loadContactHoldings(contact.id, plan);
-    const person = { id: contact.id, name, email: contact.email };
+    const person = { id: contact.id, name, email: email ?? "" };
     // The clock is read once, here, for the pack balances.
     const now = new Date().toISOString();
 
     const facts: [string, ReactNode][] = [
-        ["Email", contact.email],
+        ["Email", email],
         // An empty string is a field someone cleared: shown as not given.
         ["Phone", contact.phone?.trim() ? contact.phone : null],
         ["Company", contact.company?.trim() ? contact.company : null],
@@ -93,9 +103,11 @@ export default async function ContactDetailPage({
                     ]}
                     title={name}
                     description={
-                        contact.company?.trim()
-                            ? contact.company
-                            : contact.email
+                        removed
+                            ? "Their details were removed at their request. Their leads stay as they were."
+                            : contact.company?.trim()
+                              ? contact.company
+                              : (email ?? undefined)
                     }
                     actions={
                         canEdit ? (

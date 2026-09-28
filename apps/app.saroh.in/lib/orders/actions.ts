@@ -11,30 +11,20 @@ import {
     changeOrderFulfilment,
     createOrderPayLink,
     editOrderBeforePreparing,
+    markOrderVisitAttended,
     moveOrderStage,
     refundOrderLines,
     retryOrderRefund,
     saveOrderCourier,
     undoOrderStage,
 } from "./kitchen-service";
-import type {
-    CreateOrderInput,
-    OrderResult,
-    UpdateOrderInput,
-} from "./service";
-import {
-    createOrder as createOrderApi,
-    updateOrder as updateOrderApi,
-} from "./service";
+import type { OrderResult, UpdateOrderInput } from "./service";
+import { updateOrder as updateOrderApi } from "./service";
 
-/** Server Actions for orders — forward the cookie to api (write = owner/EDITOR+). */
-
-export async function createOrder(
-    storeId: string,
-    input: CreateOrderInput,
-): Promise<OrderResult> {
-    return createOrderApi(storeId, input);
-}
+/**
+ * Server Actions for orders — forward the cookie to api (write =
+ * owner/EDITOR+). Taking an order is New order's (`new-order-actions.ts`).
+ */
 
 export async function updateOrder(
     storeId: string,
@@ -52,6 +42,11 @@ export async function moveStage(orderId: string, input: MoveStageInput) {
 
 export async function saveCourier(orderId: string, input: CourierFields) {
     return saveOrderCourier(orderId, input);
+}
+
+/** "Mark visit N attended" on a treatment's order (B14). */
+export async function markVisitAttended(orderId: string, visitNumber: number) {
+    return markOrderVisitAttended(orderId, visitNumber);
 }
 
 export async function undoStage(orderId: string, eventId: string) {

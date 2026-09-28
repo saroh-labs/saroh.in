@@ -128,5 +128,11 @@ describe("the Bookings answers (A6)", () => {
                 refund: { ...cancelled.refund, status: "DONE" },
             }),
         ).toBeNull();
+        // Whether the team was told (A14): a boolean, or absent before A14.
+        expect(cancelResult({ ...cancelled, told: true })).toEqual({
+            ...cancelled,
+            told: true,
+        });
+        expect(cancelResult({ ...cancelled, told: "yes" })).toBeNull();
     });
 });

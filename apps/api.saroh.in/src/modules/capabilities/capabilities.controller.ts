@@ -56,6 +56,19 @@ export class CapabilitiesController {
         };
     }
 
+    /**
+     * What turning a module off touches, with real counts (F13). Needs
+     * `module:read`; each count needs its own read (the lifecycle service).
+     */
+    @Get("modules/:moduleKey/impact")
+    async impact(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("moduleKey") moduleKeyParam: string,
+    ) {
+        const moduleKey = this.moduleKey(moduleKeyParam);
+        return { data: await this.lifecycle.impact(ctx, moduleKey) };
+    }
+
     /** Set an Organization module's lifecycle (enable / disable / archive). */
     @Put("modules/:moduleKey")
     async setStatus(

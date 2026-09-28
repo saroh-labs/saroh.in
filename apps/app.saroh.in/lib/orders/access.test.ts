@@ -2,10 +2,88 @@ import { describe, expect, it } from "vitest";
 
 import {
     orderLockedText,
+    orderPowers,
     ordersAccess,
     ordersLockedCopy,
     ordersPlace,
 } from "./access";
+
+describe("orderPowers — each the power its endpoint asks (B16)", () => {
+    const none = {
+        stage: false,
+        create: false,
+        edit: false,
+        payLink: false,
+        refund: false,
+        export: false,
+    };
+    const all = {
+        stage: true,
+        create: true,
+        edit: true,
+        payLink: true,
+        refund: true,
+        export: true,
+    };
+
+    it("counter staff with order:create take orders and make their pay links, nothing more", () => {
+        expect(
+            orderPowers({
+                role: "MEMBER",
+                actions: ["order:create", "order:read", "contact:read"],
+            }),
+        ).toEqual({ ...none, create: true, payLink: true });
+    });
+
+    it("order:edit changes orders and replaces pay links; no refund, no export", () => {
+        expect(
+            orderPowers({ role: "MEMBER", actions: ["order:edit"] }),
+        ).toEqual({ ...none, edit: true, payLink: true });
+    });
+
+    it("refund and export are their own", () => {
+        expect(
+            orderPowers({ role: "MEMBER", actions: ["order:refund"] }),
+        ).toEqual({ ...none, refund: true });
+        expect(
+            orderPowers({ role: "MEMBER", actions: ["order:export"] }),
+        ).toEqual({ ...none, export: true });
+    });
+
+    it("the kitchen only moves steps", () => {
+        expect(
+            orderPowers({ role: "MEMBER", actions: ["order:stage"] }),
+        ).toEqual({ ...none, stage: true });
+    });
+
+    it("reads the old umbrellas an API before B16 sends", () => {
+        expect(
+            orderPowers({
+                role: "OWNER",
+                actions: [
+                    "order:read",
+                    "order:write",
+                    "order:stage",
+                    "payment:manage",
+                ],
+            }),
+        ).toEqual(all);
+    });
+
+    it("falls back to the built-in roles without resolved actions", () => {
+        expect(orderPowers({ role: "OWNER" })).toEqual(all);
+        expect(orderPowers({ role: "ADMIN" })).toEqual(all);
+        expect(orderPowers({ role: "MEMBER" })).toEqual({
+            ...none,
+            stage: true,
+        });
+        expect(orderPowers({ role: "REVIEWER" })).toEqual(none);
+    });
+
+    it("leaves it to the API when there is no organization", () => {
+        expect(orderPowers(null)).toEqual(all);
+    });
+});
 
 describe("ordersAccess", () => {
     it("opens Orders with order:read, and shows the money", () => {

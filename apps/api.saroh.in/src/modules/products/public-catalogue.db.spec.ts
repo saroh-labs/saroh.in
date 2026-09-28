@@ -58,6 +58,14 @@ async function business(name: string, shopOpen = true) {
             },
         });
     }
+    // Commerce rolled out for the business (DEC-057).
+    await prisma.featureFlagOverride.create({
+        data: {
+            flagKey: "MODULE_COMMERCE",
+            organizationId: org.id,
+            enabled: true,
+        },
+    });
     return org.id;
 }
 
@@ -183,6 +191,11 @@ describe("public catalogue (G11)", () => {
             where: { key: "SITE_SHOP" },
             create: { key: "SITE_SHOP", enabledByDefault: false },
             update: { enabledByDefault: false },
+        });
+        await prisma.featureFlag.upsert({
+            where: { key: "MODULE_COMMERCE" },
+            create: { key: "MODULE_COMMERCE", enabledByDefault: false },
+            update: {},
         });
 
         rye = await business("Rye & Co.");
@@ -328,6 +341,30 @@ describe("public catalogue (G11)", () => {
                         organizationId: rye,
                     },
                 },
+                data: { enabled: true },
+            });
+        }
+    });
+
+    it("404s the shop and its product pages while Commerce isn't rolled out for the business (DEC-057)", async () => {
+        const where = {
+            flagKey_organizationId: {
+                flagKey: "MODULE_COMMERCE",
+                organizationId: rye,
+            },
+        };
+        await prisma.featureFlagOverride.update({
+            where,
+            data: { enabled: false },
+        });
+        try {
+            await expectNotFound(catalogue.list(ryeSite, "visitor"));
+            await expectNotFound(
+                catalogue.product(ryeSite, "focaccia", "visitor"),
+            );
+        } finally {
+            await prisma.featureFlagOverride.update({
+                where,
                 data: { enabled: true },
             });
         }

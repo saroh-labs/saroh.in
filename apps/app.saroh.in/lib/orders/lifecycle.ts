@@ -330,6 +330,9 @@ export function eventText(
                 const listed = REFUND_REASONS.some((r) => r.label === why);
                 return `Cancelled · ${listed ? why.charAt(0).toLowerCase() + why.slice(1) : why}`;
             }
+            // A treatment fulfilled by its visits says so whole (B14):
+            // "All 3 visits attended".
+            if (e.note?.trim()) return e.note.trim();
             const label =
                 e.toStatus && e.toStatus in STATUS_LABEL
                     ? STATUS_LABEL[e.toStatus as OrderStatus]

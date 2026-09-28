@@ -555,11 +555,8 @@ describe("the storefront rows follow store:read", () => {
             g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
         );
     const sites: { id: string; name: string }[] = [];
-    const storefront = [
-        "/commerce/products",
-        "/commerce/customers",
-        "/commerce/storefronts",
-    ];
+    // Customers follows contact:read (matrix W-1, B16), below.
+    const storefront = ["/commerce/products", "/commerce/storefronts"];
 
     it("still offers products and the storefront to a Member, whose floor includes it", () => {
         const hrefs = childHrefs(
@@ -569,7 +566,7 @@ describe("the storefront rows follow store:read", () => {
         expect(hrefs).toContain("/commerce/storefronts");
     });
 
-    it("offers a store:read role without the kitchen all three", () => {
+    it("offers a store:read role both storefront rows", () => {
         const hrefs = childHrefs(
             navFor({
                 role: "MEMBER",
@@ -595,52 +592,82 @@ describe("the storefront rows follow store:read", () => {
     });
 });
 
-describe("Sell → Customers is not the counter's (R7, #508)", () => {
+describe("each Sell row follows its own read (matrix W-1, B16)", () => {
     const childHrefs = (groups: ReturnType<typeof navFor>) =>
         groups.flatMap((g) =>
             g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
         );
     const sites: { id: string; name: string }[] = [];
 
-    it("withholds it from a Member, who moves stages but reads no money", () => {
+    it("offers Customers on contact:read, a Member's floor included", () => {
+        // The list is the business's contacts (DEC-041); the API serves it
+        // to `contact:read`, and leaves its order columns to `order:read`.
         expect(
             childHrefs(navFor({ role: "MEMBER", moduleKeys: null, sites })),
-        ).not.toContain("/commerce/customers");
+        ).toContain("/commerce/customers");
         expect(
             childHrefs(
                 navFor({
                     role: "MEMBER",
-                    actions: ["store:read", "order:stage"],
-                    moduleKeys: null,
-                    sites,
-                }),
-            ),
-        ).not.toContain("/commerce/customers");
-    });
-
-    it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
-        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
-            "/commerce/customers",
-        );
-    });
-
-    it("offers it to an invented role that also reads orders", () => {
-        expect(
-            childHrefs(
-                navFor({
-                    role: "MEMBER",
-                    actions: ["store:read", "order:stage", "order:read"],
+                    actions: ["store:read", "order:stage", "contact:read"],
                     moduleKeys: null,
                     sites,
                 }),
             ),
         ).toContain("/commerce/customers");
+    });
+
+    it("withholds Customers from a role without contact:read, whatever else it holds", () => {
+        expect(
+            childHrefs(
+                navFor({
+                    role: "MEMBER",
+                    actions: ["store:read", "order:read", "order:create"],
+                    moduleKeys: null,
+                    sites,
+                }),
+            ),
+        ).not.toContain("/commerce/customers");
+    });
+
+    it("offers Customers without storefronts to a role that only reads contacts", () => {
+        const hrefs = childHrefs(
+            navFor({
+                role: "MEMBER",
+                actions: ["contact:read"],
+                moduleKeys: null,
+                sites,
+            }),
+        );
+        expect(hrefs).toContain("/commerce/customers");
+        expect(hrefs).not.toContain("/commerce/products");
+        expect(hrefs).not.toContain("/commerce/orders");
+    });
+
+    it.each(["OWNER", "ADMIN"] as const)("offers Customers to %s", (role) => {
+        expect(childHrefs(navFor({ role, moduleKeys: null, sites }))).toContain(
+            "/commerce/customers",
+        );
     });
 
     it("fails open for an actor it cannot judge", () => {
         expect(
             childHrefs(navFor({ role: null, moduleKeys: null, sites })),
         ).toContain("/commerce/customers");
+    });
+
+    it("gives a Reviewer no Sell group at all: they hold none of its reads", () => {
+        for (const actions of [undefined, ["site:read", "site:comment"]]) {
+            const groups = navFor({
+                role: "REVIEWER",
+                actions,
+                moduleKeys: null,
+                sites,
+            });
+            expect(
+                groups.flatMap((g) => g.items.map((i) => i.label)),
+            ).not.toContain("Sell");
+        }
     });
 });
 

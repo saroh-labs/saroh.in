@@ -675,3 +675,18 @@ its own audit row, and answers 404 for an unknown business
 (`feature-flags.service.db.spec.ts`). A path that only works on a seeded
 database needs a real-database spec that starts without the seed.
 **Category**: database · tests · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`
+
+## Database — making a relation optional quietly changes its foreign key (B13)
+
+**Problem**: Making `Order.customerId` nullable for walk-ins, the migration
+is only `DROP NOT NULL`, but `Customer` → `Customer?` alone would not have
+matched it: the replay check compares the datamodel with the migrations.
+**Root cause**: Prisma's default `onDelete` is `Restrict` for a required
+relation and `SetNull` for an optional one. Turning `Customer` into
+`Customer?` with no `onDelete` asked for `ON DELETE SET NULL`, so the next
+`migrate dev` would have rewritten the foreign key, and deleting a customer
+would have silently turned their orders into walk-ins.
+**Fix**: The relation names `onDelete: Restrict`, as the foreign key has
+always been (`schema.prisma`), and `db:verify:replay` passes. When a
+required relation becomes optional, say its `onDelete` explicitly.
+**Category**: database · migrations · `packages/database/prisma/schema.prisma`

@@ -30,6 +30,17 @@ const mockDb = {
     inventory: { quantity: 10, reserved: 0 },
     entries: [] as { id: string; kind: string }[],
     locks: 0,
+    // The customer's notices queued (A14), and those already told.
+    jobs: [] as {
+        type: string;
+        status: string;
+        runAt?: Date;
+        payload: { eventKey: string; [k: string]: unknown };
+    }[],
+    told: new Map<
+        string,
+        { threadMessageId: string | null; messageId: string | null }
+    >(),
 };
 
 // The order's invoice (ADR-008, U5) has its own specs; here the business
@@ -118,6 +129,52 @@ jest.mock("@saroh/database", () => {
                 Object.assign(mockDb.order, data);
                 return Promise.resolve(pick(mockDb.order));
             }),
+        },
+        job: {
+            create: jest.fn(
+                ({ data }: { data: (typeof mockDb.jobs)[number] }) => {
+                    mockDb.jobs.push({ status: "PENDING", ...data });
+                    return Promise.resolve({ id: `job_${mockDb.jobs.length}` });
+                },
+            ),
+            deleteMany: jest.fn(
+                ({
+                    where,
+                }: {
+                    where: {
+                        type: string;
+                        status: string;
+                        payload: { equals: string };
+                    };
+                }) => {
+                    const before = mockDb.jobs.length;
+                    mockDb.jobs = mockDb.jobs.filter(
+                        (j) =>
+                            !(
+                                j.type === where.type &&
+                                j.status === where.status &&
+                                j.payload.eventKey === where.payload.equals
+                            ),
+                    );
+                    return Promise.resolve({
+                        count: before - mockDb.jobs.length,
+                    });
+                },
+            ),
+        },
+        customerNotice: {
+            findUnique: jest.fn(
+                ({
+                    where,
+                }: {
+                    where: { organizationId_eventKey: { eventKey: string } };
+                }) =>
+                    Promise.resolve(
+                        mockDb.told.get(
+                            where.organizationId_eventKey.eventKey,
+                        ) ?? null,
+                    ),
+            ),
         },
         orderEvent: {
             create: jest.fn(({ data }: { data: Partial<MockEvent> }) => {
@@ -439,6 +496,8 @@ function reset(over: Record<string, unknown> = {}) {
     mockDb.seq = 0;
     mockDb.locks = 0;
     mockDb.events = [];
+    mockDb.jobs = [];
+    mockDb.told = new Map();
     mockDb.inventory = { quantity: 10, reserved: 3 };
     mockDb.entries = [];
     mockDb.order = {
@@ -570,6 +629,76 @@ describe("moving through the kitchen", () => {
                 { to: "PREPARING" },
             ),
         ).rejects.toThrow(/not found/);
+    });
+});
+
+describe("telling the customer (A14)", () => {
+    it("Ready queues the customer's notice 10 seconds ahead, keyed to its step; other steps queue none", async () => {
+        const before = Date.now();
+        await kitchen.moveStage(MEMBER, "order_1", { to: "PREPARING" });
+        const ready = await kitchen.moveStage(MEMBER, "order_1", {
+            to: "READY",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", { to: "COLLECTED" });
+
+        expect(mockDb.jobs).toHaveLength(1);
+        const [job] = mockDb.jobs;
+        expect(job).toMatchObject({
+            organizationId: "org_1",
+            type: "customer.notify",
+            payload: {
+                kind: "ORDER_READY",
+                eventKey: `order:${ready.eventId}`,
+                orderId: "order_1",
+                orderEventId: ready.eventId,
+            },
+        });
+        const wait = (job.runAt as Date).getTime() - before;
+        expect(wait).toBeGreaterThanOrEqual(10_000);
+        expect(wait).toBeLessThan(15_000);
+    });
+
+    it("a shipment's handover queues its own notice", async () => {
+        reset({ fulfilment: "SHIPPING" });
+        await kitchen.moveStage(MEMBER, "order_1", { to: "PREPARING" });
+        await kitchen.moveStage(MEMBER, "order_1", { to: "READY" });
+        const out = await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+            trackingNumber: "AWB4411",
+        });
+        expect(mockDb.jobs.map((j) => j.payload.kind)).toEqual([
+            "ORDER_READY",
+            "ORDER_HANDED_OVER",
+        ]);
+        expect(mockDb.jobs[1].payload.eventKey).toBe(`order:${out.eventId}`);
+    });
+
+    it("Undo inside the wait takes the notice back unsent: nobody was told", async () => {
+        await kitchen.moveStage(MEMBER, "order_1", { to: "PREPARING" });
+        const ready = await kitchen.moveStage(MEMBER, "order_1", {
+            to: "READY",
+        });
+        const back = await kitchen.undoStage(MEMBER, "order_1", ready.eventId);
+        expect(back.told).toBe(false);
+        expect(mockDb.jobs).toHaveLength(0);
+    });
+
+    it("Undo after the notice went says they've already been told", async () => {
+        await kitchen.moveStage(MEMBER, "order_1", { to: "PREPARING" });
+        const ready = await kitchen.moveStage(MEMBER, "order_1", {
+            to: "READY",
+        });
+        // The worker ran it: the job is no longer waiting, and the
+        // customer's thread has the message.
+        mockDb.jobs[0].status = "DONE";
+        mockDb.told.set(`order:${ready.eventId}`, {
+            threadMessageId: "ctm_1",
+            messageId: null,
+        });
+        const back = await kitchen.undoStage(MEMBER, "order_1", ready.eventId);
+        expect(back.told).toBe(true);
+        expect(mockDb.jobs).toHaveLength(1);
     });
 });
 

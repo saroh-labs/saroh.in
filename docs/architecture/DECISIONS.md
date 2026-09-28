@@ -461,7 +461,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **"Placed" means the order's `createdAt`**, and the late clock starts there for every order, online and pay-later ones included.
     - **Which types a storefront offers** is one setting on the storefront (Pick-up, Local delivery, Shipping). Digital and the appointment types follow the product.
     - **Changing how an order is fulfilled takes a delivery amount typed by staff.** There is no delivery fee per storefront yet; the shop's checkout brings one later.
-    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email.
+    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email. _Amended 2026-09-28 (user, round-2 B13b):_ only a walk-in with **just a name** stays a walk-in with no customer and no contact. **A walk-in whose phone is given is a customer**: the order is made for the store customer that phone finds (the business's contact with it, compared as C2's `duplicates.ts` compares phones; never a contact removed for privacy) or makes, with a contact linked by the staff member (MANUAL), so it joins their history and duplicate matching and a privacy removal reaches it. Someone known only by a phone carries the reserved `phone+<random>@phone.invalid` placeholder as their email (`contacts/contact-email.ts`). `Order.walkInPhone` is no longer written.
     - **An appointment order's shape** is set by [DEC-050](#dec-050-a-treatment-is-one-order-whose-line-bills-a-service).
 
 ## DEC-046 Brand and fonts are their own track, and Saroh's fonts stop reaching merchant sites now

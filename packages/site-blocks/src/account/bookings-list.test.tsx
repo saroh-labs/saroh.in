@@ -21,6 +21,7 @@ import {
     cancelledText,
     cancelNote,
     moveClassHref,
+    movedText,
     treatmentLead,
     treatmentVisitWords,
 } from "./bookings-model";
@@ -295,6 +296,71 @@ describe("the Bookings tab (A6)", () => {
         expect(router.refresh).toHaveBeenCalled();
     });
 
+    it("once the business is told of a move (A14), it says so", async () => {
+        const calls = draw(
+            lists(),
+            api({
+                move: vi.fn().mockResolvedValue({
+                    ok: true,
+                    booking: CHECK_UP,
+                    told: true,
+                }),
+            }),
+        );
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Move Check-up · Mon 5 Oct, 10:00",
+            }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.click(
+            await within(sheet).findByRole("radio", {
+                name: /Tue 6 Oct at 11:00/,
+            }),
+        );
+        fireEvent.click(
+            within(sheet).getByRole("button", {
+                name: "Move to Tue 6 Oct at 11:00",
+            }),
+        );
+        await waitFor(() => expect(calls.move).toHaveBeenCalled());
+        expect(
+            await screen.findByText(
+                "Moved to Tue 6 Oct at 11:00. Kavi Dental has been told.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("once the team is told of a cancel (A14), it says so", async () => {
+        draw(
+            lists(),
+            api({
+                cancel: vi.fn().mockResolvedValue({
+                    ok: true,
+                    result: {
+                        booking: { ...CHECK_UP, state: "cancelled" },
+                        refund: null,
+                        kept: null,
+                        order: false,
+                        told: true,
+                    },
+                }),
+            }),
+        );
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Cancel Check-up · Mon 5 Oct, 10:00",
+            }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Yes, cancel it" }),
+        );
+        expect(
+            await screen.findByText("Cancelled. The team has been told."),
+        ).toBeInTheDocument();
+    });
+
     it("with no free times, Move points to Messages", async () => {
         draw(
             lists(),
@@ -538,6 +604,39 @@ describe("the Bookings words (A6)", () => {
                 order: false,
             }),
         ).toBe("Cancelled. The ₹400 you paid online is kept.");
+    });
+
+    it("says the team was told only when it was (A14)", () => {
+        const base = {
+            booking: CHECK_UP,
+            refund: null,
+            kept: null,
+            order: false,
+        };
+        expect(cancelledText({ ...base, told: true })).toBe(
+            "Cancelled. The team has been told.",
+        );
+        expect(cancelledText({ ...base, told: false })).toBe("Cancelled.");
+        // An API before A14 says nothing about it.
+        expect(cancelledText(base)).toBe("Cancelled.");
+        expect(
+            cancelledText({
+                ...base,
+                refund: { amount: "400.00", currency: "INR", status: "SENT" },
+                told: true,
+            }),
+        ).toBe(
+            "Cancelled. The team has been told. ₹400 is being refunded to the way you paid.",
+        );
+        expect(movedText("Tue 6 Oct at 11:00", "Kavi Dental", true)).toBe(
+            "Moved to Tue 6 Oct at 11:00. Kavi Dental has been told.",
+        );
+        expect(movedText("Tue 6 Oct at 11:00", " ", true)).toBe(
+            "Moved to Tue 6 Oct at 11:00. The team has been told.",
+        );
+        expect(movedText("Tue 6 Oct at 11:00", "Kavi Dental", false)).toBe(
+            "Moved to Tue 6 Oct at 11:00.",
+        );
     });
 
     it("a visit booked today says Today; a treatment all done has no lead", () => {

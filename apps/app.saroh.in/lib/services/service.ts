@@ -609,12 +609,16 @@ export function rescheduleBooking(
 
 export function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean } = {},
+    options: { returnCredit?: boolean; closesClass?: boolean } = {},
 ): Promise<CrmResult<CancelledBooking>> {
     // The business calling a class off gives a pack's class back even inside
     // the free-cancellation window (U15), and — for someone who may refund —
-    // money a late cancel would keep (E8).
-    const query = options.returnCredit ? "?returnCredit=true" : "";
+    // money a late cancel would keep (E8). Cancelling the whole class also
+    // closes its waitlist, so nobody is offered a place in it (A12).
+    const params = new URLSearchParams();
+    if (options.returnCredit) params.set("returnCredit", "true");
+    if (options.closesClass) params.set("closesClass", "true");
+    const query = params.size > 0 ? `?${params.toString()}` : "";
     return send<CancelledBooking>(
         `/bookings/${bookingId}${query}`,
         "DELETE",

@@ -28,7 +28,11 @@ function makeTx() {
             update: jest.fn(),
             count: jest.fn().mockResolvedValue(0),
         },
-        bookingEvent: { create: jest.fn() },
+        bookingEvent: {
+            create: jest.fn(),
+            findFirst: jest.fn().mockResolvedValue({ id: "ev_booked" }),
+        },
+        job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),
@@ -43,6 +47,12 @@ function makeTx() {
         },
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        // The class waitlist (A12): nobody in line, no place held.
+        classWaitlistEntry: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         contactAttention: {
             findFirst: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockResolvedValue({ id: "att_1" }),

@@ -110,8 +110,8 @@ export class PublicProductReviewsService {
                 orderBy: { createdAt: "asc" },
                 select: { style: true },
             });
-            const first = order.customer.firstName?.trim();
-            const lastInitial = order.customer.lastName?.trim().charAt(0);
+            const first = order.customer?.firstName?.trim();
+            const lastInitial = order.customer?.lastName?.trim().charAt(0);
             return {
                 storeName: order.store.name,
                 theme: site
@@ -288,7 +288,8 @@ export class PublicProductReviewsService {
             organizationId: order.organizationId,
             status: order.status,
             paymentStatus: order.paymentStatus,
-            customerEmail: order.customer.email,
+            // A walk-in (B13) has no email, so no review link is ever theirs.
+            customerEmail: order.customer?.email ?? null,
             productLines: items.length,
         });
         if (ineligible) {

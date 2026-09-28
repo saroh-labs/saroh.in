@@ -19,19 +19,26 @@ import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
 import { assertClassPacksOn } from "./class-packs-on";
 import type {
+    ExtendPurchaseDto,
+    ListPackEventsQueryDto,
     ListPacksQueryDto,
     ListPurchasesQueryDto,
     PackDraftDto,
     PackInputDto,
+    PackUsedQueryDto,
     SellPackDto,
     UsePackDto,
 } from "./dto";
+import { assertFirstPackAllowed } from "./first-pack";
 import type { PackEditorView } from "./pack-draft-view";
 import {
+    columnValues,
     lockPack,
     PACK_DRAFT_FIELDS,
+    PACK_DRAFT_SELECT,
     readPackEditor,
     revised,
+    timesSold,
 } from "./pack-draft-view";
 import {
     createPackDraft,
@@ -40,11 +47,50 @@ import {
     publishPack,
     savePackDraft,
 } from "./pack-drafts";
+import type { PackEventsPage } from "./pack-events";
+import {
+    diffPack,
+    listPackEvents,
+    packActor,
+    recordPackChange,
+    recordPackEvent,
+} from "./pack-events";
+import { extendPurchase } from "./pack-extend";
+import type { PackKind, PackPaidBy } from "./pack-kind";
+import {
+    DEFAULT_PACK_KIND,
+    MIN_VALIDITY_DAYS,
+    purchasesPayingFor,
+    readPackKind,
+    refuseKindChange,
+} from "./pack-kind";
 import { assertPackOnSale, PACK_DRAFT } from "./pack-on-sale";
+import type {
+    MoneyTotal,
+    PackCounts,
+    PackHolderView,
+    PackOverview,
+    PurchaseStanding,
+} from "./pack-reads";
+import {
+    packCounts,
+    packHolders,
+    packOverview,
+    standingOf,
+} from "./pack-reads";
+import type { PackSaleView, PackUsedPage } from "./pack-used-sales";
+import { packSales, packUsed } from "./pack-used-sales";
 import { redeemPackInTx, reversePackInTx } from "./redeem-pack";
 
 const DAY_MS = 86_400_000;
 const LIST_LIMIT = 500;
+
+/** A validity under a week is refused (E13, default 46), as the DTO says. */
+function assertValidity(days: number | undefined): void {
+    if (days !== undefined && days < MIN_VALIDITY_DAYS) {
+        fieldError("A pack is valid for at least 7 days", "validityDays");
+    }
+}
 
 function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
@@ -72,6 +118,12 @@ export interface PackView {
     sold: number;
     /** Purchases that still have classes and time left. */
     activeHolders: number;
+    /** Classes (or sessions) left across those purchases (E13). */
+    creditsLeft: number;
+    /** People holding a live purchase: one person with two counts once (E15). */
+    people: number;
+    /** What its sales were sold for, per currency (E15). `pack:read` covers it. */
+    takings: MoneyTotal[];
     /** A live pack holds unpublished changes (E14): "Changes not published". */
     hasPendingChanges: boolean;
     /**
@@ -80,6 +132,15 @@ export interface PackView {
      */
     pendingChangedAt: string | null;
     createdAt: string;
+    /** Classes or one-to-one sessions (E13, default 45). */
+    kind: PackKind;
+    /** Sold only to someone who has never bought a pack of its kind (E13). */
+    firstPackOnly: boolean;
+}
+
+/** One pack with Pack Detail's Overview figures (E13). */
+export interface PackDetailView extends PackView {
+    overview: PackOverview;
 }
 
 /** What selling a pack does besides recording it, for the sell dialog to say. */
@@ -88,7 +149,7 @@ export interface SellingTerms {
     invoicesOnSale: boolean;
 }
 
-export type PurchaseStanding = "ACTIVE" | "USED_UP" | "EXPIRED";
+export type { PurchaseStanding };
 
 export interface PurchaseView {
     id: string;
@@ -105,6 +166,8 @@ export interface PurchaseView {
     /** The invoice issued for it; null when sold with Payments off. */
     invoiceId: string | null;
     createdAt: string;
+    /** How it was paid (E13); null when not recorded. */
+    paidBy: PackPaidBy | null;
 }
 
 const PACK_INCLUDE = {
@@ -120,6 +183,7 @@ const PURCHASE_SELECT = {
     currency: true,
     expiresAt: true,
     createdAt: true,
+    paidBy: true,
     pack: { select: { id: true, name: true } },
     contact: {
         select: { id: true, firstName: true, lastName: true, email: true },
@@ -170,7 +234,7 @@ export class ClassPacksService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             include: PACK_INCLUDE,
         });
-        const holders = await this.holderCounts(
+        const holders = await packCounts(
             ctx.organizationId,
             rows.map((r) => r.id),
         );
@@ -186,9 +250,22 @@ export class ClassPacksService {
         return { invoicesOnSale: await paymentsOn(prisma, ctx.organizationId) };
     }
 
-    async getPack(ctx: OrganizationContext, id: string): Promise<PackView> {
+    /**
+     * One pack with Pack Detail's Overview (E13): who holds it, the classes
+     * left across them, how many run out soon or ran out unused, and what
+     * it has sold, this month and in all. `pack:read` covers all of it,
+     * money included (DEC-039).
+     */
+    async getPack(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<PackDetailView> {
         authorize(ctx, "pack:read");
-        return this.readPack(ctx.organizationId, id);
+        const pack = await this.readPack(ctx.organizationId, id);
+        return {
+            ...pack,
+            overview: await packOverview(ctx.organizationId, id),
+        };
     }
 
     async createPack(
@@ -196,17 +273,20 @@ export class ClassPacksService {
         dto: PackInputDto,
     ): Promise<PackView> {
         authorize(ctx, "pack:write");
+        const kind = dto.kind ?? DEFAULT_PACK_KIND;
+        const units = kind === "ONE_TO_ONE" ? "sessions" : "classes";
         if (!dto.name) fieldError("Give the pack a name", "name");
         if (dto.credits === undefined) {
-            fieldError("Say how many classes it holds", "credits");
+            fieldError(`Say how many ${units} it holds`, "credits");
         }
         if (dto.validityDays === undefined) {
             fieldError("Say how long it is valid", "validityDays");
         }
+        assertValidity(dto.validityDays);
         if (!dto.price) fieldError("Set a price", "price");
         if (!dto.currency) fieldError("Choose a currency", "currency");
         if (!dto.serviceIds?.length) {
-            fieldError("Choose the classes it pays for", "serviceIds");
+            fieldError(`Choose the ${units} it pays for`, "serviceIds");
         }
         const serviceIds = await this.assertServices(
             ctx.organizationId,
@@ -224,6 +304,8 @@ export class ClassPacksService {
                     validityDays,
                     price: fromCents(toCents(price)),
                     currency,
+                    kind,
+                    firstPackOnly: dto.firstPackOnly ?? false,
                 },
                 select: { id: true },
             });
@@ -233,6 +315,18 @@ export class ClassPacksService {
                     serviceId,
                     organizationId: ctx.organizationId,
                 })),
+            });
+            // Its first event (E13), with the terms it went on sale with.
+            const made = await tx.classPack.findUniqueOrThrow({
+                where: { id: created.id },
+                select: PACK_DRAFT_SELECT,
+            });
+            await recordPackEvent(tx, {
+                organizationId: ctx.organizationId,
+                packId: created.id,
+                kind: "CREATED",
+                actor: packActor(ctx),
+                details: diffPack(null, columnValues(made)),
             });
             return created.id;
         });
@@ -246,6 +340,7 @@ export class ClassPacksService {
     ): Promise<PackView> {
         authorize(ctx, "pack:write");
         await this.readPack(ctx.organizationId, id);
+        assertValidity(dto.validityDays);
         const serviceIds = dto.serviceIds
             ? await this.assertServices(ctx.organizationId, dto.serviceIds)
             : undefined;
@@ -264,6 +359,19 @@ export class ClassPacksService {
                 id,
                 "This pack is a draft. Change it in the pack editor.",
             );
+            const beforeRow = await tx.classPack.findUniqueOrThrow({
+                where: { id },
+                select: PACK_DRAFT_SELECT,
+            });
+            // The kind is locked once sold (E13): every holder bought it for
+            // one kind of booking.
+            if (
+                dto.kind !== undefined &&
+                dto.kind !== readPackKind(beforeRow.kind) &&
+                (await timesSold(tx, ctx.organizationId, id)) > 0
+            ) {
+                refuseKindChange();
+            }
             await tx.classPack.updateMany({
                 where: { id, organizationId: ctx.organizationId },
                 data: {
@@ -284,6 +392,10 @@ export class ClassPacksService {
                     ...(dto.currency !== undefined
                         ? { currency: dto.currency }
                         : {}),
+                    ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+                    ...(dto.firstPackOnly !== undefined
+                        ? { firstPackOnly: dto.firstPackOnly }
+                        : {}),
                 },
             });
             if (serviceIds) {
@@ -299,6 +411,18 @@ export class ClassPacksService {
                     })),
                 });
             }
+            // One CHANGED event with what differs (E13); none if nothing did.
+            const afterRow = await tx.classPack.findUniqueOrThrow({
+                where: { id },
+                select: PACK_DRAFT_SELECT,
+            });
+            await recordPackChange(tx, {
+                organizationId: ctx.organizationId,
+                packId: id,
+                actor: packActor(ctx),
+                before: columnValues(beforeRow),
+                after: columnValues(afterRow),
+            });
         });
         return this.readPack(ctx.organizationId, id);
     }
@@ -326,6 +450,12 @@ export class ClassPacksService {
             await tx.classPack.updateMany({
                 where: { id, organizationId: ctx.organizationId },
                 data: { status, ...revised(ctx) },
+            });
+            await recordPackEvent(tx, {
+                organizationId: ctx.organizationId,
+                packId: id,
+                kind: status === "ARCHIVED" ? "ARCHIVED" : "RESTORED",
+                actor: packActor(ctx),
             });
         });
         return this.readPack(ctx.organizationId, id);
@@ -402,6 +532,8 @@ export class ClassPacksService {
     /**
      * Sell a pack to a contact. The purchase keeps the pack's classes, price
      * and validity as they are now; it expires that many days from today.
+     * How the desk was paid is recorded when given (E13), and a "first pack
+     * only" pack is refused (409) to someone who has had a pack of its kind.
      */
     async sell(
         ctx: OrganizationContext,
@@ -412,25 +544,42 @@ export class ClassPacksService {
         const organizationId = ctx.organizationId;
         // Switched off: no new sales, whatever enforcement says (E12).
         await assertClassPacksOn(prisma, organizationId);
-        const [pack, contact] = await Promise.all([
+        const [found, contact] = await Promise.all([
             prisma.classPack.findFirst({
                 where: { id: packId, organizationId },
+                select: { id: true, status: true },
             }),
             prisma.contact.findFirst({
                 where: { id: dto.contactId, organizationId },
                 select: { id: true },
             }),
         ]);
-        if (!pack) notFound("Class pack");
+        if (!found) notFound("Class pack");
         if (!contact) notFound("Contact", "contactId");
         // A draft isn't published yet, an archived pack isn't sold (E14).
-        assertPackOnSale(pack);
+        assertPackOnSale(found);
 
-        const price = toMoneyString(pack.price);
         const id = await prisma.$transaction(async (tx) => {
+            // The published terms, held FOR SHARE for the sale: a publish or
+            // a kind change (FOR NO KEY UPDATE) waits for it, so a pack is
+            // never sold on half-published terms, nor has its kind changed
+            // by a save that counted no sales while this one was committing.
+            await tx.$queryRaw`SELECT id FROM "ClassPack" WHERE id = ${found.id} AND "organizationId" = ${organizationId} FOR SHARE`;
+            const pack = await tx.classPack.findFirst({
+                where: { id: found.id, organizationId },
+            });
+            if (!pack) notFound("Class pack");
+            assertPackOnSale(pack);
+            const price = toMoneyString(pack.price);
             // Merged since the page loaded (C9)? Sell to the survivor.
             const buyer = await resolveContact(tx, contact.id, organizationId);
             if (!buyer || buyer.removed) notFound("Contact", "contactId");
+            await assertFirstPackAllowed(tx, {
+                organizationId,
+                contactId: buyer.id,
+                pack,
+            });
+            const paidBy = dto.paidBy ?? null;
             const purchase = await tx.packPurchase.create({
                 data: {
                     organizationId,
@@ -443,16 +592,25 @@ export class ClassPacksService {
                         Date.now() + pack.validityDays * DAY_MS,
                     ),
                     createdByUserId: ctx.userId,
+                    paidBy,
                 },
                 select: { id: true },
             });
             if (await paymentsOn(tx, organizationId)) {
+                const unit =
+                    readPackKind(pack.kind) === "ONE_TO_ONE"
+                        ? pack.credits === 1
+                            ? "session"
+                            : "sessions"
+                        : pack.credits === 1
+                          ? "class"
+                          : "classes";
                 await this.invoices.issueInTx(tx, organizationId, {
                     contactId: buyer.id,
                     currency: pack.currency,
                     lines: [
                         {
-                            description: `${pack.name} · ${pack.credits} ${pack.credits === 1 ? "class" : "classes"}`,
+                            description: `${pack.name} · ${pack.credits} ${unit}`,
                             quantity: 1,
                             unitPrice: price,
                         },
@@ -462,9 +620,83 @@ export class ClassPacksService {
                     createdByUserId: ctx.userId,
                 });
             }
+            await recordPackEvent(tx, {
+                organizationId,
+                packId: pack.id,
+                purchaseId: purchase.id,
+                kind: "SOLD",
+                actor: packActor(ctx),
+                details: {
+                    price,
+                    currency: pack.currency,
+                    credits: pack.credits,
+                    paidBy,
+                },
+            });
             return purchase.id;
         });
         return this.readPurchase(ctx, id);
+    }
+
+    // — Pack Detail's reads and Extend (E13) ——————————————————————————
+
+    /** Everyone who has bought it, live purchases first (Who has it). */
+    async listHolders(
+        ctx: OrganizationContext,
+        packId: string,
+    ): Promise<PackHolderView[]> {
+        authorize(ctx, "pack:read");
+        await this.assertPack(ctx.organizationId, packId);
+        return packHolders(ctx.organizationId, { packId });
+    }
+
+    /** Classes spent from it in a range, this week by default (Used). */
+    async listUsed(
+        ctx: OrganizationContext,
+        packId: string,
+        query: PackUsedQueryDto,
+    ): Promise<PackUsedPage> {
+        authorize(ctx, "pack:read");
+        await this.assertPack(ctx.organizationId, packId);
+        return packUsed(ctx.organizationId, packId, query);
+    }
+
+    /** Every sale, newest first, with its method and who sold it (Sales). */
+    async listSales(
+        ctx: OrganizationContext,
+        packId: string,
+    ): Promise<PackSaleView[]> {
+        authorize(ctx, "pack:read");
+        await this.assertPack(ctx.organizationId, packId);
+        return packSales(ctx, packId);
+    }
+
+    /** Its history, newest first, paged (Activity). */
+    async listEvents(
+        ctx: OrganizationContext,
+        packId: string,
+        query: ListPackEventsQueryDto,
+    ): Promise<PackEventsPage> {
+        authorize(ctx, "pack:read");
+        await this.assertPack(ctx.organizationId, packId);
+        return listPackEvents(ctx.organizationId, packId, query);
+    }
+
+    /**
+     * Give a holder's pack more days: at most 30 at a time, with a reason
+     * (default 46). Answers the holder as Who has it shows them.
+     */
+    async extend(
+        ctx: OrganizationContext,
+        purchaseId: string,
+        dto: ExtendPurchaseDto,
+    ): Promise<PackHolderView> {
+        authorize(ctx, "pack:write");
+        await extendPurchase(ctx, purchaseId, dto);
+        const [holder] = await packHolders(ctx.organizationId, {
+            purchaseId,
+        });
+        return holder;
     }
 
     async listPurchases(
@@ -472,20 +704,28 @@ export class ClassPacksService {
         query: ListPurchasesQueryDto,
     ): Promise<PurchaseView[]> {
         authorize(ctx, "pack:read");
+        // Only packs that pay for this service: they cover it and are of its
+        // kind (E13) — a one-to-one pack isn't offered for a class. Another
+        // business's service id, or one that's gone, matches nothing.
+        let forService: Prisma.PackPurchaseWhereInput = {};
+        if (query.serviceId) {
+            const service = await prisma.service.findFirst({
+                where: {
+                    id: query.serviceId,
+                    organizationId: ctx.organizationId,
+                },
+                select: { id: true, capacity: true },
+            });
+            forService = service
+                ? purchasesPayingFor(service)
+                : { id: { in: [] } };
+        }
         const rows = await prisma.packPurchase.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 ...(query.contactId ? { contactId: query.contactId } : {}),
                 ...(query.packId ? { packId: query.packId } : {}),
-                ...(query.serviceId
-                    ? {
-                          pack: {
-                              services: {
-                                  some: { serviceId: query.serviceId },
-                              },
-                          },
-                      }
-                    : {}),
+                ...forService,
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
@@ -677,8 +917,20 @@ export class ClassPacksService {
             include: PACK_INCLUDE,
         });
         if (!row) notFound("Class pack");
-        const holders = await this.holderCounts(organizationId, [id]);
+        const holders = await packCounts(organizationId, [id]);
         return this.packView(row, holders.get(id));
+    }
+
+    /** The pack is this business's, or it is a 404. */
+    private async assertPack(
+        organizationId: string,
+        id: string,
+    ): Promise<void> {
+        const row = await prisma.classPack.findFirst({
+            where: { id, organizationId },
+            select: { id: true },
+        });
+        if (!row) notFound("Class pack");
     }
 
     private async readPurchase(
@@ -691,39 +943,6 @@ export class ClassPacksService {
         });
         if (!row) notFound("Class pack purchase");
         return this.purchaseView(row, new Date(), ctx);
-    }
-
-    /**
-     * Per pack: how many times it has been sold, and how many of those are
-     * still live — unexpired, with a class left.
-     */
-    private async holderCounts(
-        organizationId: string,
-        packIds: string[],
-    ): Promise<Map<string, { sold: number; active: number }>> {
-        const counts = new Map<string, { sold: number; active: number }>();
-        if (packIds.length === 0) return counts;
-        const rows = await prisma.packPurchase.findMany({
-            where: { organizationId, packId: { in: packIds } },
-            select: {
-                packId: true,
-                credits: true,
-                expiresAt: true,
-                _count: {
-                    select: { redemptions: { where: { reversedAt: null } } },
-                },
-            },
-        });
-        const now = new Date();
-        for (const r of rows) {
-            const c = counts.get(r.packId) ?? { sold: 0, active: 0 };
-            c.sold += 1;
-            if (r.expiresAt > now && r.credits - r._count.redemptions > 0) {
-                c.active += 1;
-            }
-            counts.set(r.packId, c);
-        }
-        return counts;
     }
 
     private packView(
@@ -740,8 +959,10 @@ export class ClassPacksService {
             services: { service: { id: string; name: string } }[];
             pendingChanges?: unknown;
             pendingChangedAt?: Date | null;
+            kind: string;
+            firstPackOnly: boolean;
         },
-        holders: { sold: number; active: number } | undefined,
+        holders: PackCounts | undefined,
     ): PackView {
         const pending =
             row.status !== PACK_DRAFT &&
@@ -758,12 +979,17 @@ export class ClassPacksService {
             services: row.services.map((s) => s.service),
             sold: holders?.sold ?? 0,
             activeHolders: holders?.active ?? 0,
+            creditsLeft: holders?.creditsLeft ?? 0,
+            people: holders?.people ?? 0,
+            takings: holders?.takings ?? [],
             hasPendingChanges: pending,
             pendingChangedAt:
                 row.status === PACK_DRAFT || pending
                     ? (row.pendingChangedAt?.toISOString() ?? null)
                     : null,
             createdAt: row.createdAt.toISOString(),
+            kind: readPackKind(row.kind),
+            firstPackOnly: row.firstPackOnly,
         };
     }
 
@@ -778,12 +1004,7 @@ export class ClassPacksService {
     ): PurchaseView {
         const used = row._count.redemptions;
         const left = Math.max(0, row.credits - used);
-        const standing: PurchaseStanding =
-            row.expiresAt <= now
-                ? "EXPIRED"
-                : left === 0
-                  ? "USED_UP"
-                  : "ACTIVE";
+        const standing = standingOf({ expiresAt: row.expiresAt, left }, now);
         return {
             id: row.id,
             pack: row.pack,
@@ -803,6 +1024,7 @@ export class ClassPacksService {
                 ? (row.invoices[0]?.id ?? null)
                 : null,
             createdAt: row.createdAt.toISOString(),
+            paidBy: (row.paidBy as PackPaidBy | null) ?? null,
         };
     }
 }

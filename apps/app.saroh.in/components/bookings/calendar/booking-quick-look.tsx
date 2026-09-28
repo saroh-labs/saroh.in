@@ -16,6 +16,10 @@ import { useEffect, useState } from "react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { formatMoney } from "@/lib/format/money";
+import {
+    bookingChangeText,
+    classCancelText,
+} from "@/lib/messages/notice-reach";
 import { listAvailability, readBookingPerson } from "@/lib/services/actions";
 import type {
     DiaryBooking,
@@ -327,7 +331,7 @@ function OneToOne({
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}. To see ${first} again, book a free time.`
-            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${rule} ${rule === 1 ? "hour" : "hours"} before. ` : ""}Saroh doesn't message ${first} — tell them yourself if you move or cancel.`;
+            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${rule} ${rule === 1 ? "hour" : "hours"} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
 
     return (
         <>
@@ -625,8 +629,8 @@ function ClassLook({
                     </Button>
                     <p className="mt-2 text-[11.5px] text-muted-foreground">
                         Cancelling the class gives back every class paid from a
-                        pack or membership. Anyone who paid is refunded by you;
-                        Saroh doesn&apos;t message them.
+                        pack or membership. Anyone who paid is refunded by you.{" "}
+                        {classCancelText(ctx.notices)}
                     </p>
                 </Card>
             ) : classUndo ? (

@@ -19,6 +19,7 @@ import type { OrderCancelService } from "./order-cancel.service";
 import type { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrderPayLinkService } from "./order-pay-link.service";
+import type { OrderStageBatchService } from "./order-stage-batch.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -42,6 +43,13 @@ describe("OrganizationOrdersController", () => {
     const readOrder = jest.fn();
     const changeFulfilment = jest.fn().mockResolvedValue({ id: "ord_1" });
     const cancelOrder = jest.fn().mockResolvedValue({ id: "ord_1" });
+    const batches = {
+        create: jest.fn().mockResolvedValue({ id: "b1" }),
+        get: jest.fn().mockResolvedValue({ id: "b1" }),
+        commit: jest.fn().mockResolvedValue({ id: "b1" }),
+        cancel: jest.fn().mockResolvedValue({ id: "b1" }),
+        undo: jest.fn().mockResolvedValue({ id: "b1" }),
+    };
     const controller = new OrganizationOrdersController(
         {
             listRows,
@@ -52,6 +60,7 @@ describe("OrganizationOrdersController", () => {
         {} as unknown as OrderPayLinkService,
         { change: changeFulfilment } as unknown as OrderFulfilmentChangeService,
         { cancel: cancelOrder } as unknown as OrderCancelService,
+        batches as unknown as OrderStageBatchService,
     );
 
     const as = (
@@ -117,6 +126,47 @@ describe("OrganizationOrdersController", () => {
             actions: resolveCapabilities("shelf-tidier", ["store:read"]),
         });
         expect(() => controller.list(tidier)).toThrow(ForbiddenException);
+    });
+
+    describe("Export (B16): order:export", () => {
+        const custom = (actions: string[]) =>
+            as("MEMBER", {
+                roleKey: "custom",
+                actions: resolveCapabilities("custom", actions),
+            });
+
+        it("refuses an export page to a role that only reads orders", () => {
+            expect(() =>
+                controller.list(custom(["order:read"]), { export: "true" }),
+            ).toThrow(ForbiddenException);
+            expect(listRows).not.toHaveBeenCalled();
+        });
+
+        it("still lists for that role without the export flag", async () => {
+            await controller.list(custom(["order:read"]));
+            expect(listRows).toHaveBeenCalled();
+        });
+
+        it("answers an export page to order:export, or a role saved with order:write", async () => {
+            for (const actions of [["order:export"], ["order:write"]]) {
+                listRows.mockClear();
+                await controller.list(custom(actions), { export: "true" });
+                // The flag is the export's own, never a filter.
+                expect(listRows).toHaveBeenCalledWith(
+                    "org_1",
+                    {},
+                    expect.objectContaining({ money: true }),
+                );
+            }
+        });
+
+        it("lets an Owner export; refuses the kitchen's Member", async () => {
+            await controller.list(as("OWNER"), { export: "true" });
+            expect(listRows).toHaveBeenCalled();
+            expect(() =>
+                controller.list(as("MEMBER"), { export: "true" }),
+            ).toThrow(ForbiddenException);
+        });
     });
 
     describe("rows, counts and a cursor (plan B, B1)", () => {
@@ -337,6 +387,32 @@ describe("OrganizationOrdersController", () => {
             const dto = { reason: "Late", idempotencyKey: "k1" };
             await controller.cancel(owner, "o1", dto);
             expect(cancelOrder).toHaveBeenCalledWith(owner, "o1", dto);
+        });
+    });
+
+    describe("B6: bulk kitchen moves", () => {
+        it("hands each batch route to its service with the caller", async () => {
+            const member = as("MEMBER");
+            const dto = {
+                batchId: "0f8fad5b-d9cb-469f-a165-70867728950e",
+                lines: [
+                    {
+                        orderId: "o1",
+                        from: "PREPARING" as const,
+                        to: "READY" as const,
+                    },
+                ],
+            };
+            await controller.createBatch(member, dto);
+            expect(batches.create).toHaveBeenCalledWith(member, dto);
+            await controller.readBatch(member, "b1");
+            expect(batches.get).toHaveBeenCalledWith(member, "b1");
+            await controller.commitBatch(member, "b1");
+            expect(batches.commit).toHaveBeenCalledWith(member, "b1");
+            await controller.cancelBatch(member, "b1");
+            expect(batches.cancel).toHaveBeenCalledWith(member, "b1");
+            await controller.undoBatch(member, "b1");
+            expect(batches.undo).toHaveBeenCalledWith(member, "b1");
         });
     });
 });

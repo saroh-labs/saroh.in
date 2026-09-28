@@ -5,6 +5,8 @@ import {
     listWords,
     missingDependencies,
     offImpact,
+    refusalActionLabel,
+    rolledOut,
     setupActionLabel,
 } from "./switch-plan";
 
@@ -94,6 +96,43 @@ describe("what turning it off says", () => {
 
     it("says nothing rather than invent a consequence", () => {
         expect(offImpact({ rows: [], dependents: [] })).toBeNull();
+        expect(offImpact({ rows: [], dependents: [], lines: [] })).toBeNull();
+    });
+
+    it("puts the API's real counts first (F13)", () => {
+        expect(
+            offImpact({
+                rows: ["Calendar", "Services"],
+                dependents: [],
+                lines: [
+                    "3 upcoming bookings stay booked; the booking page stops taking new ones.",
+                ],
+            }),
+        ).toBe(
+            "3 upcoming bookings stay booked; the booking page stops taking new ones. Calendar and Services leave the rail. Nothing is deleted.",
+        );
+    });
+
+    it("asks about a background module when the API has something to say", () => {
+        expect(
+            offImpact({
+                rows: [],
+                dependents: [],
+                lines: [
+                    "3 live subscriptions stop renewing until it's back on. Nobody is charged in between.",
+                ],
+            }),
+        ).toBe(
+            "3 live subscriptions stop renewing until it's back on. Nobody is charged in between. Nothing is deleted.",
+        );
+    });
+
+    it("says it couldn't count when the API couldn't be asked", () => {
+        expect(
+            offImpact({ rows: ["Invoices"], dependents: [], lines: null }),
+        ).toBe(
+            "We couldn't count what this touches right now. Invoices leaves the rail. Nothing is deleted.",
+        );
     });
 });
 
@@ -109,5 +148,30 @@ describe("words", () => {
     it("gives a setup step a verb only when it knows one", () => {
         expect(setupActionLabel("CRM_NO_PIPELINE")).toBe("Create a pipeline");
         expect(setupActionLabel("AUTOMATIONS_NO_RULE")).toBeNull();
+    });
+
+    it("gives a refusal a way to clear it only when it knows one", () => {
+        expect(refusalActionLabel("COMMERCE_OPEN_ORDERS")).toBe("Go to Orders");
+        expect(refusalActionLabel("SOMETHING_NEW")).toBeNull();
+    });
+});
+
+describe("which modules are shown (DEC-057)", () => {
+    it("never shows a module Saroh hasn't rolled out", () => {
+        const views = [
+            { key: "APPOINTMENTS", blockers: [] },
+            {
+                key: "CLASS_PACKS",
+                blockers: [{ code: "ROLLOUT_DISABLED" }],
+            },
+            {
+                key: "COMMERCE",
+                blockers: [{ code: "ORG_MODULE_DISABLED" }],
+            },
+        ];
+        expect(rolledOut(views).map((m) => m.key)).toEqual([
+            "APPOINTMENTS",
+            "COMMERCE",
+        ]);
     });
 });

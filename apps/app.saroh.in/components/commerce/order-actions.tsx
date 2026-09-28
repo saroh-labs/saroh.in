@@ -40,6 +40,8 @@ export function OrderActions({
     pending,
     onPendingChange,
     withCancel = true,
+    canRecord = true,
+    canRefund = true,
 }: {
     storeId: string;
     orderId: string;
@@ -53,14 +55,24 @@ export function OrderActions({
      * is "Cancel order…" on the Change card, a refund in full.
      */
     withCancel?: boolean;
+    /** Record a payment by hand (`order:edit`, B16). */
+    canRecord?: boolean;
+    /**
+     * Cancel, or record money handed back (`order:refund`, B16). Without it
+     * neither is drawn: the API would refuse them.
+     */
+    canRefund?: boolean;
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
     // Recording a payment by hand is for money that moved outside Saroh —
     // cash, a bank transfer. A card refund goes through Refund instead, which
-    // actually sends the money back.
-    const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus];
-    const cancellable = withCancel && canCancel(status);
+    // actually sends the money back. Each move is offered only to someone
+    // whose role the API would let make it.
+    const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus].filter((to) =>
+        to === "REFUNDED" ? canRefund : canRecord,
+    );
+    const cancellable = withCancel && canRefund && canCancel(status);
 
     async function commit(p: Pending) {
         const res = await updateOrder(

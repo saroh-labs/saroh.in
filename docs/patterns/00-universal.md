@@ -53,11 +53,13 @@ this was written, led by `sites.service.ts`, `site-editor.tsx` and
 Still over after #508 split the booking page and the bookings service (U10),
 each with why it stops there:
 
-- `bookings/bookings.service.ts` (1,380; 1,712 before A6) — the merchant's
+- `bookings/bookings.service.ts` (1,364; 1,712 before A6) — the merchant's
   side: service and rule CRUD, the calendar read, cancel, outcome,
   reschedule and booking by hand behind one controller. A6 moved the cancel
   and move writes, which the customer's account shares, to
-  `booking-cancel.ts` and `booking-move.ts`; what is left calls them. Under
+  `booking-cancel.ts` and `booking-move.ts`, and B14 the outcome write,
+  which Order Detail's "Mark visit N attended" shares, to
+  `booking-outcome.ts`; what is left calls them. Under
   400 means one injectable per feature and a controller and DI change, not
   a move.
 - `bookings/public-bookings.service.ts` (820 after A10, C12 and E9) and
@@ -74,31 +76,61 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,409 after E19 and E20, whose range,
+  (1,173), `calendar/calendar.service.ts` (1,411 after E19, E20 and B13, whose range,
   days-off and payments reads already sit in their own files; split next),
-  `orders/order-kitchen.service.ts` (1,138 after B2b–B15 and B9), `staff/staff.service.ts` (744).
+  `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
   B9 kept its change of fulfilment and its cancel out of the kitchen
   service (`order-fulfilment-change.service.ts`, 402, one transaction and
   its money; `order-cancel.service.ts`, `order-cancel.ts`,
   `order-change-options.ts`, `order-customer-note.ts`); it added only the
-  read's change options and exported `lockOrder`. The edit is the next cut.
-- `payments/payments.service.ts` (2,042 after B8, B9 and E8) — every money
+  read's change options and exported `lockOrder`. B14 kept a treatment's
+  visits out of it too — the read in `order-visits.ts`, "Mark visit N
+  attended" in `order-visit-attend.ts`, the order following its visits in
+  `treatment-fulfil.ts`, and the paper's title (D15) in
+  `order-invoice-title.ts` — adding only the read's `visits`, the title's
+  select and a one-line delegate. The edit is the next cut.
+  B13 (walk-ins, New order v2) left it untouched: who the order is for, the
+  counter payment and the ways a cart may leave are `orders/new-order.ts`,
+  and how a walk-in reads everywhere is `orders/walk-in.ts`.
+  B6 (bulk kitchen moves) took the single move, its Undo and `lockOrder`
+  out to `orders/order-stage-write.ts`, which every batch line shares;
+  the batch itself is `order-stage-batch.service.ts` and its lines'
+  helpers `order-stage-batch-lines.ts`.
+- `orders/order-read.ts` (654; 638 before B14) — the one read Order Detail
+  renders and its DTOs. B14 added the `visits` and `title` fields and put
+  what fills them in their own files; the DTO interfaces are the seam.
+- `orders/orders.service.ts` (683 after B13) and `orders/dto.ts` (583) —
+  the storefront-scoped create, its pricing, discount code and stock
+  promise in one serializable write, and the order DTOs. B13 added only the
+  calls into `new-order.ts` and the DTO's optional fields, whose classes are
+  in `new-order.dto.ts`. The create's pricing is the next seam.
+- `payments/payments.service.ts` (2,045 after B8, B9, E8 and B13's null-safe
+  customer check) — every money
   path of an order (intents, refunds and their two phases, the pay link's
   intent) shares one private refund core and provider call; B9 added only
   a thin `refundOrderForCancel` onto that core and the cancel's finish in
   `recordRefundTaken`. Refunds as their own service is the seam.
-- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (546
-  after B8, B11 and B9) — the page's panels share its one `panel` and hold
+- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (579
+  after B8, B11, B9, B13 and B14) — the page's panels share its one `panel` and hold
   state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
-  `cancel-panel.tsx` and `use-order-changes.ts`; the header and the money
-  column are the next seams.
-- The calendar's `lib/calendar/layers.ts` (449) and
-  `components/calendar/business-calendar.tsx` (404) — the layers' order,
-  tones, words and day lines, and the screen's month, switches and day
-  sheet. E22 put the named problems and their fixes in their own
-  `lib/calendar/problems.ts` rather than grow them; the month summary and
-  the item lines are `layers.ts`'s next seams, and the switches row the
-  screen's.
+  `cancel-panel.tsx` and `use-order-changes.ts`, B13's walk-in card to
+  `walk-in-card.tsx`; B14's Visits card, its
+  stepper and next action to `visits-card.tsx` and `visits-next.tsx`, their
+  words to `lib/orders/visits.ts`, and the timeline's lines to
+  `lib/orders/timeline-steps.ts`. The header and the money column are the
+  next seams.
+- `app.saroh.in/components/commerce/orders/order-quick-view.tsx` (407; 401
+  before B14's "1 of 3 visits" line) — the panel, its read and retry, and
+  the body share one open state; the body is the seam.
+- The calendar's `lib/calendar/layers.ts` (443) — the layers' order,
+  tones, words and day lines. E22 put the named problems and their fixes
+  in their own `lib/calendar/problems.ts`, and E23 the money (in, out,
+  due, the strip and the day's line) in `lib/calendar/money.ts` and the
+  export in `lib/calendar/export.ts`, rather than grow it; the month
+  summary and the item lines are its next seams.
+  `components/calendar/business-calendar.tsx` (404 after E22) went back
+  under when E23 took the switches row to `layer-switches.tsx` and the
+  month strip to `month-strip.tsx`.
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
@@ -122,6 +154,14 @@ each with why it stops there:
   to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
   the second allow-list file it re-exports; the order serializers are the
   next seam if A8 and A13 grow it further.
+- `home/home.service.ts` (778; 797 before F2) — `build()` is one parallel
+  read of every Home source, each behind its own guard, and the ranking of
+  what they return. Round 2 put each source in its own file
+  (`home-money-sources.ts`, `home-site-stock-sources.ts`,
+  `home-people-sources.ts`, `home-today.ts`, `home-week.ts`, …); F2 also
+  moved the CRM reads to `home-crm-sources.ts` rather than grow it. The
+  refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
+  and the schedule band are the next seams.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:

@@ -83,6 +83,7 @@ export function NewBookingDialog({
     triggerClassName,
     plainTrigger = false,
     visit,
+    primaryTrigger = false,
 }: {
     services: {
         id: string;
@@ -100,6 +101,11 @@ export function NewBookingDialog({
     plainTrigger?: boolean;
     /** Book this treatment's next visit (E10), on its order. */
     visit?: VisitToBook;
+    /**
+     * "Book visit N" as the page's primary action (B14, Order Detail's
+     * header) rather than the booking page's outline button.
+     */
+    primaryTrigger?: boolean;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -289,8 +295,8 @@ export function NewBookingDialog({
             <DialogTrigger asChild>
                 {visit ? (
                     <Button
-                        variant="outline"
-                        size="sm"
+                        variant={primaryTrigger ? "default" : "outline"}
+                        size={primaryTrigger ? "default" : "sm"}
                         disabled={services.length === 0}
                         className={triggerClassName}
                     >

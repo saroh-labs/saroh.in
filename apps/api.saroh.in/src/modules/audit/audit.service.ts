@@ -39,6 +39,10 @@ export const AuditAction = {
     // How a storefront's orders leave, or when they count as late (B17);
     // metadata names the storefront and each change as words.
     StorefrontFulfilmentUpdate: "storefront.fulfilment.update",
+    // Customers who share an email linked on their own, or left for staff
+    // (DEC-055, C15); metadata names the storefront and the setting as it
+    // was and became.
+    StorefrontSameEmailUpdate: "storefront.same-email.update",
     // An untracked product marked Sold out by hand at a storefront, or
     // available again (#515); metadata names the product and storefront.
     ProductSoldOutMark: "product.sold-out.mark",
@@ -60,6 +64,10 @@ export const AuditAction = {
     // the timeline reads it as "Details changed". Metadata names the parts
     // that changed (`fields`: firstName, email, address, …), never a value.
     CustomerDetailsChanged: "customer.details.changed",
+    // A customer's details removed for a privacy request (DEC-042, C11),
+    // written in the removal's transaction with the contact as the target.
+    // Counts only (what was deleted, blanked or cancelled), never a value.
+    CustomerRemoved: "customer.removed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

@@ -544,7 +544,8 @@ export class PaymentsService {
 
     /**
      * Refund an Order's money, by line or in full (S5-003; ADR-008, U6).
-     * `payment:manage` — a Member never refunds.
+     * `order:refund` (B16), which `payment:manage` implies — a Member
+     * never refunds.
      *
      * - The Order must belong to `ctx.organizationId` (else 404) and have a
      *   SUCCEEDED payment (else 400) — only money actually collected goes
@@ -573,7 +574,7 @@ export class PaymentsService {
         orderId: string,
         input: RefundRequest = {},
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         if (input.kind === "goodwill") {
             return this.refundGoodwill(ctx, orderId, input);
         }
@@ -622,7 +623,7 @@ export class PaymentsService {
     /**
      * "Or another amount" (B8): hand back an amount that no line explains —
      * late, a goodwill gesture — with the reason it was given. The caller
-     * holds `payment:manage` ({@link initiateRefund}).
+     * holds `order:refund` ({@link initiateRefund}).
      *
      * The same two phases as a refund by line: it is capped at what was
      * paid and not yet handed back, read under the order's row lock (a
@@ -649,7 +650,7 @@ export class PaymentsService {
 
     /**
      * Hand back a fixed amount because the order was edited down before
-     * anyone started on it (U6). `payment:manage`; the caller has already
+     * anyone started on it (U6). `order:refund` (B16); the caller has already
      * lowered the order total. No lines: nothing that was bought is being
      * refunded — the order simply costs less now.
      */
@@ -659,7 +660,7 @@ export class PaymentsService {
         amountCents: number,
         idempotencyKey: string,
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         return this.refundOrder(ctx, order, {
             idempotencyKey,
@@ -672,7 +673,7 @@ export class PaymentsService {
     /**
      * "Cancel order…" (B9): everything still refundable, by what is left of
      * each line, with the reason, through the same two phases as any
-     * refund. `payment:manage`. `guard` runs under the order's row lock
+     * refund. `order:refund` (B16). `guard` runs under the order's row lock
      * before anything is reserved, so the cancel's own refusals (handed
      * over, cancelled already) are read where no stage move can slip in.
      * The refund rows carry the cancel's key (`order-cancel.ts`); the order
@@ -687,7 +688,7 @@ export class PaymentsService {
             guard: (tx: Prisma.TransactionClient) => Promise<void>;
         },
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         return this.refundOrder(ctx, order, {
             idempotencyKey: input.idempotencyKey,
@@ -710,7 +711,9 @@ export class PaymentsService {
     /**
      * Take the difference when an order is edited up after it was paid (U6):
      * a new payment on the ORDER for exactly that amount — the order stays
-     * the ledger for its own payments. `payment:manage`. Idempotent by key.
+     * the ledger for its own payments. `order:refund` (B16): settling the
+     * money of a changed paid order is the order's money power, either way.
+     * Idempotent by key.
      */
     async createDifferenceIntent(
         ctx: OrganizationContext,
@@ -718,7 +721,7 @@ export class PaymentsService {
         amountCents: number,
         idempotencyKey: string,
     ): Promise<CreateIntentResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         if (amountCents <= 0) {
             throw new BadRequestException("Nothing more to take on this order");
@@ -747,7 +750,7 @@ export class PaymentsService {
 
     /**
      * Try again a refund whose provider answer was lost (#508, U1).
-     * `payment:manage`; the refund must be a PENDING row of an order of the
+     * `order:refund` (B16); the refund must be a PENDING row of an order of the
      * caller's organization (else 404).
      *
      * It looks before it sends: the provider is asked for the refund made
@@ -763,7 +766,7 @@ export class PaymentsService {
         orderId: string,
         refundId: string,
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         const row = await prisma.paymentRefund.findFirst({
             where: {
@@ -1523,7 +1526,10 @@ export class PaymentsService {
                 store: { select: { settings: { select: { pausedAt: true } } } },
             },
         });
-        if (!order || !customer.customerIds.includes(order.customerId)) {
+        if (
+            !order?.customerId ||
+            !customer.customerIds.includes(order.customerId)
+        ) {
             throw new NotFoundException("Order not found");
         }
         if (order.status === "CANCELLED") {

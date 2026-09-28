@@ -200,6 +200,22 @@ function detailRows(
                 withoutValues: false,
             };
         }
+        case "storefront.same-email.update": {
+            // Customers who share an email (C15): On or Off, and where.
+            const changes = recordedChanges(meta) ?? [];
+            const where = text(meta.storefront);
+            const label = "Link customers who share an email";
+            return {
+                rows: changes.map((c) =>
+                    row(
+                        where ? `${label}, ${where}` : label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    ),
+                ),
+                withoutValues: false,
+            };
+        }
         case "storefront.hours.update": {
             const changes = recordedChanges(meta) ?? [];
             const where = text(meta.storefront);

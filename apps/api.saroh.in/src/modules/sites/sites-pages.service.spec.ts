@@ -10,6 +10,7 @@ jest.mock("@saroh/database", () => {
             site: { findFirst: jest.fn() },
             page: {
                 findFirst: jest.fn(),
+                findMany: jest.fn(),
                 create: jest.fn(),
                 update: jest.fn(),
                 delete: jest.fn(),
@@ -26,6 +27,7 @@ import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const pageFindFirst = prisma.page.findFirst as jest.Mock;
+const pageFindMany = prisma.page.findMany as jest.Mock;
 const pageCreate = prisma.page.create as jest.Mock;
 const pageUpdate = prisma.page.update as jest.Mock;
 const pageDelete = prisma.page.delete as jest.Mock;
@@ -48,7 +50,22 @@ const service = new SitesService({
 beforeEach(() => {
     jest.clearAllMocks();
     siteFindFirst.mockResolvedValue({ id: "site_1" });
+    // The site's addresses, for a refusal's suggestion.
+    pageFindMany.mockResolvedValue([{ path: "/" }, { path: "/about" }]);
 });
+
+/** The refusal a promise rejected with, for its message and details. */
+async function refusal(promise: Promise<unknown>) {
+    const error = await promise.then(
+        () => null,
+        (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
+    return (error as BadRequestException).getResponse() as {
+        message: string;
+        details: { field: string; reason: string; suggestion: string };
+    };
+}
 
 describe("SitesService.createPage", () => {
     it("creates a non-home page scoped to the org when the path is free", async () => {
@@ -88,13 +105,90 @@ describe("SitesService.createPage", () => {
     it("refuses a path another page already holds, and names that page", async () => {
         pageFindFirst.mockResolvedValue({ title: "About us" });
 
-        await expect(
+        const body = await refusal(
             service.createPage(ctx(), "site_1", {
                 title: "About",
                 path: "/about",
             }),
-        ).rejects.toThrow(/About us/);
+        );
+        expect(body.message).toMatch(/About us/);
+        // Another address is offered, one no page holds.
+        expect(body.details).toMatchObject({ field: "path", reason: "taken" });
+        expect(body.details.suggestion).toBe("/about-2");
         expect(pageCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["/book", "your booking page", "/book"],
+        ["/book/walkthrough", "your booking page", "/book"],
+        ["/shop", "your shop", "/shop"],
+        ["/shop/sale", "your shop", "/shop"],
+        ["/checkout", "where your customers pay", "/checkout"],
+        ["/checkout/thanks", "where your customers pay", "/checkout"],
+    ])(
+        "refuses a free-form page at %s, saying what it is for, with another address (G14)",
+        async (path, purpose, root) => {
+            pageFindFirst.mockResolvedValue(null);
+
+            const body = await refusal(
+                service.createPage(ctx(), "site_1", {
+                    title: "Our range",
+                    path,
+                }),
+            );
+            expect(body.message).toContain(`${root} is ${purpose}`);
+            expect(body.message).toContain("Pick another address");
+            expect(body.details).toMatchObject({
+                field: "path",
+                reason: "reserved",
+            });
+            // From the page's own title, which no route owns.
+            expect(body.details.suggestion).toBe("/our-range");
+            expect(pageCreate).not.toHaveBeenCalled();
+        },
+    );
+
+    it("leaves addresses that only start with a reserved word alone", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        pageCreate.mockResolvedValue({ id: "page_3" });
+
+        await service.createPage(ctx(), "site_1", {
+            title: "Book a trial",
+            path: "/book-a-trial",
+        });
+        expect(pageCreate).toHaveBeenCalled();
+    });
+
+    it("suggests an address that is free, not one another page holds", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        pageFindMany.mockResolvedValue([
+            { path: "/" },
+            { path: "/our-range" },
+            { path: "/sale" },
+        ]);
+
+        const body = await refusal(
+            service.createPage(ctx(), "site_1", {
+                title: "Our range",
+                path: "/shop/sale",
+            }),
+        );
+        // The title's address and the rest of the path are taken.
+        expect(body.details.suggestion).toBe("/shop-info");
+    });
+
+    it("keeps a new page in the menu unless told otherwise", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        pageCreate.mockResolvedValue({ id: "page_3" });
+
+        await service.createPage(ctx(), "site_1", {
+            title: "Private",
+            path: "/private",
+            inMenu: false,
+        });
+        expect(pageCreate.mock.calls[0][0].data).toMatchObject({
+            inMenu: false,
+        });
     });
 
     it("denies site:update to a MEMBER before touching the database", async () => {
@@ -267,6 +361,115 @@ describe("SitesService.updatePage", () => {
         await expect(
             service.updatePage(ctx(), "site_1", "nope", { title: "x" }),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("refuses to move a free-form page to /book (G14)", async () => {
+        pageFindFirst.mockResolvedValueOnce({
+            id: "page_2",
+            path: "/about",
+            isHome: false,
+            title: "Walkthrough",
+            kind: "FREE",
+        });
+
+        const body = await refusal(
+            service.updatePage(ctx(), "site_1", "page_2", { path: "/book" }),
+        );
+        expect(body.message).toContain("/book is your booking page");
+        expect(body.details.suggestion).toBe("/walkthrough");
+        expect(pageUpdate).not.toHaveBeenCalled();
+    });
+
+    it("lets a free-form page already at /book keep it while renamed (G14)", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_2",
+            path: "/book",
+            isHome: false,
+            title: "Book a walkthrough",
+            kind: "FREE",
+        });
+        pageUpdate.mockResolvedValue({ id: "page_2" });
+
+        // Never moved or lost by the rule: only a NEW address is checked.
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            title: "Walkthrough",
+            path: "/book",
+        });
+        expect(pageUpdate).toHaveBeenCalled();
+    });
+
+    it("never moves a Book page off /book, but renames it (G14)", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_book",
+            path: "/book",
+            isHome: false,
+            title: "Book",
+            kind: "BOOK",
+        });
+        pageUpdate.mockResolvedValue({ id: "page_book", title: "Classes" });
+
+        const body = await refusal(
+            service.updatePage(ctx(), "site_1", "page_book", {
+                path: "/classes",
+            }),
+        );
+        expect(body.message).toMatch(/always at \/book/);
+        expect(body.details).toMatchObject({ field: "path", reason: "fixed" });
+        expect(pageUpdate).not.toHaveBeenCalled();
+
+        // Its title is also its menu name, and that can change.
+        await service.updatePage(ctx(), "site_1", "page_book", {
+            title: "Classes",
+        });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({ title: "Classes" });
+    });
+
+    it("moves a Contact page to a free address, but not into /shop (G14)", async () => {
+        pageFindFirst
+            .mockResolvedValueOnce({
+                id: "page_contact",
+                path: "/contact",
+                isHome: false,
+                title: "Contact",
+                kind: "CONTACT",
+            })
+            .mockResolvedValueOnce(null);
+        pageUpdate.mockResolvedValue({ id: "page_contact" });
+
+        await service.updatePage(ctx(), "site_1", "page_contact", {
+            path: "/find-us",
+        });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({ path: "/find-us" });
+
+        pageFindFirst.mockResolvedValueOnce({
+            id: "page_contact",
+            path: "/find-us",
+            isHome: false,
+            title: "Contact",
+            kind: "CONTACT",
+        });
+        await refusal(
+            service.updatePage(ctx(), "site_1", "page_contact", {
+                path: "/shop",
+            }),
+        );
+    });
+
+    it("takes a page out of the menu, and leaves it alone when absent (G14)", async () => {
+        pageFindFirst.mockResolvedValue({
+            id: "page_2",
+            path: "/about",
+            isHome: false,
+            title: "About",
+            kind: "FREE",
+        });
+        pageUpdate.mockResolvedValue({ id: "page_2" });
+
+        await service.updatePage(ctx(), "site_1", "page_2", { inMenu: false });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({ inMenu: false });
+
+        await service.updatePage(ctx(), "site_1", "page_2", { title: "Us" });
+        expect(pageUpdate.mock.calls[1][0].data).toEqual({ title: "Us" });
     });
 
     it("denies site:update to a MEMBER before touching the database", async () => {

@@ -482,3 +482,17 @@ describe("plans", () => {
         expect(resolveVariant("plans", {})).toBe("default");
     });
 });
+
+/** G12 — Product grid reads the catalogue live. */
+describe("productGrid", () => {
+    it("publishes exactly what was authored", () => {
+        const draft = { title: "Breads", source: "picked" as const };
+        expect(
+            toRendered("productGrid", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("has one look, and content without one wears it", () => {
+        expect(resolveVariant("productGrid", {})).toBe("default");
+    });
+});

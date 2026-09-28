@@ -67,9 +67,12 @@ interface TimesSheetProps {
     cta: (label: string) => string;
     confirm: (
         startAt: string,
-    ) => Promise<{ ok: true } | { ok: false; message: string }>;
-    /** Done: the page says so, with the chosen time's words. */
-    onDone: (label: string) => void;
+    ) => Promise<{ ok: true; told?: boolean } | { ok: false; message: string }>;
+    /**
+     * Done: the page says so, with the chosen time's words, and whether the
+     * business was told of it (A14).
+     */
+    onDone: (label: string, told: boolean) => void;
     onClose: () => void;
     businessName: string;
 }
@@ -129,7 +132,7 @@ function OpenTimesSheet({
         );
         setBusy(false);
         if (result.ok) {
-            onDone(label);
+            onDone(label, result.told === true);
             return;
         }
         setProblem(result.message);

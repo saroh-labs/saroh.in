@@ -138,7 +138,7 @@ describe("the money this week", () => {
             organizationId: "org_1",
             paidAt: { gte: new Date(MONDAY), lt: NOW },
             kind: { not: "CREDIT_NOTE" },
-            NOT: { source: "BOOKING", number: null },
+            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
         });
         // No `orderId: null`: an order's money is its invoice (ADR-008),
         // and nothing else counts it.

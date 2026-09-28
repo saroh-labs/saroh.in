@@ -100,6 +100,18 @@ describe("ordersToCsv", () => {
         expect(line).toContain('2026-09-11T06:30:00.000Z,,,,"Northwind');
     });
 
+    it("writes a walk-in by name, marked as one, with their phone (B13)", () => {
+        const line = ordersToCsv([
+            order,
+            {
+                ...order,
+                customer: null,
+                walkIn: { name: "Ravi", phone: "+91 90000 11111" },
+            },
+        ]).split("\r\n")[2];
+        expect(line).toContain(",Ravi (walk-in),,+91 90000 11111,");
+    });
+
     it("writes one line per order: 120 filtered orders are 120 lines", () => {
         const rows = Array.from({ length: 120 }, (_, i) => ({
             ...order,

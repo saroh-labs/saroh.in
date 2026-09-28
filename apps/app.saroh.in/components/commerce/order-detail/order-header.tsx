@@ -49,12 +49,19 @@ export function OrderHeading({
     number,
     standing,
     age,
+    how,
     children,
 }: {
     order: OrderRead;
     number: string;
     standing: { label: string; tone: PillTone };
     age: { text: string; late: boolean; rule: string | null } | null;
+    /**
+     * How it is fulfilled, in words, where the type says more than
+     * Delivery or Collection: "Appointment, in person · next visit today,
+     * 18:00" (B14).
+     */
+    how?: string;
     /** The header's buttons. */
     children: ReactNode;
 }) {
@@ -87,9 +94,10 @@ export function OrderHeading({
                     <span>
                         <ViewerDate iso={order.placedAt} variant="moment" /> ·{" "}
                         {order.store.name} ·{" "}
-                        {delivery
-                            ? `Delivery${order.deliveryAddress?.city ? ` to ${order.deliveryAddress.city}` : ""}`
-                            : "Collection"}
+                        {how ??
+                            (delivery
+                                ? `Delivery${order.deliveryAddress?.city ? ` to ${order.deliveryAddress.city}` : ""}`
+                                : "Collection")}
                     </span>
                 </div>
             </div>

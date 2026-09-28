@@ -85,6 +85,13 @@ components/shared/             app shell, navigation, command menu
   decides who is staff.
 - **Current** — `saroh.app` renders publications only — `[domain]/` for tenant
   hosts and `preview/[token]/` for drafts — and draws from the `--site-*` layer.
+- **Current** — A static route under `saroh.app/app/[domain]/` shadows any
+  merchant page at that address, and nothing says so. `/book`, `/shop` and
+  `/checkout` are reserved page paths for that reason (round-2 G14,
+  `RESERVED_PAGE_PATHS` in `apps/api.saroh.in/src/modules/sites/page-kinds.ts`):
+  the API refuses a page there and the pre-publish check flags one made
+  before. A new static route needs its address added there too.
+  `/account` is not yet on the list.
 
 ## Not adopted
 

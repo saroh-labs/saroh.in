@@ -111,7 +111,14 @@ export async function moveBooking(
         }),
         (body) => (isBookingRow(body) ? body : null),
     );
-    return got.ok ? { ok: true, booking: got.value } : got;
+    // The business is told of it (A14): only when the API says so.
+    return got.ok
+        ? {
+              ok: true,
+              booking: got.value,
+              told: (got.value as { told?: unknown }).told === true,
+          }
+        : got;
 }
 
 export async function cancelBooking(ref: string): Promise<AccountCancelAnswer> {

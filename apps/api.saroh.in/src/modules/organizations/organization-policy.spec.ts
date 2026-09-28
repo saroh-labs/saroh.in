@@ -310,3 +310,90 @@ describe("customer:merge (DEC-042, C9)", () => {
         expect(outOfReach(editor, merger)).toEqual(["customer:merge"]);
     });
 });
+
+describe("customer:remove (DEC-042, C11)", () => {
+    it("is Owner's and Admin's, never a Member's or a Reviewer's", () => {
+        expect(can("OWNER", "customer:remove")).toBe(true);
+        expect(can("ADMIN", "customer:remove")).toBe(true);
+        expect(can("MEMBER", "customer:remove")).toBe(false);
+        expect(can("REVIEWER", "customer:remove")).toBe(false);
+    });
+
+    it("is not implied by contact:write or customer:merge", () => {
+        const editor = resolveCapabilities("front-desk", [
+            "contact:read",
+            "contact:write",
+            "customer:merge",
+        ]);
+        expect(editor.has("contact:write")).toBe(true);
+        expect(editor.has("customer:remove")).toBe(false);
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const remover = resolveCapabilities("remover", ["customer:remove"]);
+        expect(remover.has("customer:remove")).toBe(true);
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["contact:write"]),
+        };
+        expect(outOfReach(editor, remover)).toEqual(["customer:remove"]);
+    });
+});
+
+describe("the split order powers (DEC-039, B16)", () => {
+    const parts = [
+        "order:create",
+        "order:edit",
+        "order:refund",
+        "order:export",
+    ] as const;
+
+    it("are Owner's and Admin's; the Member and Reviewer bundles don't change here (F18)", () => {
+        for (const part of parts) {
+            expect(can("OWNER", part)).toBe(true);
+            expect(can("ADMIN", part)).toBe(true);
+            expect(can("MEMBER", part)).toBe(false);
+            expect(can("REVIEWER", part)).toBe(false);
+        }
+    });
+
+    it("a saved order:write role is judged on its parts when someone edits it", () => {
+        // A Manager holding only order:read can't edit a role that takes and
+        // changes orders — its implied parts count against them.
+        const manager: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "manager",
+            actions: resolveCapabilities("manager", [
+                "member:role:update",
+                "order:read",
+            ]),
+        };
+        expect(
+            outOfReach(manager, resolveCapabilities("senior", ["order:write"])),
+        ).toEqual([
+            "order:write",
+            "order:create",
+            "order:edit",
+            "order:export",
+        ]);
+    });
+
+    it("a granter holding payment:manage may grant order:refund (it is implied)", () => {
+        const cashier: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "cashier",
+            actions: resolveCapabilities("cashier", [
+                "member:role:update",
+                "payment:manage",
+            ]),
+        };
+        expect(withinReach(cashier, ["order:refund", "order:read"])).toBe(true);
+    });
+});

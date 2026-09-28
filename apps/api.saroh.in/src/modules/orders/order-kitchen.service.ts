@@ -24,6 +24,9 @@ import {
 } from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import { orderContactId } from "../site-accounts/customer-notify.handler";
+import type { NoticeReach } from "../site-accounts/notice-reach";
+import { contactReach } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
 import {
@@ -39,11 +42,8 @@ import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
 import { changeOptionsFor } from "./order-change-options";
-import {
-    adjustReservation,
-    applyInventoryTransition,
-    phaseOf,
-} from "./order-inventory";
+import { adjustReservation, applyInventoryTransition } from "./order-inventory";
+import { INVOICE_TITLE_SELECT } from "./order-invoice-title";
 import { isServiceLine } from "./order-line";
 import {
     fromCents,
@@ -54,7 +54,17 @@ import {
 } from "./order-pricing";
 import type { OrderReadDto } from "./order-read";
 import { serializeOrderRead } from "./order-read";
-import { canEditItems, planStageMove, planUndo } from "./order-stage";
+import { canEditItems } from "./order-stage";
+import type { CourierField } from "./order-stage-write";
+import {
+    COURIER_FIELDS,
+    lockOrder,
+    writeStageMove,
+    writeStageUndo,
+} from "./order-stage-write";
+import type { VisitAttended } from "./order-visit-attend";
+import { markVisitAttended } from "./order-visit-attend";
+import { visitsForRead } from "./order-visits";
 import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
 
 /**
@@ -70,9 +80,9 @@ import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
  * Who may do what (DEC-024):
  *  - `order:stage` (Owner, Admin, Member) — read the kitchen view, move the
  *    stage, undo the last step.
- *  - `order:write` (Owner, Admin) — edit lines, fulfilment, address, notes.
- *    Taking or returning the difference also needs `payment:manage`.
- *  - Money in the read only with `payment:read` (ADR-008).
+ *  - `order:edit` (Owner, Admin; B16) — edit lines, fulfilment, address,
+ *    notes. Taking or returning the difference also needs `order:refund`.
+ *  - Money in the read with `order:read` or `payment:read` (ADR-008; B16).
  *
  * Every write takes the order's row lock first, so a stage move, an undo, an
  * edit and a refund on one order happen one at a time.
@@ -87,11 +97,16 @@ export class OrderKitchenService {
         @Optional() private readonly payments?: PaymentsService,
     ) {}
 
-    /** The order as Order Detail renders it. `order:read` or `order:stage`. */
+    /**
+     * The order as Order Detail renders it. `order:read` or `order:stage`.
+     * `customerNotice`: how its Ready and handover reach the customer (A14),
+     * so the screen never says nothing is sent when something is; null when
+     * it couldn't be read.
+     */
     async read(
         ctx: OrganizationContext,
         orderId: string,
-    ): Promise<OrderReadDto> {
+    ): Promise<OrderReadDto & { customerNotice: NoticeReach | null }> {
         if (!allows(ctx, "order:read") && !allows(ctx, "order:stage")) {
             // The same refusal authorize() gives, naming the narrower action.
             authorize(ctx, "order:stage");
@@ -123,7 +138,10 @@ export class OrderKitchenService {
                       select: { id: true, name: true },
                   })
                 : [];
-        const money = allows(ctx, "payment:read");
+        // `order:read` shows the whole order, money included (matrix §1
+        // rule 2, B16), as the list's rows already do; `payment:read` kept
+        // it before, and still does.
+        const money = allows(ctx, "order:read") || allows(ctx, "payment:read");
         const read = serializeOrderRead(order, {
             money,
             owedBack: money
@@ -160,7 +178,47 @@ export class OrderKitchenService {
                 `An order's change options couldn't be read: ${String(error)}`,
             );
         }
-        return change ? { ...read, next: { ...read.next, ...change } } : read;
+        const withNotice = {
+            ...read,
+            customerNotice: await this.noticeOf(ctx, order),
+            // A treatment's visits (B14), in their own file.
+            ...(await visitsForRead(order, this.logger)),
+        };
+        return change
+            ? { ...withNotice, next: { ...withNotice.next, ...change } }
+            : withNotice;
+    }
+
+    /**
+     * "Mark visit N attended" (B14): `order:stage`, once the visit has
+     * started; the last one fulfils the order (`order-visit-attend.ts`).
+     */
+    markVisitAttended(
+        ctx: OrganizationContext,
+        orderId: string,
+        visitNumber: number,
+    ): Promise<VisitAttended> {
+        return markVisitAttended(ctx, orderId, visitNumber);
+    }
+
+    /** How the order's notices reach its customer (A14); null if unknown. */
+    private async noticeOf(
+        ctx: OrganizationContext,
+        order: { customerId: string | null; customerAccountId: string | null },
+    ): Promise<NoticeReach | null> {
+        try {
+            const contactId = await orderContactId(
+                prisma,
+                ctx.organizationId,
+                order,
+            );
+            return await contactReach(prisma, ctx.organizationId, contactId);
+        } catch (error) {
+            this.logger.warn(
+                `How an order's notices reach its customer couldn't be read: ${String(error)}`,
+            );
+            return null;
+        }
     }
 
     /**
@@ -196,79 +254,9 @@ export class OrderKitchenService {
         dto: MoveStageDto,
     ): Promise<{ id: string; stage: string; status: string; eventId: string }> {
         authorize(ctx, "order:stage");
-        return prisma.$transaction(async (tx) => {
-            const order = await lockOrder(tx, ctx, orderId);
-            const move = planStageMove(
-                {
-                    stage: order.stage,
-                    status: order.status,
-                    paymentStatus: order.paymentStatus,
-                    fulfilment: order.fulfilment,
-                },
-                dto.to,
-            );
-            // The courier's details belong to the handover to one (DEC-045):
-            // all optional there, and refused on any other step.
-            if (move.to !== "HANDED_TO_COURIER") {
-                const stray = COURIER_FIELDS.find((f) => dto[f]);
-                if (stray) {
-                    throw new BadRequestException({
-                        message: `${COURIER_FIELD_WORDS[stray]} goes with handing the order to a courier.`,
-                        field: stray,
-                    });
-                }
-            }
-            await applyInventoryTransition(
-                tx,
-                order.items,
-                phaseOf(move.fromStatus),
-                phaseOf(move.toStatus),
-                ctx.userId,
-            );
-            await tx.order.update({
-                where: { id: order.id },
-                data: {
-                    stage: move.to,
-                    status: move.toStatus,
-                    ...(dto.trackingUrl
-                        ? { trackingUrl: dto.trackingUrl }
-                        : {}),
-                    ...(dto.courierName
-                        ? { courierName: dto.courierName }
-                        : {}),
-                    ...(dto.trackingNumber
-                        ? { trackingNumber: dto.trackingNumber }
-                        : {}),
-                },
-            });
-            const event = await tx.orderEvent.create({
-                data: {
-                    organizationId: ctx.organizationId,
-                    orderId: order.id,
-                    kind: "STAGE",
-                    actorUserId: ctx.userId,
-                    fromStage: move.from,
-                    toStage: move.to,
-                    fromStatus: move.fromStatus,
-                    toStatus: move.toStatus,
-                    // The handover's step says who took it and their number
-                    // ("Delhivery · AWB4411"), as they were at the handover:
-                    // the order's own fields may be corrected later.
-                    note:
-                        dto.note ??
-                        (move.to === "HANDED_TO_COURIER"
-                            ? handoverNote(dto)
-                            : null),
-                },
-                select: { id: true },
-            });
-            return {
-                id: order.id,
-                stage: move.to,
-                status: move.toStatus,
-                eventId: event.id,
-            };
-        });
+        return prisma.$transaction((tx) =>
+            writeStageMove(tx, ctx, orderId, dto),
+        );
     }
 
     /**
@@ -276,85 +264,35 @@ export class OrderKitchenService {
      * latest step, only once, only within the window (order-stage.ts); its
      * stock moves are reversed on the rows the lines recorded, and the undo
      * is itself a step on the timeline.
+     *
+     * The step's notice to the customer (A14) is taken back if it hasn't
+     * gone; `told` says it had, for "They've already been told" (B6).
      */
     async undoStage(
         ctx: OrganizationContext,
         orderId: string,
         eventId: string,
-    ): Promise<{ id: string; stage: string; status: string; eventId: string }> {
+    ): Promise<{
+        id: string;
+        stage: string;
+        status: string;
+        eventId: string;
+        told: boolean;
+    }> {
         authorize(ctx, "order:stage");
-        return prisma.$transaction(async (tx) => {
-            const order = await lockOrder(tx, ctx, orderId);
-            const event = await tx.orderEvent.findFirst({
-                where: { id: eventId, orderId: order.id },
-            });
-            if (!event)
-                throw new NotFoundException("That step is not on this order");
-            const latest = await tx.orderEvent.findFirst({
-                where: { orderId: order.id },
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                select: { id: true },
-            });
-            const now = new Date();
-            const back = planUndo(
-                {
-                    stage: order.stage,
-                    status: order.status,
-                },
-                {
-                    ...event,
-                    fromStage: event.fromStage,
-                    toStage: event.toStage,
-                },
-                latest?.id ?? null,
-                now,
-            );
-            await applyInventoryTransition(
-                tx,
-                order.items,
-                phaseOf(order.status),
-                phaseOf(back.status),
-                ctx.userId,
-            );
-            await tx.order.update({
-                where: { id: order.id },
-                data: { stage: back.stage, status: back.status },
-            });
-            await tx.orderEvent.update({
-                where: { id: event.id },
-                data: { undoneAt: now },
-            });
-            const undo = await tx.orderEvent.create({
-                data: {
-                    organizationId: ctx.organizationId,
-                    orderId: order.id,
-                    kind: "UNDO",
-                    actorUserId: ctx.userId,
-                    fromStage: order.stage,
-                    toStage: back.stage,
-                    fromStatus: order.status,
-                    toStatus: back.status,
-                    undoesEventId: event.id,
-                },
-                select: { id: true },
-            });
-            return {
-                id: order.id,
-                stage: back.stage,
-                status: back.status,
-                eventId: undo.id,
-            };
-        });
+        return prisma.$transaction((tx) =>
+            writeStageUndo(tx, ctx, orderId, eventId),
+        );
     }
 
     /**
-     * Change an order before anyone starts on it (ADR-008). `order:write`.
+     * Change an order before anyone starts on it (ADR-008). `order:edit`.
      *
      * Lines, fulfilment and address only while it is New; notes until it is
      * cancelled. Stock follows each line on the row it recorded. When the
      * total changes on an order that was paid, the difference is taken (a
      * payment on the order for exactly that amount) or handed back (a refund
-     * marked as for the edit), which also needs `payment:manage`. An earlier
+     * marked as for the edit), which also needs `order:refund`. An earlier
      * edit's charge still unpaid is superseded, so one charge at most is ever
      * open for the difference. An unpaid order just costs the new total.
      *
@@ -391,8 +329,8 @@ export class OrderKitchenService {
         const courier = COURIER_FIELDS.filter((f) => dto[f] !== undefined);
         // The courier's details belong to the handover step, so whoever
         // moves orders may record them (`order:stage`, matrix §2); the rest
-        // of an edit is `order:write`'s.
-        if (touchesOrder || courier.length === 0) authorize(ctx, "order:write");
+        // of an edit is `order:edit`'s (B16).
+        if (touchesOrder || courier.length === 0) authorize(ctx, "order:edit");
         if (courier.length > 0) authorize(ctx, "order:stage");
         if (!touchesOrder && courier.length === 0) {
             throw new BadRequestException("Nothing to change");
@@ -477,9 +415,10 @@ export class OrderKitchenService {
                 });
             }
             const paid = order.paymentStatus === "PAID";
-            if (touchesItems && paid && !allows(ctx, "payment:manage")) {
-                // Changing what a paid order costs moves money.
-                authorize(ctx, "payment:manage");
+            if (touchesItems && paid) {
+                // Changing what a paid order costs moves money, which is
+                // the order's money power (B16; `payment:manage` implies it).
+                authorize(ctx, "order:refund");
             }
 
             const changes: string[] = [];
@@ -871,28 +810,6 @@ export class OrderKitchenService {
     }
 }
 
-/** The courier's details: typed at the handover, or added after it. */
-const COURIER_FIELDS = [
-    "courierName",
-    "trackingNumber",
-    "trackingUrl",
-] as const;
-type CourierField = (typeof COURIER_FIELDS)[number];
-
-const COURIER_FIELD_WORDS: Record<CourierField, string> = {
-    courierName: "A courier's name",
-    trackingNumber: "A tracking number",
-    trackingUrl: "A tracking link",
-};
-
-/** The handover step's words: the courier and number given with it, if any. */
-function handoverNote(dto: MoveStageDto): string | null {
-    const words = [dto.courierName, dto.trackingNumber].filter(
-        (w): w is string => typeof w === "string" && w !== "",
-    );
-    return words.length > 0 ? words.join(" · ") : null;
-}
-
 /**
  * Record the courier's name, number or link on an order handed to a courier
  * (DEC-045), under the lock the edit took. A pick-up, a digital order or an
@@ -1056,6 +973,8 @@ const READ_INCLUDE = {
             status: true,
             source: true,
             paymentIntents: LEDGER_PAYMENTS,
+            // What the paper is called (D15): frozen on issue.
+            ...INVOICE_TITLE_SELECT,
         },
     },
     paymentIntents: {
@@ -1085,43 +1004,6 @@ const READ_INCLUDE = {
         },
     },
 } satisfies Prisma.OrderInclude;
-
-/**
- * Take the order's row lock and load what every kitchen write needs. Scoped
- * to the caller's organization: another business's order is a 404.
- */
-export async function lockOrder(
-    tx: Prisma.TransactionClient,
-    ctx: OrganizationContext,
-    orderId: string,
-) {
-    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} AND "organizationId" = ${ctx.organizationId} FOR UPDATE`;
-    const order = await tx.order.findFirst({
-        where: { id: orderId, organizationId: ctx.organizationId },
-        include: {
-            items: {
-                orderBy: { id: "asc" },
-                include: {
-                    product: {
-                        select: {
-                            name: true,
-                            status: true,
-                            fulfilmentTypes: true,
-                        },
-                    },
-                    refundLines: {
-                        where: {
-                            paymentRefund: { status: { not: "FAILED" } },
-                        },
-                        select: { id: true },
-                    },
-                },
-            },
-        },
-    });
-    if (!order) throw new NotFoundException("Order not found");
-    return order;
-}
 
 /** Price lines to add, against the order's own storefront. */
 async function priceOrderLinesFor(

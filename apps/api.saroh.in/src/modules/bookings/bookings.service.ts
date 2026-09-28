@@ -22,13 +22,13 @@ import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import type { CancelledBooking } from "./booking-cancel";
 import { cancelFoundBooking, sendCancelRefund } from "./booking-cancel";
-import { BookingEventType } from "./booking-event-type";
 import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
 import { bookingMoney } from "./booking-money";
 import { moveFoundBooking } from "./booking-move";
+import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
 import { bookingPayLinkInTx } from "./booking-pay-link";
 import { loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
@@ -687,7 +687,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
-        options: { returnCredit?: boolean } = {},
+        options: { returnCredit?: boolean; closesClass?: boolean } = {},
     ): Promise<CancelledBooking> {
         authorize(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);
@@ -757,27 +757,11 @@ export class BookingsService {
             return booking;
         }
 
+        // A visit of a treatment (E9) takes its order's lock first, and its
+        // last visit attended fulfils the order (B14, `booking-outcome.ts`).
         return prisma.$transaction(async (tx) => {
-            const updated = await tx.booking.update({
-                where: { id: booking.id },
-                data: { outcome },
-            });
-            await tx.bookingEvent.create({
-                data: {
-                    bookingId: booking.id,
-                    organizationId: ctx.organizationId,
-                    type:
-                        outcome === "ATTENDED"
-                            ? BookingEventType.Attended
-                            : BookingEventType.NoShow,
-                    actorUserId: ctx.userId,
-                    // The slot it is about, like CANCELLED — so a history line
-                    // says which appointment, not just what was decided.
-                    fromStartAt: booking.startAt,
-                },
-                select: { id: true },
-            });
-            return updated;
+            await lockVisitOrderInTx(tx, booking.orderId);
+            return writeOutcomeInTx(tx, ctx, booking, outcome);
         });
     }
 
