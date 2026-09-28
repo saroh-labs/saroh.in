@@ -237,6 +237,31 @@ describe("pay now (U19)", () => {
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
+    it("counts only a provider whose checkout can open: not a Razorpay one missing its public key id (DEC-054)", async () => {
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "NOW" }),
+            "iphash",
+            NOW,
+        );
+        expect(db.merchantPaymentProvider.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    status: "CONNECTED",
+                    OR: [
+                        { provider: { not: "RAZORPAY" } },
+                        {
+                            AND: [
+                                { publicKey: { not: null } },
+                                { publicKey: { not: "" } },
+                            ],
+                        },
+                    ],
+                }),
+            }),
+        );
+    });
+
     it("hands a replayed hold a fresh token, to the same booker only", async () => {
         db.booking.findUnique.mockResolvedValue(
             created({

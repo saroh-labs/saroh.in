@@ -145,8 +145,8 @@ describe("PaymentsService.connectProvider", () => {
 
         const result = await service.connectProvider(ctx(), {
             provider: "razorpay",
-            publicKey: "rzp_key_123",
-            keyId: "rzp_key_123",
+            publicKey: "rzp_test_Key123",
+            keyId: "rzp_test_Key123",
             keySecret: "super-secret-value",
         });
 
@@ -171,7 +171,7 @@ describe("PaymentsService.connectProvider", () => {
             id: "mpp_1",
             provider: "RAZORPAY",
             status: "CONNECTED",
-            publicKey: "rzp_key_123",
+            publicKey: "rzp_test_Key123",
             createdAt: expect.any(Date),
             updatedAt: expect.any(Date),
         });
@@ -194,7 +194,7 @@ describe("PaymentsService.connectProvider", () => {
 
         const result = await service.connectProvider(ctx(), {
             provider: "razorpay",
-            keyId: "rzp_key_123",
+            keyId: "rzp_test_Key123",
             keySecret: "super-secret-value",
             webhookSecret: "whsec_top_secret",
         });
@@ -237,6 +237,105 @@ describe("PaymentsService.connectProvider", () => {
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(providerUpsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("PaymentsService.connectProvider — the public key (DEC-054)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "mpp_1",
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-01"),
+                    ...create,
+                }),
+        );
+    });
+
+    it("stores Razorpay's key id as its public key when setup sends only the pair", async () => {
+        const { service } = makeService();
+        const result = await service.connectProvider(ctx(), {
+            provider: "RAZORPAY",
+            keyId: "rzp_live_AbC123",
+            keySecret: "super-secret-value",
+        });
+        const call = providerUpsert.mock.calls[0][0];
+        expect(call.create.publicKey).toBe("rzp_live_AbC123");
+        expect(call.update.publicKey).toBe("rzp_live_AbC123");
+        expect(result.publicKey).toBe("rzp_live_AbC123");
+        expect(JSON.stringify(result)).not.toContain("super-secret-value");
+    });
+
+    it("accepts a public key id sent beside it when it is the same key", async () => {
+        const { service } = makeService();
+        const result = await service.connectProvider(ctx(), {
+            provider: "razorpay",
+            publicKey: "rzp_test_AbC123",
+            keyId: "rzp_test_AbC123",
+            keySecret: "s3cret",
+        });
+        expect(result.publicKey).toBe("rzp_test_AbC123");
+    });
+
+    it("refuses a public key id that names a different key, before any write", async () => {
+        const { service } = makeService();
+        await expect(
+            service.connectProvider(ctx(), {
+                provider: "RAZORPAY",
+                publicKey: "rzp_live_Other",
+                keyId: "rzp_live_AbC123",
+                keySecret: "s3cret",
+            }),
+        ).rejects.toThrow(/are different/);
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["no rzp_ prefix", "AbC123"],
+        ["an unknown mode", "rzp_prod_AbC123"],
+        ["nothing after the mode", "rzp_live_"],
+        ["a space inside", "rzp_live_AbC 123"],
+    ])("refuses a Razorpay key id with %s", async (_why, keyId) => {
+        const { service } = makeService();
+        await expect(
+            service.connectProvider(ctx(), {
+                provider: "RAZORPAY",
+                keyId,
+                keySecret: "s3cret",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it("refuses the key id pasted as the secret too", async () => {
+        const { service } = makeService();
+        await expect(
+            service.connectProvider(ctx(), {
+                provider: "RAZORPAY",
+                keyId: "rzp_live_AbC123",
+                keySecret: "rzp_live_AbC123",
+            }),
+        ).rejects.toThrow(/secret is the key id/);
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it("leaves Cashfree's public key optional and its app id unchecked", async () => {
+        const { service } = makeService();
+        const bare = await service.connectProvider(ctx(), {
+            provider: "CASHFREE",
+            keyId: "TEST1234app",
+            keySecret: "cfsk_secret",
+        });
+        expect(bare.publicKey).toBeNull();
+        const withKey = await service.connectProvider(ctx(), {
+            provider: "CASHFREE",
+            keyId: "TEST1234app",
+            keySecret: "cfsk_secret",
+            publicKey: "  cf_public  ",
+        });
+        expect(withKey.publicKey).toBe("cf_public");
     });
 });
 
@@ -327,6 +426,37 @@ describe("PaymentsService.createIntentForOrder", () => {
             clientParams: expect.any(Object),
         });
         expect(JSON.stringify(result)).not.toContain("super-secret-value");
+    });
+
+    it.each([null, ""])(
+        "makes no provider order through a Razorpay connection whose public key is %p (DEC-054)",
+        async (publicKey) => {
+            const { service, fake } = makeService();
+            orderFindUnique.mockResolvedValue(ORDER);
+            providerFindMany.mockResolvedValue([connectedRow({ publicKey })]);
+
+            await expect(
+                service.createIntentForOrder(ctx(), "order_1"),
+            ).rejects.toThrow(/needs its public key id/);
+            expect(fake.calls).toHaveLength(0);
+            expect(intentCreate).not.toHaveBeenCalled();
+        },
+    );
+
+    it("still makes a Cashfree order with no public key: its window opens on the session", async () => {
+        const { service, fake } = makeService(
+            new FakeMerchantProvider("CASHFREE"),
+        );
+        orderFindUnique.mockResolvedValue(ORDER);
+        providerFindMany.mockResolvedValue([
+            connectedRow({ provider: "CASHFREE", publicKey: null }),
+        ]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+
+        const result = await service.createIntentForOrder(ctx(), "order_1");
+        expect(fake.calls).toHaveLength(1);
+        expect(result.publicKey).toBeNull();
     });
 
     it("is idempotent: a prior (orderId, idempotencyKey) returns the first intent without calling the provider", async () => {

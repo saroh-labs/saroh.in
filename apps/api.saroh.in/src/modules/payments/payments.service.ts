@@ -39,6 +39,7 @@ import {
     PROVIDER_FACTORY,
     RefundCallError,
 } from "./providers/provider.port";
+import { needsPublicKey, publicKeyFor } from "./public-key";
 
 /** Validated input for {@link PaymentsService.connectProvider}. */
 export interface ConnectProviderInput {
@@ -406,6 +407,11 @@ export class PaymentsService {
             );
         }
 
+        // Razorpay's checkout opens with the key id, so it is the public key;
+        // both it and the secret are checked before anything is stored
+        // (DEC-054). Throws 400 before any write.
+        const publicKey = publicKeyFor({ ...input, provider });
+
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.
         const sealed = encryptSecret(
@@ -429,14 +435,14 @@ export class PaymentsService {
                 organizationId: ctx.organizationId,
                 provider,
                 status: "CONNECTED",
-                publicKey: input.publicKey ?? null,
+                publicKey,
                 encryptedCredentials: sealed.ciphertext,
                 credentialsIv: sealed.iv,
                 credentialsAuthTag: sealed.authTag,
             },
             update: {
                 status: "CONNECTED",
-                publicKey: input.publicKey ?? null,
+                publicKey,
                 encryptedCredentials: sealed.ciphertext,
                 credentialsIv: sealed.iv,
                 credentialsAuthTag: sealed.authTag,
@@ -1303,6 +1309,18 @@ export class PaymentsService {
         }
 
         const providerRow = await resolveProvider();
+        // A Razorpay connection without its public key id can't open the
+        // checkout window, so no provider order is made for it (DEC-054).
+        // Settings › Providers says it needs attention; the backfill fills
+        // every connection made before setup asked for it.
+        if (
+            needsPublicKey(providerRow.provider) &&
+            !providerRow.publicKey?.trim()
+        ) {
+            throw new ConflictException(
+                "Online payment isn't ready: the business's Razorpay connection needs its public key id.",
+            );
+        }
 
         // Decrypt in-memory ONLY here, at the moment of the provider call.
         const credentials = this.openCredentials(providerRow);
