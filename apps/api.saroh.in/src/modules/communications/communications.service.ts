@@ -17,10 +17,20 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
+import type {
+    NoticeChannels,
+    NoticeReach,
+} from "../site-accounts/notice-reach";
+import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { MessageSendPayload } from "./message-send.handler";
 import { MESSAGE_SEND_TYPE } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
-import type { InvoiceMailVars, TransactionalTemplate } from "./transactional";
+import type {
+    InvoiceMailVars,
+    InvoiceTemplate,
+    NoticeTemplate,
+    RenderedMessage,
+} from "./transactional";
 import { renderTransactional } from "./transactional";
 
 type Db = Prisma.TransactionClient;
@@ -36,10 +46,20 @@ export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
     | { kind: "SITE_ACCOUNT"; contactId: string };
 
+/**
+ * What a transactional message says: an invoice's template with its
+ * values, or one of A14's notices, already worded by its handler
+ * (`site-accounts/notify-templates.ts`) from the same fixed templates.
+ */
+export type TransactionalWords =
+    | { template: InvoiceTemplate; vars: InvoiceMailVars }
+    | { template: NoticeTemplate; rendered: RenderedMessage };
+
 /** Input for {@link CommunicationsService.queueTransactional}. */
-export interface TransactionalInput {
-    template: TransactionalTemplate;
-    vars: InvoiceMailVars;
+export type TransactionalInput = TransactionalWords & TransactionalSend;
+
+/** Who it goes to and what it carries, whatever it says. */
+export interface TransactionalSend {
     recipient: TransactionalRecipient;
     /**
      * Makes the secret link the body points at (a fresh pay link). Called
@@ -636,10 +656,10 @@ export class CommunicationsService {
             );
         }
 
-        const { subject, body } = renderTransactional(
-            input.template,
-            input.vars,
-        );
+        const { subject, body } =
+            "rendered" in input
+                ? input.rendered
+                : renderTransactional(input.template, input.vars);
         const base = {
             organizationId,
             channel: "EMAIL",
@@ -699,6 +719,30 @@ export class CommunicationsService {
             },
         });
         return { id: message.id, status: "QUEUED", toAddress: to.address };
+    }
+
+    /**
+     * How a notice about a customer's own booking or order reaches them
+     * (A14, R17): the business's channels, and for `contactId` that
+     * customer's reach (`site-accounts/notice-reach.ts`). `contact:read`,
+     * as the booking peek that asks it. Another business's contact reads
+     * as reaching nobody, never as a 404 that would confirm it exists.
+     */
+    async noticeReach(
+        ctx: OrganizationContext,
+        contactId: string | null,
+    ): Promise<NoticeChannels & { reach: NoticeReach | null }> {
+        authorize(ctx, "contact:read");
+        const channels = await noticeChannels(prisma, ctx.organizationId);
+        const reach = contactId
+            ? await contactReach(
+                  prisma,
+                  ctx.organizationId,
+                  contactId,
+                  channels,
+              )
+            : null;
+        return { ...channels, reach };
     }
 
     // ---- Reads (auditable lifecycle) --------------------------------------

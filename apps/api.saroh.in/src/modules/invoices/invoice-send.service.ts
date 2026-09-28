@@ -18,7 +18,7 @@ import {
     accountThreadOn,
 } from "../communications/account-thread";
 import { CommunicationsService } from "../communications/communications.service";
-import type { TransactionalTemplate } from "../communications/transactional";
+import type { InvoiceTemplate } from "../communications/transactional";
 import { authorize } from "../organizations/organization-policy";
 import { isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
@@ -41,7 +41,7 @@ export interface InvoiceSendResult {
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Home's default zone (`home-needs.ts`), for a business that never set one. */
 const DEFAULT_ZONE = "Asia/Kolkata";
-const INVOICE_TEMPLATES: TransactionalTemplate[] = [
+const INVOICE_TEMPLATES: InvoiceTemplate[] = [
     "INVOICE_SENT",
     "INVOICE_REMINDER",
 ];
@@ -245,7 +245,7 @@ export class InvoiceSendService {
                 );
             }
 
-            const template: TransactionalTemplate = reminder
+            const template: InvoiceTemplate = reminder
                 ? "INVOICE_REMINDER"
                 : "INVOICE_SENT";
             let email: InvoiceSendResult["email"] = null;

@@ -28,7 +28,11 @@ function makeTx() {
             update: jest.fn(),
             count: jest.fn().mockResolvedValue(0),
         },
-        bookingEvent: { create: jest.fn() },
+        bookingEvent: {
+            create: jest.fn(),
+            findFirst: jest.fn().mockResolvedValue({ id: "ev_booked" }),
+        },
+        job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),

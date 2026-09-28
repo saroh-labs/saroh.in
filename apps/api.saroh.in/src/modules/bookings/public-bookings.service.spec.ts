@@ -37,7 +37,7 @@ jest.mock("@saroh/database", () => {
         },
         customerSubscription: { findFirst: jest.fn() },
         invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-        bookingEvent: { create: jest.fn() },
+        bookingEvent: { create: jest.fn().mockResolvedValue({ id: "ev_1" }) },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
@@ -221,7 +221,12 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(jobCreate.mock.calls[0][0].data).toMatchObject({
             organizationId: "org_SVC",
             type: "booking.notify",
-            payload: { bookingId: "bk_1", serviceId: "svc_1" },
+            payload: {
+                bookingId: "bk_1",
+                serviceId: "svc_1",
+                reason: "booked",
+                eventId: "ev_1",
+            },
         });
     });
 

@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
+import { stampConfirmedEmail } from "./confirmation-stamp";
 import type {
     CommsCredentials,
     CommsProviderFactory,
@@ -54,6 +55,10 @@ const SENT_STATES = new Set(["SENT", "DELIVERED"]);
  *    attempts++) and the Message → FAILED, then RE-THROWS so the durable worker
  *    retries with backoff; the SENT guard keeps a later success from being
  *    undone and keeps a completed send from re-firing.
+ *  - Once a booking or order confirmation is accepted, the contact's email
+ *    is stamped verified when they made it online with that email (A14,
+ *    DEC-049, `confirmation-stamp.ts`). Only after a success: a failed send
+ *    stamps nothing.
  *
  * SECURITY: credentials are decrypted in-memory ONLY at the instant of the
  * provider call and never logged; provider errors are already sanitized by the
@@ -179,6 +184,19 @@ export class MessageSendHandler {
             const reason = err instanceof Error ? err.message : "send failed";
             await this.recordFailure(delivery.id, message.id, reason);
             throw err;
+        }
+
+        // The email went: a confirmation proves the address (A14). The send
+        // is done either way, so a failure here is logged, never retried
+        // into a second email.
+        try {
+            await stampConfirmedEmail(prisma, message, new Date());
+        } catch (err) {
+            this.logger.warn(
+                `message.send: message ${message.id} sent; its confirmation stamp failed (${
+                    err instanceof Error ? err.message : "unknown"
+                })`,
+            );
         }
     };
 

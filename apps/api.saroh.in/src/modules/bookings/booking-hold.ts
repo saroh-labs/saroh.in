@@ -11,6 +11,7 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
+import { BookingEventType } from "./booking-event-type";
 import { courseSeatsHeld } from "./course-seats";
 import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
 
@@ -414,6 +415,27 @@ export async function confirmHoldInTx(
     });
     // Confirmed now, so its booking-page note waits for staff (C12).
     await suggestFromBookingNoteInTx(tx, { ...booking, status: "CONFIRMED" });
+    // And told now (A14): a hold is not told when it is made, only when
+    // it is paid. Keyed to its Booked event, as any booking's notice.
+    const booked = await tx.bookingEvent.findFirst({
+        where: { bookingId: booking.id, type: BookingEventType.Booked },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+    });
+    await tx.job.create({
+        data: {
+            organizationId: input.organizationId,
+            type: "booking.notify",
+            payload: {
+                bookingId: booking.id,
+                serviceId: booking.serviceId,
+                contactId: booking.contactId,
+                reason: "confirmed",
+                ...(booked ? { eventId: booked.id } : {}),
+            },
+        },
+        select: { id: true },
+    });
     const profile = await loadTaxProfile(tx, input.organizationId);
     const number = await numberFor(
         tx,

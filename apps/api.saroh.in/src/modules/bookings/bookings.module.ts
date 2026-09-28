@@ -13,6 +13,10 @@ import { AccountBookingsTabController } from "../site-accounts/account-bookings-
 import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
 import { AccountBookingsService } from "../site-accounts/account-bookings.service";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import {
+    BOOKING_NOTIFY_TYPE,
+    BookingNotifyHandler,
+} from "./booking-notify.handler";
 import { BookingsController } from "./bookings.controller";
 import { BookingsService } from "./bookings.service";
 import {
@@ -51,8 +55,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         JobsModule,
         // Sends a cancel's refund of money paid online (E8).
         PaymentsModule,
-        // The customer session guard for signed-in booking (A9), and the
-        // account area's switch (A6).
+        // The customer session guard for signed-in booking (A9), the
+        // account area's switch (A6), and the customer notices
+        // `booking.notify` delegates to (A14).
         SiteAccountsModule,
     ],
     controllers: [
@@ -68,6 +73,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicTodayService,
         AccountBookingsService,
         ReleaseHoldsHandler,
+        BookingNotifyHandler,
         OrganizationGuard,
     ],
     exports: [BookingsService],
@@ -78,15 +84,19 @@ export class BookingsModule implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly releaseHolds: ReleaseHoldsHandler,
+        private readonly bookingNotify: BookingNotifyHandler,
     ) {}
 
     /**
-     * Registers the hold release sweep (U19) and starts its chain — the
+     * Registers `booking.notify` (A14) and the hold release sweep (U19),
+     * and starts the sweep's chain — the
      * renewal job's shape (ADR-007): never under test, where no worker runs,
      * and never throwing, so a database not up yet cannot stop the boot.
      */
     async onModuleInit(): Promise<void> {
         this.registry.register(RELEASE_HOLDS_TYPE, this.releaseHolds.handle);
+        // Tells the customer, and the team, about a booking (A14).
+        this.registry.register(BOOKING_NOTIFY_TYPE, this.bookingNotify.handle);
         if (env.NODE_ENV === "test") return;
         await this.releaseHolds.schedule(new Date());
         this.chainCheck = setInterval(() => {

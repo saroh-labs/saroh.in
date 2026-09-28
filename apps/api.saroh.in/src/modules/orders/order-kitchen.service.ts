@@ -24,6 +24,13 @@ import {
 } from "../payments/intent-state";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import {
+    cancelOrderStepNotice,
+    enqueueOrderStepNotice,
+} from "../site-accounts/customer-notify-queue";
+import { orderContactId } from "../site-accounts/customer-notify.handler";
+import type { NoticeReach } from "../site-accounts/notice-reach";
+import { contactReach } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
 import {
@@ -86,11 +93,16 @@ export class OrderKitchenService {
         @Optional() private readonly payments?: PaymentsService,
     ) {}
 
-    /** The order as Order Detail renders it. `order:read` or `order:stage`. */
+    /**
+     * The order as Order Detail renders it. `order:read` or `order:stage`.
+     * `customerNotice`: how its Ready and handover reach the customer (A14),
+     * so the screen never says nothing is sent when something is; null when
+     * it couldn't be read.
+     */
     async read(
         ctx: OrganizationContext,
         orderId: string,
-    ): Promise<OrderReadDto> {
+    ): Promise<OrderReadDto & { customerNotice: NoticeReach | null }> {
         if (!allows(ctx, "order:read") && !allows(ctx, "order:stage")) {
             // The same refusal authorize() gives, naming the narrower action.
             authorize(ctx, "order:stage");
@@ -123,7 +135,7 @@ export class OrderKitchenService {
                   })
                 : [];
         const money = allows(ctx, "payment:read");
-        return serializeOrderRead(order, {
+        const read = serializeOrderRead(order, {
             money,
             owedBack: money
                 ? await owedBackOn(prisma, ctx.organizationId, order.id)
@@ -143,6 +155,27 @@ export class OrderKitchenService {
                 ? { returnable: await returnableUnits(prisma, order.id) }
                 : {}),
         });
+        return { ...read, customerNotice: await this.noticeOf(ctx, order) };
+    }
+
+    /** How the order's notices reach its customer (A14); null if unknown. */
+    private async noticeOf(
+        ctx: OrganizationContext,
+        order: { customerId: string; customerAccountId: string | null },
+    ): Promise<NoticeReach | null> {
+        try {
+            const contactId = await orderContactId(
+                prisma,
+                ctx.organizationId,
+                order,
+            );
+            return await contactReach(prisma, ctx.organizationId, contactId);
+        } catch (error) {
+            this.logger.warn(
+                `How an order's notices reach its customer couldn't be read: ${String(error)}`,
+            );
+            return null;
+        }
     }
 
     /**
@@ -244,6 +277,15 @@ export class OrderKitchenService {
                 },
                 select: { id: true },
             });
+            // Ready and the handover tell the customer, 10 seconds later so
+            // an Undo can take it back (A14, `customer.notify`).
+            await enqueueOrderStepNotice(tx, {
+                organizationId: ctx.organizationId,
+                orderId: order.id,
+                orderEventId: event.id,
+                stage: move.to,
+                now: new Date(),
+            });
             return {
                 id: order.id,
                 stage: move.to,
@@ -258,12 +300,21 @@ export class OrderKitchenService {
      * latest step, only once, only within the window (order-stage.ts); its
      * stock moves are reversed on the rows the lines recorded, and the undo
      * is itself a step on the timeline.
+     *
+     * The step's notice to the customer (A14) is taken back if it hasn't
+     * gone; `told` says it had, for "They've already been told" (B6).
      */
     async undoStage(
         ctx: OrganizationContext,
         orderId: string,
         eventId: string,
-    ): Promise<{ id: string; stage: string; status: string; eventId: string }> {
+    ): Promise<{
+        id: string;
+        stage: string;
+        status: string;
+        eventId: string;
+        told: boolean;
+    }> {
         authorize(ctx, "order:stage");
         return prisma.$transaction(async (tx) => {
             const order = await lockOrder(tx, ctx, orderId);
@@ -320,11 +371,17 @@ export class OrderKitchenService {
                 },
                 select: { id: true },
             });
+            const notice = await cancelOrderStepNotice(
+                tx,
+                ctx.organizationId,
+                event.id,
+            );
             return {
                 id: order.id,
                 stage: back.stage,
                 status: back.status,
                 eventId: undo.id,
+                told: notice.told,
             };
         });
     }

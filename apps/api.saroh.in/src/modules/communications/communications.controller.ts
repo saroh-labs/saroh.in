@@ -116,4 +116,19 @@ export class CommunicationsController {
     ) {
         return this.comms.getMessage(ctx, messageId);
     }
+
+    // ---- Customer notices (A14) ----
+    /**
+     * How a notice about a customer's own booking or order reaches them:
+     * one customer's (`?contactId=`), or the business's channels alone.
+     * Not module-gated: it says what IS sent, which is also "nothing".
+     */
+    @Get("customer-notices/reach")
+    noticeReach(
+        @OrgContext() ctx: OrganizationContext,
+        @Query("contactId") contactId?: string,
+    ) {
+        const id = contactId?.trim() ?? "";
+        return this.comms.noticeReach(ctx, id === "" ? null : id);
+    }
 }
