@@ -9,6 +9,7 @@ import {
     moduleName,
     record,
     recordedChanges,
+    recordedValueText,
     text,
 } from "./activity-changes";
 import { detailsLabels, mergedMoves } from "./activity-customers";
@@ -69,7 +70,7 @@ function shown(field: string, value: ChangeValue): string {
         return value === true ? "Registered" : "Not registered";
     }
     if (typeof value === "boolean") return value ? "On" : "Off";
-    return String(value);
+    return recordedValueText(field, value);
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

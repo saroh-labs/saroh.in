@@ -133,6 +133,27 @@ describe("activityDetail — what changed", () => {
         expect(detail.withoutValues).toBe(false);
     });
 
+    it("shows a business type by its name, before and after (F10)", () => {
+        const detail = activityDetail(
+            event({
+                metadata: {
+                    fields: ["type"],
+                    changes: [
+                        { field: "type", before: "company", after: "llp" },
+                    ],
+                },
+            }),
+            KOLKATA,
+        );
+        expect(detail.changes).toEqual([
+            {
+                label: "Type of business",
+                before: "Private limited company",
+                after: "LLP",
+            },
+        ]);
+    });
+
     it("says an earlier save kept no values, listing every field once", () => {
         const detail = activityDetail(
             event({

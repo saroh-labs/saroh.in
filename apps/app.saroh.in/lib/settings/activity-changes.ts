@@ -6,6 +6,8 @@
  * `activity-detail.ts` the sheet.
  */
 
+import { businessTypeLabel } from "@/lib/organizations/business-types";
+
 /** The Business settings tab a field is on. */
 export type BusinessTab = "identity" | "contact" | "tax" | "hours" | "address";
 
@@ -174,6 +176,21 @@ export const fieldsOf = (meta: Record<string, unknown>): string[] =>
         ? meta.fields.filter((f): f is string => typeof f === "string")
         : [];
 
+/**
+ * A recorded value as a person reads it: a business type by its name
+ * ("llp" is "LLP", and the old "company" Private limited, F10); anything
+ * else as recorded.
+ */
+export function recordedValueText(
+    field: string,
+    value: string | number | boolean,
+): string {
+    if (field === "type" && typeof value === "string") {
+        return businessTypeLabel(value) ?? value;
+    }
+    return String(value);
+}
+
 /** Values too long to read inside a sentence; the sheet shows them. */
 const LONG_FIELDS = new Set([
     "registeredAddress",
@@ -202,7 +219,7 @@ function valueSentence(change: RecordedChange): string | null {
     }
     if (change.after === null) return `cleared ${known.phrase}`;
     if (LONG_FIELDS.has(change.field)) return null;
-    const after = String(change.after);
+    const after = recordedValueText(change.field, change.after);
     if (after.length > MAX_SENTENCE_VALUE) return null;
     return `changed ${known.phrase} to ${after}`;
 }

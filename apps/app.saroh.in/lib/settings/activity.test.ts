@@ -51,6 +51,28 @@ describe("activityLine — settings saves", () => {
         ).toBe("Sanjay updated the invoice prefix → Tax and invoices");
     });
 
+    it("says a business type by its name, the old company as Private limited (F10)", () => {
+        const typeChange = (before: string | null, after: string | null) =>
+            said({
+                metadata: {
+                    fields: ["type"],
+                    changes: [{ field: "type", before, after }],
+                },
+            });
+        expect(typeChange("individual", "llp")).toBe(
+            "Sanjay changed the type of business to LLP → Identity",
+        );
+        expect(typeChange("llp", "company")).toBe(
+            "Sanjay changed the type of business to Private limited company → Identity",
+        );
+        expect(typeChange(null, "individual")).toBe(
+            "Sanjay changed the type of business to Individual / sole proprietor → Identity",
+        );
+        expect(typeChange("trust", null)).toBe(
+            "Sanjay cleared the type of business → Identity",
+        );
+    });
+
     it("says the address once, however many of its lines changed", () => {
         expect(
             said({
