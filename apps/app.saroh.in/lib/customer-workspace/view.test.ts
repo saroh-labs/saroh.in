@@ -235,6 +235,59 @@ describe("the tabs, by business kind", () => {
         expect(tabFromQuery("msg", tabs)).toBe("msg");
     });
 
+    it("adds Reviews after Invoices, counting every review, hidden too (C6)", () => {
+        const review = (id: string, status: "PUBLISHED" | "HIDDEN") => ({
+            id,
+            rating: 5,
+            body: "Lovely",
+            displayName: "Asha R.",
+            productId: "p1",
+            productName: "Sourdough",
+            storeId: "s1",
+            invitedTo: "asha@example.in",
+            status,
+            reply: null,
+            repliedAt: null,
+            createdAt: "2026-09-20T10:00:00Z",
+        });
+        const thread = {
+            messages: [],
+            earlier: false,
+            unread: 0,
+            signsIn: true,
+            canReply: true,
+        };
+        const tabs = tabsFor(shop(), thread, [
+            review("r1", "PUBLISHED"),
+            review("r2", "HIDDEN"),
+        ]);
+        expect(tabs.map((t) => t.label)).toEqual([
+            "Overview",
+            "Orders",
+            "Subscriptions",
+            "Invoices",
+            "Reviews",
+            "Messages",
+            "Notes",
+        ]);
+        expect(tabs.find((t) => t.key === "rev")?.count).toBe(2);
+        expect(tabFromQuery("rev", tabs)).toBe("rev");
+        // None yet: the tab stays, with its 0 and the empty state.
+        expect(
+            tabsFor(shop(), null, []).find((t) => t.key === "rev")?.count,
+        ).toBe(0);
+    });
+
+    it("keeps a failed Reviews read's tab without a count, and has none for a role that can't read reviews", () => {
+        expect(
+            tabsFor(shop(), null, "failed").find((t) => t.key === "rev")?.count,
+        ).toBeNull();
+        const noReviews = tabsFor(shop(), null, null);
+        expect(noReviews.map((t) => t.key)).not.toContain("rev");
+        // An old link to ?tab=rev opens Overview instead.
+        expect(tabFromQuery("rev", noReviews)).toBe("over");
+    });
+
     it("opens the tab the address names, else Overview", () => {
         const tabs = tabsFor(gym());
         expect(tabFromQuery("bk", tabs)).toBe("bk");

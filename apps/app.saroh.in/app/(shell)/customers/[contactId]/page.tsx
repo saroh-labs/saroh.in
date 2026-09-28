@@ -13,9 +13,10 @@ import type {
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
 import { getSuggestions, getThread } from "@/lib/customer-workspace/service";
-import type { ThreadRead } from "@/lib/customer-workspace/view";
+import type { ReviewsRead, ThreadRead } from "@/lib/customer-workspace/view";
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Customer" };
@@ -83,7 +84,13 @@ export default async function CustomerDetailPage({
     const thread: ThreadRead = may("message:read")
         ? await getThread(contactId).catch((): ThreadRead => "failed")
         : null;
-    const tabs = tabsFor(detail, thread);
+    // Their product reviews (C6), where the business sells and for whoever
+    // may read reviews; a failed read shows the tab with the failure said.
+    const reviews: ReviewsRead =
+        detail.linkedCustomers !== undefined && may("product-review:read")
+            ? await contactReviews(contactId).catch((): ReviewsRead => "failed")
+            : null;
+    const tabs = tabsFor(detail, thread, reviews);
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
@@ -118,6 +125,8 @@ export default async function CustomerDetailPage({
                     (s): s is DuplicateSuggestion => s.kind === "contact",
                 )}
                 thread={thread}
+                reviews={reviews}
+                canReplyReviews={may("product-review:write")}
                 nowIso={new Date().toISOString()}
             />
         </PageContainer>
