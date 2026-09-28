@@ -104,6 +104,7 @@ export type NavAction =
     | "course:write"
     | "course:read"
     | "pack:read"
+    | "pack:sell"
     | "pack:write";
 
 /**
@@ -140,6 +141,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:write",
         "subscription:write",
         "course:write",
+        "pack:sell",
         "pack:write",
         "lead:read",
         "pipeline:read",
@@ -168,6 +170,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "invoice:write",
         "subscription:write",
         "course:write",
+        "pack:sell",
         "pack:write",
         "lead:read",
         "pipeline:read",

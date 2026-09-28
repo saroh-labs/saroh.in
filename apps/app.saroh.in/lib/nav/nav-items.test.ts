@@ -939,6 +939,21 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         expect(navRoleCan("ADMIN", "pack:write")).toBe(true);
         expect(navRoleCan("MEMBER", "pack:write")).toBe(false);
         expect(navRoleCan("REVIEWER", "pack:write")).toBe(false);
+        for (const role of ["OWNER", "ADMIN"] as const) {
+            expect(navRoleCan(role, "pack:sell")).toBe(true);
+        }
+        // Whether a Member sells packs is F18's (matrix Q1).
+        expect(navRoleCan("MEMBER", "pack:sell")).toBe(false);
+        expect(navRoleCan("REVIEWER", "pack:sell")).toBe(false);
+    });
+
+    it("offers Sell a pack to a role the business made to sell, not to make (E26)", () => {
+        const seller = {
+            role: "MEMBER" as const,
+            actions: ["pack:read", "pack:sell"],
+        };
+        expect(navCan(seller, ["pack:sell", "pack:write"])).toBe(true);
+        expect(navCan(seller, "pack:write")).toBe(false);
     });
 });
 

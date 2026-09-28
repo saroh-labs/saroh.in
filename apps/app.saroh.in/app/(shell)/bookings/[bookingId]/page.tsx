@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
-import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
@@ -76,7 +76,7 @@ async function packsFor(booking: BookingDetail) {
         modulesOrUnknown(),
     ]);
     if (!canReadPacks(organization)) return undefined;
-    const canWrite = canWritePacks(organization) && packsOn(modules);
+    const canWrite = canUsePacksOnBookings(organization) && packsOn(modules);
     const live = booking.packRedemption?.reversedAt
         ? null
         : (booking.packRedemption?.purchase ?? null);
