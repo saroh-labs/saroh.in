@@ -234,6 +234,27 @@ describe("Business Calendar month (DB)", () => {
             "2026-10-06T05:00:00Z",
             "ONLINE",
         );
+        // Its payment, with the fee the provider reported (E19): ₹23.60.
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: org.id,
+                orderId: refunded.id,
+                provider: "RAZORPAY",
+                amountCents: 100_000,
+                currency: "INR",
+                status: "SUCCEEDED",
+                feeCents: 2_360,
+                attempts: {
+                    create: {
+                        organizationId: org.id,
+                        provider: "RAZORPAY",
+                        providerRef: `pay_${tag}`,
+                        status: "CAPTURED",
+                        createdAt: new Date("2026-10-06T05:00:00Z"),
+                    },
+                },
+            },
+        });
         await prisma.$transaction((tx) =>
             issueCreditNote(tx, {
                 invoiceId,
@@ -295,6 +316,7 @@ describe("Business Calendar month (DB)", () => {
         const orgIds = [ctx.organizationId, otherOrgId];
         const where = { organizationId: { in: orgIds } };
         await prisma.subscriptionSkip.deleteMany({ where });
+        await prisma.paymentIntent.deleteMany({ where });
         await prisma.booking.deleteMany({ where });
         await prisma.service.deleteMany({ where });
         await prisma.invoice.deleteMany({ where });
@@ -380,6 +402,66 @@ describe("Business Calendar month (DB)", () => {
         ]);
         // The order's own paper never shows on the Invoices layer.
         expect(october.totals.invoices).toBe(0);
+    });
+
+    it("money in, out and due match a hand sum (E19)", async () => {
+        const october = await calendar.month(ctx, "2026-10", NOW);
+        const day = (d: string) => october.days.find((x) => x.date === d);
+        // ₹1,000 in; out is the ₹300 refund plus the ₹23.60 fee.
+        expect(day("2026-10-06")?.money).toEqual([
+            {
+                currency: "INR",
+                in: 100_000,
+                out: 32_360,
+                net: 67_640,
+                due: 0,
+                failed: 0,
+            },
+        ]);
+        expect(
+            day("2026-10-06")?.layers.orders?.items.find((i) =>
+                i.title.startsWith("ORD-refund"),
+            ),
+        ).toMatchObject({
+            in: 100_000,
+            out: 32_360,
+            outWhy: ["refund", "fee"],
+        });
+        // In: ₹1,000 + ₹400 + ₹1,000. The pay-later order's money is the
+        // 2nd's, though the order sits on 30 September.
+        expect(day("2026-10-02")?.money?.[0].in).toBe(100_000);
+        expect(october.money?.total).toEqual([
+            expect.objectContaining({ in: 240_000, out: 32_360 }),
+        ]);
+        const entries = october.money?.entries ?? [];
+        expect(entries.reduce((n, e) => n + e.in, 0)).toBe(240_000);
+        expect(entries.reduce((n, e) => n + e.out, 0)).toBe(32_360);
+
+        // September: ₹750 in on the 5th (orders from before invoicing);
+        // due is the ₹4,000 invoice (overdue, still owed) and ₹300 on each
+        // renewal the Subscriptions layer shows (the 25th and the 26th).
+        const september = await calendar.month(ctx, "2026-09", NOW);
+        const renewals = september.days
+            .flatMap((d) => d.layers.subscriptions?.items ?? [])
+            .filter((i) => i.kind === "renewal");
+        expect(renewals).toHaveLength(2);
+        expect(september.money?.total).toEqual([
+            {
+                currency: "INR",
+                in: 75_000,
+                out: 0,
+                net: 75_000,
+                due: 400_000 + 2 * 30_000,
+                failed: 0,
+            },
+        ]);
+
+        const member = await calendar.month(
+            { ...ctx, role: "MEMBER" },
+            "2026-10",
+            NOW,
+        );
+        expect(member).not.toHaveProperty("money");
     });
 
     it("a hold shows as held while it lasts and is gone once it has run out", async () => {

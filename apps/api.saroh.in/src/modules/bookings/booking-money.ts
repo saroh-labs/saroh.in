@@ -42,6 +42,44 @@ export function paidADeposit(snapshot: unknown): boolean {
     return typeof deposit?.cents === "number";
 }
 
+/** The price and currency a booking was made at, from its snapshot. */
+export function bookingPrice(snapshot: unknown): {
+    priceCents: number | null;
+    currency: string | null;
+} {
+    const terms = (
+        snapshot as {
+            service?: { priceCents?: unknown; currency?: unknown };
+        } | null
+    )?.service;
+    return {
+        priceCents:
+            typeof terms?.priceCents === "number" ? terms.priceCents : null,
+        currency: typeof terms?.currency === "string" ? terms.currency : null,
+    };
+}
+
+/**
+ * What is still due at the visit (default 50): the price less what was paid
+ * online, while the booking stands and is paid for with money — at the desk,
+ * or online in part. Null for a pack's or a membership's class, and once
+ * cancelled. The calendar's Due (E19) reads the same rule.
+ */
+export function bookingDueCents(
+    booking: { status: string; paidWith: string | null; snapshot: unknown },
+    paidOnlineCents: number,
+): number | null {
+    const { priceCents } = bookingPrice(booking.snapshot);
+    const byMoney =
+        booking.paidWith === "DESK" ||
+        booking.paidWith === "PAID" ||
+        paidOnlineCents > 0;
+    if (booking.status === "CANCELLED" || !byMoney || priceCents === null) {
+        return null;
+    }
+    return Math.max(0, priceCents - paidOnlineCents);
+}
+
 type Db = Pick<Prisma.TransactionClient, "paymentIntent" | "paymentRefund">;
 
 /** The money of one booking — see {@link BookingMoney}. */
@@ -55,15 +93,7 @@ export async function bookingMoney(
         snapshot: unknown;
     },
 ): Promise<BookingMoney> {
-    const terms = (
-        booking.snapshot as {
-            service?: { priceCents?: unknown; currency?: unknown };
-        } | null
-    )?.service;
-    const priceCents =
-        typeof terms?.priceCents === "number" ? terms.priceCents : null;
-    const currency =
-        typeof terms?.currency === "string" ? terms.currency : null;
+    const { priceCents, currency } = bookingPrice(booking.snapshot);
     const [paid, refund] = await Promise.all([
         db.paymentIntent.aggregate({
             where: {
@@ -91,20 +121,12 @@ export async function bookingMoney(
         }),
     ]);
     const paidOnlineCents = paid._sum.amountCents ?? 0;
-    const byMoney =
-        booking.paidWith === "DESK" ||
-        booking.paidWith === "PAID" ||
-        paidOnlineCents > 0;
-    const stands = booking.status !== "CANCELLED" && byMoney;
     return {
         priceCents,
         currency,
         paidOnlineCents,
         deposit: paidOnlineCents > 0 && paidADeposit(booking.snapshot),
-        dueCents:
-            stands && priceCents !== null
-                ? Math.max(0, priceCents - paidOnlineCents)
-                : null,
+        dueCents: bookingDueCents(booking, paidOnlineCents),
         refund: refund
             ? {
                   amountCents: refund.amountCents,
