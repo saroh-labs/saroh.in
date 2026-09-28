@@ -55,6 +55,83 @@ const PRODUCT_ROLES = {
         actions: ["order:read", "booking:read"],
     },
 };
+/**
+ * The role editor within reach (F19): a "Manager" the business handed
+ * `member:role:update` to, without any money. Counter is within their reach;
+ * Senior holds `payment:manage`, so it is above them.
+ */
+const MANAGER_ACTIONS = [
+    "org:read",
+    "member:read",
+    "member:role:update",
+    "store:read",
+    "store:write",
+    "inventory:write",
+    "order:read",
+];
+PRODUCT_ROLES.MANAGER = {
+    role: "MEMBER",
+    roleKey: "manager",
+    roleLabel: "Manager",
+    actions: MANAGER_ACTIONS,
+};
+const invented = (key, label, actions, members = 0) => ({
+    key,
+    label,
+    actions,
+    ringTone: "neutral",
+    system: false,
+    members,
+});
+const ROLES = [
+    {
+        key: "MEMBER",
+        label: "Member",
+        actions: ["org:read", "member:read", "store:read"],
+        ringTone: "saffron",
+        system: true,
+        members: 0,
+    },
+    invented("counter", "Counter", ["order:read", "store:read"]),
+    invented("senior", "Senior", ["order:read", "payment:manage"]),
+    invented(
+        "manager",
+        "Manager",
+        [
+            "member:read",
+            "member:role:update",
+            "store:read",
+            "store:write",
+            "order:read",
+        ],
+        1,
+    ),
+];
+const CATALOGUE = {
+    groups: ["team", "sell", "money"],
+    capabilities: [
+        {
+            action: "member:read",
+            group: "team",
+            label: "See who is in the team",
+        },
+        {
+            action: "member:role:update",
+            group: "team",
+            label: "Change what a role can do",
+            note: "Includes inventing roles. Someone with this can grant only what they hold themselves.",
+        },
+        { action: "store:read", group: "sell", label: "See storefronts" },
+        { action: "store:write", group: "sell", label: "Change storefronts" },
+        { action: "order:read", group: "sell", label: "See orders" },
+        {
+            action: "payment:manage",
+            group: "money",
+            label: "Manage payments",
+            note: "Includes refunds.",
+        },
+    ],
+};
 const STORE = {
     id: "store_1",
     name: "Hill Road",
@@ -340,6 +417,10 @@ createServer((req, res) => {
                 items: [],
             },
         });
+    // Team → Roles (F19).
+    if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);
+    if (path.endsWith("/roles")) return reply(200, ROLES);
+    if (path.endsWith("/members")) return reply(200, []);
     if (path.endsWith("/notifications/unread-count"))
         return reply(200, { count: 0 });
     return reply(404, { error: "Fixture route not found" });

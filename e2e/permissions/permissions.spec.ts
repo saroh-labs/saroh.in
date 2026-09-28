@@ -312,6 +312,59 @@ test("a failed Orders read says so, and is never an empty list", async ({
     );
 });
 
+test("a Manager who edits roles can give only what they hold (F19)", async ({
+    page,
+    context,
+}) => {
+    // Holds `member:role:update` and storefronts, but no money.
+    await scenario(context, "MANAGER");
+    await page.goto("/settings/people?view=roles");
+
+    // Counter is within reach: what the Manager holds can be ticked, and
+    // what they don't is locked with the reason beside it.
+    await expect(
+        page.getByRole("heading", { name: "Counter", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "Change storefronts, not allowed" }),
+    ).toBeEnabled();
+    await expect(
+        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+    ).toBeDisabled();
+    await expect(
+        page.getByText("You don't have this yourself, so you can't give it.", {
+            exact: true,
+        }),
+    ).toHaveCount(1);
+
+    // Their own role follows the same rule: nothing they lack can be added.
+    await page.getByRole("button", { name: /^Manager/ }).click();
+    await expect(
+        page.getByRole("heading", { name: "Manager", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+    ).toBeDisabled();
+
+    // Senior holds payments, so it is above them: read-only, and it says why.
+    await page.getByRole("button", { name: /^Senior/ }).click();
+    await expect(
+        page.getByRole("heading", { name: "Senior", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "This role can do things you can't (Manage payments), so only someone who can do all of them may change it.",
+        ),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "See orders, allowed" }),
+    ).toBeDisabled();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove role" })).toHaveCount(
+        0,
+    );
+});
+
 test("a business with no orders yet is empty, not failed", async ({
     page,
     context,

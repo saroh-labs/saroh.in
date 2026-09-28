@@ -82,6 +82,14 @@ what the API allows.
   routes are `member:read` / `member:invite` / `member:role:update` /
   `member:remove`, plus `POST /organization-invitations/:token/accept`, which
   runs on the session alone because the caller is not a member yet.
+- **Current** (F19) — **Granting is bounded by reach.** Nobody gives a role a
+  permission they don't hold, or changes, renames or removes a role that can
+  already do more than they can — their own role included. Members (who can
+  be put in which role) and roles (what a role may be given) both ask
+  `withinReach` / `outOfReach` in `organization-policy.ts`, on the target's
+  resolved set (implied holds count); the refusal is a 403 naming the
+  permissions in the owner's words. Any new write of a permission list
+  (F17's extras) asks the same helper.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
