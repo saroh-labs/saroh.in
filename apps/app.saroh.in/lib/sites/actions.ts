@@ -6,6 +6,7 @@ import { listVisitPlaces } from "@/lib/stores/storefronts";
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
 import type {
+    CreatePageInput,
     CreateSiteInput,
     PreviewLinkDays,
     ReviewerVerdict,
@@ -14,6 +15,7 @@ import type {
     SiteNavigation,
     SiteSettingsInput,
     SiteStyle,
+    UpdatePageInput,
 } from "./service";
 import {
     createApproval as createApprovalApi,
@@ -114,17 +116,14 @@ export async function updateSiteFooter(
     return updateSiteFooterApi(siteId, footer);
 }
 
-export async function createPage(
-    siteId: string,
-    input: { title: string; path: string },
-) {
+export async function createPage(siteId: string, input: CreatePageInput) {
     return createPageApi(siteId, input);
 }
 
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string; hidden?: boolean },
+    input: UpdatePageInput,
 ) {
     return updatePageApi(siteId, pageId, input);
 }

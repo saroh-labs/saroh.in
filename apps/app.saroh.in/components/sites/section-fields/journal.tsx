@@ -1,23 +1,28 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
-import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type { JournalContent } from "@/lib/sites/service";
 
+import {
+    DisplayOptions,
+    hiddenFlag,
+    unlessDefault,
+    wordsOrAbsent,
+} from "./display-options";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 /**
- * The `journal` section's editor fields (G10).
+ * The `journal` section's editor fields (G10; display options G16).
  *
- * Only how the posts show is chosen here: the title, three or six, and
- * whether photos and excerpts show. Which posts is not a choice — the newest
- * the site has published, read live — and the inspector's note above says
- * where they are written (Website › Posts). With none yet, the canvas says so.
+ * Only how the posts show is chosen here: the title, three or six, then Show
+ * as, whether photos and excerpts show and the words at the foot of each
+ * post. Which posts is not a choice — the newest the site has published,
+ * read live — and the inspector's note above says where they are written
+ * (Website › Posts). With none yet, the canvas says so.
  */
 export function JournalFields({
     section,
@@ -26,7 +31,6 @@ export function JournalFields({
     const c = section.content;
     const patch = (next: Partial<JournalContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
-    const id = section.key ?? "journal";
 
     return (
         <div className="grid gap-3">
@@ -61,26 +65,25 @@ export function JournalFields({
                 </ToggleGroup>
             </Field>
 
-            <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={`${id}-images`}>Photos</Label>
-                <Switch
-                    id={`${id}-images`}
-                    checked={c.showImages !== false}
-                    onCheckedChange={(on) =>
-                        patch({ showImages: on ? undefined : false })
-                    }
-                />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={`${id}-excerpts`}>Excerpts</Label>
-                <Switch
-                    id={`${id}-excerpts`}
-                    checked={c.showExcerpts !== false}
-                    onCheckedChange={(on) =>
-                        patch({ showExcerpts: on ? undefined : false })
-                    }
-                />
-            </div>
+            <DisplayOptions
+                layout={c.layout ?? "cards"}
+                onLayout={(v) => patch({ layout: unlessDefault(v, "cards") })}
+                photos={{
+                    value: c.showImages !== false,
+                    onChange: (on) => patch({ showImages: hiddenFlag(on) }),
+                }}
+                descriptions={{
+                    value: c.showExcerpts !== false,
+                    onChange: (on) => patch({ showExcerpts: hiddenFlag(on) }),
+                    note: "The first lines of each post.",
+                }}
+                button={{
+                    value: c.buttonLabel ?? "",
+                    onChange: (v) => patch({ buttonLabel: wordsOrAbsent(v) }),
+                    placeholder: "Read",
+                    note: "Words at the foot of each post, like “Read”. Leave empty for none: the whole post card opens it.",
+                }}
+            />
         </div>
     );
 }

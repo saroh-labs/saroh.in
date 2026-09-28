@@ -76,6 +76,17 @@ components/shared/             app shell, navigation, command menu
   drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
   `inspector-host`). A new editor panel or piece of editor state goes there,
   not back into `site-editor.tsx`.
+- **Current** — **The editor's page menu offers what the API lists** (round-2
+  G16): `components/sites/pages-panel.tsx` (the list), `page-settings.tsx`
+  (the open page's title, address, In the menu, On the site, Delete) and
+  `add-page-panel.tsx` (the kinds in `getSite`'s `addablePageKinds`, then
+  Blank page), with their words in `lib/sites/page-menu.ts`. It never
+  decides which kinds can be added or which addresses are free; it shows
+  the API's refusal and offers its `details.suggestion`. A list section's
+  display options (Show as, Photos, Descriptions, Prices, Highlight,
+  Button) go through `section-fields/display-options.tsx` and
+  `components/sites/choice-field.tsx`, and each option's default is stored
+  as absent, so an untouched section publishes as before.
 
 ## The other apps
 
