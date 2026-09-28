@@ -9,14 +9,62 @@ import type {
     Consent,
     Delivery,
     Message,
+    Prisma,
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { isReservedContactEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
+import type { MessageSendPayload } from "./message-send.handler";
 import { MESSAGE_SEND_TYPE } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
+import type { InvoiceMailVars, TransactionalTemplate } from "./transactional";
+import { renderTransactional } from "./transactional";
+
+type Db = Prisma.TransactionClient;
+
+/**
+ * Who a transactional message may go to — only ever one of two addresses
+ * (D17): the bill-to email the invoice kept when it was issued, or the
+ * email a customer verified when they made their site account. Never an
+ * address the caller typed, so the path cannot be turned into a way to
+ * email anyone.
+ */
+export type TransactionalRecipient =
+    | { kind: "INVOICE_BILL_TO"; invoiceId: string }
+    | { kind: "SITE_ACCOUNT"; contactId: string };
+
+/** Input for {@link CommunicationsService.queueTransactional}. */
+export interface TransactionalInput {
+    template: TransactionalTemplate;
+    vars: InvoiceMailVars;
+    recipient: TransactionalRecipient;
+    /**
+     * Makes the secret link the body points at (a fresh pay link). Called
+     * only when the message will really go, so a suppressed send never
+     * retires the link the business already shared.
+     */
+    secretLink?: () => Promise<string>;
+    /** The invoice it is about, recorded on the Message. */
+    invoiceId?: string;
+    /** The staff member who sent it; null when Saroh did. */
+    createdByUserId: string | null;
+}
+
+/** A queued (or suppressed) transactional message. */
+export interface TransactionalResult {
+    id: string;
+    status: "QUEUED" | "SUPPRESSED";
+    toAddress: string;
+}
+
+/** Where an email for this recipient would go, with the contact it is for. */
+export interface TransactionalAddress {
+    address: string;
+    contactId: string | null;
+}
 
 /** Validated input for {@link CommunicationsService.connectProvider}. */
 export interface ConnectCommsInput {
@@ -483,6 +531,174 @@ export class CommunicationsService {
             status: message.status,
             channel: message.channel,
         };
+    }
+
+    // ---- Transactional (D17; A14 reuses it) -------------------------------
+
+    /**
+     * Whether the business can send email at all: its own provider,
+     * connected. Saroh's own email is never used for a business's customers
+     * (DEC-011, default 38).
+     */
+    async emailConnected(db: Db, organizationId: string): Promise<boolean> {
+        const row = await db.communicationProvider.findUnique({
+            where: {
+                organizationId_channel: { organizationId, channel: "EMAIL" },
+            },
+            select: { status: true },
+        });
+        return row?.status === "CONNECTED";
+    }
+
+    /**
+     * The one address a transactional email for `recipient` may go to, or
+     * null when there is none. An invoice's bill-to email comes first (a
+     * draft's is the contact's, which issuing copies); a reserved
+     * placeholder (DEC-049) is no email, and then the contact's verified
+     * site-account email is used, if they have an active account.
+     */
+    async transactionalAddress(
+        db: Db,
+        organizationId: string,
+        recipient: TransactionalRecipient,
+    ): Promise<TransactionalAddress | null> {
+        let contactId: string | null;
+        let candidate: string | null = null;
+        if (recipient.kind === "INVOICE_BILL_TO") {
+            const invoice = await db.invoice.findFirst({
+                where: { id: recipient.invoiceId, organizationId },
+                select: {
+                    status: true,
+                    billToEmail: true,
+                    contactId: true,
+                    contact: { select: { email: true } },
+                },
+            });
+            if (!invoice) return null;
+            contactId = invoice.contactId;
+            candidate =
+                invoice.status === "DRAFT"
+                    ? (invoice.contact?.email ?? null)
+                    : invoice.billToEmail;
+        } else {
+            contactId = recipient.contactId;
+        }
+        if (candidate?.trim() && !isReservedContactEmail(candidate)) {
+            return { address: candidate.trim(), contactId };
+        }
+        if (!contactId) return null;
+        const account = await db.customerAccount.findFirst({
+            where: { organizationId, contactId, status: "ACTIVE" },
+            orderBy: { linkedAt: "desc" },
+            select: { email: true },
+        });
+        return account ? { address: account.email, contactId } : null;
+    }
+
+    /**
+     * THE transactional send path (D17). The caller has authorized and
+     * holds the transaction, so the message commits or rolls back with what
+     * it is about (an invoice's new pay link, say).
+     *
+     * - The address comes only from {@link transactionalAddress}: none → 409.
+     * - The business's own EMAIL provider must be connected: otherwise 409.
+     * - A REVOKED email consent still suppresses it: a SUPPRESSED Message is
+     *   written for the record, with no delivery and no job, and the secret
+     *   link is never made. No marketing opt-in is asked (default 10).
+     * - Otherwise Message + Delivery + `message.send` Job, as any send. A
+     *   secret link is sealed into the job's payload (AES-256-GCM, the
+     *   credentials' key) and put into the email only when the job hands it
+     *   to the provider; the stored body keeps the slot.
+     */
+    async queueTransactional(
+        tx: Db,
+        organizationId: string,
+        input: TransactionalInput,
+    ): Promise<TransactionalResult> {
+        const to = await this.transactionalAddress(
+            tx,
+            organizationId,
+            input.recipient,
+        );
+        if (!to) {
+            throw new ConflictException(
+                "There's no email address to send this to.",
+            );
+        }
+        const provider = await tx.communicationProvider.findUnique({
+            where: {
+                organizationId_channel: { organizationId, channel: "EMAIL" },
+            },
+        });
+        if (provider?.status !== "CONNECTED") {
+            throw new ConflictException(
+                "Connect an email provider in Settings to send this.",
+            );
+        }
+
+        const { subject, body } = renderTransactional(
+            input.template,
+            input.vars,
+        );
+        const base = {
+            organizationId,
+            channel: "EMAIL",
+            contactId: to.contactId,
+            toAddress: to.address,
+            subject,
+            body,
+            createdByUserId: input.createdByUserId,
+            invoiceId: input.invoiceId ?? null,
+            template: input.template,
+        };
+
+        const consent = to.contactId
+            ? await tx.consent.findUnique({
+                  where: {
+                      contactId_channel: {
+                          contactId: to.contactId,
+                          channel: "EMAIL",
+                      },
+                  },
+                  select: { status: true },
+              })
+            : null;
+        if (consent?.status === "REVOKED") {
+            const suppressed = await tx.message.create({
+                data: { ...base, status: "SUPPRESSED" },
+            });
+            return {
+                id: suppressed.id,
+                status: "SUPPRESSED",
+                toAddress: to.address,
+            };
+        }
+
+        const link = input.secretLink ? await input.secretLink() : null;
+        const message = await tx.message.create({
+            data: { ...base, status: "QUEUED" },
+        });
+        const delivery = await tx.delivery.create({
+            data: {
+                organizationId,
+                messageId: message.id,
+                provider: provider.provider,
+                status: "QUEUED",
+            },
+        });
+        const payload: MessageSendPayload = {
+            messageId: message.id,
+            deliveryId: delivery.id,
+            ...(link ? { link: encryptSecret(link) } : {}),
+        };
+        await tx.job.create({
+            data: {
+                organizationId,
+                type: MESSAGE_SEND_TYPE,
+                payload: payload as unknown as Prisma.InputJsonObject,
+            },
+        });
+        return { id: message.id, status: "QUEUED", toAddress: to.address };
     }
 
     // ---- Reads (auditable lifecycle) --------------------------------------

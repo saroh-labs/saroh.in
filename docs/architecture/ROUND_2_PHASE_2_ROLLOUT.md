@@ -101,3 +101,50 @@ to UPI and card (`packages/site-blocks/src/booking-flow/checkout.ts`). The
 booking page promises "UPI or card". Limiting Cashfree the same way would
 mean setting `order_meta.payment_methods` (for example `"upi,cc,dc"`) on the
 order; it is left for a decision.
+
+---
+
+## D17: sending an invoice (wave 2)
+
+"Send with pay link" and "Send reminder" on Invoice Detail, through the
+business's own connected email provider (`invoices/invoice-send.service.ts`,
+the transactional path in `communications/communications.service.ts`).
+
+- **Migration** `20261013160000_invoice_messages`: two nullable columns on
+  `Message` (`invoiceId`, `template`), an index and a foreign key. Additive;
+  the old API never reads them.
+- **API before app.** The workspace shows Send only when the invoice read
+  carries a `send` flag with a channel, so the new app on the old API shows
+  "Copy pay link" as before, and the old app ignores the new fields.
+- **The account thread stays off.** The thread channel needs A14's poster
+  (not yet built) **and** the `ACCOUNT_THREAD` flag. Leave the flag without
+  a row until A13 and A14 are live in production (waves plan, boundary 6);
+  never configured, it is off.
+- Nothing changes for a business without a connected email provider: no
+  Send, and the Payment panel points at Settings › Providers.
+
+### Verify
+
+1. On a test business with an email provider and a payment provider, open an
+   unpaid invoice: "Send with pay link" is offered; send it. The email
+   arrives with a pay link that opens the pay page; "What happened" says
+   "Sent to …".
+2. "Send reminder" is then offered but off, and the Payment panel says when
+   the next can go.
+3. Without an email provider: no Send, only "Copy pay link".
+
+### Rollback
+
+A queued send whose job has not run yet carries its pay link sealed in the
+job, and its stored body holds a slot the old API's worker doesn't fill.
+Before deploying the previous API, check no such job is waiting, or it goes
+out with the slot instead of the link:
+
+```sql
+SELECT count(*) FROM "Job"
+WHERE type = 'message.send' AND status IN ('PENDING', 'PROCESSING')
+  AND payload ? 'link';
+```
+
+Wait for 0 (the worker sends them within seconds). The two columns stay;
+the old API ignores them.

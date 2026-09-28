@@ -27,6 +27,7 @@ import {
     FakeCommsProvider,
     FakeCommsProviderFactory,
 } from "./providers/fake.provider";
+import { SECRET_LINK_SLOT } from "./transactional";
 
 const deliveryFindUnique = prisma.delivery.findUnique as jest.Mock;
 const deliveryUpdate = prisma.delivery.update as jest.Mock;
@@ -197,6 +198,59 @@ describe("MessageSendHandler", () => {
         await expect(handler.handle(job())).resolves.toBeUndefined();
         expect(fake.calls).toHaveLength(0);
         expect(deliveryUpdate).not.toHaveBeenCalled();
+    });
+
+    it("puts a sealed secret link into the email only as it goes to the provider (D17)", async () => {
+        const link = "https://saroh.app/pay/tok_SECRET";
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue({
+            ...message,
+            body: `<a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a>`,
+        });
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await handler.handle({
+            ...job(),
+            payload: {
+                messageId: "msg_1",
+                deliveryId: "del_1",
+                link: encryptSecret(link),
+            },
+        } as unknown as Job);
+
+        expect(fake.calls[0]?.body).toBe(`<a href="${link}">${link}</a>`);
+        // Nothing written back carries it.
+        expect(JSON.stringify(messageUpdate.mock.calls)).not.toContain(
+            "tok_SECRET",
+        );
+        expect(JSON.stringify(deliveryUpdate.mock.calls)).not.toContain(
+            "tok_SECRET",
+        );
+    });
+
+    it("never sends a body still waiting for its link: FAILED, no send", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue({
+            ...message,
+            body: `Pay here: ${SECRET_LINK_SLOT}`,
+        });
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await handler.handle(job());
+
+        expect(fake.calls).toHaveLength(0);
+        expect(deliveryUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "FAILED",
+            error: "secret link missing",
+        });
     });
 
     it("registers under the message.send job type", () => {

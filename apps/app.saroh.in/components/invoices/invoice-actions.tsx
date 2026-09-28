@@ -59,16 +59,21 @@ export interface InvoiceRef {
 
 /**
  * Issue a draft: it takes the next number in the series and its lines lock.
- * Saroh doesn't send it, and the dialog says so.
+ * Issuing never sends it, and the dialog says so: where the business can
+ * send (D17), "Send with pay link" does both; where it can't, Saroh doesn't
+ * send it at all.
  */
 export function IssueDialog({
     open,
     onOpenChange,
     invoice,
+    canSend = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
+    /** The business can send it (D17), so the copy names Send. */
+    canSend?: boolean;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
@@ -92,9 +97,10 @@ export function IssueDialog({
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         It takes the next number and its lines lock — a mistake
-                        after this is corrected with a credit note. Saroh
-                        doesn&apos;t send it: copy its pay link or print it and
-                        hand it over.
+                        after this is corrected with a credit note.{" "}
+                        {canSend
+                            ? "Issuing doesn't send it: Send with pay link issues and sends in one step."
+                            : "Saroh doesn't send it: copy its pay link or print it and hand it over."}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
