@@ -16,7 +16,7 @@ import { BookingsService } from "./bookings.service";
 import type { SignedInCustomer } from "./public-bookings.service";
 import { PublicBookingsService } from "./public-bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
-import { mergeWaitlistInTx } from "./waitlist-merge";
+import { mergeWaitlistInTx, removeWaitlistInTx } from "./waitlist-merge";
 import { expireLapsedOffers } from "./waitlist-offer";
 import { WaitlistOfferHandler } from "./waitlist-offer.handler";
 import { OFFER_HOLD_MS, WAITLIST_WORDS } from "./waitlist-rules";
@@ -539,5 +539,33 @@ describe("the class waitlist (A12)", () => {
         expect(live).toHaveLength(1);
         expect(live[0].position).toBe(1);
         void booked;
+    });
+    it("a privacy removal deletes their places and passes a held one on", async () => {
+        const at = nextMonday(7, 27);
+        const { serviceId, booked } = await fullClass(2, at);
+        const b = await customer();
+        const c = await customer();
+        await waitlist.join(b, serviceId, at.toISOString());
+        await waitlist.join(c, serviceId, at.toISOString());
+        await bookings.cancelBooking(owner, booked[0].booking.id);
+        await runOffer(serviceId, at);
+        const before = (await offerJobs(serviceId)).length;
+
+        const gone = await prisma.$transaction((tx) =>
+            removeWaitlistInTx(tx, {
+                organizationId: owner.organizationId,
+                contactId: b.contactId,
+                now: new Date(),
+            }),
+        );
+        expect(gone).toBe(1);
+        expect(
+            await prisma.classWaitlistEntry.count({
+                where: { contactId: b.contactId },
+            }),
+        ).toBe(0);
+        expect((await offerJobs(serviceId)).length).toBe(before + 1);
+        expect(await runOffer(serviceId, at)).toBe(1);
+        expect((await entryOf(c, serviceId, at)).status).toBe("OFFERED");
     });
 });

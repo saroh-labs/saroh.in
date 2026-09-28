@@ -16,8 +16,8 @@ import { contactRelations } from "./merge-plan";
  * relation to `Contact` has no rule in {@link REMOVAL_RULES}, as it does for
  * a merge. `personal-data.ts` covers the personal fields that don't hang off
  * `Contact` (store customers, order delivery, message and review addresses).
- * `ClassWaitlistEntry` (A12) adds its row when it lands: deleted, and an
- * OFFERED place passes to the next person.
+ * `ClassWaitlistEntry` (A12) has its row: deleted, and a place held for
+ * them passes to the next person (`bookings/waitlist-merge.ts`).
  */
 
 export type RemovalRuleKind =
@@ -118,6 +118,10 @@ export const REMOVAL_RULES: Readonly<Record<string, RemovalRule>> = {
     "CustomerThread.contactId": {
         kind: "delete-thread",
         note: "Their message thread goes, with every message in it (A13).",
+    },
+    "ClassWaitlistEntry.contactId": {
+        kind: "deleted",
+        note: "Their places in line go; a place held for them passes to the next person (A12).",
     },
     "PaymentMandate.contactId": {
         kind: "cancel-mandates",

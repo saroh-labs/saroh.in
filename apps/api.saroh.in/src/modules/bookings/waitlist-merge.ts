@@ -16,7 +16,8 @@ import { offerFreedPlaceInTx } from "./waitlist-queue";
  *   merged-away person's place in its line is CLOSED, and a place held for
  *   them goes to the next in line.
  *
- * Returns how many places moved.
+ * Returns how many places moved. {@link removeWaitlistInTx} is a privacy
+ * removal's rule (C11): their places go, and a held one passes on.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -113,5 +114,33 @@ export async function mergeWaitlistInTx(
         where: { organizationId, contactId: from },
         data: { contactId: to },
     });
+    return count;
+}
+
+/**
+ * A privacy removal (C11's rule for `ClassWaitlistEntry`, A12): every place
+ * in line the person holds is deleted, and a place held for them is offered
+ * to the next in line (`waitlist.offer`). Returns how many went.
+ */
+export async function removeWaitlistInTx(
+    tx: Tx,
+    input: { organizationId: string; contactId: string; now: Date },
+): Promise<number> {
+    const { organizationId, contactId, now } = input;
+    const heldPlaces = await tx.classWaitlistEntry.findMany({
+        where: {
+            organizationId,
+            contactId,
+            status: "OFFERED",
+            offeredUntil: { gt: now },
+        },
+        select: { serviceId: true, startAt: true },
+    });
+    const { count } = await tx.classWaitlistEntry.deleteMany({
+        where: { organizationId, contactId },
+    });
+    for (const held of heldPlaces) {
+        await offerFreedPlaceInTx(tx, { organizationId, ...held });
+    }
     return count;
 }
