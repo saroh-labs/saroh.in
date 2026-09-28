@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     title: "How it works — Saroh",
     description:
         "Make an account, name the business, switch on the job you do. Your sidebar is built from what is on, and your role can differ in every business.",
+    alternates: { canonical: "/how-it-works" },
 };
 
 export default function HowItWorks() {

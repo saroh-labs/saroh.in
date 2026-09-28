@@ -8,6 +8,7 @@ export const metadata: Metadata = {
     title: "Coming soon — Saroh",
     description:
         "What Saroh is building next — online payments, reminders, one catalogue for every storefront and more — and how to manage until each arrives.",
+    alternates: { canonical: "/coming-soon" },
 };
 
 export default function ComingSoon() {

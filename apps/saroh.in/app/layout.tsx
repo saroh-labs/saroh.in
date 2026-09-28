@@ -44,7 +44,9 @@ const DESCRIPTION =
     "Saroh runs the selling, bookings, website and contacts for one business in one place. Switch on what you do; the rest never appears.";
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://saroh.in"),
+    // The site is served at www (saroh.in redirects there), so every
+    // canonical and share link names www: one host for search engines.
+    metadataBase: new URL("https://www.saroh.in"),
     title: "Saroh — one business, not four logins",
     description: DESCRIPTION,
     openGraph: {
