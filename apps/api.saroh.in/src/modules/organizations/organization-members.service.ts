@@ -64,6 +64,19 @@ export interface MemberView {
      * not the whole team's to watch.
      */
     lastActiveAt: Date | null;
+    /**
+     * The storefronts this person works on, and their role at each (Admin,
+     * Manager, Editor or Viewer; DEC-048). A narrower grant on top of their
+     * business role: Team shows it under their name. Closed storefronts are
+     * left out.
+     */
+    storefronts: StorefrontRoleView[];
+}
+
+export interface StorefrontRoleView {
+    storeId: string;
+    name: string;
+    role: string;
 }
 
 export interface InvitationView {
@@ -110,35 +123,53 @@ export class OrganizationMembersService {
         authorize(ctx, "member:read");
         const seesActivity = allows(ctx, "member:remove");
 
-        const [memberships, grants, sessions] = await Promise.all([
-            prisma.membership.findMany({
-                where: { organizationId: ctx.organizationId },
-                select: {
-                    userId: true,
-                    role: true,
-                    user: { select: { name: true, email: true } },
-                },
-            }),
-            prisma.siteReviewer.findMany({
-                where: { organizationId: ctx.organizationId },
-                select: { userId: true, siteId: true },
-            }),
-            // One grouped read for the whole roster, not one per person —
-            // and none for a viewer who is not shown it.
-            seesActivity
-                ? prisma.session.groupBy({
-                      by: ["userId"],
-                      where: {
-                          user: {
-                              memberships: {
-                                  some: { organizationId: ctx.organizationId },
+        const [memberships, grants, storefrontRoles, sessions] =
+            await Promise.all([
+                prisma.membership.findMany({
+                    where: { organizationId: ctx.organizationId },
+                    select: {
+                        userId: true,
+                        role: true,
+                        user: { select: { name: true, email: true } },
+                    },
+                }),
+                prisma.siteReviewer.findMany({
+                    where: { organizationId: ctx.organizationId },
+                    select: { userId: true, siteId: true },
+                }),
+                // One read for the roster's storefront roles (DEC-048).
+                prisma.storeMembers.findMany({
+                    where: {
+                        store: {
+                            organizationId: ctx.organizationId,
+                            deletedAt: null,
+                        },
+                    },
+                    orderBy: { createdAt: "asc" },
+                    select: {
+                        userId: true,
+                        role: true,
+                        store: { select: { id: true, name: true } },
+                    },
+                }),
+                // One grouped read for the whole roster, not one per person —
+                // and none for a viewer who is not shown it.
+                seesActivity
+                    ? prisma.session.groupBy({
+                          by: ["userId"],
+                          where: {
+                              user: {
+                                  memberships: {
+                                      some: {
+                                          organizationId: ctx.organizationId,
+                                      },
+                                  },
                               },
                           },
-                      },
-                      _max: { updatedAt: true },
-                  })
-                : Promise.resolve([]),
-        ]);
+                          _max: { updatedAt: true },
+                      })
+                    : Promise.resolve([]),
+            ]);
 
         const lastActive = new Map(
             sessions.map((s) => [s.userId, s._max.updatedAt]),
@@ -151,6 +182,13 @@ export class OrganizationMembersService {
                 grant.siteId,
             ]);
         }
+        const storefrontsOf = new Map<string, StorefrontRoleView[]>();
+        for (const s of storefrontRoles) {
+            storefrontsOf.set(s.userId, [
+                ...(storefrontsOf.get(s.userId) ?? []),
+                { storeId: s.store.id, name: s.store.name, role: s.role },
+            ]);
+        }
 
         return memberships.map((m) => ({
             userId: m.userId,
@@ -161,6 +199,7 @@ export class OrganizationMembersService {
             siteIds: byUser.get(m.userId) ?? [],
             isSelf: m.userId === ctx.userId,
             lastActiveAt: lastActive.get(m.userId) ?? null,
+            storefronts: storefrontsOf.get(m.userId) ?? [],
         }));
     }
 
@@ -581,6 +620,11 @@ export class OrganizationMembersService {
      *
      * Their notes and approvals stay. Those are a record of what was said
      * about the site, and deleting them would rewrite the review history.
+     *
+     * Their storefront roles go too (DEC-048): one roster underneath, so
+     * someone off the team is off every storefront of this business. Deleted
+     * in the same serializable transaction as the last-owner check, so a
+     * refused removal leaves every storefront role where it was.
      */
     async remove(ctx: OrganizationContext, userId: string) {
         authorize(ctx, "member:remove");
@@ -593,8 +637,18 @@ export class OrganizationMembersService {
             await this.assertNotLastOwner(ctx.organizationId, userId, "remove");
         }
 
-        const revokedLinks = await prisma.$transaction(
+        const { revokedLinks, storefrontRoles } = await prisma.$transaction(
             async (tx) => {
+                if (membership.role === "OWNER") {
+                    // Again inside the transaction: two owners removing each
+                    // other at once must not both pass.
+                    await this.assertNotLastOwner(
+                        ctx.organizationId,
+                        userId,
+                        "remove",
+                        tx,
+                    );
+                }
                 await tx.membership.delete({
                     where: {
                         organizationId_userId: {
@@ -614,7 +668,18 @@ export class OrganizationMembersService {
                     },
                     data: { revokedAt: new Date() },
                 });
-                return count;
+                // Closed storefronts included: a storefront reopened later
+                // must not bring a removed person back with it.
+                const storefronts = await tx.storeMembers.deleteMany({
+                    where: {
+                        userId,
+                        store: { organizationId: ctx.organizationId },
+                    },
+                });
+                return {
+                    revokedLinks: count,
+                    storefrontRoles: storefronts.count,
+                };
             },
             { isolationLevel: "Serializable" },
         );
@@ -627,10 +692,10 @@ export class OrganizationMembersService {
             targetType: "membership",
             targetId: userId,
             outcome: AuditOutcome.Success,
-            metadata: { role: membership.role, revokedLinks },
+            metadata: { role: membership.role, revokedLinks, storefrontRoles },
         });
 
-        return { removed: true, revokedLinks };
+        return { removed: true, revokedLinks, storefrontRoles };
     }
 
     // -----------------------------------------------------------------------
@@ -664,8 +729,9 @@ export class OrganizationMembersService {
         organizationId: string,
         userId: string,
         what: "demote" | "remove",
+        db: Pick<typeof prisma, "membership"> = prisma,
     ) {
-        const otherOwners = await prisma.membership.count({
+        const otherOwners = await db.membership.count({
             where: { organizationId, role: "OWNER", userId: { not: userId } },
         });
         if (otherOwners === 0) {

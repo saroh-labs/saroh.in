@@ -15,6 +15,11 @@ export const AuditAction = {
     MembershipAccept: "membership.accept",
     MembershipRemove: "membership.remove",
     MembershipRoleUpdate: "membership.role.update",
+    // Someone on a storefront put on the business's team as Storefront team
+    // (F16, DEC-048), by accepting a storefront invite or by the backfill.
+    // Written in the join's own transaction by `joinTeamFromStorefront`
+    // (`@saroh/database`); metadata names the storefront and the source.
+    MembershipStorefrontJoin: "membership.storefront-join",
     TeamCreate: "team.create",
     TeamUpdate: "team.update",
     TeamDelete: "team.delete",
