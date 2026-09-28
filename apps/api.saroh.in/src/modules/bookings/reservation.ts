@@ -63,6 +63,12 @@ export interface ReserveWith {
     subscriptionId?: string | null;
     /** A pay-now hold (U19): PENDING, holding its place until then. */
     holdUntil?: Date | null;
+    /**
+     * A later visit of a treatment (E9, DEC-050): the order that sold it
+     * and which visit this is. Written with the booking, so the one-live-
+     * visit unique refuses a second booking of the same visit at once.
+     */
+    visit?: { orderId: string; visitNumber: number };
 }
 
 /** Who a reservation is made by. */
@@ -453,6 +459,12 @@ export async function reserveInTx(
                       staffId: person.staffId,
                       paidWith: person.paidWith ?? null,
                       subscriptionId: person.subscriptionId ?? null,
+                  }
+                : {}),
+            ...(person?.visit
+                ? {
+                      orderId: person.visit.orderId,
+                      visitNumber: person.visit.visitNumber,
                   }
                 : {}),
         },

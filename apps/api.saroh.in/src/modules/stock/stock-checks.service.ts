@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { RESERVING_STATUSES } from "../orders/order-inventory";
+import { PRODUCT_LINES } from "../orders/order-line";
 import type { ResolveCheckDto, StockChecksQueryDto } from "./dto";
 import type { StockReader } from "./stock-access";
 import { stockReader, stockWriter } from "./stock-access";
@@ -395,10 +396,12 @@ export class StockChecksService {
      */
     private async saleChecks(reader: StockReader): Promise<Found[]> {
         const { organizationId } = reader;
-        const lines = await prisma.orderItem.findMany({
+        const found = await prisma.orderItem.findMany({
             where: {
                 stockLevelId: null,
                 OR: [{ stockRow: "NONE" }, { stockRow: null }],
+                // A service line (E9) never takes stock: no sale is missed.
+                ...PRODUCT_LINES,
                 order: {
                     organizationId,
                     status: { in: [...FULFILLED_STATUSES] },
@@ -425,6 +428,9 @@ export class StockChecksService {
                 },
             },
         });
+        const lines = found.flatMap(({ product, productId, ...line }) =>
+            product && productId ? [{ ...line, product, productId }] : [],
+        );
         if (lines.length === 0) return [];
         const shelves = await prisma.stockLevel.findMany({
             where: {

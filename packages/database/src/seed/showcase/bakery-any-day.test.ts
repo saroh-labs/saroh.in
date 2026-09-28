@@ -87,7 +87,7 @@ function reviewable(now: Date): { bought: Bought[]; a: PlanInput } {
             {
                 itemId: str(i.id),
                 orderId: i.orderId,
-                productId: i.productId,
+                productId: str(i.productId),
                 variantId: i.variantId ?? null,
                 storeId: o.storeId,
                 customerId: str(c.id),

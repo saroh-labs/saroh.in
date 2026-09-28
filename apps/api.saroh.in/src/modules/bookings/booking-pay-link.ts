@@ -83,6 +83,7 @@ export async function bookingPayLinkInTx(
             status: true,
             paidWith: true,
             courseEnrollmentId: true,
+            orderId: true,
             startAt: true,
             timezone: true,
             contactId: true,
@@ -109,6 +110,13 @@ export async function bookingPayLinkInTx(
     if (booking.status === "PENDING") {
         throw new ConflictException(
             "This booking is waiting on the customer's own online payment.",
+        );
+    }
+    // A treatment's visit is paid for on its order (E9, DEC-050): a visit
+    // is never invoiced on its own.
+    if (booking.orderId) {
+        throw new ConflictException(
+            "This visit is part of a treatment, so it's paid for on its order.",
         );
     }
     // A course's session is paid for with the course, on its enrolment's

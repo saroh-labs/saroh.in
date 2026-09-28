@@ -1,4 +1,6 @@
 import { toMoneyString } from "../../common/money";
+import type { OrderLineKind } from "./order-line";
+import { lineKind, lineName } from "./order-line";
 
 /**
  * Decimal → string serializers for orders. An Order carries five Decimal money
@@ -13,7 +15,14 @@ interface DecimalLike {
 
 export interface OrderItemDto {
     id: string;
-    productId: string;
+    /** Null on a service line (E9): it bills `serviceId` instead. */
+    productId: string | null;
+    /** The service a treatment's line bills (E9, DEC-050); null otherwise. */
+    serviceId: string | null;
+    /** What the line bills, so screens don't branch on which id is set. */
+    kind: OrderLineKind;
+    /** The product's or the service's name. */
+    name: string | null;
     /** The variant bought, when the line names one. */
     variantId: string | null;
     variant: { title: string } | null;
@@ -78,7 +87,9 @@ interface RawSummary {
 
 interface RawItem {
     id: string;
-    productId: string;
+    productId: string | null;
+    serviceId?: string | null;
+    service?: { name: string } | null;
     variantId?: string | null;
     variant?: { title: string } | null;
     quantity: number;
@@ -136,6 +147,9 @@ export function serializeOrderDetail(order: RawDetail): OrderDetailDto {
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,
+            serviceId: i.serviceId ?? null,
+            kind: lineKind(i),
+            name: lineName(i),
             variantId: i.variantId ?? null,
             variant: i.variant ?? null,
             quantity: i.quantity,

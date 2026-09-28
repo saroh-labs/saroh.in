@@ -27,24 +27,44 @@ export interface PricedLine {
 
 /**
  * The lines with the GST rate each product's price includes (ADR-008), for
- * the informational `Order.tax` of a GST-registered business.
+ * the informational `Order.tax` of a GST-registered business. A service
+ * line (E9, DEC-050) takes its service's rate.
  */
 export async function withGstRates(
     lines: readonly {
-        productId: string;
+        productId: string | null;
+        serviceId?: string | null;
         quantity: number;
         priceCents: number;
     }[],
 ): Promise<{ quantity: number; unitCents: number; rateBps: number | null }[]> {
-    const products = await prisma.product.findMany({
-        where: { id: { in: [...new Set(lines.map((l) => l.productId))] } },
-        select: { id: true, gstRate: true },
-    });
-    const rate = new Map(products.map((p) => [p.id, rateToBps(p.gstRate)]));
+    const productIds = [
+        ...new Set(lines.flatMap((l) => (l.productId ? [l.productId] : []))),
+    ];
+    const serviceIds = [
+        ...new Set(lines.flatMap((l) => (l.serviceId ? [l.serviceId] : []))),
+    ];
+    const [products, services] = await Promise.all([
+        productIds.length > 0
+            ? prisma.product.findMany({
+                  where: { id: { in: productIds } },
+                  select: { id: true, gstRate: true },
+              })
+            : [],
+        serviceIds.length > 0
+            ? prisma.service.findMany({
+                  where: { id: { in: serviceIds } },
+                  select: { id: true, gstRate: true },
+              })
+            : [],
+    ]);
+    const rate = new Map(
+        [...products, ...services].map((p) => [p.id, rateToBps(p.gstRate)]),
+    );
     return lines.map((l) => ({
         quantity: l.quantity,
         unitCents: l.priceCents,
-        rateBps: rate.get(l.productId) ?? null,
+        rateBps: rate.get(l.productId ?? l.serviceId ?? "") ?? null,
     }));
 }
 

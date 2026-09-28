@@ -17,6 +17,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { PRODUCT_LINES } from "../orders/order-line";
 import type { IneligibleReason } from "./eligibility";
 import { INELIGIBLE_MESSAGE, orderIneligibility } from "./eligibility";
 import { MAX_REVIEW_SENDS, mintReviewToken, REVIEW_LINK_DAYS } from "./token";
@@ -215,6 +216,8 @@ export class ProductReviewsService {
                 createdAt: {
                     gte: new Date(Date.now() - INVITABLE_WINDOW_DAYS * DAY_MS),
                 },
+                // A treatment's order (E9) has no product to review.
+                items: { some: PRODUCT_LINES },
             },
             orderBy: { createdAt: "desc" },
             take: 200,
@@ -227,7 +230,7 @@ export class ProductReviewsService {
                 customer: {
                     select: { email: true, firstName: true, lastName: true },
                 },
-                _count: { select: { items: true } },
+                _count: { select: { items: { where: PRODUCT_LINES } } },
             },
         });
         return orders
@@ -469,7 +472,7 @@ export class ProductReviewsService {
                 customerId: true,
                 store: { select: { name: true } },
                 customer: { select: { email: true } },
-                _count: { select: { items: true } },
+                _count: { select: { items: { where: PRODUCT_LINES } } },
                 reviewInvitation: {
                     select: {
                         completedAt: true,
@@ -493,6 +496,7 @@ export class ProductReviewsService {
             status: order.status,
             paymentStatus: order.paymentStatus,
             customerEmail: order.customer.email,
+            productLines: order._count.items,
         });
         if (ineligible) return ineligible;
         if (order.reviewInvitation?.completedAt) return "completed";

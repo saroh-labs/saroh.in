@@ -82,6 +82,8 @@ jest.mock("@saroh/database", () => {
                     ? [{ amountCents: o.paidCents as number, refunds: [] }]
                     : [],
             discountRedemption: null,
+            // Its paper: none of it paid at booking (E9).
+            invoices: [],
         };
     };
     const client = {

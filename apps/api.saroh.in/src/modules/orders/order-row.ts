@@ -1,6 +1,7 @@
 import { fromMinor, toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import { lineName } from "./order-line";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
 import { amountDueCents } from "./order-read";
@@ -87,7 +88,12 @@ export interface RawOrderRow {
         lastName: string | null;
         phone: string | null;
     } | null;
-    items: { product: { name: string } | null }[];
+    items: {
+        product: { name: string } | null;
+        service?: { name: string } | null;
+    }[];
+    /** A treatment's balance recorded by hand (E9): nothing is due. */
+    balanceByHand?: boolean;
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
@@ -128,7 +134,7 @@ export function serializeOrderRow(
         order.paymentIntents.length === 0;
     const names: string[] = [];
     for (const item of order.items) {
-        const name = item.product?.name;
+        const name = lineName(item);
         if (name && !names.includes(name)) names.push(name);
     }
     const customerName = [order.customer?.firstName, order.customer?.lastName]

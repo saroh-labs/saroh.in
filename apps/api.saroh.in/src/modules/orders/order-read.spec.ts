@@ -468,3 +468,78 @@ describe("amountDueCents", () => {
         );
     });
 });
+
+describe("serializeOrderRead: a treatment's order (E9, DEC-050)", () => {
+    const treatment: RawOrderRead = {
+        ...base,
+        status: "PENDING",
+        paymentStatus: "UNPAID",
+        stage: "NEW",
+        fulfilment: "APPOINTMENT_IN_PERSON",
+        subtotal: "12000.00",
+        shipping: "0.00",
+        total: "12000.00",
+        deliveryLine1: null,
+        deliveryCity: null,
+        deliveryState: null,
+        deliveryPostalCode: null,
+        items: [
+            {
+                id: "li_rct",
+                productId: null,
+                serviceId: "svc_rct",
+                service: { name: "Root canal treatment" },
+                quantity: 1,
+                price: "12000.00",
+                product: null,
+                variant: null,
+                refundLines: [],
+            },
+        ],
+        events: [],
+        // The deposit, paid on its booking's invoice at booking.
+        paymentIntents: [{ amountCents: 600000, refunds: [] }],
+    };
+
+    it("names the service line, with no product, allergens or stock", () => {
+        const read = serializeOrderRead(treatment, opts(true));
+        expect(read.items).toEqual([
+            expect.objectContaining({
+                id: "li_rct",
+                productId: null,
+                serviceId: "svc_rct",
+                kind: "service",
+                name: "Root canal treatment",
+                allergens: { contains: [], mayContain: [] },
+                returnable: 0,
+            }),
+        ]);
+    });
+
+    it("isn't edited here: it changes through its visits", () => {
+        expect(serializeOrderRead(treatment, opts(true)).next.editable).toBe(
+            false,
+        );
+    });
+
+    it("counts the deposit as paid and the rest as due", () => {
+        expect(serializeOrderRead(treatment, opts(true)).money).toMatchObject({
+            paid: "6000.00",
+            due: "6000.00",
+            recordedByHand: false,
+        });
+    });
+
+    it("the balance recorded by hand: all of it paid, nothing due", () => {
+        const paid = {
+            ...treatment,
+            paymentStatus: "PAID",
+            balanceByHand: true,
+        };
+        expect(serializeOrderRead(paid, opts(true)).money).toMatchObject({
+            paid: "12000.00",
+            due: "0.00",
+        });
+        expect(amountDueCents(paid)).toBe(0);
+    });
+});

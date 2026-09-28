@@ -120,6 +120,8 @@ export class OrdersService {
                 items: {
                     include: {
                         product: { select: { name: true } },
+                        // A treatment's line names its service (E9).
+                        service: { select: { name: true } },
                         variant: { select: { title: true } },
                     },
                 },

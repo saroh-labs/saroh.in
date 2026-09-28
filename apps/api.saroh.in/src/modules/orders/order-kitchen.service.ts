@@ -41,6 +41,7 @@ import {
     applyInventoryTransition,
     phaseOf,
 } from "./order-inventory";
+import { isServiceLine } from "./order-line";
 import {
     fromCents,
     notSold,
@@ -51,6 +52,7 @@ import {
 import type { OrderReadDto } from "./order-read";
 import { serializeOrderRead } from "./order-read";
 import { canEditItems, planStageMove, planUndo } from "./order-stage";
+import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
 
 /**
  * The kitchen flow on one order (ADR-008, U6): the read Order Detail renders,
@@ -91,11 +93,18 @@ export class OrderKitchenService {
             // The same refusal authorize() gives, naming the narrower action.
             authorize(ctx, "order:stage");
         }
-        const order = await prisma.order.findFirst({
+        const found = await prisma.order.findFirst({
             where: { id: orderId, organizationId: ctx.organizationId },
             include: READ_INCLUDE,
         });
-        if (!order) throw new NotFoundException("Order not found");
+        if (!found) throw new NotFoundException("Order not found");
+        // A treatment's payment at booking is on its invoice (E9).
+        const order = withBookingPayments(
+            found,
+            found.invoices.filter(
+                (i) => i.source === "BOOKING" && i.kind === "INVOICE",
+            ),
+        );
 
         const actorIds = [
             ...new Set(
@@ -395,6 +404,19 @@ export class OrderKitchenService {
                 // those need the order before handover, these after it.
                 return saveCourier(tx, ctx, order, dto, courier, handedOver);
             }
+            // A treatment (E9, DEC-050) is sold as it was booked: its line
+            // and its way are the service's and its visits', never edited
+            // here. Notes still change.
+            if (
+                (touchesItems || touchesDelivery) &&
+                order.items.some(isServiceLine)
+            ) {
+                throw new ConflictException({
+                    message:
+                        "A treatment's order changes through its visits, not here.",
+                    field: touchesItems ? "lines" : "fulfilment",
+                });
+            }
             if (
                 (touchesItems || touchesDelivery) &&
                 !canEditItems({
@@ -441,20 +463,29 @@ export class OrderKitchenService {
                         field: "lines",
                     });
                 }
+                // Every line here bills a product: a treatment's order was
+                // refused above.
+                const { product, productId } = item;
+                if (!product || !productId) {
+                    throw new BadRequestException({
+                        message: "That line is not on this order.",
+                        field: "lines",
+                    });
+                }
                 const delta = change.quantity - item.quantity;
                 if (delta === 0) continue;
                 // Nobody orders more of a product set to Not sold, staff
                 // included (DEC-032); lowering or removing its line is fine.
-                if (delta > 0 && item.product.status === "ARCHIVED") {
-                    throw new ConflictException(notSold(item.product.name));
+                if (delta > 0 && product.status === "ARCHIVED") {
+                    throw new ConflictException(notSold(product.name));
                 }
                 const unit = toCents(item.price.toString());
                 subtotalCents += delta * unit;
                 corrections.push({
                     // A removed line is deleted below; its credit names none.
                     orderItemId: change.quantity === 0 ? null : item.id,
-                    productId: item.productId,
-                    description: item.product.name,
+                    productId,
+                    description: product.name,
                     deltaQuantity: delta,
                     unitCents: unit,
                 });
@@ -466,7 +497,7 @@ export class OrderKitchenService {
                         "RELEASED",
                     );
                     await tx.orderItem.delete({ where: { id: item.id } });
-                    changes.push(`removed ${item.product.name}`);
+                    changes.push(`removed ${product.name}`);
                 } else {
                     await adjustReservation(tx, item, delta);
                     await tx.orderItem.update({
@@ -474,7 +505,7 @@ export class OrderKitchenService {
                         data: { quantity: change.quantity },
                     });
                     changes.push(
-                        `${item.product.name} ${item.quantity} → ${change.quantity}`,
+                        `${product.name} ${item.quantity} → ${change.quantity}`,
                     );
                 }
             }
@@ -502,7 +533,7 @@ export class OrderKitchenService {
                     corrections.push({
                         orderItemId: item.id,
                         productId: line.productId,
-                        description: item.product.name,
+                        description: item.product?.name ?? line.name,
                         deltaQuantity: line.quantity,
                         unitCents: line.priceCents,
                     });
@@ -590,7 +621,7 @@ export class OrderKitchenService {
                     [
                         ...order.items
                             .filter((i) => !removed.has(i.id))
-                            .map((i) => i.product),
+                            .flatMap((i) => (i.product ? [i.product] : [])),
                         ...added,
                     ],
                     type,
@@ -612,7 +643,12 @@ export class OrderKitchenService {
             if (profile.registered && (touchesItems || touchesDelivery)) {
                 const items = await tx.orderItem.findMany({
                     where: { orderId: order.id },
-                    select: { productId: true, quantity: true, price: true },
+                    select: {
+                        productId: true,
+                        serviceId: true,
+                        quantity: true,
+                        price: true,
+                    },
                 });
                 const address =
                     dto.address === null
@@ -622,6 +658,7 @@ export class OrderKitchenService {
                     await withGstRates(
                         items.map((i) => ({
                             productId: i.productId,
+                            serviceId: i.serviceId,
                             quantity: i.quantity,
                             priceCents: toCents(i.price.toString()),
                         })),
@@ -942,6 +979,8 @@ const READ_INCLUDE = {
                     },
                 },
             },
+            // A treatment's line bills a service (E9, DEC-050).
+            service: { select: { name: true } },
             variant: {
                 select: {
                     title: true,
@@ -961,10 +1000,18 @@ const READ_INCLUDE = {
         },
     },
     events: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-    // The order's invoice and its corrections (ADR-008).
+    // The order's invoice and its corrections (ADR-008). A treatment's
+    // invoice was paid at booking (E9): its payments count as the order's.
     invoices: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: { id: true, number: true, kind: true, status: true },
+        select: {
+            id: true,
+            number: true,
+            kind: true,
+            status: true,
+            source: true,
+            paymentIntents: LEDGER_PAYMENTS,
+        },
     },
     paymentIntents: {
         where: { status: "SUCCEEDED" },
