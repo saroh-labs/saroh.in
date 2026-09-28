@@ -136,6 +136,8 @@ function fromEvidence(
         tag: ev.tag ?? null,
         tone: ev.tone ?? action.tone ?? SEVERITY_TONE[action.severity],
         href: ev.href,
+        // F4: the action the row offers in place, when it offers one.
+        ...(ev.inline ? { inline: ev.inline } : {}),
     };
 }
 

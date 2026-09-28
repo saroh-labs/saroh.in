@@ -13,9 +13,9 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { mergeWaitlistInTx } from "../bookings/waitlist-merge";
 import { reservedMergedEmail } from "../contacts/contact-email";
-import { authorize } from "../organizations/organization-policy";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
 import { absorbThread } from "../site-accounts/thread-store";
+import { requireCustomerPower } from "./customer-access";
 import type {
     AccountPlan,
     ConsentChannel,
@@ -156,7 +156,7 @@ export class MergeService {
         otherId: string,
         survivorId?: string,
     ): Promise<MergePreview> {
-        authorize(ctx, "customer:merge");
+        requireCustomerPower(ctx, "customer:merge");
         refuseSelf(contactId, otherId);
         return this.db.$transaction(async (tx) => {
             const pair = await this.loadPair(
@@ -223,7 +223,7 @@ export class MergeService {
         dto: MergeContactsDto,
         now: Date = new Date(),
     ): Promise<MergeResult> {
-        authorize(ctx, "customer:merge");
+        requireCustomerPower(ctx, "customer:merge");
         refuseSelf(contactId, otherId);
         if (dto.survivorId !== contactId && dto.survivorId !== otherId) {
             throw new BadRequestException(

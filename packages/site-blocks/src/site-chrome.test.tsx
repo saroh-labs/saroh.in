@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { SiteFooterContent } from "./site-chrome";
-import { footerLine, SiteFooter, SiteHeader } from "./site-chrome";
+import { footerLine, SiteFooter, SiteHeader, siteMenu } from "./site-chrome";
 
 /**
  * The customer site's v2 header and footer (G17): one row with the name,
@@ -328,5 +328,112 @@ describe("footerLine", () => {
         { format: "html", value: "Bare text" },
     ] as const)("reads %j as more than a line", (footer) => {
         expect(footerLine(footer)).toBeNull();
+    });
+});
+
+describe("module pages in the menu (G15)", () => {
+    // What G14 publishes for a site with no menu of its own: its module
+    // pages, in the kinds' order, each carrying its kind.
+    const MODULE_MENU = [
+        { label: "Book", href: "/book", kind: "BOOK" },
+        { label: "Prices", href: "/prices", kind: "PRICES" },
+        { label: "Journal", href: "/journal", kind: "JOURNAL" },
+        { label: "Contact", href: "/contact", kind: "CONTACT" },
+    ];
+
+    const hrefs = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+
+    it("reads Home · Book · Prices · Journal · Contact on Pulse", () => {
+        render(<SiteHeader name="Pulse Fitness" navigation={MODULE_MENU} />);
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row)).toEqual([
+            "Home",
+            "Book",
+            "Prices",
+            "Journal",
+            "Contact",
+        ]);
+        expect(hrefs(row)).toEqual([
+            "/",
+            "/book",
+            "/prices",
+            "/journal",
+            "/contact",
+        ]);
+    });
+
+    it("keeps Book after Home, in the editor's order", () => {
+        expect(
+            siteMenu([
+                { label: "Journal", href: "/journal", kind: "JOURNAL" },
+                { label: "Book", href: "/book", kind: "BOOK" },
+            ]).map((i) => i.label),
+        ).toEqual(["Home", "Journal", "Book"]);
+    });
+
+    it("takes Book out while Appointments is off", () => {
+        render(
+            <SiteHeader
+                name="Pulse Fitness"
+                navigation={MODULE_MENU}
+                modules={{
+                    BOOK: "off",
+                    PRICES: "on",
+                    JOURNAL: "on",
+                    CONTACT: "on",
+                }}
+            />,
+        );
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row)).toEqual([
+            "Home",
+            "Prices",
+            "Journal",
+            "Contact",
+        ]);
+    });
+
+    it("shows a module page whose state isn't known: it never guesses off", () => {
+        expect(
+            siteMenu(MODULE_MENU, { PRICES: "off" }).map((i) => i.label),
+        ).toEqual(["Home", "Book", "Journal", "Contact"]);
+        expect(siteMenu(MODULE_MENU, null)).toHaveLength(5);
+    });
+
+    it("draws no menu once every module page is off, not Home alone", () => {
+        expect(
+            siteMenu([{ label: "Book", href: "/book", kind: "BOOK" }], {
+                BOOK: "off",
+            }),
+        ).toEqual([]);
+    });
+
+    it("leaves the merchant's own menu as it is: no Home added", () => {
+        const own = [
+            { label: "Classes", href: "/classes" },
+            { label: "Book", href: "/book", kind: "BOOK" },
+        ];
+        expect(siteMenu(own)).toEqual(own);
+        expect(siteMenu(own, { BOOK: "off" })).toEqual([
+            { label: "Classes", href: "/classes" },
+        ]);
+    });
+
+    it("draws an existing site's menu exactly as published", () => {
+        expect(siteMenu(NAV)).toEqual(NAV);
+        expect(siteMenu([])).toEqual([]);
+    });
+
+    it("keeps Home inside a draft preview", () => {
+        render(
+            <SiteHeader
+                name="Pulse Fitness"
+                navigation={MODULE_MENU.slice(0, 1)}
+                basePath="/preview/tok"
+            />,
+        );
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(hrefs(row)).toEqual(["/preview/tok", "/preview/tok/book"]);
     });
 });

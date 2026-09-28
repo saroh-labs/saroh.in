@@ -426,13 +426,20 @@ describe("Customers list (DB)", () => {
         expect(page.rows[0].phone).toBe("+91 98450 12345");
     });
 
+    it("gives a Member phone and email, and finds a person by their email (C13)", async () => {
+        const page = await list.list(member, { q: "asha@example" });
+        expect(idsOf(page)).toEqual([asha]);
+        expect(page.rows[0].email).toBe("asha@example.com");
+        expect(page.rows[0].phone).toBe("+91 98450 12345");
+    });
+
     it("sends no Spent at all, not zeros, to a role without both order:read and invoice:read", async () => {
         const page = await list.list(member, {});
         expect(page.sees.spent).toBe(false);
         for (const row of page.rows) expect(row).not.toHaveProperty("spent");
         expect(page.counts).not.toHaveProperty("subscribers");
         await expect(list.list(member, { sort: "spent" })).rejects.toThrow(
-            /may not perform/,
+            "Your role can't see orders.",
         );
     });
 

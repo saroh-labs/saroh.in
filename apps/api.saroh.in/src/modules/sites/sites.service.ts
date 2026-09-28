@@ -42,7 +42,8 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
-import { addableModulePageKinds } from "./module-pages";
+import type { PublicModulePageStates } from "./module-pages";
+import { addableModulePageKinds, publicModulePageStates } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import type { SiteChangeKind } from "./pending-changes";
@@ -254,6 +255,13 @@ export interface PublicSiteView {
      * route repeating the subdomain-or-custom-hostname resolution.
      */
     siteId?: string;
+    /**
+     * Whether each module page in the snapshot shows now (G15): its module
+     * on or off, read live beside the immutable snapshot. Present only when
+     * the snapshot holds a module page, so a site without them reads as
+     * before.
+     */
+    modules?: PublicModulePageStates;
 }
 
 /**
@@ -2121,6 +2129,7 @@ export class SitesService {
             where,
             select: {
                 id: true,
+                organizationId: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
@@ -2129,10 +2138,18 @@ export class SitesService {
         if (!site?.currentPublication) {
             throw new NotFoundException(`No published site found for ${label}`);
         }
+        const { snapshot, publishedAt } = site.currentPublication;
+        // Module pages show only while their module is on (G15); the
+        // organization comes from the Site, never from the caller.
+        const modules = await publicModulePageStates(
+            snapshot,
+            site.organizationId,
+        );
         return {
-            snapshot: site.currentPublication.snapshot,
-            publishedAt: site.currentPublication.publishedAt,
+            snapshot,
+            publishedAt,
             siteId: site.id,
+            ...(modules ? { modules } : {}),
         };
     }
 

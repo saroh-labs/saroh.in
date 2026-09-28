@@ -251,6 +251,11 @@ describe("the Pack Editor", () => {
             "Ten classes is published — you can sell it now.",
         );
         expect(text()).toContain("On sale");
+        // Live now, it has a page of its own (E16).
+        const view = Array.from(host.querySelectorAll("a")).find(
+            (a) => a.textContent.trim() === "View pack",
+        );
+        expect(view?.getAttribute("href")).toBe("/class-packs/pk-1");
     });
 
     it("a sold pack's kind is locked, and says why", () => {

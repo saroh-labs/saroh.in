@@ -50,8 +50,18 @@ export type OrgAction =
     | "domain:manage"
     | "form:read"
     | "form:write"
+    // See customers and contacts: the Customers list, Customer Detail, name,
+    // phone, email, address, notes and non-sensitive Needs attention, and
+    // search by any of them (DEC-041: one Contact backs both screens).
     | "contact:read"
+    // Edit customers and contacts, and the hard delete of one with no orders
+    // or invoices (DEC-042). Implies `contact:read` (`resolveCapabilities`).
     | "contact:write"
+    // See sensitive Needs attention entries (Medical by default) and booking
+    // page intake notes (DEC-040, C13; permission matrix Q2). Its own power,
+    // never implied by `contact:write`: a front desk edits a patient's phone
+    // number but should not read their medical notes. OWNER/ADMIN by default.
+    | "customer:sensitive"
     // Merge two customers into one (DEC-042, C9). Its own power from the day
     // it shipped, never implied by `contact:write`: a merge can't be undone,
     // and a business lets staff fix a phone number long before it lets them
@@ -165,6 +175,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "form:write",
     "contact:read",
     "contact:write",
+    "customer:sensitive",
     "customer:merge",
     "customer:remove",
     "lead:read",

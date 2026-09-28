@@ -47,6 +47,7 @@ const LAYER_HOME: Record<LayerKey, string> = {
  * a failed renewal, a late order, an overdue invoice, a no-show — shows
  * its fix beside it (E22). For a role that reads money (E23) the day
  * says what came in, went out and is due, and each layer what it took.
+ * Under the title, who is off or that the business is closed (E24).
  */
 export function DayPanel({
     day,
@@ -59,6 +60,7 @@ export function DayPanel({
     shortcuts = [],
     can,
     money = null,
+    offLine = null,
 }: {
     day: CalendarDay;
     layers: LayerStyle[];
@@ -74,6 +76,8 @@ export function DayPanel({
     can: ProblemCan;
     /** `payment:read` only (E23): the month's money. Null: none drawn. */
     money?: CalendarCash | null;
+    /** Who is off, or the business closed, that day (E24). */
+    offLine?: string | null;
 }) {
     const entries = money?.shown.filter((e) => e.date === day.date) ?? [];
     const cash = money ? dayMoney(entries, money.currency) : null;
@@ -95,6 +99,11 @@ export function DayPanel({
                 dayTitle(day.date, today) +
                     (day.date === today ? " · today" : ""),
             )}
+            {offLine ? (
+                <p className="mt-[3px] text-[12.5px] text-neutral-600 dark:text-muted-foreground">
+                    {offLine}
+                </p>
+            ) : null}
             <p className="mb-2.5 mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground">
                 {n > 0
                     ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`

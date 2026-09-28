@@ -155,7 +155,7 @@ export function markOrderVisitAttended(
 export function undoOrderStage(
     orderId: string,
     eventId: string,
-): Promise<CrmResult<{ stage: string }>> {
+): Promise<CrmResult<{ stage: string; told?: boolean }>> {
     return mutate(
         path(orderId, "/stage/undo"),
         "POST",

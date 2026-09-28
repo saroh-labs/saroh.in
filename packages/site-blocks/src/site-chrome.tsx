@@ -133,6 +133,44 @@ export function SiteFooter({
 }
 
 /**
+ * Whether each module page shows now (G15), by kind (`BOOK`, `SHOP`, …), as
+ * the public site read says: `off` while its module is switched off or not
+ * rolled out for the business.
+ */
+export type ModulePageStates = Partial<Record<string, "on" | "off">>;
+
+/**
+ * The menu the header draws (G15), from the published navigation.
+ *
+ * - An entry for a module page whose module is `off` leaves the menu. One
+ *   whose state isn't known stays: the site never guesses a module off, as
+ *   the workspace's module gate fails open.
+ * - **Home leads a menu made of module pages alone.** A site with no menu of
+ *   its own publishes one of its module pages only (G14), which reads as
+ *   "Book · Prices · Journal" with no way back but the name. The design's
+ *   menu always starts at Home, so it is put in front:
+ *   "Home · Book · Prices · Journal · Contact". (Home is never a module
+ *   page, so it can't already be there.) It is not added while nothing else
+ *   is listed: Home alone is no menu.
+ *
+ * A menu with a free-form entry is the merchant's own and keeps its shape,
+ * less any module page that is off; a menu without module pages comes back
+ * exactly as it was published, so an existing site's header doesn't change.
+ */
+export function siteMenu(
+    navigation: readonly SiteNavItem[],
+    modules?: ModulePageStates | null,
+): SiteNavItem[] {
+    const shown = navigation.filter(
+        (item) => !item.kind || modules?.[item.kind] !== "off",
+    );
+    const moduleOnly =
+        navigation.length > 0 && navigation.every((item) => item.kind);
+    if (!moduleOnly || shown.length === 0) return shown;
+    return [{ label: "Home", href: "/" }, ...shown];
+}
+
+/**
  * The site's header (#206, G17), in one row: the name, the menu, the bag,
  * Sign in or the avatar, and the main button ("Book" or "Order").
  *
@@ -156,9 +194,16 @@ export function SiteHeader({
     action = null,
     bag,
     account,
+    modules,
 }: {
     name: string;
     navigation: SiteNavItem[];
+    /**
+     * Whether each module page shows now (G15), from the public site read.
+     * An entry whose module is off leaves the menu; one not named here
+     * stays (see `siteMenu`).
+     */
+    modules?: ModulePageStates | null;
     /**
      * Prefix for every link, "" on a live site. A draft preview (#198) lives
      * under /preview/<token>, and a menu that pointed at "/about" would drop
@@ -174,7 +219,7 @@ export function SiteHeader({
 }) {
     const to = (href: string) =>
         basePath && href.startsWith("/") ? `${basePath}${href}` : href;
-    const items = navigation.map((item) => ({
+    const items = siteMenu(navigation, modules).map((item) => ({
         label: item.label,
         href: to(item.href),
     }));

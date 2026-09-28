@@ -10,6 +10,7 @@ import {
     overdueFollowUps,
     crmNumbers as readCrmNumbers,
 } from "./home-crm-sources";
+import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
     HomeAction,
@@ -51,11 +52,13 @@ export type {
     HomeBooking,
     HomeEvidence,
     HomeInline,
+    HomeInlineKind,
     HomeInput,
     HomeLastDay,
     HomeModel,
     HomeNeed,
     HomeNumber,
+    HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
     HomeSeverity,
@@ -121,6 +124,8 @@ export class HomeService {
         @Optional() private readonly stockChecks?: StockChecksService,
         // Optional as the stock checks: without it no message is read.
         @Optional() private readonly threads?: ThreadsService,
+        // Optional too: without it every row stays a link (F4).
+        @Optional() private readonly inline?: HomeInlineService,
     ) {}
 
     /**
@@ -593,6 +598,8 @@ export class HomeService {
         actions.sort(
             (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
         );
+        // What each row offers in place (F4), for whoever may do it.
+        await this.inline?.decorate(actions, input, now);
 
         return {
             view: "business",

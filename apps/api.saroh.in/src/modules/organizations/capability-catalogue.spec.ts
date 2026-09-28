@@ -125,6 +125,45 @@ describe("the split order powers (B16)", () => {
     });
 });
 
+describe("the customer powers (C13)", () => {
+    it("labels each in the owner's words, in one group, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["contact:read", "See customers and contacts"],
+            ["contact:write", "Edit customers and contacts"],
+            ["customer:sensitive", "See sensitive notes"],
+            ["customer:merge", "Merge duplicate customers"],
+            ["customer:remove", "Remove a customer's details"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("contacts");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("lists them together, reads before writes, the irreversible last", () => {
+        const order = CAPABILITIES.filter((c) => c.group === "contacts")
+            .map((c) => c.action)
+            .slice(0, 5);
+        expect(order).toEqual([
+            "contact:read",
+            "contact:write",
+            "customer:sensitive",
+            "customer:merge",
+            "customer:remove",
+        ]);
+    });
+
+    it("says that seeing a customer doesn't include their sensitive notes", () => {
+        expect(CAPABILITY_BY_ACTION.get("contact:read")?.note).toMatch(
+            /sensitive notes need their own permission/,
+        );
+        expect(CAPABILITY_BY_ACTION.get("customer:sensitive")?.note).toMatch(
+            /Medical/,
+        );
+    });
+});
+
 describe("Count and move stock (#513)", () => {
     it("is on the list, grantable, with a label an owner reads", () => {
         const stock = CAPABILITY_BY_ACTION.get("inventory:write");

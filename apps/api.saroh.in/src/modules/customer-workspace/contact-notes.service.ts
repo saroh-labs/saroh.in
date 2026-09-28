@@ -7,9 +7,9 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize } from "../organizations/organization-policy";
 import { allergenKey, allergensByName } from "./allergen-match";
 import { ensureAllergyEntries } from "./attention-allergy";
+import { requireCustomerPower } from "./customer-access";
 import type { ContactNoteDto } from "./dto";
 
 /**
@@ -203,7 +203,7 @@ export class ContactNotesService {
         contactId: string,
         dto: ContactNoteDto,
     ): Promise<ContactNoteView> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         await this.requireContact(ctx, contactId);
         const body = dto.body ?? "";
         const allergenIds = [...new Set(dto.allergenIds ?? [])];
@@ -251,7 +251,7 @@ export class ContactNotesService {
         noteId: string,
         dto: ContactNoteDto,
     ): Promise<ContactNoteView> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         const current = await this.read(ctx, contactId, noteId);
         const body = dto.body ?? current.body;
         const allergenIds = dto.allergenIds
@@ -297,7 +297,7 @@ export class ContactNotesService {
         contactId: string,
         noteId: string,
     ): Promise<void> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         await this.read(ctx, contactId, noteId);
         await this.db.$transaction(async (tx) => {
             await tx.contactNote.delete({ where: { id: noteId } });

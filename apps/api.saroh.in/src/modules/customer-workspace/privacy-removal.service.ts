@@ -12,7 +12,7 @@ import {
     cancelFoundBooking,
     sendCancelRefund,
 } from "../bookings/booking-cancel";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import {
     autopayRefusal,
     cancelAutopayFirst,
@@ -20,6 +20,7 @@ import {
 } from "../payments/mandate-gate";
 import { MandatesService } from "../payments/mandates.service";
 import { PaymentsService } from "../payments/payments.service";
+import { requireCustomerPower } from "./customer-access";
 import { fullName } from "./merge-plan";
 import type {
     RemovalGoes,
@@ -90,7 +91,7 @@ export class PrivacyRemovalService {
         contactId: string,
         now: Date = new Date(),
     ): Promise<RemovalPreview> {
-        authorize(ctx, "customer:remove");
+        requireCustomerPower(ctx, "customer:remove");
         return this.db.$transaction(async (tx) => {
             const contact = await findContact(
                 tx,
@@ -118,7 +119,7 @@ export class PrivacyRemovalService {
         contactId: string,
         now: Date = new Date(),
     ): Promise<RemovalResult> {
-        authorize(ctx, "customer:remove");
+        requireCustomerPower(ctx, "customer:remove");
         const organizationId = ctx.organizationId;
 
         // 1. The refusals, before anything is touched.

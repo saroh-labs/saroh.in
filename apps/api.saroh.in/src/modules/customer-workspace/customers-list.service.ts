@@ -8,8 +8,9 @@ import {
     isReservedContactEmail,
 } from "../contacts/contact-email";
 import type { OrgAction } from "../organizations/organization-actions";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import { attentionFor, canSeeSensitive } from "./attention-read";
+import { requireCustomerPower } from "./customer-access";
 import type { MoneyTotal } from "./customer-detail.service";
 import type {
     CustomerChip,
@@ -200,7 +201,7 @@ export class CustomersListService {
         ctx: OrganizationContext,
         query: ListCustomersQueryDto,
     ): Promise<CustomersPage> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         const sees = {
             orders: allows(ctx, "order:read"),
@@ -211,12 +212,12 @@ export class CustomersListService {
         const chip = query.chip ?? "all";
         const sort = query.sort ?? (sees.orders ? "last" : "name");
         for (const action of [...CHIP_NEEDS[chip], ...SORT_NEEDS[sort]]) {
-            authorize(ctx, action);
+            requireCustomerPower(ctx, action);
         }
         // "Bought at" is about orders; a storefront of another business is
         // a 404, as every cross-tenant id.
         if (query.store) {
-            authorize(ctx, "order:read");
+            requireCustomerPower(ctx, "order:read");
             await this.requireStore(organizationId, query.store);
         }
         const page = query.page ?? 1;
@@ -328,11 +329,11 @@ export class CustomersListService {
         ctx: OrganizationContext,
         query: ListUnlinkedQueryDto,
     ): Promise<UnlinkedPage> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         // Who paid at a storefront is about orders, as `list`'s filter is.
         if (query.store) {
-            authorize(ctx, "order:read");
+            requireCustomerPower(ctx, "order:read");
             await this.requireStore(organizationId, query.store);
         }
         const orders = allows(ctx, "order:read");

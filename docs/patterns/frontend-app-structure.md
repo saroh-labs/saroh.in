@@ -86,12 +86,22 @@ components/shared/             app shell, navigation, command menu
 - **Current** — `saroh.app` renders publications only — `[domain]/` for tenant
   hosts and `preview/[token]/` for drafts — and draws from the `--site-*` layer.
 - **Current** — A static route under `saroh.app/app/[domain]/` shadows any
-  merchant page at that address, and nothing says so. `/book`, `/shop` and
-  `/checkout` are reserved page paths for that reason (round-2 G14,
-  `RESERVED_PAGE_PATHS` in `apps/api.saroh.in/src/modules/sites/page-kinds.ts`):
-  the API refuses a page there and the pre-publish check flags one made
-  before. A new static route needs its address added there too.
-  `/account` is not yet on the list.
+  merchant page at that address, and nothing says so. `/book`, `/shop`,
+  `/checkout` and `/account` are reserved page paths for that reason (round-2
+  G14, G15; `RESERVED_PAGE_PATHS` in
+  `apps/api.saroh.in/src/modules/sites/page-kinds.ts`): the API refuses a page
+  there and the pre-publish check flags one made before. A new static route
+  needs its address added there too. `/account` is reserved whether or not
+  `SITE_ACCOUNT_AREA` is on, because its route answers (or 404s) either way.
+- **Current** — Module pages on the live site (round-2 G15,
+  `saroh.app/lib/module-pages.ts`): `/book` and `/shop` draw their Book or
+  Shop page's sections when one is published (deep links still go to the
+  flow or product), `[slug]` draws Prices, Journal and Contact, and all of
+  them go through `components/published-page.tsx`. A module page whose
+  module is off (the public site read's `modules`) leaves the menu and its
+  address shows `ModulePageUnavailable`, never a 404; an unknown state shows
+  the page. A menu made only of module pages gets Home in front
+  (`siteMenu` in `site-blocks/src/site-chrome.tsx`).
 
 ## Not adopted
 

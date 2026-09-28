@@ -316,9 +316,23 @@ describe("a shop customer's overview", () => {
         ]);
     });
 
-    it("leaves money tiles out for a viewer who reads no money", () => {
+    it("leaves Spent out without order:read and invoice:read, keeping the average the orders show (C13)", () => {
         const d = shop({ money: false });
         delete d.stats.spent;
+        expect(orderTiles(d, NOW).map((t) => t.label)).toEqual([
+            "Orders",
+            "Average order",
+            "Last order",
+        ]);
+    });
+
+    it("states no average from orders sent without totals (an API before C13)", () => {
+        const d = shop({ money: false });
+        delete d.stats.spent;
+        for (const o of d.orders?.rows ?? []) {
+            delete o.total;
+            delete o.currency;
+        }
         expect(orderTiles(d, NOW).map((t) => t.label)).toEqual([
             "Orders",
             "Last order",

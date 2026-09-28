@@ -13,6 +13,12 @@ import { useId, useState, useSyncExternalStore } from "react";
 export interface SiteNavItem {
     label: string;
     href: string;
+    /**
+     * The module page this entry opens (G14), as the publisher resolved it:
+     * `BOOK`, `SHOP`, … Absent for a free-form page. The header leaves the
+     * entry out while its module is off (G15, `siteMenu`).
+     */
+    kind?: string;
 }
 
 /** The header's one main button: "Book" or "Order", or nothing. */

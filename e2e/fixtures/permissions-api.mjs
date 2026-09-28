@@ -51,6 +51,9 @@ const PRODUCT_ROLES = {
     },
     NOREAD: {
         role: "MEMBER",
+        // The API always sends the stored role's key; a role the business
+        // made is not a built-in one, whatever it is based on.
+        roleKey: "front_desk",
         roleLabel: "Front desk",
         actions: ["order:read", "booking:read"],
     },
@@ -320,6 +323,23 @@ createServer((req, res) => {
                     dependencies: [],
                     blockers: [{ code: "UNAUTHORIZED" }],
                 },
+                // Payments is out of a Member's and a Reviewer's reach
+                // (`payment:read`), as the real API says: its gate answers
+                // with Payments' locked card (D18).
+                ...(scenario === "MEMBER" || scenario === "REVIEWER"
+                    ? [
+                          {
+                              key: "PAYMENTS",
+                              label: "Payments",
+                              lifecycle: "ENABLED",
+                              readiness: "DISABLED",
+                              selectedForProject: true,
+                              canManage: false,
+                              dependencies: [],
+                              blockers: [{ code: "UNAUTHORIZED" }],
+                          },
+                      ]
+                    : []),
                 // Sell is out of a Reviewer's reach, as the real API says —
                 // so its gate, not the Orders page, answers them (DEC-056).
                 ...(scenario === "REVIEWER"

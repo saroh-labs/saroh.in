@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -20,6 +21,7 @@ import {
     IgnoreModuleReadiness,
     RequireModule,
 } from "../capabilities/require-module.decorator";
+import { payLinkUrl } from "../invoices/pay-link-url";
 import {
     CancelSubscriptionDto,
     ChangePlanDto,
@@ -332,14 +334,17 @@ export class SubscriptionsController {
 
     /**
      * Retry a failed charge: a new pay link for the overdue latest invoice,
-     * replacing the old one. Answers with the token, shown once.
+     * replacing the old one. Answers with the token and the link's address
+     * (Home's "Retry by pay link", F4), shown once.
      */
     @Post(":subscriptionId/retry")
     @HttpCode(200)
-    retry(
+    @Header("Cache-Control", "no-store")
+    async retry(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
     ) {
-        return this.subscriptions.retryPayment(ctx, id);
+        const link = await this.subscriptions.retryPayment(ctx, id);
+        return { ...link, url: payLinkUrl(link.token) };
     }
 }

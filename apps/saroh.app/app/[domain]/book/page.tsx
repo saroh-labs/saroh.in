@@ -7,13 +7,20 @@ import {
     BookingUnavailable,
     initialDateOf,
     initialTimeOf,
+    ModulePageUnavailable,
     MoveClass,
 } from "@saroh/site-blocks";
 
+import { PublishedPage } from "@/components/published-page";
 import { accountAreaOn, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getSignedInCustomer } from "@/lib/customer-session";
+import {
+    isBookingDeepLink,
+    moduleLabel,
+    moduleRoute,
+} from "@/lib/module-pages";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
 
@@ -60,6 +67,14 @@ import {
  *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
+ *
+ * **The Book page dresses it** (round-2 G15). When the site has published a
+ * Book page, a plain `/book` draws that page's sections (its title, intro
+ * and the services list with its display options) inside the site's chrome;
+ * a service there opens `/book?service=<id>`, which goes straight into the
+ * flow as before. While Appointments is off (or not rolled out) the Book
+ * page's address says "This isn't available right now" with a link home.
+ * A site with no Book page gets today's flow, unchanged.
  */
 
 export async function generateMetadata({
@@ -71,9 +86,15 @@ export async function generateMetadata({
     const resolved = await getSiteForHost(domain);
     if (!resolved) return null;
     const name = resolved.snapshot.site.name;
+    // The Book page's own title (G15), which is also its menu name.
+    const label = moduleLabel(resolved.snapshot.pages, "BOOK", "Book");
     return {
-        title: `Book · ${name}`,
-        openGraph: { title: `Book · ${name}`, siteName: name, url: "/book" },
+        title: `${label} · ${name}`,
+        openGraph: {
+            title: `${label} · ${name}`,
+            siteName: name,
+            url: "/book",
+        },
         metadataBase: new URL(`https://${domain}`),
     };
 }
@@ -107,6 +128,27 @@ export default async function BookPage({
                 apiUrl={publicApiUrl()}
                 businessName={resolved.snapshot.site.name}
                 move={moveBooking}
+            />
+        );
+    }
+
+    // The Book page (G15): its sections on a plain /book, or its address
+    // taken off while Appointments is off. Deep links go on to the flow.
+    const route = moduleRoute(
+        resolved.snapshot.pages,
+        resolved.modules,
+        "BOOK",
+        isBookingDeepLink({ service, date, start }),
+    );
+    if (route.draw === "unavailable") {
+        return <ModulePageUnavailable business={resolved.snapshot.site.name} />;
+    }
+    if (route.draw === "page") {
+        return (
+            <PublishedPage
+                page={route.page}
+                snapshot={resolved.snapshot}
+                siteId={resolved.siteId}
             />
         );
     }

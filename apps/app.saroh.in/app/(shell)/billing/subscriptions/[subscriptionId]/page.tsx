@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
-import { AccessDenied } from "@/components/shared/access-denied";
+import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionDetail } from "@/components/subscriptions/subscription-detail/detail-screen";
+import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -50,12 +51,11 @@ export default async function SubscriptionPage({
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     // Told so, and who can change it — not a "not found" that reads like a
-    // broken link.
-    if (organization?.actions && !may("subscription:read")) {
+    // broken link. The design's locked card (D18).
+    if (organization && !mayRead(organization, "subscription:read")) {
         return (
-            <AccessDenied
-                title="You can't open this subscription"
-                description={`Your role in ${organization.name} can't see subscriptions. An owner or admin can change that in Team.`}
+            <PaymentsLocked
+                {...paymentsLockedCopy(organization, "subscriptions")}
             />
         );
     }

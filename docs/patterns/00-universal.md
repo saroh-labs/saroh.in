@@ -127,16 +127,24 @@ each with why it stops there:
   in their own `lib/calendar/problems.ts`, and E23 the money (in, out,
   due, the strip and the day's line) in `lib/calendar/money.ts` and the
   export in `lib/calendar/export.ts`, rather than grow it; the month
-  summary and the item lines are its next seams.
+  summary and the item lines are its next seams. E24 left it untouched:
+  days off are `lib/calendar/days-off.ts`, and the team filter's
+  narrowing of the month is `lib/calendar/team.ts`.
   `components/calendar/business-calendar.tsx` (404 after E22) went back
   under when E23 took the switches row to `layer-switches.tsx` and the
-  month strip to `month-strip.tsx`.
-- `organizations/organization-settings-form.tsx` (1,246) — one form holds
+  month strip to `month-strip.tsx`; E24 (388) moved the ‹ › month steps
+  to `month-step.tsx` to make room for the team filter, whose select is
+  `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
+  which needed nothing new from the API.
+- `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
+  F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
   to `time-zone-select.tsx`, and the Hours card, which saves to the
-  storefronts, to `business-hours-section.tsx`. Less
+  storefronts, to `business-hours-section.tsx`. F12's Undo on a save kept
+  its rules out (`lib/organizations/settings-undo.ts`, and the hold and
+  toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
 - `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
   member drawer and the invite dialog share the screen's roster and role
@@ -154,13 +162,14 @@ each with why it stops there:
   to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
   the second allow-list file it re-exports; the order serializers are the
   next seam if A8 and A13 grow it further.
-- `home/home.service.ts` (778; 797 before F2) — `build()` is one parallel
+- `home/home.service.ts` (785 after F4; 797 before F2) — `build()` is one parallel
   read of every Home source, each behind its own guard, and the ranking of
   what they return. Round 2 put each source in its own file
   (`home-money-sources.ts`, `home-site-stock-sources.ts`,
   `home-people-sources.ts`, `home-today.ts`, `home-week.ts`, …); F2 also
-  moved the CRM reads to `home-crm-sources.ts` rather than grow it. The
-  refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
+  moved the CRM reads to `home-crm-sources.ts` rather than grow it, and
+  F4's inline actions are `HomeInlineService` in `home-inline.ts`, called
+  once. The refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
   and the schedule band are the next seams.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each

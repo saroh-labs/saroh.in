@@ -13,7 +13,7 @@ import {
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
-import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
+import { showError, showInfo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FieldErrors } from "react-hook-form";
@@ -40,6 +40,11 @@ import {
     LeaveDialog,
     useLeaveGuard,
 } from "@/components/organizations/use-leave-guard";
+import {
+    cardUndo,
+    logoCardUndo,
+    useSettingsUndo,
+} from "@/components/organizations/use-settings-undo";
 import { countryName, CountrySelect } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
@@ -392,6 +397,13 @@ export function OrganizationSettingsForm({
     const editDirty = editing === "hours" ? hoursDirty : isDirty;
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
+    // Undo on a save (F12); what it saved back shows at once.
+    const undo = useSettingsUndo();
+    const applySaved = (next: OrganizationSettings) => {
+        setSettings(next);
+        form.reset(valuesOf(next));
+        router.refresh();
+    };
     // The number-format rules span four fields (and the prefix and GST
     // switch), but the form re-checks only the field that changed, so the
     // rule is worked out here from what is on screen: a part ticked in shows
@@ -419,6 +431,8 @@ export function OrganizationSettingsForm({
             setTab(editing);
             return;
         }
+        // A new edit closes the last save's Undo, which would reset it.
+        undo.settle();
         form.reset(valuesOf(settings));
         // No zone saved: the browser's is offered, as a change to save.
         const fromBrowser = key === "identity" && !savedZone && browserZone();
@@ -512,14 +526,15 @@ export function OrganizationSettingsForm({
             tax.state = "";
         }
 
-        const result = await saveOrganizationSettings({
+        const sent = {
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
             ...(Object.keys(profile).length > 0 ? { profile } : {}),
             ...(Object.keys(tax).length > 0 ? { tax } : {}),
             ...(Object.keys(registeredAddress).length > 0
                 ? { registeredAddress }
                 : {}),
-        });
+        };
+        const result = await saveOrganizationSettings(sent);
 
         if (!result.ok) {
             const field = result.field ? FIELD_OF[result.field] : undefined;
@@ -530,10 +545,11 @@ export function OrganizationSettingsForm({
         }
 
         const title = SECTIONS[editing].title;
-        showSuccess(
+        undo.offer(
             editing === "contact"
                 ? `${title} saved`
                 : `${title} saved — invoices from now on use it`,
+            cardUndo(settings, result.data, sent, applySaved),
         );
         setSettings(result.data);
         form.reset(valuesOf(result.data));
@@ -1233,7 +1249,17 @@ export function OrganizationSettingsForm({
                                         logoUrl={settings.logo?.url ?? null}
                                         name={settings.name}
                                         canEdit={canEdit}
-                                        onSaved={setSettings}
+                                        onSaved={(next, said) => {
+                                            undo.offer(
+                                                said,
+                                                logoCardUndo(
+                                                    settings,
+                                                    next,
+                                                    setSettings,
+                                                ),
+                                            );
+                                            setSettings(next);
+                                        }}
                                     />
                                 ) : undefined
                             }
@@ -1252,6 +1278,7 @@ export function OrganizationSettingsForm({
                     onEdit={() => startEditing("hours")}
                     onDone={() => setEditing(null)}
                     onDirty={setHoursDirty}
+                    offerUndo={undo.offer}
                 />
 
                 <BusinessPrintPreview

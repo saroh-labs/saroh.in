@@ -295,8 +295,10 @@ export interface Tile {
 
 /**
  * The four figures over a shop customer: orders, spent, average order and
- * last order. Money tiles only for a viewer who reads money; a figure whose
- * source failed is not stated.
+ * last order. Each follows its own read (DEC-039, matrix §1 rule 3): the
+ * average comes from the orders themselves, which `order:read` shows whole;
+ * Spent sums orders and invoices, so the API sends it only to whoever reads
+ * both. A figure whose source failed is not stated.
  */
 export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
     const rows = d.orders?.rows ?? [];
@@ -326,23 +328,24 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
                   : "",
             opens: null,
         });
-        const paid = rows.filter(
-            (o) =>
-                o.paymentStatus === "PAID" &&
-                o.total !== undefined &&
-                o.currency !== undefined,
-        );
-        const currency = paid[0]?.currency;
-        const same = paid.filter((o) => o.currency === currency);
-        if (currency && same.length) {
-            const sum = same.reduce((n, o) => n + Number(o.total), 0);
-            tiles.push({
-                label: "Average order",
-                value: money(String(Math.round(sum / same.length)), currency),
-                note: `Across ${same.length} ${same.length === 1 ? "order" : "orders"}`,
-                opens: null,
-            });
-        }
+    }
+    // An API before C13 sent no totals without a money read.
+    const paid = rows.filter(
+        (o) =>
+            o.paymentStatus === "PAID" &&
+            o.total !== undefined &&
+            o.currency !== undefined,
+    );
+    const currency = paid[0]?.currency;
+    const same = paid.filter((o) => o.currency === currency);
+    if (currency && same.length) {
+        const sum = same.reduce((n, o) => n + Number(o.total), 0);
+        tiles.push({
+            label: "Average order",
+            value: money(String(Math.round(sum / same.length)), currency),
+            note: `Across ${same.length} ${same.length === 1 ? "order" : "orders"}`,
+            opens: null,
+        });
     }
     const last = rows.at(0);
     if (last) {

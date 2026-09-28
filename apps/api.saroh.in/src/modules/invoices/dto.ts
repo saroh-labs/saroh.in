@@ -16,8 +16,16 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type { InvoiceView, PaymentMethod } from "./invoice-state";
-import { INVOICE_VIEWS, PAYMENT_METHODS } from "./invoice-state";
+import type {
+    InvoiceSource,
+    InvoiceView,
+    PaymentMethod,
+} from "./invoice-state";
+import {
+    INVOICE_SOURCES,
+    INVOICE_VIEWS,
+    PAYMENT_METHODS,
+} from "./invoice-state";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -190,6 +198,32 @@ export class ListInvoicesQueryDto {
     @IsOptional()
     @IsISO8601({ strict: true })
     paidSince?: string;
+
+    /**
+     * What it was for (D18, the list's chips). A correction is filed under
+     * its original's source (`list-filter.ts`).
+     */
+    @IsOptional()
+    @IsIn(INVOICE_SOURCES)
+    source?: InvoiceSource;
+
+    /** One pack's sales: Pack Detail's "Receipts" (D18). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    packId?: string;
+
+    /** One course's enrolments: Course Detail's "Payments" (D18). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    courseId?: string;
+
+    /** One order's paper: its invoice and every correction to it (D18). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    orderId?: string;
 }
 
 /** Whose unpaid invoices to add up: a person, or one subscription. */

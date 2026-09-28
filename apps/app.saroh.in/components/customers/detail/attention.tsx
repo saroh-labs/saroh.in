@@ -257,10 +257,13 @@ export function AttentionEditor({
     state,
     contactId,
     choices,
+    canSensitive,
 }: {
     state: AttentionState;
     contactId: string;
     choices: { id: string; name: string }[];
+    /** `customer:sensitive` (C13). */
+    canSensitive: boolean;
 }) {
     if (!state.sheet) return null;
     return (
@@ -271,6 +274,7 @@ export function AttentionEditor({
             contactId={contactId}
             entry={state.sheet.entry}
             choices={choices}
+            canSensitive={canSensitive}
         />
     );
 }

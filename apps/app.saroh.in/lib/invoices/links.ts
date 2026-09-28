@@ -16,6 +16,19 @@ export function invoiceHref(id: string): string {
 }
 
 /**
+ * The Invoices list narrowed (D18): to one pack's sales (Pack Detail's
+ * Receipts), one course's (Course Detail's Payments), or one source chip.
+ * No argument: the whole list, which is also "Show all invoices".
+ */
+export function invoicesHref(
+    only?: { pack: string } | { course: string } | { source: string },
+): string {
+    if (!only) return "/billing/invoices";
+    const [key, value] = Object.entries(only)[0];
+    return `/billing/invoices?${key}=${encodeURIComponent(value)}`;
+}
+
+/**
  * What made it, when that has a page: an order (its invoice and the
  * corrections to it), a subscription, a class pack sold. Null for one written
  * by hand, and for a booking — the calendar has no page for one booking yet.

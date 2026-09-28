@@ -31,6 +31,7 @@ import {
     paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
+import { listFilterWhere } from "./list-filter";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
 import { buildManualInvoice } from "./order-invoice";
 import {
@@ -139,6 +140,8 @@ export class InvoicesService {
                 ...(query.paidSince
                     ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
+                // What it was for (D18); ANDed on, so hidden drafts stay hidden.
+                ...listFilterWhere(query),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,

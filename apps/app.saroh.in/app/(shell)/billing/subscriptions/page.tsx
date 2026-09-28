@@ -1,6 +1,7 @@
-import { AccessDenied } from "@/components/shared/access-denied";
+import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
+import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -42,12 +43,11 @@ export default async function SubscriptionsPage({
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     // Told so, and who can change it, on both tabs — rather than a read that
-    // is refused halfway down the page.
-    if (organization?.actions && !may("subscription:read")) {
+    // is refused halfway down the page. The design's locked card (D18).
+    if (organization && !mayRead(organization, "subscription:read")) {
         return (
-            <AccessDenied
-                title="You can't open subscriptions"
-                description={`Your role in ${organization.name} can't see subscriptions or plans. An owner or admin can change that in Team.`}
+            <PaymentsLocked
+                {...paymentsLockedCopy(organization, "subscriptions")}
             />
         );
     }

@@ -36,6 +36,7 @@ import {
     fieldOf,
     KIND_WORD,
     LABEL_MAX,
+    NO_SENSITIVE_NOTE,
     pickKind,
     picksAllergen,
     toInput,
@@ -65,6 +66,7 @@ export function AttentionSheet({
     contactId,
     entry,
     choices,
+    canSensitive = true,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -73,11 +75,13 @@ export function AttentionSheet({
     entry: AttentionEntry | null;
     /** The business's allergens, one per name; empty when it keeps none. */
     choices: Choice[];
+    /** `customer:sensitive`: may mark a note sensitive (C13). */
+    canSensitive?: boolean;
 }) {
     const router = useRouter();
     const id = useId();
     const [start] = useState(() =>
-        entry ? draftFrom(entry, choices) : emptyDraft(),
+        entry ? draftFrom(entry, choices) : emptyDraft(canSensitive),
     );
     const [draft, setDraft] = useState<AttentionDraft>(start);
     const [tried, setTried] = useState(false);
@@ -201,7 +205,13 @@ export function AttentionSheet({
                                         aria-checked={on}
                                         disabled={saving}
                                         onClick={() =>
-                                            change(pickKind(draft, k))
+                                            change(
+                                                pickKind(
+                                                    draft,
+                                                    k,
+                                                    canSensitive,
+                                                ),
+                                            )
                                         }
                                         className={cn(
                                             CHOICE,
@@ -340,25 +350,31 @@ export function AttentionSheet({
                         </FieldNote>
                     </div>
 
-                    <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.45] text-foreground/75 coarse:min-h-11">
-                        <Checkbox
-                            checked={draft.sensitive}
-                            disabled={saving}
-                            onCheckedChange={(v) =>
-                                change({
-                                    ...draft,
-                                    sensitive: v === true,
-                                    sensitiveSet: true,
-                                })
-                            }
-                            className="mt-px"
-                        />
-                        <span>
-                            Sensitive — only people who can edit customers can
-                            read it. Everyone else sees that there is a note
-                            they can&apos;t read.
-                        </span>
-                    </label>
+                    {canSensitive ? (
+                        <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.45] text-foreground/75 coarse:min-h-11">
+                            <Checkbox
+                                checked={draft.sensitive}
+                                disabled={saving}
+                                onCheckedChange={(v) =>
+                                    change({
+                                        ...draft,
+                                        sensitive: v === true,
+                                        sensitiveSet: true,
+                                    })
+                                }
+                                className="mt-px"
+                            />
+                            <span>
+                                Sensitive — only people who can see sensitive
+                                notes can read it. Everyone else sees that there
+                                is a note they can&apos;t read.
+                            </span>
+                        </label>
+                    ) : (
+                        <p className="text-[12.5px] leading-[1.45] text-muted-foreground">
+                            {NO_SENSITIVE_NOTE}
+                        </p>
+                    )}
 
                     {failed && unplaced ? (
                         <p
