@@ -12,7 +12,8 @@ import { InvoicesService } from "./invoices.service";
 
 /**
  * Invoices a business issues (ADR-007). Exports the service so
- * subscriptions, courses and class packs can issue on their own transaction.
+ * subscriptions, courses and class packs can issue on their own transaction,
+ * and the send service so Home's Send reminder reads the one send flag (F4).
  */
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { InvoicesService } from "./invoices.service";
             useClass: AccountThreadPosterService,
         },
     ],
-    exports: [InvoicesService],
+    // The send service too: Home's Send reminder reads its send flag (F4).
+    exports: [InvoicesService, InvoiceSendService],
 })
 export class InvoicesModule {}
