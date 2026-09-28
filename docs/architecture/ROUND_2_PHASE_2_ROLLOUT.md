@@ -332,3 +332,164 @@ business joined>` opens the joined month, with no error page.
 
 Roll the workspace back first (it asks for `from`/`to`), then the API.
 Nothing is stored.
+
+## E9: a treatment sold as one order (wave 2)
+
+Decision: DEC-050. **Migration** `20261014110000_treatment_orders`: a
+`BOOKING` value on `CustomerLinkReason`; `OrderItem.serviceId` and
+`productId` made nullable; `Booking.orderId` and `visitNumber`; the partial
+unique index `Booking_one_live_visit`; two foreign keys; and two CHECKs,
+`OrderItem_bills_one_thing` and `Booking_visit_of_order`. Additive: every
+existing line has a product and every existing booking neither an order
+nor a visit number, so both CHECKs hold on the day.
+
+- **Locks.** Not built `CONCURRENTLY` (no migration here is). Adding
+  `OrderItem_bills_one_thing` scans `OrderItem` under an ACCESS EXCLUSIVE
+  lock, the two foreign keys validate under SHARE ROW EXCLUSIVE on
+  `OrderItem`, `Service`, `Booking` and `Order`, and `Booking_one_live_visit`
+  builds under a SHARE lock on `Booking` (reads go on; order and booking
+  writes wait). Before running it, note the row counts and run it in a
+  quiet hour if `OrderItem` is past a few hundred thousand rows:
+
+    ```sql
+    SELECT (SELECT count(*) FROM "OrderItem") AS order_items,
+           (SELECT count(*) FROM "Booking") AS bookings;
+    ```
+
+- **API before app.** The old workspace on the new API: a treatment line
+  comes with `productId: null` and its name. Checked against the released
+  workspace (`origin/main`, e365b3ba): Order Detail's line
+  (`order-detail/items.tsx`) draws the name as a link through
+  `productHref(storeId, l.productId)`, which encodes `null` as the text
+  "null" — no crash, but the link opens a missing product page. Nothing
+  else in the old workspace reads a line's product id. Treatments are sold
+  only once a service has more than one visit, so deploy the workspace
+  soon after the API.
+
+### Verify
+
+```sql
+-- Both CHECKs exist and are validated (two rows, convalidated = true).
+SELECT conname, convalidated FROM pg_constraint
+WHERE conname IN ('OrderItem_bills_one_thing', 'Booking_visit_of_order');
+
+-- Nothing breaks them (both 0).
+SELECT count(*) FROM "OrderItem" WHERE num_nonnulls("productId", "serviceId") <> 1;
+SELECT count(*) FROM "Booking"
+WHERE ("orderId" IS NOT NULL AND "visitNumber" IS NULL)
+   OR ("visitNumber" IS NOT NULL AND "visitNumber" < 1);
+```
+
+### Rollback
+
+Safe only while no treatment order exists. The previous API never writes a
+service line, but several of its readers assume every line has a product
+(`item.product.name` in Customer detail, an order's pay page, the order
+invoice and reviews), so once a treatment order exists they fail on it.
+Check first:
+
+```sql
+SELECT count(*) FROM "OrderItem" WHERE "serviceId" IS NOT NULL;
+```
+
+At 0, deploy the previous API and leave the schema. Above 0, roll forward
+instead. Never drop the columns while a row uses them.
+
+## F16: storefront people join the team (wave 3)
+
+Decision: DEC-048 (amended 2026-09-27). **Migration**
+`20261014200000_storefront_team_notice`: `Organization.
+storefrontTeamNoticeDismissedAt`, nullable (additive). From this API, a
+storefront invite accepted puts the person on the business's team as
+"Storefront team"; accepting re-checks the inviter's `member:invite` and
+reach, so an invite sent before this release by someone who can't invite
+to the team is refused ("ask for a new one"). Removing someone from Team
+revokes the storefront invites still waiting for them.
+
+### After the API deploys
+
+1. **Take a snapshot and verify it restores** — the backfill writes
+   memberships and Activity entries in every business.
+2. **Run the backfill** from a checkout of the release commit:
+
+    ```bash
+    DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/store-members-to-memberships.cli.ts
+    ```
+
+    It prints counts only: businesses, storefront people, added as
+    Storefront team, already on the team, and businesses skipped (their
+    `storefront-team` role holds more than the narrow list — an owner
+    widened it by hand; look at those before running again). Record them in
+    the release issue. **Idempotent:** it never touches a membership that
+    exists, so a second run adds nobody (`added … 0`).
+
+### Verify
+
+```sql
+-- Storefront people with no membership in the storefront's business
+-- (0, or only people in the businesses the backfill skipped).
+SELECT count(*) FROM "StoreMembers" sm
+JOIN "Store" s ON s.id = sm."storeId"
+LEFT JOIN "Membership" m
+  ON m."organizationId" = s."organizationId" AND m."userId" = sm."userId"
+WHERE m."userId" IS NULL;
+```
+
+### Rollback
+
+Deploy the previous API. The memberships the backfill made stay (they are
+what Team shows, in the narrow role); remove any by hand on Team. The
+column is ignored by the old image.
+
+## G13: the site's bag and checkout (wave 3; off until switched on)
+
+**Migration** `20261014180000_shop_checkout`: `Order.checkoutKey` (unique
+per storefront, many nulls) and `StoreSettings.localDeliveryFee` /
+`shippingFee`. Additive; the old image never reads them. Everything ships
+behind the per-business `SITE_SHOP` flag, off: no checkout can start until
+an override is set.
+
+- A refused checkout's refund (the last unit sold meanwhile, or it had
+  closed) is sent from a `payments.send-refund` job written with the
+  refusal, retried with backoff; the order shows in Orders (money reached
+  it), and the customer is told "on its way back" only once the provider
+  has the refund. The job type is new: the API that writes it registers
+  its handler, so there is no ordering step.
+- A new checkout closes the account's older unpaid ones at that
+  storefront ("Replaced by a newer checkout").
+
+### Rollback
+
+Switch the `SITE_SHOP` overrides off first, then deploy the previous API. A
+`payments.send-refund` job left PENDING dead-letters on the old image (no
+handler); its refund stays PENDING on the order, where Try again sends it.
+
+## C8: a contact's address (wave 3)
+
+**Migration** `20261014210000_contact_address`: six nullable columns on
+`Contact`. Additive, nothing backfilled; the old image never reads them.
+Rollback: deploy the previous API and workspace; addresses saved meanwhile
+stay in the columns, unread.
+
+## Date-range indexes (review follow-up)
+
+**Migration** `20261015100000_calendar_range_indexes`: `Order
+(organizationId, createdAt)`, `Invoice (organizationId, status, paidAt)`,
+`(organizationId, paidAt)` and `(organizationId, issuedAt)`, and
+`StaffTimeOff (organizationId, startAt)`, for the calendar's and Home's
+date-range reads. Additive; each build holds a SHARE lock on its table
+(writes wait while it builds). Rollback: nothing to do — the old image
+reads the same; drop an index only if it is found to cost writes.
+
+## Before switching a flag on (advisory)
+
+These browser suites are skipped in CI while their features are off. Run
+them against a stack prepared as each file's header says, and record the
+result in the release issue, **before** turning the feature on anywhere:
+
+- `e2e/tests/site-shop.spec.ts` — before any `SITE_SHOP` override:
+  `E2E_SITE_SHOP=1`, Northwind's override on, a Razorpay test connection.
+- `e2e/tests/site-account.spec.ts` — before `SITE_ACCOUNT_AREA=on` (API
+  first, then saroh.app): the stack started with `SITE_ACCOUNT_AREA=on` in
+  both.
