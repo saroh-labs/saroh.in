@@ -196,7 +196,7 @@ export function Me({
                     receipts.value.map((r) => (
                         <AccountRow
                             key={r.ref}
-                            title={`Receipt ${r.number}`}
+                            title={`${r.billOfSupply ? "Bill of supply" : "Receipt"} ${r.number}`}
                             sub={[
                                 accountDate(r.paidAt ?? r.issuedAt),
                                 accountMoney(r.total, r.currency),

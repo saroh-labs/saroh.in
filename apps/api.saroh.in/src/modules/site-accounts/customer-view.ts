@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 
 import { toMoneyString } from "../../common/money";
+import { isBillOfSupply } from "../invoices/invoice-title";
 import type { OrderStage } from "../orders/dto";
 import { goesByCourier } from "../orders/fulfilment";
 import { isServiceLine, lineName } from "../orders/order-line";
@@ -205,6 +206,8 @@ export interface AccountReceipt {
     paidAt: string | null;
     total: string;
     currency: string;
+    /** A registered business's exempt paper (D15), as the pay page says. */
+    billOfSupply: boolean;
 }
 
 export interface AccountNote {
@@ -624,6 +627,9 @@ export function receiptView(row: {
     paidAt: Date | null;
     total: { toString(): string };
     currency: string;
+    kind: string;
+    sellerGstin: string | null;
+    lines: { gstRate: { toString(): string } | null }[];
 }): AccountReceipt {
     return {
         ref: row.id,
@@ -632,6 +638,7 @@ export function receiptView(row: {
         paidAt: row.paidAt?.toISOString() ?? null,
         total: toMoneyString(row.total),
         currency: row.currency,
+        billOfSupply: isBillOfSupply(row),
     };
 }
 

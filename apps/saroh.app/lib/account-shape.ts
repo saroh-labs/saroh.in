@@ -264,7 +264,8 @@ function isReceipt(v: unknown): v is AccountReceipt {
         isNullableString(v.issuedAt) &&
         isNullableString(v.paidAt) &&
         isString(v.total) &&
-        isString(v.currency)
+        isString(v.currency) &&
+        (v.billOfSupply === undefined || typeof v.billOfSupply === "boolean")
     );
 }
 

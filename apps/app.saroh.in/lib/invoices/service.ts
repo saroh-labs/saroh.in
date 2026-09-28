@@ -93,6 +93,10 @@ export interface SendResult {
 /** INVOICE, or a correction to one: a credit note (down) or a supplementary invoice (up). */
 export type InvoiceKind = "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
 
+/** What a paper is called (D15, the API's `invoice-title.ts`). */
+export type InvoiceTitle =
+    "Tax invoice" | "Bill of supply" | "Credit note" | "Receipt" | "Invoice";
+
 export interface InvoiceLine {
     id: string;
     description: string;
@@ -155,6 +159,16 @@ export interface Invoice {
     };
     /** Absent from an API older than ADR-008: read it as INVOICE. */
     kind?: InvoiceKind;
+    /**
+     * What the paper is called, worked out by the API from what was frozen
+     * on it (D15). Absent from an older API: `paperTitle` falls back.
+     */
+    title?: InvoiceTitle;
+    /**
+     * A GST-registered business's paper with every line at 0% — a bill of
+     * supply, or a credit note against one: no tax columns (D15).
+     */
+    exempt?: boolean;
     /** The invoice a credit note or supplementary invoice corrects. */
     related?: { id: string; number: string | null } | null;
     corrections?: InvoiceCorrection[];

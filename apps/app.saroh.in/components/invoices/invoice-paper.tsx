@@ -2,20 +2,14 @@ import { cn } from "@saroh/ui/lib/utils";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import {
+    isExemptPaper,
+    paperFooter,
+    paperTitle,
+} from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
 import type { InvoiceBusiness } from "@/lib/invoices/tax";
-
-/** What the paper is called: a tax invoice, a receipt, a credit note. */
-export function paperTitle(
-    i: Pick<Invoice, "gst" | "kind" | "standing">,
-): string {
-    if (i.kind === "CREDIT_NOTE") return "Credit note";
-    if (i.gst) return "Tax invoice";
-    return i.standing === "PAID" || i.standing === "CREDITED"
-        ? "Receipt"
-        : "Invoice";
-}
 
 /**
  * The invoice as the customer receives it, after "Saroh Invoice Detail": a
@@ -24,7 +18,9 @@ export function paperTitle(
  * registered address (frozen on issue, like the GSTIN), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
  * of supply, HSN/SAC and rate on every line, taxable value and CGST + SGST
- * or IGST — or a receipt for a business that is not registered.
+ * or IGST — or a receipt for a business that is not registered. A
+ * registered business's paper whose every line is exempt is a bill of
+ * supply (D15): its GSTIN and SAC, and no place of supply or tax columns.
  *
  * Every figure is the API's, frozen when it was issued; nothing is summed
  * here. It is cream paper with dark ink in either theme (`.invoice-paper`),
@@ -43,6 +39,9 @@ export function InvoicePaper({
     const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
     const who = billedTo(i);
     const gst = i.gst ?? null;
+    // GST charged on it: a tax invoice's columns, which a bill of supply
+    // (and a credit note against one) leaves off.
+    const taxed = gst && !isExemptPaper(i) ? gst : null;
     const credit = i.kind === "CREDIT_NOTE";
     const title = paperTitle(i);
     const gstin = gst?.sellerGstin ?? business?.gstin ?? null;
@@ -71,14 +70,14 @@ export function InvoicePaper({
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;
 
-    const sums: [string, string][] = gst
+    const sums: [string, string][] = taxed
         ? [
               ["Taxable value", money(i.subtotal)],
-              ...(gst.taxType === "INTER"
-                  ? ([["IGST", money(gst.igst)]] as [string, string][])
+              ...(taxed.taxType === "INTER"
+                  ? ([["IGST", money(taxed.igst)]] as [string, string][])
                   : ([
-                        ["CGST", money(gst.cgst)],
-                        ["SGST", money(gst.sgst)],
+                        ["CGST", money(taxed.cgst)],
+                        ["SGST", money(taxed.sgst)],
                     ] as [string, string][])),
           ]
         : typedTax
@@ -174,16 +173,16 @@ export function InvoicePaper({
                         </p>
                     ) : null}
                 </div>
-                {gst ? (
+                {taxed ? (
                     <div className="min-w-0 flex-[0_1_200px]">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                             Place of supply
                         </p>
                         <p className="mt-1 text-[13px]">
-                            {gst.placeOfSupply
-                                ? `${gst.placeOfSupply.name ?? "State"} (${gst.placeOfSupply.code})`
+                            {taxed.placeOfSupply
+                                ? `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
                                 : "—"}
-                            {gst.taxType === "INTER"
+                            {taxed.taxType === "INTER"
                                 ? " — IGST"
                                 : " — CGST + SGST"}
                         </p>
@@ -203,7 +202,7 @@ export function InvoicePaper({
                         const rate = l.gst?.rate ? Number(l.gst.rate) : null;
                         const discount = Number(l.discount ?? 0);
                         const sub = [
-                            gst
+                            taxed
                                 ? rate
                                     ? `GST ${rate}% · taxable ${money(l.gst?.taxableValue ?? "0")}`
                                     : "Nil-rated"
@@ -262,7 +261,7 @@ export function InvoicePaper({
                         </span>
                         <span className="tabular-nums">{money(i.total)}</span>
                     </div>
-                    {gst ? (
+                    {taxed ? (
                         <p className="mt-1 text-[11.5px] text-muted-foreground">
                             Prices include GST.
                         </p>
@@ -271,35 +270,8 @@ export function InvoicePaper({
             </div>
 
             <p className="mt-[18px] border-t border-dashed border-border-strong pt-3 text-[12px] leading-[1.5] text-muted-foreground">
-                {footer(i, businessName)}
+                {paperFooter(i, businessName)}
             </p>
         </article>
     );
-}
-
-function footer(i: Invoice, businessName: string): string {
-    if (i.gst) {
-        const law =
-            i.kind === "CREDIT_NOTE"
-                ? `Credit note under section 34, CGST Act, against ${i.related?.number ?? "the invoice named above"}.`
-                : "Tax invoice under section 31, CGST Act.";
-        const state =
-            i.standing === "CREDITED"
-                ? " Cancelled by credit note."
-                : i.standing === "PAID"
-                  ? " Paid in full."
-                  : "";
-        return `${law} Reverse charge does not apply.${state}`;
-    }
-    const paid =
-        i.standing === "PAID"
-            ? "Receipt — paid in full. "
-            : i.standing === "VOID"
-              ? "Void — this is not to be paid. "
-              : i.standing === "CREDITED"
-                ? "Cancelled by credit note. "
-                : "";
-    return Number(i.tax) > 0
-        ? `${paid}${businessName} is not registered for GST.`
-        : `${paid}${businessName} is not registered for GST, so no tax is charged.`;
 }

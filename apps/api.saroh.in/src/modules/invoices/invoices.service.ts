@@ -18,6 +18,7 @@ import type {
     RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, rateToBps } from "./gst";
 import { gstinProblem, stateCode } from "./gst-states";
 import type { InvoiceSource } from "./invoice-state";
@@ -143,7 +144,12 @@ export class InvoicesService {
             take: LIST_LIMIT,
             select: INVOICE_LIST_SELECT,
         });
-        return rows.map((r) => serializeInvoice(r as InvoiceRow, now));
+        const exempt = await exemptInvoiceIds(prisma, ctx.organizationId, rows);
+        return rows.map((r) =>
+            serializeInvoice(r as InvoiceRow, now, {
+                exempt: exempt.has(r.id),
+            }),
+        );
     }
 
     /**
