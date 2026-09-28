@@ -90,6 +90,22 @@ what the API allows.
   resolved set (implied holds count); the refusal is a 403 naming the
   permissions in the owner's words. Any new write of a permission list
   (F17's extras) asks the same helper.
+- **Current** (F16, DEC-048) — **A storefront's people are on the team.**
+  Accepting a storefront invite (`members/members.service.ts`) also makes a
+  `Membership` in the store's business, in the same transaction, in the
+  narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
+  `member:read`, `module:read`, `media:read`, `store:read`,
+  `product-review:read` — no customers, bookings, orders or money), unless
+  the person already holds a role, which is never lowered or replaced. The
+  rule is `joinTeamFromStorefront` in `@saroh/database`
+  (`backfill/store-members-to-memberships.ts`, shared with the one-off
+  backfill); it writes a `membership.storefront-join` Activity entry. A
+  storefront invite needs `member:invite` in the business as well as the
+  `StoreOwner` check, and the Storefront team role as the business has it
+  must be within the inviter's reach. Removing someone from the team deletes
+  their `StoreMembers` rows in that business's storefronts, in the removal's
+  serializable transaction. What anyone does inside a storefront still comes
+  from their storefront role.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so

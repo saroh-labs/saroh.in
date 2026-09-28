@@ -15,6 +15,11 @@ export const AuditAction = {
     MembershipAccept: "membership.accept",
     MembershipRemove: "membership.remove",
     MembershipRoleUpdate: "membership.role.update",
+    // Someone on a storefront put on the business's team as Storefront team
+    // (F16, DEC-048), by accepting a storefront invite or by the backfill.
+    // Written in the join's own transaction by `joinTeamFromStorefront`
+    // (`@saroh/database`); metadata names the storefront and the source.
+    MembershipStorefrontJoin: "membership.storefront-join",
     TeamCreate: "team.create",
     TeamUpdate: "team.update",
     TeamDelete: "team.delete",
@@ -51,6 +56,10 @@ export const AuditAction = {
     // transaction with the survivor as the target. Ids and counts only,
     // never the discarded name, email or phone (DEC-035).
     CustomerMerged: "customer.merged",
+    // A customer's details edited by staff (C8), written with the edit;
+    // the timeline reads it as "Details changed". Metadata names the parts
+    // that changed (`fields`: firstName, email, address, …), never a value.
+    CustomerDetailsChanged: "customer.details.changed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

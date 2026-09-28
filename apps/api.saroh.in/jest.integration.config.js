@@ -74,6 +74,8 @@ module.exports = {
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
+        // G13: pure; public-checkout.db.spec.ts runs here.
+        "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",

@@ -39,7 +39,7 @@ export type {
 const API_URL =
     env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
 
-async function shopFetch(path: string): Promise<Response | null> {
+export async function shopFetch(path: string): Promise<Response | null> {
     const requestHeaders = await headers();
     const sent: Record<string, string> = { accept: "application/json" };
     const host = servedHost(requestHeaders);

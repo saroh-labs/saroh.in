@@ -13,9 +13,14 @@ import {
     pickKind,
     picksAllergen,
     rowTags,
+    SUGGESTION_KINDS,
+    suggestionDraft,
+    suggestionsTitle,
+    suggestionWhen,
     tagText,
     tagTitle,
     toInput,
+    toSuggestionInput,
 } from "./attention";
 
 const TZ = "Asia/Kolkata";
@@ -339,5 +344,96 @@ describe("the editor", () => {
         expect(fieldOf("detail")).toBe("detail");
         expect(fieldOf("kind")).toBeNull();
         expect(fieldOf(undefined)).toBeNull();
+    });
+});
+
+describe("booking-page notes (C12)", () => {
+    const rahul = entry({
+        label: "I take amlodipine 5mg for blood pressure",
+        detail: "I take amlodipine 5mg for blood pressure. Please check before the numbing.",
+        source: "BOOKING_PAGE",
+        status: "SUGGESTED",
+        bookingId: "bk_1",
+        createdByUserId: null,
+        addedBy: null,
+        createdAt: "2026-09-18T05:12:00Z",
+    });
+
+    it("starts from the suggested label, Medical and sensitive", () => {
+        const draft = suggestionDraft(rahul, []);
+        expect(draft).toMatchObject({
+            kind: "MEDICAL",
+            label: "I take amlodipine 5mg for blood pressure",
+            sensitive: true,
+            sensitiveSet: false,
+        });
+        // The design's card holds 40 characters.
+        expect(
+            suggestionDraft(entry({ label: "x".repeat(60) }), []).label,
+        ).toHaveLength(40);
+    });
+
+    it("offers Medical, Allergy and Access; sensitive follows Medical until ticked", () => {
+        expect(SUGGESTION_KINDS).toEqual(["MEDICAL", "ALLERGY", "ACCESS"]);
+        const draft = suggestionDraft(rahul, []);
+        expect(pickKind(draft, "ACCESS").sensitive).toBe(false);
+        const ticked = { ...draft, sensitive: true, sensitiveSet: true };
+        expect(pickKind(ticked, "ACCESS").sensitive).toBe(true);
+        // A suggestion of a kind the card doesn't offer starts as Medical.
+        expect(suggestionDraft(entry({ kind: "OTHER" }), []).kind).toBe(
+            "MEDICAL",
+        );
+    });
+
+    it("sends the kind, label and tick, never the booker's words", () => {
+        const draft = {
+            ...suggestionDraft(rahul, []),
+            label: "  Takes amlodipine ",
+        };
+        expect(toSuggestionInput(draft, [])).toEqual({
+            kind: "MEDICAL",
+            label: "Takes amlodipine",
+            sensitive: true,
+            allergenId: null,
+        });
+    });
+
+    it("sends an allergen from the list for an Allergy, with no label", () => {
+        const draft = {
+            ...pickKind(suggestionDraft(rahul, CHOICES), "ALLERGY"),
+            allergenId: SESAME.id,
+        };
+        expect(draftProblem({ ...draft, allergenId: null }, CHOICES)).toEqual({
+            field: "allergenId",
+            message: "Pick what they're allergic to.",
+        });
+        expect(toSuggestionInput(draft, CHOICES)).toEqual({
+            kind: "ALLERGY",
+            label: "",
+            sensitive: false,
+            allergenId: SESAME.id,
+        });
+        expect(draftTag(draft, CHOICES)).toBe("Allergy: Sesame");
+    });
+
+    it("says how many notes wait, and who wrote each and when", () => {
+        expect(suggestionsTitle(1)).toBe("1 note from the booking page");
+        expect(suggestionsTitle(2)).toBe("2 notes from the booking page");
+        expect(suggestionWhen("Rahul", rahul.createdAt, TZ, NOW)).toBe(
+            "Rahul wrote this when booking online, 18 Sep at 10:42",
+        );
+        expect(suggestionWhen(null, rahul.createdAt, TZ, NOW)).toBe(
+            "They wrote this when booking online, 18 Sep at 10:42",
+        );
+    });
+
+    it("reads as from the booking page once added", () => {
+        const added = { ...rahul, status: "ACTIVE" as const };
+        expect(entryMeta(added, "user_1", TZ, NOW)).toBe(
+            "From the booking page · 18 Sep",
+        );
+        expect(tagTitle({ ...added, label: "Takes amlodipine" })).toBe(
+            `${rahul.detail} · from the booking page`,
+        );
     });
 });

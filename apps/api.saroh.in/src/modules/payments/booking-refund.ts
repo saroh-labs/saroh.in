@@ -11,7 +11,9 @@ import type { Prisma } from "@saroh/database";
  * Only the booking's own invoice (source BOOKING) is refunded here: the
  * deposit or full price taken at booking, or a pay link it was sent. A
  * visit of a treatment has no invoice of its own — its money is on the
- * order and goes back only through the order's refund (DEC-050, B9).
+ * order and goes back only through the order's refund (DEC-050, B9). Visit
+ * 1 of a treatment booked online paid the order's invoice (it names the
+ * order, E9), so {@link bookingPaymentInTx} never finds that payment.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -71,6 +73,9 @@ export async function bookingPaymentInTx(
                 source: "BOOKING",
                 kind: "INVOICE",
                 status: "PAID",
+                // A treatment's visit 1 paid its order's invoice (E9): that
+                // money is the order's, refunded only through the order.
+                orderId: null,
             },
         },
         orderBy: { createdAt: "asc" },

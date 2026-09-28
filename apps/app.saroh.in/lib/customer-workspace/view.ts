@@ -346,6 +346,8 @@ export function favourites(rows: DetailOrder[]): Favourite[] {
     for (const o of rows) {
         const seen = new Set<string>();
         for (const i of o.items) {
+            // A treatment's line (E9) bills a service, not a product.
+            if (!i.productId) continue;
             const f = byProduct.get(i.productId) ?? {
                 name: i.name,
                 orders: 0,
@@ -391,9 +393,16 @@ export function howTheyGet(rows: DetailOrder[]): string {
     return `Collects at ${where} — ${collected.length} of ${rows.length} orders. The rest were delivered.`;
 }
 
-/** Where their last delivery went. */
-export function deliveryAddress(rows: DetailOrder[]): string {
+/**
+ * Their delivery address: the one kept on their record (C8, as one line),
+ * else where their last delivery went.
+ */
+export function deliveryAddress(
+    rows: DetailOrder[],
+    kept: string | null = null,
+): string {
     return (
+        kept ??
         rows.find((o) => o.delivery)?.delivery ??
         "No address — they have only collected."
     );

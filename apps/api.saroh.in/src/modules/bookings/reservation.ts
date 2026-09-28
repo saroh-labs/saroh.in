@@ -17,7 +17,7 @@ import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
 import { courseSeatsHeld } from "./course-seats";
-import type { BookingLocationType, BookPay, PaidWith } from "./dto";
+import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { depositCents } from "./service-fields";
 
 /*
@@ -40,8 +40,14 @@ export interface BookInput {
      * 15 minutes (`HOLD_MINUTES`) while they pay online, DEPOSIT does the
      * same for the service's deposit only (E8), DESK books it to pay on the
      * day. Absent — the one-service booking block — books as before.
+     * CREDIT (A10, signed in only) spends one class of the pack or
+     * membership named below (`creditChoiceOf`).
      */
-    pay?: BookPay;
+    pay?: AccountBookPay;
+    /** Paying with CREDIT (A10): the pack purchase it comes out of… */
+    packPurchaseId?: string;
+    /** …or the membership. */
+    subscriptionId?: string;
     /**
      * Where, for a service offered either way (E7). Absent: in person. See
      * {@link bookingLocation}.
@@ -54,6 +60,11 @@ export interface BookInput {
     intakeNote?: string;
 }
 
+/** The pack or the membership a class credit comes out of (A10). */
+export type CreditChoice =
+    | { kind: "PACK"; packPurchaseId: string }
+    | { kind: "MEMBERSHIP"; subscriptionId: string };
+
 /** Who a booking is with and how it is paid, for {@link reserveInTx}. */
 export interface ReserveWith {
     staffId: string | null;
@@ -63,6 +74,12 @@ export interface ReserveWith {
     subscriptionId?: string | null;
     /** A pay-now hold (U19): PENDING, holding its place until then. */
     holdUntil?: Date | null;
+    /**
+     * A later visit of a treatment (E9, DEC-050): the order that sold it
+     * and which visit this is. Written with the booking, so the one-live-
+     * visit unique refuses a second booking of the same visit at once.
+     */
+    visit?: { orderId: string; visitNumber: number };
 }
 
 /** Who a reservation is made by. */
@@ -215,6 +232,9 @@ export async function bookingByKey(
     });
 }
 
+/** A serialization failure that nothing else explained: the race was lost. */
+class RaceLost extends ConflictException {}
+
 /**
  * The reservation itself, shared by the booking page and a booking made
  * by hand: re-count inside a Serializable transaction, upsert the contact,
@@ -229,6 +249,52 @@ export async function bookingByKey(
  * caller says what to tell the booker (`also.onRace`).
  */
 export async function reserve(
+    activation: ActivationEvents | undefined,
+    service: Service,
+    startAt: Date,
+    endAt: Date,
+    input: BookInput,
+    by: ReserveBy,
+    also?: {
+        inTx: (tx: Prisma.TransactionClient, booking: Booking) => Promise<void>;
+        onRace: string;
+        /**
+         * Try once more after losing a serialization race, so the answer is
+         * true now (`backend-billing-and-classes.md`): a customer spending
+         * their last credit in two tabs is told the pack is empty, not that
+         * something changed (A10).
+         */
+        retryOnce?: boolean;
+    },
+    person?: ReserveWith,
+): Promise<Booking> {
+    try {
+        return await reserveOnce(
+            activation,
+            service,
+            startAt,
+            endAt,
+            input,
+            by,
+            also,
+            person,
+        );
+    } catch (err) {
+        if (!also?.retryOnce || !(err instanceof RaceLost)) throw err;
+        return reserveOnce(
+            activation,
+            service,
+            startAt,
+            endAt,
+            input,
+            by,
+            also,
+            person,
+        );
+    }
+}
+
+async function reserveOnce(
     activation: ActivationEvents | undefined,
     service: Service,
     startAt: Date,
@@ -286,9 +352,7 @@ export async function reserve(
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
         if (code === "P2034") {
-            throw new ConflictException(
-                also?.onRace ?? "This slot is fully booked",
-            );
+            throw new RaceLost(also?.onRace ?? "This slot is fully booked");
         }
         throw err;
     }
@@ -453,6 +517,12 @@ export async function reserveInTx(
                       staffId: person.staffId,
                       paidWith: person.paidWith ?? null,
                       subscriptionId: person.subscriptionId ?? null,
+                  }
+                : {}),
+            ...(person?.visit
+                ? {
+                      orderId: person.visit.orderId,
+                      visitNumber: person.visit.visitNumber,
                   }
                 : {}),
         },

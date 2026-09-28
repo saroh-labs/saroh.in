@@ -104,6 +104,19 @@ describe("layersFor", () => {
         ]);
     });
 
+    it("a clinic reads its bookings, then its payments in green (E20)", () => {
+        const layers = layersFor(
+            month({
+                layers: ["bookings", "classes", "payments"],
+                totals: { bookings: 12, classes: 0, payments: 5 },
+            }),
+        );
+        expect(layers.map((l) => [l.key, l.label, l.one, l.tone])).toEqual([
+            ["bookings", "Bookings", "booking", 1],
+            ["payments", "Payments", "payment", 2],
+        ]);
+    });
+
     it("keeps the lead and a layer that could not be read, even at nothing", () => {
         const keys = layersFor(
             month({
@@ -302,6 +315,21 @@ describe("how things read", () => {
             sub: "Placed 10:00",
             flag: null,
             href: "/commerce/orders/o1",
+        });
+    });
+
+    it("a clinic's payment, with its time and what it paid for (E20)", () => {
+        const paid = item({
+            kind: "paid",
+            title: "Check-up · Asha Rao",
+            subtitle: "INV-0042",
+            link: { type: "invoice", id: "inv_1" },
+        });
+        expect(describeItem("payments", paid, at)).toEqual({
+            title: "10:00 Paid · Check-up · Asha Rao",
+            sub: "INV-0042",
+            flag: null,
+            href: "/billing/invoices/inv_1",
         });
     });
 

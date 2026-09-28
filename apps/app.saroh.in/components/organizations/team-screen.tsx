@@ -53,13 +53,20 @@ import {
 import type {
     OrganizationInvitation,
     OrganizationMember,
+    StorefrontTeamNoticePerson,
 } from "@/lib/organizations/members";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { OrganizationRole } from "@/lib/organizations/service";
+import {
+    STOREFRONT_TEAM_LABEL,
+    STOREFRONT_TEAM_ROLE,
+    storefrontRolesLine,
+} from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { LastActiveLine } from "./last-active-line";
 import { RolesTab } from "./roles-tab";
+import { StorefrontTeamNotice } from "./storefront-team-notice";
 
 const ROLES: OrganizationRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
 
@@ -141,9 +148,12 @@ const TEAM_TABS = ["roles", "people"] as const;
  * active, the role in words beside a dot of the same colour, a Remove on the
  * row and an Edit drawer that changes the role.
  *
- * Team is business-scoped: there is no storefront anywhere on this screen. A
- * role is held in a business and covers everything that business has, and an
- * invitation adds someone to this business only.
+ * Team is business-scoped: a role is held in a business and covers
+ * everything that business has, and an invitation adds someone to this
+ * business only. A storefront's people are on it too (DEC-048, F16): their
+ * storefront roles show under their name as a narrower grant on top, and
+ * those the storefront backfill added are named once in a notice with
+ * Change role.
  *
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
@@ -163,6 +173,7 @@ export function TeamScreen({
     roles,
     catalogue,
     myActions,
+    joinedFromStorefronts = [],
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -177,6 +188,11 @@ export function TeamScreen({
     catalogue: RoleCatalogue | null;
     /** What the viewer may do here; `null` when unknown, and nothing is held back. */
     myActions: string[] | null;
+    /**
+     * People the storefront backfill put on the team (F16), for the one-time
+     * notice. Empty for anyone who may not change roles.
+     */
+    joinedFromStorefronts?: StorefrontTeamNoticePerson[];
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -321,6 +337,26 @@ export function TeamScreen({
                     book={book}
                     onEdit={setEditing}
                     onRemove={setRemoving}
+                    notice={
+                        canEditRoles ? (
+                            <StorefrontTeamNotice
+                                // Only people still on the roster.
+                                people={joinedFromStorefronts.filter((p) =>
+                                    members.some((m) => m.userId === p.userId),
+                                )}
+                                roleLabel={
+                                    byKey.get(STOREFRONT_TEAM_ROLE)?.label ??
+                                    STOREFRONT_TEAM_LABEL
+                                }
+                                onChangeRole={(userId) => {
+                                    const member = members.find(
+                                        (m) => m.userId === userId,
+                                    );
+                                    if (member) setEditing(member);
+                                }}
+                            />
+                        ) : null
+                    }
                 />
             )}
 
@@ -367,6 +403,7 @@ function PeopleTab({
     book,
     onEdit,
     onRemove,
+    notice,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -375,6 +412,8 @@ function PeopleTab({
     book: RoleBook;
     onEdit: (member: OrganizationMember) => void;
     onRemove: (member: OrganizationMember) => void;
+    /** The storefront-people notice (F16), above the roster. */
+    notice?: React.ReactNode;
 }) {
     // The design's columns need about 600px; the panel is that wide only
     // once the settings list sits beside it on a wide screen. Narrower, a
@@ -388,6 +427,8 @@ function PeopleTab({
     return (
         <div className="space-y-3.5">
             {canManage ? <TwoStepRequirement /> : null}
+
+            {notice}
 
             {canManage && invitations.length > 0 ? (
                 <PendingInvites invitations={invitations} book={book} />
@@ -450,6 +491,14 @@ function PeopleTab({
                                                 ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
                                                 : ""}
                                         </p>
+                                        {m.storefronts &&
+                                        m.storefronts.length > 0 ? (
+                                            <p className="mt-px truncate text-[11.5px] text-muted-foreground">
+                                                {storefrontRolesLine(
+                                                    m.storefronts,
+                                                )}
+                                            </p>
+                                        ) : null}
                                         {/* The role, where there is no Role
                                             column to hold it. */}
                                         <p className="mt-px flex min-w-0 items-center gap-1.5 text-[11.5px] xl:hidden">
@@ -931,7 +980,11 @@ function RemoveMember({
                 if (!open) onClose();
             }}
             title={`Remove ${name} from ${organizationName}?`}
-            description={`${name} loses access to ${organizationName} now, and any share links they made stop working. Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
+            description={`${name} loses access to ${organizationName} now, and any share links they made stop working.${
+                member?.storefronts && member.storefronts.length > 0
+                    ? ` They come off ${new Intl.ListFormat("en", { type: "conjunction" }).format(member.storefronts.map((s) => s.name))} too.`
+                    : ""
+            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
             confirmLabel="Remove from team"
             onConfirm={remove}
         />

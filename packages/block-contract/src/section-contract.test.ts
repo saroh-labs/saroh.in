@@ -390,6 +390,7 @@ describe("per-section padding override (#189)", () => {
         contact: { phone: "+44 113 496 0000" },
         servicesList: { serviceIds: ["svc_1"] },
         visitUs: {},
+        journal: {},
     };
 
     it("is accepted on every section type", () => {

@@ -57,18 +57,22 @@ each with why it stops there:
   rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
   hand behind one controller. Under 400 means one injectable per feature and
   a controller and DI change, not a move.
-- `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
-  (418) — one class sharing its rate limiters, and one serializable write
-  with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (892; 643 before E7, E11,
-  G18 and A9's sign-in at the last step) — its state, effects and handlers
-  (the hold poll, confirm, letting a hold go, signing in and "Not you?")
-  share one component's state; the drawing is already in `steps/` and the
-  pure rules in `flow-helpers.ts` and `initial-start.ts`. Less means a
-  reducer or hook seam, which is new logic; the sign-in handlers are the
-  first one to take out.
+- `bookings/public-bookings.service.ts` (820 after A10, C12 and E9) and
+  `bookings/reservation.ts` (725) — one class sharing its rate limiters, and
+  one serializable write with its helpers; cutting them splits a method.
+  A10's credit rules went to `bookings/booking-credit.ts` rather than grow
+  them further; `bookOnline` is the seam when they are next cut.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (1,068; 643 before E7,
+  E11, G18, A9's sign-in at the last step and A10's credit) — its state,
+  effects and handlers (the hold poll, confirm, letting a hold go, signing
+  in and "Not you?") share one component's state; the drawing is already in
+  `steps/`, the pure rules in `flow-helpers.ts` and `initial-start.ts`, and
+  A10's credit read in the `use-credit.ts` hook. Less means a reducer or
+  more hook seams, which is new logic; the sign-in handlers are the next
+  one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,051),
+  (1,173), `calendar/calendar.service.ts` (1,409 after E19 and E20, whose range,
+  days-off and payments reads already sit in their own files; split next),
   `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)

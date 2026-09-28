@@ -9,9 +9,11 @@ import { CalendarService } from "./calendar.service";
 import { CalendarMonthQueryDto } from "./dto";
 
 /**
- * The Business Calendar's month (U4): everything dated, per day and layer,
- * in one read. Not module-gated: it spans modules and leaves out, layer by
- * layer, whatever is off or the viewer may not read — like Home.
+ * The Business Calendar (U4, plan 005 E20): everything dated, per day and
+ * layer, in one read of `from`..`to` (or the `month` alias, until Z3). Not
+ * module-gated: it spans modules and leaves out, layer by layer, whatever
+ * is off or the viewer may not read — like Home. A viewer who reads no
+ * layer at all is refused (403).
  */
 @Controller("organizations/:organizationId/calendar")
 @UseGuards(BetterAuthGuard, OrganizationGuard)
@@ -19,10 +21,14 @@ export class CalendarController {
     constructor(private readonly calendar: CalendarService) {}
 
     @Get()
-    month(
+    read(
         @OrgContext() ctx: OrganizationContext,
         @Query() query: CalendarMonthQueryDto,
     ): Promise<CalendarMonth> {
-        return this.calendar.month(ctx, query.month);
+        return this.calendar.read(ctx, {
+            month: query.month,
+            from: query.from,
+            to: query.to,
+        });
     }
 }

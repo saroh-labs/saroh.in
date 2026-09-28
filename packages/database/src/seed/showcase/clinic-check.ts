@@ -288,6 +288,16 @@ export async function checkKavi(
                   AND ss.kind = 'SHOP' AND ss.address IS NOT NULL
                   AND jsonb_array_length(ss."openingHours") = 7
                   AND NOT EXISTS (SELECT 1 FROM "ProductListing" l WHERE l."storeId" = st.id)`),
+        // E9 (DEC-050): one order, one service line, a booking per visit.
+        "a treatment sold as an order, two of its visits booked": await has(
+            prisma.$queryRaw<Row[]>`
+                SELECT COUNT(*) AS n FROM "Order" o
+                WHERE o."organizationId" = ${orgId}
+                  AND EXISTS (SELECT 1 FROM "OrderItem" oi
+                              WHERE oi."orderId" = o.id AND oi."serviceId" IS NOT NULL)
+                  AND (SELECT COUNT(*) FROM "Booking" b
+                       WHERE b."orderId" = o.id AND b.status <> 'CANCELLED') >= 2`,
+        ),
         "a free-cancel window of 24 hours": await has(prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "BookingRules"
             WHERE "organizationId" = ${orgId} AND "freeCancelHours" = 24`),

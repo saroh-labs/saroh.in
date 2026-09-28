@@ -1,8 +1,10 @@
 import { fromMinor, toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import { lineName } from "./order-line";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
+import type { OrderReadDto } from "./order-read";
 import { amountDueCents } from "./order-read";
 import type { OrderStage } from "./order-stage";
 import { orderStanding } from "./order-standing";
@@ -19,7 +21,9 @@ import { orderStanding } from "./order-standing";
  * (`fulfilment.ts`). B2b adds whether it is late (`late`,
  * `lateBy`, `lateAfterMinutes`, by the rule in `fulfilment.ts`, the same one
  * the Late filter runs in SQL) and the courier. B15 adds `attention`, with no
- * stand-in here.
+ * stand-in here. B5 adds when the order's pay link was made, for the row
+ * menu's "New pay link" (never the link: only its hash is kept), and the
+ * quick view's projection of the order read (`quickViewOf`).
  */
 
 interface DecimalLike {
@@ -64,6 +68,11 @@ export interface OrderRowDto extends FulfilmentView, LateView {
     /** Who took it, typed at the handover to a courier; else null. */
     courierName: string | null;
     trackingNumber: string | null;
+    /**
+     * When the order's pay link was made (B11); null when it has none. Only
+     * with `order:read`. Never the link: only its hash is kept.
+     */
+    payLinkCreatedAt?: Date | null;
 }
 
 /** What `order-list.ts` loads for each row. */
@@ -80,6 +89,8 @@ export interface RawOrderRow {
     createdAt: Date;
     courierName: string | null;
     trackingNumber: string | null;
+    /** When its pay link was made (B11); absent where it isn't loaded. */
+    payLinkCreatedAt?: Date | null;
     store: { id: string; name: string };
     customer: {
         email: string;
@@ -87,7 +98,12 @@ export interface RawOrderRow {
         lastName: string | null;
         phone: string | null;
     } | null;
-    items: { product: { name: string } | null }[];
+    items: {
+        product: { name: string } | null;
+        service?: { name: string } | null;
+    }[];
+    /** A treatment's balance recorded by hand (E9): nothing is due. */
+    balanceByHand?: boolean;
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
@@ -128,7 +144,7 @@ export function serializeOrderRow(
         order.paymentIntents.length === 0;
     const names: string[] = [];
     for (const item of order.items) {
-        const name = item.product?.name;
+        const name = lineName(item);
         if (name && !names.includes(name)) names.push(name);
     }
     const customerName = [order.customer?.firstName, order.customer?.lastName]
@@ -186,6 +202,7 @@ export function serializeOrderRow(
                   unpaidAmount: fromMinor(
                       byHand ? 0 : amountDueCents(order, captured),
                   ),
+                  payLinkCreatedAt: order.payLinkCreatedAt ?? null,
               }
             : {}),
         itemCount: order.items.length,
@@ -194,4 +211,21 @@ export function serializeOrderRow(
         courierName: order.courierName,
         trackingNumber: order.trackingNumber,
     };
+}
+
+/**
+ * The order read as the Orders list's quick view asks for it (B5,
+ * `GET :orderId?view=quick`): Order Detail's read, with the customer's phone
+ * and email left out for a caller without `contact:read` — the rule the
+ * list's rows already follow, so opening a row never shows more of the
+ * customer than the row did. Everything else (money, the pay link's date)
+ * is already left out by the read itself for whoever may not see it.
+ */
+export function quickViewOf(
+    read: OrderReadDto,
+    view: Pick<RowView, "contact">,
+): OrderReadDto {
+    if (view.contact || !read.customer) return read;
+    const { phone: _phone, email: _email, ...customer } = read.customer;
+    return { ...read, customer: { ...customer, phone: null } };
 }

@@ -1,0 +1,904 @@
+/**
+ * The site's bag and checkout end to end against a real Postgres (round-2
+ * G13), through the HTTP routes with the real session guard and the signed
+ * relay: options, the quote priced from listings, the signed-in start that
+ * makes an unpaid online order and its intent, the success webhook that
+ * holds its units and makes it a paid order, the last unit lost to another
+ * payment (refused and refunded), the abandoned checkout closed after a day
+ * (and a late payment refunded), and the refusals — no provider, a paused
+ * storefront, a fourth open checkout, a session from another site.
+ *
+ * The provider and the webhook verifier are the network-free fakes; only
+ * the credential key is added to the env. Runs in the integration project
+ * (TEST_DATABASE_URL).
+ */
+jest.mock("../../env", () => {
+    const actual = jest.requireActual<typeof import("../../env")>("../../env");
+    return {
+        ...actual,
+        env: {
+            ...actual.env,
+            PAYMENTS_ENC_KEY:
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        },
+    };
+});
+
+import type { INestApplication } from "@nestjs/common";
+import { ValidationPipe } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import type { Job } from "@saroh/database";
+import { prisma } from "@saroh/database";
+import { createHmac } from "node:crypto";
+
+import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
+import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
+import { validationPipeOptions } from "../../common/validation";
+import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { PaymentsService } from "../payments/payments.service";
+import {
+    FakeMerchantProvider,
+    FakeProviderFactory,
+} from "../payments/providers/fake.provider";
+import {
+    SEND_REFUND_TYPE,
+    SendRefundHandler,
+} from "../payments/send-refund.handler";
+import {
+    SiteCodeAlerts,
+    SiteCodeDelivery,
+} from "../site-accounts/code-delivery";
+import { CUSTOMER_SESSION_HEADER } from "../site-accounts/customer-session.guard";
+import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import { signSiteRelay, SITE_RELAY_HEADER } from "../site-accounts/site-relay";
+import { siteRelaySecret } from "../site-accounts/site-secrets";
+import {
+    FakeWebhookProvider,
+    FakeWebhookProviderFactory,
+} from "../webhooks/providers/fake.webhook";
+import { WebhooksService } from "../webhooks/webhooks.service";
+import { CloseAbandonedCheckoutHandler } from "./close-abandoned-checkout.handler";
+import {
+    CHECKOUT_NOT_COMPLETED,
+    CHECKOUT_REPLACED,
+    CHECKOUT_SOLD_OUT,
+    CLOSE_ABANDONED_CHECKOUT_TYPE,
+} from "./online-checkout";
+import { realOrderWhere } from "./open-orders";
+import { PublicCheckoutController } from "./public-checkout.controller";
+import {
+    CHECKOUT_OPEN_ALREADY,
+    PublicCheckoutService,
+} from "./public-checkout.service";
+
+const WEBHOOK_SECRET = "whsec_g13_checkout";
+const tag = `${process.pid}-${Date.now()}`;
+let seq = 0;
+const next = () => `${tag}-${++seq}`;
+
+const fake = new FakeMerchantProvider("RAZORPAY");
+const payments = new PaymentsService(new FakeProviderFactory(fake));
+const webhooks = new WebhooksService(
+    new FakeWebhookProviderFactory(new FakeWebhookProvider("RAZORPAY")),
+    payments,
+);
+const closer = new CloseAbandonedCheckoutHandler();
+const sender = new SendRefundHandler(payments);
+
+const sent: { to: string; code: string }[] = [];
+let app: INestApplication;
+let url: string;
+
+beforeAll(async () => {
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_SHOP" },
+        create: { key: "SITE_SHOP", enabledByDefault: false },
+        update: { enabledByDefault: false },
+    });
+    const moduleRef = await Test.createTestingModule({
+        imports: [SiteAccountsModule],
+        controllers: [PublicCheckoutController],
+        providers: [
+            {
+                provide: PublicCheckoutService,
+                // Generous: these tests read and start many times from one
+                // address.
+                useValue: new PublicCheckoutService(
+                    payments,
+                    new FixedWindowRateLimiter(1_000),
+                    new FixedWindowRateLimiter(1_000),
+                ),
+            },
+        ],
+    })
+        .overrideProvider(SiteCodeDelivery)
+        .useFactory({
+            factory: (alerts: SiteCodeAlerts) =>
+                new SiteCodeDelivery(
+                    alerts,
+                    (to, details) => {
+                        sent.push({ to, code: details.code });
+                        return Promise.resolve("sent");
+                    },
+                    [0, 0],
+                ),
+            inject: [SiteCodeAlerts],
+        })
+        .compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    app.useGlobalPipes(new ValidationPipe(validationPipeOptions));
+    app.useGlobalInterceptors(new OrgRlsInterceptor());
+    app.useGlobalFilters(new AllExceptionsFilter());
+    await app.listen(0, "127.0.0.1");
+    url = await app.getUrl();
+});
+
+afterAll(async () => {
+    await app?.close();
+});
+
+interface Shop {
+    organizationId: string;
+    storeId: string;
+    siteId: string;
+    host: string;
+    productId: string;
+    listingId: string;
+}
+
+/**
+ * A business whose published site sells from "Online": Sourdough at 250.00,
+ * counting stock with `onHand` on the shelf, Pick-up and Local delivery
+ * (60.00), and Razorpay connected unless asked otherwise.
+ */
+async function shop(
+    over: { onHand?: number; provider?: boolean; paused?: boolean } = {},
+): Promise<Shop> {
+    const org = await prisma.organization.create({
+        data: { name: "Rye & Co.", slug: `g13-${next()}` },
+    });
+    await prisma.featureFlagOverride.create({
+        data: { flagKey: "SITE_SHOP", organizationId: org.id, enabled: true },
+    });
+    const store = await prisma.store.create({
+        data: {
+            name: "Online",
+            slug: `g13-store-${next()}`,
+            organizationId: org.id,
+        },
+    });
+    await prisma.storeSettings.create({
+        data: {
+            storeId: store.id,
+            currency: "INR",
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+            collectionEnabled: true,
+            localDeliveryFee: "60.00",
+            pausedAt: over.paused ? new Date() : null,
+        },
+    });
+    const product = await prisma.product.create({
+        data: {
+            organizationId: org.id,
+            name: "Sourdough",
+            slug: `sourdough-${next()}`,
+            price: "250.00",
+            currency: "INR",
+            status: "PUBLISHED",
+            stockTracked: true,
+        },
+    });
+    const listing = await prisma.productListing.create({
+        data: {
+            organizationId: org.id,
+            storeId: store.id,
+            productId: product.id,
+        },
+    });
+    await prisma.stockLevel.create({
+        data: {
+            organizationId: org.id,
+            storeId: store.id,
+            productId: product.id,
+            variantId: null,
+            onHand: over.onHand ?? 10,
+            promised: 0,
+            lowStockAlert: 0,
+        },
+    });
+    const subdomain = `g13x${seq}x${process.pid}`;
+    const site = await prisma.site.create({
+        data: {
+            organizationId: org.id,
+            name: "Rye & Co.",
+            slug: `g13-site-${next()}`,
+            subdomain,
+            storefrontId: store.id,
+        },
+    });
+    const publication = await prisma.publication.create({
+        data: {
+            siteId: site.id,
+            organizationId: org.id,
+            snapshot: { pages: [] },
+            templateId: "blank",
+            templateVersion: 1,
+        },
+    });
+    await prisma.site.update({
+        where: { id: site.id },
+        data: { currentPublicationId: publication.id },
+    });
+    if (over.provider !== false) {
+        await payments.connectProvider(
+            { organizationId: org.id, userId: "u_owner", role: "OWNER" },
+            {
+                provider: "RAZORPAY",
+                publicKey: "rzp_test_G13",
+                keyId: "rzp_test_G13",
+                keySecret: "rzp_secret",
+                webhookSecret: WEBHOOK_SECRET,
+            },
+        );
+    }
+    return {
+        organizationId: org.id,
+        storeId: store.id,
+        siteId: site.id,
+        host: `${subdomain}.saroh.app`,
+        productId: product.id,
+        listingId: listing.id,
+    };
+}
+
+async function call(
+    method: string,
+    path: string,
+    input: { host?: string; token?: string; body?: unknown } = {},
+) {
+    const headers: Record<string, string> = { accept: "application/json" };
+    if (input.host) {
+        headers[SITE_RELAY_HEADER] = signSiteRelay(
+            { address: "203.0.113.13", host: input.host },
+            siteRelaySecret(),
+        );
+    }
+    if (input.token) headers[CUSTOMER_SESSION_HEADER] = input.token;
+    if (input.body) headers["content-type"] = "application/json";
+    const res = await fetch(`${url}${path}`, {
+        method,
+        headers,
+        body: input.body ? JSON.stringify(input.body) : undefined,
+    });
+    const text = await res.text();
+    return {
+        status: res.status,
+        body: (text ? JSON.parse(text) : null) as Record<string, unknown>,
+    };
+}
+
+/** Sign in through the real routes: ask for a code, then trade it. */
+async function signIn(host: string, who = `buyer-${next()}@example.in`) {
+    const asked = await call("POST", "/public/site-accounts/codes", {
+        host,
+        body: { email: who },
+    });
+    expect(asked.status).toBe(202);
+    const code = sent.filter((s) => s.to === who).at(-1)?.code;
+    const verified = await call("POST", "/public/site-accounts/sessions", {
+        host,
+        body: { email: who, code },
+    });
+    expect(verified.status).toBe(201);
+    return { email: who, token: verified.body.token as string };
+}
+
+function start(
+    s: Shop,
+    token: string,
+    over: Record<string, unknown> = {},
+    host = s.host,
+) {
+    return call("POST", `/public/sites/${s.siteId}/checkout`, {
+        host,
+        token,
+        body: {
+            lines: [{ listingId: s.listingId, quantity: 2 }],
+            fulfilment: "PICKUP",
+            key: `key-${next()}`.replace(/[^A-Za-z0-9_-]/g, "_"),
+            ...over,
+        },
+    });
+}
+
+function quote(s: Shop, body: Record<string, unknown>) {
+    return call("POST", `/public/sites/${s.siteId}/checkout/quote`, {
+        host: s.host,
+        body,
+    });
+}
+
+let eventSeq = 0;
+/** A signed success webhook for the fake verifier; each call is new. */
+async function paid(organizationId: string, providerIntentId: string) {
+    eventSeq += 1;
+    const raw = Buffer.from(
+        JSON.stringify({
+            providerEventId: `evt_g13_${tag}_${eventSeq}`,
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId,
+            providerPaymentRef: `pay_g13_${eventSeq}`,
+        }),
+    );
+    return webhooks.handle("razorpay", organizationId, raw, {
+        "x-fake-signature": createHmac("sha256", WEBHOOK_SECRET)
+            .update(raw)
+            .digest("hex"),
+    });
+}
+
+function errorOf(body: Record<string, unknown>) {
+    return body.error as { message: string; details?: { reason?: string } };
+}
+
+const payment = (body: Record<string, unknown>) =>
+    body.payment as {
+        paymentIntentId: string;
+        providerIntentId: string;
+        amountCents: number;
+        publicKey: string | null;
+    };
+
+describe("the site's checkout options and quote (G13)", () => {
+    it("offers the storefront's ways and fees when a provider can take the payment", async () => {
+        const s = await shop();
+        const res = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/options`,
+            { host: s.host },
+        );
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            canOrder: true,
+            storefront: { name: "Online" },
+            currency: "INR",
+            ways: [
+                { type: "PICKUP", label: "Pick-up", fee: null },
+                {
+                    type: "LOCAL_DELIVERY",
+                    label: "Local delivery",
+                    fee: "60.00",
+                },
+            ],
+        });
+    });
+
+    it("prices the bag from listings, and shows a changed price before paying", async () => {
+        const s = await shop();
+        const body = {
+            lines: [{ listingId: s.listingId, quantity: 2 }],
+            fulfilment: "LOCAL_DELIVERY",
+        };
+        const first = await quote(s, body);
+        expect(first.status).toBe(200);
+        expect(first.body).toMatchObject({
+            subtotal: "500.00",
+            delivery: "60.00",
+            total: "560.00",
+            ready: true,
+        });
+        await prisma.product.update({
+            where: { id: s.productId },
+            data: { price: "300.00" },
+        });
+        const again = await quote(s, body);
+        expect(again.body).toMatchObject({
+            subtotal: "600.00",
+            total: "660.00",
+        });
+    });
+
+    it("refuses a bag that names a price or an amount", async () => {
+        const s = await shop();
+        const res = await quote(s, {
+            lines: [{ listingId: s.listingId, quantity: 1, price: "1.00" }],
+            total: "1.00",
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("never prices another business's listing on this site", async () => {
+        const [a, b] = [await shop(), await shop()];
+        const res = await quote(a, {
+            lines: [{ listingId: b.listingId, quantity: 1 }],
+        });
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ total: "0.00", ready: false });
+        expect(
+            (res.body.lines as { state: string }[]).map((l) => l.state),
+        ).toEqual(["gone"]);
+    });
+
+    it("404s while the shop is off for the business", async () => {
+        const s = await shop();
+        await prisma.featureFlagOverride.deleteMany({
+            where: { organizationId: s.organizationId },
+        });
+        const res = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/options`,
+            { host: s.host },
+        );
+        expect(res.status).toBe(404);
+    });
+});
+
+describe("starting a checkout and paying (G13)", () => {
+    it("makes an unpaid online order holding nothing, absent from Orders, until the payment holds it", async () => {
+        const s = await shop({ onHand: 5 });
+        const { email, token } = await signIn(s.host);
+
+        const res = await start(s, token, {
+            fulfilment: "LOCAL_DELIVERY",
+            address: {
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+        });
+        expect(res.status).toBe(201);
+        const orderId = res.body.orderId as string;
+        expect(res.body).toMatchObject({ total: "560.00", currency: "INR" });
+        // The amount charged is the order's total, and nothing else.
+        expect(payment(res.body)).toMatchObject({
+            amountCents: 56000,
+            publicKey: "rzp_test_G13",
+        });
+
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+            include: { items: true, customer: true },
+        });
+        expect(order).toMatchObject({
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            placedOnline: true,
+            paidAt: null,
+            fulfilment: "LOCAL_DELIVERY",
+            deliveryLine1: "12 Hill Road",
+        });
+        expect(order.shipping.toString()).toBe("60");
+        expect(order.customer.email).toBe(email);
+        expect(order.items).toEqual([
+            expect.objectContaining({
+                quantity: 2,
+                heldQuantity: 0,
+                stockRow: null,
+            }),
+        ]);
+        // Nothing promised; no invoice; not in Orders.
+        const shelf = await prisma.stockLevel.findFirstOrThrow({
+            where: { productId: s.productId },
+        });
+        expect(shelf.promised).toBe(0);
+        expect(await prisma.invoice.count({ where: { orderId } })).toBe(0);
+        expect(
+            await prisma.order.count({
+                where: { id: orderId, ...realOrderWhere() },
+            }),
+        ).toBe(0);
+        // Linked to the account's contact, by the site, by no one on the team.
+        const account = await prisma.customerAccount.findFirstOrThrow({
+            where: { email },
+        });
+        expect(
+            await prisma.customerIdentityLink.findMany({
+                where: { customerId: order.customerId },
+                select: { contactId: true, reason: true, linkedByUserId: true },
+            }),
+        ).toEqual([
+            {
+                contactId: account.contactId,
+                reason: "SITE_ACCOUNT",
+                linkedByUserId: null,
+            },
+        ]);
+        // Its close is written, a day out.
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                payload: { equals: { orderId } },
+            },
+        });
+        expect(job.runAt.getTime() - Date.now()).toBeGreaterThan(
+            23 * 60 * 60 * 1000,
+        );
+
+        // The payment arrives: the units hold, and it is an order now.
+        expect(
+            await paid(s.organizationId, payment(res.body).providerIntentId),
+        ).toEqual({ status: "processed", changed: true });
+        const after = await prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+            include: { items: true },
+        });
+        expect(after.paymentStatus).toBe("PAID");
+        expect(after.paidAt).not.toBeNull();
+        expect(after.items[0]?.heldQuantity).toBe(2);
+        expect(
+            (
+                await prisma.stockLevel.findFirstOrThrow({
+                    where: { productId: s.productId },
+                })
+            ).promised,
+        ).toBe(2);
+        expect(await prisma.invoice.count({ where: { orderId } })).toBe(1);
+        expect(
+            await prisma.order.count({
+                where: { id: orderId, ...realOrderWhere() },
+            }),
+        ).toBe(1);
+
+        const standing = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/orders/${orderId}`,
+            { host: s.host, token },
+        );
+        expect(standing.body).toMatchObject({
+            state: "placed",
+            total: "560.00",
+        });
+
+        // A repeat of the webhook changes nothing.
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+        expect(await prisma.invoice.count({ where: { orderId } })).toBe(1);
+    });
+
+    it("returns the same order and intent for the same key", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const key = `same_${next()}`.replace(/[^A-Za-z0-9_-]/g, "_");
+        const one = await start(s, token, { key });
+        const two = await start(s, token, { key });
+        expect(two.status).toBe(201);
+        expect(two.body.orderId).toBe(one.body.orderId);
+        expect(payment(two.body).paymentIntentId).toBe(
+            payment(one.body).paymentIntentId,
+        );
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(1);
+        expect(
+            await prisma.paymentIntent.count({
+                where: { orderId: one.body.orderId as string },
+            }),
+        ).toBe(1);
+    });
+
+    it("refuses to start with no provider, or a paused storefront, and makes nothing", async () => {
+        for (const s of [
+            await shop({ provider: false }),
+            await shop({ paused: true }),
+        ]) {
+            const options = await call(
+                "GET",
+                `/public/sites/${s.siteId}/checkout/options`,
+                { host: s.host },
+            );
+            expect(options.body).toMatchObject({ canOrder: false, ways: [] });
+            const { token } = await signIn(s.host);
+            const res = await start(s, token);
+            expect(res.status).toBe(403);
+            expect(
+                await prisma.order.count({ where: { storeId: s.storeId } }),
+            ).toBe(0);
+        }
+    });
+
+    it("refuses a bag that changed since it was priced", async () => {
+        const s = await shop({ onHand: 1 });
+        const { token } = await signIn(s.host);
+        const res = await start(s, token); // two asked, one left
+        expect(res.status).toBe(409);
+        expect(errorOf(res.body).details?.reason).toBe("bag-changed");
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
+    });
+
+    it("closes the account's older unpaid checkouts here when a new one starts", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const ids: string[] = [];
+        for (let i = 0; i < 4; i++) {
+            const res = await start(s, token);
+            expect(res.status).toBe(201);
+            ids.push(res.body.orderId as string);
+        }
+        const orders = await prisma.order.findMany({
+            where: { id: { in: ids } },
+            include: { events: true },
+        });
+        const byId = new Map(orders.map((o) => [o.id, o]));
+        // Only the newest is still waiting for its payment.
+        expect(ids.map((id) => byId.get(id)?.status)).toEqual([
+            "CANCELLED",
+            "CANCELLED",
+            "CANCELLED",
+            "PENDING",
+        ]);
+        expect(byId.get(ids[0])?.events.map((e) => e.note)).toEqual([
+            CHECKOUT_REPLACED,
+        ]);
+    });
+
+    it("two starts at once with different bags leave one checkout waiting", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const [a, b] = await Promise.all([start(s, token), start(s, token)]);
+        expect([a.status, b.status]).toEqual([201, 201]);
+        const waiting = await prisma.order.count({
+            where: { storeId: s.storeId, status: "PENDING" },
+        });
+        expect(waiting).toBe(1);
+        expect(
+            await prisma.customer.count({ where: { storeId: s.storeId } }),
+        ).toBe(1);
+    });
+
+    it("says a fourth open checkout, across the business's storefronts, must wait", async () => {
+        const s = await shop();
+        const { token, email } = await signIn(s.host);
+        // Three waiting at another storefront of the business, under the
+        // same email in another case.
+        const other = await prisma.store.create({
+            data: {
+                name: "Market",
+                slug: `g13-market-${next()}`,
+                organizationId: s.organizationId,
+            },
+        });
+        const elsewhere = await prisma.customer.create({
+            data: {
+                storeId: other.id,
+                organizationId: s.organizationId,
+                email: email.toUpperCase(),
+            },
+        });
+        for (let i = 0; i < 3; i++) {
+            await prisma.order.create({
+                data: {
+                    storeId: other.id,
+                    organizationId: s.organizationId,
+                    orderId: `ORD-M${i}`,
+                    customerId: elsewhere.id,
+                    currency: "INR",
+                    subtotal: "250.00",
+                    total: "250.00",
+                    placedOnline: true,
+                },
+            });
+        }
+        const fourth = await start(s, token);
+        expect(fourth.status).toBe(429);
+        expect(errorOf(fourth.body).message).toBe(CHECKOUT_OPEN_ALREADY);
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
+    });
+
+    it("uses the store customer staff made for the email, whatever its case", async () => {
+        const s = await shop();
+        const { token, email } = await signIn(s.host);
+        const made = await prisma.customer.create({
+            data: {
+                storeId: s.storeId,
+                organizationId: s.organizationId,
+                email: email.toUpperCase(),
+            },
+        });
+        const res = await start(s, token);
+        expect(res.status).toBe(201);
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+        });
+        expect(order.customerId).toBe(made.id);
+        expect(
+            await prisma.customer.count({ where: { storeId: s.storeId } }),
+        ).toBe(1);
+    });
+
+    it("refuses a session from site A on site B's host, or naming site B", async () => {
+        const [a, b] = [await shop(), await shop()];
+        const { token } = await signIn(a.host);
+        // A's session, relayed from B's host.
+        expect((await start(b, token, {}, b.host)).status).toBe(401);
+        // A's session on A's host, naming B's site.
+        expect(
+            (
+                await call("POST", `/public/sites/${b.siteId}/checkout`, {
+                    host: a.host,
+                    token,
+                    body: {
+                        lines: [{ listingId: b.listingId, quantity: 1 }],
+                        fulfilment: "PICKUP",
+                        key: "cross_site_key",
+                    },
+                })
+            ).status,
+        ).toBe(401);
+        expect(
+            await prisma.order.count({ where: { storeId: b.storeId } }),
+        ).toBe(0);
+    });
+});
+
+describe("a payment that can't hold (G13)", () => {
+    it("holds the last unit for one payment and refunds the other automatically", async () => {
+        const s = await shop({ onHand: 1 });
+        const one = await signIn(s.host);
+        const two = await signIn(s.host);
+        const line = { lines: [{ listingId: s.listingId, quantity: 1 }] };
+        const first = await start(s, one.token, line);
+        const second = await start(s, two.token, line);
+        expect([first.status, second.status]).toEqual([201, 201]);
+
+        await paid(s.organizationId, payment(first.body).providerIntentId);
+        const refundsBefore = fake.refundCalls.length;
+        await paid(s.organizationId, payment(second.body).providerIntentId);
+
+        const lost = await prisma.order.findUniqueOrThrow({
+            where: { id: second.body.orderId as string },
+            include: { events: true },
+        });
+        // Never a paid order: closed, but the customer's money came in and
+        // is owed back, so staff find it in Orders.
+        expect(lost).toMatchObject({
+            status: "CANCELLED",
+            paymentStatus: "UNPAID",
+        });
+        expect(lost.events.map((e) => e.note)).toContain(CHECKOUT_SOLD_OUT);
+        expect(
+            await prisma.order.count({
+                where: { id: lost.id, ...realOrderWhere() },
+            }),
+        ).toBe(1);
+        const refund = await prisma.paymentRefund.findFirstOrThrow({
+            where: { paymentIntentId: payment(second.body).paymentIntentId },
+        });
+        expect(refund.amountCents).toBe(25000);
+        expect(
+            await prisma.invoice.count({ where: { orderId: lost.id } }),
+        ).toBe(0);
+
+        // Not sent inline: a job, written with the refusal, sends it.
+        expect(fake.refundCalls.length).toBe(refundsBefore);
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: SEND_REFUND_TYPE,
+                payload: { equals: { refundId: refund.id } },
+            },
+        });
+        const standingNow = () =>
+            call(
+                "GET",
+                `/public/sites/${s.siteId}/checkout/orders/${lost.id}`,
+                { host: s.host, token: two.token },
+            );
+        // Owed, not yet "on its way back".
+        const waiting = await standingNow();
+        expect(waiting.body).toMatchObject({ state: "refunding" });
+        expect(waiting.body.message).not.toMatch(/on its way/i);
+
+        // No answer from the provider: the job throws, so it is tried again.
+        fake.failNextRefund("UNKNOWN");
+        await expect(sender.handle(job as Job)).rejects.toThrow(
+            "no answer from the provider",
+        );
+        expect((await standingNow()).body).toMatchObject({
+            state: "refunding",
+        });
+        await sender.handle(job as Job);
+        expect(fake.refundCalls.length).toBe(refundsBefore + 2);
+        expect(
+            (
+                await prisma.paymentRefund.findUniqueOrThrow({
+                    where: { id: refund.id },
+                })
+            ).providerRefundId,
+        ).not.toBeNull();
+        // A repeat sends nothing more.
+        await sender.handle(job as Job);
+        expect(fake.refundCalls.length).toBe(refundsBefore + 2);
+
+        const standing = await standingNow();
+        expect(standing.body).toMatchObject({ state: "refunded" });
+        expect(standing.body.message).toMatch(/sold out/i);
+        // The other customer's order is theirs alone to read.
+        const peek = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/orders/${lost.id}`,
+            { host: s.host, token: one.token },
+        );
+        expect(peek.status).toBe(404);
+
+        const shelf = await prisma.stockLevel.findFirstOrThrow({
+            where: { productId: s.productId },
+        });
+        expect(shelf.promised).toBe(1);
+    });
+
+    it("closes an abandoned checkout after a day, and refunds a payment that comes later", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const res = await start(s, token);
+        const orderId = res.body.orderId as string;
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                payload: { equals: { orderId } },
+            },
+        });
+
+        await closer.handle(job as Job);
+        const closed = await prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+            include: { events: true },
+        });
+        expect(closed.status).toBe("CANCELLED");
+        expect(closed.events).toEqual([
+            expect.objectContaining({
+                kind: "STATUS",
+                actorUserId: null,
+                note: CHECKOUT_NOT_COMPLETED,
+            }),
+        ]);
+        // Run twice: nothing more.
+        await closer.handle(job as Job);
+        expect(await prisma.orderEvent.count({ where: { orderId } })).toBe(1);
+
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+        const after = await prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+        });
+        expect(after).toMatchObject({
+            status: "CANCELLED",
+            paymentStatus: "UNPAID",
+        });
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntentId: payment(res.body).paymentIntentId },
+            }),
+        ).toBe(1);
+        expect(
+            (
+                await prisma.stockLevel.findFirstOrThrow({
+                    where: { productId: s.productId },
+                })
+            ).promised,
+        ).toBe(0);
+    });
+
+    it("leaves a paid checkout alone when its close comes round", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const res = await start(s, token);
+        const orderId = res.body.orderId as string;
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                payload: { equals: { orderId } },
+            },
+        });
+        await closer.handle(job as Job);
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id: orderId },
+                select: { status: true, paymentStatus: true },
+            }),
+        ).toEqual({ status: "PENDING", paymentStatus: "PAID" });
+    });
+});

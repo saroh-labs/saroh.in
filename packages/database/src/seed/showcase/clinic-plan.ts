@@ -63,20 +63,54 @@ export interface KaviInvoice {
     id: string;
     number: string;
     status: "ISSUED" | "PAID";
-    source: "BOOKING" | "MANUAL";
+    source: "BOOKING" | "MANUAL" | "ORDER";
     bookingId: string | null;
+    /** A treatment's order invoice (E9): the order it bills. */
+    orderId: string | null;
     contactId: string;
     billToName: string;
     billToEmail: string;
     createdAt: Date;
     issuedAt: Date;
-    dueAt: Date;
+    /** Null on an order's invoice: the order is where it is paid. */
+    dueAt: Date | null;
     paidAt: Date | null;
     paymentMethod: string | null;
     paymentReference: string | null;
     paymentNote: string | null;
     createdByUserId: string | null;
-    lines: { description: string; quantity: number; unitPaise: number }[];
+    lines: {
+        description: string;
+        quantity: number;
+        unitPaise: number;
+        /** The order line it bills, on an order's invoice. */
+        orderItemId?: string;
+    }[];
+}
+
+/**
+ * A treatment sold as one order (E9, DEC-050): its store customer at the
+ * clinic's storefront, linked to the patient's contact, one line billing
+ * the service, and its visits' bookings.
+ */
+export interface KaviOrder {
+    id: string;
+    key: string;
+    /** "ORD-001": the writer numbers them after any made by hand. */
+    service: number;
+    contactId: string;
+    customerId: string;
+    linkId: string;
+    itemId: string;
+    first: string;
+    last: string;
+    email: string;
+    phone: string;
+    placedAt: Date;
+    /** Paid at the desk (by hand), or still due on the order. */
+    paidAt: Date | null;
+    fulfilment: "APPOINTMENT_IN_PERSON" | "APPOINTMENT_ONLINE";
+    visits: { bookingId: string; visitNumber: number }[];
 }
 
 export interface KaviWorld {
@@ -91,6 +125,8 @@ export interface KaviWorld {
     invoices: KaviInvoice[];
     /** Each series' last number, e.g. KD/26-27 → 41. */
     sequences: { series: string; lastNumber: number }[];
+    /** The treatments' orders (E9), written before their bookings. */
+    orders: KaviOrder[];
 }
 
 /** A span of time, in epoch milliseconds, end exclusive. */
@@ -855,8 +891,58 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
         updatedAt: new Date(rct2.createdAt),
     });
 
+    // --- the treatments, sold as orders (E9, DEC-050): Rahul's root canal
+    // (visit 1 attended and paid at the desk, visit 2 coming up, visit 3 not
+    // booked yet) and Farah's whitening (visit 1 coming up, still due).
+    const farahWhitening = planned.find((p) => p.scene === "farah_whitening");
+    if (!farahWhitening) throw new Error("Kavi Dental: no whitening scene");
+    const orders = [
+        {
+            key: "rahul_rct",
+            visits: [rct1, rct2],
+            paidAt: Math.min(t, rct1.end + 12 * MINUTE),
+        },
+        { key: "farah_whitening", visits: [farahWhitening], paidAt: null },
+    ].map(({ key, visits, paidAt }): KaviOrder => {
+        const first = visits[0];
+        const person = people[first.contact];
+        return {
+            id: kaviId("order", key),
+            key,
+            service: first.service,
+            contactId: person.id,
+            customerId: kaviId("customer", key),
+            linkId: kaviId("customerlink", key),
+            itemId: kaviId("orderitem", key),
+            first: person.first,
+            last: person.last,
+            email: person.email,
+            phone: person.phone,
+            placedAt: new Date(first.createdAt),
+            paidAt: paidAt === null ? null : new Date(paidAt),
+            fulfilment:
+                first.locationType === "ONLINE"
+                    ? "APPOINTMENT_ONLINE"
+                    : "APPOINTMENT_IN_PERSON",
+            visits: visits.map((v, i) => ({
+                bookingId: v.id,
+                visitNumber: i + 1,
+            })),
+        };
+    });
+    // Each visit names its order, and is paid for there, never on its own.
+    for (const order of orders) {
+        for (const v of order.visits) {
+            const booking = bookings.find((b) => b.id === v.bookingId);
+            if (!booking) throw new Error(`Kavi Dental: no ${v.bookingId}`);
+            booking.orderId = order.id;
+            booking.visitNumber = v.visitNumber;
+            booking.paidWith = null;
+        }
+    }
+
     // --- money
-    const money = planMoney(input, planned, people);
+    const money = planMoney(input, planned, people, orders);
 
     return {
         closures,
@@ -866,6 +952,7 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
         events,
         attention,
         ...money,
+        orders,
     };
 }
 
@@ -920,6 +1007,7 @@ function planMoney(
     input: KaviPlanInput,
     planned: readonly Planned[],
     people: readonly Person[],
+    orders: readonly KaviOrder[],
 ): Pick<KaviWorld, "intents" | "attempts" | "invoices" | "sequences"> {
     const { orgId } = input;
     const t = input.now.getTime();
@@ -979,6 +1067,7 @@ function planMoney(
                 status: "PAID",
                 source: "BOOKING",
                 bookingId: p.id,
+                orderId: null,
                 ...bill(p),
                 createdAt: new Date(p.createdAt),
                 issuedAt: new Date(paidAt),
@@ -1023,6 +1112,7 @@ function planMoney(
             status: paid ? "PAID" : "ISSUED",
             source: "MANUAL",
             bookingId: null,
+            orderId: null,
             ...bill(p),
             createdAt: new Date(issuedAt),
             issuedAt: new Date(issuedAt),
@@ -1042,8 +1132,47 @@ function planMoney(
                 : input.ownerUserId,
         });
     }
+    // A treatment paid at the desk has its order's one invoice (DEC-023),
+    // as `ensureOrderInvoice` writes it: the service by name, never due.
+    for (const order of orders) {
+        if (!order.paidAt) continue;
+        const svc = KAVI_SERVICES[order.service];
+        docs.push({
+            id: kaviId("invoice", "o", order.key),
+            status: "PAID",
+            source: "ORDER",
+            bookingId: null,
+            orderId: order.id,
+            contactId: order.contactId,
+            billToName: `${order.first} ${order.last}`,
+            billToEmail: order.email,
+            lines: [
+                {
+                    description: svc.name,
+                    quantity: 1,
+                    unitPaise: svc.pricePaise,
+                    orderItemId: order.itemId,
+                },
+            ],
+            createdAt: order.paidAt,
+            issuedAt: order.paidAt,
+            dueAt: null,
+            paidAt: order.paidAt,
+            paymentMethod: "RECORDED",
+            paymentReference: null,
+            paymentNote: "Paid on the treatment's order",
+            createdByUserId: input.deskUserId,
+        });
+    }
     // One still due, not yet overdue: the latest bill written at the desk.
-    if (!docs.some((d) => d.status === "ISSUED" && d.dueAt.getTime() > t)) {
+    if (
+        !docs.some(
+            (d) =>
+                d.status === "ISSUED" &&
+                d.dueAt !== null &&
+                d.dueAt.getTime() > t,
+        )
+    ) {
         const last = docs
             .filter(
                 (d) =>
@@ -1058,7 +1187,10 @@ function planMoney(
         last.paymentMethod = null;
         last.paymentReference = null;
         last.dueAt = new Date(
-            Math.max(last.dueAt.getTime(), istAt(input.now, 5, 0).getTime()),
+            Math.max(
+                last.dueAt?.getTime() ?? 0,
+                istAt(input.now, 5, 0).getTime(),
+            ),
         );
     }
 

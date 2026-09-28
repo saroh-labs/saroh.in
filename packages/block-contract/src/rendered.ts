@@ -283,6 +283,19 @@ const renderedVisitUs = z.object({
 });
 
 /**
+ * `journal`, as published (G10): nothing resolves at publish. The posts are
+ * read when the page is served, from the site the page belongs to.
+ */
+const renderedJournal = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    count: z.union([z.literal(3), z.literal(6)]).optional(),
+    showExcerpts: z.boolean().optional(),
+    showImages: z.boolean().optional(),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -309,6 +322,7 @@ export const RENDERED_SCHEMAS = {
     contact: renderedContact,
     servicesList: renderedServicesList,
     visitUs: renderedVisitUs,
+    journal: renderedJournal,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -327,6 +341,7 @@ export type RenderedTestimonials = RenderedContent<"testimonials">;
 export type RenderedContact = RenderedContent<"contact">;
 export type RenderedServicesList = RenderedContent<"servicesList">;
 export type RenderedVisitUs = RenderedContent<"visitUs">;
+export type RenderedJournal = RenderedContent<"journal">;
 
 /**
  * Validate rendered content for a block type.

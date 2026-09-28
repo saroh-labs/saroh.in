@@ -26,6 +26,7 @@ import {
     planLineRefund,
     planRemainingLines,
 } from "../orders/order-refunds";
+import { orderMoneyIntents } from "../orders/treatment-ledger";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
@@ -727,7 +728,7 @@ export class PaymentsService {
             where: {
                 id: refundId,
                 organizationId: ctx.organizationId,
-                paymentIntent: { orderId: order.id },
+                paymentIntent: orderMoneyIntents(order.id),
             },
             include: {
                 ...REFUND_ROW_INCLUDE,
@@ -830,6 +831,71 @@ export class PaymentsService {
         return refundResult([outcome.row]);
     }
 
+    /**
+     * Send an automatic refund from its job (`SEND_REFUND_TYPE`): a
+     * refused site checkout's (G13, DEC-032). It looks before it sends, as
+     * try-again does (DEC-026): the provider is asked for the refund made
+     * under the row's id, and only when it has none is it sent — under the
+     * same reference, so a repeat is the same refund. Idempotent: a row
+     * already taken, settled or failed is left as it is.
+     *
+     * Reads what became of it: `ACCEPTED` (the provider has it; its webhook
+     * settles it), `REFUSED` (the row is FAILED — money still owed, which
+     * the order shows staff), `UNKNOWN` (no answer; the job tries again)
+     * or `DONE` (nothing to send).
+     */
+    async sendQueuedRefund(
+        organizationId: string,
+        refundId: string,
+    ): Promise<"ACCEPTED" | "REFUSED" | "UNKNOWN" | "DONE"> {
+        const row = await prisma.paymentRefund.findFirst({
+            where: { id: refundId, organizationId },
+            include: {
+                ...REFUND_ROW_INCLUDE,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        orderId: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (row?.status !== "PENDING" || row.providerRefundId) {
+            return "DONE";
+        }
+        let found: RefundResult | null;
+        try {
+            const call = await this.refundCall(
+                organizationId,
+                row.paymentIntent,
+            );
+            found = await this.factory.get(call.provider).findRefund({
+                reference: row.id,
+                providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                providerPaymentRef: call.providerPaymentRef,
+                credentials: call.credentials,
+            });
+        } catch {
+            // No answer about it: it may exist, so nothing is sent yet.
+            return "UNKNOWN";
+        }
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(organizationId, row, row.paymentIntent);
+        if (outcome.kind === "ACCEPTED" && row.paymentIntent.orderId) {
+            await this.recordRefundTaken(
+                { organizationId, userId: null },
+                row.paymentIntent.orderId,
+                row.reason,
+                [outcome],
+            );
+        }
+        return outcome.kind;
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -860,7 +926,7 @@ export class PaymentsService {
                 where: {
                     organizationId: ctx.organizationId,
                     idempotencyKey: k,
-                    paymentIntent: { orderId: order.id },
+                    paymentIntent: orderMoneyIntents(order.id),
                 },
                 include: REFUND_ROW_INCLUDE,
                 orderBy: { createdAt: "asc" },
@@ -882,9 +948,13 @@ export class PaymentsService {
                 if (replay.length > 0) return { replay, done: true as const };
             }
 
+            // The order's own payments, and a treatment's paid at booking on
+            // the booking invoice that names the order (E9, DEC-050): a
+            // visit never refunds on its own, so this is where that money
+            // comes back. Its credit note lands on that invoice.
             const payments = await tx.paymentIntent.findMany({
                 where: {
-                    orderId: order.id,
+                    ...orderMoneyIntents(order.id),
                     organizationId: ctx.organizationId,
                     status: "SUCCEEDED",
                 },
@@ -1356,6 +1426,74 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             () => payLinkProvider(prisma, order.organizationId, order.storeId),
+        );
+    }
+
+    /**
+     * The site checkout's create-intent (round-2 G13), for an unpaid online
+     * order the signed-in customer started. Beside
+     * {@link createIntentForOrderPublic}, through the same core: the amount
+     * is `order.total` and nothing else, so a tampered client can't change
+     * what is charged. The provider is the one the storefront takes payment
+     * through ({@link payLinkProvider}, B11's rule), never one the request
+     * names.
+     *
+     * Refused unless the order is this business's, was placed online by
+     * this customer's store customer, is still open and owed, and its
+     * storefront isn't paused. The same idempotency key returns the same
+     * intent.
+     */
+    async createIntentForOnlineOrder(
+        customer: { organizationId: string; customerIds: readonly string[] },
+        orderId: string,
+        idempotencyKey: string,
+    ): Promise<CreateIntentResult> {
+        const order = await prisma.order.findFirst({
+            where: {
+                id: orderId,
+                organizationId: customer.organizationId,
+                placedOnline: true,
+            },
+            select: {
+                id: true,
+                storeId: true,
+                customerId: true,
+                total: true,
+                currency: true,
+                status: true,
+                paymentStatus: true,
+                store: { select: { settings: { select: { pausedAt: true } } } },
+            },
+        });
+        if (!order || !customer.customerIds.includes(order.customerId)) {
+            throw new NotFoundException("Order not found");
+        }
+        if (order.status === "CANCELLED") {
+            throw new ConflictException("This checkout has closed.");
+        }
+        if (
+            order.paymentStatus !== "UNPAID" &&
+            order.paymentStatus !== "FAILED"
+        ) {
+            throw new ConflictException("This order is already paid.");
+        }
+        if (order.store.settings?.pausedAt) {
+            throw new ConflictException(
+                "This storefront is paused and is not taking payments.",
+            );
+        }
+        await assertOrganizationOpen(customer.organizationId);
+        const { organizationId } = customer;
+        return this.createIntentFor(
+            organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: totalToCents(order.total),
+                currency: order.currency,
+            },
+            idempotencyKey,
+            () => payLinkProvider(prisma, organizationId, order.storeId),
         );
     }
 

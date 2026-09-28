@@ -25,6 +25,10 @@ import { addressProblem } from "./site-address";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
+import {
+    checkoutReadiness,
+    readinessMessage,
+} from "../orders/checkout-readiness";
 import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
@@ -2658,12 +2662,24 @@ export class SitesService {
                 effectiveStorefront(prisma, sellsFrom),
                 sellsFromChoices(prisma, ctx.organizationId),
             ]);
+            // Whether that storefront can take an online order (G13): the
+            // same question the site's checkout asks.
+            const ready = chosen
+                ? await checkoutReadiness(prisma, ctx.organizationId, chosen.id)
+                : null;
             flags.unshift(
                 ...checkShop({
                     storefrontChosen: chosen !== null,
                     candidates: choices.length,
                     pages: site.pages,
                     isShopPath,
+                    cantTakeOrders:
+                        ready && !ready.ok
+                            ? {
+                                  reason: ready.reason,
+                                  message: readinessMessage(ready.reason),
+                              }
+                            : null,
                 }),
             );
         }

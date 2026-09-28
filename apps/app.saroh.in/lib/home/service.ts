@@ -174,6 +174,46 @@ export interface HomeLastDay {
     items: HomeSinceItem[];
 }
 
+/**
+ * This week's takings against the same days last week (F7): up, down or
+ * level by a whole percent, or `THIN` — too little last week to compare.
+ */
+export type HomeWeekChange =
+    { kind: "UP" | "DOWN" | "LEVEL"; percent: number } | { kind: "THIN" };
+
+/** Takings so far this week in one currency (F7), net of refunds. */
+export interface HomeWeekTakings {
+    currency: string;
+    amountMinor: number;
+    lastWeekMinor: number;
+    change: HomeWeekChange;
+    /** The invoices paid since Monday. */
+    href: string;
+}
+
+/** Owed to the business (F7): issued, unpaid, not an order's own. */
+export interface HomeWeekOwed {
+    totals: { currency: string; amountMinor: number }[];
+    bills: number;
+    overdue: number;
+    href: string;
+}
+
+/**
+ * This week (F7). The API sends each figure only to a viewer who holds its
+ * read, so a missing figure is one this viewer may not see — never zero.
+ * See `lib/home/week.ts` for the words.
+ */
+export interface HomeWeek {
+    zone: string;
+    /** This week's Monday in the business's zone, `2026-09-14`. */
+    startDate: string;
+    takings?: HomeWeekTakings[];
+    bookings?: { count: number; lastWeek: number; href: string };
+    orders?: { count: number; href: string };
+    owed?: HomeWeekOwed;
+}
+
 /** Whose Home this is (F9): the business's, or a Reviewer's. */
 export type HomeView = "business" | "reviewer";
 
@@ -227,6 +267,8 @@ export interface HomeModel {
     today: HomeToday | null;
     /** The header (F6); null from an API that predates it. */
     lastDay: HomeLastDay | null;
+    /** This week (F7); null when none of it may be read, it failed, or from an older API. */
+    week: HomeWeek | null;
 }
 
 const EMPTY: HomeModel = {
@@ -241,6 +283,7 @@ const EMPTY: HomeModel = {
     needsTotal: 0,
     today: null,
     lastDay: null,
+    week: null,
 };
 
 /**
@@ -263,11 +306,13 @@ async function readHome(projectId?: string): Promise<HomeModel> {
     // An API from before F5 sends no `today`: no column, not an empty day.
     // One from before F6 sends no `lastDay`: a plain greeting, no strip.
     // One from before F9 sends no `view`: it is the business's Home.
+    // One from before F7 sends no `week` (nor does a Reviewer's): no panel.
     const model: HomeModel = {
         ...read,
         view: read.view === "reviewer" ? "reviewer" : "business",
         today: read.today ?? null,
         lastDay: read.lastDay ?? null,
+        week: read.week ?? null,
     };
     // An API from before F3 sends no `needs`. Say the list couldn't be read,
     // never "Nothing needs you", while the two deploys cross.

@@ -38,7 +38,13 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
         },
         order: { findUnique: jest.fn(), update: jest.fn() },
-        invoice: { findFirst: jest.fn(), update: jest.fn() },
+        invoice: {
+            findFirst: jest.fn(),
+            // The invoice a refund is on: a plain pay link, not a
+            // treatment's booking invoice.
+            findUnique: jest.fn().mockResolvedValue(null),
+            update: jest.fn(),
+        },
         // The intent's row lock, then the invoice's; [] keeps the status read.
         $queryRaw: jest.fn().mockResolvedValue([]),
     };

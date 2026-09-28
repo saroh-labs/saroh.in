@@ -93,6 +93,22 @@ describe("Business Calendar month (DB)", () => {
                     },
                 });
             }
+            // An abandoned site checkout on the same day: never on the
+            // calendar, as it is never in Orders (B1).
+            await prisma.order.create({
+                data: {
+                    storeId: store.id,
+                    organizationId,
+                    orderId: `ORD-${slug}-abandoned`,
+                    customerId: customer.id,
+                    subtotal: "999",
+                    total: "999",
+                    currency: "INR",
+                    paymentStatus: "UNPAID",
+                    placedOnline: true,
+                    createdAt: new Date("2026-09-05T08:00:00Z"),
+                },
+            });
         }
 
         await prisma.invoice.create({

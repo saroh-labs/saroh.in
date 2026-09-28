@@ -5,6 +5,7 @@ import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
 import { env } from "@/env";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
 import {
     getOrderFilterOptions,
@@ -68,16 +69,29 @@ export default async function OrdersPage({
 
     const query = readOrdersQuery(params);
     const storesRead = listBusinessStores();
-    const [page, stores, openByStore, filterOptions] = await Promise.all([
-        listOrderRows(orderListParams(query)),
-        storesRead,
-        // Counted beside the page, not after it.
-        storesRead.then((all) =>
-            all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
-        ),
-        // What the filter bar offers (B4); null leaves its menus out.
-        getOrderFilterOptions(query.product ?? undefined),
-    ]);
+    // What a row's menu and quick view may offer (B5), as Order Detail
+    // asks it. A pay link needs a provider that opens the checkout window
+    // (DEC-054), asked only of someone who may make one.
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const payOnline =
+        may("order:write") && access.money
+            ? hasPaymentProvider().catch(() => false)
+            : Promise.resolve(false);
+    const [page, stores, openByStore, filterOptions, canPayOnline] =
+        await Promise.all([
+            listOrderRows(orderListParams(query)),
+            storesRead,
+            // Counted beside the page, not after it.
+            storesRead.then((all) =>
+                all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
+            ),
+            // What the filter bar offers (B4); null leaves its menus out.
+            getOrderFilterOptions(query.product ?? undefined),
+            payOnline,
+        ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
     // the first page rather than show an empty one.
@@ -110,6 +124,15 @@ export default async function OrdersPage({
                 kitchen={!access.money}
                 filterOptions={filterOptions}
                 shareUrl={shareUrl}
+                can={{
+                    // Without resolved actions a Member still stages (DEC-024).
+                    stage: organization?.actions
+                        ? may("order:stage")
+                        : organization?.role !== "REVIEWER",
+                    write: may("order:write"),
+                    refund: may("payment:manage"),
+                    payOnline: canPayOnline,
+                }}
             />
         </PageContainer>
     );

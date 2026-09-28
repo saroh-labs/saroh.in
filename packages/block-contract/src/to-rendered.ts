@@ -112,6 +112,8 @@ export const TO_RENDERED = {
     servicesList: resolvesNestedCta,
     // An id and two switches; the place is read live. Nothing to resolve.
     visitUs: identity,
+    // A title, a count and two switches; the posts are read live.
+    journal: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

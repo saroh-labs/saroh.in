@@ -7,6 +7,7 @@ jest.mock("@saroh/database", () => {
             contact: {
                 findMany: jest.fn(),
                 findUnique: jest.fn(),
+                findFirst: jest.fn(),
                 update: jest.fn(),
                 create: jest.fn(),
                 delete: jest.fn(),
@@ -31,6 +32,7 @@ jest.mock("@saroh/database", () => {
             packPurchase: { count: jest.fn() },
             courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
             invoice: { updateMany: jest.fn() },
+            auditEvent: { create: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
             order: { groupBy: jest.fn(), findMany: jest.fn() },
@@ -51,6 +53,8 @@ import { ContactsService } from "./contacts.service";
 const findMany = prisma.contact.findMany as jest.Mock;
 const findUnique = prisma.contact.findUnique as jest.Mock;
 const update = prisma.contact.update as jest.Mock;
+const findFirst = prisma.contact.findFirst as jest.Mock;
+const auditCreate = prisma.auditEvent.create as jest.Mock;
 const create = prisma.contact.create as jest.Mock;
 const leadGroupBy = prisma.lead.groupBy as jest.Mock;
 const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
@@ -453,7 +457,7 @@ describe("ContactsService.update", () => {
 
     it("patches only the supplied fields of an owned contact", async () => {
         const service = new ContactsService();
-        findUnique.mockResolvedValue({ id: "c_1", organizationId: "org_1" });
+        findUnique.mockResolvedValue({ ...CONTACT, company: null });
         update.mockResolvedValue({ id: "c_1" });
 
         await service.update(ctx(), "c_1", { company: "Acme" });
@@ -462,6 +466,99 @@ describe("ContactsService.update", () => {
             where: { id: "c_1" },
             data: { company: "Acme" },
         });
+    });
+
+    it("changes the email, clears its stamp and notes it on the timeline (C8)", async () => {
+        const service = new ContactsService();
+        findUnique.mockResolvedValue({
+            ...CONTACT,
+            emailVerifiedAt: new Date(),
+            emailVerifiedVia: "SIGN_IN_CODE",
+        });
+        findFirst.mockResolvedValue(null);
+        update.mockResolvedValue({ id: "c_1" });
+
+        await service.update(ctx(), "c_1", {
+            email: "ananya.rao@gmail.com",
+            addressLine1: "12 Hill Road",
+            city: "Bengaluru",
+            postalCode: "560038",
+            country: "IN",
+        });
+
+        expect(findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                id: { not: "c_1" },
+                email: { equals: "ananya.rao@gmail.com", mode: "insensitive" },
+            },
+            select: { id: true, firstName: true, lastName: true },
+        });
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "c_1" },
+            data: expect.objectContaining({
+                email: "ananya.rao@gmail.com",
+                emailVerifiedAt: null,
+                emailVerifiedVia: null,
+                addressLine1: "12 Hill Road",
+                postalCode: "560038",
+            }),
+        });
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "customer.details.changed",
+                targetType: "contact",
+                targetId: "c_1",
+                // Names only, never the address or email itself (DEC-035).
+                metadata: { fields: ["email", "address"] },
+            }),
+        });
+    });
+
+    it("refuses an email another contact holds with a 409 naming them", async () => {
+        const service = new ContactsService();
+        findUnique.mockResolvedValue(CONTACT);
+        findFirst.mockResolvedValue({
+            id: "c_2",
+            firstName: "Priya",
+            lastName: "R",
+        });
+
+        const err = await service
+            .update(ctx(), "c_1", { email: "priya@example.com" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toMatchObject({
+            details: { field: "email", contactId: "c_2", name: "Priya R" },
+        });
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("answers a lost race for the email with the same 409", async () => {
+        const service = new ContactsService();
+        findUnique.mockResolvedValue(CONTACT);
+        findFirst.mockResolvedValue(null);
+        update.mockRejectedValue(
+            Object.assign(new Error("unique"), { code: "P2002" }),
+        );
+
+        await expect(
+            service.update(ctx(), "c_1", { email: "priya@example.com" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("writes nothing when nothing changes", async () => {
+        const service = new ContactsService();
+        findUnique.mockResolvedValue(CONTACT);
+
+        const out = await service.update(ctx(), "c_1", {
+            firstName: "Ananya",
+            email: "ananya@example.com",
+        });
+
+        expect(out).toEqual(CONTACT);
+        expect(update).not.toHaveBeenCalled();
+        expect(auditCreate).not.toHaveBeenCalled();
     });
 
     it("404s (and never writes) a cross-tenant contact", async () => {

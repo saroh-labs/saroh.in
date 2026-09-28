@@ -34,10 +34,13 @@ export function BookingDetailView({
     past,
     packs,
     canRefund = false,
+    canReadOrder = false,
 }: {
     booking: BookingDetail;
     /** `payment:manage`: may refund money a late cancel keeps (E8). */
     canRefund?: boolean;
+    /** `order:read`: a treatment's visit links to its order (E9). */
+    canReadOrder?: boolean;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -120,6 +123,7 @@ export function BookingDetailView({
                                     freeCancelUntil={booking.freeCancelUntil}
                                     timezone={timezone}
                                     canRefund={canRefund}
+                                    canReadOrder={canReadOrder}
                                 />
                             </>
                         )}

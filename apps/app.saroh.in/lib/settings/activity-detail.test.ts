@@ -395,6 +395,20 @@ describe("activityDetail — what changed", () => {
         ).toEqual([{ label: "Role", before: null, after: "Admin" }]);
         // No role kept: nothing to list, not an empty row.
         expect(rows({ action: "membership.accept", metadata: {} })).toEqual([]);
+        // Joined from a storefront (F16): the role and where from.
+        expect(
+            rows({
+                action: "membership.storefront-join",
+                metadata: {
+                    role: "MEMBER",
+                    storefront: "Hill Road",
+                    source: "backfill",
+                },
+            }),
+        ).toEqual([
+            { label: "Role", before: null, after: "Member" },
+            { label: "From storefront", before: null, after: "Hill Road" },
+        ]);
         expect(
             rows({
                 action: "membership.remove",

@@ -7,6 +7,17 @@ import { productHref } from "@/lib/products/links";
 import { FOCUS, PanelTitle } from "./parts";
 
 /**
+ * Where a line's name goes: its product, or — for a treatment's line, which
+ * bills a service (E9, DEC-050) — the service.
+ */
+function lineHref(storeId: string, line: OrderReadLine): string {
+    if (line.kind === "service" || !line.productId) {
+        return `/services/${encodeURIComponent(line.serviceId ?? "")}`;
+    }
+    return productHref(storeId, line.productId);
+}
+
+/**
  * What was bought: a photo, the name (to its product), variant and SKU, the
  * allergy tag where a customer's note matches the line, and — only with a
  * money read — the price and the line's total. A Member sees how many.
@@ -60,10 +71,7 @@ export function OrderItems({
                                 <div>
                                     {l.name ? (
                                         <Link
-                                            href={productHref(
-                                                storeId,
-                                                l.productId,
-                                            )}
+                                            href={lineHref(storeId, l)}
                                             className={cn(
                                                 FOCUS,
                                                 "text-[13.5px] font-semibold text-foreground underline-offset-4 hover:underline",

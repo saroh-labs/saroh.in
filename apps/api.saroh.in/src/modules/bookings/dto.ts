@@ -86,6 +86,15 @@ export type PaidWith = (typeof PAID_WITH)[number];
 export const BOOK_PAY = ["NOW", "DEPOSIT", "DESK"] as const;
 export type BookPay = (typeof BOOK_PAY)[number];
 
+/**
+ * How a signed-in customer pays (A10): the booking page's ways, or CREDIT —
+ * one class from the pack or membership the credit read offered them
+ * (`booking-credit.ts`), named by `packPurchaseId` or `subscriptionId`.
+ * Only the signed-in route takes it.
+ */
+export const ACCOUNT_BOOK_PAY = [...BOOK_PAY, "CREDIT"] as const;
+export type AccountBookPay = (typeof ACCOUNT_BOOK_PAY)[number];
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -527,6 +536,26 @@ export class BookingsRangeQueryDto {
 
     @IsISO8601()
     to!: string;
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    staffId?: string;
+}
+
+/**
+ * Book the next visit of a treatment (E9, DEC-050): which visit, when, and
+ * optionally with whom. A body is JSON, so the number arrives as one.
+ */
+export class BookVisitDto {
+    @IsInt()
+    @Min(1)
+    @Max(12)
+    visitNumber!: number;
+
+    @IsISO8601()
+    startAt!: string;
 
     @IsOptional()
     @IsString()

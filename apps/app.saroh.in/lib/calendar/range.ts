@@ -28,6 +28,33 @@ function lastDayOf(month: string): string {
     return `${month}-${String(d).padStart(2, "0")}`;
 }
 
+/**
+ * The days a month asks the API for (E20's `from`/`to`, both inclusive):
+ * "2026-09" → 1 to 30 September.
+ */
+export function monthSpan(month: string): { from: string; to: string } {
+    return { from: `${month}-01`, to: lastDayOf(month) };
+}
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * The month to open instead, when the API refused a range outside what the
+ * calendar reaches (E20): before the business joined, or past three months
+ * ahead. It names the month in `details.month`. Null for any other 400,
+ * which is a real failure.
+ */
+export function monthToOpen(body: unknown): string | null {
+    if (!body || typeof body !== "object") return null;
+    const error = (body as { error?: unknown }).error;
+    if (!error || typeof error !== "object") return null;
+    const details = (error as { details?: unknown }).details;
+    if (!details || typeof details !== "object") return null;
+    const { reason, month } = details as { reason?: unknown; month?: unknown };
+    if (reason !== "before_joined" && reason !== "too_far_ahead") return null;
+    return typeof month === "string" && MONTH.test(month) ? month : null;
+}
+
 /** The days the calendar reaches, from what the API said and this month. */
 export function calendarRange(
     joinedAt: string | null | undefined,

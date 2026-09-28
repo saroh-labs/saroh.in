@@ -21,6 +21,7 @@ import {
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
+import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
@@ -40,6 +41,7 @@ import { RefundPanel } from "./refund-panel";
 import { KitchenStepper } from "./stepper";
 import type { TimelineStep } from "./timeline";
 import { OrderTimeline } from "./timeline";
+import { useArrival } from "./use-arrival";
 import type { Panel } from "./use-kitchen";
 import { useKitchen } from "./use-kitchen";
 
@@ -88,6 +90,7 @@ export function OrderDetail({
     customerHref,
     addable = null,
     aside,
+    arrival = null,
 }: {
     order: OrderRead;
     /** Allergy notes; "unavailable" when they could not be read. */
@@ -102,6 +105,8 @@ export function OrderDetail({
     addable?: Sellable[] | "unavailable" | null;
     /** Extra panels for the right column (reviews). */
     aside?: ReactNode;
+    /** Opened from the Orders list to refund, hand over or print (B5). */
+    arrival?: Arrival;
 }) {
     const [panel, setPanel] = useState<Panel>(null);
     const [menu, setMenu] = useState<OrderMenuPending | null>(null);
@@ -229,9 +234,16 @@ export function OrderDetail({
             })),
         {
             key: "placed",
-            what: `Placed at ${order.store.name}`,
+            what: order.placedOnline
+                ? `Ordered on your website, from ${order.store.name}`
+                : `Placed at ${order.store.name}`,
             at: order.placedAt,
-            who: order.customer ? first : null,
+            // The customer placed it themselves at the site's checkout (G13).
+            who: order.placedOnline
+                ? "by the customer"
+                : order.customer
+                  ? first
+                  : null,
         },
     ].sort((a, b) => b.at.localeCompare(a.at));
 
@@ -248,6 +260,16 @@ export function OrderDetail({
               : hold?.kind === "refund"
                 ? "A refund is on its way."
                 : null;
+
+    useArrival(
+        arrival,
+        {
+            refund: refundBlock === null && money !== null,
+            courier: next === "HANDED_TO_COURIER",
+            print: order.ticketName !== null,
+        },
+        setPanel,
+    );
 
     const addressText = order.deliveryAddress
         ? [

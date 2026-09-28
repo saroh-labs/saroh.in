@@ -496,3 +496,72 @@ describe("the seller's registered address (CGST rule 46)", () => {
         );
     });
 });
+
+describe("buildOrderInvoice: a treatment's service line (E9, DEC-050)", () => {
+    it("bills the service by name, at its rate and SAC, naming the line", () => {
+        const doc = buildOrderInvoice(
+            order({
+                subtotal: "11800.00",
+                shipping: "0.00",
+                discount: "0.00",
+                total: "11800.00",
+                fulfilment: "APPOINTMENT_IN_PERSON",
+                items: [
+                    {
+                        id: "item_rct",
+                        quantity: 1,
+                        price: "11800.00",
+                        product: null,
+                        service: {
+                            name: "Root canal treatment",
+                            gstRate: "18",
+                            sacCode: "999312",
+                        },
+                        variant: null,
+                    },
+                ],
+            }),
+            RYE,
+        );
+        expect(doc.lines).toHaveLength(1);
+        expect(doc.lines[0]).toMatchObject({
+            description: "Root canal treatment",
+            quantity: 1,
+            rateBps: 1800,
+            code: "999312",
+            orderItemId: "item_rct",
+            amountCents: 1_180_000,
+            taxableCents: 1_000_000,
+        });
+        expect(doc.totalCents).toBe(1_180_000);
+    });
+
+    it("an exempt service line carries no tax", () => {
+        const doc = buildOrderInvoice(
+            order({
+                subtotal: "12000.00",
+                shipping: "0.00",
+                discount: "0.00",
+                total: "12000.00",
+                fulfilment: "APPOINTMENT_IN_PERSON",
+                items: [
+                    {
+                        id: "item_rct",
+                        quantity: 1,
+                        price: "12000.00",
+                        product: null,
+                        service: {
+                            name: "Root canal treatment",
+                            gstRate: "0",
+                            sacCode: "9993",
+                        },
+                        variant: null,
+                    },
+                ],
+            }),
+            RYE,
+        );
+        expect(doc.taxCents).toBe(0);
+        expect(doc.lines[0]).toMatchObject({ code: "9993", rateBps: 0 });
+    });
+});

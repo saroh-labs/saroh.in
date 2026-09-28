@@ -4,11 +4,14 @@ export function PayOption({
     on,
     label,
     sub,
+    tag,
     onPick,
 }: {
     on: boolean;
     label: string;
     sub: string;
+    /** A short word at the end of the row: "Included" (A10). */
+    tag?: string;
     onPick: () => void;
 }) {
     return (
@@ -25,6 +28,11 @@ export function PayOption({
                     {sub}
                 </span>
             </span>
+            {tag ? (
+                <span className="bg-site-accent text-site-accent-fg whitespace-nowrap rounded-full px-[9px] py-[3px] text-xs font-semibold">
+                    {tag}
+                </span>
+            ) : null}
         </button>
     );
 }

@@ -30,6 +30,11 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         contact: { upsert: jest.fn(), findUnique: jest.fn() },
+        // A booking-page note's suggestion (C12).
+        contactAttention: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn(),
+        },
         customerSubscription: { findFirst: jest.fn() },
         invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         bookingEvent: { create: jest.fn() },
@@ -96,6 +101,7 @@ const eventCreate = prisma.bookingEvent.create as jest.Mock;
 const ruleFindMany = prisma.availabilityRule.findMany as jest.Mock;
 const bookingFindMany = prisma.booking.findMany as jest.Mock;
 const moduleFindFirst = prisma.organizationModule.findFirst as jest.Mock;
+const attentionCreate = prisma.contactAttention.create as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -764,9 +770,7 @@ describe("the booking page's Where and intake note (E7)", () => {
             "iphash",
         );
 
-        expect(bookingCreate.mock.calls[0][0].data.locationType).toBe(
-            "ONLINE",
-        );
+        expect(bookingCreate.mock.calls[0][0].data.locationType).toBe("ONLINE");
         expect(toPublicBooking(booking)).toMatchObject({
             online: true,
             meetingUrl: "https://meet.example.com/kavi",
@@ -893,6 +897,61 @@ describe("the booking page's Where and intake note (E7)", () => {
             ),
         ).resolves.toMatchObject({ id: "bk_prev" });
         expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("puts a confirmed booking's note on the customer's record as a sensitive suggestion (C12)", async () => {
+        wireBookHappyPath();
+        echoCreate();
+
+        await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({
+                intakeNote: "I take amlodipine for blood pressure.",
+            }),
+            "iphash",
+        );
+
+        // Inside the booking's one transaction.
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(attentionCreate.mock.calls[0][0].data).toEqual({
+            organizationId: "org_SVC",
+            contactId: "contact_1",
+            kind: "MEDICAL",
+            label: "I take amlodipine for blood pressure",
+            detail: "I take amlodipine for blood pressure.",
+            sensitive: true,
+            source: "BOOKING_PAGE",
+            status: "SUGGESTED",
+            bookingId: "bk_1",
+        });
+    });
+
+    it("suggests nothing for a booking with no note", async () => {
+        wireBookHappyPath();
+        echoCreate();
+
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
+
+        expect(attentionCreate).not.toHaveBeenCalled();
+    });
+
+    it("leaves a pay-now hold's note until the payment confirms it", async () => {
+        wireBookHappyPath();
+        bookingCreate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                id: "bk_1",
+                ...data,
+                status: "PENDING",
+            }),
+        );
+
+        await new PublicBookingsService().book(
+            "svc_1",
+            baseInput({ intakeNote: "Nervous about needles" }),
+            "iphash",
+        );
+
+        expect(attentionCreate).not.toHaveBeenCalled();
     });
 
     it("never answers the booker with the note", () => {

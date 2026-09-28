@@ -348,6 +348,7 @@ describe("CustomerDetailService", () => {
                 items: [
                     {
                         productId: "prod_1",
+                        kind: "product",
                         name: "Sourdough loaf",
                         variant: "800g",
                         quantity: 2,
@@ -850,6 +851,12 @@ describe("CustomerDetailService", () => {
         expect(where).toEqual({
             organizationId: "org_1",
             customerId: { in: ["cust_1"] },
+            // Never an abandoned site checkout.
+            NOT: {
+                placedOnline: true,
+                paymentStatus: "UNPAID",
+                paymentIntents: { none: { status: "SUCCEEDED" } },
+            },
         });
     });
 

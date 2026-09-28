@@ -54,6 +54,7 @@ export const ACTIVITY_ACTIONS = [
     "organization.plan.changed",
     "membership.invite",
     "membership.accept",
+    "membership.storefront-join",
     "membership.role.update",
     "membership.remove",
     "product.sold-out.mark",
@@ -247,6 +248,19 @@ export function activityLine(
         case "membership.accept": {
             const as = role(meta.role);
             return line(`joined the team${as ? ` as ${as}` : ""}`, TEAM());
+        }
+        case "membership.storefront-join": {
+            // Someone on a storefront put on the team (F16, DEC-048): by
+            // accepting a storefront invite, or by the one-off backfill.
+            const as = role(meta.role);
+            const from = text(meta.storefront);
+            const tail = `${as ? ` as ${as}` : ""}${from ? `, from ${from}` : ""}`;
+            return line(
+                meta.source === "backfill"
+                    ? `was added to the team${tail}`
+                    : `joined the team${tail}`,
+                TEAM(),
+            );
         }
         case "membership.role.update": {
             const from = role(meta.from);

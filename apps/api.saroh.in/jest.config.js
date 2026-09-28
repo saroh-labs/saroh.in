@@ -198,6 +198,9 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-row.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
+        // G13: the site bag's pricing, DB-free. The real rows are in
+        // public-checkout.db.spec.ts.
+        "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -245,6 +248,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        // A10: spending a pack as the team and as the customer, mocked tx.
+        "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

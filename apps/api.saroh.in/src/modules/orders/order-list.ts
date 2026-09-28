@@ -18,6 +18,7 @@ import {
 } from "./order-list-filters";
 import type { OrderRowDto } from "./order-row";
 import { serializeOrderRow } from "./order-row";
+import { withBookingPayments } from "./treatment-ledger";
 
 /** Rows per page (default 87). */
 export const ORDER_PAGE_SIZE = 50;
@@ -132,6 +133,8 @@ export async function listOrderRows(
                   createdAt: true,
                   courierName: true,
                   trackingNumber: true,
+                  // Whether a pay link is out (B11), for the row menu (B5).
+                  payLinkCreatedAt: true,
                   store: { select: { id: true, name: true } },
                   customer: {
                       select: {
@@ -143,7 +146,11 @@ export async function listOrderRows(
                   },
                   items: {
                       orderBy: { id: "asc" },
-                      select: { product: { select: { name: true } } },
+                      select: {
+                          product: { select: { name: true } },
+                          // A treatment's line names its service (E9).
+                          service: { select: { name: true } },
+                      },
                   },
                   paymentIntents: {
                       where: { status: "SUCCEEDED" },
@@ -155,10 +162,34 @@ export async function listOrderRows(
                           },
                       },
                   },
+                  // A treatment's payment at booking (E9).
+                  invoices: {
+                      where: { source: "BOOKING", kind: "INVOICE" },
+                      select: {
+                          paymentIntents: {
+                              where: { status: "SUCCEEDED" },
+                              select: {
+                                  amountCents: true,
+                                  refunds: {
+                                      where: { status: { not: "FAILED" } },
+                                      select: {
+                                          amountCents: true,
+                                          forEdit: true,
+                                      },
+                                  },
+                              },
+                          },
+                      },
+                  },
               },
           })
         : [];
-    const byId = new Map(loaded.map((o) => [o.id, o]));
+    const byId = new Map(
+        loaded.map(({ invoices, ...o }) => [
+            o.id,
+            withBookingPayments(o, invoices),
+        ]),
+    );
     // Each storefront's late thresholds, once per storefront in the page:
     // the numbers `lateSql` read for the Late filter and the counts.
     const thresholds = await lateThresholdsByStore(

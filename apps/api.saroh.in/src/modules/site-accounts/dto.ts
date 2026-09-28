@@ -7,11 +7,12 @@ import {
     IsString,
     Matches,
     MaxLength,
+    MinLength,
 } from "class-validator";
 
-import type { BookingLocationType, BookPay } from "../bookings/dto";
+import type { AccountBookPay, BookingLocationType } from "../bookings/dto";
 import {
-    BOOK_PAY,
+    ACCOUNT_BOOK_PAY,
     BOOKING_LOCATION_TYPES,
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
@@ -88,10 +89,26 @@ export class AccountBookDto {
     @MaxLength(64)
     staffId?: string;
 
-    /** NOW, DEPOSIT (E8) or DESK; the amount is always the server's. */
+    /**
+     * NOW, DEPOSIT (E8), DESK, or CREDIT (A10): one class from the pack or
+     * membership the credit read offered, named below. The amount is always
+     * the server's.
+     */
     @IsOptional()
-    @IsIn(BOOK_PAY)
-    pay?: BookPay;
+    @IsIn(ACCOUNT_BOOK_PAY)
+    pay?: AccountBookPay;
+
+    /** Paying with CREDIT from a pack: the purchase the page was offered. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    packPurchaseId?: string;
+
+    /** Paying with CREDIT from a membership: the one the page was offered. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    subscriptionId?: string;
 
     @IsOptional()
     @IsIn(BOOKING_LOCATION_TYPES, {
@@ -104,4 +121,64 @@ export class AccountBookDto {
     @IsString()
     @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
     intakeNote?: string;
+}
+
+/** The credit read (A10): what a customer could pay a class with, and when. */
+export class AccountCreditQueryDto {
+    @IsString()
+    @MaxLength(64)
+    serviceId!: string;
+
+    @IsISO8601()
+    startAt!: string;
+}
+
+// ---- The account area (A5) --------------------------------------------------
+
+/**
+ * The customer's own details in Me (default 75): a name, and a phone kept as
+ * a contact detail, never a way to sign in. An empty phone clears it. The
+ * email changes only with a code (`ChangeEmailDto`).
+ */
+export class UpdateDetailsDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Enter your name" })
+    @MaxLength(128)
+    name?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(/^(\+?[\d\s-]{7,20})?$/, {
+        message: "Enter a phone number, like +91 98765 43210",
+    })
+    phone?: string;
+}
+
+/** Ask for a code at a new sign-in email. */
+export class ChangeEmailCodeDto {
+    @Transform(lowerTrim)
+    @IsEmail()
+    @MaxLength(254)
+    email!: string;
+
+    /** The bot challenge's token, when the sheet was asked for one. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2_048)
+    challenge?: string;
+}
+
+/** Change the sign-in email with the code sent to the new one. */
+export class ChangeEmailDto extends VerifyCodeDto {}
+
+/** A health note the customer sends to the team (default 12). */
+export class AddNoteDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Write your note" })
+    @MaxLength(500, { message: "Keep it to 500 characters" })
+    text!: string;
 }

@@ -450,6 +450,35 @@ describe("merging two customers (DEC-042)", () => {
         expect(survivor.email).toBe("new@example.in");
     });
 
+    it("fills the survivor's empty address from the other, and the tombstone keeps none (C8)", async () => {
+        const ctx = await business();
+        const a = await person(ctx, { createdAt: OLDER });
+        const b = await person(ctx, { createdAt: NEWER });
+        const home = {
+            addressLine1: "12 Hill Road",
+            addressLine2: null,
+            city: "Bengaluru",
+            state: "Karnataka",
+            postalCode: "560038",
+            country: "IN",
+        };
+        await prisma.contact.update({ where: { id: b }, data: home });
+
+        await merges.merge(ctx, a, b, dto(a));
+
+        const [survivor, tombstone] = await Promise.all([
+            prisma.contact.findUniqueOrThrow({ where: { id: a } }),
+            prisma.contact.findUniqueOrThrow({ where: { id: b } }),
+        ]);
+        expect(survivor).toMatchObject(home);
+        expect(tombstone).toMatchObject({
+            addressLine1: null,
+            city: null,
+            postalCode: null,
+            country: null,
+        });
+    });
+
     it("keeps notes side by side and a Needs attention entry once", async () => {
         const ctx = await business();
         const a = await person(ctx, { createdAt: OLDER });

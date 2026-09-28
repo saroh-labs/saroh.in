@@ -191,6 +191,7 @@ describe("a deposit at booking (E8, real database)", () => {
             refund: null,
             refundableCents: 40_000,
             refundInTimeCancels: true,
+            treatmentOrderId: null,
         });
     });
 

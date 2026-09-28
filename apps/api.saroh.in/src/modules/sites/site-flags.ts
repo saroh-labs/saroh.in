@@ -41,7 +41,10 @@ export type FlagType =
     | "phoneWidth"
     // The shop (G11), raised only while it is open for the business.
     | "storefrontUnchosen"
-    | "reservedAddress";
+    | "reservedAddress"
+    // The checkout (G13): the site sells from a storefront that can't take
+    // an online order now, so its shop offers "Ask about ordering".
+    | "shopCantTakeOrders";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -611,6 +614,14 @@ export interface ShopFlagInput {
     pages: { id: string; path: string; hidden: boolean }[];
     /** Whether a path is the shop's address or under it. */
     isShopPath: (path: string) => boolean;
+    /**
+     * Why the chosen storefront can't take an online order now (G13), or
+     * null when it can (or none is chosen).
+     */
+    cantTakeOrders?: {
+        reason: "paused" | "no-provider";
+        message: string;
+    } | null;
 }
 
 /**
@@ -632,6 +643,15 @@ export function checkShop(input: ShopFlagInput): Flag[] {
             pageId: null,
             sectionIndex: null,
             field: "storefrontId",
+        });
+    }
+    if (input.storefrontChosen && input.cantTakeOrders) {
+        flags.push({
+            type: "shopCantTakeOrders",
+            message: input.cantTakeOrders.message,
+            pageId: null,
+            sectionIndex: null,
+            field: null,
         });
     }
     for (const page of input.pages) {

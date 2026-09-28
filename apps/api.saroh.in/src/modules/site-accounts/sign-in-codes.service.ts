@@ -103,6 +103,24 @@ export function destinationHashFor(
     return hmac(["dest", organizationId, normaliseAccountEmail(email)]);
 }
 
+/**
+ * The destination's keyed hash for an email change (A5): bound to the
+ * account as well as the email, so the code can only change that account's
+ * email, and a sign-in for the same email can never use it.
+ */
+export function changeDestinationHashFor(
+    organizationId: string,
+    accountId: string,
+    email: string,
+): string {
+    return hmac([
+        "change",
+        organizationId,
+        accountId,
+        normaliseAccountEmail(email),
+    ]);
+}
+
 /** The code's keyed hash, bound to its business and destination. */
 export function codeHashFor(
     organizationId: string,
@@ -202,23 +220,10 @@ export class SignInCodesService {
                 email,
             );
 
-            const addressKey = `${site.organizationId}:${relay.clientHash}`;
-            const addressBusy = !this.codeLimiter.take(
-                addressKey,
-                now.getTime(),
-            );
-            if (addressBusy && !this.challenge.configured) {
-                // No challenge to ask, so the limit is a refusal: the one
-                // hard stop on one address asking this business for code
-                // after code (A-2).
-                throw limited(
-                    "limit",
-                    this.codeLimiter.retryAfterSeconds(
-                        addressKey,
-                        now.getTime(),
-                    ),
-                );
-            }
+            // No challenge to ask, so past the address limit is a refusal:
+            // the one hard stop on one address asking this business for
+            // code after code (A-2).
+            const addressBusy = this.takeAddress(site, relay, now);
 
             const returning = await prisma.customerAccount.count({
                 where: {
@@ -227,38 +232,103 @@ export class SignInCodesService {
                     status: { in: ["ACTIVE", "MERGED"] },
                 },
             });
-            const newDestination = returning === 0;
-            const decision = decideCodeRequest({
-                counts: await loadCodeCounts(prisma, {
-                    organizationId: site.organizationId,
-                    destinationHash,
-                    clientHash: relay.clientHash,
-                    now,
-                }),
-                newDestination,
-                ceilings: ceilingsFor(site.businessCreatedAt, now),
-                addressBusy,
-                now,
-            });
-            if (decision.kind !== "send") {
-                throw limited(
-                    decision.kind === "refuse" ? "limit" : "wait",
-                    decision.retryAfterSeconds,
-                );
-            }
-            for (const alert of decision.alerts) {
-                this.alerts.ceilingPassed(site.organizationId, alert);
-            }
-            if (decision.challenge) {
-                await this.passChallenge(site, relay, dto.challenge);
-            }
-
-            return this.issueCode(site, relay, email, {
+            return this.sendCode(site, relay, email, {
                 destinationHash,
-                newDestination,
+                newDestination: returning === 0,
+                addressBusy,
+                challenge: dto.challenge,
                 now,
             });
         });
+    }
+
+    /**
+     * Send a code to `email` under `destinationHash`, after the limits
+     * (code-limits) and the challenge they may ask for. Runs inside the
+     * caller's `runInOrgContext`. Sign-in keys the destination by email
+     * (`destinationHashFor`); an email change keys it by account and email
+     * (`changeDestinationHashFor`, A5), so a change code never signs anyone
+     * in and a sign-in code never changes an email.
+     */
+    async sendCode(
+        site: SiteHost,
+        relay: SiteRelay,
+        email: string,
+        input: {
+            destinationHash: string;
+            newDestination: boolean;
+            addressBusy: boolean;
+            challenge: string | undefined;
+            now: Date;
+        },
+    ): Promise<CodeRequested> {
+        const { destinationHash, newDestination, addressBusy, now } = input;
+        const decision = decideCodeRequest({
+            counts: await loadCodeCounts(prisma, {
+                organizationId: site.organizationId,
+                destinationHash,
+                clientHash: relay.clientHash,
+                now,
+            }),
+            newDestination,
+            ceilings: ceilingsFor(site.businessCreatedAt, now),
+            addressBusy,
+            now,
+        });
+        if (decision.kind !== "send") {
+            throw limited(
+                decision.kind === "refuse" ? "limit" : "wait",
+                decision.retryAfterSeconds,
+            );
+        }
+        for (const alert of decision.alerts) {
+            this.alerts.ceilingPassed(site.organizationId, alert);
+        }
+        if (decision.challenge) {
+            await this.passChallenge(site, relay, input.challenge);
+        }
+
+        return this.issueCode(site, relay, email, {
+            destinationHash,
+            newDestination,
+            now,
+        });
+    }
+
+    /**
+     * The in-process per-address limit for code requests: true when this
+     * address is past it. Past it with no challenge configured is a 429
+     * (the one hard stop, A-2); with one, the limits ask for the challenge.
+     */
+    takeAddress(site: SiteHost, relay: SiteRelay, now: Date): boolean {
+        const addressKey = `${site.organizationId}:${relay.clientHash}`;
+        const busy = !this.codeLimiter.take(addressKey, now.getTime());
+        if (busy && !this.challenge.configured) {
+            throw limited(
+                "limit",
+                this.codeLimiter.retryAfterSeconds(addressKey, now.getTime()),
+            );
+        }
+        return busy;
+    }
+
+    /**
+     * The per-address limit on verify tries, keyed by the destination: only
+     * the visitor's own tries at their own code count (429 past it).
+     */
+    takeVerifyTry(
+        site: SiteHost,
+        relay: SiteRelay,
+        destinationHash: string,
+        now: Date,
+    ): void {
+        const tries = `${site.organizationId}:${destinationHash}:${relay.clientHash}`;
+        if (!this.verifyLimiter.take(tries, now.getTime())) {
+            throw limited(
+                "limit",
+                this.verifyLimiter.retryAfterSeconds(tries, now.getTime()),
+            );
+        }
     }
 
     async verifyCode(
@@ -274,14 +344,8 @@ export class SignInCodesService {
                 site.organizationId,
                 email,
             );
-            const tries = `${site.organizationId}:${destinationHash}:${relay.clientHash}`;
-            if (!this.verifyLimiter.take(tries, now.getTime())) {
-                throw limited(
-                    "limit",
-                    this.verifyLimiter.retryAfterSeconds(tries, now.getTime()),
-                );
-            }
-            await this.consume(
+            this.takeVerifyTry(site, relay, destinationHash, now);
+            await this.consumeCode(
                 site.organizationId,
                 destinationHash,
                 dto.code,
@@ -375,8 +439,11 @@ export class SignInCodesService {
         };
     }
 
-    /** Check and use up the code, or say why not (400). */
-    private async consume(
+    /**
+     * Check and use up the live code for `destinationHash`, or say why not
+     * (400). Runs inside the caller's `runInOrgContext`.
+     */
+    async consumeCode(
         organizationId: string,
         destinationHash: string,
         code: string,

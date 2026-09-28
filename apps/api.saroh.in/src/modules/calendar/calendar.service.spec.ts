@@ -32,6 +32,10 @@ function order(id: string, createdAt: string, over: object = {}) {
         total: "250",
         currency: "INR",
         createdAt: new Date(createdAt),
+        storeId: "store_1",
+        // Handed over: never late, unless a test says otherwise (E20).
+        stage: "COLLECTED",
+        fulfilment: "PICKUP",
         customer,
         // No invoice: dated by its placing, like an order from before
         // orders were invoiced.
@@ -126,6 +130,27 @@ interface Fixture {
     failFees?: boolean;
     /** When the business was created; `"fail"` makes the read throw. */
     createdAt?: Date | "fail";
+    /** Storefront settings rows, for the late rule (E20). */
+    storeSettings?: object[];
+    /** Closures, time off and the team (E20). */
+    closures?: object[];
+    timeOff?: object[];
+    staff?: object[];
+    failDaysOff?: boolean;
+    /** Paid invoices for the Payments layer (E20). */
+    payments?: object[];
+}
+
+/** A booking row's slot end and person, an hour and nobody unless given. */
+function withSlot(b: object): object {
+    const row = b as { startAt?: Date; endAt?: Date; staffId?: unknown };
+    return {
+        staffId: null,
+        ...b,
+        endAt:
+            row.endAt ??
+            (row.startAt ? new Date(row.startAt.getTime() + 3_600_000) : null),
+    };
 }
 
 function build(
@@ -142,8 +167,17 @@ function build(
 
     const invoiceRead = jest.fn(
         (args: {
-            where: { source?: string; orderId?: unknown; status?: unknown };
+            where: {
+                source?: string;
+                orderId?: unknown;
+                status?: unknown;
+                paidAt?: unknown;
+            };
         }) => {
+            // The Payments layer (E20): paid, and no order's.
+            if (args.where.paidAt && args.where.orderId === null) {
+                return Promise.resolve(f.payments ?? []);
+            }
             if (args.where.source === "SUBSCRIPTION") {
                 return Promise.resolve(f.subscriptionInvoices ?? []);
             }
@@ -184,6 +218,22 @@ function build(
         },
         service: { findFirst: jest.fn().mockResolvedValue(null) },
         order: { findMany: jest.fn().mockResolvedValue(f.orders ?? []) },
+        storeSettings: {
+            findMany: jest.fn().mockResolvedValue(f.storeSettings ?? []),
+        },
+        businessClosure: {
+            findMany: jest.fn(() =>
+                f.failDaysOff
+                    ? Promise.reject(new Error("closures unreadable"))
+                    : Promise.resolve(f.closures ?? []),
+            ),
+        },
+        staffTimeOff: {
+            findMany: jest.fn().mockResolvedValue(f.timeOff ?? []),
+        },
+        staffMember: {
+            findMany: jest.fn().mockResolvedValue(f.staff ?? []),
+        },
         customerSubscription: {
             findMany: jest.fn(
                 (args: { where: { collectionWeekday?: unknown } }) =>
@@ -210,9 +260,9 @@ function build(
                             ? (f.bookings ?? []).map((b) => ({
                                   snapshot: {},
                                   invoices: [],
-                                  ...b,
+                                  ...withSlot(b),
                               }))
-                            : (f.classes ?? []),
+                            : (f.classes ?? []).map(withSlot),
                     ),
             ),
         },
@@ -313,6 +363,12 @@ describe("CalendarService.month", () => {
                     createdAt: {
                         gte: new Date("2026-08-31T18:30:00Z"),
                         lt: new Date("2026-09-30T18:30:00Z"),
+                    },
+                    // Never an abandoned site checkout.
+                    NOT: {
+                        placedOnline: true,
+                        paymentStatus: "UNPAID",
+                        paymentIntents: { none: { status: "SUCCEEDED" } },
                     },
                 },
             }),
@@ -699,7 +755,8 @@ describe("CalendarService.month", () => {
     it("a module that is off contributes no layer", async () => {
         const { service } = build(["APPOINTMENTS"]);
         const res = await service.month(OWNER, "2026-09", NOW);
-        expect(res.layers).toEqual(["bookings", "classes"]);
+        // No orders and no Invoices layer: its payments are a layer (E20).
+        expect(res.layers).toEqual(["bookings", "classes", "payments"]);
         // Money, but nothing to take it through: no orders, no invoices.
         expect(res.takings).toEqual({ lead: "bookings", total: [] });
     });
@@ -1130,5 +1187,488 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
         expect(res.takings?.total).toEqual([
             { currency: "INR", amount: "250.00" },
         ]);
+    });
+});
+
+/** A custom role holding exactly these actions. */
+function custom(...actions: string[]): OrganizationContext {
+    return {
+        ...OWNER,
+        role: "CUSTOM",
+        actions: new Set(["org:read", ...actions]),
+    };
+}
+
+/** What a refusal carries, for a test to read. */
+async function refusal(p: Promise<unknown>) {
+    const error = await p.then(
+        () => null,
+        (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
+    return (error as BadRequestException).getResponse() as {
+        message: string;
+        details?: Record<string, string>;
+    };
+}
+
+/** A one-to-one booking row, as the diary read selects it. */
+function booking(id: string, startAt: string, over: object = {}) {
+    return {
+        id,
+        startAt: new Date(startAt),
+        status: "CONFIRMED",
+        outcome: null,
+        paidWith: null,
+        bookerName: null,
+        bookerEmail: null,
+        service: { name: "Check-up" },
+        staff: { name: "Dr. Pillai" },
+        staffId: "st_pillai",
+        contact: customer,
+        ...over,
+    };
+}
+
+const PILLAI = { id: "st_pillai", name: "Dr. Pillai", title: "Dentist" };
+const RAO = { id: "st_rao", name: "Dr. Rao", title: "Dentist" };
+
+/** Closed all day from Monday 19 October to Wednesday the 21st (IST). */
+const DIWALI = {
+    startAt: new Date("2026-10-18T18:30:00Z"),
+    endAt: new Date("2026-10-21T18:30:00Z"),
+    allDay: true,
+    reason: "Diwali",
+};
+
+describe("CalendarService.read — from/to, staff and days off (E20)", () => {
+    it("a week: bookings with their person and length, and the closures", async () => {
+        const { service, db } = build(["APPOINTMENTS"], {
+            bookings: [
+                booking("bk_1", "2026-10-19T04:30:00Z", {
+                    endAt: new Date("2026-10-19T05:15:00Z"),
+                }),
+                booking("bk_2", "2026-10-22T09:00:00Z", {
+                    staff: { name: "Dr. Rao" },
+                    staffId: "st_rao",
+                }),
+            ],
+            closures: [DIWALI],
+            staff: [PILLAI, RAO],
+        });
+        const res = await service.read(
+            OWNER,
+            { from: "2026-10-19", to: "2026-10-25" },
+            NOW,
+        );
+
+        expect(res.days.map((d) => d.date)).toEqual([
+            "2026-10-19",
+            "2026-10-20",
+            "2026-10-21",
+            "2026-10-22",
+            "2026-10-23",
+            "2026-10-24",
+            "2026-10-25",
+        ]);
+        expect(res.from).toBe("2026-10-18T18:30:00.000Z");
+        expect(res.to).toBe("2026-10-25T18:30:00.000Z");
+        expect(res.month).toBe("2026-10");
+        expect(res.days[0].layers.bookings?.items[0]).toMatchObject({
+            staffId: "st_pillai",
+            durationMinutes: 45,
+        });
+        expect(res.days[3].layers.bookings?.items[0]).toMatchObject({
+            staffId: "st_rao",
+            durationMinutes: 60,
+        });
+        // Read between the week's own midnights.
+        expect(db.booking.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    startAt: {
+                        gte: new Date("2026-10-18T18:30:00Z"),
+                        lt: new Date("2026-10-25T18:30:00Z"),
+                    },
+                }),
+            }),
+        );
+        expect(res.daysOff).toEqual([
+            {
+                kind: "closure",
+                startAt: "2026-10-18T18:30:00.000Z",
+                endAt: "2026-10-21T18:30:00.000Z",
+                allDay: true,
+                dates: ["2026-10-19", "2026-10-20", "2026-10-21"],
+                reason: "Diwali",
+            },
+        ]);
+        expect(res.hasStaff).toBe(true);
+        expect(res.staff).toEqual([PILLAI, RAO]);
+    });
+
+    it("a week crossing two months is one read, both halves in it", async () => {
+        const { service } = build(["APPOINTMENTS"], {
+            bookings: [
+                booking("bk_s", "2026-09-30T06:00:00Z"),
+                booking("bk_o", "2026-10-02T06:00:00Z"),
+            ],
+        });
+        const res = await service.read(
+            OWNER,
+            { from: "2026-09-28", to: "2026-10-04" },
+            NOW,
+        );
+        expect(res.month).toBe("2026-09");
+        expect(res.days).toHaveLength(7);
+        expect(res.totals.bookings).toBe(2);
+    });
+
+    it("a class session carries its instructor and length", async () => {
+        const { service } = build(["APPOINTMENTS"], {
+            classes: [
+                {
+                    serviceId: "svc_yoga",
+                    startAt: new Date("2026-09-08T01:30:00Z"),
+                    endAt: new Date("2026-09-08T02:30:00Z"),
+                    staffId: "st_meera",
+                    status: "CONFIRMED",
+                    service: { name: "Morning yoga", capacity: 10 },
+                    staff: { name: "Meera" },
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.days[7].layers.classes?.items[0]).toMatchObject({
+            staffId: "st_meera",
+            durationMinutes: 60,
+        });
+    });
+
+    it("a range before the joined month is refused with the earliest month", async () => {
+        // Joined on 2 June 2026 (the fixture's default).
+        const { service } = build();
+        const body = await refusal(
+            service.read(OWNER, { from: "2026-05-01", to: "2026-05-31" }, NOW),
+        );
+        expect(body.details).toEqual({
+            reason: "before_joined",
+            month: "2026-06",
+            earliestMonth: "2026-06",
+        });
+        // The joined month itself is read, from its 1st.
+        const june = await service.read(
+            OWNER,
+            { from: "2026-06-01", to: "2026-06-30" },
+            NOW,
+        );
+        expect(june.joinedAt).toBe("2026-06-02");
+    });
+
+    it("a week that holds the joined month's 1st is read whole", async () => {
+        const { service } = build();
+        const res = await service.read(
+            OWNER,
+            { from: "2026-05-25", to: "2026-06-07" },
+            NOW,
+        );
+        expect(res.days[0].date).toBe("2026-05-25");
+    });
+
+    it("a range past three months ahead is refused with the latest month", async () => {
+        const { service } = build();
+        // Now is 20 September: December is the last month reached.
+        const body = await refusal(
+            service.read(OWNER, { from: "2027-01-01", to: "2027-01-31" }, NOW),
+        );
+        expect(body.details).toEqual({
+            reason: "too_far_ahead",
+            month: "2026-12",
+            latestMonth: "2026-12",
+        });
+        await expect(
+            service.read(OWNER, { from: "2026-12-01", to: "2026-12-31" }, NOW),
+        ).resolves.toMatchObject({ month: "2026-12" });
+    });
+
+    it("the month alias is not held to the range: the previous app pulls back on its own", async () => {
+        const { service } = build();
+        const res = await service.month(OWNER, "2026-01", NOW);
+        expect(res.month).toBe("2026-01");
+        expect(res.joinedAt).toBe("2026-06-02");
+    });
+
+    it("the joined day unread: no back edge", async () => {
+        const { service } = build(undefined, { createdAt: "fail" });
+        const res = await service.read(
+            OWNER,
+            { from: "2025-01-01", to: "2025-01-31" },
+            NOW,
+        );
+        expect(res.joinedAt).toBeNull();
+    });
+
+    it("refuses a malformed, mixed, backwards or overlong range", async () => {
+        const { service } = build();
+        for (const query of [
+            { from: "2026-09-01" },
+            { from: "2026-02-30", to: "2026-03-02" },
+            { month: "2026-09", from: "2026-09-01", to: "2026-09-30" },
+            { from: "2026-09-10", to: "2026-09-01" },
+            { from: "2026-07-01", to: "2026-09-30" },
+            {},
+        ]) {
+            await expect(
+                service.read(OWNER, query, NOW),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        }
+    });
+
+    it("a caller with none of the layer reads is refused, which the app shows as locked", async () => {
+        const { service, db } = build();
+        await expect(
+            service.read(
+                custom("contact:read"),
+                { from: "2026-09-01", to: "2026-09-30" },
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.order.findMany).not.toHaveBeenCalled();
+        // Any one read is enough.
+        await expect(
+            service.read(
+                custom("invoice:read"),
+                { from: "2026-09-01", to: "2026-09-30" },
+                NOW,
+            ),
+        ).resolves.toMatchObject({ layers: ["invoices"] });
+    });
+
+    it("time off names its person and reason only for booking:read", async () => {
+        const off = {
+            startAt: new Date("2026-09-14T18:30:00Z"),
+            endAt: new Date("2026-09-15T18:30:00Z"),
+            allDay: true,
+            reason: "Wedding",
+            staff: { id: "st_pillai", name: "Dr. Pillai" },
+        };
+        const { service } = build(["APPOINTMENTS"], {
+            timeOff: [off],
+            staff: [PILLAI, RAO],
+        });
+        const range = { from: "2026-09-01", to: "2026-09-30" };
+
+        const owner = await service.read(OWNER, range, NOW);
+        expect(owner.daysOff).toEqual([
+            {
+                kind: "time_off",
+                startAt: "2026-09-14T18:30:00.000Z",
+                endAt: "2026-09-15T18:30:00.000Z",
+                allDay: true,
+                dates: ["2026-09-15"],
+                staffId: "st_pillai",
+                name: "Dr. Pillai",
+                reason: "Wedding",
+            },
+        ]);
+
+        // Payments only: someone is off, not who.
+        const payments = await service.read(custom("payment:read"), range, NOW);
+        expect(payments.daysOff).toEqual([
+            {
+                kind: "time_off",
+                startAt: "2026-09-14T18:30:00.000Z",
+                endAt: "2026-09-15T18:30:00.000Z",
+                allDay: true,
+                dates: ["2026-09-15"],
+            },
+        ]);
+        expect(payments.hasStaff).toBe(true);
+        expect(payments).not.toHaveProperty("staff");
+    });
+
+    it("a part-day closure is on its day alone", async () => {
+        const { service } = build(["APPOINTMENTS"], {
+            closures: [
+                {
+                    startAt: new Date("2026-09-10T08:30:00Z"),
+                    endAt: new Date("2026-09-10T11:30:00Z"),
+                    allDay: false,
+                    reason: null,
+                },
+            ],
+        });
+        const res = await service.read(
+            OWNER,
+            { from: "2026-09-01", to: "2026-09-30" },
+            NOW,
+        );
+        expect(res.daysOff?.[0]).toMatchObject({
+            allDay: false,
+            dates: ["2026-09-10"],
+        });
+        expect(res.hasStaff).toBe(false);
+        expect(res.staff).toEqual([]);
+    });
+
+    it("days off unreadable: named, and the rest of the calendar still comes", async () => {
+        const { service } = build(["APPOINTMENTS"], {
+            failDaysOff: true,
+            bookings: [booking("bk_1", "2026-09-08T04:30:00Z")],
+        });
+        const res = await service.read(
+            OWNER,
+            { from: "2026-09-01", to: "2026-09-30" },
+            NOW,
+        );
+        expect(res.daysOff).toBeNull();
+        expect(res.hasStaff).toBeNull();
+        expect(res.unavailable).toEqual([
+            { source: "days_off", label: "Days off" },
+        ]);
+        expect(res.totals.bookings).toBe(1);
+    });
+
+    it("without Appointments there are no days off, and none are read", async () => {
+        const { service, db } = build(["COMMERCE"]);
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.daysOff).toEqual([]);
+        expect(res.hasStaff).toBe(false);
+        expect(db.businessClosure.findMany).not.toHaveBeenCalled();
+        expect(db.staffMember.findMany).not.toHaveBeenCalled();
+    });
+
+    it("flags: a late order, a cancelled one, a no-show and a failed renewal", async () => {
+        const { service } = build(undefined, {
+            orders: [
+                // Open and placed a day ago: past the 2-hour pick-up default.
+                order("o_late", "2026-09-19T06:00:00Z", {
+                    status: "PROCESSING",
+                    stage: "NEW",
+                }),
+                // Open, but its storefront gives pick-ups two days.
+                order("o_slow", "2026-09-19T06:00:00Z", {
+                    status: "PROCESSING",
+                    stage: "NEW",
+                    storeId: "store_2",
+                }),
+                order("o_gone", "2026-09-19T07:00:00Z", {
+                    status: "CANCELLED",
+                }),
+                order("o_done", "2026-09-19T08:00:00Z", {
+                    status: "DELIVERED",
+                }),
+            ],
+            storeSettings: [
+                {
+                    storeId: "store_2",
+                    pickupLateAfterMinutes: 2880,
+                    localDeliveryLateAfterMinutes: 1440,
+                    shippingLateAfterMinutes: 2880,
+                },
+            ],
+            bookings: [
+                booking("bk_ns", "2026-09-18T04:30:00Z", {
+                    outcome: "NO_SHOW",
+                }),
+            ],
+            subs: [SUBSCRIBER],
+            subscriptionInvoices: [
+                {
+                    ...RENEWAL_CHARGE,
+                    status: "ISSUED",
+                    dueAt: new Date("2026-09-12T18:30:00Z"),
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        const orders = dayOfMonth(res, "2026-09-19").layers.orders?.items;
+        const flagsOf = (id: string) => orders?.find((i) => i.id === id)?.flags;
+        expect(flagsOf("o_late")).toEqual(["late"]);
+        expect(flagsOf("o_slow")).toBeUndefined();
+        expect(flagsOf("o_gone")).toEqual(["cancelled"]);
+        expect(flagsOf("o_done")).toBeUndefined();
+        expect(
+            dayOfMonth(res, "2026-09-18").layers.bookings?.items[0].flags,
+        ).toEqual(["no_show"]);
+        expect(
+            dayOfMonth(res, "2026-09-13").layers.subscriptions?.items.find(
+                (i) => i.kind === "failed",
+            )?.flags,
+        ).toEqual(["failed"]);
+    });
+});
+
+/** A booking's paid invoice, as the Payments layer selects it (E20). */
+function payment(id: string, paidAt: string, over: object = {}) {
+    return {
+        id,
+        number: `INV-${id}`,
+        total: "800.00",
+        currency: "INR",
+        paidAt: new Date(paidAt),
+        billToName: null,
+        contact: customer,
+        booking: { staffId: "st_pillai", service: { name: "Check-up" } },
+        ...over,
+    };
+}
+
+describe("CalendarService.read — the clinic's Payments layer (E20)", () => {
+    it("a business with no orders has its payments from invoices, with their money", async () => {
+        const { service } = build(["APPOINTMENTS"], {
+            payments: [payment("inv_1", "2026-09-08T06:00:00Z")],
+            moneyPaper: [
+                moneyPaper({
+                    id: "inv_1",
+                    total: "800.00",
+                    at: "2026-09-08T06:00:00Z",
+                    source: "BOOKING",
+                    bookingId: "bk_1",
+                }),
+            ],
+        });
+        const res = await service.read(
+            OWNER,
+            { from: "2026-09-01", to: "2026-09-30" },
+            NOW,
+        );
+        expect(res.layers).toContain("payments");
+        const item = dayOfMonth(res, "2026-09-08").layers.payments?.items[0];
+        expect(item).toMatchObject({
+            kind: "paid",
+            title: "Check-up · Asha Rao",
+            subtitle: "INV-inv_1",
+            amount: "800.00",
+            currency: "INR",
+            link: { type: "invoice", id: "inv_1" },
+            staffId: "st_pillai",
+            in: 80000,
+        });
+        expect(res.totals.payments).toBe(1);
+        // Its takings, each rupee once.
+        expect(res.takings?.total).toEqual([
+            { currency: "INR", amount: "800.00" },
+        ]);
+        expect(res.money?.total?.[0]).toMatchObject({ in: 80000 });
+    });
+
+    it("no Payments layer where Invoices lists them, where orders are sold, or without payment:read", async () => {
+        const range = { from: "2026-09-01", to: "2026-09-30" };
+        const withInvoices = build(["APPOINTMENTS", "PAYMENTS"]);
+        expect(
+            (await withInvoices.service.read(OWNER, range, NOW)).layers,
+        ).not.toContain("payments");
+
+        const shop = build(["COMMERCE", "APPOINTMENTS"]);
+        expect(
+            (await shop.service.read(OWNER, range, NOW)).layers,
+        ).not.toContain("payments");
+
+        const member = build(["APPOINTMENTS"], {
+            payments: [payment("inv_1", "2026-09-08T06:00:00Z")],
+        });
+        const res = await member.service.read(MEMBER, range, NOW);
+        expect(res.layers).toEqual(["bookings", "classes"]);
     });
 });

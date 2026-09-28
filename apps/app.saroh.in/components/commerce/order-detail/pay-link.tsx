@@ -33,11 +33,18 @@ export function usePayLink({
     orderId,
     first,
     madeAt,
+    shownIn = "the Money panel",
 }: {
     orderId: string;
     first: string;
     /** When the link out now was made; null when there is none. */
     madeAt: string | null;
+    /**
+     * Where the new address is on screen to copy by hand when the clipboard
+     * refuses: the Money panel on Order Detail, a window on the Orders list
+     * (B5).
+     */
+    shownIn?: string;
 }) {
     const router = useRouter();
     const [url, setUrl] = useState<string | null>(null);
@@ -56,7 +63,7 @@ export function usePayLink({
             showSuccess(
                 (await copy(res.data.url))
                     ? `Pay link copied. Send it to ${first}.`
-                    : "Pay link ready. Copy it from the Money panel.",
+                    : `Pay link ready. Copy it from ${shownIn}.`,
                 "Nothing is sent by Saroh — the order shows paid once they pay.",
             );
             router.refresh();

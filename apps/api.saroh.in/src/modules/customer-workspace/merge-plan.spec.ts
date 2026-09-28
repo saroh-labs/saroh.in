@@ -19,6 +19,15 @@ import {
  * refusals and the counts the preview names.
  */
 
+const NO_ADDRESS = {
+    addressLine1: null,
+    addressLine2: null,
+    city: null,
+    state: null,
+    postalCode: null,
+    country: null,
+};
+
 function contact(over: Partial<MergeContact> = {}): MergeContact {
     return {
         id: "a",
@@ -27,6 +36,7 @@ function contact(over: Partial<MergeContact> = {}): MergeContact {
         email: "asha@example.in",
         phone: "+91 98450 00001",
         company: null,
+        ...NO_ADDRESS,
         createdAt: new Date("2026-01-01T00:00:00Z"),
         emailVerifiedAt: null,
         emailVerifiedVia: null,
@@ -229,7 +239,62 @@ describe("survivorFields (default 89)", () => {
             email: "asha.r@gmail.com",
             phone: "98450 00002",
             company: "Rao Studio",
+            ...NO_ADDRESS,
         });
+    });
+
+    it("fills an empty address from the other, whole (C8)", () => {
+        const home = {
+            addressLine1: "12 Hill Road",
+            addressLine2: null,
+            city: "Bengaluru",
+            state: "Karnataka",
+            postalCode: "560038",
+            country: "IN",
+        };
+        const fields = survivorFields(
+            asha,
+            contact({ id: "b", ...home }),
+            none,
+            {
+                name: "survivor",
+                email: "survivor",
+                phone: "survivor",
+            },
+        );
+        expect(fields).toMatchObject(home);
+    });
+
+    it("keeps the survivor's own address, never mixing lines (C8)", () => {
+        const survivor = contact({ addressLine1: "3 Lake View" });
+        const other = contact({
+            id: "b",
+            addressLine1: "12 Hill Road",
+            city: "Bengaluru",
+            postalCode: "560038",
+            country: "IN",
+        });
+        const fields = survivorFields(survivor, other, none, {
+            name: "survivor",
+            email: "survivor",
+            phone: "survivor",
+        });
+        expect(fields).toMatchObject({
+            addressLine1: "3 Lake View",
+            city: null,
+            postalCode: null,
+            country: null,
+        });
+    });
+
+    it("reads a survivor with only a country as having no address (C8)", () => {
+        const fields = survivorFields(
+            contact({ country: "IN" }),
+            contact({ id: "b", addressLine1: "12 Hill Road", country: "IN" }),
+            none,
+            { name: "survivor", email: "survivor", phone: "survivor" },
+        );
+        expect(fields.addressLine1).toBe("12 Hill Road");
     });
 
     it("fills an empty company from the other, and keeps the survivor's own", () => {

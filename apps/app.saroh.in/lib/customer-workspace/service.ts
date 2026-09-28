@@ -3,7 +3,11 @@ import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
-import type { AttentionEntry, AttentionInput } from "./attention";
+import type {
+    AttentionEntry,
+    AttentionInput,
+    SuggestionInput,
+} from "./attention";
 import type { UnlinkPreview } from "./site-account";
 
 /**
@@ -12,7 +16,7 @@ import type { UnlinkPreview } from "./site-account";
  * explicit and reversible, and only exact email/phone produce a suggestion.
  */
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "DETAILS";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -103,6 +107,59 @@ export function unlinkAccount(
     );
 }
 
+/** Who already holds an email the sheet tried to give (C8's 409). */
+export interface EmailHolder {
+    contactId: string;
+    name: string | null;
+}
+
+export type DetailsResult =
+    | { ok: true }
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          /** Set when another customer holds the email. */
+          holder?: EmailHolder;
+      };
+
+function holderOf(body: unknown): EmailHolder | undefined {
+    const b = (body ?? {}) as { error?: unknown; details?: unknown };
+    const inner =
+        b.error && typeof b.error === "object"
+            ? (b.error as { details?: unknown }).details
+            : b.details;
+    const d = (inner ?? {}) as { contactId?: unknown; name?: unknown };
+    return typeof d.contactId === "string" && d.contactId
+        ? {
+              contactId: d.contactId,
+              name: typeof d.name === "string" ? d.name : null,
+          }
+        : undefined;
+}
+
+/**
+ * Save the edit sheet (C8): name, phone, company, email and address, on
+ * the contact. A refusal keeps its field, and an email another customer
+ * holds names them.
+ */
+export async function updateDetails(
+    contactId: string,
+    input: Record<string, string>,
+): Promise<DetailsResult> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}/contacts/${encodeURIComponent(contactId)}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+    );
+    if (res.ok) return { ok: true };
+    const body: unknown = await res.json().catch(() => null);
+    const failure = toFailure(body, "Couldn't save their details.");
+    const holder = res.status === 409 ? holderOf(body) : undefined;
+    return holder ? { ...failure, holder } : failure;
+}
+
 export interface NoteInput {
     body: string;
     allergenIds: string[];
@@ -170,6 +227,26 @@ export function updateAttention(
     input: AttentionInput,
 ) {
     return writeAttention(attentionPath(contactId, entryId), "PATCH", input);
+}
+
+/**
+ * "Add to Needs attention" on a booking-page note (C12), with the kind,
+ * label and sensitive tick staff settled on. A refusal keeps its field.
+ */
+export async function confirmAttention(
+    contactId: string,
+    entryId: string,
+    input: SuggestionInput,
+): Promise<ApiResult<AttentionEntry>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}${attentionPath(contactId, entryId)}/confirm`,
+        { method: "POST", body: JSON.stringify(input) },
+    );
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: body as AttentionEntry };
+    return toFailure(body, "Could not add that to Needs attention.");
 }
 
 /** Take an entry off the list; the API keeps the row, stamped removed. */

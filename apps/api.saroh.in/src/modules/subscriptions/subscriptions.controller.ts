@@ -24,11 +24,14 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    DeleteDraftQueryDto,
+    DraftRevisionDto,
     ListPlanEventsQueryDto,
     ListPlansQueryDto,
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PlanDraftDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -76,6 +79,74 @@ export class SubscriptionPlansController {
         return this.subscriptions.createPlan(ctx, dto);
     }
 
+    // — The Plan Editor's drafts (D5) ——————————————————————————————
+    // Each write answers with the plan as the editor reads it; a stale
+    // `revision` is a 409 naming who saved since, and writes nothing.
+
+    /** The editor's first save of a new plan, which makes it a DRAFT. */
+    @Post("drafts")
+    @HttpCode(201)
+    createDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: PlanInputDto,
+    ) {
+        return this.subscriptions.createPlanDraft(ctx, dto);
+    }
+
+    /** The plan as the editor reads it, with its draft revision. */
+    @Get(":planId/draft")
+    getDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+    ) {
+        return this.subscriptions.getPlanEditor(ctx, id);
+    }
+
+    /** Autosave: a draft's fields, or a live plan's unpublished changes. */
+    @Patch(":planId/draft")
+    saveDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: PlanDraftDto,
+    ) {
+        return this.subscriptions.savePlanDraft(ctx, id, dto);
+    }
+
+    @Post(":planId/publish")
+    @HttpCode(200)
+    publish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: DraftRevisionDto,
+    ) {
+        return this.subscriptions.publishPlan(ctx, id, dto.revision);
+    }
+
+    @Post(":planId/discard")
+    @HttpCode(200)
+    discard(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: DraftRevisionDto,
+    ) {
+        return this.subscriptions.discardPlanChanges(ctx, id, dto.revision);
+    }
+
+    /** Delete a draft nobody has bought; a published plan is archived. */
+    @Delete(":planId")
+    @HttpCode(204)
+    async remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Query() query: DeleteDraftQueryDto,
+    ): Promise<void> {
+        await this.subscriptions.deletePlanDraft(ctx, id, query.revision);
+    }
+
+    /**
+     * The old Plans form's whole-plan save, kept for one release while the
+     * app moves to the editor (D7); removed by follow-up Z6. Refuses a draft.
+     */
     @Patch(":planId")
     update(
         @OrgContext() ctx: OrganizationContext,

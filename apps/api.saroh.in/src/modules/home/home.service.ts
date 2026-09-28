@@ -31,6 +31,7 @@ import { pausesWaitingOnPayments } from "./home-pause-sources";
 import { readReviews } from "./home-reviewer";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { readToday, todayScope } from "./home-today";
+import { readWeek, weekScope } from "./home-week";
 
 export type {
     HomeAction,
@@ -51,6 +52,10 @@ export type {
     HomeTone,
     HomeUnavailable,
     HomeView,
+    HomeWeek,
+    HomeWeekChange,
+    HomeWeekOwed,
+    HomeWeekTakings,
 } from "./home-model";
 
 const SEVERITY_RANK: Record<HomeSeverity, number> = {
@@ -236,6 +241,7 @@ export class HomeService {
         const canReadSubscriptions = holds(input, "subscription:read");
         const stockChecks = this.stockChecks;
         const scope = todayScope(input, available);
+        const week = weekScope(input, available);
 
         const [
             crmNumbers,
@@ -250,6 +256,7 @@ export class HomeService {
             overdueInvoiceAction,
             short,
             notLive,
+            thisWeek,
         ] = await Promise.all([
             available.has("CRM")
                 ? guard(
@@ -397,6 +404,18 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // This week (F7): each figure for whoever holds its read.
+            week
+                ? guard(
+                      { moduleKey: "HOME", label: "This week" },
+                      () =>
+                          readWeek(this.db, input.organizationId, week, {
+                              now,
+                              zone,
+                          }),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -520,6 +539,7 @@ export class HomeService {
             ...flattenNeeds(actions, zone),
             today,
             lastDay,
+            week: thisWeek,
         };
     }
 
@@ -557,6 +577,8 @@ export class HomeService {
             needsTotal: 0,
             today: null,
             lastDay: lastDayHeader(now, zone),
+            // No `week` at all (F7): not even an empty one travels to a
+            // Reviewer.
         };
     }
 

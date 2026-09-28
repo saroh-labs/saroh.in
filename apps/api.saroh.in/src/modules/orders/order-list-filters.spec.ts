@@ -139,7 +139,7 @@ describe("the conditions", () => {
         const s = orderConditions("org_1", {}, { contact: false }, {});
         expect(text(s)).toContain(`o."organizationId" = ?`);
         expect(text(s)).toContain(
-            `NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`,
+            `NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID' AND NOT EXISTS`,
         );
         expect(s.values).toEqual(["org_1"]);
     });

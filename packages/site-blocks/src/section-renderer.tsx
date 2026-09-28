@@ -7,6 +7,7 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedJournal,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -21,6 +22,8 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import type { JournalFeed } from "./blocks/journal";
+import JournalSection from "./blocks/journal";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -58,6 +61,7 @@ export default function SectionRenderer({
     apiUrl,
     bookHref,
     siteId,
+    journal,
 }: {
     section: Section;
     /**
@@ -74,6 +78,12 @@ export default function SectionRenderer({
      * editor's canvas — and those blocks then say what they will show.
      */
     siteId?: string | null;
+    /**
+     * The site's latest posts, read by the page that serves it (G10), for the
+     * Journal block. Undefined on the editor's canvas, where the block reads
+     * them itself and says so when there are none.
+     */
+    journal?: JournalFeed;
 }) {
     switch (section.type) {
         case "hero":
@@ -140,6 +150,15 @@ export default function SectionRenderer({
                     siteId={siteId}
                 />
             );
+        case "journal":
+            return (
+                <JournalSection
+                    content={section.content as RenderedJournal}
+                    feed={journal}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -187,6 +206,7 @@ export function PageSections({
     apiUrl,
     bookHref,
     siteId,
+    journal,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
@@ -195,6 +215,8 @@ export function PageSections({
     bookHref?: string;
     /** The live site's id, for the blocks that read by site (G8). */
     siteId?: string | null;
+    /** The site's latest posts, for the Journal block (G10). */
+    journal?: JournalFeed;
 }) {
     return (
         <>
@@ -206,6 +228,7 @@ export function PageSections({
                         apiUrl={apiUrl}
                         bookHref={bookHref}
                         siteId={siteId}
+                        journal={journal}
                     />
                 );
                 return style === undefined ? (

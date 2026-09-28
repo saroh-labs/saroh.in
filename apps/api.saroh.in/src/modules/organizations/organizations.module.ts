@@ -12,6 +12,7 @@ import { OrganizationRolesService } from "./organization-roles.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
 import { PublicInvitationsController } from "./public-invitations.controller";
+import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
 
 /**
  * Organization onboarding and settings (S1-003 / S1-004).
@@ -45,6 +46,7 @@ import { PublicInvitationsController } from "./public-invitations.controller";
         OrganizationSettingsService,
         OrganizationMembersService,
         OrganizationRolesService,
+        StorefrontTeamNoticeService,
     ],
     // The members service is exported for the admin console, whose operators
     // change a person's place in a business under the business's own rules.

@@ -23,6 +23,8 @@ export interface AttentionEntry {
     allergen: { id: string; name: string } | null;
     source: AttentionSource;
     status: "SUGGESTED" | "ACTIVE";
+    /** The booking whose note suggested it (C12). */
+    bookingId?: string | null;
     createdByUserId: string | null;
     /** Who added it, by name; null for the booking page or the customer. */
     addedBy: string | null;
@@ -300,6 +302,79 @@ export function draftTag(draft: AttentionDraft, choices: Choice[]): string {
         ? (choices.find((c) => c.id === draft.allergenId)?.name ?? "")
         : draft.label.trim();
     return tagText({ kind: draft.kind, label });
+}
+
+// ------------------------------------------------- booking-page notes (C12)
+
+/** The kinds the booking-page card offers, as the design draws them. */
+export const SUGGESTION_KINDS: AttentionKind[] = [
+    "MEDICAL",
+    "ALLERGY",
+    "ACCESS",
+];
+
+/** The card's "Short label for the team" is kept short, as in the design. */
+export const SUGGESTION_LABEL_MAX = 40;
+
+/**
+ * A note from the booking page, to add: the label the API suggested (its
+ * first words), Medical unless it was suggested as another of the card's
+ * kinds, and sensitive — which then follows Medical until someone ticks it
+ * by hand, as in the editor. The booker's words stay the detail.
+ */
+export function suggestionDraft(
+    e: AttentionEntry,
+    choices: Choice[],
+): AttentionDraft {
+    const kind = SUGGESTION_KINDS.includes(e.kind) ? e.kind : "MEDICAL";
+    return {
+        ...draftFrom(e, choices),
+        kind,
+        label: Array.from(e.label).slice(0, SUGGESTION_LABEL_MAX).join(""),
+        sensitiveSet: false,
+    };
+}
+
+/** What the confirm route takes (C12). */
+export interface SuggestionInput {
+    kind: AttentionKind;
+    label: string;
+    sensitive: boolean;
+    allergenId: string | null;
+}
+
+/** The card's draft, as sent: the detail is the booker's and isn't sent. */
+export function toSuggestionInput(
+    draft: AttentionDraft,
+    choices: Choice[],
+): SuggestionInput {
+    const { detail: _detail, ...rest } = toInput(draft, choices);
+    return rest;
+}
+
+/**
+ * The card's heading: "1 note from the booking page". Only someone who may
+ * read them is sent any, so there is never a count of notes they can't.
+ */
+export function suggestionsTitle(count: number): string {
+    return `${count} ${count === 1 ? "note" : "notes"} from the booking page`;
+}
+
+/** "Rahul wrote this when booking online, 18 Sep at 10:42". */
+export function suggestionWhen(
+    first: string | null,
+    createdAt: string,
+    timeZone: string,
+    now: Date,
+): string {
+    const time = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).format(new Date(createdAt));
+    const who = first?.trim() ? first.trim() : "They";
+    return `${who} wrote this when booking online, ${dayText(createdAt, timeZone, now)} at ${time}`;
 }
 
 /** A field the API named in a refusal, if the sheet has one like it. */

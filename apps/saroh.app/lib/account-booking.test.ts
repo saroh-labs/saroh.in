@@ -67,6 +67,38 @@ describe("accountBookingBody", () => {
         ).toBeNull();
     });
 
+    it("forwards a class credit (A10): the one pack or membership it names", () => {
+        expect(
+            accountBookingBody({
+                ...REQUEST,
+                pay: "CREDIT",
+                packPurchaseId: "pp_1",
+            }),
+        ).toEqual({ ...REQUEST, pay: "CREDIT", packPurchaseId: "pp_1" });
+        expect(
+            accountBookingBody({
+                ...REQUEST,
+                pay: "CREDIT",
+                subscriptionId: "sub_1",
+            }),
+        ).toEqual({ ...REQUEST, pay: "CREDIT", subscriptionId: "sub_1" });
+    });
+
+    it("refuses a credit that names none or both, and drops one on another way to pay", () => {
+        expect(accountBookingBody({ ...REQUEST, pay: "CREDIT" })).toBeNull();
+        expect(
+            accountBookingBody({
+                ...REQUEST,
+                pay: "CREDIT",
+                packPurchaseId: "pp_1",
+                subscriptionId: "sub_1",
+            }),
+        ).toBeNull();
+        expect(
+            accountBookingBody({ ...REQUEST, packPurchaseId: "pp_1" }),
+        ).toEqual(REQUEST);
+    });
+
     it("leaves out an empty name and an empty note", () => {
         expect(
             accountBookingBody({

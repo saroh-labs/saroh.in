@@ -8,6 +8,7 @@ import {
 import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { PRODUCT_LINES } from "../orders/order-line";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import type { PublicReviewDto } from "./dto";
 import { orderIneligibility } from "./eligibility";
@@ -268,6 +269,8 @@ export class PublicProductReviewsService {
                     select: { email: true, firstName: true, lastName: true },
                 },
                 items: {
+                    // A service line (E9) invites no product review.
+                    where: PRODUCT_LINES,
                     select: {
                         id: true,
                         productId: true,
@@ -278,15 +281,19 @@ export class PublicProductReviewsService {
             },
         });
         if (!order) throw new NotFoundException("Review link not found");
+        const items = order.items.flatMap(({ product, productId, ...item }) =>
+            product && productId ? [{ ...item, product, productId }] : [],
+        );
         const ineligible = orderIneligibility({
             organizationId: order.organizationId,
             status: order.status,
             paymentStatus: order.paymentStatus,
             customerEmail: order.customer.email,
+            productLines: items.length,
         });
         if (ineligible) {
             throw gone("not-eligible", "This order no longer takes reviews.");
         }
-        return order;
+        return { ...order, items };
     }
 }

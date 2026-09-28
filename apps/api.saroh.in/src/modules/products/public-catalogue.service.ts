@@ -277,6 +277,7 @@ export class PublicCatalogueService {
                     listings: {
                         where: { storeId: scope.storefront.id },
                         select: {
+                            id: true,
                             soldOutAt: true,
                             variants: { select: { variantId: true } },
                         },
@@ -330,6 +331,8 @@ export class PublicCatalogueService {
 
             return {
                 slug: p.slug,
+                // What the bag holds (G13): the listing, never a price.
+                listingId: listing.id,
                 name: p.name,
                 currency: p.currency,
                 price: money(p.price) ?? "0.00",

@@ -38,6 +38,7 @@ const ORDER: LayerKey[] = [
     "collections",
     "subscriptions",
     "invoices",
+    "payments",
 ];
 
 /**
@@ -62,6 +63,9 @@ function toneOf(key: LayerKey, shop: boolean): LayerTone {
             return shop ? 5 : 1;
         case "classes":
             return shop ? 6 : 3;
+        // The design's clinic: its payments green, beside its bookings.
+        case "payments":
+            return 2;
     }
 }
 
@@ -107,6 +111,11 @@ const LABELS: Record<
     invoices: () => ({ label: "Invoices", one: "invoice", many: "invoices" }),
     bookings: () => ({ label: "Bookings", one: "booking", many: "bookings" }),
     classes: () => ({ label: "Classes", one: "class", many: "classes" }),
+    payments: () => ({
+        label: "Payments",
+        one: "payment",
+        many: "payments",
+    }),
 };
 
 /** The layers switched off, by key. */
@@ -311,6 +320,12 @@ export function describeItem(
                 at ? `${at} ${item.title}` : item.title,
                 item.subtitle,
                 item.kind === "full" ? { label: "Full", tone: "accent" } : null,
+            );
+        // "10:30 Paid · Check-up · Asha Rao", then its invoice (E20).
+        case "payments":
+            return line(
+                joined(at ? `${at} Paid` : "Paid", item.title),
+                item.subtitle,
             );
     }
 }

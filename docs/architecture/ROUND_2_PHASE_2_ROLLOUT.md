@@ -249,3 +249,247 @@ creates or renews meanwhile is left unset or stale:
 **Before deploying this release again, run the backfill once more** (step 4) and check step 6. After Z1 has removed the fallback, rolling back below
 this release means running the backfill before re-deploying, or members
 the old API added would read as unlimited.
+
+## D5: the plan draft writers (wave 3; CP-3 keeps them apart from D7)
+
+The Plan Editor's API: `POST subscription-plans/drafts` (a new plan starts
+as a DRAFT), `GET`/`PATCH :planId/draft` (read and autosave),
+`POST :planId/publish`, `POST :planId/discard` and `DELETE :planId` (a
+draft nobody bought). Every write carries the editor's `revision`; a stale
+one is a 409 naming who saved since. The rules are in
+`docs/patterns/backend-billing-and-classes.md` ("Plan drafts").
+
+- **Migration** `20261014150000_plan_drafts`: four columns on
+  `SubscriptionPlan` (`pendingChanges`, `pendingChangedAt`,
+  `pendingChangedById`, `draftRevision` default 0). Additive; every
+  existing plan reads as live with nothing pending.
+- **D21 must be in production first** (it has been since CP-1): the readers
+  that refuse a DRAFT. An image older than CP-1 would sell one.
+- **API before app.** Nothing in the app creates a draft until D7's Plan
+  Editor, which ships in a later release than this one (CP-3).
+- **Drafts are hidden from the old app.** `GET subscription-plans` with no
+  filter lists live and archived plans only; a draft is listed only with
+  `?include=drafts` (everything) or `?status=DRAFT`. A workspace from before
+  D7 never asks, so if D7 is rolled back after drafts exist, its Plans tab
+  doesn't draw a draft as a live card. D7's Plans tab asks with
+  `include=drafts`.
+- **The old form's `PATCH :planId` stays** until follow-up Z6 (a checkpoint
+  after D7). It refuses a draft, and a change through it moves the draft
+  revision, so an editor open on the plan is told instead of saving over it.
+
+### Verify
+
+1. `GET subscription-plans` on a business with plans answers as before, now
+   with `pendingChangedAt: null` on each.
+2. Once D7 is live: a new plan saves as Draft and isn't on the site or in
+   Subscribe someone; Publish puts it on sale. On a live plan, a changed
+   price shows "Unpublished changes" and Subscribe still charges the old
+   price until Publish changes.
+
+### Rollback
+
+To CP-1 or later (the D21 readers): safe. Those images refuse a DRAFT
+everywhere it could be sold, and ignore the new columns, so a live plan's
+unpublished changes simply wait. Their unfiltered Plans list shows drafts
+again, which is why D7 ships in a later release than this one. Below CP-1:
+not safe once any DRAFT row exists (it would be sold); archive or delete
+the drafts first:
+
+```sql
+SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
+```
+
+## E20: the calendar reads a range (wave 3)
+
+`GET organizations/:org/calendar` takes `from`/`to` (local dates, both
+inclusive, at most 62 days) as well as `month` (`calendar/range.ts`). No
+migration.
+
+- **API before app.** The new workspace asks for `from`/`to`, which the old
+  API refuses (400), so deploy the API first. The old workspace sends
+  `month`, which the new API still answers, and ignores the new fields
+  (`staffId`, `durationMinutes`, `flags`, `daysOff`, `hasStaff`, `staff`)
+  and the new `payments` layer.
+- **`month` is an alias for one release.** It is not held to the range:
+  the old workspace reads `joinedAt` from the answer and pulls the address
+  back itself. Follow-up Z3 removes it once no old workspace is live.
+- **What the new API refuses:** a range wholly before the month the
+  business joined (`details.reason: "before_joined"`, `earliestMonth`), or
+  wholly past three months ahead (`too_far_ahead`, `latestMonth`). The new
+  workspace opens that month instead. A role that reads none of orders,
+  bookings, subscriptions, invoices or payments gets 403, which the
+  workspace shows as its locked card.
+
+### Verify
+
+1. `/calendar` opens this month; `/calendar?month=<a month before the
+business joined>` opens the joined month, with no error page.
+2. `/calendar?month=<four months ahead>` opens the third month ahead.
+3. Kavi Dental (no orders): the Payments layer lists its paid booking
+   invoices.
+
+### Rollback
+
+Roll the workspace back first (it asks for `from`/`to`), then the API.
+Nothing is stored.
+
+## E9: a treatment sold as one order (wave 2)
+
+Decision: DEC-050. **Migration** `20261014110000_treatment_orders`: a
+`BOOKING` value on `CustomerLinkReason`; `OrderItem.serviceId` and
+`productId` made nullable; `Booking.orderId` and `visitNumber`; the partial
+unique index `Booking_one_live_visit`; two foreign keys; and two CHECKs,
+`OrderItem_bills_one_thing` and `Booking_visit_of_order`. Additive: every
+existing line has a product and every existing booking neither an order
+nor a visit number, so both CHECKs hold on the day.
+
+- **Locks.** Not built `CONCURRENTLY` (no migration here is). Adding
+  `OrderItem_bills_one_thing` scans `OrderItem` under an ACCESS EXCLUSIVE
+  lock, the two foreign keys validate under SHARE ROW EXCLUSIVE on
+  `OrderItem`, `Service`, `Booking` and `Order`, and `Booking_one_live_visit`
+  builds under a SHARE lock on `Booking` (reads go on; order and booking
+  writes wait). Before running it, note the row counts and run it in a
+  quiet hour if `OrderItem` is past a few hundred thousand rows:
+
+    ```sql
+    SELECT (SELECT count(*) FROM "OrderItem") AS order_items,
+           (SELECT count(*) FROM "Booking") AS bookings;
+    ```
+
+- **API before app.** The old workspace on the new API: a treatment line
+  comes with `productId: null` and its name. Checked against the released
+  workspace (`origin/main`, e365b3ba): Order Detail's line
+  (`order-detail/items.tsx`) draws the name as a link through
+  `productHref(storeId, l.productId)`, which encodes `null` as the text
+  "null" — no crash, but the link opens a missing product page. Nothing
+  else in the old workspace reads a line's product id. Treatments are sold
+  only once a service has more than one visit, so deploy the workspace
+  soon after the API.
+
+### Verify
+
+```sql
+-- Both CHECKs exist and are validated (two rows, convalidated = true).
+SELECT conname, convalidated FROM pg_constraint
+WHERE conname IN ('OrderItem_bills_one_thing', 'Booking_visit_of_order');
+
+-- Nothing breaks them (both 0).
+SELECT count(*) FROM "OrderItem" WHERE num_nonnulls("productId", "serviceId") <> 1;
+SELECT count(*) FROM "Booking"
+WHERE ("orderId" IS NOT NULL AND "visitNumber" IS NULL)
+   OR ("visitNumber" IS NOT NULL AND "visitNumber" < 1);
+```
+
+### Rollback
+
+Safe only while no treatment order exists. The previous API never writes a
+service line, but several of its readers assume every line has a product
+(`item.product.name` in Customer detail, an order's pay page, the order
+invoice and reviews), so once a treatment order exists they fail on it.
+Check first:
+
+```sql
+SELECT count(*) FROM "OrderItem" WHERE "serviceId" IS NOT NULL;
+```
+
+At 0, deploy the previous API and leave the schema. Above 0, roll forward
+instead. Never drop the columns while a row uses them.
+
+## F16: storefront people join the team (wave 3)
+
+Decision: DEC-048 (amended 2026-09-27). **Migration**
+`20261014200000_storefront_team_notice`: `Organization.
+storefrontTeamNoticeDismissedAt`, nullable (additive). From this API, a
+storefront invite accepted puts the person on the business's team as
+"Storefront team"; accepting re-checks the inviter's `member:invite` and
+reach, so an invite sent before this release by someone who can't invite
+to the team is refused ("ask for a new one"). Removing someone from Team
+revokes the storefront invites still waiting for them.
+
+### After the API deploys
+
+1. **Take a snapshot and verify it restores** — the backfill writes
+   memberships and Activity entries in every business.
+2. **Run the backfill** from a checkout of the release commit:
+
+    ```bash
+    DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/store-members-to-memberships.cli.ts
+    ```
+
+    It prints counts only: businesses, storefront people, added as
+    Storefront team, already on the team, and businesses skipped (their
+    `storefront-team` role holds more than the narrow list — an owner
+    widened it by hand; look at those before running again). Record them in
+    the release issue. **Idempotent:** it never touches a membership that
+    exists, so a second run adds nobody (`added … 0`).
+
+### Verify
+
+```sql
+-- Storefront people with no membership in the storefront's business
+-- (0, or only people in the businesses the backfill skipped).
+SELECT count(*) FROM "StoreMembers" sm
+JOIN "Store" s ON s.id = sm."storeId"
+LEFT JOIN "Membership" m
+  ON m."organizationId" = s."organizationId" AND m."userId" = sm."userId"
+WHERE m."userId" IS NULL;
+```
+
+### Rollback
+
+Deploy the previous API. The memberships the backfill made stay (they are
+what Team shows, in the narrow role); remove any by hand on Team. The
+column is ignored by the old image.
+
+## G13: the site's bag and checkout (wave 3; off until switched on)
+
+**Migration** `20261014180000_shop_checkout`: `Order.checkoutKey` (unique
+per storefront, many nulls) and `StoreSettings.localDeliveryFee` /
+`shippingFee`. Additive; the old image never reads them. Everything ships
+behind the per-business `SITE_SHOP` flag, off: no checkout can start until
+an override is set.
+
+- A refused checkout's refund (the last unit sold meanwhile, or it had
+  closed) is sent from a `payments.send-refund` job written with the
+  refusal, retried with backoff; the order shows in Orders (money reached
+  it), and the customer is told "on its way back" only once the provider
+  has the refund. The job type is new: the API that writes it registers
+  its handler, so there is no ordering step.
+- A new checkout closes the account's older unpaid ones at that
+  storefront ("Replaced by a newer checkout").
+
+### Rollback
+
+Switch the `SITE_SHOP` overrides off first, then deploy the previous API. A
+`payments.send-refund` job left PENDING dead-letters on the old image (no
+handler); its refund stays PENDING on the order, where Try again sends it.
+
+## C8: a contact's address (wave 3)
+
+**Migration** `20261014210000_contact_address`: six nullable columns on
+`Contact`. Additive, nothing backfilled; the old image never reads them.
+Rollback: deploy the previous API and workspace; addresses saved meanwhile
+stay in the columns, unread.
+
+## Date-range indexes (review follow-up)
+
+**Migration** `20261015100000_calendar_range_indexes`: `Order
+(organizationId, createdAt)`, `Invoice (organizationId, status, paidAt)`,
+`(organizationId, paidAt)` and `(organizationId, issuedAt)`, and
+`StaffTimeOff (organizationId, startAt)`, for the calendar's and Home's
+date-range reads. Additive; each build holds a SHARE lock on its table
+(writes wait while it builds). Rollback: nothing to do — the old image
+reads the same; drop an index only if it is found to cost writes.
+
+## Before switching a flag on (advisory)
+
+These browser suites are skipped in CI while their features are off. Run
+them against a stack prepared as each file's header says, and record the
+result in the release issue, **before** turning the feature on anywhere:
+
+- `e2e/tests/site-shop.spec.ts` — before any `SITE_SHOP` override:
+  `E2E_SITE_SHOP=1`, Northwind's override on, a Razorpay test connection.
+- `e2e/tests/site-account.spec.ts` — before `SITE_ACCOUNT_AREA=on` (API
+  first, then saroh.app): the stack started with `SITE_ACCOUNT_AREA=on` in
+  both.

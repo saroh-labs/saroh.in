@@ -25,6 +25,7 @@ export const LAYERS = [
     "invoices",
     "bookings",
     "classes",
+    "payments",
 ] as const;
 export type LayerKey = (typeof LAYERS)[number];
 
@@ -35,6 +36,7 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
     invoices: "Invoices",
     bookings: "Bookings",
     classes: "Classes",
+    payments: "Payments",
 };
 
 /** Where an item opens. A class session opens its service, at its start. */
@@ -78,7 +80,23 @@ export interface CalendarItem {
     failed?: number;
     /** What `out` is made of, when there is any. */
     outWhy?: ("refund" | "fee")[];
+    /**
+     * The person it is with (plan 005 E20): bookings and classes, and a
+     * booking's payment — null when nobody is named. Absent elsewhere.
+     */
+    staffId?: string | null;
+    /** How long it takes, in minutes: bookings and classes (E20). */
+    durationMinutes?: number;
+    /** What is wrong with it or became of it (E20), when anything. */
+    flags?: ItemFlag[];
 }
+
+/**
+ * An item's flags (plan 005 E20): an order past its storefront's late
+ * threshold, a booking nobody came to, an order cancelled, a renewal
+ * charge that failed.
+ */
+export type ItemFlag = "late" | "no_show" | "cancelled" | "failed";
 
 /** An item and the local day it belongs to. */
 export interface DatedItem {

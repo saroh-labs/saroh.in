@@ -1,16 +1,30 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { SiteTheme } from "@saroh/site-blocks";
+import type { SignInOptions } from "@saroh/site-blocks";
+import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
 
+import { accountAreaOn } from "@/lib/account-area";
 import { getBookingPage } from "@/lib/booking-page";
+import { getCatalogue } from "@/lib/catalogue";
+import { customerReader } from "@/lib/customer-reader";
+import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
     getPublicationForHost,
     getSiteForHost,
     shareImages,
 } from "@/lib/publication";
+import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { getSignInOptions } from "@/lib/sign-in";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
+
+import {
+    loadSignInOptions,
+    requestSignInCode,
+    verifySignInCode,
+} from "./account/actions";
+import { checkoutStanding, quoteBag, startCheckout } from "./shop/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -107,12 +121,81 @@ export default async function SiteLayout({
     /*
      * The header's main button (G17) follows what the business offers now,
      * not what was published: a merchant who turns Appointments off loses
-     * "Book" at once. `/book` reads the same page, once per request.
+     * "Book" at once. `/book` reads the same page, once per request. "Order"
+     * follows the shop (G11): the API serves `/shop` only while it is open
+     * for the business (`SITE_SHOP`), and `/shop` reads the same list.
+     * The checkout options are read beside it rather than after: whether
+     * the shop is open is the API's per-business flag, known here only
+     * from the catalogue's answer, and waiting for it would add a round
+     * trip to every page of a site that sells.
      */
-    const action = headerAction({
-        booking: siteId ? await getBookingPage(siteId) : null,
-        shopServes: false,
-    });
+    const [booking, catalogue, checkout] = siteId
+        ? await Promise.all([
+              getBookingPage(siteId),
+              getCatalogue(siteId),
+              getCheckoutOptions(siteId),
+          ])
+        : [null, null, null];
+    const shopServes = catalogue?.ok ?? false;
+    const action = headerAction({ booking, shopServes });
+
+    /*
+     * The bag (G13), only where the site takes an online order now: the
+     * shop serves, a provider can take the payment and the storefront isn't
+     * paused. Elsewhere the product page offers "Ask about ordering".
+     */
+    const takesOrders = shopServes && checkout?.canOrder === true;
+    // Who is signed in, read once per render: the bag and the account
+    // entry share it. A read that fails is a visitor signed out.
+    const readCustomer = customerReader(getSignedInCustomer);
+    const [customer, signInOptions] = takesOrders
+        ? await Promise.all([
+              readCustomer(),
+              getSignInOptions().catch((): SignInOptions | null => null),
+          ])
+        : [null, null];
+    const bag =
+        takesOrders && siteId ? (
+            <ShopBag
+                site={siteId}
+                businessName={snapshot.site.name}
+                api={{
+                    quote: quoteBag,
+                    start: startCheckout,
+                    standing: checkoutStanding,
+                }}
+                account={{
+                    customer,
+                    options: signInOptions ?? {
+                        businessName: snapshot.site.name,
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: requestSignInCode,
+                        verifyCode: verifySignInCode,
+                    },
+                }}
+            />
+        ) : null;
+
+    /*
+     * The header's Sign in / account entry (A5, G17's account slot), on
+     * every site once the account area is switched on (SITE_ACCOUNT_AREA).
+     * Who is signed in is read only when there is a session cookie; a read
+     * that fails leaves the visitor signed out, never the page down.
+     */
+    const account = accountAreaOn() ? (
+        <AccountEntry
+            customer={await readCustomer()}
+            businessName={snapshot.site.name}
+            api={{
+                requestCode: requestSignInCode,
+                verifyCode: verifySignInCode,
+            }}
+            loadOptions={loadSignInOptions}
+        />
+    ) : undefined;
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
@@ -121,6 +204,8 @@ export default async function SiteLayout({
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}
                 action={action}
+                account={account}
+                bag={bag}
             />
 
             <div>{children}</div>

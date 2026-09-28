@@ -178,6 +178,18 @@ export interface VisitUsContent {
     showHours?: boolean;
 }
 
+/**
+ * `journal` — how the site's latest posts show (G10). The posts themselves
+ * are read live by the site, never stored here. `count` is 3 or 6 (absent:
+ * 3); both switches read as on when absent.
+ */
+export interface JournalContent {
+    title?: string;
+    count?: 3 | 6;
+    showExcerpts?: boolean;
+    showImages?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -237,6 +249,7 @@ export interface SectionContentByType {
     contact: ContactContent;
     servicesList: ServicesListContent;
     visitUs: VisitUsContent;
+    journal: JournalContent;
 }
 
 /**
@@ -1125,7 +1138,9 @@ export type FlagType =
     | "phoneWidth"
     // The shop (G11): raised only while it is open for the business.
     | "storefrontUnchosen"
-    | "reservedAddress";
+    | "reservedAddress"
+    // The checkout (G13): the shop can't take an online order now.
+    | "shopCantTakeOrders";
 
 export interface Flag {
     type: FlagType;

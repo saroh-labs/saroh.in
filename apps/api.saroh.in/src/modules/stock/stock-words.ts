@@ -181,6 +181,15 @@ export const SOLD_OUT_WHILE_PAYING =
 export const ORDER_CLOSED_WHILE_PAYING =
     "Sorry, this order was closed before your payment reached us — your money is on its way back.";
 
+/**
+ * The same two, while the refund is not yet with the provider (G13): the
+ * money is owed and being sent, not yet on its way (DEC-026).
+ */
+export const SOLD_OUT_REFUNDING =
+    "Sorry, it sold out while you were paying. We're sending your money back.";
+export const ORDER_CLOSED_REFUNDING =
+    "Sorry, this order was closed before your payment reached us. We're sending your money back.";
+
 /** Why a kitchen undo can't take a fulfilment back. */
 export const RETURNED_CANT_UNDO =
     "Money or items have come back on this order, so it can't be taken back to before it was handed over.";

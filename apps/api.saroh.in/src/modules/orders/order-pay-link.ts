@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { amountDueCents } from "./order-read";
+import { withBookingPayments } from "./treatment-ledger";
 
 /**
  * An order's pay link (plan B, B11), as ADR-007's invoice pay link: a token
@@ -31,6 +32,23 @@ export const PAY_LINK_ORDER_SELECT = {
             refunds: {
                 where: { status: { not: "FAILED" } },
                 select: { amountCents: true, forEdit: true },
+            },
+        },
+    },
+    // A treatment's deposit, paid at booking on its invoice (E9): a pay
+    // link asks only for the rest.
+    invoices: {
+        where: { source: "BOOKING", kind: "INVOICE" },
+        select: {
+            paymentIntents: {
+                where: { status: "SUCCEEDED" },
+                select: {
+                    amountCents: true,
+                    refunds: {
+                        where: { status: { not: "FAILED" } },
+                        select: { amountCents: true, forEdit: true },
+                    },
+                },
             },
         },
     },
@@ -65,7 +83,7 @@ export function payLinkStanding(order: PayLinkOrder): PayLinkStanding {
 
 /** The order's total less what was taken — what a pay link charges. */
 export function dueCentsOf(order: PayLinkOrder): number {
-    return amountDueCents(order);
+    return amountDueCents(withBookingPayments(order, order.invoices));
 }
 
 /**

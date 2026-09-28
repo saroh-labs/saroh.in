@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
+import { addressLine } from "@/lib/customer-workspace/details";
 import type { OrderFilter, Tile } from "@/lib/customer-workspace/view";
 import {
     allowanceChangeLine,
@@ -118,7 +119,7 @@ export function Overview({
                                 Delivery address
                             </div>
                             <div className="text-[13.5px] leading-[1.5]">
-                                {deliveryAddress(rows)}
+                                {deliveryAddress(rows, addressLine(d.contact))}
                             </div>
                         </section>
                     </div>

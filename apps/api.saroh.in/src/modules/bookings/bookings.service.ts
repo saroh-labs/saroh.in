@@ -72,6 +72,14 @@ import type { ServiceView } from "./service-fields";
 import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
 import { useMembershipInTx } from "./use-membership";
+import type { BookVisitInput } from "./visits";
+import {
+    bookVisit,
+    isTreatment,
+    startTreatmentInTx,
+    treatmentEmail,
+    treatmentStorefront,
+} from "./visits";
 
 /** Exactly what {@link BookingsService.getBooking} reads, named so the
  *  controller's inferred return type stays portable. */
@@ -177,6 +185,11 @@ export interface CancelMoney {
     } | null;
     /** Kept: cancelled late (DEC-051). */
     kept: { amountCents: number; currency: string } | null;
+    /**
+     * A visit of a treatment (E9, DEC-050): its money stays on this order
+     * and comes back only through the order's refund. Null otherwise.
+     */
+    treatmentOrderId?: string | null;
 }
 
 const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
@@ -725,6 +738,10 @@ export class BookingsService {
             }
             const inTime = !isLateCancel(booking, now, rules);
             const late = !options.returnCredit && !inTime;
+            // A visit of a treatment never refunds on its own (E9, DEC-050,
+            // DEC-051), early or late, whoever cancels it: its slot is
+            // freed and its money stays on the order, which refunds it.
+            const visit = Boolean(booking.orderId);
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
                 data: {
@@ -739,10 +756,11 @@ export class BookingsService {
             // Money paid online goes back once when cancelled in time and
             // the business's policy refunds (E8, DEC-058). Otherwise only
             // someone who may refund hands it back, by hand.
-            const automatic = refundsAutomatically(inTime, rules);
+            const automatic = !visit && refundsAutomatically(inTime, rules);
             const refunds =
-                automatic ||
-                (!!options.returnCredit && allows(ctx, "payment:manage"));
+                !visit &&
+                (automatic ||
+                    (!!options.returnCredit && allows(ctx, "payment:manage")));
             const reserved = refunds
                 ? await reserveBookingRefundInTx(tx, {
                       organizationId: ctx.organizationId,
@@ -752,9 +770,14 @@ export class BookingsService {
                           : "Booking cancelled by the business",
                   })
                 : null;
-            const kept = reserved
-                ? null
-                : await bookingPaymentInTx(tx, ctx.organizationId, booking.id);
+            const kept =
+                reserved || visit
+                    ? null
+                    : await bookingPaymentInTx(
+                          tx,
+                          ctx.organizationId,
+                          booking.id,
+                      );
             // A pay link sent for it (E4) stops working with the place.
             await retirePayLinkInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
@@ -783,6 +806,9 @@ export class BookingsService {
                           currency: kept.currency,
                       }
                     : null,
+                ...(booking.orderId
+                    ? { treatmentOrderId: booking.orderId }
+                    : {}),
             };
             return {
                 booking: cancelled,
@@ -1233,6 +1259,26 @@ export class BookingsService {
         if (service.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Service not found");
         }
+        // A treatment is sold as one order (E9, DEC-050), paid on it: never
+        // with a pack or a membership, and never without a storefront.
+        const treatment = isTreatment(service);
+        if (treatment && (withPack || withMembership)) {
+            throw new BadRequestException({
+                message:
+                    "A treatment is paid for on its order, not with a pack or a membership.",
+                field: "paidWith",
+            });
+        }
+        const treatmentStore = treatment
+            ? await treatmentStorefront(prisma, service)
+            : null;
+        if (treatment && !treatmentStore) {
+            throw new ConflictException({
+                message:
+                    "Treatments are sold as orders. Add a storefront first.",
+                details: { reason: "no-storefront" },
+            });
+        }
 
         const startAt = new Date(dto.startAt);
         if (Number.isNaN(startAt.getTime())) {
@@ -1323,6 +1369,10 @@ export class BookingsService {
             });
         }
 
+        // Its bill goes to an email (DEC-050): a contact with none is asked
+        // for one.
+        if (treatmentStore) treatmentEmail(booker.bookerEmail);
+
         if (dto.idempotencyKey) {
             const existing = await prisma.booking.findUnique({
                 where: {
@@ -1347,6 +1397,32 @@ export class BookingsService {
         const paidWith: PaidWith | null = withPack
             ? "PACK"
             : (dto.paidWith ?? null);
+
+        if (treatmentStore) {
+            // The treatment's order, with this booking its visit 1.
+            const booked = await reserve(
+                this.activation,
+                service,
+                startAt,
+                endAt,
+                booker,
+                { source: "manual", actorUserId: ctx.userId },
+                {
+                    inTx: async (tx, booking) => {
+                        await startTreatmentInTx(tx, {
+                            service,
+                            booking,
+                            storeId: treatmentStore.id,
+                        });
+                    },
+                    onRace: "That changed while you were booking. Try again.",
+                },
+                { ...person, paidWith },
+            );
+            return prisma.booking.findUniqueOrThrow({
+                where: { id: booked.id },
+            });
+        }
 
         return reserve(
             this.activation,
@@ -1393,6 +1469,19 @@ export class BookingsService {
                     : null,
             },
         );
+    }
+
+    /**
+     * Book visit `n` of a treatment (E9, DEC-050) — see {@link bookVisit}.
+     * `booking:write`; another business's order is a 404.
+     */
+    async bookVisit(
+        ctx: OrganizationContext,
+        orderId: string,
+        dto: BookVisitInput,
+    ): Promise<Booking> {
+        authorize(ctx, "booking:write");
+        return bookVisit(ctx, orderId, dto);
     }
 
     /**

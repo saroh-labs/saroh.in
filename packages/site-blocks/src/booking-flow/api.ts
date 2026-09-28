@@ -3,7 +3,9 @@ import type {
     BookingWhere,
     BookPay,
     BookResult,
+    CreditAnswer,
     HoldView,
+    OfferedCredit,
 } from "./model";
 import { isBookingDays, isHoldView } from "./model";
 
@@ -148,8 +150,15 @@ export interface SignedInBookRequest {
     bookerName?: string;
     idempotencyKey: string;
     staffId?: string;
-    /** Pay it all now, only the deposit now (E8), or at the desk. */
+    /**
+     * Pay it all now, only the deposit now (E8), at the desk, or with the
+     * class credit the API offered (A10), named below.
+     */
     pay: BookPay;
+    /** Paying with CREDIT: the pack purchase the credit read gave… */
+    packPurchaseId?: string;
+    /** …or the membership. */
+    subscriptionId?: string;
     /** The answer to Where, for a service offered either way (E7). */
     locationType?: BookingWhere;
     /** "Anything we should know?" (E7), when they wrote something. */
@@ -160,6 +169,32 @@ export interface SignedInBookRequest {
 export type BookSignedIn = (
     request: SignedInBookRequest,
 ) => Promise<Result<BookResult>>;
+
+/**
+ * The class credit a signed-in customer could pay with (A10): the site's
+ * server action that asks, with the session
+ * (`GET public/site-accounts/bookings/credit`).
+ */
+export type CreditFor = (request: {
+    serviceId: string;
+    startAt: string;
+}) => Promise<Result<CreditAnswer>>;
+
+/** The reason the API gives when a credit can't be spent any more. */
+export const CREDIT_GONE = "credit-gone";
+
+/**
+ * The credit request, or null, for a booking paid with one: the pack or the
+ * membership the offer named, and nothing else.
+ */
+export function creditRequest(
+    credit: OfferedCredit | null,
+): Pick<SignedInBookRequest, "packPurchaseId" | "subscriptionId"> | null {
+    if (!credit) return null;
+    return credit.kind === "PACK"
+        ? { packPurchaseId: credit.id }
+        : { subscriptionId: credit.id };
+}
 
 export function fetchHold(
     apiUrl: string,

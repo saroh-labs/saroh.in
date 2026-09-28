@@ -26,6 +26,9 @@ import {
 } from "../invoices/invoice-state";
 import type { FulfilmentType } from "../orders/fulfilment";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
+import { realOrderWhere } from "../orders/open-orders";
+import type { OrderLineKind } from "../orders/order-line";
+import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
@@ -144,7 +147,9 @@ export interface DetailOrder {
     itemCount: number;
     /** What was bought, line by line (up to ORDER_LINES), for "usually buys". */
     items: {
-        productId: string;
+        /** Null on a treatment's line (E9, DEC-050): it bills a service. */
+        productId: string | null;
+        kind: OrderLineKind;
         name: string;
         variant: string | null;
         quantity: number;
@@ -324,6 +329,13 @@ export interface CustomerDetail {
         email: string;
         phone: string | null;
         company: string | null;
+        /** Their postal address (C8); each line null when not kept. */
+        addressLine1: string | null;
+        addressLine2: string | null;
+        city: string | null;
+        state: string | null;
+        postalCode: string | null;
+        country: string | null;
         source: string | null;
         createdAt: string;
     };
@@ -492,6 +504,12 @@ export class CustomerDetailService {
                 email: true,
                 phone: true,
                 company: true,
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                state: true,
+                postalCode: true,
+                country: true,
                 source: true,
                 createdAt: true,
                 mergedIntoId: true,
@@ -704,6 +722,12 @@ export class CustomerDetailService {
                 email: shownEmail,
                 phone: contact.phone,
                 company: contact.company,
+                addressLine1: contact.addressLine1,
+                addressLine2: contact.addressLine2,
+                city: contact.city,
+                state: contact.state,
+                postalCode: contact.postalCode,
+                country: contact.country,
                 source: contact.source,
                 createdAt: contact.createdAt.toISOString(),
             },
@@ -878,7 +902,12 @@ export class CustomerDetailService {
     }> {
         const customerIds = links.map((l) => l.customerId);
         if (customerIds.length === 0) return { rows: [], count: 0, paid: [] };
-        const where = { organizationId, customerId: { in: customerIds } };
+        // Never an abandoned site checkout, as Orders (B1).
+        const where = {
+            organizationId,
+            customerId: { in: customerIds },
+            ...realOrderWhere(),
+        };
 
         const [rows, count, paid] = await Promise.all([
             this.db.order.findMany({
@@ -910,6 +939,7 @@ export class CustomerDetailService {
                             productId: true,
                             quantity: true,
                             product: { select: { name: true } },
+                            ...LINE_SERVICE_SELECT,
                             variant: { select: { title: true } },
                         },
                     },
@@ -940,7 +970,8 @@ export class CustomerDetailService {
                 itemCount: o._count.items,
                 items: o.items.map((i) => ({
                     productId: i.productId,
-                    name: i.product.name,
+                    kind: lineKind(i),
+                    name: lineName(i) ?? "",
                     variant: i.variant?.title ?? null,
                     quantity: i.quantity,
                 })),

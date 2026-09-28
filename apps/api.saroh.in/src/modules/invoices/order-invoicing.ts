@@ -17,6 +17,7 @@ import type {
 import {
     buildCorrection,
     buildCreditNote,
+    buildManualInvoice,
     buildOrderInvoice,
     buildPaymentSupplementary,
     formatSellerAddress,
@@ -195,7 +196,12 @@ export async function ensureOrderInvoice(
         where: { orderId, kind: "INVOICE" },
         select: { id: true, number: true },
     });
-    if (existing) return { ...existing, created: false };
+    if (existing) {
+        // A treatment paid by deposit at booking (E9): the rest, paid now,
+        // gets its one balance invoice.
+        await ensureTreatmentBalanceInvoice(tx, orderId, existing.id, opts);
+        return { ...existing, created: false };
+    }
 
     const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -226,6 +232,10 @@ export async function ensureOrderInvoice(
                     price: true,
                     product: {
                         select: { name: true, gstRate: true, hsnCode: true },
+                    },
+                    // A treatment's line bills a service (E9, DEC-050).
+                    service: {
+                        select: { name: true, gstRate: true, sacCode: true },
                     },
                     variant: { select: { title: true } },
                 },
@@ -423,6 +433,86 @@ function asOriginal(row: OriginalRow): Original {
         total: row.total,
         lines: row.lines,
     };
+}
+
+/**
+ * A treatment's balance invoice (E9, DEC-050, DEC-023). A treatment paid by
+ * deposit at booking has one invoice, the deposit's (source BOOKING, naming
+ * the order). When the rest is paid — recorded at the clinic, or through
+ * the order's pay link — it gets one balance invoice for exactly the rest,
+ * a supplementary invoice against the deposit's, so the two total the
+ * treatment's price and a refund of the order can credit both. Once there,
+ * nothing more is written. Anything else is left alone.
+ */
+async function ensureTreatmentBalanceInvoice(
+    tx: Tx,
+    orderId: string,
+    invoiceId: string,
+    opts: { at?: Date; method?: string | null; reference?: string | null },
+): Promise<void> {
+    const which = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { source: true },
+    });
+    if (which?.source !== "BOOKING") return;
+    // Under the invoice's lock (after the order's, the documented order): a
+    // payment and a hand-recorded balance racing make one balance invoice.
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} FOR UPDATE`;
+    const original = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { ...ORIGINAL_SELECT, source: true },
+    });
+    if (original?.source !== "BOOKING" || original.status !== "PAID") return;
+    const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+            total: true,
+            items: {
+                where: { serviceId: { not: null } },
+                select: {
+                    id: true,
+                    service: {
+                        select: { name: true, gstRate: true, sacCode: true },
+                    },
+                },
+            },
+        },
+    });
+    const line = order?.items[0];
+    if (!order || !line?.service) return;
+    const invoiced = await tx.invoice.aggregate({
+        where: { relatedInvoiceId: original.id, kind: "SUPPLEMENTARY" },
+        _sum: { total: true },
+    });
+    const balanceCents =
+        toCents(order.total.toString()) -
+        toCents(original.total.toString()) -
+        toCents((invoiced._sum.total ?? 0).toString());
+    if (balanceCents <= 0) return;
+    const profile = await loadTaxProfile(tx, original.organizationId);
+    const doc = buildManualInvoice(
+        [
+            {
+                description: `Balance for ${line.service.name}`,
+                quantity: 1,
+                unitCents: balanceCents,
+                rateBps: rateToBps(line.service.gstRate?.toString() ?? null),
+                code: line.service.sacCode,
+                orderItemId: line.id,
+            },
+        ],
+        // The paper follows the deposit's: a receipt stays a receipt.
+        { ...profile, registered: original.sellerGstin !== null },
+        original.billToState,
+        0,
+    );
+    await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
+        status: "PAID",
+        at: opts.at ?? new Date(),
+        method: opts.method ?? null,
+        reference: opts.reference ?? null,
+        note: "Balance of the treatment",
+    });
 }
 
 /**

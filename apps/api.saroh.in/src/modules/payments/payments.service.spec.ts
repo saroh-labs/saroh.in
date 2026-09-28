@@ -1148,7 +1148,21 @@ describe("PaymentsService.initiateRefund", () => {
                     where: {
                         id: "rf_other",
                         organizationId: "org_1",
-                        paymentIntent: { orderId: "order_1" },
+                        // The order's own payments, or a treatment's on the
+                        // booking invoice that names it (E9).
+                        paymentIntent: {
+                            OR: [
+                                { orderId: "order_1" },
+                                {
+                                    orderId: null,
+                                    invoice: {
+                                        orderId: "order_1",
+                                        source: "BOOKING",
+                                        kind: "INVOICE",
+                                    },
+                                },
+                            ],
+                        },
                     },
                 }),
             );

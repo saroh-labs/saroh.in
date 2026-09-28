@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ProductPage, ShopUnavailable } from "@saroh/site-blocks";
+import type { SignInOptions } from "@saroh/site-blocks";
+import {
+    AddToBag,
+    AskAboutOrdering,
+    ProductPage,
+    ShopUnavailable,
+} from "@saroh/site-blocks";
 
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
+import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { enquiryPagePath } from "@/lib/shop-checkout-shape";
+import { getSignInOptions } from "@/lib/sign-in";
 
 import PostPage, {
     generateMetadata as postMetadata,
@@ -13,9 +22,10 @@ import PostPage, {
 /**
  * One product on a merchant's site (round-2 G11): `/shop/<product>`, drawn
  * by the same `ProductPage` the workspace's Customer view previews it with,
- * in public mode — no staff notes, and an action slot that the bag and
- * checkout (G13) fill with Add to bag or "Ask about ordering". Until then
- * the slot is empty and the page only shows the product.
+ * in public mode — no staff notes, and an action slot (G13): Add to bag
+ * where the site takes an online order now, else "Ask about ordering",
+ * which opens the site's enquiry form with the product named (or a call,
+ * where the site has no form).
  *
  * 404 unless the product is published, not archived and sold at the site's
  * storefront, and the shop is open (the API decides; see `lib/catalogue.ts`).
@@ -90,10 +100,31 @@ export default async function ShopProductPage({
         );
     }
 
-    const lookup = await getCatalogueProduct(resolved.siteId, productSlug);
+    const [lookup, checkout] = await Promise.all([
+        getCatalogueProduct(resolved.siteId, productSlug),
+        getCheckoutOptions(resolved.siteId),
+    ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         return <ShopUnavailable business={resolved.snapshot.site.name} />;
     }
-    return <ProductPage product={lookup.data} preview={false} />;
+    const product = lookup.data;
+    const business = resolved.snapshot.site.name;
+    const action =
+        checkout?.canOrder && product.listingId ? (
+            <AddToBag site={resolved.siteId} listingId={product.listingId} />
+        ) : (
+            <AskAboutOrdering
+                enquiryHref={enquiryPagePath(resolved.snapshot)}
+                phone={
+                    (
+                        await getSignInOptions().catch(
+                            (): SignInOptions | null => null,
+                        )
+                    )?.phone ?? null
+                }
+                businessName={business}
+            />
+        );
+    return <ProductPage product={product} preview={false} action={action} />;
 }

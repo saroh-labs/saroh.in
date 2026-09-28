@@ -332,6 +332,24 @@ describe("a shop customer's overview", () => {
         ]);
     });
 
+    it("leaves a treatment's line out of what they usually buy (E9)", () => {
+        const rows = [
+            order({
+                id: "o4",
+                items: [
+                    {
+                        productId: null,
+                        kind: "service",
+                        name: "Root canal treatment",
+                        variant: null,
+                        quantity: 1,
+                    },
+                ],
+            }),
+        ];
+        expect(favourites(rows)).toEqual([]);
+    });
+
     it("says how they get their orders and where the last delivery went", () => {
         const rows = shop().orders?.rows ?? [];
         expect(howTheyGet(rows)).toBe(
@@ -349,6 +367,13 @@ describe("a shop customer's overview", () => {
         );
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
+        );
+        // The address kept on their record comes first (C8).
+        expect(deliveryAddress(rows, "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
+        );
+        expect(deliveryAddress([order()], "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
         );
     });
 

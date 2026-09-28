@@ -11,9 +11,16 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { isValidSlotStart } from "./availability";
+import type { PublicCredit } from "./booking-credit";
+import {
+    creditChoiceOf,
+    offeredCredit,
+    spendCreditInTx,
+} from "./booking-credit";
 import type { HoldState } from "./booking-hold";
 import {
     createHoldInvoiceInTx,
@@ -53,7 +60,7 @@ import {
     toPublicBooking,
 } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
-import type { BookInput, ReserveWith } from "./reservation";
+import type { BookInput, CreditChoice, ReserveWith } from "./reservation";
 import {
     alreadyBooked,
     bookingByKey,
@@ -64,6 +71,12 @@ import {
 } from "./reservation";
 import { depositCents } from "./service-fields";
 import { serviceStaff } from "./staff-availability";
+import {
+    isTreatment,
+    requireTreatmentStorefront,
+    startTreatmentInTx,
+    treatmentEmail,
+} from "./visits";
 
 /**
  * A customer signed in on the business's site (A9): who `CustomerSessionGuard`
@@ -327,10 +340,25 @@ export class PublicBookingsService {
             : given;
         // How they pay, as the service allows it (E8): a deposit service is
         // paid online, in part or in full; any other never takes a deposit.
+        // A credit (A10) pays the class whatever its price or deposit, and
+        // only for someone signed in: it is their own pack or membership.
+        const askedPay = asked.pay;
+        const credit =
+            askedPay === "CREDIT" ? creditOf(asked, service, signedIn) : null;
         const input: BookInput = {
             ...asked,
-            pay: payAtBooking(service, asked.pay),
+            pay:
+                askedPay === "CREDIT"
+                    ? askedPay
+                    : payAtBooking(service, askedPay),
         };
+        // A treatment is sold as one order (E9, DEC-050): with nowhere to
+        // sell it, or no email to bill, it is refused before anything is
+        // held.
+        const treatmentStore = isTreatment(service)
+            ? await requireTreatmentStorefront(service)
+            : null;
+        if (treatmentStore) treatmentEmail(input.bookerEmail);
         // Where and the note are checked before anything is held (E7): an
         // answer to Where the service can't give, or a note past its length.
         const place = bookingLocation(service.locationType, input.locationType);
@@ -445,6 +473,12 @@ export class PublicBookingsService {
             throw err;
         }
         if (input.pay === "DESK") person.paidWith = "DESK";
+        // Paid with a credit (A10): said on the booking as the desk says it.
+        if (credit) {
+            person.paidWith = credit.kind === "PACK" ? "PACK" : "MEMBERSHIP";
+            person.subscriptionId =
+                credit.kind === "MEMBERSHIP" ? credit.subscriptionId : null;
+        }
 
         // 6. Atomic, serializable reservation (see the method doc for WHY) —
         //    with the hold's invoice in the same transaction for pay now.
@@ -458,9 +492,39 @@ export class PublicBookingsService {
             payToken: null,
         };
         const also = {
-            onRace: "This slot is fully booked",
+            // With a credit, the race lost may have been the pack's (or the
+            // month's) last class; tried again, the answer says which.
+            onRace: credit
+                ? "That changed while you were booking. Try again."
+                : "This slot is fully booked",
+            retryOnce: credit !== null,
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
+                // A note on a booking confirmed now waits on the customer's
+                // record for staff (C12). A pay-now hold's waits for the
+                // payment (`confirmHoldInTx`).
+                await suggestFromBookingNoteInTx(tx, booking);
+                if (credit) {
+                    // The contact the booking resolved to (C9): a credit is
+                    // only ever spent by the person who holds it.
+                    await spendCreditInTx(tx, {
+                        organizationId: service.organizationId,
+                        bookingId: booking.id,
+                        contactId: booking.contactId ?? "",
+                        serviceId: service.id,
+                        startAt,
+                        credit,
+                    });
+                    return;
+                }
+                // The treatment's order, with this booking its visit 1.
+                const sold = treatmentStore
+                    ? await startTreatmentInTx(tx, {
+                          service,
+                          booking,
+                          storeId: treatmentStore.id,
+                      })
+                    : null;
                 if (!price || !booking.contactId) return;
                 const hold = await createHoldInvoiceInTx(tx, {
                     organizationId: service.organizationId,
@@ -480,6 +544,15 @@ export class PublicBookingsService {
                         sacCode: service.sacCode,
                     },
                     startAt,
+                    // A treatment's pay-now invoice is its order's (E9).
+                    ...(sold
+                        ? {
+                              order: {
+                                  orderId: sold.orderId,
+                                  orderItemId: sold.orderItemId,
+                              },
+                          }
+                        : {}),
                 });
                 made.payToken = hold.payToken;
             },
@@ -523,7 +596,43 @@ export class PublicBookingsService {
         if (made.bookingId !== booking.id) {
             return this.replay(booking, input, place, now);
         }
+        // A treatment's visit 1 names its order, written after the booking.
+        if (treatmentStore) {
+            booking = await prisma.booking.findUniqueOrThrow({
+                where: { id: booking.id },
+            });
+        }
         return { booking, payToken: made.payToken };
+    }
+
+    /**
+     * The credit a signed-in customer could pay a class with (A10): the
+     * pay step asks once a time is chosen, and books with what it is given.
+     * Another business's service is as good as missing; nothing is held.
+     */
+    async creditFor(
+        signedIn: SignedInCustomer,
+        serviceId: string,
+        startAtISO: string,
+    ): Promise<{ credit: PublicCredit | null }> {
+        const { service } = await loadBookableService(serviceId, {
+            bookingPage: true,
+        });
+        if (service.organizationId !== signedIn.organizationId) {
+            throw new NotFoundException("Service not found");
+        }
+        const startAt = new Date(startAtISO);
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        return {
+            credit: await offeredCredit(prisma, {
+                organizationId: service.organizationId,
+                contactId: signedIn.contactId,
+                service,
+                startAt,
+            }),
+        };
     }
 
     /**
@@ -588,11 +697,14 @@ export class PublicBookingsService {
         const paidAs =
             existing.paidWith === "DESK"
                 ? "DESK"
-                : existing.paidWith === "PAID" || existing.holdExpiresAt
-                  ? paidADeposit(existing.snapshot)
-                      ? "DEPOSIT"
-                      : "NOW"
-                  : undefined;
+                : existing.paidWith === "PACK" ||
+                    existing.paidWith === "MEMBERSHIP"
+                  ? "CREDIT"
+                  : existing.paidWith === "PAID" || existing.holdExpiresAt
+                    ? paidADeposit(existing.snapshot)
+                        ? "DEPOSIT"
+                        : "NOW"
+                    : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
                 input.bookerEmail.trim().toLowerCase() ||
@@ -654,6 +766,24 @@ export class PublicBookingsService {
             currency: service.currency,
         };
     }
+}
+
+/**
+ * The credit a CREDIT booking names (A10): only someone signed in has one,
+ * and it must name exactly one pack or membership (`creditChoiceOf`).
+ */
+function creditOf(
+    asked: BookInput,
+    service: Pick<Service, "capacity" | "visits">,
+    signedIn: SignedInCustomer | undefined,
+): CreditChoice {
+    if (!signedIn) {
+        throw new BadRequestException({
+            message: "Sign in to use a credit.",
+            field: "pay",
+        });
+    }
+    return creditChoiceOf(asked, service);
 }
 
 /**

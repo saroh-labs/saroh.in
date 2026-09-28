@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import type {
     RenderedBooking,
+    RenderedJournal,
     RenderedServicesList,
     RenderedVisitUs,
     SectionType,
@@ -12,6 +13,8 @@ import { blockFixture } from "@saroh/block-contract";
 
 import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
+import type { JournalPost } from "./blocks/journal";
+import JournalSection from "./blocks/journal";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
 import type { PublicVisit } from "./blocks/visit-us";
@@ -73,6 +76,40 @@ export const SAMPLE_VISIT: PublicVisit = {
     ],
     timezone: "Europe/London",
 };
+
+/**
+ * Posts for previewing `journal` where there are no real ones: the catalog
+ * and the Add-section picker (G10). Dates are fixed, so the picture is the
+ * same on every machine; the last has no photo and no excerpt of its own, so
+ * those cases look right too.
+ */
+export const SAMPLE_POSTS: JournalPost[] = [
+    {
+        title: "Why our sourdough takes two days",
+        slug: "two-day-sourdough",
+        excerpt:
+            "A slow, cold rise is where the flavour comes from. Here is what happens overnight.",
+        image: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%23d9cbb5'/%3E%3Cellipse cx='400' cy='230' rx='230' ry='110' fill='%23a8794c'/%3E%3C/svg%3E",
+        author: "Asha",
+        publishedAt: "2026-09-18T08:00:00.000Z",
+    },
+    {
+        title: "The new rye starter",
+        slug: "new-rye-starter",
+        excerpt:
+            "Six weeks of feeding, and it is finally ready for the counter.",
+        image: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%232f2a26'/%3E%3Crect x='300' y='90' width='200' height='240' rx='24' fill='%23e0913a'/%3E%3C/svg%3E",
+        author: "Asha",
+        publishedAt: "2026-09-04T08:00:00.000Z",
+    },
+    {
+        title: "Opening hours over the festival",
+        slug: "festival-hours",
+        content:
+            "<p>We close early on the Friday and open late on the Saturday. Orders for the weekend close on Thursday at 6pm.</p>",
+        publishedAt: "2026-08-28T08:00:00.000Z",
+    },
+];
 
 /**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
@@ -149,6 +186,12 @@ const LIVE_DATA_PREVIEWS: Partial<
         <ServicesListSection
             content={content as RenderedServicesList}
             services={SAMPLE_SERVICES}
+        />
+    ),
+    journal: (content) => (
+        <JournalSection
+            content={content as RenderedJournal}
+            feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
         />
     ),
     visitUs: (content) => (

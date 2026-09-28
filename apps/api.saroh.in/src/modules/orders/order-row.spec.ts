@@ -1,5 +1,6 @@
+import type { OrderReadDto } from "./order-read";
 import type { RawOrderRow } from "./order-row";
-import { serializeOrderRow } from "./order-row";
+import { quickViewOf, serializeOrderRow } from "./order-row";
 
 /**
  * One Orders row (plan B, B1): what it says, and what it leaves out for a
@@ -182,5 +183,72 @@ describe("serializeOrderRow", () => {
             now,
         });
         expect(row.customer).toBeNull();
+    });
+
+    it("says when the pay link was made, with money, and never the link (B5)", () => {
+        const made = new Date("2026-09-27T09:30:00.000Z");
+        const row = serializeOrderRow(raw({ payLinkCreatedAt: made }), {
+            money: true,
+            contact: false,
+            now,
+        });
+        expect(row.payLinkCreatedAt).toEqual(made);
+        expect(JSON.stringify(row)).not.toMatch(/order-pay|token/i);
+
+        const none = serializeOrderRow(raw(), {
+            money: true,
+            contact: false,
+            now,
+        });
+        expect(none.payLinkCreatedAt).toBeNull();
+
+        const kitchen = serializeOrderRow(raw({ payLinkCreatedAt: made }), {
+            money: false,
+            contact: true,
+            now,
+        });
+        expect(kitchen).not.toHaveProperty("payLinkCreatedAt");
+    });
+});
+
+describe("quickViewOf (B5)", () => {
+    const read = {
+        id: "o1",
+        orderId: "1042",
+        customer: {
+            id: "c1",
+            name: "Asha Rao",
+            phone: "+91 98765 43210",
+            email: "asha@example.in",
+            contactId: "k1",
+            orderCount: 3,
+            firstOrderAt: null,
+        },
+        notes: "No sesame",
+    } as unknown as OrderReadDto;
+
+    it("keeps the customer's phone and email for a caller who reads contacts", () => {
+        expect(quickViewOf(read, { contact: true })).toBe(read);
+    });
+
+    it("leaves them out for one who doesn't, and keeps the rest", () => {
+        const quick = quickViewOf(read, { contact: false });
+        expect(quick.customer).toEqual({
+            id: "c1",
+            name: "Asha Rao",
+            phone: null,
+            contactId: "k1",
+            orderCount: 3,
+            firstOrderAt: null,
+        });
+        expect(quick.customer).not.toHaveProperty("email");
+        expect(quick.notes).toBe("No sesame");
+        // The read it came from is left as it was.
+        expect(read.customer?.phone).toBe("+91 98765 43210");
+    });
+
+    it("keeps an order whose customer record is gone", () => {
+        const gone = { ...read, customer: null } as OrderReadDto;
+        expect(quickViewOf(gone, { contact: false }).customer).toBeNull();
     });
 });

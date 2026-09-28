@@ -529,6 +529,27 @@ const visitUsV1 = z.object({
     showHours: z.boolean().optional(),
 });
 
+/**
+ * journal v1 — the site's latest published posts, read live (G10).
+ *
+ * A bound block (ADR-004): it stores how many posts to show and how, never the
+ * posts. They are read when the page is served, from the posts this site owns
+ * (`GET public/sites/:siteId/posts`, newest first), so publishing a post puts
+ * it on the page without republishing the site, and taking one down removes it.
+ *
+ * `count` is 3 or 6 — a row, or two. ABSENT means 3. `showExcerpts` and
+ * `showImages` default to on, so ABSENT means shown. With no posts live the
+ * block renders nothing on the site; the editor's canvas says why.
+ */
+const journalV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    count: z.union([z.literal(3), z.literal(6)]).optional(),
+    showExcerpts: z.boolean().optional(),
+    showImages: z.boolean().optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -627,6 +648,7 @@ export const SECTION_TYPES = [
     "contact",
     "servicesList",
     "visitUs",
+    "journal",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -751,6 +773,13 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // A title, an id and two switches; the place is read from the API live.
         schema: visitUsV1,
+        sanitizedFields: [],
+    },
+    [key("journal", 1)]: {
+        type: "journal",
+        version: 1,
+        // A title, a count and two switches; the posts are read live.
+        schema: journalV1,
         sanitizedFields: [],
     },
 };

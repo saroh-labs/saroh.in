@@ -48,6 +48,11 @@ export interface BookingMoney {
      * what was paid online automatically. The screen states it.
      */
     refundInTimeCancels: boolean;
+    /**
+     * A visit of a treatment (E9, DEC-050): the order its money is on. It
+     * never refunds on its own (`refundableCents` is 0); the order does.
+     */
+    treatmentOrderId: string | null;
 }
 
 /** Whether a booking's snapshot says only its deposit was paid online. */
@@ -107,6 +112,8 @@ export async function bookingMoney(
         organizationId: string;
         status: string;
         paidWith: string | null;
+        /** A visit of a treatment (E9): the order its money is on. */
+        orderId?: string | null;
         snapshot: unknown;
     },
     rules: Pick<BookingRulesValue, "refundInTimeCancels"> = REFUNDS_BY_DEFAULT,
@@ -163,5 +170,6 @@ export async function bookingMoney(
             : null,
         refundableCents: left?.leftCents ?? 0,
         refundInTimeCancels: rules.refundInTimeCancels,
+        treatmentOrderId: booking.orderId ?? null,
     };
 }

@@ -258,6 +258,55 @@ export interface HomeLastDay {
 }
 
 /**
+ * This week's takings against last week's same days (F7): up, down or level
+ * by a whole percent, or `THIN` — too little last week to compare.
+ */
+export type HomeWeekChange =
+    { kind: "UP" | "DOWN" | "LEVEL"; percent: number } | { kind: "THIN" };
+
+/** Takings so far this week in one currency (F7), net of refunds. */
+export interface HomeWeekTakings {
+    currency: string;
+    amountMinor: number;
+    /** The same days last week, in the same currency. */
+    lastWeekMinor: number;
+    change: HomeWeekChange;
+    /** The invoices paid since Monday. */
+    href: string;
+}
+
+/** What is owed to the business (F7): issued, unpaid, not an order's own. */
+export interface HomeWeekOwed {
+    totals: { currency: string; amountMinor: number }[];
+    /** Unpaid bills, of every currency. */
+    bills: number;
+    /** Of those, past their due date. */
+    overdue: number;
+    href: string;
+}
+
+/**
+ * Home's "This week" (F7). Each figure is present only for a viewer who
+ * holds its read, and absent — never zero — otherwise: takings with
+ * `payment:read` and `invoice:read`, bookings with `booking:read`, orders
+ * with `order:read` or `order:stage`, owed with `invoice:read`.
+ */
+export interface HomeWeek {
+    /** The zone the week is kept in. */
+    zone: string;
+    /** This week's Monday in that zone, `2026-09-14`. */
+    startDate: string;
+    /** One per currency taken this week; empty when nothing came in. */
+    takings?: HomeWeekTakings[];
+    /** Confirmed bookings Monday to Sunday, and the whole of last week. */
+    bookings?: { count: number; lastWeek: number; href: string };
+    /** Orders placed since Monday. */
+    orders?: { count: number; href: string };
+    /** Absent too for a business that has never billed outside an order. */
+    owed?: HomeWeekOwed;
+}
+
+/**
  * Whose Home this is (F9): the business's, or a Reviewer's, which carries
  * only the sites they were asked to review. F11 adds the staff landing.
  */
@@ -343,6 +392,12 @@ export interface HomeModel {
      * and `unavailable` names "The last 24 hours".
      */
     lastDay: HomeLastDay;
+    /**
+     * This week (F7): null when the viewer reads none of its figures, or
+     * when the read failed (then `unavailable` names "This week"). Never
+     * sent to a Reviewer.
+     */
+    week?: HomeWeek | null;
 }
 
 export interface HomeInput {

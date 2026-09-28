@@ -1,5 +1,7 @@
 import type { ContactEmailVerifiedVia } from "@saroh/database";
 
+import type { ContactAddress } from "../contacts/contact-address";
+import { ADDRESS_FIELDS, isEmptyAddress } from "../contacts/contact-address";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { maskEmail } from "../site-accounts/account-linking.service";
 
@@ -145,7 +147,7 @@ export function unruledContactRelations(
 
 // ── The people ──────────────────────────────────────────────────────────
 
-export interface MergeContact {
+export interface MergeContact extends ContactAddress {
     id: string;
     firstName: string | null;
     lastName: string | null;
@@ -229,7 +231,7 @@ export function fieldOptions(
 }
 
 /** The survivor's contact fields after the merge. */
-export interface SurvivorFields {
+export interface SurvivorFields extends ContactAddress {
     firstName: string | null;
     lastName: string | null;
     /** The email to hold; the survivor's own when neither side offers one. */
@@ -248,9 +250,10 @@ function pick<T>(
 }
 
 /**
- * Name, email and phone as picked (DEC-042, default 89); company is the
- * survivor's, filled from the other where the survivor has none. (Address
- * joins company when C8 adds it to Contact.)
+ * Name, email and phone as picked (DEC-042, default 89); company and
+ * address are the survivor's, filled from the other where the survivor has
+ * none (R11). The address moves whole, never line by line: a survivor with
+ * any line of its own keeps its own, so two addresses are never mixed.
  */
 export function survivorFields(
     survivor: MergeContact,
@@ -275,7 +278,14 @@ export function survivorFields(
         company: survivor.company?.trim()
             ? survivor.company
             : (other.company ?? null),
+        ...addressOf(isEmptyAddress(survivor) ? other : survivor),
     };
+}
+
+function addressOf(c: ContactAddress): ContactAddress {
+    return Object.fromEntries(
+        ADDRESS_FIELDS.map((f) => [f, c[f] ?? null]),
+    ) as ContactAddress;
 }
 
 // ── Consent ─────────────────────────────────────────────────────────────

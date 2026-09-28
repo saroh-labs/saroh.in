@@ -1,20 +1,23 @@
 import {
     Body,
     Controller,
+    Get,
     Header,
     HttpCode,
     HttpStatus,
     Post,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
+import type { PublicCredit } from "../bookings/booking-credit";
 import type { PublicBookingResult } from "../bookings/public-bookings.controller";
 import { publicBookingResult } from "../bookings/public-bookings.controller";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import type { CustomerContext } from "./customer-context.decorator";
 import { CurrentCustomer } from "./customer-context.decorator";
 import { CustomerSessionGuard } from "./customer-session.guard";
-import { AccountBookDto } from "./dto";
+import { AccountBookDto, AccountCreditQueryDto } from "./dto";
 import type { SiteRelay } from "./site-relay";
 import { RelayContext } from "./site-relay";
 
@@ -57,6 +60,8 @@ export class AccountBookingsController {
                 pay: dto.pay,
                 locationType: dto.locationType,
                 intakeNote: dto.intakeNote,
+                packPurchaseId: dto.packPurchaseId,
+                subscriptionId: dto.subscriptionId,
             },
             // The visitor's address, as the site's server relayed it: the
             // API only ever sees that server's.
@@ -69,5 +74,28 @@ export class AccountBookingsController {
             },
         );
         return publicBookingResult(booking, payToken);
+    }
+
+    /**
+     * The credit the pay step offers (A10): one class from the customer's
+     * own pack or membership for this service at this time, or null. The
+     * booking names what this gave it (`pay: "CREDIT"`) and is checked
+     * again under the pack's or the membership's lock.
+     */
+    @Get("bookings/credit")
+    @Header("Cache-Control", "no-store")
+    credit(
+        @CurrentCustomer() customer: CustomerContext,
+        @Query() query: AccountCreditQueryDto,
+    ): Promise<{ credit: PublicCredit | null }> {
+        return this.bookings.creditFor(
+            {
+                organizationId: customer.organizationId,
+                accountId: customer.accountId,
+                contactId: customer.contactId,
+            },
+            query.serviceId,
+            query.startAt,
+        );
     }
 }
