@@ -13,8 +13,10 @@ import type { SiteAccount } from "./site-account";
  *
  * Rooted on the contact. A block the viewer may not read, or whose module is
  * off, is ABSENT; one the API could not read is `null` and named in
- * `unavailable`. Money figures are left out for a role that reads no money
- * (`money: false`), never sent for the screen to hide.
+ * `unavailable`. Each part follows its own read (DEC-039, C13): an order's
+ * total with `order:read`, a pack's price with `pack:read`. Spent sums orders
+ * and invoices, so it comes only with both reads (`money: true`), and is left
+ * out, never sent for the screen to hide.
  */
 
 export interface MoneyTotal {

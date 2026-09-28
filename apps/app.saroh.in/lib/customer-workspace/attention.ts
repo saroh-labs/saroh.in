@@ -163,13 +163,17 @@ interface Choice {
 
 const nameKey = (name: string) => name.trim().toLowerCase();
 
-/** A new entry starts as the design's does: Medical, and sensitive. */
-export function emptyDraft(): AttentionDraft {
+/**
+ * A new entry starts as the design's does: Medical, and sensitive — unless
+ * the viewer can't see sensitive notes (`customer:sensitive`, C13), since
+ * the API refuses a sensitive note from someone who couldn't read it back.
+ */
+export function emptyDraft(canSensitive = true): AttentionDraft {
     return {
         kind: "MEDICAL",
         label: "",
         detail: "",
-        sensitive: true,
+        sensitive: canSensitive,
         sensitiveSet: false,
         allergenId: null,
     };
@@ -198,17 +202,27 @@ export function draftFrom(
     };
 }
 
-/** Pick a kind: Medical is sensitive by default, unless ticked by hand. */
+/**
+ * Pick a kind: Medical is sensitive by default, unless ticked by hand, or
+ * the viewer can't see sensitive notes.
+ */
 export function pickKind(
     draft: AttentionDraft,
     kind: AttentionKind,
+    canSensitive = true,
 ): AttentionDraft {
     return {
         ...draft,
         kind,
-        sensitive: draft.sensitiveSet ? draft.sensitive : kind === "MEDICAL",
+        sensitive: draft.sensitiveSet
+            ? draft.sensitive
+            : kind === "MEDICAL" && canSensitive,
     };
 }
+
+/** Said where the sensitive tick would be, to a role without it. */
+export const NO_SENSITIVE_NOTE =
+    "Your role can't add sensitive notes, so everyone who can see customers will read this one.";
 
 /** The allergen is picked from the list, when the business has one. */
 export function picksAllergen(

@@ -52,7 +52,7 @@ export function PossibleMatch({
                 </Button>
             ) : (
                 <span className="text-[12px] text-muted-foreground">
-                    An owner or admin can link them.
+                    Your role can't link them.
                 </span>
             )}
         </div>
@@ -97,7 +97,7 @@ export function DuplicateNotice({
                         </Button>
                     ) : (
                         <span className="text-[12px] text-muted-foreground">
-                            An owner or admin can merge them.
+                            Your role can't merge them.
                         </span>
                     )}
                 </div>

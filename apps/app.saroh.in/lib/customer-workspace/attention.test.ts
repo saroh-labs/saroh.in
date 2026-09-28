@@ -182,6 +182,14 @@ describe("the editor", () => {
         expect(d.sensitive).toBe(true);
     });
 
+    it("never starts or turns sensitive for a role without customer:sensitive (C13)", () => {
+        const d = emptyDraft(false);
+        expect(d.kind).toBe("MEDICAL");
+        expect(d.sensitive).toBe(false);
+        const access = pickKind(d, "ACCESS", false);
+        expect(pickKind(access, "MEDICAL", false).sensitive).toBe(false);
+    });
+
     it("turns sensitive off for Access and on again for Medical", () => {
         const access = pickKind(emptyDraft(), "ACCESS");
         expect(access.sensitive).toBe(false);
