@@ -131,12 +131,15 @@ each with why it stops there:
   `components/calendar/business-calendar.tsx` (404 after E22) went back
   under when E23 took the switches row to `layer-switches.tsx` and the
   month strip to `month-strip.tsx`.
-- `organizations/organization-settings-form.tsx` (1,246) — one form holds
+- `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
+  F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
   to `time-zone-select.tsx`, and the Hours card, which saves to the
-  storefronts, to `business-hours-section.tsx`. Less
+  storefronts, to `business-hours-section.tsx`. F12's Undo on a save kept
+  its rules out (`lib/organizations/settings-undo.ts`, and the hold and
+  toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
 - `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
   member drawer and the invite dialog share the screen's roster and role
