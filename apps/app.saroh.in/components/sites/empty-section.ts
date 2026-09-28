@@ -118,6 +118,14 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { title: "Come and see us" },
             };
+        case "plans":
+            // Nothing to choose: the plans on sale, read live.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Plans" },
+            };
         case "journal":
             // Nothing to choose: the site's newest three posts, read live.
             return {

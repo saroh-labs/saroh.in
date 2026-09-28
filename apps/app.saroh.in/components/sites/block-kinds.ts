@@ -48,6 +48,12 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: (siteId) => `/sites/${siteId}/posts`,
         linkLabel: "Open Posts",
     },
+    plans: {
+        reads: "Reads your plans on sale live, so a price or a newly published plan shows here without publishing the site again.",
+        notice: "Plans live in Payments › Subscriptions › Plans. Only published plans show; a draft or an unpublished change never does, and nothing shows while Payments is off.",
+        href: "/billing/subscriptions?tab=plans",
+        linkLabel: "Open Plans",
+    },
     booking: {
         reads: "Reads your services and their availability live, so a visitor can only book what you actually offer.",
         notice: "Which services can be booked, and when, follow Services and your opening hours — change them there, and this block follows.",

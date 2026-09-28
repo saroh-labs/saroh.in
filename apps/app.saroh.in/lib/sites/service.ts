@@ -190,6 +190,18 @@ export interface JournalContent {
     showImages?: boolean;
 }
 
+/**
+ * `plans` — how the business's plans on sale show (G9). The plans themselves
+ * are read live by the site, never stored here. `highlight` absent means
+ * `first`; `showDescriptions` absent means shown.
+ */
+export interface PlansContent {
+    title?: string;
+    highlight?: "first" | "none";
+    buttonLabel?: string;
+    showDescriptions?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -250,6 +262,7 @@ export interface SectionContentByType {
     servicesList: ServicesListContent;
     visitUs: VisitUsContent;
     journal: JournalContent;
+    plans: PlansContent;
 }
 
 /**
