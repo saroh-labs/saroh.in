@@ -257,7 +257,58 @@ export interface HomeLastDay {
     items: HomeSinceItem[];
 }
 
+/**
+ * Whose Home this is (F9): the business's, or a Reviewer's, which carries
+ * only the sites they were asked to review. F11 adds the staff landing.
+ */
+export type HomeView = "business" | "reviewer";
+
+/** A page of a site a Reviewer was asked to review (F9). */
+export interface HomeReviewPage {
+    id: string;
+    title: string;
+    path: string;
+    /** Notes left on this page that nobody has settled. */
+    openNotes: number;
+    /** The Review tab, opened on this page. */
+    href: string;
+}
+
+/**
+ * A site a Reviewer was granted (F9, `SiteReviewer`), as their Home lists
+ * it: its pages, who asked for the review and when while it waits on them,
+ * and the notes still open. Never a site they weren't granted.
+ */
+export interface HomeReviewSite {
+    id: string;
+    name: string;
+    /** `/sites/:id/review`. */
+    href: string;
+    /** Who asked for the review, while nobody has answered it; else null. */
+    requestedBy: string | null;
+    /** ISO instant it was asked for, while it waits; else null. */
+    requestedAt: string | null;
+    /** Open notes on the whole site, pages gone included. */
+    openNotes: number;
+    /** Its visible pages, home first, up to five. */
+    pages: HomeReviewPage[];
+    /** Every visible page, for "2 more pages". */
+    pageCount: number;
+    /** The public address's label, for "See the live site". */
+    subdomain: string | null;
+    /** Whether it has been published. */
+    live: boolean;
+}
+
 export interface HomeModel {
+    /** Whose Home this is; `reviewer` sends `reviews` and nothing else. */
+    view: HomeView;
+    /**
+     * A Reviewer's sites (F9), present only on `view: "reviewer"`. Empty
+     * when they have none — or when the read failed, which `unavailable`
+     * then names.
+     */
+    reviews?: HomeReviewSite[];
     actions: HomeAction[];
     primaryAction: HomeAction | null;
     hasAnyModule: boolean;
@@ -296,6 +347,8 @@ export interface HomeModel {
 
 export interface HomeInput {
     organizationId: string;
+    /** The viewer: a Reviewer's Home reads only their own grants (F9). */
+    userId?: string;
     organizationRole: OrgRole;
     /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
     organizationActions?: ReadonlySet<OrgAction>;
