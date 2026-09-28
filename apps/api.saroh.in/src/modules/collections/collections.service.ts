@@ -21,6 +21,7 @@ import type {
 import { COLLECTION_PRODUCTS_MAX } from "./dto";
 import type { WebsitePlacement } from "./website-pages";
 import {
+    NO_PRODUCT_BLOCKS,
     PRODUCT_BLOCKS,
     websitePagesFor,
     websitePagesForCollections,
@@ -203,6 +204,7 @@ export class CollectionsService {
         const website = await websitePagesForCollections(
             organizationId,
             rows.map((r) => r.id),
+            await productBlocksFor(organizationId),
         );
         return rows.map((r) =>
             summary(
@@ -223,7 +225,11 @@ export class CollectionsService {
     ): Promise<CollectionDetail> {
         const row = await this.require(organizationId, collectionId);
         const website = (
-            await websitePagesForCollections(organizationId, [collectionId])
+            await websitePagesForCollections(
+                organizationId,
+                [collectionId],
+                await productBlocksFor(organizationId),
+            )
         ).get(collectionId);
         if (row.categoryId) {
             const tree = await categoryTree(organizationId);
@@ -622,6 +628,9 @@ export async function productPlacement(
     productId: string,
 ): Promise<ProductPlacement> {
     const collections = await productCollections(organizationId, productId);
+    // The site's `/shop` and its Product grids show it once the shop is
+    // open (G11, G12).
+    const shopOpen = await shopRolloutOn(organizationId);
     return {
         collections,
         website: await websitePagesFor(
@@ -632,11 +641,20 @@ export async function productPlacement(
                     .filter((c) => c.showing)
                     .map((c) => c.id),
             },
-            PRODUCT_BLOCKS,
-            // The site's `/shop` shows it once the shop is open (G11).
-            await shopRolloutOn(organizationId),
+            shopOpen ? PRODUCT_BLOCKS : NO_PRODUCT_BLOCKS,
+            shopOpen,
         ),
     };
+}
+
+/**
+ * The blocks that can show a product on this business's sites: the Product
+ * grid (G12) once the shop is open for it (`SITE_SHOP`), none before.
+ */
+async function productBlocksFor(organizationId: string) {
+    return (await shopRolloutOn(organizationId))
+        ? PRODUCT_BLOCKS
+        : NO_PRODUCT_BLOCKS;
 }
 
 /**

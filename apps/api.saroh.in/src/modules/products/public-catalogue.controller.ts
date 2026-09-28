@@ -1,6 +1,16 @@
-import { Controller, Get, Header, Headers, Ip, Param } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Header,
+    Headers,
+    Ip,
+    Param,
+    Query,
+} from "@nestjs/common";
 
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
+import type { RawGridQuery } from "./product-grid";
+import { parseGridQuery } from "./product-grid";
 import type {
     PublicCatalogue,
     PublicProduct,
@@ -31,14 +41,23 @@ import { PublicCatalogueService } from "./public-catalogue.service";
 export class PublicCatalogueController {
     constructor(private readonly catalogue: PublicCatalogueService) {}
 
+    /**
+     * `/shop`'s list, or with `?source=newest|collection|picked` (and
+     * `collection`, `ids`, `count`) a Product grid's (G12).
+     */
     @Get(":siteId/shop/products")
     @Header("Cache-Control", "no-store")
     list(
         @Param("siteId") siteId: string,
+        @Query() query: RawGridQuery,
         @Ip() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicCatalogue> {
-        return this.catalogue.list(siteId, visitorKey(ip, relay));
+        return this.catalogue.list(
+            siteId,
+            visitorKey(ip, relay),
+            parseGridQuery(query),
+        );
     }
 
     @Get(":siteId/shop/products/:slug")

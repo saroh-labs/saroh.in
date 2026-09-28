@@ -6,11 +6,15 @@ import { prisma } from "@saroh/database";
  * never from a draft — a page the merchant hasn't published doesn't show it.
  *
  * A page shows a product when one of its sections is a product block that
- * names the product, or names a collection the product is in. No such block
- * exists yet (the Products/Collection block is #473), so `PRODUCT_BLOCKS` is
- * empty, every answer is `{ showsProducts: false, pages: [] }`, and the
- * screen says "The website doesn't show products yet." When #473 adds a
- * block, it registers how to read its content here.
+ * names the product, or names a collection the product is in. The Product
+ * grid (G12) is that block; `PRODUCT_BLOCKS` says how to read it. It shows
+ * products only while the shop is open for the business (`SITE_SHOP`), so
+ * callers hand these readers in only then; with none, every answer is
+ * `{ showsProducts: false, pages: [] }` and the screen says "The website
+ * doesn't show products yet."
+ *
+ * A grid of the NEWEST products names none: which ones it shows changes as
+ * products are added, so it is not listed as a page showing any one of them.
  */
 
 /** What one section of a product block shows. */
@@ -22,8 +26,37 @@ export interface ProductBlockReach {
 /** Reads a product block's published content. Forgiving: unknown → nothing. */
 export type ProductBlockReader = (content: unknown) => ProductBlockReach;
 
-/** Section types that show products, by how to read them. None yet (#473). */
-export const PRODUCT_BLOCKS: Readonly<Record<string, ProductBlockReader>> = {};
+/** Readers for no block at all: nothing on the website shows a product. */
+export const NO_PRODUCT_BLOCKS: Readonly<Record<string, ProductBlockReader>> =
+    {};
+
+/**
+ * A Product grid's reach (G12), by its source: the products it picked, or
+ * the collection it shows. Only the source in use counts — ids left from an
+ * earlier choice show nothing.
+ */
+export const readProductGrid: ProductBlockReader = (content) => {
+    const c = (
+        typeof content === "object" && content !== null ? content : {}
+    ) as { source?: unknown; productIds?: unknown; collectionId?: unknown };
+    if (c.source === "picked" && Array.isArray(c.productIds)) {
+        return {
+            productIds: c.productIds.filter(
+                (id): id is string => typeof id === "string",
+            ),
+            collectionIds: [],
+        };
+    }
+    if (c.source === "collection" && typeof c.collectionId === "string") {
+        return { productIds: [], collectionIds: [c.collectionId] };
+    }
+    return { productIds: [], collectionIds: [] };
+};
+
+/** Section types that show products, by how to read them. */
+export const PRODUCT_BLOCKS: Readonly<Record<string, ProductBlockReader>> = {
+    productGrid: readProductGrid,
+};
 
 /** A live page that shows the product. */
 export interface WebsitePage {
@@ -56,7 +89,7 @@ export interface ShownTarget {
 export function pagesShowing(
     snapshot: unknown,
     target: ShownTarget,
-    blocks: Readonly<Record<string, ProductBlockReader>> = PRODUCT_BLOCKS,
+    blocks: Readonly<Record<string, ProductBlockReader>> = NO_PRODUCT_BLOCKS,
 ): { path: string; title: string }[] {
     if (snapshot === null || typeof snapshot !== "object") return [];
     const pages = (snapshot as { pages?: unknown }).pages;
@@ -108,7 +141,7 @@ export function pagesShowing(
 export async function websitePagesFor(
     organizationId: string,
     target: ShownTarget,
-    blocks: Readonly<Record<string, ProductBlockReader>> = PRODUCT_BLOCKS,
+    blocks: Readonly<Record<string, ProductBlockReader>> = NO_PRODUCT_BLOCKS,
     shopOpen = false,
 ): Promise<WebsitePlacement> {
     if (Object.keys(blocks).length === 0 && !shopOpen) {
@@ -166,7 +199,7 @@ function hasPageAt(snapshot: unknown, path: string): boolean {
 export async function websitePagesForCollections(
     organizationId: string,
     collectionIds: readonly string[],
-    blocks: Readonly<Record<string, ProductBlockReader>> = PRODUCT_BLOCKS,
+    blocks: Readonly<Record<string, ProductBlockReader>> = NO_PRODUCT_BLOCKS,
 ): Promise<Map<string, WebsitePlacement>> {
     const out = new Map<string, WebsitePlacement>();
     if (collectionIds.length === 0) return out;

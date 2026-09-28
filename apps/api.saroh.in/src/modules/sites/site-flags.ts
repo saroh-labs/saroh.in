@@ -44,7 +44,10 @@ export type FlagType =
     | "reservedAddress"
     // The checkout (G13): the site sells from a storefront that can't take
     // an online order now, so its shop offers "Ask about ordering".
-    | "shopCantTakeOrders";
+    | "shopCantTakeOrders"
+    // A Product grid (G12) that will show nothing, or less than was
+    // picked, because what it names isn't on sale at the storefront.
+    | "productsNotOnSale";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
