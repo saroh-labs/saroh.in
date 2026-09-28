@@ -2,6 +2,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderRead } from "@/lib/orders/read";
 
 import { FOCUS, Panel } from "./parts";
@@ -28,7 +29,8 @@ export function CustomerCard({
     href,
     notes,
     address,
-    tracking,
+    shipment,
+    onChangeTracking,
     orderNote,
 }: {
     customer: NonNullable<OrderRead["customer"]>;
@@ -37,7 +39,10 @@ export function CustomerCard({
     notes: AllergyNote[] | null;
     /** Delivery orders only. */
     address: string | null;
-    tracking: { url: string; courier: string | null } | null;
+    /** Who took it and how to follow it, once it's with a courier (B10). */
+    shipment: Shipment | null;
+    /** Opens the panel to add or correct them. */
+    onChangeTracking: () => void;
     /** What the customer wrote with the order. */
     orderNote: string | null;
 }) {
@@ -98,25 +103,77 @@ export function CustomerCard({
                     {orderNote}”
                 </p>
             ) : null}
-            {tracking ? (
-                <div className="mt-2 flex min-w-0 flex-wrap gap-x-1 text-[12.5px]">
-                    <span className="text-muted-foreground">Tracking</span>{" "}
-                    {tracking.courier ? (
-                        <span>{tracking.courier} ·</span>
-                    ) : null}
-                    <a
-                        href={tracking.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={cn(
-                            FOCUS,
-                            "min-w-0 truncate font-mono text-[12px] underline-offset-4 hover:underline",
-                        )}
-                    >
-                        {tracking.url.replace(/^https?:\/\//, "")}
-                    </a>
-                </div>
+            {shipment ? (
+                <TrackingRow shipment={shipment} onChange={onChangeTracking} />
             ) : null}
         </Panel>
+    );
+}
+
+/**
+ * "Tracking  Delhivery · 1487 2290 3314", the number opening the courier's
+ * link when there is one; "No tracking number yet · Add" until it is typed.
+ * Our own driver has no number to wait for.
+ */
+function TrackingRow({
+    shipment,
+    onChange,
+}: {
+    shipment: Shipment;
+    onChange: () => void;
+}) {
+    const { courier, number, url, ownDriver, canChange } = shipment;
+    const shown = number ?? (url ? url.replace(/^https?:\/\//, "") : null);
+    const action = (label: string, name: string) => (
+        <button
+            type="button"
+            onClick={onChange}
+            aria-label={name}
+            className={cn(
+                FOCUS,
+                "rounded-sm font-sans text-[12.5px] font-semibold text-foreground underline underline-offset-4 coarse:min-h-11",
+            )}
+        >
+            {label}
+        </button>
+    );
+    return (
+        <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12.5px]">
+            <span className="text-muted-foreground">Tracking</span>{" "}
+            {courier ? (
+                <span className="font-mono text-[12px]">
+                    {courier}
+                    {shown ? " ·" : ""}
+                </span>
+            ) : null}
+            {shown && url ? (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn(
+                        FOCUS,
+                        "min-w-0 truncate font-mono text-[12px] underline underline-offset-4",
+                    )}
+                >
+                    {shown}
+                </a>
+            ) : shown ? (
+                <span className="min-w-0 break-all font-mono text-[12px]">
+                    {shown}
+                </span>
+            ) : null}
+            {!number && !ownDriver ? (
+                <span className="text-muted-foreground">
+                    {courier || url ? "· " : ""}No tracking number yet
+                    {canChange ? " · " : ""}
+                </span>
+            ) : null}
+            {canChange
+                ? !number && !ownDriver
+                    ? action("Add", "Add the tracking number")
+                    : action("Change", "Change the courier or tracking number")
+                : null}
+        </div>
     );
 }
