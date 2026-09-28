@@ -156,14 +156,14 @@ describe("the API's answers", () => {
             problemOf(429, {
                 error: {
                     message:
-                        "You have a checkout open already — finish or wait a few minutes",
+                        "You have other checkouts waiting for payment. Finish one of them, or try again tomorrow.",
                 },
             }),
         ).toEqual({
             ok: false,
             reason: "busy",
             message:
-                "You have a checkout open already — finish or wait a few minutes",
+                "You have other checkouts waiting for payment. Finish one of them, or try again tomorrow.",
         });
         // Any other API text stays with the API.
         const other = problemOf(429, {

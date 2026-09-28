@@ -60,6 +60,7 @@ import { WebhooksService } from "../webhooks/webhooks.service";
 import { CloseAbandonedCheckoutHandler } from "./close-abandoned-checkout.handler";
 import {
     CHECKOUT_NOT_COMPLETED,
+    CHECKOUT_REPLACED,
     CHECKOUT_SOLD_OUT,
     CLOSE_ABANDONED_CHECKOUT_TYPE,
 } from "./online-checkout";
@@ -607,15 +608,106 @@ describe("starting a checkout and paying (G13)", () => {
         ).toBe(0);
     });
 
-    it("says a fourth open checkout must wait", async () => {
+    it("closes the account's older unpaid checkouts here when a new one starts", async () => {
         const s = await shop();
         const { token } = await signIn(s.host);
+        const ids: string[] = [];
+        for (let i = 0; i < 4; i++) {
+            const res = await start(s, token);
+            expect(res.status).toBe(201);
+            ids.push(res.body.orderId as string);
+        }
+        const orders = await prisma.order.findMany({
+            where: { id: { in: ids } },
+            include: { events: true },
+        });
+        const byId = new Map(orders.map((o) => [o.id, o]));
+        // Only the newest is still waiting for its payment.
+        expect(ids.map((id) => byId.get(id)?.status)).toEqual([
+            "CANCELLED",
+            "CANCELLED",
+            "CANCELLED",
+            "PENDING",
+        ]);
+        expect(byId.get(ids[0])?.events.map((e) => e.note)).toEqual([
+            CHECKOUT_REPLACED,
+        ]);
+    });
+
+    it("two starts at once with different bags leave one checkout waiting", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const [a, b] = await Promise.all([start(s, token), start(s, token)]);
+        expect([a.status, b.status]).toEqual([201, 201]);
+        const waiting = await prisma.order.count({
+            where: { storeId: s.storeId, status: "PENDING" },
+        });
+        expect(waiting).toBe(1);
+        expect(
+            await prisma.customer.count({ where: { storeId: s.storeId } }),
+        ).toBe(1);
+    });
+
+    it("says a fourth open checkout, across the business's storefronts, must wait", async () => {
+        const s = await shop();
+        const { token, email } = await signIn(s.host);
+        // Three waiting at another storefront of the business, under the
+        // same email in another case.
+        const other = await prisma.store.create({
+            data: {
+                name: "Market",
+                slug: `g13-market-${next()}`,
+                organizationId: s.organizationId,
+            },
+        });
+        const elsewhere = await prisma.customer.create({
+            data: {
+                storeId: other.id,
+                organizationId: s.organizationId,
+                email: email.toUpperCase(),
+            },
+        });
         for (let i = 0; i < 3; i++) {
-            expect((await start(s, token)).status).toBe(201);
+            await prisma.order.create({
+                data: {
+                    storeId: other.id,
+                    organizationId: s.organizationId,
+                    orderId: `ORD-M${i}`,
+                    customerId: elsewhere.id,
+                    currency: "INR",
+                    subtotal: "250.00",
+                    total: "250.00",
+                    placedOnline: true,
+                },
+            });
         }
         const fourth = await start(s, token);
         expect(fourth.status).toBe(429);
         expect(errorOf(fourth.body).message).toBe(CHECKOUT_OPEN_ALREADY);
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
+    });
+
+    it("uses the store customer staff made for the email, whatever its case", async () => {
+        const s = await shop();
+        const { token, email } = await signIn(s.host);
+        const made = await prisma.customer.create({
+            data: {
+                storeId: s.storeId,
+                organizationId: s.organizationId,
+                email: email.toUpperCase(),
+            },
+        });
+        const res = await start(s, token);
+        expect(res.status).toBe(201);
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+        });
+        expect(order.customerId).toBe(made.id);
+        expect(
+            await prisma.customer.count({ where: { storeId: s.storeId } }),
+        ).toBe(1);
     });
 
     it("refuses a session from site A on site B's host, or naming site B", async () => {

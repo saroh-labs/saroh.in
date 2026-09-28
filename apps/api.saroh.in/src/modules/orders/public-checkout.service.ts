@@ -64,7 +64,9 @@ import { fromCents } from "./order-pricing";
  *   (`online-checkout.ts`) and its intent, and a retry with the same key
  *   returns the same pair.
  * - **Limited.** Options and quote per visitor address; start per address
- *   and per account (at most three checkouts open at once).
+ *   and per account (at most three checkouts open at once, business-wide;
+ *   a new one at a storefront closes the account's older unpaid ones
+ *   there, so changing the bag never piles them up).
  */
 
 /** Options and quote reads per visitor per minute. */
@@ -73,11 +75,7 @@ const READ_WINDOW_MS = 60_000;
 /** Checkout starts per visitor address per ten minutes. */
 const STARTS_PER_WINDOW = 10;
 const START_WINDOW_MS = 10 * 60_000;
-/** Unpaid checkouts one account may have open at once. */
-export const MAX_OPEN_CHECKOUTS = 3;
-
-export const CHECKOUT_OPEN_ALREADY =
-    "You have a checkout open already — finish or wait a few minutes";
+export { CHECKOUT_OPEN_ALREADY, MAX_OPEN_CHECKOUTS } from "./online-checkout";
 
 /** What the site asks before it draws a bag. */
 export interface CheckoutOptions {
@@ -246,19 +244,6 @@ export class PublicCheckoutService {
                     );
                 }
                 return this.pay(scope, account, existing.id, dto.key);
-            }
-
-            const open = await prisma.order.count({
-                where: {
-                    organizationId: scope.organizationId,
-                    placedOnline: true,
-                    status: "PENDING",
-                    paymentStatus: { in: ["UNPAID", "FAILED"] },
-                    customer: { email: account.email },
-                },
-            });
-            if (open >= MAX_OPEN_CHECKOUTS) {
-                throw tooManyRequests(CHECKOUT_OPEN_ALREADY);
             }
 
             const { quote, lines, settings } = await priceBag(
@@ -438,8 +423,12 @@ export class PublicCheckoutService {
         orderId: string,
         key: string,
     ): Promise<CheckoutStarted> {
+        // Matched as the checkout matched it: whatever case staff typed.
         const customers = await prisma.customer.findMany({
-            where: { storeId: scope.storefront.id, email: account.email },
+            where: {
+                storeId: scope.storefront.id,
+                email: { equals: account.email, mode: "insensitive" },
+            },
             select: { id: true },
         });
         const payment = await this.payments.createIntentForOnlineOrder(

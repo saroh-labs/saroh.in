@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { gstInsideOrder } from "../invoices/order-invoice";
@@ -9,8 +9,12 @@ import type { CheckoutStartDto } from "./checkout.dto";
 import type { StorefrontFulfilmentType } from "./fulfilment";
 import { shipsToAddress, storedValueFor } from "./fulfilment";
 import {
+    CHECKOUT_OPEN_ALREADY,
     CHECKOUT_OPEN_MS,
+    CHECKOUT_REPLACED,
     CLOSE_ABANDONED_CHECKOUT_TYPE,
+    closeCheckoutInTx,
+    MAX_OPEN_CHECKOUTS,
 } from "./online-checkout";
 import { fromCents, withGstRates } from "./order-pricing";
 
@@ -78,20 +82,69 @@ export async function createCheckoutOrder(
         const orderNumber = `ORD-${String(count + 1 + attempt).padStart(3, "0")}`;
         try {
             return await prisma.$transaction(async (tx) => {
-                const customer = await tx.customer.upsert({
+                // Found whatever case staff typed it in, as a treatment's
+                // customer is; made only when there is none.
+                const customer =
+                    (await tx.customer.findFirst({
+                        where: {
+                            storeId,
+                            email: {
+                                equals: account.email,
+                                mode: "insensitive",
+                            },
+                        },
+                        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                        select: { id: true },
+                    })) ??
+                    (await tx.customer.create({
+                        data: {
+                            storeId,
+                            organizationId: scope.organizationId,
+                            email: account.email,
+                            firstName: account.firstName,
+                            lastName: account.lastName,
+                        },
+                        select: { id: true },
+                    }));
+                // One start at a time per customer at this storefront: the
+                // close, the count and the new order below are decided under
+                // the customer's lock, so two starts can't both pass the cap.
+                await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customer.id} FOR UPDATE`;
+                // A new checkout replaces the account's older unpaid ones
+                // here: a changed bag makes a new one, and must not pile up
+                // checkouts until the cap locks the customer out. A payment
+                // that still reaches a closed one is refunded (DEC-032).
+                const older = await tx.order.findMany({
                     where: {
-                        storeId_email: { storeId, email: account.email },
-                    },
-                    create: {
                         storeId,
-                        organizationId: scope.organizationId,
-                        email: account.email,
-                        firstName: account.firstName,
-                        lastName: account.lastName,
+                        customerId: customer.id,
+                        placedOnline: true,
+                        status: "PENDING",
+                        paymentStatus: { in: ["UNPAID", "FAILED"] },
                     },
-                    update: {},
+                    orderBy: { createdAt: "asc" },
                     select: { id: true },
                 });
+                for (const o of older) {
+                    await closeCheckoutInTx(tx, o.id, CHECKOUT_REPLACED);
+                }
+                const open = await tx.order.count({
+                    where: {
+                        organizationId: scope.organizationId,
+                        placedOnline: true,
+                        status: "PENDING",
+                        paymentStatus: { in: ["UNPAID", "FAILED"] },
+                        customer: {
+                            email: {
+                                equals: account.email,
+                                mode: "insensitive",
+                            },
+                        },
+                    },
+                });
+                if (open >= MAX_OPEN_CHECKOUTS) {
+                    throw new HttpException(CHECKOUT_OPEN_ALREADY, 429);
+                }
                 // Linked to the account's contact, unless it already
                 // stands for someone (staff linked it, or a payment did).
                 const linked = await tx.customerIdentityLink.count({
@@ -165,9 +218,21 @@ export async function createCheckoutOrder(
                 where: {
                     storeId_checkoutKey: { storeId, checkoutKey: dto.key },
                 },
-                select: { id: true },
+                select: { id: true, customer: { select: { email: true } } },
             });
-            if (raced) return raced.id;
+            if (raced) {
+                // Only this account's own twin: a key another account used
+                // is never handed over.
+                if (
+                    raced.customer.email.trim().toLowerCase() !==
+                    account.email.trim().toLowerCase()
+                ) {
+                    throw new ConflictException(
+                        "That checkout isn't yours. Start again.",
+                    );
+                }
+                return raced.id;
+            }
             if (attempt === 4) throw err;
         }
     }

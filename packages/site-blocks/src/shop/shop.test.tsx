@@ -470,13 +470,13 @@ describe("the header's bag", () => {
                 ok: false,
                 reason: "busy",
                 message:
-                    "You have a checkout open already — finish or wait a few minutes",
+                    "You have other checkouts waiting for payment. Finish one of them, or try again tomorrow.",
             },
         });
         await openTheBag();
         fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
         expect(await screen.findByRole("alert")).toHaveTextContent(
-            "You have a checkout open already",
+            "You have other checkouts waiting for payment",
         );
         expect(readBag(SITE)).toHaveLength(1);
     });

@@ -22,8 +22,20 @@ export const CLOSE_ABANDONED_CHECKOUT_TYPE = "orders.close-abandoned-checkout";
 /** How long a checkout stays open for its payment. */
 export const CHECKOUT_OPEN_MS = 24 * 60 * 60 * 1000;
 
+/** Unpaid checkouts one account may have open at once, business-wide. */
+export const MAX_OPEN_CHECKOUTS = 3;
+
+/**
+ * Said when the cap is reached. A new checkout at a storefront closes the
+ * account's older unpaid ones there, so this is only reached with
+ * checkouts waiting at other storefronts, which close within a day.
+ */
+export const CHECKOUT_OPEN_ALREADY =
+    "You have other checkouts waiting for payment. Finish one of them, or try again tomorrow.";
+
 /** The timeline's words for each way a checkout closes. */
 export const CHECKOUT_NOT_COMPLETED = "Checkout not completed";
+export const CHECKOUT_REPLACED = "Replaced by a newer checkout";
 export const CHECKOUT_SOLD_OUT =
     "Sold out while the customer was paying — refunded automatically";
 export const CHECKOUT_PAID_LATE =

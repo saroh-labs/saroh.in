@@ -167,7 +167,7 @@ export function problemOf(
     if (status === 409 && reason === "bag-changed") return fail("bag-changed");
     if (status === 429) {
         // The one limit written for the customer: a fourth open checkout.
-        return message?.startsWith("You have a checkout open already")
+        return message?.startsWith("You have other checkouts waiting")
             ? fail("busy", message)
             : fail("busy");
     }
