@@ -1125,7 +1125,9 @@ export type FlagType =
     | "phoneWidth"
     // The shop (G11): raised only while it is open for the business.
     | "storefrontUnchosen"
-    | "reservedAddress";
+    | "reservedAddress"
+    // The checkout (G13): the shop can't take an online order now.
+    | "shopCantTakeOrders";
 
 export interface Flag {
     type: FlagType;

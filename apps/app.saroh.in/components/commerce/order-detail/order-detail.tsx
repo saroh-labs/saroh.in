@@ -229,9 +229,16 @@ export function OrderDetail({
             })),
         {
             key: "placed",
-            what: `Placed at ${order.store.name}`,
+            what: order.placedOnline
+                ? `Ordered on your website, from ${order.store.name}`
+                : `Placed at ${order.store.name}`,
             at: order.placedAt,
-            who: order.customer ? first : null,
+            // The customer placed it themselves at the site's checkout (G13).
+            who: order.placedOnline
+                ? "by the customer"
+                : order.customer
+                  ? first
+                  : null,
         },
     ].sort((a, b) => b.at.localeCompare(a.at));
 

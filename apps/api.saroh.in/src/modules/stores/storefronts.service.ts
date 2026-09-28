@@ -25,6 +25,7 @@ import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
+import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
 import type { LateRuleNotice } from "./storefront-fulfilment";
 import {
@@ -106,6 +107,11 @@ export interface StorefrontSettings extends StorefrontSummary {
     /** The site checkout's flat delivery fees (G13); `null` is free. */
     localDeliveryFee: string | null;
     shippingFee: string | null;
+    /**
+     * Whether the business's site shop is open (the `SITE_SHOP` rollout
+     * flag, G11/G13): the fees above are asked for only then.
+     */
+    siteShop: boolean;
     /** The provider this storefront's checkout names, if it names one. */
     checkoutProvider: string | null;
     /**
@@ -187,6 +193,7 @@ export class StorefrontsService {
             providers,
             onHand,
             promised,
+            siteShop,
         ] = await Promise.all([
             prisma.storeSettings.findUnique({ where: { storeId } }),
             prisma.order.count({
@@ -215,6 +222,9 @@ export class StorefrontsService {
                 where: { storeId, promised: { gt: 0 } },
                 _sum: { promised: true },
             }),
+            // Only whether to ask for the website's delivery fees: a flag
+            // that can't be read hides them rather than the screen.
+            shopRolloutOn(organizationId).catch(() => false),
         ]);
         const connected = providers.filter((p) => p.status === "CONNECTED");
         const named = settings?.checkoutProvider ?? null;
@@ -259,6 +269,7 @@ export class StorefrontsService {
             shippingFee: settings?.shippingFee
                 ? toMoneyString(settings.shippingFee)
                 : null,
+            siteShop,
             checkoutProvider: named,
             effectiveProvider: named
                 ? connected.some((p) => p.provider === named)

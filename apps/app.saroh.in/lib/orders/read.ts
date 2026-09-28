@@ -160,6 +160,11 @@ export interface OrderRead extends FulfilmentFields {
     /** The storefront's own number, e.g. "1063". */
     orderId: string;
     placedAt: string;
+    /**
+     * Placed by the customer at the site's checkout (G13). Optional: an API
+     * from before it sends none.
+     */
+    placedOnline?: boolean;
     updatedAt: string;
     store: { id: string; name: string };
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
