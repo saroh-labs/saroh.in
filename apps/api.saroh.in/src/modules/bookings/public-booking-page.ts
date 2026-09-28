@@ -21,6 +21,7 @@ import {
 } from "./booking-slots";
 import type { LocationType } from "./dto";
 import { loadBookableService } from "./reservation";
+import { depositCents } from "./service-fields";
 import {
     businessTimezone,
     loadClosures,
@@ -88,6 +89,13 @@ export interface PublicBookingPage {
         capacity: number;
         priceCents: number | null;
         currency: string | null;
+        /**
+         * What is paid online at booking when the booker pays the deposit
+         * (E8): the service's share of its price, worked out here, or null
+         * when it takes none. A service with a deposit is never paid at the
+         * desk; one whose deposit is the full price is paid now.
+         */
+        depositCents: number | null;
         /** Online only. A service offered either way is not (see `where`). */
         online: boolean;
         /**
@@ -285,6 +293,7 @@ export async function publicBookingPage(
                       priceCents: true,
                       currency: true,
                       locationType: true,
+                      depositMode: true,
                       staffServices: {
                           where: { staff: { status: "ACTIVE" } },
                           select: { staff: { select: { name: true } } },
@@ -311,6 +320,7 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
+            depositCents: depositCents(svc.priceCents, svc.depositMode),
             online: svc.locationType === "ONLINE",
             // The page asks Where for EITHER (E7); anything unknown reads
             // as in person, which asks nothing and shows no link.

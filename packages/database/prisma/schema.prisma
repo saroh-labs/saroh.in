@@ -3724,6 +3724,12 @@ model Booking {
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
+  // The free-cancel deadline, fixed when the booking is made (E8, DEC-051):
+  // its start less the business's free-cancel hours then. A move never
+  // changes it. Null — bookings before the column, or made with no rule —
+  // is judged by its start and today's rules, as before.
+  freeCancelUntil DateTime?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])

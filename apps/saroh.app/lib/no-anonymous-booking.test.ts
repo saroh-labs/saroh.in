@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 /**
  * Sign-in is always on (round-2 plan A, A9; ADR-011): no merchant site books
  * through the anonymous route any more. `POST public/services/:id/book`
- * keeps serving for the release that moved the booking page, for a page
- * loaded before that deploy, and answers 410 from the next. That is only
- * safe if nothing a site renders still calls it — which this pins, across
- * this app and the blocks every site is built from.
+ * kept serving for the release that moved the booking page, and answers
+ * 410 "Sign in to book" since the next (round 2, phase 2). That is only
+ * safe while nothing a site renders still calls it — which this pins,
+ * across this app and the blocks every site is built from.
  */
 
 const ROOTS = [

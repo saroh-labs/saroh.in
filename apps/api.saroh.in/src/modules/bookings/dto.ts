@@ -77,6 +77,15 @@ export type BookingOutcome = (typeof BOOKING_OUTCOMES)[number];
 export const PAID_WITH = ["MEMBERSHIP", "PACK", "PAID", "DESK"] as const;
 export type PaidWith = (typeof PAID_WITH)[number];
 
+/**
+ * How the booking page's booker pays (U19, E8): NOW pays the whole price
+ * online, DEPOSIT pays the service's deposit online and the rest at the
+ * visit, DESK pays it all at the visit. A service that takes a deposit is
+ * never DESK; one that takes none is never DEPOSIT.
+ */
+export const BOOK_PAY = ["NOW", "DEPOSIT", "DESK"] as const;
+export type BookPay = (typeof BOOK_PAY)[number];
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -382,13 +391,14 @@ export class BookServiceDto {
     staffId?: string;
 
     /**
-     * How the booking page's booker pays (U19): NOW holds the place while
-     * they pay online, DESK books it to pay on the day. Absent: as before.
-     * There is no amount — the price is the service's, read on the server.
+     * How the booking page's booker pays (U19, E8): NOW or DEPOSIT holds the
+     * place while they pay online, DESK books it to pay on the day. Absent:
+     * as before. There is no amount — the price and the deposit are the
+     * service's, worked out on the server.
      */
     @IsOptional()
-    @IsIn(["NOW", "DESK"])
-    pay?: "NOW" | "DESK";
+    @IsIn(BOOK_PAY)
+    pay?: BookPay;
 
     /**
      * Where it happens, for a service offered either way (E7): the booker's

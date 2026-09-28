@@ -13,8 +13,10 @@ import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
+import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
 import { courseSeatsHeld } from "./course-seats";
-import type { BookingLocationType, PaidWith } from "./dto";
+import type { BookingLocationType, BookPay, PaidWith } from "./dto";
+import { depositCents } from "./service-fields";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -33,10 +35,11 @@ export interface BookInput {
     staffId?: string;
     /**
      * How the booking page's booker pays (U19): NOW holds the place for
-     * 15 minutes (`HOLD_MINUTES`) while they pay online, DESK books it to
-     * pay on the day. Absent — the one-service booking block — books as before.
+     * 15 minutes (`HOLD_MINUTES`) while they pay online, DEPOSIT does the
+     * same for the service's deposit only (E8), DESK books it to pay on the
+     * day. Absent — the one-service booking block — books as before.
      */
-    pay?: "NOW" | "DESK";
+    pay?: BookPay;
     /**
      * Where, for a service offered either way (E7). Absent: in person. See
      * {@link bookingLocation}.
@@ -323,6 +326,12 @@ export async function reserveInTx(
     const organizationId = service.organizationId;
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
+    // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
+    // no later move changes it.
+    const freeCancelUntil = freeCancelDeadline(
+        startAt,
+        await loadBookingRules(tx, organizationId),
+    );
 
     // A signed-in customer booking a session they hold themselves, unpaid
     // (a pay-now they left, now at the desk or trying again): that hold is
@@ -424,6 +433,7 @@ export async function reserveInTx(
             ),
             intakeNote: intakeNoteOf(input.intakeNote),
             customerAccountId: by.account?.accountId ?? null,
+            freeCancelUntil,
             ...(person
                 ? {
                       staffId: person.staffId,
@@ -556,7 +566,20 @@ export function buildSnapshot(
             // bookings, never the ones already made (ADR-007).
             locationType: service.locationType,
             meetingUrl: service.meetingUrl,
+            depositMode: service.depositMode,
         },
+        // What was asked for at booking when only the deposit is paid online
+        // (E8): the rest is due at the visit. Absent for every other way.
+        ...(input.pay === "DEPOSIT"
+            ? {
+                  deposit: {
+                      cents: depositCents(
+                          service.priceCents,
+                          service.depositMode,
+                      ),
+                  },
+              }
+            : {}),
         slot: {
             startAt: startAt.toISOString(),
             endAt: endAt.toISOString(),

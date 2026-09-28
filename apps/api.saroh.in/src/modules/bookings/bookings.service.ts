@@ -2,6 +2,7 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    Logger,
     NotFoundException,
     Optional,
 } from "@nestjs/common";
@@ -15,6 +16,12 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
 import { isGstRate } from "../invoices/gst";
 import { allows, authorize } from "../organizations/organization-policy";
+import {
+    bookingPaymentInTx,
+    lockBookingIntentsInTx,
+    reserveBookingRefundInTx,
+} from "../payments/booking-refund";
+import { PaymentsService } from "../payments/payments.service";
 import { isValidSlotStart } from "./availability";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
@@ -27,6 +34,8 @@ import {
 } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
+import type { BookingMoney } from "./booking-money";
+import { bookingMoney } from "./booking-money";
 import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
 import { isLateCancel, loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
@@ -97,10 +106,12 @@ export type BookingDetail = Prisma.BookingGetPayload<{
 
 /**
  * One booking as staff read it: with the booker's intake note (E7) only for
- * someone who may see sensitive Needs attention (`intakeNoteFor`).
+ * someone who may see sensitive Needs attention (`intakeNoteFor`), and its
+ * money worked out on the server (E8).
  */
-export type BookingDetailView =
-    BookingDetail | WithoutIntakeNote<BookingDetail>;
+export type BookingDetailView = (
+    BookingDetail | WithoutIntakeNote<BookingDetail>
+) & { money: BookingMoney };
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -144,6 +155,30 @@ const diarySelect = {
     },
 } satisfies Prisma.BookingSelect;
 
+/**
+ * Where a cancel's refund stands (E8): SENT once the provider took it,
+ * CONFIRMING while its answer is awaited (the money is held), REFUSED when
+ * the provider made none.
+ */
+export type RefundStatus = "SENT" | "CONFIRMING" | "REFUSED";
+
+/** What a cancel did with money paid online for the booking (E8). */
+export interface CancelMoney {
+    /** Handed back: cancelled in time, or by someone who may refund. */
+    refund: {
+        amountCents: number;
+        currency: string;
+        status: RefundStatus;
+    } | null;
+    /** Kept: cancelled late (DEC-051). */
+    kept: { amountCents: number; currency: string } | null;
+}
+
+const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
+
+/** A cancelled booking, and what happened to its money. */
+export type CancelledBooking = Booking & { money: CancelMoney };
+
 /** The widest range the bookings calendar reads at once: two years. */
 const MAX_CALENDAR_RANGE_MS = 731 * 86_400_000;
 
@@ -185,7 +220,14 @@ function serviceGstRate(rate: string | null | undefined): string | null {
  */
 @Injectable()
 export class BookingsService {
-    constructor(@Optional() private readonly activation?: ActivationEvents) {}
+    private readonly logger = new Logger(BookingsService.name);
+
+    constructor(
+        @Optional() private readonly activation?: ActivationEvents,
+        // Sends a cancel's refund after it commits (E8). Optional so the
+        // specs that never refund need not build one.
+        @Optional() private readonly payments?: PaymentsService,
+    ) {}
 
     // ── Service CRUD ───────────────────────────────────────────────────────
 
@@ -601,18 +643,33 @@ export class BookingsService {
     /**
      * Cancel a booking: set status CANCELLED + `cancelledAt`, freeing the slot.
      * Authorizes `booking:write`; cross-tenant/missing → 404. Idempotent — an
-     * already-cancelled booking is returned unchanged.
+     * already-cancelled booking is returned unchanged, and refunds nothing.
      *
-     * The business's free-cancellation rule decides what happens to a class
-     * that was paid for (U3): cancelled in time, a pack's class goes back;
-     * inside the window it stays used and the booking says it was cancelled
-     * late (a membership's class then counts against its month too). With no
-     * rule, every cancel is in time — as before the rules existed.
+     * The business's free-cancellation rule decides what happens to what was
+     * paid (U3, E8). The deadline is the one fixed when the booking was made
+     * (`freeCancelUntil`, DEC-051), so a move never changes it. Cancelled in
+     * time, a pack's class goes back, and money paid online for it — a
+     * deposit or the whole price — is refunded once. Inside the window the
+     * class stays used (a membership's counts against its month), the money
+     * is kept, and the booking says it was cancelled late. With no rule,
+     * every cancel is in time — as before the rules existed.
      *
      * `returnCredit` is the business cancelling rather than the customer —
      * a whole class called off (U15). The rule protects the business from a
      * customer dropping out late; it never takes a class from someone whose
-     * class was cancelled on them.
+     * class was cancelled on them. It hands back money kept by a late cancel
+     * only for a caller who also holds `payment:manage`; anyone else's
+     * cancel keeps it, and the answer says so.
+     *
+     * The refund is two-phase (DEC-026): under the locks (intent → invoice
+     * → booking, the documented order) the booking is re-read — already
+     * cancelled, nothing more happens — then cancelled with one PENDING
+     * refund keyed per booking, in one transaction. The provider is called
+     * after commit with the row's id as Saroh's reference; a definite no
+     * marks it FAILED, no answer leaves it PENDING with the money held, and
+     * the credit note follows the provider's confirmation (DEC-023). So a
+     * staff cancel and a customer cancel racing each other make one cancel
+     * and one refund.
      *
      * A pay-now hold (PENDING) is released rather than cancelled (#508): its
      * draft invoice is voided with it, as when its time runs out.
@@ -622,37 +679,43 @@ export class BookingsService {
         bookingId: string,
         now: Date = new Date(),
         options: { returnCredit?: boolean } = {},
-    ): Promise<Booking> {
+    ): Promise<CancelledBooking> {
         authorize(ctx, "booking:write");
 
         const found = await this.requireOwnedBooking(ctx, bookingId);
         if (found.status === "CANCELLED") {
-            return found;
+            return { ...found, money: NOTHING_MOVED };
         }
         const rules = await loadBookingRules(prisma, ctx.organizationId);
-        return prisma.$transaction(async (tx) => {
-            // Where it stands now, under its locks — invoice before booking,
-            // the webhook's order (#508) — so a second cancel, or a payment
-            // landing on a hold, is seen rather than overwritten.
+        const done = await prisma.$transaction(async (tx) => {
+            // Where it stands now, under its locks — the payment's, then
+            // the invoice's, then the booking's: the webhook's order (#508,
+            // E8) — so a second cancel, or a payment landing on a hold, is
+            // seen rather than overwritten.
+            await lockBookingIntentsInTx(tx, found.id);
             await lockBookingInTx(tx, found.id);
             const booking =
                 (await tx.booking.findUnique({ where: { id: found.id } })) ??
                 found;
-            if (booking.status === "CANCELLED") return booking;
+            if (booking.status === "CANCELLED") {
+                return { booking, money: NOTHING_MOVED, send: null };
+            }
             // A pay-now hold nobody has paid: let it go as the booker would,
             // so its draft invoice is voided and its pay link stops working.
             // A payment that lands after is recorded as owed back.
             if (booking.status === "PENDING") {
                 await releaseHoldInTx(tx, booking.id, now, ctx.userId);
-                return (
-                    (await tx.booking.findUnique({
-                        where: { id: booking.id },
-                    })) ?? booking
-                );
+                return {
+                    booking:
+                        (await tx.booking.findUnique({
+                            where: { id: booking.id },
+                        })) ?? booking,
+                    money: NOTHING_MOVED,
+                    send: null,
+                };
             }
-            const late =
-                !options.returnCredit &&
-                isLateCancel(booking.startAt, now, rules);
+            const inTime = !isLateCancel(booking, now, rules);
+            const late = !options.returnCredit && !inTime;
             const cancelled = await tx.booking.update({
                 where: { id: booking.id },
                 data: {
@@ -664,6 +727,23 @@ export class BookingsService {
             // A class paid for with a pack goes back to it (ADR-007) —
             // unless it was cancelled too late to (U3).
             if (!late) await reversePackInTx(tx, booking.id);
+            // Money paid online goes back once when cancelled in time; a
+            // late one is handed back only by someone who may refund (E8).
+            const refunds =
+                inTime ||
+                (!!options.returnCredit && allows(ctx, "payment:manage"));
+            const reserved = refunds
+                ? await reserveBookingRefundInTx(tx, {
+                      organizationId: ctx.organizationId,
+                      bookingId: booking.id,
+                      reason: inTime
+                          ? "Booking cancelled in time"
+                          : "Booking cancelled by the business",
+                  })
+                : null;
+            const kept = reserved
+                ? null
+                : await bookingPaymentInTx(tx, ctx.organizationId, booking.id);
             // A pay link sent for it (E4) stops working with the place.
             await retirePayLinkInTx(tx, booking.id);
             // The slot it was cancelled OUT of, so the history reads as a
@@ -678,8 +758,70 @@ export class BookingsService {
                 },
                 select: { id: true },
             });
-            return cancelled;
+            const money: CancelMoney = {
+                refund: reserved
+                    ? {
+                          amountCents: reserved.amountCents,
+                          currency: reserved.currency,
+                          status: "CONFIRMING",
+                      }
+                    : null,
+                kept: kept
+                    ? {
+                          amountCents: kept.leftCents,
+                          currency: kept.currency,
+                      }
+                    : null,
+            };
+            return {
+                booking: cancelled,
+                money,
+                send: reserved?.reservedNow ? reserved.refundId : null,
+            };
         });
+        // Phase two, after commit: the provider, under the row's id.
+        if (done.send && done.money.refund) {
+            done.money.refund.status = await this.sendRefund(
+                ctx.organizationId,
+                done.send,
+            );
+        }
+        return { ...done.booking, money: done.money };
+    }
+
+    /**
+     * Send a cancel's reserved refund (DEC-026), and say where it stands:
+     * SENT once the provider took it, REFUSED when it definitely made none
+     * (the row is FAILED, the money freed), CONFIRMING when no answer came —
+     * the row stays PENDING with the money held until the refund webhook
+     * settles it. Never throws: the cancel has already happened.
+     */
+    private async sendRefund(
+        organizationId: string,
+        refundId: string,
+    ): Promise<RefundStatus> {
+        if (!this.payments) {
+            this.logger.warn(
+                `Refund ${refundId} reserved with no payments service; held until the provider says`,
+            );
+            return "CONFIRMING";
+        }
+        try {
+            const sent = await this.payments.sendAutomaticRefund(
+                organizationId,
+                refundId,
+            );
+            if (sent.status === "FAILED") return "REFUSED";
+            if (sent.status === "SUCCEEDED") return "SENT";
+            return sent.beingConfirmed ? "CONFIRMING" : "SENT";
+        } catch (err) {
+            this.logger.warn(
+                `Refund ${refundId}: ${
+                    err instanceof Error ? err.message : String(err)
+                }; held until the provider says`,
+            );
+            return "CONFIRMING";
+        }
     }
 
     /**
@@ -772,8 +914,10 @@ export class BookingsService {
             where: { id: bookingId },
             include: bookingDetailInclude,
         });
+        // What was paid at booking, what is due and any refund (E8).
+        const money = await bookingMoney(prisma, booking);
         // The booker's note (E7) only behind C1's sensitive gate.
-        return intakeNoteFor(ctx, booking);
+        return { ...intakeNoteFor(ctx, booking), money };
     }
 
     /**
