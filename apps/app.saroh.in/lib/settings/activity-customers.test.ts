@@ -140,4 +140,25 @@ describe("Activity — customer records", () => {
             { label: "Company", before: null, after: null },
         ]);
     });
+
+    it("says a privacy removal without naming them, and leads to the list (C11)", () => {
+        expect(ACTIVITY_ACTIONS).toContain("customer.removed");
+        const line = activityLine(
+            event({
+                action: "customer.removed",
+                metadata: { removed: { bookingsCancelled: 1, notes: 2 } },
+            }),
+        );
+        expect(line?.what).toBe(
+            "removed a customer's details (privacy request) — 1 booking to come cancelled",
+        );
+        expect(line?.where).toEqual({
+            label: "Customers",
+            href: "/commerce/customers",
+        });
+        expect(
+            activityLine(event({ action: "customer.removed", metadata: {} }))
+                ?.what,
+        ).toBe("removed a customer's details (privacy request)");
+    });
 });

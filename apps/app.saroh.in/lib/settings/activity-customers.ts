@@ -94,6 +94,20 @@ export function detailsWhat(meta: Record<string, unknown>): string {
         : "changed a customer's details";
 }
 
+/**
+ * "removed a customer's details (privacy request) — 1 booking to come
+ * cancelled" (`customer.removed`, C11). Counts only: who they were is
+ * gone, and the stream never held it.
+ */
+export function removedWhat(meta: Record<string, unknown>): string {
+    const removed = record(meta.removed);
+    const cancelled = countOf(removed.bookingsCancelled) ?? 0;
+    const base = "removed a customer's details (privacy request)";
+    return cancelled > 0
+        ? `${base} — ${counted(cancelled, "booking to come", "bookings to come")} cancelled`
+        : base;
+}
+
 /** The sheet's rows for a details change: each detail, no values. */
 export function detailsLabels(meta: Record<string, unknown>): string[] {
     return changedDetails(meta).map(

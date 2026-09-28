@@ -12,7 +12,12 @@ import {
     recordedChanges,
     text,
 } from "./activity-changes";
-import { customerPlace, detailsWhat, mergedWhat } from "./activity-customers";
+import {
+    customerPlace,
+    detailsWhat,
+    mergedWhat,
+    removedWhat,
+} from "./activity-customers";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -70,6 +75,7 @@ export const ACTIVITY_ACTIONS = [
     "business.stock-tracking.off",
     "customer.merged",
     "customer.details.changed",
+    "customer.removed",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -318,6 +324,9 @@ export function activityLine(
             return line(mergedWhat(meta), customerPlace(event.targetId));
         case "customer.details.changed":
             return line(detailsWhat(meta), customerPlace(event.targetId));
+        // Their page is gone (C11): the line leads to the list.
+        case "customer.removed":
+            return line(removedWhat(meta), customerPlace(null));
         default:
             return null;
     }
