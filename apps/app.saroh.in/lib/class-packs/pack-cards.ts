@@ -69,6 +69,8 @@ export interface PackCardView {
     name: string;
     /** Where the name leads; null when it leads nowhere this person can go. */
     href: string | null;
+    /** The card's Open button: Pack Detail, for a published pack only. */
+    openHref: string | null;
     badges: { label: string; tone: BadgeTone }[];
     /** "₹1,500", or "No price yet" on a draft still at nothing. */
     price: string;
@@ -100,16 +102,22 @@ export function editHref(id: string): string {
     return `/class-packs/${encodeURIComponent(id)}/edit`;
 }
 
+/** Pack Detail (E16), on a tab other than Overview when one is named. */
+export function detailHref(id: string, tab?: string): string {
+    const base = `/class-packs/${encodeURIComponent(id)}`;
+    return tab && tab !== "overview" ? `${base}?tab=${tab}` : base;
+}
+
 /**
- * Where a card's name leads. Pack Detail (E16) is not built yet, so a
- * published pack opens in the editor for someone who may change it, as the
- * list's rows did; a draft always does ("Draft cards open the editor").
- * E16 points published packs at `/class-packs/:id`.
+ * Where a card's name leads: a published pack to its own page (E16), for
+ * anyone who can see the list; a draft to the editor ("Draft cards open the
+ * editor"), and nowhere for someone who can't change packs.
  */
 export function packHref(
     p: Pick<PackListItem, "id" | "status">,
     canWrite: boolean,
 ): string | null {
+    if (p.status !== "DRAFT") return detailHref(p.id);
     return canWrite ? editHref(p.id) : null;
 }
 
@@ -148,6 +156,7 @@ export function packCard(p: PackListItem, canWrite: boolean): PackCardView {
         id: p.id,
         name: p.name,
         href: packHref(p, canWrite),
+        openHref: draft ? null : detailHref(p.id),
         badges,
         price: priced || !draft ? money(p.price, p.currency) : "No price yet",
         each:

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { OwedPurchase, PackListItem } from "./pack-cards";
 import {
+    detailHref,
     orderForList,
     owedSummary,
     packCard,
@@ -79,6 +80,7 @@ describe("packCard", () => {
         expect(card.showSell).toBe(false);
         expect(card.canArchive).toBe(false);
         expect(card.href).toBe("/class-packs/pk_1/edit");
+        expect(card.openHref).toBeNull();
         expect(card.why).toMatch(/^Draft — not on sale until you publish/);
     });
 
@@ -127,9 +129,25 @@ describe("packCard", () => {
         expect(card.stillToUseNote).toBe("across 32 people");
     });
 
-    it("leads nowhere for someone who can't change packs", () => {
-        expect(packHref(pack(), false)).toBeNull();
-        expect(packCard(pack(), false).href).toBeNull();
+    it("a published pack opens its own page, for anyone who can see the list (E16)", () => {
+        expect(packCard(pack(), true).href).toBe("/class-packs/pk_1");
+        expect(packCard(pack(), false).href).toBe("/class-packs/pk_1");
+        expect(packCard(pack(), false).openHref).toBe("/class-packs/pk_1");
+        const archived = packCard(pack({ status: "ARCHIVED" }), true);
+        expect(archived.href).toBe("/class-packs/pk_1");
+        expect(archived.openHref).toBe("/class-packs/pk_1");
+    });
+
+    it("a draft leads nowhere for someone who can't change packs", () => {
+        const draft = pack({ status: "DRAFT", sold: 0 });
+        expect(packHref(draft, false)).toBeNull();
+        expect(packCard(draft, false).href).toBeNull();
+        expect(packCard(draft, false).openHref).toBeNull();
+    });
+
+    it("names a tab in Pack Detail's address, and leaves Overview out", () => {
+        expect(detailHref("pk 1", "who")).toBe("/class-packs/pk%201?tab=who");
+        expect(detailHref("pk_1", "overview")).toBe("/class-packs/pk_1");
     });
 });
 

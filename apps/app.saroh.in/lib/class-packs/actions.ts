@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import * as detail from "./pack-detail-data";
 import type { DeskPaidBy } from "./sell-words";
 import type { PackInput, PackPurchase } from "./service";
 import * as api from "./service";
@@ -9,7 +10,8 @@ import * as api from "./service";
 /** Thin: the API decides who may, and what a pack may pay for. */
 
 function refresh() {
-    revalidatePath("/class-packs");
+    // "layout": the list and every pack's own page (E16) under it.
+    revalidatePath("/class-packs", "layout");
     revalidatePath("/class-packs/purchases");
     // Selling may issue an invoice; spending one changes a booking.
     revalidatePath("/billing/invoices");
@@ -59,6 +61,18 @@ export async function payBookingWithPack(
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
 }
+/**
+ * Give a holder's pack more days, 1 to 30 with a reason (E16 on E13). The
+ * refusal keeps its status, so the dialog says a 409 in plain words.
+ */
+export async function extendHolder(
+    purchaseId: string,
+    days: number,
+    reason: string,
+) {
+    return then(detail.extendPurchase(purchaseId, days, reason));
+}
+
 export async function takePackOffBooking(bookingId: string) {
     const res = await then(api.removeFromBooking(bookingId));
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);

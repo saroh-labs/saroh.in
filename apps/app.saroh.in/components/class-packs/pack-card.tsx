@@ -15,8 +15,9 @@ const EYEBROW =
 /**
  * One pack on the Packs list (round-2 E15, after "Saroh Packs"): its
  * badges, price and terms, what it has sold and what is still to use, and
- * Sell at the desk, Edit and Archive. A draft has no Sell and opens the
- * editor; an archived pack keeps Sell, off, with why beside it.
+ * Open (its Pack Detail, E16), Sell at the desk, Edit and Archive. A draft
+ * has no Open or Sell and opens the editor; an archived pack keeps Sell,
+ * off, with why beside it.
  */
 export function PackCard({
     card,
@@ -104,8 +105,22 @@ export function PackCard({
                     {card.why}
                 </p>
             ) : null}
-            {canSell || canWrite ? (
+            {card.openHref || canSell || canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
+                    {card.openHref ? (
+                        <Button
+                            asChild
+                            variant="outline"
+                            className={cn(BUTTON, "coarse:h-11")}
+                        >
+                            <Link
+                                href={card.openHref}
+                                aria-label={`Open ${card.name}`}
+                            >
+                                Open
+                            </Link>
+                        </Button>
+                    ) : null}
                     {canSell && card.showSell ? (
                         <Button
                             variant="outline"
