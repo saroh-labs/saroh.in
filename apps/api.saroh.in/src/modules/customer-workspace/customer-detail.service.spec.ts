@@ -734,7 +734,7 @@ describe("CustomerDetailService", () => {
         expect(JSON.stringify(detail)).not.toMatch(/"(total|price|amount)"/);
     });
 
-    it("leaves money out of rows a moneyless custom role may read", async () => {
+    it("shows each part whole to whoever reads it, and Spent only with both reads (C13)", async () => {
         const { svc, db } = make();
         const clerk: OrganizationContext = {
             ...OWNER,
@@ -749,10 +749,47 @@ describe("CustomerDetailService", () => {
 
         const detail = await svc.detail(clerk, "c1");
 
-        expect(detail.orders?.rows[0]).not.toHaveProperty("total");
-        expect(detail.packs?.rows[0]).not.toHaveProperty("price");
+        // `order:read` shows the whole order; `pack:read` shows prices.
+        expect(detail.orders?.rows[0]).toHaveProperty("total", "450.00");
+        expect(detail.packs?.rows[0]).toHaveProperty("price");
+        // Spent sums orders and invoices: not without `invoice:read`.
+        expect(detail.money).toBe(false);
         expect(detail.stats).not.toHaveProperty("spent");
+        expect(detail).not.toHaveProperty("invoices");
         expect(db.order.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("gives invoices and Owed to invoice:read alone, with no Spent or orders", async () => {
+        const { svc } = make();
+        const books: OrganizationContext = {
+            ...OWNER,
+            role: "MEMBER",
+            roleKey: "books",
+            actions: new Set<OrgAction>(["contact:read", "invoice:read"]),
+        };
+
+        const detail = await svc.detail(books, "c1");
+
+        expect(detail.invoices).toBeDefined();
+        expect(detail.stats).toHaveProperty("owed");
+        expect(detail).not.toHaveProperty("orders");
+        expect(detail.stats).not.toHaveProperty("spent");
+        expect(detail).not.toHaveProperty("subscriptions");
+    });
+
+    it("gives subscriptions to subscription:read without a payments read", async () => {
+        const { svc } = make();
+        const plans: OrganizationContext = {
+            ...OWNER,
+            role: "MEMBER",
+            roleKey: "plans",
+            actions: new Set<OrgAction>(["contact:read", "subscription:read"]),
+        };
+
+        const detail = await svc.detail(plans, "c1");
+
+        expect(detail.subscriptions).toBeDefined();
+        expect(detail).not.toHaveProperty("invoices");
     });
 
     it("returns the rest when the packs read throws, naming packs", async () => {
@@ -878,7 +915,7 @@ describe("CustomerDetailService", () => {
 
         await expect(
             svc.detail({ ...OWNER, role: "REVIEWER" }, "c1"),
-        ).rejects.toThrow(/contact:read/);
+        ).rejects.toThrow("Your role can't see customers.");
     });
 });
 

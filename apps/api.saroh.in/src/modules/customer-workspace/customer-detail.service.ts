@@ -30,7 +30,7 @@ import { realOrderWhere } from "../orders/open-orders";
 import type { OrderLineKind } from "../orders/order-line";
 import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
 import { hasCustomer } from "../orders/walk-in";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
 import {
@@ -46,6 +46,7 @@ import {
     loadContactNotes,
     notedAllergens,
 } from "./contact-notes.service";
+import { requireCustomerPower } from "./customer-access";
 import { normaliseEmail } from "./duplicates";
 
 /**
@@ -69,10 +70,13 @@ import { normaliseEmail } from "./duplicates";
  *
  * ## Money
  *
- * Money figures go only to a role that may read the merchant's money
- * (`invoice:read` and `payment:read`, ADR-008): spent, owed, prices and
- * totals are left OUT for anyone else, not sent for the screen to hide. The
- * invoices and subscriptions blocks are money and need it too.
+ * Each part follows its own read (DEC-039, matrix §1 rules 2 and 3), and
+ * nothing inside a part is hidden from someone who holds it: an order's total
+ * goes with `order:read`, a pack's price with `pack:read`, the subscriptions
+ * block with `subscription:read`, invoices and Owed with `invoice:read`.
+ * "Spent" sums orders and invoices, so where the business sells it needs
+ * both `order:read` and `invoice:read` (`money`); it is left OUT for anyone
+ * else, not sent for the screen to hide.
  *
  * "Spent" counts each rupee once: paid orders plus paid invoices that are not
  * an order's own invoice (ADR-008). Owed is unpaid issued invoices, again
@@ -160,9 +164,9 @@ export interface DetailOrder {
     stage: string;
     /** Where a delivery went; null for a collection. */
     delivery: string | null;
-    /** Money only — absent for a viewer who reads no money. */
-    total?: string;
-    currency?: string;
+    /** The order's total: `order:read` shows the whole order. */
+    total: string;
+    currency: string;
     /** The linked store customer this order came through. */
     via: { customerId: string; storefront: Storefront };
 }
@@ -237,9 +241,9 @@ export interface DetailPack {
     /** When it was bought. */
     boughtAt: string;
     standing: "ACTIVE" | "USED_UP" | "EXPIRED";
-    /** Money only. */
-    price?: string;
-    currency?: string;
+    /** What it sold for: `pack:read` shows prices. */
+    price: string;
+    currency: string;
 }
 
 export interface DetailStats {
@@ -345,7 +349,7 @@ export interface CustomerDetail {
      * website as ‹email›". Null when they don't sign in.
      */
     siteAccount: SiteAccountView | null;
-    /** Whether money figures were included for this viewer. */
+    /** Whether Spent was included for this viewer (it sums two reads). */
     money: boolean;
     /** The business's zone, for the dates the screen writes out. */
     timezone: string;
@@ -472,7 +476,7 @@ export class CustomerDetailService {
         ctx: OrganizationContext,
         contactId: string,
     ): Promise<CustomerDetail | MergedContactRedirect> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const tombstone = await this.db.contact.findFirst({
             where: {
                 id: contactId,
@@ -491,7 +495,7 @@ export class CustomerDetailService {
         ctx: OrganizationContext,
         contactId: string,
     ): Promise<CustomerDetail> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
 
         // NOT guarded: without the contact there is no page, and a contact in
@@ -564,16 +568,21 @@ export class CustomerDetailService {
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
         );
 
-        const money =
-            allows(ctx, "invoice:read") && allows(ctx, "payment:read");
+        // Each part on its own read (DEC-039, matrix §1 rule 3); nothing
+        // inside a part is hidden from someone who holds its read. "Spent"
+        // sums orders and invoices, so where the business sells it needs
+        // both reads.
         const commerce = on.has("COMMERCE");
+        const money =
+            allows(ctx, "invoice:read") &&
+            (!commerce || allows(ctx, "order:read"));
         const wants = {
             orders: commerce && allows(ctx, "order:read"),
             bookings: on.has("APPOINTMENTS") && allows(ctx, "booking:read"),
             packs: on.has("APPOINTMENTS") && allows(ctx, "pack:read"),
             subscriptions:
-                on.has("PAYMENTS") && money && allows(ctx, "subscription:read"),
-            invoices: on.has("PAYMENTS") && money,
+                on.has("PAYMENTS") && allows(ctx, "subscription:read"),
+            invoices: on.has("PAYMENTS") && allows(ctx, "invoice:read"),
         };
 
         const unavailable: DetailUnavailable[] = [];
@@ -657,7 +666,7 @@ export class CustomerDetailService {
                 : skip,
             wants.packs
                 ? attempt("packs", () =>
-                      this.readPacks(organizationId, contactId, money),
+                      this.readPacks(organizationId, contactId),
                   )
                 : skip,
             // Classes a month are a count, not money: whoever reads the
@@ -714,8 +723,8 @@ export class CustomerDetailService {
             } else {
                 stats.spent = null;
             }
-            if (wants.invoices) stats.owed = invoices ? invoices.owed : null;
         }
+        if (wants.invoices) stats.owed = invoices ? invoices.owed : null;
 
         const noteRows = notes?.[0] ?? null;
         return {
@@ -899,7 +908,8 @@ export class CustomerDetailService {
     private async readOrders(
         organizationId: string,
         links: LinkedCustomer[],
-        money: boolean,
+        /** Sum what was paid, for Spent. */
+        sumPaid: boolean,
     ): Promise<{
         rows: DetailOrder[];
         count: number;
@@ -951,7 +961,7 @@ export class CustomerDetailService {
                 },
             }),
             this.db.order.count({ where }),
-            money
+            sumPaid
                 ? this.db.order.groupBy({
                       by: ["currency"],
                       where: { ...where, paymentStatus: "PAID" },
@@ -996,9 +1006,9 @@ export class CustomerDetailService {
                           .filter(Boolean)
                           .join(", ") || null
                     : null,
-                ...(money
-                    ? { total: toMoneyString(o.total), currency: o.currency }
-                    : {}),
+                // The whole order goes with `order:read` (matrix §1 rule 2).
+                total: toMoneyString(o.total),
+                currency: o.currency,
                 via: { customerId: o.customerId, storefront: o.store },
             })),
         };
@@ -1201,11 +1211,7 @@ export class CustomerDetailService {
         };
     }
 
-    private async readPacks(
-        organizationId: string,
-        contactId: string,
-        money: boolean,
-    ) {
+    private async readPacks(organizationId: string, contactId: string) {
         const now = new Date();
         const rows = await this.db.packPurchase.findMany({
             where: { organizationId, contactId },
@@ -1248,9 +1254,9 @@ export class CustomerDetailService {
                     : left === 0
                       ? "USED_UP"
                       : "ACTIVE",
-                ...(money
-                    ? { price: toMoneyString(p.price), currency: p.currency }
-                    : {}),
+                // `pack:read` shows prices (matrix §2).
+                price: toMoneyString(p.price),
+                currency: p.currency,
             };
         });
         return {

@@ -177,7 +177,7 @@ describe("Needs attention (DB)", () => {
                 kind: "OTHER",
                 label: "VIP",
             }),
-        ).rejects.toThrow(/may not perform "contact:write"/);
+        ).rejects.toThrow("Your role can't change customers' details.");
 
         const made = await attention.create(owner, contactId, {
             kind: "MEDICAL",
