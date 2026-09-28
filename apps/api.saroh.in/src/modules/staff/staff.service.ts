@@ -9,10 +9,10 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
+import { requireBookingPower } from "../bookings/booking-access";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { loadBookingRules } from "../bookings/booking-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
-import { authorize } from "../organizations/organization-policy";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
 import type {
@@ -173,7 +173,7 @@ export class StaffService {
     // ── People ─────────────────────────────────────────────────────────────
 
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
         const [rows, timezone, closures] = await Promise.all([
             prisma.staffMember.findMany({
@@ -192,7 +192,7 @@ export class StaffService {
         staffId: string,
         now = new Date(),
     ): Promise<StaffView> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         return this.read(ctx, staffId, now);
     }
 
@@ -200,7 +200,7 @@ export class StaffService {
         ctx: OrganizationContext,
         dto: CreateStaffDto,
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const hours = dto.hours ?? [];
         const refusal = weeklyHoursRefusal(hours);
         if (refusal) refuse(refusal.message, refusal.field);
@@ -252,7 +252,7 @@ export class StaffService {
         staffId: string,
         dto: UpdateStaffDto,
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         if (dto.membershipId) {
             await this.assertMembership(ctx, dto.membershipId, person.id);
@@ -304,7 +304,7 @@ export class StaffService {
         staffId: string,
         serviceIds: string[],
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         const ids = [...new Set(serviceIds)];
         await this.assertServices(ctx, ids);
@@ -339,7 +339,7 @@ export class StaffService {
         hours: StaffHoursDto[],
         now = new Date(),
     ): Promise<{ staff: StaffView; outside: BookingBrief[] }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         const refusal = weeklyHoursRefusal(hours);
         if (refusal) refuse(refusal.message, refusal.field);
@@ -368,7 +368,7 @@ export class StaffService {
         staffId: string,
         dto: AddExtraHoursDto,
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         if (!isCalendarDate(dto.date)) refuse("That is not a date.", "date");
         const range = rangeRefusal(dto, dto.date, "endMinute");
@@ -406,7 +406,7 @@ export class StaffService {
         extraHoursId: string,
         now = new Date(),
     ): Promise<{ staff: StaffView; outside: BookingBrief[] }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         const { count } = await prisma.staffExtraHours.deleteMany({
             where: {
@@ -435,7 +435,7 @@ export class StaffService {
         dto: AddTimeOffDto,
         now = new Date(),
     ): Promise<{ staff: StaffView; affected: BookingBrief[] }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
 
         let spans: OffSpan[];
@@ -505,7 +505,7 @@ export class StaffService {
         staffId: string,
         ids: string[],
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         const unique = [...new Set(ids)];
         await prisma.$transaction(async (tx) => {
@@ -529,7 +529,7 @@ export class StaffService {
         staffId: string,
         timeOffId: string,
     ): Promise<StaffView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
         const { count } = await prisma.staffTimeOff.deleteMany({
             where: {
@@ -547,7 +547,7 @@ export class StaffService {
     async getBookingRules(
         ctx: OrganizationContext,
     ): Promise<BookingRulesValue> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         return loadBookingRules(prisma, ctx.organizationId);
     }
 
@@ -556,7 +556,7 @@ export class StaffService {
         ctx: OrganizationContext,
         dto: UpdateBookingRulesDto,
     ): Promise<BookingRulesValue> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const data = {
             ...(dto.bookAheadDays !== undefined
                 ? { bookAheadDays: dto.bookAheadDays }

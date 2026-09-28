@@ -94,7 +94,7 @@ export function NewBookingDialog({
     }[];
     /** Customer search and pay links, as far as the viewer may (E4). */
     people: BookingPeople;
-    /** May read and spend class packs (`pack:read` and `pack:write`). */
+    /** May read and spend class packs (`pack:read`, `pack:sell` and `booking:write`). */
     canUsePacks?: boolean;
     triggerClassName?: string;
     /** The calendar's button: words only, as the Bookings design draws it. */

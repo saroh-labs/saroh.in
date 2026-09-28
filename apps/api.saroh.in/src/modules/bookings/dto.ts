@@ -473,7 +473,7 @@ export class BookByHandDto {
 
     /**
      * Pay with a class pack (ADR-007): `true` spends the booker's pack that
-     * expires soonest, or `packPurchaseId` names one. Needs `pack:write`.
+     * expires soonest, or `packPurchaseId` names one. Needs `pack:sell`.
      */
     @IsOptional()
     @IsBoolean()

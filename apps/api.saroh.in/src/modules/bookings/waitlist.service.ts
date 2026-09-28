@@ -13,10 +13,10 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
-import { authorize } from "../organizations/organization-policy";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach } from "../site-accounts/notice-reach";
 import { isValidSlotStart } from "./availability";
+import { requireBookingPower } from "./booking-access";
 import { refuseIfClosed, toAvailabilityService } from "./booking-slots";
 import type { SignedInCustomer } from "./public-bookings.service";
 import {
@@ -313,7 +313,7 @@ export class WaitlistService {
         startAtISO: string,
         now: Date = new Date(),
     ): Promise<{ rows: WaitlistRosterRow[] }> {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         const startAt = new Date(startAtISO);
         if (Number.isNaN(startAt.getTime())) {
             throw new BadRequestException("startAt is not a valid instant");

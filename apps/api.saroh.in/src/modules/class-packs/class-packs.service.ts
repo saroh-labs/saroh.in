@@ -11,12 +11,16 @@ import { readPending } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import {
+    CANT_USE_PACKS,
+    requireBookingPower,
+} from "../bookings/booking-access";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import { assertClassPacksOn } from "./class-packs-on";
 import type {
     ExtendPurchaseDto,
@@ -221,7 +225,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         query: ListPacksQueryDto,
     ): Promise<PackView[]> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         // Drafts only when asked (E14): an app before the Pack Editor would
         // draw one as a pack on sale.
         const status = query.status
@@ -246,7 +250,7 @@ export class ClassPacksService {
      * the sell dialog mentions one only when there will be one.
      */
     async sellingTerms(ctx: OrganizationContext): Promise<SellingTerms> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         return { invoicesOnSale: await paymentsOn(prisma, ctx.organizationId) };
     }
 
@@ -260,7 +264,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<PackDetailView> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         const pack = await this.readPack(ctx.organizationId, id);
         return {
             ...pack,
@@ -272,7 +276,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         dto: PackInputDto,
     ): Promise<PackView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         const kind = dto.kind ?? DEFAULT_PACK_KIND;
         const units = kind === "ONE_TO_ONE" ? "sessions" : "classes";
         if (!dto.name) fieldError("Give the pack a name", "name");
@@ -338,7 +342,7 @@ export class ClassPacksService {
         id: string,
         dto: PackInputDto,
     ): Promise<PackView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await this.readPack(ctx.organizationId, id);
         assertValidity(dto.validityDays);
         const serviceIds = dto.serviceIds
@@ -437,7 +441,7 @@ export class ClassPacksService {
         id: string,
         status: "ACTIVE" | "ARCHIVED",
     ): Promise<PackView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await this.readPack(ctx.organizationId, id);
         await prisma.$transaction(async (tx) => {
             const was = await this.lockOutOfDraft(
@@ -470,7 +474,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<PackEditorView> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         return readPackEditor(ctx.organizationId, id);
     }
 
@@ -479,7 +483,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         dto: PackInputDto,
     ): Promise<PackEditorView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         const id = await createPackDraft(ctx, dto);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -490,7 +494,7 @@ export class ClassPacksService {
         id: string,
         dto: PackDraftDto,
     ): Promise<PackEditorView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await savePackDraft(ctx, id, dto);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -501,7 +505,7 @@ export class ClassPacksService {
         id: string,
         revision: number,
     ): Promise<PackEditorView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await publishPack(ctx, id, revision);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -512,7 +516,7 @@ export class ClassPacksService {
         id: string,
         revision: number,
     ): Promise<PackEditorView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await discardPackChanges(ctx, id, revision);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -523,7 +527,7 @@ export class ClassPacksService {
         id: string,
         revision: number,
     ): Promise<void> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await deletePackDraft(ctx, id, revision);
     }
 
@@ -540,7 +544,7 @@ export class ClassPacksService {
         packId: string,
         dto: SellPackDto,
     ): Promise<PurchaseView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:sell");
         const organizationId = ctx.organizationId;
         // Switched off: no new sales, whatever enforcement says (E12).
         await assertClassPacksOn(prisma, organizationId);
@@ -645,7 +649,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         packId: string,
     ): Promise<PackHolderView[]> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         await this.assertPack(ctx.organizationId, packId);
         return packHolders(ctx.organizationId, { packId });
     }
@@ -656,7 +660,7 @@ export class ClassPacksService {
         packId: string,
         query: PackUsedQueryDto,
     ): Promise<PackUsedPage> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         await this.assertPack(ctx.organizationId, packId);
         return packUsed(ctx.organizationId, packId, query);
     }
@@ -666,7 +670,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         packId: string,
     ): Promise<PackSaleView[]> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         await this.assertPack(ctx.organizationId, packId);
         return packSales(ctx, packId);
     }
@@ -677,7 +681,7 @@ export class ClassPacksService {
         packId: string,
         query: ListPackEventsQueryDto,
     ): Promise<PackEventsPage> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         await this.assertPack(ctx.organizationId, packId);
         return listPackEvents(ctx.organizationId, packId, query);
     }
@@ -691,7 +695,7 @@ export class ClassPacksService {
         purchaseId: string,
         dto: ExtendPurchaseDto,
     ): Promise<PackHolderView> {
-        authorize(ctx, "pack:write");
+        requireBookingPower(ctx, "pack:write");
         await extendPurchase(ctx, purchaseId, dto);
         const [holder] = await packHolders(ctx.organizationId, {
             purchaseId,
@@ -703,7 +707,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         query: ListPurchasesQueryDto,
     ): Promise<PurchaseView[]> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         // Only packs that pay for this service: they cover it and are of its
         // kind (E13) — a one-to-one pack isn't offered for a class. Another
         // business's service id, or one that's gone, matches nothing.
@@ -739,7 +743,7 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         id: string,
     ): Promise<PurchaseView> {
-        authorize(ctx, "pack:read");
+        requireBookingPower(ctx, "pack:read");
         return this.readPurchase(ctx, id);
     }
 
@@ -747,16 +751,16 @@ export class ClassPacksService {
 
     /**
      * Pay a booking already made with one of its booker's packs. Needs both
-     * the pack power and the booking power: it spends a class and changes
-     * what the booking says about payment.
+     * `pack:sell` (the desk's pack power, E26) and `booking:write`: it
+     * spends a class and changes what the booking says about payment.
      */
     async useOnBooking(
         ctx: OrganizationContext,
         bookingId: string,
         dto: UsePackDto,
     ): Promise<{ bookingId: string; purchase: PurchaseView }> {
-        authorize(ctx, "pack:write");
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "pack:sell", CANT_USE_PACKS);
+        requireBookingPower(ctx, "booking:write");
         const booking = await prisma.booking.findFirst({
             where: { id: bookingId, organizationId: ctx.organizationId },
             select: {
@@ -842,8 +846,8 @@ export class ClassPacksService {
         ctx: OrganizationContext,
         bookingId: string,
     ): Promise<{ bookingId: string; returned: boolean }> {
-        authorize(ctx, "pack:write");
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "pack:sell", CANT_USE_PACKS);
+        requireBookingPower(ctx, "booking:write");
         const booking = await prisma.booking.findFirst({
             where: { id: bookingId, organizationId: ctx.organizationId },
             select: { id: true },

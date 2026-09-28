@@ -6,7 +6,7 @@ import { BookingsView } from "@/components/bookings/bookings-view";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
-import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -106,7 +106,7 @@ export default async function BookingsPage({
                             // while Class packs is on (E12).
                             canUsePacks={
                                 canReadPacks(organization) &&
-                                canWritePacks(organization) &&
+                                canUsePacksOnBookings(organization) &&
                                 packsOn(await modulesOrUnknown())
                             }
                         />

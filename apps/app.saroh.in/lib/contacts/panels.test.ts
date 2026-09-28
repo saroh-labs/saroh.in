@@ -49,6 +49,21 @@ describe("contactPanels", () => {
         expect(plan.canAct.courses).toBe(false);
     });
 
+    it("offers Sell a pack to a role that sells packs, and not to one that only reads them (E26)", () => {
+        const seller = contactPanels(
+            { role: "MEMBER", actions: ["pack:sell", "pack:read"] },
+            ALL,
+        );
+        expect(seller.panels).toEqual(["packs"]);
+        expect(seller.canAct.packs).toBe(true);
+        // An API from before E26 sends pack:write, which sold then.
+        const legacy = contactPanels(
+            { role: "MEMBER", actions: ["pack:read", "pack:write"] },
+            ALL,
+        );
+        expect(legacy.canAct.packs).toBe(true);
+    });
+
     it("drops the money panels with Payments off, keeping packs and courses without invoice mentions", () => {
         const plan = contactPanels(
             { role: "OWNER" },

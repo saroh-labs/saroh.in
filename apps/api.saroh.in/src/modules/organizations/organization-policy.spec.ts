@@ -220,6 +220,7 @@ describe("subscriptions, invoices, courses and class packs (ADR-007)", () => {
         "course:read",
         "course:write",
         "pack:read",
+        "pack:sell",
         "pack:write",
     ] as const;
 
@@ -500,5 +501,130 @@ describe("the customer capabilities (DEC-039, C13)", () => {
         ).toEqual(["customer:sensitive"]);
         // The read it implies is theirs to give.
         expect(withinReach(editor, ["contact:read"])).toBe(true);
+    });
+});
+
+describe("the booking and class-pack capabilities (DEC-039, E26)", () => {
+    const BUNDLES: [OrgAction, Record<OrgRole, boolean>][] = [
+        [
+            "booking:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "service:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "booking:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "service:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        // Whether a Member holds pack:read and pack:sell is F18's (Q1).
+        [
+            "pack:read",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "pack:sell",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "pack:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+    ];
+
+    it.each(BUNDLES)(
+        "%s follows matrix §4's default bundles",
+        (action, want) => {
+            for (const role of ORG_ROLES) {
+                expect(can(role, action)).toBe(want[role]);
+            }
+        },
+    );
+
+    const role = (key: string, actions: string[]): OrganizationContext => ({
+        organizationId: "org",
+        userId: "u",
+        role: "MEMBER",
+        roleKey: key,
+        actions: resolveCapabilities(key, actions),
+    });
+
+    it("a role with pack:sell alone can sell and see packs, and can't change them", () => {
+        const trainer = role("trainer", ["pack:sell"]);
+        expect(() => authorize(trainer, "pack:sell")).not.toThrow();
+        expect(() => authorize(trainer, "pack:read")).not.toThrow();
+        expect(() => authorize(trainer, "pack:write")).toThrow(
+            ForbiddenException,
+        );
+    });
+
+    it("a role saved with pack:write before the split still sells, and sees", () => {
+        const set = resolveCapabilities("packs-lead", ["pack:write"]);
+        expect([...set].sort()).toEqual(
+            ["pack:read", "pack:sell", "pack:write"].sort(),
+        );
+    });
+
+    it("pack:read alone shows the whole pack and sells nothing", () => {
+        const set = resolveCapabilities("viewer", ["pack:read"]);
+        expect([...set]).toEqual(["pack:read"]);
+    });
+
+    it("booking:write and service:write imply their reads, and nothing more", () => {
+        expect(
+            [...resolveCapabilities("desk", ["booking:write"])].sort(),
+        ).toEqual(["booking:read", "booking:write"]);
+        expect(
+            [...resolveCapabilities("setup", ["service:write"])].sort(),
+        ).toEqual(["service:read", "service:write"]);
+    });
+
+    it("no booking power implies a pack power, nor the other way round", () => {
+        const desk = resolveCapabilities("desk", [
+            "booking:write",
+            "service:write",
+        ]);
+        expect(desk.has("pack:read")).toBe(false);
+        expect(desk.has("pack:sell")).toBe(false);
+        const seller = resolveCapabilities("seller", ["pack:write"]);
+        expect(seller.has("booking:write")).toBe(false);
+        expect(seller.has("booking:read")).toBe(false);
+    });
+
+    it("the Front desk template (matrix §4) books and sells, and changes no set-up", () => {
+        const desk = role("front-desk", [
+            "booking:write",
+            "order:stage",
+            "order:create",
+            "contact:write",
+            "pack:sell",
+        ]);
+        for (const action of [
+            "booking:read",
+            "booking:write",
+            "pack:read",
+            "pack:sell",
+        ] as const) {
+            expect(() => authorize(desk, action)).not.toThrow();
+        }
+        for (const action of ["service:write", "pack:write"] as const) {
+            expect(() => authorize(desk, action)).toThrow(ForbiddenException);
+        }
+    });
+
+    it("pack:sell is granted only within the granter's reach", () => {
+        const lead = role("lead", ["member:role:update", "pack:sell"]);
+        expect(
+            outOfReach(lead, resolveCapabilities("editor", ["pack:write"])),
+        ).toEqual(["pack:write"]);
+        // What pack:sell implies is theirs to give.
+        expect(
+            withinReach(lead, resolveCapabilities("seller", ["pack:sell"])),
+        ).toBe(true);
     });
 });

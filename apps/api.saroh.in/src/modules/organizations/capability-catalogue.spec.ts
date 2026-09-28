@@ -164,6 +164,51 @@ describe("the customer powers (C13)", () => {
     });
 });
 
+describe("the booking and class-pack powers (E26)", () => {
+    it("relabels service:write for the set-up it covers, keeping its key", () => {
+        // One power, one key: no separate "booking settings" permission.
+        expect(CAPABILITY_BY_ACTION.get("service:write")?.label).toBe(
+            "Change services, hours, time off and booking rules",
+        );
+        expect(
+            CAPABILITIES.some(
+                (c) => (c.action as string) === "booking:settings",
+            ),
+        ).toBe(false);
+    });
+
+    it("labels selling a pack apart from changing one, in Schedule, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["pack:read", "See class packs and who bought them"],
+            ["pack:sell", "Sell class packs and book with them"],
+            ["pack:write", "Make and change class packs"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("schedule");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("lists the pack powers together, the read first", () => {
+        const packs = CAPABILITIES.filter((c) =>
+            c.action.startsWith("pack:"),
+        ).map((c) => c.action);
+        expect(packs).toEqual(["pack:read", "pack:sell", "pack:write"]);
+    });
+
+    it("says what each pack power includes", () => {
+        // The whole pack, money included: there is no money-free read.
+        expect(CAPABILITY_BY_ACTION.get("pack:read")?.note).toMatch(/prices/);
+        expect(CAPABILITY_BY_ACTION.get("pack:sell")?.note).toContain(
+            "Make and change class packs",
+        );
+        expect(CAPABILITY_BY_ACTION.get("pack:write")?.note).toMatch(
+            /can also sell them/,
+        );
+    });
+});
+
 describe("Count and move stock (#513)", () => {
     it("is on the list, grantable, with a label an owner reads", () => {
         const stock = CAPABILITY_BY_ACTION.get("inventory:write");
