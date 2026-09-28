@@ -126,7 +126,7 @@ function sub(over: Record<string, unknown> = {}) {
         organizationId: "org_1",
         status: "ACTIVE",
         planId: "plan_1",
-        plan: { id: "plan_1", name: "Monthly membership" },
+        plan: { id: "plan_1", name: "Monthly membership", classesPerMonth: 8 },
         contactId: "c_1",
         contact: {
             id: "c_1",
@@ -149,6 +149,8 @@ function sub(over: Record<string, unknown> = {}) {
         pendingPlanId: null,
         pendingPlan: null,
         pausedUntil: null,
+        classesPerPeriod: 8,
+        classesPerPeriodSetAt: at("2026-09-01T00:00:00Z"),
         createdAt: at("2026-09-01T00:00:00Z"),
         ...over,
     };
@@ -525,6 +527,8 @@ describe("renewal", () => {
             data: {
                 currentPeriodStart: at("2026-10-01T00:00:00Z"),
                 currentPeriodEnd: at("2026-11-01T00:00:00Z"),
+                classesPerPeriod: 8,
+                classesPerPeriodSetAt: now,
             },
         });
         expect(issueInTx).toHaveBeenCalledWith(
@@ -1253,6 +1257,7 @@ const WEEKLY_BOX = {
     price: decimal("300"),
     currency: "INR",
     interval: "MONTH",
+    classesPerMonth: null,
 };
 
 describe("collections on a subscription", () => {
@@ -1694,6 +1699,9 @@ describe("renewal with skips and a booked plan", () => {
                 currency: "INR",
                 interval: "MONTH",
                 pendingPlanId: null,
+                // The booked plan's classes, from this renewal (D10).
+                classesPerPeriod: null,
+                classesPerPeriodSetAt: now,
             },
         });
         expect(issueInTx.mock.calls[0]![2].lines[0]).toMatchObject({
@@ -1753,6 +1761,8 @@ describe("renewal with skips and a booked plan", () => {
             data: {
                 currentPeriodStart: at("2026-10-01T00:00:00Z"),
                 currentPeriodEnd: at("2026-10-08T00:00:00Z"),
+                classesPerPeriod: 8,
+                classesPerPeriodSetAt: now,
             },
         });
         expect(tx.subscriptionSkip!.findMany).toHaveBeenCalledWith({
@@ -2446,5 +2456,154 @@ describe("pause with an end date (D8)", () => {
             expect(events().map((e) => e.kind)).toEqual(["ENDED"]);
             expect(issueInTx).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe("classes from the next renewal (D10)", () => {
+    const now = at("2026-11-01T02:00:00Z");
+    const renewing = (over: Record<string, unknown> = {}) =>
+        sub({
+            anchorAt: at("2026-10-01T00:00:00Z"),
+            currentPeriodStart: at("2026-10-01T00:00:00Z"),
+            currentPeriodEnd: at("2026-11-01T00:00:00Z"),
+            ...over,
+        });
+    const written = () =>
+        tx.customerSubscription!.update!.mock.calls[0]![0].data as Record<
+            string,
+            unknown
+        >;
+    const planAt = (classesPerMonth: number | null) => ({
+        id: "plan_1",
+        name: "Monthly membership",
+        classesPerMonth,
+    });
+
+    it("takes the plan's classes at subscribe, stamped", async () => {
+        db.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...PLAN,
+            classesPerMonth: 8,
+        });
+        await service.subscribe(owner, { contactId: "c_1", planId: "plan_1" });
+        expect(
+            tx.customerSubscription!.create!.mock.calls[0]![0].data,
+        ).toMatchObject({
+            classesPerPeriod: 8,
+            classesPerPeriodSetAt: at("2026-09-22T10:00:00Z"),
+        });
+    });
+
+    it("stamps a plan with no classes as set, not left for the fallback", async () => {
+        db.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...PLAN,
+            classesPerMonth: null,
+        });
+        await service.subscribe(owner, { contactId: "c_1", planId: "plan_1" });
+        expect(
+            tx.customerSubscription!.create!.mock.calls[0]![0].data,
+        ).toMatchObject({
+            classesPerPeriod: null,
+            classesPerPeriodSetAt: at("2026-09-22T10:00:00Z"),
+        });
+    });
+
+    it("gives a member the plan's new number at their renewal, not before", async () => {
+        // The plan moved from 8 to 10 on 5 Oct; this member kept 8 until
+        // their renewal on 1 Nov.
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            renewing({ plan: planAt(10), classesPerPeriod: 8 }),
+        );
+        await expect(service.renewOne("sub_1", now)).resolves.toBe("renewed");
+        expect(written()).toMatchObject({
+            currentPeriodStart: at("2026-11-01T00:00:00Z"),
+            classesPerPeriod: 10,
+            classesPerPeriodSetAt: now,
+        });
+    });
+
+    it("keeps no allowance as none at renewal", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            renewing({ plan: planAt(null), classesPerPeriod: null }),
+        );
+        await service.renewOne("sub_1", now);
+        expect(written()).toMatchObject({
+            classesPerPeriod: null,
+            classesPerPeriodSetAt: now,
+        });
+    });
+
+    it("takes the booked plan's classes when a plan change applies", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            renewing({
+                pendingPlanId: "plan_2",
+                pendingPlan: { ...WEEKLY_BOX, classesPerMonth: 12 },
+            }),
+        );
+        await service.renewOne("sub_1", now);
+        expect(written()).toMatchObject({
+            planId: "plan_2",
+            classesPerPeriod: 12,
+        });
+    });
+
+    it("keeps the current plan's classes while a booked change waits on a clash", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            renewing({
+                pendingPlanId: "plan_2",
+                pendingPlan: { ...WEEKLY_BOX, classesPerMonth: 12 },
+            }),
+        );
+        tx.customerSubscription!.count!.mockResolvedValue(1);
+        await service.renewOne("sub_1", now);
+        expect(written()).not.toHaveProperty("planId");
+        expect(written()).toMatchObject({ classesPerPeriod: 8 });
+    });
+
+    it("sets a row the previous image wrote (never set) at its renewal", async () => {
+        tx.customerSubscription!.findUnique!.mockResolvedValue(
+            renewing({ classesPerPeriod: null, classesPerPeriodSetAt: null }),
+        );
+        await service.renewOne("sub_1", now);
+        expect(written()).toMatchObject({
+            classesPerPeriod: 8,
+            classesPerPeriodSetAt: now,
+        });
+    });
+
+    it("takes them again on a resume that starts a new period", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-08-10T00:00:00Z"),
+                anchorAt: at("2026-08-01T00:00:00Z"),
+                currentPeriodStart: at("2026-08-01T00:00:00Z"),
+                currentPeriodEnd: at("2026-09-01T00:00:00Z"),
+                plan: planAt(10),
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(written()).toMatchObject({
+            status: "ACTIVE",
+            classesPerPeriod: 10,
+            classesPerPeriodSetAt: at("2026-09-22T10:00:00Z"),
+        });
+    });
+
+    it("leaves them on a resume inside the paid period: no new period", async () => {
+        tx.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                status: "PAUSED",
+                pausedAt: at("2026-09-20T00:00:00Z"),
+                plan: planAt(10),
+            }),
+        );
+        await service.resume(owner, "sub_1");
+        expect(written()).not.toHaveProperty("classesPerPeriod");
+        expect(written()).not.toHaveProperty("classesPerPeriodSetAt");
+    });
+
+    it("keeps the subscription's plan to its id and name on the wire", async () => {
+        const view = await service.get(owner, "sub_1");
+        expect(view.plan).toEqual({ id: "plan_1", name: "Monthly membership" });
     });
 });

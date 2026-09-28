@@ -132,6 +132,11 @@ export interface MembershipAllowance {
     left: number;
     resetsAt: string;
     paused: boolean;
+    /**
+     * The classes a month from the next renewal, when they differ (D10).
+     * Optional: an API before D10 doesn't send it.
+     */
+    nextPeriod?: { perMonth: number | null; from: string } | null;
 }
 
 export interface DetailStats {

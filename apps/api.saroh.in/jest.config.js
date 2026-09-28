@@ -240,6 +240,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         // D21: which plans are on sale; a DRAFT is refused.
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
+        // D10: a subscription's own classes a month, and the fallback.
+        "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

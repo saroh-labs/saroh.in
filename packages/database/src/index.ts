@@ -34,3 +34,6 @@ export * from "./backfill/razorpay-public-keys";
 // The E12 Class packs module backfill, exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/class-packs-module";
+// The D10 classes-a-month backfill, exported so the API's integration suite
+// can run it against the previous image's rows (twice) and check them.
+export * from "./backfill/classes-per-period";

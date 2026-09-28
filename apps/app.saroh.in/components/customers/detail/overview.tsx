@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import type { OrderFilter, Tile } from "@/lib/customer-workspace/view";
 import {
+    allowanceChangeLine,
     bookingRow,
     deliveryAddress,
     favourites,
@@ -197,6 +198,8 @@ function OrderTile({
 function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
     const cl = d.stats.classesLeft;
     const m = cl?.allowance ?? null;
+    // Its classes from the next renewal, when they change (D10).
+    const change = m ? allowanceChangeLine(m, d.timezone, now) : null;
     const packs = packLines(d.packs?.rows ?? [], d.timezone, now);
     return (
         <section className={CARD} aria-label="Classes left">
@@ -250,6 +253,11 @@ function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
                                     ? "Paused — classes start again when it resumes."
                                     : `Classes this month · resets ${dayText(m.resetsAt, d.timezone, now)}, unused ones don't carry over`}
                             </div>
+                            {change ? (
+                                <div className="mt-0.5 text-[12px] text-muted-foreground">
+                                    {change}
+                                </div>
+                            ) : null}
                         </Link>
                     ) : null}
                     {packs.map((p) => (

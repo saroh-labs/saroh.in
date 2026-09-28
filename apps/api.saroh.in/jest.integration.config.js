@@ -121,6 +121,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         // D21: pure; the real rows are in plan-drafts-readers.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
+        // D10: pure; the real rows are in subscription-classes.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.

@@ -6,6 +6,11 @@ import {
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import {
+    ALLOWANCE_SELECT,
+    classesAllowance,
+} from "../subscriptions/classes-allowance";
+
 type Tx = Prisma.TransactionClient;
 
 /** What a booking asks of a membership. */
@@ -24,7 +29,9 @@ function refuse(message: string): never {
 /**
  * Pay a booking with one of a membership's classes, on the caller's
  * transaction (U3). The membership must be the booker's own and active, and —
- * when its plan has a monthly allowance — have a class left in the calendar
+ * when its period includes classes a month (D10: the subscription's own
+ * allowance, taken from its plan at each renewal, so a plan's new number
+ * reaches a member at their next renewal) — have a class left in the calendar
  * month of the session, counted in the membership's own timezone. A class
  * cancelled late stays used, so it counts too.
  *
@@ -45,6 +52,7 @@ export async function useMembershipInTx(
             contactId: true,
             status: true,
             timezone: true,
+            ...ALLOWANCE_SELECT,
             plan: { select: { name: true, classesPerMonth: true } },
         },
     });
@@ -66,7 +74,7 @@ export async function useMembershipInTx(
     }
     await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${sub.id} FOR UPDATE`;
 
-    const allowance = sub.plan.classesPerMonth;
+    const allowance = classesAllowance(sub);
     if (allowance !== null) {
         const local = DateTime.fromJSDate(input.startAt, {
             zone: sub.timezone,
