@@ -511,6 +511,82 @@ describe("a treatment sold as one order (E9, real database)", () => {
         expect(again.visitNumber).toBe(1);
     });
 
+    it("paid in full at booking: the order's refund hands the booking payment back, and its credit note lands on the booking invoice", async () => {
+        const booking = await bookedAndPaid(
+            whitening,
+            "refund-now@example.in",
+            "NOW",
+        );
+        const orderId = booking.orderId ?? "";
+        const bookingInvoice = await prisma.invoice.findFirstOrThrow({
+            where: { orderId, kind: "INVOICE", source: "BOOKING" },
+        });
+
+        const result = await payments.initiateRefund(owner, orderId, {
+            idempotencyKey: `treat-refund-${tag}-now`,
+        });
+        expect(result.refunds).toHaveLength(1);
+        const row = await prisma.paymentRefund.findUniqueOrThrow({
+            where: { id: result.refunds[0].id },
+            include: { paymentIntent: true },
+        });
+        expect(row.amountCents).toBe(1_200_000);
+        expect(row.paymentIntent.invoiceId).toBe(bookingInvoice.id);
+
+        // The same key again is the same refund, not a second one.
+        const again = await payments.initiateRefund(owner, orderId, {
+            idempotencyKey: `treat-refund-${tag}-now`,
+        });
+        expect(again.refunds.map((r) => r.id)).toEqual([row.id]);
+
+        // Its credit note offsets the booking invoice that took the money.
+        const note = await prisma.invoice.findFirstOrThrow({
+            where: { kind: "CREDIT_NOTE", paymentRefundId: row.id },
+        });
+        expect(note.relatedInvoiceId).toBe(bookingInvoice.id);
+        expect(String(note.total)).toBe("12000");
+
+        // Nothing is left: a second refund is refused.
+        await expect(
+            payments.initiateRefund(owner, orderId, {
+                idempotencyKey: `treat-refund-${tag}-now-2`,
+            }),
+        ).rejects.toThrow("Nothing is left to refund on this order");
+    });
+
+    it("a deposit at booking and the balance by hand: the order's refund hands back only the deposit it received", async () => {
+        const booking = await bookedAndPaid(
+            rootCanal,
+            "refund-deposit@example.in",
+            "DEPOSIT",
+        );
+        const orderId = booking.orderId ?? "";
+        await orders.updateStatus(storeId, orderId, owner.userId, {
+            paymentStatus: "PAID",
+        });
+
+        const result = await payments.initiateRefund(owner, orderId, {
+            idempotencyKey: `treat-refund-${tag}-deposit`,
+        });
+        expect(result.refunds).toHaveLength(1);
+        expect(result.refunds[0].amountCents).toBe(600_000);
+        const total = await prisma.paymentRefund.aggregate({
+            where: { paymentIntent: { invoice: { orderId } } },
+            _sum: { amountCents: true },
+        });
+        expect(total._sum.amountCents).toBe(600_000);
+
+        // Another amount past what came in is refused.
+        await expect(
+            payments.initiateRefund(owner, orderId, {
+                kind: "goodwill",
+                amountCents: 100,
+                reason: "Sorry",
+                idempotencyKey: `treat-refund-${tag}-deposit-2`,
+            }),
+        ).rejects.toThrow();
+    });
+
     it("a pay-now hold let go before it was paid cancels the unsold treatment", async () => {
         keySeq += 1;
         const { booking, payToken } = await publicBookings.bookOnline(

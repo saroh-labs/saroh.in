@@ -54,3 +54,23 @@ export function withBookingPayments<
         balanceByHand: order.paymentStatus === "PAID" && booking.length > 0,
     };
 }
+
+/**
+ * Every payment that is the order's own money: its own intents, and a
+ * treatment's payments on the booking invoice that names it (a deposit or
+ * the whole price paid at booking). What a refund of the order may hand
+ * back, and where a refund of it is looked for.
+ */
+export function orderMoneyIntents(
+    orderId: string,
+): Prisma.PaymentIntentWhereInput {
+    return {
+        OR: [
+            { orderId },
+            {
+                orderId: null,
+                invoice: { orderId, source: "BOOKING", kind: "INVOICE" },
+            },
+        ],
+    };
+}

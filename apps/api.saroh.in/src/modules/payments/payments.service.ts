@@ -26,6 +26,7 @@ import {
     planLineRefund,
     planRemainingLines,
 } from "../orders/order-refunds";
+import { orderMoneyIntents } from "../orders/treatment-ledger";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
@@ -727,7 +728,7 @@ export class PaymentsService {
             where: {
                 id: refundId,
                 organizationId: ctx.organizationId,
-                paymentIntent: { orderId: order.id },
+                paymentIntent: orderMoneyIntents(order.id),
             },
             include: {
                 ...REFUND_ROW_INCLUDE,
@@ -860,7 +861,7 @@ export class PaymentsService {
                 where: {
                     organizationId: ctx.organizationId,
                     idempotencyKey: k,
-                    paymentIntent: { orderId: order.id },
+                    paymentIntent: orderMoneyIntents(order.id),
                 },
                 include: REFUND_ROW_INCLUDE,
                 orderBy: { createdAt: "asc" },
@@ -882,9 +883,13 @@ export class PaymentsService {
                 if (replay.length > 0) return { replay, done: true as const };
             }
 
+            // The order's own payments, and a treatment's paid at booking on
+            // the booking invoice that names the order (E9, DEC-050): a
+            // visit never refunds on its own, so this is where that money
+            // comes back. Its credit note lands on that invoice.
             const payments = await tx.paymentIntent.findMany({
                 where: {
-                    orderId: order.id,
+                    ...orderMoneyIntents(order.id),
                     organizationId: ctx.organizationId,
                     status: "SUCCEEDED",
                 },
