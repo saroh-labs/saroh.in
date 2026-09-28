@@ -565,3 +565,30 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - **A Reviewer on Orders sees the Orders locked card**, not the generic module card (B7, F9).
 - **"Returning" counts only what the viewer can read.** Without `invoice:read` it is judged from orders alone (C3).
 - **The bot check (Cloudflare Turnstile, free) is deferred.** Code sign-in runs without a challenge until abuse shows up. The API logs `site_codes_challenge_unconfigured` meanwhile, and the check is switched on by setting the two keys.
+
+## DEC-057 A module Saroh has switched off is never shown to the business
+
+**Status: Accepted — 2026-09-28** · applies to every surface that lists or gates modules
+
+- Context: on a fresh production database every module's rollout flag was unset, so Settings › Modules listed Website, Contacts, Appointments and Sell with their switches on and a raw `ROLLOUT_DISABLED` line under each.
+- Decision: **a module whose rollout flag is off (`ROLLOUT_DISABLED`) is not shown to the business anywhere**: not in Settings › Modules, the rail, the command menu, "Also sell", onboarding's module choices, setup checklists or any upsell. Only modules Saroh has rolled out appear, and the business turns those on or off. A raw blocker code is never shown to a merchant.
+- Consequences: the module list the app renders is the set that has passed the rollout gate. Turning a rollout flag off in the admin console hides the module; the business's own setting and its data are kept.
+- Migration: none.
+
+## DEC-058 A cancelled booking is refunded by the business's own policy, never beyond what was received
+
+**Status: Accepted — 2026-09-28** — amends [DEC-051](#dec-051-a-bookings-deposit-is-refunded-once-against-a-free-cancel-deadline-fixed-at-booking) · round-2 plan E (E8, E30)
+
+- Context: E8 refunded any money paid online when a booking was cancelled in time. Which cancellations are refunded is the business's refund policy, and Saroh doesn't set it.
+- Decision: **each business sets its own policy for cancellations made in time**, in its booking settings: refund what the customer paid online automatically, or don't. Saroh follows that setting. **A refund is never more than the money actually received** for that booking, and a late cancel is never refunded automatically. Staff with `payment:manage` can still refund by hand, within what was received. DEC-051's mechanics stay as they are: the fixed free-cancel deadline, one refund under the booking's lock, and the provider called after commit.
+- Consequences: the booking page and the cancel dialog state the business's policy as it is set. A business that never set it gets the default, automatic refund of what was paid online, which is what E8 shipped. The setting's copy makes plain that the business can change it.
+- Migration: one booking-policy setting per business, with a default; additive.
+
+## DEC-059 The payment window shows the methods the business's account has switched on
+
+**Status: Accepted — 2026-09-28** · round-2 plan E (E11, D23), plan D
+
+- Context: the booking page promised "UPI or card", and Razorpay's window was limited to UPI and card by Saroh, while Cashfree's showed whatever the account had switched on.
+- Decision: **Saroh doesn't choose or restrict payment methods.** The provider's window shows the methods the business has switched on in its Razorpay or Cashfree account. Saroh's copy names no methods it can't vouch for: at most, it shows methods the provider reports as switched on for that account.
+- Consequences: Razorpay's UPI-and-card-only display block is removed. "UPI or card" becomes neutral copy, such as "Pay online in the ‹Razorpay› window", unless the provider reports the account's methods.
+- Migration: none.

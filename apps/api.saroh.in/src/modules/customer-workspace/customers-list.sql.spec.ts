@@ -81,10 +81,11 @@ describe("customers list SQL", () => {
         expect(orderBySql("spent").sql).toContain("m.spent DESC NULLS LAST");
     });
 
-    it("never lists a tombstone or a removed contact, whose placeholders end in removed.invalid", () => {
+    it("never lists a merge's tombstone, by mergedIntoId, or a removed contact, by its placeholder", () => {
         const sql = notRetired("c");
-        expect(sql.sql).toContain("c.email");
-        expect(sql.values).toEqual(["%@removed.invalid"]);
+        expect(sql.sql).toContain(`c."mergedIntoId" IS NULL`);
+        expect(sql.sql).toContain(`c."email"`);
+        expect(sql.values).toEqual(["removed+%@removed.invalid"]);
     });
 
     it("counts a paid order and paid invoices that are not an order's own, never a credit note", () => {

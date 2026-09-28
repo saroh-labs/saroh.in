@@ -8,6 +8,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
@@ -596,6 +597,10 @@ export function buildSnapshot(
  * The signed-in booker's own contact (A9). A name typed on the booking page
  * fills a contact that has none; a name the contact already has is kept,
  * and nothing else about it changes.
+ *
+ * The id comes from the session, read before this transaction, so it goes
+ * through `resolveContact` (C9): a booking racing a merge lands on the
+ * survivor, never on the tombstone.
  */
 async function accountContactInTx(
     tx: Prisma.TransactionClient,
@@ -603,8 +608,12 @@ async function accountContactInTx(
     who: SignedInBooker,
     input: BookInput,
 ): Promise<{ id: string }> {
+    const resolved = await resolveContact(tx, who.contactId, organizationId);
+    if (!resolved || resolved.removed) {
+        throw new NotFoundException("Sign in to continue.");
+    }
     const contact = await tx.contact.findFirst({
-        where: { id: who.contactId, organizationId },
+        where: { id: resolved.id, organizationId },
         select: { id: true, firstName: true, lastName: true },
     });
     if (!contact) throw new NotFoundException("Sign in to continue.");

@@ -3268,6 +3268,18 @@ model Contact {
   // Needs attention: one shared list of what the team must know (DEC-040, C1).
   attention ContactAttention[]
 
+  // A merge's tombstone (DEC-042, C9). The merged-away contact is never
+  // deleted: it keeps its id, holds only ids (a reserved placeholder email,
+  // no name, phone, company or address) and points at the survivor, so a
+  // late webhook, job or sign-in carrying its id lands on the survivor
+  // through `customer-workspace/resolve-contact.ts`. Never more than one hop:
+  // a merge re-points tombstones that already pointed at the merged contact.
+  // Deleting the survivor takes its tombstones with it.
+  mergedIntoId String?
+  mergedInto   Contact?  @relation("ContactMerge", fields: [mergedIntoId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  mergedFrom   Contact[] @relation("ContactMerge")
+  mergedAt     DateTime?
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -3276,6 +3288,8 @@ model Contact {
   // The target of (contactId, organizationId) foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])
+  // A survivor's tombstones (a merge re-points them), and "not a tombstone".
+  @@index([organizationId, mergedIntoId])
 }
 
 // Form — an org-owned enquiry form definition. Optionally bound to a Site so a

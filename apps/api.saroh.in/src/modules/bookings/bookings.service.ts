@@ -1238,9 +1238,21 @@ export class BookingsService {
 
         let booker: BookInput;
         if (dto.contactId) {
-            const contact = await prisma.contact.findUnique({
+            let contact = await prisma.contact.findUnique({
                 where: { id: dto.contactId },
             });
+            // A page loaded before a merge can still name the merged-away
+            // contact (C9): book the survivor it points at. The booking is
+            // then made by the survivor's email, never the tombstone's
+            // placeholder.
+            if (
+                contact?.mergedIntoId &&
+                contact.organizationId === ctx.organizationId
+            ) {
+                contact = await prisma.contact.findUnique({
+                    where: { id: contact.mergedIntoId },
+                });
+            }
             if (contact?.organizationId !== ctx.organizationId) {
                 throw new NotFoundException("Contact not found");
             }

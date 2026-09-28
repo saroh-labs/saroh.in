@@ -28,6 +28,8 @@ import {
 } from "./customers-list.dto";
 import { CustomersListService } from "./customers-list.service";
 import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
+import { MergeContactsDto, MergePreviewQueryDto } from "./merge.dto";
+import { MergeService } from "./merge.service";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -55,6 +57,7 @@ export class CustomerWorkspaceController {
         private readonly attention: ContactAttentionService,
         private readonly customers: CustomersListService,
         private readonly accounts: AccountUnlinkService,
+        private readonly merges: MergeService,
     ) {}
 
     /**
@@ -79,13 +82,43 @@ export class CustomerWorkspaceController {
         return this.customers.unlinked(ctx, query);
     }
 
-    /** One read of a customer, rooted on the contact (U8). */
+    /**
+     * What merging two customers would do (DEC-042, C9): what moves, the
+     * name, email and phone to pick from, consent per channel, the site
+     * account's outcome, and anything that refuses it.
+     */
+    @Get(":contactId/merge/:otherId/preview")
+    mergePreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("otherId") otherId: string,
+        @Query() query: MergePreviewQueryDto,
+    ) {
+        return this.merges.preview(ctx, contactId, otherId, query.survivorId);
+    }
+
+    /** Merge two customers into the one kept (DEC-042, C9). Final. */
+    @Post(":contactId/merge/:otherId")
+    @HttpCode(200)
+    merge(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+        @Param("otherId") otherId: string,
+        @Body() dto: MergeContactsDto,
+    ) {
+        return this.merges.merge(ctx, contactId, otherId, dto);
+    }
+
+    /**
+     * One read of a customer, rooted on the contact (U8). A merged-away
+     * contact answers `{ mergedInto }`, and the page goes to the survivor.
+     */
     @Get(":contactId/detail")
     detail(
         @OrgContext() ctx: OrganizationContext,
         @Param("contactId") contactId: string,
     ) {
-        return this.details.detail(ctx, contactId);
+        return this.details.read(ctx, contactId);
     }
 
     /** What "This isn't them" would move with the site account (A4). */

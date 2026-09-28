@@ -10,6 +10,7 @@ import { DateTime, IANAZone } from "luxon";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
@@ -473,11 +474,18 @@ export class SubscriptionsService {
         const id = await prisma
             .$transaction(async (tx) => {
                 await assertPaymentsOn(tx, organizationId, "subscribe people");
+                // Merged since the page loaded (C9)? Subscribe the survivor.
+                const person = await resolveContact(
+                    tx,
+                    contact.id,
+                    organizationId,
+                );
+                if (!person || person.removed) notFound("Contact", "contactId");
                 const created = await tx.customerSubscription.create({
                     data: {
                         organizationId,
                         planId: plan.id,
-                        contactId: contact.id,
+                        contactId: person.id,
                         status: "ACTIVE",
                         price,
                         currency: plan.currency,
@@ -497,7 +505,7 @@ export class SubscriptionsService {
                     invoiceId = await this.invoicePeriod(tx, {
                         organizationId,
                         subscriptionId: created.id,
-                        contactId: contact.id,
+                        contactId: person.id,
                         planName: plan.name,
                         price,
                         currency: plan.currency,

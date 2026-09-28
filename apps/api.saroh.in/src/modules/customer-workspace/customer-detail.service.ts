@@ -289,6 +289,14 @@ export interface OffersConsent {
     at: string | null;
 }
 
+/**
+ * A contact merged into another (C9): the page redirects to the survivor
+ * (C10). The tombstone has nothing of its own to show.
+ */
+export interface MergedContactRedirect {
+    mergedInto: string;
+}
+
 export interface CustomerDetail {
     contact: {
         id: string;
@@ -430,6 +438,29 @@ export class CustomerDetailService {
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
+    /**
+     * The page's read: the detail, or for a merge's tombstone (C9) where
+     * the page goes instead (`{ mergedInto }`).
+     */
+    async read(
+        ctx: OrganizationContext,
+        contactId: string,
+    ): Promise<CustomerDetail | MergedContactRedirect> {
+        authorize(ctx, "contact:read");
+        const tombstone = await this.db.contact.findFirst({
+            where: {
+                id: contactId,
+                organizationId: ctx.organizationId,
+                mergedIntoId: { not: null },
+            },
+            select: { mergedIntoId: true },
+        });
+        if (tombstone?.mergedIntoId) {
+            return { mergedInto: tombstone.mergedIntoId };
+        }
+        return this.detail(ctx, contactId);
+    }
+
     async detail(
         ctx: OrganizationContext,
         contactId: string,
@@ -450,6 +481,7 @@ export class CustomerDetailService {
                 company: true,
                 source: true,
                 createdAt: true,
+                mergedIntoId: true,
                 // The one that signs in; a merged or removed one does not.
                 customerAccounts: {
                     where: { status: { in: ["ACTIVE", "BLOCKED"] } },
@@ -464,6 +496,14 @@ export class CustomerDetailService {
             },
         });
         if (!contact) throw new NotFoundException("Contact not found");
+        // A merge's tombstone holds ids only (DEC-042); `read` sends the
+        // page on to the survivor.
+        if (contact.mergedIntoId) {
+            throw new NotFoundException({
+                message: "This customer was merged into another",
+                details: { mergedInto: contact.mergedIntoId },
+            });
+        }
         const account =
             contact.customerAccounts.length > 0
                 ? contact.customerAccounts[0]

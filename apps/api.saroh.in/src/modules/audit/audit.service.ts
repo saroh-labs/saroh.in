@@ -47,6 +47,10 @@ export const AuditAction = {
     ProductStockTrackingOff: "product.stock-tracking.off",
     BusinessStockTrackingOn: "business.stock-tracking.on",
     BusinessStockTrackingOff: "business.stock-tracking.off",
+    // Two customers merged into one (DEC-042, C9), written in the merge's
+    // transaction with the survivor as the target. Ids and counts only,
+    // never the discarded name, email or phone (DEC-035).
+    CustomerMerged: "customer.merged",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

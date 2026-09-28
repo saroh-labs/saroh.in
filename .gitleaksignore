@@ -36,3 +36,5 @@ ad86c5a44e20d53db5a5353bf969a795cc4e8c9d:.github/workflows/ci.yml:generic-api-ke
 # property it is assigned to has "key" in its name.
 22c37cf52b66179a5b1d3fe4853c89b8445d1f57:apps/api.saroh.in/src/modules/admin/admin-operations.service.spec.ts:generic-api-key:166
 22c37cf52b66179a5b1d3fe4853c89b8445d1f57:apps/api.saroh.in/src/modules/admin/admin-operations.service.spec.ts:generic-api-key:189
+# D22 test fixture: a made-up rzp_live_ key id pasted as the secret, to prove it's refused. Not a real key.
+e8796721e07925da1c573088c9ba0bedc2439654:apps/api.saroh.in/src/modules/payments/payments.service.spec.ts:generic-api-key:318
