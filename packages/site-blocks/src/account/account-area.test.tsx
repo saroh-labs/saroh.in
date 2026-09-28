@@ -309,6 +309,16 @@ describe("Me", () => {
                             total: "12000.00",
                             currency: "INR",
                         },
+                        {
+                            ref: "inv_2",
+                            number: "KD/26-27/0002",
+                            issuedAt: "2026-09-03T00:00:00.000Z",
+                            paidAt: "2026-09-03T00:00:00.000Z",
+                            total: "900.00",
+                            currency: "INR",
+                            // D15: an exempt paper is named as the clinic's copy is.
+                            billOfSupply: true,
+                        },
                     ],
                 }}
                 notes={null}
@@ -316,16 +326,18 @@ describe("Me", () => {
                 api={meApi()}
             />,
         );
+        expect(
+            screen.getByText("Bill of supply KD/26-27/0002"),
+        ).toBeInTheDocument();
         expect(screen.getByText("Farah Khan")).toBeInTheDocument();
         expect(
             screen.getByText("+91 98765 43210 · farah@example.in"),
         ).toBeInTheDocument();
         expect(screen.getByText("Receipt KD-0001")).toBeInTheDocument();
         expect(screen.getByText("2 Sept 2026 · ₹12,000")).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
-            "href",
-            "/account/receipts/inv_1",
-        );
+        expect(
+            screen.getAllByRole("link", { name: "View" })[0],
+        ).toHaveAttribute("href", "/account/receipts/inv_1");
         expect(screen.queryByText("Health notes")).toBeNull();
         expect(screen.queryByText(/Remove my details/)).toBeNull();
     });

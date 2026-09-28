@@ -9,7 +9,7 @@ import { startPayment } from "@/app/pay/[token]/actions";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
-import { payDate, payMoney } from "@/lib/invoice-pay-shape";
+import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
 
 /**
  * The invoice a pay link shows, and its Pay button (ADR-007, U13).
@@ -66,7 +66,7 @@ export function InvoicePay({
             <p className="text-sm text-site-muted">{invoice.businessName}</p>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-2xl font-bold tracking-tight text-site-fg">
-                    Invoice {invoice.number}
+                    {payTitle(invoice)} {invoice.number}
                 </h1>
                 <StatusBadge status={invoice.status} />
             </div>
@@ -142,6 +142,11 @@ export function InvoicePay({
                     </tfoot>
                 </table>
             </div>
+            {invoice.billOfSupply ? (
+                <p className="mt-2 text-xs text-site-muted">
+                    Supply exempt from GST.
+                </p>
+            ) : null}
 
             {payable ? (
                 <div className="mt-6 space-y-4">

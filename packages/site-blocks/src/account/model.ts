@@ -170,6 +170,11 @@ export interface AccountReceipt {
     paidAt: string | null;
     total: string;
     currency: string;
+    /**
+     * A GST-registered business's exempt paper (D15): it is named a bill of
+     * supply, as the business's own copy is. Absent from an older API.
+     */
+    billOfSupply?: boolean;
 }
 
 export interface AccountNote {

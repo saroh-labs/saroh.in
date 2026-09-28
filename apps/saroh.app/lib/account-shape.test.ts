@@ -196,6 +196,10 @@ describe("receipts and notes", () => {
         };
         expect(receiptsResult([row])).toEqual([row]);
         expect(receiptsResult([{ ...row, total: 12000 }])).toBe(null);
+        // D15: a bill of supply says so; an older API leaves it out.
+        const exempt = { ...row, billOfSupply: true };
+        expect(receiptsResult([exempt])).toEqual([exempt]);
+        expect(receiptsResult([{ ...row, billOfSupply: "yes" }])).toBe(null);
         const note = {
             ref: "n",
             text: "Blood thinners",
