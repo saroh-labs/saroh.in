@@ -190,6 +190,7 @@ export function InspectorHost({
                     />
                 ) : (
                     <BlockInspector
+                        siteId={siteId}
                         active={active}
                         count={sections.length}
                         pages={pages}

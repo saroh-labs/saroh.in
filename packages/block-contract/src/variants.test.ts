@@ -363,3 +363,63 @@ describe("visitUs", () => {
         expect(resolveVariant("visitUs", {})).toBe("default");
     });
 });
+
+/** G10 — the Journal lists the site's latest posts, read live. */
+describe("journal", () => {
+    it("is valid with nothing set, so a just-added block saves", () => {
+        expect(parseSectionContent("journal", 1, {}).success).toBe(true);
+    });
+
+    it("keeps a title, a count of 3 or 6 and both switches", () => {
+        const parsed = parseSectionContent("journal", 1, {
+            title: "  Journal ",
+            count: 6,
+            showExcerpts: false,
+            showImages: true,
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            title: "Journal",
+            count: 6,
+            showExcerpts: false,
+            showImages: true,
+        });
+    });
+
+    it("refuses any other count", () => {
+        for (const count of [0, 1, 4, 12, "3"]) {
+            expect(parseSectionContent("journal", 1, { count }).success).toBe(
+                false,
+            );
+        }
+    });
+
+    it("never stores the posts themselves, so it can't go stale", () => {
+        const parsed = parseSectionContent("journal", 1, {
+            count: 3,
+            posts: [{ title: "A copied post", slug: "copied" }],
+        });
+        expect(parsed.success && parsed.data).toEqual({ count: 3 });
+    });
+
+    it("refuses an over-long title", () => {
+        expect(
+            parseSectionContent("journal", 1, { title: "x".repeat(161) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("publishes exactly what was authored", () => {
+        const draft = {
+            title: "Journal",
+            count: 6 as const,
+            showImages: false,
+        };
+        expect(
+            toRendered("journal", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("has one look, and content without one wears it", () => {
+        expect(resolveVariant("journal", {})).toBe("default");
+    });
+});

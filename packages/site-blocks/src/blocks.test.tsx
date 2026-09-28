@@ -7,6 +7,7 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedJournal,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -16,7 +17,7 @@ import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { SAMPLE_VISIT } from "./block-fixture-preview";
+import { SAMPLE_POSTS, SAMPLE_VISIT } from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
@@ -25,6 +26,7 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import JournalSection from "./blocks/journal";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -389,6 +391,29 @@ describe("block rendering", () => {
                 now={new Date("2026-09-25T09:00:00Z")}
             />,
         );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // Sample posts rather than a fetch: the page serving the site reads them
+    // and hands them in (G10).
+    it("journal", () => {
+        const { container } = render(
+            <JournalSection
+                content={BLOCK_META.journal.fixtures.default as RenderedJournal}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("journal, words only", () => {
+        const { container } = render(
+            <JournalSection
+                content={BLOCK_META.journal.cases.plain as RenderedJournal}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/news" }}
+            />,
+        );
+        expect(container.querySelector("img")).toBeNull();
         expect(container.innerHTML).toMatchSnapshot();
     });
 

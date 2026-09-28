@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { PageSections } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
-import { findHomePage, getSiteForHost } from "@/lib/publication";
+import {
+    findHomePage,
+    getJournalFeed,
+    getSiteForHost,
+} from "@/lib/publication";
 
 /**
  * Tenant site home (S2-006).
@@ -32,12 +36,20 @@ export default async function SiteHomePage({
         notFound();
     }
 
+    // The Journal's posts (G10), read only when the page draws one.
+    const journal = await getJournalFeed(
+        home.sections,
+        resolved.snapshot,
+        resolved.siteId,
+    );
+
     return (
         <PageSections
             sections={home.sections}
             apiUrl={publicApiUrl()}
             bookHref="/book"
             siteId={resolved.siteId}
+            journal={journal}
         />
     );
 }

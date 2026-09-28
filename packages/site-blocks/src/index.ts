@@ -17,6 +17,7 @@ export type { Section } from "./section-renderer";
 
 export {
     BlockFixturePreview,
+    SAMPLE_POSTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
@@ -29,6 +30,12 @@ export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
+export {
+    default as JournalSection,
+    postExcerpt,
+    postEyebrow,
+} from "./blocks/journal";
+export type { JournalFeed, JournalPost } from "./blocks/journal";
 export {
     default as OnTodayHero,
     isPublicToday,

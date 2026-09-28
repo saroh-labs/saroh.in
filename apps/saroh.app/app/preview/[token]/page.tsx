@@ -4,7 +4,11 @@ import { PageSections } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
 import { publicApiUrl } from "@/lib/api-url";
-import { findHomePage, getPreviewByToken } from "@/lib/publication";
+import {
+    findHomePage,
+    getPreviewByToken,
+    getPreviewJournalFeed,
+} from "@/lib/publication";
 
 /** The draft's home page, behind a preview token (#198). */
 export default async function PreviewHomePage({
@@ -28,11 +32,19 @@ export default async function PreviewHomePage({
     const home = findHomePage(preview.snapshot);
     if (!home) notFound();
 
+    // The draft's posts (G10), as the preview's own index shows them.
+    const journal = await getPreviewJournalFeed(
+        home.sections,
+        preview.snapshot,
+        token,
+    );
+
     return (
         <PageSections
             sections={home.sections}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
+            journal={journal}
         />
     );
 }
