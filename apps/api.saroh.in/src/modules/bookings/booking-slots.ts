@@ -12,6 +12,7 @@ import type {
 import {
     availableSlots,
     countOverlapping,
+    guarded,
     intersectIntervals,
     isPersonSlotStart,
     outsideClosures,
@@ -98,8 +99,11 @@ export async function openSlots(
         );
         return slots;
     }
+    // Read the buffers' width beyond the range too, so a booking just
+    // outside it still keeps its neighbours clear (DEC-052).
+    const reach = guarded({ startAt: from, endAt: to }, availService);
     const [busy, closed] = await Promise.all([
-        busyOverlapping(service.id, from, to),
+        busyOverlapping(service.id, reach.startAt, reach.endAt),
         loadClosures(prisma, service.organizationId, from, to),
     ]);
     const slots = outsideClosures(
@@ -202,7 +206,7 @@ export async function resolvePerson(
     if (named && audience === "team") {
         const person = people[0];
         const slot = { startAt, endAt };
-        if (countOverlapping(slot, person.busy) > 0) {
+        if (countOverlapping(guarded(slot, availService), person.busy) > 0) {
             throw new ConflictException({
                 message: `${named.name} is already booked then.`,
                 field: "staffId",

@@ -9,6 +9,7 @@ import type { Slot } from "./availability";
 import {
     countOverlapping,
     enumerateSlots,
+    guarded,
     outsideClosures,
     staffSlots,
 } from "./availability";
@@ -195,14 +196,22 @@ export async function publicDays(
             enumerateSlots(availService, rules, from, to),
             closed,
         );
-        const busy = await busyOverlapping(service.id, from, to);
+        // The buffers' width beyond the range too (DEC-052).
+        const reach = guarded({ startAt: from, endAt: to }, availService);
+        const busy = await busyOverlapping(
+            service.id,
+            reach.startAt,
+            reach.endAt,
+        );
         const [instructor] = staffing.people as (
             Staffing["people"][number] | undefined
         )[];
         starts = hours
             .filter((slot) => bookable(slot.startAt))
             .map((slot) => {
-                const left = service.capacity - countOverlapping(slot, busy);
+                const left =
+                    service.capacity -
+                    countOverlapping(guarded(slot, availService), busy);
                 return {
                     startAt: slot.startAt.toISOString(),
                     endAt: slot.endAt.toISOString(),

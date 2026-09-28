@@ -8,6 +8,8 @@ import {
     availableSlots,
     countOverlapping,
     enumerateSlots,
+    guarded,
+    guardMinutes,
     intersectIntervals,
     isPersonSlotStart,
     isValidSlotStart,
@@ -16,6 +18,7 @@ import {
     overlaps,
     personSlots,
     staffSlots,
+    stepMinutes,
     subtractIntervals,
     workingIntervals,
 } from "./availability";
@@ -136,10 +139,10 @@ describe("enumerateSlots — DST correctness (America/New_York)", () => {
     });
 });
 
-describe("enumerateSlots — buffers space slots", () => {
-    it("spaces consecutive starts by duration + both buffers", () => {
-        // duration 30, before 10, after 5 → step 45. Window Mon 09:00–11:00.
-        // Starts: 09:00, 09:45, 10:30 (10:30+30=11:00 fits; next 11:15 would not).
+describe("enumerateSlots — buffers and the half-hour step", () => {
+    it("steps a length plus buffers of 45 every half hour (DEC-052)", () => {
+        // duration 30, before 10, after 5 → 45, capped at 30. Window Mon
+        // 09:00–11:00. The buffers are kept clear by the overlap check now.
         const slots = enumerateSlots(
             svc({
                 durationMinutes: 30,
@@ -152,7 +155,8 @@ describe("enumerateSlots — buffers space slots", () => {
         );
         expect(startISOs(slots)).toEqual([
             "2026-07-20T09:00:00.000Z",
-            "2026-07-20T09:45:00.000Z",
+            "2026-07-20T09:30:00.000Z",
+            "2026-07-20T10:00:00.000Z",
             "2026-07-20T10:30:00.000Z",
         ]);
     });
@@ -332,7 +336,7 @@ describe("interval helpers", () => {
 });
 
 describe("staffSlots — free times per person (U3)", () => {
-    it("offers 6:00 … 11:00 starts for Mon 6–12 and a 60-minute service", () => {
+    it("offers 6:00, 6:30 … 11:00 starts for Mon 6–12 and a 60-minute service", () => {
         const slots = staffSlots(
             ONE_HOUR,
             [],
@@ -343,10 +347,15 @@ describe("staffSlots — free times per person (U3)", () => {
         );
         expect(startISOs(slots)).toEqual([
             "2026-07-20T06:00:00.000Z",
+            "2026-07-20T06:30:00.000Z",
             "2026-07-20T07:00:00.000Z",
+            "2026-07-20T07:30:00.000Z",
             "2026-07-20T08:00:00.000Z",
+            "2026-07-20T08:30:00.000Z",
             "2026-07-20T09:00:00.000Z",
+            "2026-07-20T09:30:00.000Z",
             "2026-07-20T10:00:00.000Z",
+            "2026-07-20T10:30:00.000Z",
             "2026-07-20T11:00:00.000Z",
         ]);
         expect(slots.every((s) => s.staffIds.join() === "asha")).toBe(true);
@@ -434,8 +443,10 @@ describe("staffSlots — free times per person (U3)", () => {
         );
         expect(startISOs(slots)).toEqual([
             "2026-07-20T06:00:00.000Z",
+            "2026-07-20T06:30:00.000Z",
             "2026-07-20T07:00:00.000Z",
             "2026-07-20T10:00:00.000Z",
+            "2026-07-20T10:30:00.000Z",
             "2026-07-20T11:00:00.000Z",
         ]);
     });
@@ -464,12 +475,13 @@ describe("staffSlots — free times per person (U3)", () => {
         );
         expect(tuesdays).toEqual([
             "2026-07-21T14:00:00.000Z",
+            "2026-07-21T14:30:00.000Z",
             "2026-07-21T15:00:00.000Z",
         ]);
     });
 
     it("intersects with the service's own rules when both exist", () => {
-        // Person 6–12, service 9–17 → 9:00, 10:00, 11:00.
+        // Person 6–12, service 9–17 → 9:00, 9:30 … 11:00.
         const slots = personSlots(
             ONE_HOUR,
             [rule(1, 9 * HOUR, 17 * HOUR)],
@@ -480,7 +492,9 @@ describe("staffSlots — free times per person (U3)", () => {
         );
         expect(startISOs(slots)).toEqual([
             "2026-07-20T09:00:00.000Z",
+            "2026-07-20T09:30:00.000Z",
             "2026-07-20T10:00:00.000Z",
+            "2026-07-20T10:30:00.000Z",
             "2026-07-20T11:00:00.000Z",
         ]);
     });
@@ -569,7 +583,7 @@ describe("isPersonSlotStart", () => {
                 [],
                 person("asha"),
                 "UTC",
-                iso("2026-07-20T06:30:00Z"),
+                iso("2026-07-20T06:15:00Z"),
             ),
         ).toBe(false);
     });
@@ -600,7 +614,8 @@ describe("outsideClosures — the whole business closed", () => {
             ...new Set(open.map((s) => s.startAt.toISOString().slice(0, 10))),
         ];
         expect(days).toEqual(["2026-11-01", "2026-11-07", "2026-11-08"]);
-        expect(open).toHaveLength(9);
+        // 09:00, 09:30 … 11:00 on each of the three open days.
+        expect(open).toHaveLength(15);
     });
 
     it("takes out only the closed hours of a part-day closure, on the grid", () => {
@@ -616,13 +631,18 @@ describe("outsideClosures — the whole business closed", () => {
                 endAt: iso("2026-11-02T16:30:00Z"),
             },
         ]);
-        // 16:00 overlaps the closure's last half hour; 17:00 is after it.
+        // 16:00 overlaps the closure's last half hour; 16:30 is after it.
         expect(startISOs(open).map((s) => s.slice(11, 16))).toEqual([
             "09:00",
+            "09:30",
             "10:00",
+            "10:30",
             "11:00",
+            "11:30",
             "12:00",
+            "12:30",
             "13:00",
+            "16:30",
             "17:00",
         ]);
     });
@@ -669,9 +689,222 @@ describe("outsideClosures — the whole business closed", () => {
         );
         expect(startISOs(open).map((s) => s.slice(11, 16))).toEqual([
             "06:00",
+            "06:30",
             "07:00",
             "10:00",
+            "10:30",
             "11:00",
         ]);
+    });
+});
+
+// ── Half-hour starts (DEC-052, E6) ──────────────────────────────────────────
+
+describe("half-hour starts — a service of 30 minutes or more (DEC-052)", () => {
+    const hhmm = (slots: { startAt: Date }[]) =>
+        startISOs(slots).map((s) => s.slice(11, 16));
+    const nineToNoon = [rule(1, 9 * HOUR, 12 * HOUR)];
+
+    it("a 60-minute service in 09:00–12:00 offers 09:00, 09:30 … 11:00", () => {
+        const slots = enumerateSlots(
+            svc({ durationMinutes: 60 }),
+            nineToNoon,
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).toEqual([
+            "09:00",
+            "09:30",
+            "10:00",
+            "10:30",
+            "11:00",
+        ]);
+    });
+
+    it("a 20-minute service keeps its own step: 09:00, 09:20, 09:40", () => {
+        const slots = enumerateSlots(
+            svc({ durationMinutes: 20 }),
+            [rule(1, 9 * HOUR, 10 * HOUR)],
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).toEqual(["09:00", "09:20", "09:40"]);
+    });
+
+    it("a 30-minute service is unchanged", () => {
+        const slots = enumerateSlots(
+            svc({ durationMinutes: 30 }),
+            [rule(1, 9 * HOUR, 10 * HOUR + 30)],
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).toEqual(["09:00", "09:30", "10:00"]);
+        expect(stepMinutes(svc({ durationMinutes: 30 }))).toBe(30);
+    });
+
+    it("a class keeps its back-to-back sessions", () => {
+        const slots = enumerateSlots(
+            svc({ durationMinutes: 60, capacity: 12 }),
+            nineToNoon,
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).toEqual(["09:00", "10:00", "11:00"]);
+    });
+
+    it("steps from the window's start, never the clock: 09:15, 09:45", () => {
+        const slots = enumerateSlots(
+            svc({ durationMinutes: 60 }),
+            [rule(1, 9 * HOUR + 15, 11 * HOUR + 15)],
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).toEqual(["09:15", "09:45", "10:15"]);
+    });
+
+    it("never offers fewer starts, and keeps today's where the length plus buffers is a multiple of 30", () => {
+        // Every length the showcase seeds (Pulse, Kavi, Northwind, and the
+        // demo stores), with and without buffers.
+        const lengths = [10, 15, 20, 30, 45, 60, 75, 90, 120];
+        const bufferPairs: [number, number][] = [
+            [0, 0],
+            [0, 15],
+            [10, 5],
+        ];
+        const window = [rule(1, 6 * HOUR, 21 * HOUR)];
+        for (const durationMinutes of lengths) {
+            for (const [
+                bufferBeforeMinutes,
+                bufferAfterMinutes,
+            ] of bufferPairs) {
+                const service = svc({
+                    durationMinutes,
+                    bufferBeforeMinutes,
+                    bufferAfterMinutes,
+                });
+                const now = startISOs(
+                    enumerateSlots(service, window, MON.from, MON.to),
+                );
+                // What it offered before E6: stepping by length + buffers.
+                const whole =
+                    durationMinutes + bufferBeforeMinutes + bufferAfterMinutes;
+                const before: string[] = [];
+                for (
+                    let m = 6 * 60;
+                    m + durationMinutes <= 21 * 60;
+                    m += whole
+                ) {
+                    before.push(
+                        new Date(MON.from.getTime() + m * 60_000).toISOString(),
+                    );
+                }
+                expect(now.length).toBeGreaterThanOrEqual(before.length);
+                if (whole % 30 === 0 || whole < 30) {
+                    for (const start of before) expect(now).toContain(start);
+                }
+            }
+        }
+    });
+
+    it("a 60-minute service with 15 minutes after, booked at 09:00, offers 10:30 next — the buffer is kept clear", () => {
+        const service = svc({ durationMinutes: 60, bufferAfterMinutes: 15 });
+        const booked: Interval[] = [
+            {
+                startAt: iso("2026-07-20T09:00:00Z"),
+                endAt: iso("2026-07-20T10:00:00Z"),
+            },
+        ];
+        const open = availableSlots(
+            service,
+            [rule(1, 9 * HOUR, 13 * HOUR)],
+            MON.from,
+            MON.to,
+            booked,
+        );
+        expect(hhmm(open)).toEqual(["10:30", "11:00", "11:30", "12:00"]);
+    });
+
+    it("keeps the buffer clear before a booking too", () => {
+        // Booked 11:00–12:00; a 60-minute start at 10:00 would end at 11:00
+        // and its 15 minutes after would run into it.
+        const service = svc({ durationMinutes: 60, bufferAfterMinutes: 15 });
+        const open = availableSlots(
+            service,
+            [rule(1, 9 * HOUR, 13 * HOUR)],
+            MON.from,
+            MON.to,
+            [
+                {
+                    startAt: iso("2026-07-20T11:00:00Z"),
+                    endAt: iso("2026-07-20T12:00:00Z"),
+                },
+            ],
+        );
+        expect(hhmm(open)).toEqual(["09:00", "09:30"]);
+    });
+
+    it("a person's buffers are kept clear too, on any service", () => {
+        const service = svc({ durationMinutes: 60, bufferAfterMinutes: 15 });
+        const slots = personSlots(
+            service,
+            [],
+            person("asha", {
+                busy: [
+                    {
+                        startAt: iso("2026-07-20T09:00:00Z"),
+                        endAt: iso("2026-07-20T10:00:00Z"),
+                    },
+                ],
+            }),
+            "UTC",
+            MON.from,
+            MON.to,
+        );
+        expect(hhmm(slots)).not.toContain("10:00");
+        expect(hhmm(slots)).toContain("10:30");
+    });
+
+    it("a 60-minute booking takes the half hours either side of it", () => {
+        const open = availableSlots(
+            svc({ durationMinutes: 60 }),
+            nineToNoon,
+            MON.from,
+            MON.to,
+            [
+                {
+                    startAt: iso("2026-07-20T10:00:00Z"),
+                    endAt: iso("2026-07-20T11:00:00Z"),
+                },
+            ],
+        );
+        expect(hhmm(open)).toEqual(["09:00", "11:00"]);
+    });
+
+    it("accepts a half-hour start as a real slot, and still refuses one off the grid", () => {
+        const service = svc({ durationMinutes: 60 });
+        expect(
+            isValidSlotStart(service, nineToNoon, iso("2026-07-20T09:30:00Z")),
+        ).toBe(true);
+        expect(
+            isValidSlotStart(service, nineToNoon, iso("2026-07-20T09:15:00Z")),
+        ).toBe(false);
+    });
+
+    it("guards a slot by both buffers either side, and not at all without them", () => {
+        const slot = {
+            startAt: iso("2026-07-20T10:00:00Z"),
+            endAt: iso("2026-07-20T11:00:00Z"),
+        };
+        const service = svc({
+            durationMinutes: 60,
+            bufferBeforeMinutes: 10,
+            bufferAfterMinutes: 5,
+        });
+        expect(guardMinutes(service)).toBe(15);
+        expect(guarded(slot, service)).toEqual({
+            startAt: iso("2026-07-20T09:45:00Z"),
+            endAt: iso("2026-07-20T11:15:00Z"),
+        });
+        expect(guarded(slot, svc())).toEqual(slot);
     });
 });

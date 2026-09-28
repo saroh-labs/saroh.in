@@ -13,6 +13,7 @@ import {
     openStateText,
     weekSummary,
 } from "../lib/opening-hours";
+import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 
 /**
@@ -244,7 +245,7 @@ export default function VisitUsSection({
                                 )}
                                 className={primaryButton}
                             >
-                                Call {phone}
+                                Call {phoneText(phone)}
                             </a>
                         ) : null}
                         {directions ? (

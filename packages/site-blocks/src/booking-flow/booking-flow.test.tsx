@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
+import type { PublicVisit } from "../blocks/visit-us";
 import type { SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -1983,5 +1984,122 @@ describe("a deposit at booking (E8)", () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
         expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
+    });
+});
+
+describe("the header's facts (E6)", () => {
+    const KAVI_VISIT: PublicVisit = {
+        source: "business",
+        storeId: null,
+        name: "Kavi Dental",
+        address: "12th Main, Indiranagar\nBengaluru 560038",
+        phone: "+918040992210",
+        hours: [
+            { day: "MON", open: "09:00", close: "19:00", closed: false },
+            { day: "TUE", open: "09:00", close: "19:00", closed: false },
+            { day: "WED", open: "09:00", close: "19:00", closed: false },
+            { day: "THU", open: "09:00", close: "19:00", closed: false },
+            { day: "FRI", open: "09:00", close: "19:00", closed: false },
+            { day: "SAT", open: "09:00", close: "19:00", closed: false },
+            { day: "SUN", open: "09:00", close: "13:00", closed: false },
+        ],
+        timezone: "Asia/Kolkata",
+        closedDates: [],
+    };
+    const KAVI_PAGE: BookingPageData = {
+        ...PAGE,
+        businessName: "Kavi Dental",
+        services: [PAGE.services[0]],
+    };
+
+    it("shows the address, the week's hours and the phone, grouped, as a call link", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={KAVI_VISIT}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Book your appointment",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "12th Main, Indiranagar, Bengaluru 560038 · Open Mon–Sat 9am–7pm, Sun 9am–1pm",
+            ),
+        ).toBeInTheDocument();
+        const call = screen.getByRole("link", { name: "+91 80409 92210" });
+        expect(call).toHaveAttribute("href", "tel:+918040992210");
+        // The facts replace the business's name; the zone stays.
+        expect(document.body.textContent).toMatch(/Times are in /);
+    });
+
+    it("says a session where classes are offered", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={PAGE}
+                visit={KAVI_VISIT}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Book your next session",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("leaves the hours out when none are saved — never 'Closed' — and the call link when there's no phone", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={{ ...KAVI_VISIT, hours: null, phone: null }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByText("12th Main, Indiranagar, Bengaluru 560038"),
+        ).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Open |Closed/);
+        expect(screen.queryByRole("link", { name: /\+91/ })).toBeNull();
+    });
+
+    it("names the business only when the visit read failed, and booking still works", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={null}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByText(/^Kavi Dental · Times are in /),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: /\+91/ })).toBeNull();
+
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
     });
 });
