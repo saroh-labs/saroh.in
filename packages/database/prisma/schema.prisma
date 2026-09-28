@@ -3928,6 +3928,13 @@ model BookingRules {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// The business's refund policy for a booking cancelled in time (E30,
+  /// DEC-058): true refunds what the customer paid online automatically,
+  /// which is what E8 shipped and the default for a business that never
+  /// set it. Never more than was received; a late cancel is never refunded
+  /// automatically.
+  refundInTimeCancels Boolean @default(true)
 }
 
 /// What has happened to a Booking, in order (#121).

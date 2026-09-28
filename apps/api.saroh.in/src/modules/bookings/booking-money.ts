@@ -1,6 +1,10 @@
 import type { Prisma } from "@saroh/database";
 
-import { bookingRefundKey } from "../payments/booking-refund";
+import {
+    bookingPaymentInTx,
+    bookingRefundKey,
+} from "../payments/booking-refund";
+import type { BookingRulesValue } from "./booking-rules";
 
 /*
  * What a booking's money reads as on its detail screen (E8, default 50):
@@ -33,6 +37,17 @@ export interface BookingMoney {
      */
     dueCents: number | null;
     refund: BookingRefundView | null;
+    /**
+     * What a cancel could hand back now: what is left of the online payment
+     * a refund draws on, never more than was received (DEC-058). 0 once
+     * cancelled, or with nothing paid online.
+     */
+    refundableCents: number;
+    /**
+     * The business's refund policy (E30, DEC-058): a cancel in time refunds
+     * what was paid online automatically. The screen states it.
+     */
+    refundInTimeCancels: boolean;
 }
 
 /** Whether a booking's snapshot says only its deposit was paid online. */
@@ -44,6 +59,8 @@ export function paidADeposit(snapshot: unknown): boolean {
 
 type Db = Pick<Prisma.TransactionClient, "paymentIntent" | "paymentRefund">;
 
+const REFUNDS_BY_DEFAULT = { refundInTimeCancels: true };
+
 /** The money of one booking — see {@link BookingMoney}. */
 export async function bookingMoney(
     db: Db,
@@ -54,6 +71,7 @@ export async function bookingMoney(
         paidWith: string | null;
         snapshot: unknown;
     },
+    rules: Pick<BookingRulesValue, "refundInTimeCancels"> = REFUNDS_BY_DEFAULT,
 ): Promise<BookingMoney> {
     const terms = (
         booking.snapshot as {
@@ -64,7 +82,8 @@ export async function bookingMoney(
         typeof terms?.priceCents === "number" ? terms.priceCents : null;
     const currency =
         typeof terms?.currency === "string" ? terms.currency : null;
-    const [paid, refund] = await Promise.all([
+    const cancelled = booking.status === "CANCELLED";
+    const [paid, refund, left] = await Promise.all([
         db.paymentIntent.aggregate({
             where: {
                 organizationId: booking.organizationId,
@@ -89,13 +108,16 @@ export async function bookingMoney(
                 providerRefundId: true,
             },
         }),
+        cancelled
+            ? null
+            : bookingPaymentInTx(db, booking.organizationId, booking.id),
     ]);
     const paidOnlineCents = paid._sum.amountCents ?? 0;
     const byMoney =
         booking.paidWith === "DESK" ||
         booking.paidWith === "PAID" ||
         paidOnlineCents > 0;
-    const stands = booking.status !== "CANCELLED" && byMoney;
+    const stands = !cancelled && byMoney;
     return {
         priceCents,
         currency,
@@ -117,5 +139,7 @@ export async function bookingMoney(
                       refund.status === "PENDING" && !refund.providerRefundId,
               }
             : null,
+        refundableCents: left?.leftCents ?? 0,
+        refundInTimeCancels: rules.refundInTimeCancels,
     };
 }

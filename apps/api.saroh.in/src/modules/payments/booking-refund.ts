@@ -57,7 +57,7 @@ export interface BookingPayment {
  * (the desk, a pack, a membership), or it has all gone back already.
  */
 export async function bookingPaymentInTx(
-    tx: Tx,
+    tx: Pick<Tx, "paymentIntent">,
     organizationId: string,
     bookingId: string,
 ): Promise<BookingPayment | null> {

@@ -3,6 +3,7 @@ import {
     freeCancelDeadline,
     isLateCancel,
     NO_BOOKING_RULES,
+    refundsAutomatically,
     withinBookingWindow,
 } from "./booking-rules";
 
@@ -83,5 +84,27 @@ describe("booking rules (U3)", () => {
                 rules,
             ),
         ).toBe(true);
+    });
+});
+
+describe("refundsAutomatically (E30, DEC-058)", () => {
+    it("refunds by default, as E8 did, with no rules set", () => {
+        expect(NO_BOOKING_RULES.refundInTimeCancels).toBe(true);
+        expect(refundsAutomatically(true, NO_BOOKING_RULES)).toBe(true);
+    });
+
+    it("follows the business's policy for a cancel in time", () => {
+        expect(refundsAutomatically(true, { refundInTimeCancels: false })).toBe(
+            false,
+        );
+    });
+
+    it("never refunds a late cancel on its own, whatever the policy", () => {
+        expect(refundsAutomatically(false, { refundInTimeCancels: true })).toBe(
+            false,
+        );
+        expect(
+            refundsAutomatically(false, { refundInTimeCancels: false }),
+        ).toBe(false);
     });
 });
