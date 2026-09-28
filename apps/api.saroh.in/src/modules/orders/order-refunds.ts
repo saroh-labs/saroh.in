@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 
 /**
  * Refund by line (ADR-008, U6) — the money arithmetic, pure.
@@ -261,4 +261,83 @@ export function refundStanding(
     return refundedCents >= capturedCents && capturedCents > 0
         ? "REFUNDED"
         : "PARTLY_REFUNDED";
+}
+
+/**
+ * "₹1,250" or "₹49.50" — an amount as a merchant reads it in a refusal.
+ * Paise only when there are some.
+ */
+export function moneyWords(cents: number, currency: string): string {
+    const fraction = cents % 100 === 0 ? 0 : 2;
+    try {
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency,
+            minimumFractionDigits: fraction,
+            maximumFractionDigits: fraction,
+        }).format(cents / 100);
+    } catch {
+        return `${currency} ${(cents / 100).toFixed(fraction)}`;
+    }
+}
+
+/**
+ * Another amount (B8, "Or another amount"): a goodwill refund names its
+ * amount and why, and nothing else — no line, so no stock comes back. Pure
+ * checks on what was asked; the cap against what is left is
+ * {@link capGoodwill}, under the order's lock.
+ */
+export function goodwillRequest(input: {
+    amountCents?: number;
+    reason?: string | null;
+    lines?: readonly unknown[];
+    putBack?: readonly unknown[];
+}): { amountCents: number; reason: string } {
+    const reason = input.reason?.trim() ?? "";
+    if (!reason) {
+        throw new BadRequestException({
+            message: "Say why you're refunding this amount.",
+            field: "reason",
+        });
+    }
+    const amountCents = input.amountCents;
+    if (
+        amountCents === undefined ||
+        !Number.isInteger(amountCents) ||
+        amountCents <= 0
+    ) {
+        throw new BadRequestException({
+            message: "Type an amount above zero.",
+            field: "amount",
+        });
+    }
+    if ((input.lines?.length ?? 0) > 0 || (input.putBack?.length ?? 0) > 0) {
+        throw new BadRequestException({
+            message:
+                "Another amount refunds money only. Choose lines, or type an amount.",
+            field: "amount",
+        });
+    }
+    return { amountCents, reason };
+}
+
+/**
+ * The goodwill cap: never more than was paid and not yet handed back
+ * (a pending refund counts — DEC-026 holds its money until confirmed).
+ * Read under the order's row lock, so two at once can't both fit.
+ */
+export function capGoodwill(
+    amountCents: number,
+    leftCents: number,
+    currency: string,
+): void {
+    const left = Math.max(0, leftCents);
+    if (amountCents <= left) return;
+    throw new ConflictException({
+        message:
+            left === 0
+                ? "Nothing is left to refund on this order."
+                : `At most ${moneyWords(left, currency)} can be refunded.`,
+        field: "amount",
+    });
 }
