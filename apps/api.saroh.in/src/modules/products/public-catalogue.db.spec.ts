@@ -518,7 +518,7 @@ describe("public catalogue (G11)", () => {
             const sql = readFileSync(
                 join(
                     __dirname,
-                    "../../../../../packages/database/prisma/migrations/20261012100000_site_storefront/migration.sql",
+                    "../../../../../packages/database/prisma/migrations/20261012120000_site_storefront/migration.sql",
                 ),
                 "utf8",
             );
