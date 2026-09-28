@@ -245,6 +245,9 @@ test.describe("orders list", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
 
         // Tap the card away from the name: the link's hit area is the card.
+        // The filter bar (B4) can push the first card under the tab bar, so
+        // bring it into view first.
+        await card.scrollIntoViewIfNeeded();
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         if (!box) return;
