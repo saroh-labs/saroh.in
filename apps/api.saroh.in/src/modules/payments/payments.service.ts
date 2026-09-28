@@ -28,6 +28,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
+import { payLinkProvider } from "./pay-link-provider";
 import type {
     MerchantProvider,
     ProviderCredentials,
@@ -1260,6 +1261,39 @@ export class PaymentsService {
                     options.provider,
                     { firstWhenSeveral: true },
                 ),
+        );
+    }
+
+    /**
+     * PUBLIC order pay-link create-intent (plan B, B11) — the write behind
+     * `POST /public/order-pay/:token/payment-intent`. The caller found the
+     * order by its token, checked it is still owed money, and worked out
+     * `amountCents` from the stored order: its total less what was taken.
+     *
+     * SECURITY: the request carries only an idempotency key. The business,
+     * amount and currency come from the order row, and the provider is the
+     * one its storefront takes payment through ({@link payLinkProvider}).
+     */
+    async createIntentForOrderPayLink(
+        order: {
+            id: string;
+            organizationId: string;
+            storeId: string;
+            amountCents: number;
+            currency: string;
+        },
+        options: { idempotencyKey?: string } = {},
+    ): Promise<CreateIntentResult> {
+        return this.createIntentFor(
+            order.organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: order.amountCents,
+                currency: order.currency,
+            },
+            options.idempotencyKey,
+            () => payLinkProvider(prisma, order.organizationId, order.storeId),
         );
     }
 

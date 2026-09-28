@@ -34,6 +34,7 @@ import {
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import type { OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
+import { retireOrderPayLinkInTx } from "./order-pay-link";
 import {
     fromCents,
     priceOrderLines,
@@ -443,6 +444,15 @@ export class OrdersService {
             }
             if (paymentChanging && nextPayment === "REFUNDED") {
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
+            }
+            // Cancelled or refunded: its pay link stops working (B11). Paid
+            // by hand, it stays readable, so a customer who opens it is told
+            // the order is paid — and it can start no payment.
+            if (
+                (statusChanging && nextStatus === "CANCELLED") ||
+                (paymentChanging && nextPayment === "REFUNDED")
+            ) {
+                await retireOrderPayLinkInTx(tx, orderId);
             }
             if (statusChanging && order.organizationId) {
                 // On the order's timeline too, as a step outside the kitchen.

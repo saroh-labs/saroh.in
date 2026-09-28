@@ -3,6 +3,7 @@
 import type { CourierFields } from "./courier";
 import type { EditOrderInput, MoveStageInput } from "./kitchen-service";
 import {
+    createOrderPayLink,
     editOrderBeforePreparing,
     moveOrderStage,
     refundOrderLines,
@@ -71,4 +72,9 @@ export async function refundLines(
 
 export async function retryRefund(orderId: string, refundId: string) {
     return retryOrderRefund(orderId, refundId);
+}
+
+/** Make the order's pay link, or replace it (B11). */
+export async function makeOrderPayLink(orderId: string) {
+    return createOrderPayLink(orderId);
 }

@@ -22,6 +22,7 @@ import {
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
+import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import {
     OPEN_INTENT_STATUSES,
@@ -404,6 +405,12 @@ export class WebhooksService {
             return this.applySupersededSuccess(tx, intent, orderId, event);
         }
 
+        // Read before the move: money arriving on an order cancelled in the
+        // meantime is owed back (plan B, B11), recorded below.
+        const cancelled =
+            intent.status !== "SUCCEEDED" &&
+            (await isOrderCancelledInTx(tx, orderId));
+
         // Order.paymentStatus → PAID FIRST, ROUTED through the state machine; an
         // illegal move throws BEFORE any intent/attempt write. A same→same
         // target (already PAID) is a guard-free no-op.
@@ -442,6 +449,25 @@ export class WebhooksService {
                         status: "CAPTURED",
                     },
                 });
+            }
+            // A pay link (or a checkout) already open when the order was
+            // cancelled can still take the money (plan B, B11). It was
+            // received, so it stays on the order as a payment to refund —
+            // and is marked as owed back, as the invoice path marks one.
+            if (cancelled) {
+                await tx.paymentAttempt.create({
+                    data: {
+                        organizationId: intent.organizationId,
+                        paymentIntentId: intent.id,
+                        provider: intent.provider,
+                        providerRef: event.providerPaymentRef ?? null,
+                        status: CAPTURED_NEEDS_REFUND,
+                        rawResponse: { orderStatus: "CANCELLED" },
+                    },
+                });
+                this.logger.warn(
+                    `Payment captured for order ${orderId} after it was cancelled; recorded as needing a refund`,
+                );
             }
         }
         return { applied };
@@ -993,7 +1019,14 @@ export class WebhooksService {
         assertPaymentTransition(current, target); // throws on an illegal move
         await tx.order.update({
             where: { id: orderId },
-            data: { paymentStatus: target },
+            data: {
+                paymentStatus: target,
+                // Paid or refunded: its pay link has nothing left to take
+                // (plan B, B11).
+                ...(target === "PAID" || target === "REFUNDED"
+                    ? RETIRED_PAY_LINK
+                    : {}),
+            },
         });
         return true;
     }
@@ -1021,6 +1054,16 @@ async function isBookingCancelledInTx(
 ): Promise<boolean> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
+    return rows[0]?.status === "CANCELLED";
+}
+
+/**
+ * Whether the order is cancelled, read under its row lock — the lock the
+ * paid move takes next anyway, so a cancel racing this is seen (B11).
+ */
+async function isOrderCancelledInTx(tx: Tx, orderId: string): Promise<boolean> {
+    const rows = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
     return rows[0]?.status === "CANCELLED";
 }
 

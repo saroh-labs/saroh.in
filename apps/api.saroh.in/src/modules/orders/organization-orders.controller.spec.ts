@@ -16,6 +16,7 @@ import { ForbiddenException } from "@nestjs/common";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { OrderKitchenService } from "./order-kitchen.service";
+import type { OrderPayLinkService } from "./order-pay-link.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -35,6 +36,7 @@ describe("OrganizationOrdersController", () => {
     const controller = new OrganizationOrdersController(
         { listRows } as unknown as OrdersService,
         {} as unknown as OrderKitchenService,
+        {} as unknown as OrderPayLinkService,
     );
 
     const as = (

@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -16,6 +17,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { orderPayLinkUrl } from "../invoices/pay-link-url";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
     EditOrderDto,
@@ -24,6 +26,7 @@ import {
     UndoStageDto,
 } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersService } from "./orders.service";
 
 /**
@@ -52,6 +55,7 @@ export class OrganizationOrdersController {
     constructor(
         private readonly orders: OrdersService,
         private readonly kitchen: OrderKitchenService,
+        private readonly payLinks: OrderPayLinkService,
     ) {}
 
     @Get()
@@ -117,6 +121,25 @@ export class OrganizationOrdersController {
         @Body() dto: UndoStageDto,
     ) {
         return this.kitchen.undoStage(ctx, orderId, dto.eventId);
+    }
+
+    /**
+     * Make the order's pay link and answer with it — once: only its hash is
+     * kept, so asking again makes a new link and the old one stops working
+     * (B11). `order:write`.
+     */
+    @Post(":orderId/pay-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async payLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+    ): Promise<{ url: string; payLinkCreatedAt: Date }> {
+        const { token, payLinkCreatedAt } = await this.payLinks.make(
+            ctx,
+            orderId,
+        );
+        return { url: orderPayLinkUrl(token), payLinkCreatedAt };
     }
 
     /** Change lines, fulfilment, address or notes (`order:write`). */

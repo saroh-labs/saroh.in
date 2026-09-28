@@ -26,6 +26,8 @@ jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
         update: jest.fn(),
+        // Cancelling or refunding retires the order's pay link (B11).
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
     const inventory = {
         findUnique: jest.fn(),
@@ -205,6 +207,13 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             USER,
         );
         expect(ensureOrderInvoice).not.toHaveBeenCalled();
+        // Refunded: its pay link stops working (B11).
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).toHaveBeenCalledWith({
+            where: { id: ORDER, payTokenHash: { not: null } },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
+        });
     });
 
     it("is idempotent: re-setting the SAME status is a no-op change, not rejected", async () => {

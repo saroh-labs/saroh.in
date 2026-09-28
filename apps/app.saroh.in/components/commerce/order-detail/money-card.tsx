@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { OrderPayments } from "@/components/stores/order-payments";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
@@ -35,6 +36,7 @@ export function MoneyCard({
     format,
     onRetryRefund,
     busy = false,
+    payLink,
 }: {
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
@@ -47,6 +49,8 @@ export function MoneyCard({
     /** Try again a refund being confirmed — `payment:manage` only. */
     onRetryRefund?: (refundId: string) => void;
     busy?: boolean;
+    /** The pay link's part, for an order still owed money (B11). */
+    payLink?: ReactNode;
 }) {
     const n = (v: string) => Number(v);
     const rows: [string, string][] = [
@@ -207,6 +211,7 @@ export function MoneyCard({
                     </div>
                 ))}
             </dl>
+            {payLink}
             {payments && payments.intents.length > 0 ? (
                 <details className="group mt-2 text-[12.5px]">
                     <summary

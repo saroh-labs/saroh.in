@@ -1516,6 +1516,13 @@ model Order {
   courierName    String?
   trackingNumber String?
 
+  // An order's pay link (plan B, B11), as ADR-007's invoice pay link: only
+  // the SHA-256 of its token is kept, so no one can read the link back, and
+  // `order:read` sees only when it was made. Both are cleared when the order
+  // is paid online, cancelled or refunded.
+  payTokenHash     String?   @unique
+  payLinkCreatedAt DateTime?
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])

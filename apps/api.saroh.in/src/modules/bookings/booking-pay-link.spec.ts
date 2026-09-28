@@ -52,6 +52,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { hashPayToken } from "../invoices/pay-token";
+import { OPENS_CHECKOUT } from "../payments/public-key";
 import { markBookingPaidInTx, retirePayLinkInTx } from "./booking-pay-link";
 import { BookingsService } from "./bookings.service";
 
@@ -210,6 +211,15 @@ describe("BookingsService.payLink (E4)", () => {
             new BookingsService().payLink(ctx(), "bk_1", NOW),
         ).rejects.toThrow("Connect a payment provider");
         expect(invoiceCreate).not.toHaveBeenCalled();
+        // Only a connection that can open the checkout window counts: a
+        // Razorpay one without its public key id doesn't (DEC-054).
+        expect(providers).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                status: "CONNECTED",
+                ...OPENS_CHECKOUT,
+            },
+        });
     });
 
     it("404s another business's booking", async () => {

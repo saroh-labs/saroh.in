@@ -71,19 +71,26 @@ export function ChangeCard({
 /**
  * The order is not paid, so the kitchen is blocked (the API offers no next
  * step). Saroh sends no messages, so this says nothing was sent — and offers
- * the one thing the counter can do: record cash taken for it.
+ * what the counter can do: record cash taken for it, or, when a payment
+ * didn't go through, a pay link to copy and send (B11).
  */
 export function PaymentBanner({
     failed,
     first,
     canRecord,
     onCash,
+    onSendLink,
+    sending = false,
 }: {
     failed: boolean;
     first: string;
     canRecord: boolean;
     onCash: () => void;
+    /** Make (or replace) the pay link — only when one can be made. */
+    onSendLink?: () => void;
+    sending?: boolean;
 }) {
+    const link = failed && onSendLink !== undefined;
     return (
         <div
             role="alert"
@@ -95,14 +102,25 @@ export function PaymentBanner({
                 </div>
                 <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
                     {failed
-                        ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ask them to pay again, or take it in cash.`
+                        ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ${link ? "send them a pay link" : "ask them to pay again"}, or take it in cash.`
                         : `It waits for ${first}'s payment. Don't start it until it's paid — or take it in cash at the counter.`}
                 </p>
             </div>
-            {canRecord ? (
+            {link ? (
                 <Button
                     type="button"
                     className={actionClass("primary")}
+                    disabled={sending}
+                    onClick={onSendLink}
+                >
+                    {sending ? "Making a link…" : "Send a pay link"}
+                </Button>
+            ) : null}
+            {canRecord ? (
+                <Button
+                    type="button"
+                    variant={link ? "outline" : "default"}
+                    className={actionClass(link ? "ghost" : "primary")}
                     onClick={onCash}
                 >
                     Paid in cash
