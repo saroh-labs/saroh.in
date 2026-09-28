@@ -76,7 +76,7 @@ export class OrganizationContextService {
     ): Promise<OrganizationContext> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { role: true },
+            select: { role: true, extraActions: true },
         });
 
         if (membership) {
@@ -107,7 +107,14 @@ export class OrganizationContextService {
                     stored !== null,
                 ),
                 roleKey: membership.role,
-                actions: resolveCapabilities(membership.role, stored?.actions),
+                // The role's permissions plus this person's own extras
+                // (F17), with implied holds; read on every request, so
+                // taking an extra away takes the power on the next one.
+                actions: resolveCapabilities(
+                    membership.role,
+                    stored?.actions,
+                    membership.extraActions,
+                ),
             };
         }
 
@@ -129,6 +136,7 @@ export class OrganizationContextService {
             where: { userId },
             select: {
                 role: true,
+                extraActions: true,
                 organization: {
                     select: {
                         id: true,
@@ -187,7 +195,11 @@ export class OrganizationContextService {
                     ? null
                     : (own?.label ?? null),
                 actions: [
-                    ...resolveCapabilities(membership.role, own?.actions),
+                    ...resolveCapabilities(
+                        membership.role,
+                        own?.actions,
+                        membership.extraActions,
+                    ),
                 ],
                 lifecycleStatus: membership.organization.lifecycleStatus,
             };

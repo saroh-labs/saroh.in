@@ -34,6 +34,12 @@ export interface RoleView {
     system: boolean;
     /** How many people hold it right now. */
     members: number;
+    /**
+     * Everything the role lets its holders do, implied holds included, for
+     * an invented role (a built-in's `actions` are already that). Team's
+     * extra permissions show these as coming with the role (F17).
+     */
+    grants?: OrgAction[];
 }
 
 /** What a built-in is called, before a business ever stores a row for it. */
@@ -124,6 +130,7 @@ export class OrganizationRolesService {
                 ringTone: r.ringTone,
                 system: false,
                 members: held.get(r.key) ?? 0,
+                grants: [...resolveCapabilities(r.key, r.actions)],
             }));
 
         return [...builtIns, ...invented];

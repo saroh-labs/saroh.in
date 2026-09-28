@@ -37,6 +37,12 @@ export interface OrganizationMember {
      * from an older API.
      */
     storefronts?: MemberStorefront[];
+    /**
+     * What this person holds beyond their role (F17): their extra
+     * permissions as action keys, less anything the role already grants.
+     * Absent from an older API.
+     */
+    extraActions?: string[];
 }
 
 export interface MemberStorefront {
@@ -156,6 +162,23 @@ export async function updateMemberRole(
         "PATCH",
         input,
         "Could not change that role.",
+    );
+}
+
+/**
+ * Set a person's extra permissions, the whole list (F17). The API refuses
+ * anything beyond the caller's own reach, their own list, and anyone who can
+ * do more than they can, in words.
+ */
+export async function setMemberExtraActions(
+    userId: string,
+    actions: string[],
+): Promise<CrmResult<{ userId: string; extraActions: string[] }>> {
+    return mutate(
+        `/members/${userId}/extra-actions`,
+        "PUT",
+        { actions },
+        "Could not change those permissions.",
     );
 }
 

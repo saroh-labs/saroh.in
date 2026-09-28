@@ -139,6 +139,28 @@ const ROLES = [
         1,
     ),
 ];
+/**
+ * The Manager's team (F17): themselves, a Member given See orders as an
+ * extra permission, and someone in Senior, which holds payments.
+ */
+const person = (userId, name, roleKey, extraActions, isSelf = false) => ({
+    userId,
+    name,
+    email: `${userId}@example.in`,
+    // Every one maps to the built-in Member by name; the key decides.
+    role: "MEMBER",
+    roleKey,
+    siteIds: [],
+    isSelf,
+    lastActiveAt: null,
+    storefronts: [],
+    extraActions,
+});
+const MANAGER_TEAM = [
+    person("u_manager", "Kiran Shah", "manager", [], true),
+    person("u_meera", "Meera Nair", "MEMBER", ["order:read"]),
+    person("u_sanjay", "Sanjay Rao", "senior", []),
+];
 const CATALOGUE = {
     groups: ["team", "sell", "money"],
     capabilities: [
@@ -492,7 +514,11 @@ createServer((req, res) => {
     // Team → Roles (F19).
     if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);
     if (path.endsWith("/roles")) return reply(200, ROLES);
-    if (path.endsWith("/members")) return reply(200, []);
+    // A person's extra permissions (F17): the Manager's team.
+    if (path.endsWith("/members"))
+        return reply(200, scenario === "MANAGER" ? MANAGER_TEAM : []);
+    if (path.endsWith("/extra-actions") && req.method === "PUT")
+        return reply(200, { userId: "u_meera", extraActions: [] });
     if (path.endsWith("/notifications/unread-count"))
         return reply(200, { count: 0 });
     return reply(404, { error: "Fixture route not found" });

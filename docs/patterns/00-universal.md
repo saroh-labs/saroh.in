@@ -163,10 +163,14 @@ each with why it stops there:
   its rules out (`lib/organizations/settings-undo.ts`, and the hold and
   toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
-- `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
-  member drawer and the invite dialog share the screen's roster and role
-  state. Each piece is its own function already; moving them is a file split
-  with props threaded through, not yet done.
+- `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
+  People tabs, the member drawer and the invite dialog share the screen's
+  roster and role state. Each piece is its own function already; moving them
+  is a file split with props threaded through, not yet done. F17 put a
+  person's extra permissions in `member-extras.tsx` (the column's chips, the
+  drawer's list and its draft hook) and `lib/organizations/extras.ts`, adding
+  only the calls, the drawer's two-step save and the column's grid; the
+  drawer is the next cut.
 - `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,

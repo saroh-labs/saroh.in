@@ -487,6 +487,63 @@ test("a Manager who edits roles can give only what they hold (F19)", async ({
     );
 });
 
+test("a person's extra permissions show on Team, and a Manager gives only what they hold (F17)", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "MANAGER");
+    await page.goto("/settings/people");
+
+    // Meera holds See orders beyond her role, so the column is there and
+    // names it — as a chip on a wide screen, a line under her name on a phone.
+    await expect(
+        page
+            .getByText(/See orders/)
+            .filter({ visible: true })
+            .first(),
+    ).toBeVisible();
+
+    await page
+        .getByRole("button", { name: "Edit Meera Nair’s role and permissions" })
+        .click();
+    await expect(
+        page.getByRole("heading", { name: "Extra permissions", exact: true }),
+    ).toBeVisible();
+    // What she holds as an extra is on; what her role gives is locked on.
+    await expect(
+        page.getByRole("switch", { name: "See orders, on", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", {
+            name: "See storefronts, on, included in the role",
+        }),
+    ).toHaveAttribute("aria-disabled", "true");
+    // Nothing the Manager lacks is offered.
+    await expect(
+        page.getByRole("switch", { name: /^Manage payments/ }),
+    ).toHaveCount(0);
+    // Giving what they hold is one switch and a save.
+    await expect(
+        page.getByRole("button", { name: "No changes yet" }),
+    ).toBeDisabled();
+    await page
+        .getByRole("switch", { name: "Change storefronts, off", exact: true })
+        .click();
+    await expect(
+        page.getByRole("button", { name: "Save changes" }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "Cancel" }).click();
+
+    // Their own row: nobody changes their own permissions.
+    await page
+        .getByRole("button", { name: "Edit Kiran Shah’s role and permissions" })
+        .click();
+    await expect(
+        page.getByText(/Nobody changes their own permissions/),
+    ).toBeVisible();
+    await expect(page.getByRole("switch", { name: /, off$/ })).toHaveCount(0);
+});
+
 test("a business with no orders yet is empty, not failed", async ({
     page,
     context,
