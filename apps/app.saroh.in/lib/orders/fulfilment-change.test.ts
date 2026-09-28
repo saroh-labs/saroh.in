@@ -135,7 +135,7 @@ describe("changeAccess — whether B9's buttons open, for this viewer", () => {
         fulfilment: { options: [], refusal: null },
         cancel: { refusal: null, pending: false },
     };
-    const owner = { write: true, refund: true };
+    const owner = { edit: true, refund: true };
 
     it("opens both for someone who may change and refund", () => {
         expect(changeAccess({ next, paymentStatus: "PAID" }, owner)).toEqual({
@@ -182,14 +182,21 @@ describe("changeAccess — whether B9's buttons open, for this viewer", () => {
         ).toBe("Cancelling — waiting for the refund to be confirmed");
     });
 
-    it("a paid order's cancel needs a refund role; an unpaid one doesn't", () => {
-        const writer = { write: true, refund: false };
+    it("a cancel needs order:refund, paid or not; a change of way order:edit (B16)", () => {
+        const editor = { edit: true, refund: false };
+        for (const paymentStatus of ["PAID", "UNPAID"] as const) {
+            expect(changeAccess({ next, paymentStatus }, editor)).toEqual({
+                fulfilment: null,
+                cancel: "Your role can't refund or cancel orders",
+            });
+        }
+        const refunder = { edit: false, refund: true };
         expect(
-            changeAccess({ next, paymentStatus: "PAID" }, writer).cancel,
-        ).toBe("Your role can't refund");
-        expect(
-            changeAccess({ next, paymentStatus: "UNPAID" }, writer).cancel,
-        ).toBeNull();
+            changeAccess({ next, paymentStatus: "UNPAID" }, refunder),
+        ).toEqual({
+            fulfilment: "Your role can't change orders",
+            cancel: null,
+        });
     });
 
     it("draws nothing for an API from before B9", () => {

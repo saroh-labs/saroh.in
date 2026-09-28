@@ -93,7 +93,7 @@ export function reachOf(pick: CustomerPick | null): string | null {
 export function payOptions(input: {
     pick: CustomerPick | null;
     way: NewOrderWay["type"] | null;
-    /** A pay link can be made here: `order:write` and a provider. */
+    /** A pay link can be made here: `order:create` (B16) and a provider. */
     canLink: boolean;
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);

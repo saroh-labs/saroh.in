@@ -26,8 +26,8 @@ import { PaymentsService } from "./payments.service";
  * Double-guarded: `BetterAuthGuard` authenticates the session user and
  * `OrganizationGuard` resolves an authorized {@link OrganizationContext} from
  * the `:organizationId` param. Handlers receive only that proven context via
- * `@OrgContext()`; the service enforces `payment:manage` / `payment:read` on
- * top. Provider secrets are inbound-only and never echoed back.
+ * `@OrgContext()`; the service enforces `payment:manage` / `payment:read`
+ * (an order's refunds: `order:refund`, B16) on top. Provider secrets are inbound-only and never echoed back.
  */
 @Controller("organizations/:organizationId")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)

@@ -12,6 +12,7 @@ import {
     clampMonth,
 } from "@/lib/calendar/range";
 import { getCalendarMonth, monthNow, todayIn } from "@/lib/calendar/service";
+import { orderPowers } from "@/lib/orders/access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -105,7 +106,8 @@ export default async function CalendarPage({
                     today={todayIn(data.timezone)}
                     thisMonth={monthNow(data.timezone)}
                     can={{
-                        order: may("order:write"),
+                        // New order: `order:create` (B16).
+                        order: orderPowers(organization).create,
                         book: may("booking:write"),
                         // A named problem's fix (E22): offered only to
                         // whoever may make it.

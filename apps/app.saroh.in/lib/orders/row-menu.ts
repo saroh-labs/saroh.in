@@ -12,14 +12,21 @@ import type { FulfilmentType, KitchenStage, OrderRead } from "./read";
  * order doesn't allow is drawn disabled, with the reason in words.
  */
 
-/** What the caller may do, from the actions the API resolved for them. */
+/**
+ * What the caller may do, from the actions the API resolved for them
+ * (`orderPowers` in `access.ts`, B16).
+ */
 export interface OrderAbilities {
-    /** Move kitchen steps (`order:stage`). */
+    /** Move steps and print (`order:stage`). */
     stage: boolean;
-    /** Change the order, and make its pay link (`order:write`, → B16). */
-    write: boolean;
-    /** Refund or cancel (`payment:manage`, → `order:refund` in B16). */
+    /** Take a new order, and make its pay link (`order:create`). */
+    create: boolean;
+    /** Make or replace a pay link (`order:create` or `order:edit`). */
+    payLink: boolean;
+    /** Refund and cancel (`order:refund`). */
     refund: boolean;
+    /** Export the list (`order:export`). */
+    export: boolean;
     /** A provider can open the checkout window (DEC-054). */
     payOnline: boolean;
 }
@@ -214,7 +221,7 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
         });
     }
 
-    if (can.write && money) {
+    if (can.payLink && money) {
         const replaces = Boolean(row.payLinkCreatedAt);
         const owed =
             row.status !== "CANCELLED" &&
@@ -239,10 +246,10 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
         href: orderPageHref(row.store.id, row.id),
     });
 
-    // Cancel is a change to the order (`order:write`), as on Order Detail;
-    // Refund hands money back (`payment:manage`).
+    // Cancel is a refund in full and Refund hands money back: both are
+    // `order:refund`'s (B16), as on Order Detail.
     if (money && row.payment === "UNPAID") {
-        if (can.write) {
+        if (can.refund) {
             items.push({
                 kind: "cancel",
                 label: "Cancel order…",

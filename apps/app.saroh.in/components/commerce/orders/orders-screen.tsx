@@ -163,11 +163,15 @@ export function OrdersScreen({
                                     New order
                                 </Button>
                             ) : null}
-                            <OrderExport
-                                query={query}
-                                total={page.counts[query.tab]}
-                                storeName={store?.name}
-                            />
+                            {/* A file of every order leaves Saroh: its own
+                                power (`order:export`, B16). */}
+                            {can.export ? (
+                                <OrderExport
+                                    query={query}
+                                    total={page.counts[query.tab]}
+                                    storeName={store?.name}
+                                />
+                            ) : null}
                         </>
                     ) : undefined
                 }
@@ -308,7 +312,8 @@ export function OrdersScreen({
                     stores={stores}
                     // The storefront in view, else the first.
                     initialStoreId={store?.id ?? stores[0].id}
-                    canLink={can.write}
+                    // A new order's pay link is `order:create`'s (B16).
+                    canLink={can.create}
                     canSearch={newOrder.canSearch}
                 />
             ) : null}
@@ -347,7 +352,9 @@ function PageLink({ href, label }: { href: string | null; label: string }) {
 /** Before the page says: nothing beyond opening the order. */
 const NO_ABILITIES: OrderAbilities = {
     stage: false,
-    write: false,
+    create: false,
+    payLink: false,
     refund: false,
+    export: false,
     payOnline: false,
 };

@@ -80,6 +80,19 @@ export type OrgAction =
     // money in it, and move its stage or undo the last step. Narrower than
     // `order:read` on purpose — it is what a Member at the counter holds.
     | "order:stage"
+    // The parts of `order:write` (DEC-039, B16), each one a business would
+    // plausibly grant without the others. `order:write` implies the first
+    // three and `payment:manage` implies `order:refund`
+    // (`resolveCapabilities`), so a role saved before the split keeps what it
+    // could do; each of the four implies `order:read`.
+    //  - take a new order (New order, a walk-in) and make its pay link;
+    | "order:create"
+    //  - change a placed order until handover, and make a new pay link;
+    | "order:edit"
+    //  - refund and cancel (a cancel is a refund in full);
+    | "order:refund"
+    //  - export orders to a spreadsheet file.
+    | "order:export"
     | "discount:read"
     | "discount:write"
     // Product reviews. Named apart from "review", which is site review (the
@@ -169,6 +182,10 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "order:read",
     "order:write",
     "order:stage",
+    "order:create",
+    "order:edit",
+    "order:refund",
+    "order:export",
     "discount:read",
     "discount:write",
     "product-review:read",

@@ -355,7 +355,7 @@ export interface RawOrderRead {
 }
 
 export interface ReadOptions {
-    /** The caller holds a money read (`payment:read`). */
+    /** The caller holds a money read (`order:read` or `payment:read`). */
     money: boolean;
     /** The caller holds `order:read` (the pay link's date). */
     fullRead: boolean;

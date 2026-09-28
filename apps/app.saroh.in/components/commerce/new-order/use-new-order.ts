@@ -45,7 +45,7 @@ export function useNewOrder({
     canSearch,
 }: {
     initialStoreId: string;
-    /** May make a pay link (`order:write`). */
+    /** May make a pay link (`order:create`, B16). */
     canLink: boolean;
     /** Holds `contact:read`: search, and read a picked person's notes. */
     canSearch: boolean;

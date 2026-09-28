@@ -801,7 +801,10 @@ describe("preview — the role an invitation actually grants", () => {
         expect(preview.roleKey).toBe("stock-clerk");
         expect(preview.roleLabel).toBe("Stock clerk");
         // In the catalogue's words, and nothing that is not a real power.
-        expect(preview.grants).toEqual(["See orders", "Change orders"]);
+        expect(preview.grants).toEqual([
+            "See orders",
+            "Take, change and export orders",
+        ]);
     });
 
     it("leaves a built-in to the page's own description", async () => {

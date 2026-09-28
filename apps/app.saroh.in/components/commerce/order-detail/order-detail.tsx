@@ -59,15 +59,20 @@ import { VisitsNextAction } from "./visits-next";
 import { NoCustomerCard } from "./walk-in-card";
 
 export interface OrderPermissions {
-    /** Move kitchen stages (`order:stage`) — a Member may. */
+    /** Move steps and print (`order:stage`) — a Member may. */
     stage: boolean;
-    /** Change items, address, cancel, record a payment (`order:write`). */
-    write: boolean;
-    /** Refund (`payment:manage`). */
+    /**
+     * Change items, address, how it's fulfilled, and record a payment by
+     * hand (`order:edit`, B16).
+     */
+    edit: boolean;
+    /** Make or replace its pay link (`order:create` or `order:edit`). */
+    payLink: boolean;
+    /** Refund and cancel (`order:refund`, B16). */
     refund: boolean;
     /**
      * A provider can open the checkout window, so a pay link can be made
-     * (B11, DEC-054). Making one also takes `write`.
+     * (B11, DEC-054). Making one also takes `payLink`.
      */
     payOnline?: boolean;
     /** May connect a provider in Settings (`payment:manage`). */
@@ -197,7 +202,7 @@ export function OrderDetail({
                 !order.money?.recordedByHand &&
                 !order.placedOnline)) &&
         Number(order.money?.due ?? 0) > 0;
-    const linkable = can.write && owed;
+    const linkable = can.payLink && owed;
     const changes = useOrderChanges({
         order,
         first,
@@ -206,7 +211,7 @@ export function OrderDetail({
         setPanel,
         startHold: kitchen.startHold,
         onOwed:
-            can.write && can.payOnline && !order.placedOnline
+            can.payLink && can.payOnline && !order.placedOnline
                 ? payLink.ask
                 : undefined,
     });
@@ -244,7 +249,7 @@ export function OrderDetail({
                     Print {order.ticketName.toLowerCase()}
                 </Button>
             ) : null}
-            {can.write ? (
+            {can.edit || can.refund ? (
                 <OrderActions
                     storeId={order.store.id}
                     orderId={order.id}
@@ -254,6 +259,8 @@ export function OrderDetail({
                     pending={menu}
                     onPendingChange={setMenu}
                     withCancel={change.cancel === undefined}
+                    canRecord={can.edit}
+                    canRefund={can.refund}
                 />
             ) : null}
             {next && !hold ? (
@@ -290,7 +297,7 @@ export function OrderDetail({
     const money = order.money;
     const remaining = money ? Number(money.paid) - Number(money.refunded) : 0;
     const refundBlock: string | null = !can.refund
-        ? "Refunds are for owners and admins."
+        ? "Your role can't refund orders."
         : refundedFull
           ? "Refunded in full."
           : !money || remaining <= 0
@@ -334,7 +341,7 @@ export function OrderDetail({
                     <PaymentBanner
                         failed={order.paymentStatus === "FAILED"}
                         first={first}
-                        canRecord={can.write}
+                        canRecord={can.edit}
                         onCash={() => setMenu({ kind: "payment", to: "PAID" })}
                         onSendLink={
                             linkable && can.payOnline ? payLink.ask : undefined
@@ -477,7 +484,7 @@ export function OrderDetail({
                                 refundTo={refundTo}
                                 remaining={remaining}
                                 linkable={
-                                    can.write &&
+                                    can.payLink &&
                                     (can.payOnline ?? false) &&
                                     !order.placedOnline
                                 }
@@ -486,9 +493,9 @@ export function OrderDetail({
                                 onClose={() => setPanel(null)}
                             />
                         ) : null}
-                        {can.write || can.refund ? (
+                        {can.edit || can.refund ? (
                             <ChangeCard
-                                canEdit={can.write}
+                                canEdit={can.edit}
                                 editable={order.next.editable}
                                 canRefund={refundBlock}
                                 fulfilment={change.fulfilment}

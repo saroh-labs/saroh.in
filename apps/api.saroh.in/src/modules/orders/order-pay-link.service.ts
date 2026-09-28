@@ -9,7 +9,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { mintPayToken } from "../invoices/pay-token";
 import { assertPaymentsOn } from "../invoices/payments-on";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { payLinkProvider } from "../payments/pay-link-provider";
 import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
 
@@ -30,17 +30,21 @@ import { PAY_LINK_ORDER_SELECT, payLinkRefusal } from "./order-pay-link";
 @Injectable()
 export class OrderPayLinkService {
     /**
-     * Mint the order's pay link and return its token. `order:write` until
-     * B16 splits it (`order:create` / `order:edit`). Another business's
-     * order is a 404; one that can't be paid, or no provider to take it, a
-     * 409.
+     * Mint the order's pay link and return its token. `order:create` or
+     * `order:edit` (B16, matrix §2): whoever takes orders makes their pay
+     * links, and whoever changes them makes a new one, which stops the old.
+     * Another business's order is a 404; one that can't be paid, or no
+     * provider to take it, a 409.
      */
     async make(
         ctx: OrganizationContext,
         orderId: string,
         now: Date = new Date(),
     ): Promise<{ token: string; payLinkCreatedAt: Date }> {
-        authorize(ctx, "order:write");
+        if (!allows(ctx, "order:create") && !allows(ctx, "order:edit")) {
+            // The refusal names the power that replaces a link.
+            authorize(ctx, "order:edit");
+        }
         await assertPaymentsOn(prisma, ctx.organizationId, "make a pay link");
         return prisma.$transaction((tx) =>
             issueOrderPayLinkInTx(tx, ctx.organizationId, orderId, now),

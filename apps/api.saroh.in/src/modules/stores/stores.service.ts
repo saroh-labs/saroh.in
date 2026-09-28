@@ -164,6 +164,44 @@ export class StoresService {
     }
 
     /**
+     * The store-scoped order writes (B16): the owning Organization when the
+     * caller may take this order `action` here, `null` when not (or the
+     * store is missing).
+     *
+     * On the organization path it is the caller's business role that
+     * decides — `order:create`, `order:edit` or `order:refund`, never
+     * `store:write`, which changes storefronts, not orders (matrix §3). A
+     * storefront role that writes to this storefront (a `StoreOwner`, or a
+     * storefront Admin, Manager or Editor) keeps taking and changing its
+     * orders, as it did before the split: storefront bundles stay what they
+     * grant today (DEC-048). The legacy path is unchanged.
+     */
+    async orderWriteOrganization(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<{ organizationId: string | null } | null> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store) return null;
+        const writable = { organizationId: store.organizationId };
+
+        if (!(await this.useOrgPath(store.organizationId))) {
+            return (await this.canWriteLegacy(storeId, userId))
+                ? writable
+                : null;
+        }
+
+        this.assertStoreHasOrg(store.organizationId);
+        if (await this.orgAllows(store.organizationId, userId, action)) {
+            return writable;
+        }
+        return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
+    }
+
+    /**
      * Whether the caller's membership in the store's business permits an
      * action beyond the store's own read/write — `order:read` or
      * `product-review:read` on a product page that shows orders and reviews.

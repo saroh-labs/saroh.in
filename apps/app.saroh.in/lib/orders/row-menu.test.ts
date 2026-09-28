@@ -66,15 +66,19 @@ function row(over: Partial<OrderRow> = {}): OrderRow {
 
 const OWNER: OrderAbilities = {
     stage: true,
-    write: true,
+    create: true,
+    payLink: true,
     refund: true,
+    export: true,
     payOnline: true,
 };
 /** A Member at the counter: `order:stage`, no money (DEC-024). */
 const KITCHEN: OrderAbilities = {
     stage: true,
-    write: false,
+    create: false,
+    payLink: false,
     refund: false,
+    export: false,
     payOnline: false,
 };
 /** The kitchen's row: the API sends no money. */
@@ -250,9 +254,9 @@ describe("rowMenu", () => {
             ).toBe("Connect a payment provider first.");
         });
 
-        it("isn't drawn for a role that can't change orders", () => {
+        it("isn't drawn for a role that can neither take nor change orders (B16)", () => {
             expect(
-                kinds(rowMenu(row(owed), { ...OWNER, write: false })),
+                kinds(rowMenu(row(owed), { ...OWNER, payLink: false })),
             ).not.toContain("pay-link");
         });
     });
@@ -316,7 +320,7 @@ describe("rowMenu", () => {
             expect(kinds(items)).not.toContain("cancel");
         });
 
-        it("gates Cancel on changing orders, as Order Detail does, not on refunding", () => {
+        it("gates Cancel on order:refund, as Order Detail does: a cancel is a refund in full (B16)", () => {
             const unpaid = row({
                 paymentStatus: "UNPAID",
                 payment: "UNPAID",
@@ -324,13 +328,18 @@ describe("rowMenu", () => {
                 stage: "NEW",
                 stepIndex: 0,
             });
-            // May change orders, may not refund: Cancel is there.
+            // May refund: Cancel is there, whatever else the role holds.
+            expect(
+                kinds(
+                    rowMenu(unpaid, {
+                        ...KITCHEN,
+                        refund: true,
+                    }),
+                ),
+            ).toContain("cancel");
+            // May take and change orders, may not refund: no Cancel.
             expect(
                 kinds(rowMenu(unpaid, { ...OWNER, refund: false })),
-            ).toContain("cancel");
-            // May refund, may not change orders: no Cancel.
-            expect(
-                kinds(rowMenu(unpaid, { ...OWNER, write: false })),
             ).not.toContain("cancel");
         });
     });

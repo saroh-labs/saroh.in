@@ -97,6 +97,9 @@ export class OrganizationOrdersController {
         // kitchen's view of it — no totals and no customer emails — the same
         // line the order read draws.
         const full = listAccess(ctx);
+        // Export reads the same pages (B4), and taking every order away in a
+        // file is its own power (B16, matrix §3): `order:export`.
+        if (query.export === "true") authorize(ctx, "order:export");
 
         // Rows, tab counts and a cursor (plan B, B1), with or without `v=2`:
         // the bare array an app before B1 read went in the contract release
@@ -106,7 +109,14 @@ export class OrganizationOrdersController {
         // Each row carries the customer's Needs attention as the caller may
         // see it, and `attention=` filters on the same (B15): sensitive
         // entries count only for a caller who may read them.
-        const { v: _v, late, attention, since, ...filter } = query;
+        const {
+            v: _v,
+            export: _export,
+            late,
+            attention,
+            since,
+            ...filter
+        } = query;
         return this.orders.listRows(
             ctx.organizationId,
             {
@@ -258,7 +268,7 @@ export class OrganizationOrdersController {
     /**
      * Make the order's pay link and answer with it — once: only its hash is
      * kept, so asking again makes a new link and the old one stops working
-     * (B11). `order:write`.
+     * (B11). `order:create` or `order:edit` (B16; see OrderPayLinkService).
      */
     @Post(":orderId/pay-link")
     @HttpCode(201)
@@ -277,8 +287,8 @@ export class OrganizationOrdersController {
     /**
      * "Change how it's fulfilled…" (B9): until handover, to a way every
      * item allows and the storefront offers, with the delivery charge staff
-     * type; the difference is charged or refunded. `order:write` (and
-     * `payment:manage` when a paid order's money moves).
+     * type; the difference is charged or refunded. `order:edit` (and
+     * `order:refund` when a paid order's money moves, B16).
      */
     @Post(":orderId/fulfilment")
     @HttpCode(200)
@@ -292,8 +302,8 @@ export class OrganizationOrdersController {
 
     /**
      * "Cancel order…" (B9): a refund in full, and the order kept as
-     * cancelled. Refused from its handover on. `order:write`, and
-     * `payment:manage` when money goes back.
+     * cancelled. Refused from its handover on. `order:refund` (B16): a
+     * cancel is a refund in full.
      */
     @Post(":orderId/cancel")
     @HttpCode(200)
@@ -305,7 +315,11 @@ export class OrganizationOrdersController {
         return this.cancels.cancel(ctx, orderId, dto);
     }
 
-    /** Change lines, fulfilment, address or notes (`order:write`). */
+    /**
+     * Change lines, fulfilment, address or notes (`order:edit`; the courier
+     * and number alone are `order:stage`'s; money moving on a paid order
+     * also takes `order:refund`, B16).
+     */
     @Patch(":orderId")
     edit(
         @OrgContext() ctx: OrganizationContext,

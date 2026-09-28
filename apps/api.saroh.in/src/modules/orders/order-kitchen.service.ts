@@ -80,9 +80,9 @@ import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
  * Who may do what (DEC-024):
  *  - `order:stage` (Owner, Admin, Member) — read the kitchen view, move the
  *    stage, undo the last step.
- *  - `order:write` (Owner, Admin) — edit lines, fulfilment, address, notes.
- *    Taking or returning the difference also needs `payment:manage`.
- *  - Money in the read only with `payment:read` (ADR-008).
+ *  - `order:edit` (Owner, Admin; B16) — edit lines, fulfilment, address,
+ *    notes. Taking or returning the difference also needs `order:refund`.
+ *  - Money in the read with `order:read` or `payment:read` (ADR-008; B16).
  *
  * Every write takes the order's row lock first, so a stage move, an undo, an
  * edit and a refund on one order happen one at a time.
@@ -138,7 +138,10 @@ export class OrderKitchenService {
                       select: { id: true, name: true },
                   })
                 : [];
-        const money = allows(ctx, "payment:read");
+        // `order:read` shows the whole order, money included (matrix §1
+        // rule 2, B16), as the list's rows already do; `payment:read` kept
+        // it before, and still does.
+        const money = allows(ctx, "order:read") || allows(ctx, "payment:read");
         const read = serializeOrderRead(order, {
             money,
             owedBack: money
@@ -283,13 +286,13 @@ export class OrderKitchenService {
     }
 
     /**
-     * Change an order before anyone starts on it (ADR-008). `order:write`.
+     * Change an order before anyone starts on it (ADR-008). `order:edit`.
      *
      * Lines, fulfilment and address only while it is New; notes until it is
      * cancelled. Stock follows each line on the row it recorded. When the
      * total changes on an order that was paid, the difference is taken (a
      * payment on the order for exactly that amount) or handed back (a refund
-     * marked as for the edit), which also needs `payment:manage`. An earlier
+     * marked as for the edit), which also needs `order:refund`. An earlier
      * edit's charge still unpaid is superseded, so one charge at most is ever
      * open for the difference. An unpaid order just costs the new total.
      *
@@ -326,8 +329,8 @@ export class OrderKitchenService {
         const courier = COURIER_FIELDS.filter((f) => dto[f] !== undefined);
         // The courier's details belong to the handover step, so whoever
         // moves orders may record them (`order:stage`, matrix §2); the rest
-        // of an edit is `order:write`'s.
-        if (touchesOrder || courier.length === 0) authorize(ctx, "order:write");
+        // of an edit is `order:edit`'s (B16).
+        if (touchesOrder || courier.length === 0) authorize(ctx, "order:edit");
         if (courier.length > 0) authorize(ctx, "order:stage");
         if (!touchesOrder && courier.length === 0) {
             throw new BadRequestException("Nothing to change");
@@ -412,9 +415,10 @@ export class OrderKitchenService {
                 });
             }
             const paid = order.paymentStatus === "PAID";
-            if (touchesItems && paid && !allows(ctx, "payment:manage")) {
-                // Changing what a paid order costs moves money.
-                authorize(ctx, "payment:manage");
+            if (touchesItems && paid) {
+                // Changing what a paid order costs moves money, which is
+                // the order's money power (B16; `payment:manage` implies it).
+                authorize(ctx, "order:refund");
             }
 
             const changes: string[] = [];
