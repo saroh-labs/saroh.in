@@ -601,3 +601,12 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - **Onboarding's "Registered" saves no business type.** It used to save `company`, which Settings reads as Private limited, so an LLP or partnership was mislabelled. The business picks its real type in Settings. F12's go-live checklist nudges for it until one is set.
 - **A walk-in who gives a phone is a customer.** A name-only walk-in stays a walk-in, with no customer and no contact. With a phone, the order is made for a customer found by that phone, or one created and linked (DEC-045 is amended). This lets their history, duplicate matching and a privacy removal reach them.
 - Migration: none.
+
+## DEC-061 Sensitive notes are their own capability
+
+**Status: Accepted — 2026-09-28** · round-2 plan C (C13), permission matrix Q2
+
+- Context: C13 split the customer capabilities, and matrix Q2 asked whether sensitive notes (medical and similar) should need a power of their own, or come with `contact:write`.
+- Decision: **`customer:sensitive` is its own capability.** Owner and Admin hold it; Member and Reviewer don't; nothing implies it. `canSeeSensitive` asks for it, and every surface that shows sensitive notes follows it.
+- Consequences: custom roles saved before C13 that hold `contact:write` no longer see sensitive notes. No migration grants the capability back; a business re-grants it in Team › Roles. This is on purpose: the matrix's front-desk template exists so that it doesn't see medical notes.
+- Migration: none.
