@@ -57,7 +57,7 @@ describe("what the site's server sends on", () => {
             startBody({
                 lines: [{ listingId: "l1", variantId: "v1", quantity: 1 }],
                 fulfilment: "LOCAL_DELIVERY",
-                key: "abcdefgh-1234",
+                key: "first-try",
                 address: {
                     line1: " 12 Hill Road ",
                     city: "Mumbai",
@@ -70,7 +70,7 @@ describe("what the site's server sends on", () => {
         ).toEqual({
             lines: [{ listingId: "l1", variantId: "v1", quantity: 1 }],
             fulfilment: "LOCAL_DELIVERY",
-            key: "abcdefgh-1234",
+            key: "first-try",
             address: {
                 line1: "12 Hill Road",
                 city: "Mumbai",
