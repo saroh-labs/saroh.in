@@ -7,6 +7,7 @@ import { PageSections } from "@saroh/site-blocks";
 import { publicApiUrl } from "@/lib/api-url";
 import {
     findPageByPath,
+    getJournalFeed,
     getPublishedPosts,
     getSiteForHost,
     postsPrefix,
@@ -114,12 +115,16 @@ export default async function SitePostPage({
         notFound();
     }
 
+    // The Journal's posts (G10), read only when the page draws one.
+    const journal = await getJournalFeed(page.sections, snapshot, siteId);
+
     return (
         <PageSections
             sections={page.sections}
             apiUrl={publicApiUrl()}
             bookHref="/book"
             siteId={siteId}
+            journal={journal}
         />
     );
 }

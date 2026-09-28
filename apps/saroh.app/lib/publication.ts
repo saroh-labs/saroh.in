@@ -1,4 +1,7 @@
+import type { JournalFeed } from "@saroh/site-blocks";
+
 import { env } from "@/env";
+import { journalFeed } from "@/lib/journal-feed";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -517,6 +520,37 @@ export async function getPublishedPosts(
     return (body?.posts ?? [])
         .map((row) => (row as Partial<PostSnapshot> | null)?.post)
         .filter((post): post is PublishedPost => Boolean(post?.slug));
+}
+
+/**
+ * The Journal block's posts for a live page (G10), or undefined when the page
+ * has no Journal. The same read as the posts index above, linked under the
+ * same prefix; with no site id there are no posts, and the block draws none.
+ */
+export function getJournalFeed(
+    sections: readonly { type: string }[],
+    snapshot: PublicationSnapshot,
+    siteId: string | null,
+): Promise<JournalFeed | undefined> {
+    return journalFeed(sections, `/${postsPrefix(snapshot)}`, () =>
+        siteId ? getPublishedPosts(siteId) : Promise.resolve([]),
+    );
+}
+
+/**
+ * The same behind a preview token: the draft's posts, drafts included, as the
+ * preview's own index shows them (#236), linked inside the preview.
+ */
+export function getPreviewJournalFeed(
+    sections: readonly { type: string }[],
+    snapshot: PublicationSnapshot,
+    token: string,
+): Promise<JournalFeed | undefined> {
+    return journalFeed(
+        sections,
+        `/preview/${encodeURIComponent(token)}/${postsPrefix(snapshot)}`,
+        () => getPreviewPosts(token),
+    );
 }
 
 /** One live post by slug, or null when it is not live. */

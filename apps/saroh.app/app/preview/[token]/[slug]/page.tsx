@@ -8,6 +8,7 @@ import { publicApiUrl } from "@/lib/api-url";
 import {
     findPageByPath,
     getPreviewByToken,
+    getPreviewJournalFeed,
     getPreviewPosts,
     postsPrefix,
 } from "@/lib/publication";
@@ -44,11 +45,19 @@ export default async function PreviewPage({
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
 
+    // The draft's posts (G10), as the preview's own index shows them.
+    const journal = await getPreviewJournalFeed(
+        page.sections,
+        preview.snapshot,
+        token,
+    );
+
     return (
         <PageSections
             sections={page.sections}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
+            journal={journal}
         />
     );
 }
