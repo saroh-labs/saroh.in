@@ -1,4 +1,7 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type { PackKind } from "@/lib/class-packs/pack-cards";
+import type { PackUseState } from "@/lib/class-packs/pack-detail-data";
+import type { PaidBy } from "@/lib/class-packs/sell-words";
 import type { DetailAttention } from "@/lib/customer-workspace/attention";
 import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
 import type { FulfilmentType } from "@/lib/orders/read";
@@ -117,9 +120,18 @@ export interface DetailInvoice {
     paidAt: string | null;
 }
 
+/** One class spent from a pack, and what became of it (E13's words). */
+export interface DetailPackUse {
+    bookingId: string;
+    startAt: string;
+    service: { id: string; name: string };
+    state: PackUseState;
+}
+
 export interface DetailPack {
     id: string;
-    pack: { id: string; name: string };
+    /** `kind` from C7's API on; without it, a classes pack. */
+    pack: { id: string; name: string; kind?: PackKind };
     credits: number;
     used: number;
     left: number;
@@ -128,6 +140,11 @@ export interface DetailPack {
     standing: "ACTIVE" | "USED_UP" | "EXPIRED";
     price?: string;
     currency?: string;
+    // C7: how it was paid, the days given, and the classes spent from it
+    // (latest first). Optional: an API from before C7 doesn't send them.
+    paidBy?: PaidBy | null;
+    extensions?: { days: number; reason: string; createdAt: string }[];
+    uses?: DetailPackUse[];
 }
 
 export interface MembershipAllowance {

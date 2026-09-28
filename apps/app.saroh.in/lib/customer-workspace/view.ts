@@ -14,6 +14,7 @@ import type {
     MembershipAllowance,
     MoneyTotal,
 } from "./detail";
+import { packHref } from "./packs";
 import type { CustomerThread } from "./thread";
 
 /**
@@ -38,7 +39,7 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
 }
 
 export type TabKey =
-    "over" | "ord" | "bk" | "sub" | "inv" | "rev" | "msg" | "notes";
+    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -73,6 +74,14 @@ export function tabsFor(
             key: "bk",
             label: "Bookings",
             count: d.bookings ? upcomingOf(d.bookings.upcoming).length : null,
+        });
+    }
+    // Their class packs (C7), where the design's Courses tab sits.
+    if (d.packs !== undefined) {
+        tabs.push({
+            key: "pk",
+            label: "Packs",
+            count: d.packs ? d.packs.rows.length : null,
         });
     }
     if (d.subscriptions !== undefined) {
@@ -587,6 +596,8 @@ export const BOOKINGS_EMPTY: Record<BookingFilter, string> = {
 
 export interface CreditLine {
     name: string;
+    /** Its Pack Detail (C7). */
+    href: string;
     left: string;
     pct: number;
     bar: "ok" | "accent" | "off";
@@ -625,6 +636,7 @@ export function packLines(
             }`;
             return {
                 name: `${p.pack.name} pack`,
+                href: packHref(p.pack.id),
                 left: expired ? "Ended" : `${p.left} of ${p.credits}`,
                 pct: Math.round((100 * p.left) / Math.max(1, p.credits)),
                 bar: expired ? "off" : soon ? "accent" : "ok",

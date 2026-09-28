@@ -76,7 +76,8 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  (1,293 after C7, which moved the packs read out to `customer-detail-packs.ts`;
+  1,351 before), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
   days-off, payments and working-hours reads already sit in their own files;
   E27 added only the response's `hours` field; split next),
   `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).

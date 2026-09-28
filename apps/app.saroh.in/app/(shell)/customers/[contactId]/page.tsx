@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 
 import { CustomerDetailScreen } from "@/components/customers/detail/detail-screen";
+import type { PackSale } from "@/components/customers/detail/packs-tab";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
+import { loadContactHoldings } from "@/lib/contacts/holdings";
+import { sellPacksOnly } from "@/lib/contacts/panels";
 import { getCustomerDetail } from "@/lib/customer-workspace/detail";
 import {
     isMergedRedirect,
@@ -90,6 +94,22 @@ export default async function CustomerDetailPage({
         detail.linkedCustomers !== undefined && may("product-review:read")
             ? await contactReviews(contactId).catch((): ReviewsRead => "failed")
             : null;
+    // Their packs are in the read only where Class packs is on and the
+    // viewer reads them (C7). Selling one needs the packs on sale; a list
+    // that can't be read offers no Sell rather than an empty dialog.
+    const packsShown = detail.packs !== undefined;
+    const packSale: PackSale | null =
+        packsShown && canSellPacks(organization)
+            ? await loadContactHoldings(contactId, sellPacksOnly()).then(
+                  ({ choices }) =>
+                      choices.packs
+                          ? {
+                                packs: choices.packs,
+                                invoicesOnSale: choices.invoicesOnSale,
+                            }
+                          : null,
+              )
+            : null;
     const tabs = tabsFor(detail, thread, reviews);
 
     return (
@@ -127,6 +147,8 @@ export default async function CustomerDetailPage({
                 thread={thread}
                 reviews={reviews}
                 canReplyReviews={may("product-review:write")}
+                packSale={packSale}
+                canExtendPacks={packsShown && canWritePacks(organization)}
                 nowIso={new Date().toISOString()}
             />
         </PageContainer>

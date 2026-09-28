@@ -49,6 +49,20 @@ function time(iso: string, timeZone: string): string {
     }).format(new Date(iso));
 }
 
+/**
+ * One use's when ("Mon 29 Sep 07:00") and what became of it — shared with
+ * Customer Detail's Packs tab (C7), so both say it the same way.
+ */
+export function useWords(
+    u: Pick<PackUse, "startAt" | "state">,
+    timeZone: string,
+): { when: string; state: { label: string; tone: Tone } } {
+    return {
+        when: `${dayWithWeekday(u.startAt, timeZone)} ${time(u.startAt, timeZone)}`,
+        state: USE_STATE[u.state],
+    };
+}
+
 /** The week's uses, latest first, as the design lists them. */
 export function usedRows(page: PackUsedPage, timeZone: string): UseRow[] {
     return page.uses
@@ -56,10 +70,9 @@ export function usedRows(page: PackUsedPage, timeZone: string): UseRow[] {
         .sort((a, b) => b.startAt.localeCompare(a.startAt))
         .map((u: PackUse) => ({
             key: `${u.bookingId}:${u.purchaseId}`,
-            when: `${dayWithWeekday(u.startAt, timeZone)} ${time(u.startAt, timeZone)}`,
+            ...useWords(u, timeZone),
             what: u.service.name,
             who: u.contact.name,
-            state: USE_STATE[u.state],
         }));
 }
 

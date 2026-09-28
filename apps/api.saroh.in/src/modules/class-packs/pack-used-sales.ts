@@ -51,7 +51,8 @@ export interface PackUsedPage {
     uses: PackUseView[];
 }
 
-function useState(r: {
+/** Shared with Customer Detail's Packs tab (C7). */
+export function packUseState(r: {
     reversedAt: Date | null;
     booking: { status: string; outcome: string | null };
 }): PackUseState {
@@ -156,7 +157,7 @@ export async function packUsed(
                 id: r.purchase.contact.id,
                 name: contactName(r.purchase.contact),
             },
-            state: useState(r),
+            state: packUseState(r),
         })),
     };
 }

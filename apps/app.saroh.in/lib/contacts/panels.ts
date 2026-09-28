@@ -103,6 +103,26 @@ export interface PanelPlan {
     paymentsOn: boolean;
 }
 
+/**
+ * Only what selling a pack needs — the packs on sale and whether a sale
+ * issues an invoice — and no panel. Customer Detail (round-2 C7) has the
+ * person's packs in its own read, and asks for this only once the viewer
+ * may sell and Class packs is on there.
+ */
+export function sellPacksOnly(): PanelPlan {
+    return {
+        panels: [],
+        canAct: {
+            subscriptions: false,
+            packs: true,
+            courses: false,
+            invoices: false,
+        },
+        mentionInvoices: false,
+        paymentsOn: false,
+    };
+}
+
 export function contactPanels(
     viewer: Viewer,
     modules: ModuleStates,
