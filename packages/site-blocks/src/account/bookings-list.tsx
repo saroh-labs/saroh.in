@@ -18,6 +18,7 @@ import {
     bookingTitle,
     cancelledText,
     moveClassHref,
+    movedText,
     treatmentLead,
     treatmentSub,
     treatmentVisitWords,
@@ -224,7 +225,9 @@ export function AccountBookingsTab({
                         ? api.move(open.row.ref, startAt)
                         : { ok: false, message: "" }
                 }
-                onDone={(label) => done(`Moved to ${label}.`)}
+                onDone={(label, told) =>
+                    done(movedText(label, businessName, told))
+                }
                 onClose={close}
                 businessName={businessName}
             />

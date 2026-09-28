@@ -79,6 +79,11 @@ export interface AccountCancelResult {
     } | null;
     kept: { amount: string; currency: string } | null;
     order: boolean;
+    /**
+     * The business is told (A14): the cancel happened now and its notice to
+     * the team is queued. Absent from an API before A14, read as false.
+     */
+    told?: boolean;
 }
 
 export const BOOKINGS_HREF = "/account/bookings";
@@ -156,7 +161,10 @@ export function cancelNote(
 
 /** What the page says once a cancel has gone through. */
 export function cancelledText(result: AccountCancelResult): string {
-    const parts = ["Cancelled."];
+    // "The team has been told" only when it is (A14).
+    const parts = result.told
+        ? ["Cancelled. The team has been told."]
+        : ["Cancelled."];
     const { refund, kept } = result;
     if (refund) {
         const amount = accountMoney(refund.amount, refund.currency);
@@ -171,6 +179,21 @@ export function cancelledText(result: AccountCancelResult): string {
         );
     }
     return parts.join(" ");
+}
+
+/**
+ * What a move says it did: "Moved to Tue 6 Oct at 11:00." and, once the
+ * business really is told of it (A14), "‹Business› has been told."
+ */
+export function movedText(
+    label: string,
+    businessName: string,
+    told: boolean,
+): string {
+    const name = businessName.trim();
+    return told
+        ? `Moved to ${label}. ${name || "The team"} has been told.`
+        : `Moved to ${label}.`;
 }
 
 /** "Mon 5 Oct at 10:00", a free time in the sheet. */

@@ -50,7 +50,10 @@ export function MoveClass({
     const [shown, setShown] = useState(SHOWN);
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
-    const [moved, setMoved] = useState<string | null>(null);
+    const [moved, setMoved] = useState<{
+        label: string;
+        told: boolean;
+    } | null>(null);
 
     const serviceRef = row?.serviceRef ?? null;
     const read = useCallback(() => {
@@ -110,7 +113,10 @@ export function MoveClass({
         );
         setBusy(false);
         if (result.ok) {
-            setMoved(timeLabel(chosen.startAt, zone));
+            setMoved({
+                label: timeLabel(chosen.startAt, zone),
+                told: result.told === true,
+            });
             return;
         }
         setProblem(result.message);
@@ -123,10 +129,13 @@ export function MoveClass({
             <main className="mx-auto w-full max-w-[640px] px-[18px] py-6">
                 <div className={card} role="status">
                     <h1 className="font-site-heading text-site-fg m-0 text-[22px] font-semibold">
-                        Moved to {moved}
+                        Moved to {moved.label}
                     </h1>
                     <p className="text-site-body mt-2 text-sm leading-normal">
                         Your place and its credit moved with it.
+                        {moved.told
+                            ? ` ${businessName.trim() || "The team"} has been told.`
+                            : ""}
                     </p>
                     <div className="mt-4">{back}</div>
                 </div>

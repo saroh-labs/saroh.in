@@ -144,6 +144,8 @@ export function cancelResult(v: unknown): AccountCancelResult | null {
         (refund === null ||
             (isAmount(refund) && isRefundStatus((refund as Rec).status))) &&
         (v.kept === null || isAmount(v.kept)) &&
-        isBoolean(v.order);
+        isBoolean(v.order) &&
+        // Served from A14 on; an API before it has none.
+        (v.told === undefined || isBoolean(v.told));
     return ok ? (v as unknown as AccountCancelResult) : null;
 }
