@@ -16,9 +16,10 @@ import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
-import { courseSeatsHeld } from "./course-seats";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
+import { seatsHeld } from "./held-seats";
 import { depositCents } from "./service-fields";
+import { acceptWaitlistInTx } from "./waitlist-queue";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -432,13 +433,18 @@ export async function reserveInTx(
         });
         // Seats an open course still holds count as taken (ADR-007) —
         // other courses' seats, for a course's own booking: its unsold
-        // seats are the ones it is filling.
-        const held = await courseSeatsHeld(
+        // seats are the ones it is filling. So does a place held for
+        // someone on the waitlist (A12), except for that person, who takes
+        // it by booking it.
+        const held = await seatsHeld(
             tx,
             serviceId,
             clear.startAt,
             clear.endAt,
-            course?.courseId,
+            {
+                exceptCourseId: course?.courseId,
+                exceptContactId: by.account?.contactId ?? null,
+            },
         );
         if (confirmed + held >= service.capacity) {
             throw new ConflictException("This slot is fully booked");
@@ -528,6 +534,15 @@ export async function reserveInTx(
         },
     });
 
+    // A place they were waiting for, or held for them, is taken (A12).
+    await acceptWaitlistInTx(tx, {
+        serviceId,
+        startAt,
+        contactId: contact.id,
+        bookingId: booking.id,
+        now: new Date(),
+    });
+
     // Where the history starts. No `fromStartAt`: there was no before.
     // The actor is whoever made it by hand; a booker who did it
     // themselves leaves it empty.
@@ -590,7 +605,10 @@ async function releaseOwnHoldInTx(
         startAt,
         now,
     );
-    if (hold) await releaseHoldInTx(tx, hold, now);
+    // Nothing frees: they are booking this very session again.
+    if (hold) {
+        await releaseHoldInTx(tx, hold, now, null, { freesPlace: false });
+    }
 }
 
 /**

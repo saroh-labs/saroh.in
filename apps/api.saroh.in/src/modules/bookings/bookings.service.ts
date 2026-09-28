@@ -687,7 +687,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
-        options: { returnCredit?: boolean } = {},
+        options: { returnCredit?: boolean; closesClass?: boolean } = {},
     ): Promise<CancelledBooking> {
         authorize(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);

@@ -254,6 +254,32 @@ export const ORDERS_MOVER: UnlinkMover = {
 };
 
 /**
+ * Places in line the customer joined from the account since it linked
+ * (A12), in any state: the new contact is who is waiting. A place staff put
+ * someone in stays with the contact. The new contact is fresh, so no line
+ * holds it twice.
+ */
+export const WAITLIST_MOVER: UnlinkMover = {
+    key: "waitlist",
+    model: "ClassWaitlistEntry",
+    noun: ["place on a waitlist", "places on waitlists"],
+    count: (tx, scope) =>
+        tx.classWaitlistEntry.count({
+            where: {
+                ...madeByAccount(scope),
+                status: { in: ["WAITING", "OFFERED"] },
+            },
+        }),
+    move: async (tx, scope) =>
+        (
+            await tx.classWaitlistEntry.updateMany({
+                where: madeByAccount(scope),
+                data: { contactId: scope.toContactId },
+            })
+        ).count,
+};
+
+/**
  * The records that move with the account. A9 adds the first, bookings made
  * signed in; each unit above adds its own, with a db test.
  */
@@ -262,6 +288,7 @@ export const UNLINK_MOVERS: readonly UnlinkMover[] = [
     BOOKING_INVOICES_MOVER,
     ORDERS_MOVER,
     THREAD_MESSAGES_MOVER,
+    WAITLIST_MOVER,
 ];
 
 /**

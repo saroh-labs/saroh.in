@@ -12,6 +12,7 @@ import { PaymentsModule } from "../payments/payments.module";
 import { AccountBookingsTabController } from "../site-accounts/account-bookings-tab.controller";
 import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
 import { AccountBookingsService } from "../site-accounts/account-bookings.service";
+import { AccountWaitlistController } from "../site-accounts/account-waitlist.controller";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import {
     BOOKING_NOTIFY_TYPE,
@@ -29,6 +30,12 @@ import {
     RELEASE_HOLDS_TYPE,
     ReleaseHoldsHandler,
 } from "./release-holds.handler";
+import {
+    WAITLIST_OFFER_TYPE,
+    WaitlistOfferHandler,
+} from "./waitlist-offer.handler";
+import { WaitlistController } from "./waitlist.controller";
+import { WaitlistService } from "./waitlist.service";
 
 const CHAIN_CHECK_MS = 15 * 60 * 1000;
 
@@ -45,7 +52,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * A signed-in customer books through {@link AccountBookingsController}
  * (round-2 A9), on the same service and limiter, and moves and cancels
  * their own bookings through {@link AccountBookingsTabController} (A6), on
- * the same writes as the team's.
+ * the same writes as the team's. A full class's waitlist (A12) is joined
+ * from the booking page ({@link AccountWaitlistController}), read by the
+ * team ({@link WaitlistController}), and offered by `waitlist.offer`.
  */
 @Module({
     imports: [
@@ -66,6 +75,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicBookingPageController,
         AccountBookingsController,
         AccountBookingsTabController,
+        AccountWaitlistController,
+        WaitlistController,
     ],
     providers: [
         BookingsService,
@@ -74,6 +85,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         AccountBookingsService,
         ReleaseHoldsHandler,
         BookingNotifyHandler,
+        WaitlistService,
+        WaitlistOfferHandler,
         OrganizationGuard,
     ],
     exports: [BookingsService],
@@ -85,6 +98,7 @@ export class BookingsModule implements OnModuleInit, OnModuleDestroy {
         private readonly registry: JobHandlerRegistry,
         private readonly releaseHolds: ReleaseHoldsHandler,
         private readonly bookingNotify: BookingNotifyHandler,
+        private readonly waitlistOffer: WaitlistOfferHandler,
     ) {}
 
     /**
@@ -97,6 +111,8 @@ export class BookingsModule implements OnModuleInit, OnModuleDestroy {
         this.registry.register(RELEASE_HOLDS_TYPE, this.releaseHolds.handle);
         // Tells the customer, and the team, about a booking (A14).
         this.registry.register(BOOKING_NOTIFY_TYPE, this.bookingNotify.handle);
+        // Offers a freed place in a class to the first in line (A12).
+        this.registry.register(WAITLIST_OFFER_TYPE, this.waitlistOffer.handle);
         if (env.NODE_ENV === "test") return;
         await this.releaseHolds.schedule(new Date());
         this.chainCheck = setInterval(() => {

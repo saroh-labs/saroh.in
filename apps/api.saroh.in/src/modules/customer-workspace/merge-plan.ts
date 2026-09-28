@@ -19,11 +19,10 @@ import { maskEmail } from "../site-accounts/account-linking.service";
  * `absorbThread`). `PaymentMandate` (D20) has its row: never moved, the
  * merged contact's are cancelled in the merge's transaction
  * (`payments/mandate-cancel-job.ts`, `cancelMandatesInTx`) and at the
- * provider by the `mandate.cancel` job after commit. The rule for
- * `ClassWaitlistEntry` (A12) is in the customers plan; A12 adds its row
- * here and its move in the service: same class, the better place stays
- * (OFFERED, then the earlier position); a second hold is released through
- * `waitlist.offer`; different classes re-point.
+ * provider by the `mandate.cancel` job after commit. `ClassWaitlistEntry`
+ * (A12) has its row: same class, the better place stays (OFFERED, then the
+ * earlier position); a second hold is released through `waitlist.offer`;
+ * different classes re-point (`bookings/waitlist-merge.ts`).
  */
 
 export type MergeSide = "survivor" | "other";
@@ -50,7 +49,9 @@ export type MergeRuleKind =
     /** One thread: the survivor's absorbs the other's messages (A13). */
     | "absorb-thread"
     /** Never moved: the merged contact's autopay is cancelled (D20). */
-    | "cancel-mandates";
+    | "cancel-mandates"
+    /** Moves; one place per class's line, the better one kept (A12). */
+    | "waitlist";
 
 export interface MergeRule {
     kind: MergeRuleKind;
@@ -124,6 +125,10 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
     "PaymentMandate.contactId": {
         kind: "cancel-mandates",
         note: "Autopay isn't moved: the survivor never authorised it, so it is cancelled (D20).",
+    },
+    "ClassWaitlistEntry.contactId": {
+        kind: "waitlist",
+        note: "Places in line follow them; in one class the better place stays, and a second held place goes to the next in line (A12).",
     },
 };
 

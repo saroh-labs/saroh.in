@@ -37,6 +37,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // A12: a class's waitlist, for the team.
+    "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
     "staff/staff.controller.ts": "APPOINTMENTS",
     // E3: business closures and the time-off preview.
@@ -158,6 +160,10 @@ const NEVER: Record<string, string> = {
     // (`appointmentsOpen`), as on the anonymous route.
     "site-accounts/account-bookings.controller.ts":
         "a signed-in customer booking on a published site — Appointments checked per service",
+    // A12: joining a full class's waitlist from the booking page, checked
+    // per service like booking (`loadBookableService`).
+    "site-accounts/account-waitlist.controller.ts":
+        "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
     // A5: the customer's account area. It lists only the modules the
     // business has rolled out and on (`account-home.service.ts`), and must
     // stay reachable whichever are off: Me, receipts and sign-out.

@@ -275,16 +275,20 @@ export class BookingsController {
     /**
      * `?returnCredit=true` when the business calls it off (a whole class):
      * the class paid for goes back even inside the free-cancellation window.
+     * `?closesClass=true` when the whole class is cancelled: its waitlist is
+     * closed rather than offered the place (A12).
      */
     @Delete("bookings/:bookingId")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
+        @Query("closesClass") closesClass?: string,
     ): Promise<WithoutIntakeNote<CancelledBooking>> {
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",
+                closesClass: closesClass === "true",
             })
             .then(withoutIntakeNote);
     }

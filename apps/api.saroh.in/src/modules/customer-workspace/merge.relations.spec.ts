@@ -48,15 +48,15 @@ describe("every relation to Contact has a merge rule", () => {
     });
 
     it("fails when a new table names a contact without a rule", () => {
-        const withWaitlist = `${schema}
-model ClassWaitlistEntry {
+        const withNew = `${schema}
+model CourseMakeUpRequest {
   id        String  @id @default(cuid())
   contactId String
   contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
 }
 `;
-        expect(unruledContactRelations(withWaitlist)).toEqual([
-            "ClassWaitlistEntry.contactId",
+        expect(unruledContactRelations(withNew)).toEqual([
+            "CourseMakeUpRequest.contactId",
         ]);
     });
 

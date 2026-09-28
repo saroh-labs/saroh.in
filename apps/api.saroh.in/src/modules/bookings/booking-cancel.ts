@@ -17,6 +17,10 @@ import {
     loadBookingRules,
     refundsAutomatically,
 } from "./booking-rules";
+import {
+    closeSessionWaitlistInTx,
+    offerFreedPlaceInTx,
+} from "./waitlist-queue";
 
 /*
  * Cancelling a booking (U3, E8, E9, E30), whoever cancels it: the team from
@@ -96,12 +100,16 @@ export interface CancelActor {
  * cancel's transaction and sent after commit, under the row's id.
  *
  * A pay-now hold (PENDING) is released rather than cancelled (#508).
+ *
+ * The place it frees goes to the class's waitlist (A12, `waitlist.offer`)
+ * — unless `closesClass`: the team is cancelling the whole class, so its
+ * line is closed instead and nobody is offered a place in it.
  */
 export async function cancelFoundBooking(
     found: Booking,
     actor: CancelActor,
     now: Date,
-    options: { returnCredit?: boolean },
+    options: { returnCredit?: boolean; closesClass?: boolean },
     send: (refundId: string) => Promise<RefundStatus>,
 ): Promise<CancelledBooking> {
     if (found.status === "CANCELLED") {
@@ -129,7 +137,17 @@ export async function cancelFoundBooking(
         // so its draft invoice is voided and its pay link stops working.
         // A payment that lands after is recorded as owed back.
         if (booking.status === "PENDING") {
-            await releaseHoldInTx(tx, booking.id, now, actor.userId);
+            await releaseHoldInTx(tx, booking.id, now, actor.userId, {
+                freesPlace: !options.closesClass,
+            });
+            if (options.closesClass) {
+                await closeSessionWaitlistInTx(tx, {
+                    organizationId,
+                    serviceId: booking.serviceId,
+                    startAt: booking.startAt,
+                    now,
+                });
+            }
             return {
                 booking:
                     (await tx.booking.findUnique({
@@ -179,6 +197,18 @@ export async function cancelFoundBooking(
                 : await bookingPaymentInTx(tx, organizationId, booking.id);
         // A pay link sent for it (E4) stops working with the place.
         await retirePayLinkInTx(tx, booking.id);
+        // The place is free: offered to the first in line, or, when the
+        // whole class is being cancelled, the line is closed (A12).
+        const session = {
+            organizationId,
+            serviceId: booking.serviceId,
+            startAt: booking.startAt,
+        };
+        if (options.closesClass) {
+            await closeSessionWaitlistInTx(tx, { ...session, now });
+        } else {
+            await offerFreedPlaceInTx(tx, session);
+        }
         // The slot it was cancelled OUT of, so the history reads as a
         // sequence rather than a list of states with the times missing.
         // No actor is the customer themselves ("by the customer").
