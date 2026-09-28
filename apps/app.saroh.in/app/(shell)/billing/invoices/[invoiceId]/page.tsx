@@ -173,7 +173,7 @@ function payLine(i: Invoice, who: string) {
             return "Not issued yet. A draft has no number and can still change.";
         default:
             return i.online?.providerConnected
-                ? `Not paid. ${first} can pay by UPI or card from the pay link — copy it and send it, or mark it paid when the money arrives.`
+                ? `Not paid. ${first} can pay online from the pay link — copy it and send it, or mark it paid when the money arrives.`
                 : `Not paid. Mark it paid when the money arrives.`;
     }
 }

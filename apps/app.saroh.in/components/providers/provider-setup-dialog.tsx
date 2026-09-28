@@ -236,8 +236,9 @@ function PaymentsForm({
                     Payments
                 </DialogTitle>
                 <DialogDescription>
-                    Where card and UPI payments are taken. Your keys are sealed
-                    when saved and are never shown again, here or anywhere.
+                    Where online payments are taken, with the methods your
+                    account has switched on. Your keys are sealed when saved and
+                    are never shown again, here or anywhere.
                 </DialogDescription>
             </DialogHeader>
 
@@ -350,7 +351,7 @@ function PaymentsForm({
                         if (!o) setConfirming(null);
                     }}
                     title={`Disconnect ${labelOfPayment(confirming)}?`}
-                    description="Checkout stops taking card and UPI payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back."
+                    description="Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back."
                     confirmLabel="Disconnect"
                     onConfirm={() => void disconnect(confirming)}
                 />

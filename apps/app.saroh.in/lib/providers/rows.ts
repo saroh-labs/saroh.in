@@ -206,7 +206,7 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
 }
 
 const PAYMENTS_CONSEQUENCE =
-    "Checkout stops taking card and UPI payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back.";
+    "Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back.";
 
 export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
     const has = (key: ProviderHealth["key"]) =>
@@ -274,12 +274,12 @@ function paymentEntry(
         type: "Payments",
         state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
-            ? "Disconnected — checkout can't take card or UPI payments through it until it is connected again."
+            ? "Disconnected — checkout can't take online payments through it until it is connected again."
             : attention
               ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
               : stores.length > 0
-                ? sentence(`Takes card and UPI payments at ${words(stores)}`)
-                : "Ready to take card and UPI payments — no storefront's checkout uses it yet.",
+                ? sentence(`Takes online payments at ${words(stores)}`)
+                : "Ready to take online payments — no storefront's checkout uses it yet.",
         refs:
             live && p.publicKey?.trim()
                 ? [{ label: "Public key", code: p.publicKey.trim() }]
