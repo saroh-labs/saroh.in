@@ -340,9 +340,9 @@ describe("the order read's attention and contact (B15, review #19)", () => {
 
     it("the counter: the allergy with every allergen it matches, and a count of what it can't see", async () => {
         const read = await kitchenService.read(member, orders.Asha);
-        // contact:read gives the phone; the inbox still needs order:read.
+        // contact:read gives the phone and the email (a Member holds it).
         expect(read.customer?.phone).toMatch(/^\+91/);
-        expect(read.customer).not.toHaveProperty("email");
+        expect(read.customer?.email).toMatch(/@example\.in$/);
         expect(read.attention).toEqual({
             entries: [
                 expect.objectContaining({

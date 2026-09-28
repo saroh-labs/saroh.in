@@ -570,13 +570,13 @@ describe("the customer's own phone and email (review #19)", () => {
         });
     });
 
-    it("the counter (contact:read, no order:read) gets the phone, still no inbox", () => {
+    it("the counter (contact:read, no order:read) gets the phone and the email", () => {
         const read = serializeOrderRead(withCustomer, {
             ...opts(false),
             contact: true,
         });
         expect(read.customer?.phone).toBe("+91 98450 00001");
-        expect(read.customer).not.toHaveProperty("email");
+        expect(read.customer?.email).toBe("priya@example.in");
     });
 
     it.each([true, false])(

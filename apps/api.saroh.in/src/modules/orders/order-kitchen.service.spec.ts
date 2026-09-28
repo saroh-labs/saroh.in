@@ -1048,7 +1048,7 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
 });
 
 describe("the order read", () => {
-    it("a Member gets the kitchen view with no money figures and no email", async () => {
+    it("a Member gets the kitchen view with no money figures, and the email (contact:read)", async () => {
         const step = await kitchen.moveStage(MEMBER, "order_1", {
             to: "PREPARING",
         });
@@ -1057,7 +1057,7 @@ describe("the order read", () => {
         expect(read.money).toBeNull();
         expect(read.items[0]).not.toHaveProperty("price");
         expect(read.events[0]).not.toHaveProperty("amountCents");
-        expect(read.customer).not.toHaveProperty("email");
+        expect(read.customer?.email).toBe("asha@example.in");
         expect(read.customer?.name).toBe("Asha Rao");
         expect(read.notes).toBe("No sesame");
         expect(read.next.stages).toEqual(["READY"]);

@@ -20,10 +20,9 @@ import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
  *
  * The customer's own phone and email go only to a caller holding
  * `contact:read` (review #19), on this read, the list's rows and the quick
- * view alike (the email here also still needs `order:read`, as before: the
- * kitchen needs a name, not an inbox). The delivery address's phone is the
- * order's, not the customer's record: whoever works the order sees it,
- * since a local delivery can't go out without it.
+ * view alike: a Member holding `contact:read` sees both. The delivery
+ * address's phone is the order's, not the customer's record: whoever works
+ * the order sees it, since a local delivery can't go out without it.
  */
 
 interface DecimalLike {
@@ -152,7 +151,7 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         name: string | null;
         /** Their own phone: null without `contact:read` (review #19). */
         phone: string | null;
-        /** Only with `contact:read` (review #19) and `order:read`. */
+        /** Only with `contact:read` (review #19). */
         email?: string;
         /**
          * The contact this store customer is confirmed as (a
@@ -467,9 +466,7 @@ export function serializeOrderRead(
                   id: order.customer.id,
                   name: name || null,
                   phone: opts.contact ? order.customer.phone : null,
-                  ...(opts.contact && opts.fullRead
-                      ? { email: order.customer.email }
-                      : {}),
+                  ...(opts.contact ? { email: order.customer.email } : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
                   orderCount: order.customer._count?.orders ?? 1,
