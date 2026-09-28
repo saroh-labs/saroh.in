@@ -279,9 +279,9 @@ describe("the Step filter (B4)", () => {
         expect(handed).toEqual(
             expect.arrayContaining([
                 "SHIPPING.HANDED_TO_COURIER",
-                // A local delivery handed over the old way reads the same.
+                // A local delivery handed to a courier before the switch
+                // (B2c) still sits there, and reads the same.
                 "LOCAL_DELIVERY.HANDED_TO_COURIER",
-                "DELIVERY.HANDED_TO_COURIER",
             ]),
         );
         expect(handed.some((p) => p.startsWith("PICKUP."))).toBe(false);
@@ -290,7 +290,6 @@ describe("the Step filter (B4)", () => {
         // ("Booked"), though all three are stage NEW.
         const fresh = stepPairs("new");
         expect(fresh).toContain("PICKUP.NEW");
-        expect(fresh).toContain("COLLECT.NEW");
         expect(fresh).not.toContain("DIGITAL.NEW");
         expect(fresh).not.toContain("APPOINTMENT_ONLINE.NEW");
         const paid = stepPairs("paid");

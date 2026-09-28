@@ -19,7 +19,6 @@ describe("filterOptionsFrom", () => {
     it("offers only the ways the business's orders leave, in table order", () => {
         const { types } = filterOptionsFrom([
             combo("SHIPPING", "NEW"),
-            combo("COLLECT", "NEW"),
             combo("PICKUP", "READY"),
         ]);
         expect(types).toEqual([
@@ -69,9 +68,9 @@ describe("filterOptionsFrom", () => {
         expect(types.map((t) => t.type)).toEqual(["PICKUP", "SHIPPING"]);
     });
 
-    it("reads a local delivery handed over the old way as Handed to courier", () => {
+    it("reads a local delivery still with a courier as Handed to courier", () => {
         const { steps } = filterOptionsFrom([
-            combo("DELIVERY", "HANDED_TO_COURIER", "SHIPPED"),
+            combo("LOCAL_DELIVERY", "HANDED_TO_COURIER", "SHIPPED"),
             combo("LOCAL_DELIVERY", "OUT_FOR_DELIVERY", "SHIPPED"),
         ]);
         // Both sit at the same point of the same type: by word.

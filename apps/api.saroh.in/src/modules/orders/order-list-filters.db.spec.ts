@@ -187,9 +187,10 @@ describe("the Step filter: what the pill says", () => {
             stage: "HANDED_TO_COURIER",
             status: "SHIPPED",
         });
-        // A local delivery handed to a courier before the switch release.
+        // A local delivery handed to a courier before the switch release,
+        // renamed by it (B2c) and still with the courier.
         o.legacyLocal = await order({
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             stage: "HANDED_TO_COURIER",
             status: "SHIPPED",
         });
