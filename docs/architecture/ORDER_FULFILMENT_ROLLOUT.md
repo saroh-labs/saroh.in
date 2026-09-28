@@ -358,7 +358,7 @@ Not one of the three releases: it adds a column and changes no enum value.
 It needs release 1's values and ships with release 2 or after it, always
 before release 3 (the phase-2 waves plan puts B12 ahead of B2d).
 
-- **Migration** `20261012100000_product_fulfilment_types`: `ALTER TABLE
+- **Migration** `20261012110000_product_fulfilment_types`: `ALTER TABLE
 "Product" ADD COLUMN "fulfilmentTypes" "OrderFulfilment"[] DEFAULT '{}'`.
   A catalogue change under a brief ACCESS EXCLUSIVE lock on `Product` with
   a constant default: no rewrite, constant time. Every existing product
