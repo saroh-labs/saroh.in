@@ -578,7 +578,7 @@ describe("fulfilment types, release 2: the switch (real database)", () => {
         const sql = readFileSync(
             join(
                 __dirname,
-                "../../../../../packages/database/prisma/migrations/20261011100000_order_fulfilment_switch/migration.sql",
+                "../../../../../packages/database/prisma/migrations/20261011160000_order_fulfilment_switch/migration.sql",
             ),
             "utf8",
         );

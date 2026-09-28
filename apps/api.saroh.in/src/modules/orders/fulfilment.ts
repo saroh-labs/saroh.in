@@ -37,7 +37,7 @@ export type { FulfilmentType, LegacyFulfilment } from "./dto";
 /**
  * The write switch. Off in release 1: create, edit and the kitchen stored
  * only the values the image before it could read. On from release 2 (B2c),
- * whose migration (`20261011100000_order_fulfilment_switch`) rewrites every
+ * whose migration (`20261011160000_order_fulfilment_switch`) rewrites every
  * row first: every write is a type's own name, a local delivery goes out for
  * delivery, and Shipping and Digital can be created. Rolling back is
  * deploying release 1's tag, which reads all of it. A constant, not an
