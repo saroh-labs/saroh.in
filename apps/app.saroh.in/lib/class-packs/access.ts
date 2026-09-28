@@ -15,3 +15,14 @@ export function canWritePacks(organization: Org): boolean {
         ? organization.actions.includes("pack:write")
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
 }
+
+/**
+ * Sell at the desk: `pack:sell` once E26 adds it, which `pack:write`
+ * implies; until then `pack:write`, as the API asks.
+ */
+export function canSellPacks(organization: Org): boolean {
+    return organization?.actions
+        ? organization.actions.includes("pack:sell") ||
+              organization.actions.includes("pack:write")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+}

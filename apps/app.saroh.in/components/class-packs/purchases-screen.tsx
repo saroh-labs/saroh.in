@@ -16,6 +16,7 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PackStanding } from "@/lib/class-packs/balance";
+import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { invoiceMoney } from "@/lib/invoices/money";
 
@@ -122,6 +123,16 @@ export function PurchasesScreen({
             cell: (p) => invoiceMoney(p.price, p.currency),
         },
         {
+            id: "paid-by",
+            header: "Paid by",
+            priority: "detail",
+            width: "118px",
+            sortValue: (p) => paidByLabel(p.paidBy),
+            cell: (p) => (
+                <span className="text-[12.5px]">{paidByLabel(p.paidBy)}</span>
+            ),
+        },
+        {
             id: "invoice",
             header: "Invoice",
             priority: "detail",
@@ -192,6 +203,12 @@ export function PurchasesScreen({
                     contacts={contacts}
                     packs={packs}
                     invoicesOnSale={invoicesOnSale}
+                    held={purchases.map((p) => ({
+                        contactId: p.contact.id,
+                        packId: p.pack.id,
+                        left: p.left,
+                        standing: p.standing,
+                    }))}
                 />
             ) : null}
         </>
