@@ -125,6 +125,9 @@ describe("SitesService.createPage", () => {
         ["/shop/sale", "your shop", "/shop"],
         ["/checkout", "where your customers pay", "/checkout"],
         ["/checkout/thanks", "where your customers pay", "/checkout"],
+        // The account area's route wins there, on or off (G15).
+        ["/account", "where your customers see their account", "/account"],
+        ["/account/help", "where your customers see their account", "/account"],
     ])(
         "refuses a free-form page at %s, saying what it is for, with another address (G14)",
         async (path, purpose, root) => {
