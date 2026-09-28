@@ -9,7 +9,7 @@ import {
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
-import { loadReadyChecklist } from "@/lib/settings/ready-service";
+import { loadSettingsChecklist } from "@/lib/settings/ready-service";
 import { listStorefrontHours } from "@/lib/stores/storefronts";
 
 /**
@@ -22,9 +22,10 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  * role denial reaches forbidden.tsx; an unavailable API reaches error.tsx.
  *
  * Above the tabs, for someone who may change things, "Ready to take
- * payments": what is left to set up (`loadReadyChecklist`, the same list as
- * Home's). Its extra read is best-effort — one that fails drops its steps,
- * never the page.
+ * payments": what is left to set up — Home's steps, then the email, business
+ * type, logo and pipeline nudges (`loadSettingsChecklist`, DEC-056). Its
+ * extra reads are best-effort — one that fails drops its steps, never the
+ * page.
  */
 export const metadata = { title: "Business" };
 
@@ -46,9 +47,11 @@ export default async function OrganizationSettingsPage() {
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const canEdit = may("org:update");
 
-    // The same steps and count as Home's "Get ready to take money".
+    // Home's "Get ready to take money" steps, and what Settings adds.
     const ready =
-        settings && canEdit ? await loadReadyChecklist(settings) : null;
+        settings && canEdit
+            ? await loadSettingsChecklist(settings, may("comms:manage"))
+            : null;
 
     return (
         <SettingsPanel

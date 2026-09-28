@@ -1,4 +1,5 @@
 import type { ModuleView } from "@/lib/modules/schema";
+import { rolledOut } from "@/lib/modules/switch-plan";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -26,8 +27,12 @@ import { BUSINESS_TAB_PARAM } from "./search";
 /** Why email needs a person, or `null` when it does not (or we can't tell). */
 export type EmailAttention = "disconnected" | "not-connected";
 
-const on = (modules: readonly ModuleView[], key: string) =>
-    modules.find((m) => m.key === key)?.lifecycle === "ENABLED";
+/**
+ * On for this business, and rolled out by Saroh: a module whose rollout is
+ * off is never named to the business, here or anywhere (DEC-057).
+ */
+export const on = (modules: readonly ModuleView[], key: string) =>
+    rolledOut(modules).find((m) => m.key === key)?.lifecycle === "ENABLED";
 
 /**
  * Only while Communications is on — off, nothing is sent to anyone. Then
@@ -64,8 +69,11 @@ export function providersTabNote(attention: EmailAttention | null) {
 export type ReadyStepKey =
     "payments" | "address" | "tax" | "catalogue" | "site";
 
+/** What Settings also asks for, beside the steps (`nudges.ts`, DEC-056). */
+export type SettingsNudgeKey = "email" | "businessType" | "logo" | "pipeline";
+
 export interface ReadyItem {
-    key: ReadyStepKey;
+    key: ReadyStepKey | SettingsNudgeKey;
     /** The step, as a thing to do ("Connect payments"). */
     label: string;
     /** Why it matters, in a sentence. */
@@ -91,7 +99,7 @@ export interface ReadyChecklist {
     total: number;
 }
 
-const business = (section: string) =>
+export const business = (section: string) =>
     `/settings/organization?${BUSINESS_TAB_PARAM}=${section}`;
 
 /** Modules that take money for something: a sale, a booking, a course, a pack. */
@@ -286,7 +294,7 @@ function site(
  */
 export function readyChecklist({
     settings,
-    modules,
+    modules: all,
 }: {
     settings: Pick<
         OrganizationSettings,
@@ -294,6 +302,8 @@ export function readyChecklist({
     >;
     modules: readonly ModuleView[] | null;
 }): ReadyChecklist {
+    // Never a step for a module Saroh has not rolled out (DEC-057).
+    const modules = all ? rolledOut(all) : null;
     const checks = [
         modules ? payments(modules) : null,
         // Absent from an API older than the registered address: unknown.
