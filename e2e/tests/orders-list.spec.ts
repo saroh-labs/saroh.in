@@ -246,8 +246,8 @@ test.describe("orders list", () => {
 
         // Tap the card away from the name: the link's hit area is the card.
         // The filter bar (B4) can push the first card under the tab bar, so
-        // bring it into view first.
-        await card.scrollIntoViewIfNeeded();
+        // bring it to the middle of the screen, clear of the fixed tab bar.
+        await card.evaluate((el) => el.scrollIntoView({ block: "center" }));
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         if (!box) return;
