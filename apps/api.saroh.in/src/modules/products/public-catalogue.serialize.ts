@@ -162,11 +162,12 @@ export function blurbOf(html: string | null): string | null {
     const text = html
         .replace(/<[^>]*>/g, " ")
         .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        // Last, so "&amp;lt;" reads "&lt;" and is never unescaped twice.
+        .replace(/&amp;/g, "&")
         .replace(/\s+/g, " ")
         .trim();
     if (!text) return null;
