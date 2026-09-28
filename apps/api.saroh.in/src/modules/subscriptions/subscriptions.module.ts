@@ -8,6 +8,8 @@ import { InvoicesModule } from "../invoices/invoices.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PublicPlansController } from "./public-plans.controller";
+import { PublicPlansService } from "./public-plans.service";
 import {
     SUBSCRIPTION_RENEW_TYPE,
     SubscriptionRenewHandler,
@@ -34,9 +36,14 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         InvoicesModule,
         JobsModule,
     ],
-    controllers: [SubscriptionPlansController, SubscriptionsController],
+    controllers: [
+        SubscriptionPlansController,
+        SubscriptionsController,
+        PublicPlansController,
+    ],
     providers: [
         SubscriptionsService,
+        PublicPlansService,
         SubscriptionRenewHandler,
         OrganizationGuard,
     ],
