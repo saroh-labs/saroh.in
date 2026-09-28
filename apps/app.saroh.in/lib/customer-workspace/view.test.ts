@@ -48,7 +48,7 @@ function order(over: Partial<DetailOrder> = {}): DetailOrder {
                 quantity: 1,
             },
         ],
-        fulfilment: "COLLECT",
+        fulfilmentType: "PICKUP",
         stage: "COLLECTED",
         delivery: null,
         total: "500.00",
@@ -109,7 +109,7 @@ function shop(over: Partial<CustomerDetail> = {}): CustomerDetail {
                     id: "o2",
                     number: "1050",
                     placedAt: "2026-08-12T05:00:00Z",
-                    fulfilment: "DELIVERY",
+                    fulfilmentType: "LOCAL_DELIVERY",
                     delivery: "14 Hill Road, Bengaluru",
                     total: "1000.00",
                 }),
@@ -340,16 +340,12 @@ describe("a shop customer's overview", () => {
         expect(howTheyGet([order()])).toBe("Always collects at Rye & Co.");
         // Read from the type (DEC-045): a shipment is delivered too, and a
         // download is not.
-        expect(
-            howTheyGet([
-                order({ fulfilment: "DELIVERY", fulfilmentType: "SHIPPING" }),
-            ]),
-        ).toBe("Always delivered.");
-        expect(
-            howTheyGet([
-                order({ fulfilment: "COLLECT", fulfilmentType: "PICKUP" }),
-            ]),
-        ).toBe("Always collects at Rye & Co.");
+        expect(howTheyGet([order({ fulfilmentType: "SHIPPING" })])).toBe(
+            "Always delivered.",
+        );
+        expect(howTheyGet([order({ fulfilmentType: "PICKUP" })])).toBe(
+            "Always collects at Rye & Co.",
+        );
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
         );

@@ -52,10 +52,8 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
-    /** The legacy word (COLLECT or DELIVERY) until B2d. */
-    fulfilment: string;
-    /** How it leaves (DEC-045); absent only from an API before B2a. */
-    fulfilmentType?: FulfilmentType;
+    /** How it leaves (DEC-045). */
+    fulfilmentType: FulfilmentType;
     stage: string;
     delivery: string | null;
     total?: string;

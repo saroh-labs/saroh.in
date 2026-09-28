@@ -53,7 +53,6 @@ function row(over: Partial<OrderRow> = {}): OrderRow {
         itemCount: 2,
         productNames: ["Sourdough loaf"],
         moreProducts: 0,
-        fulfilment: "COLLECT",
         fulfilmentType: "PICKUP",
         fulfilmentLabel: "Pick-up",
         steps: PICKUP,
@@ -89,7 +88,6 @@ describe("rowProgress", () => {
     it("reads a Local delivery handed to a courier before B2c, with Delivered next", () => {
         const p = rowProgress(
             row({
-                fulfilment: "DELIVERY",
                 fulfilmentType: "LOCAL_DELIVERY",
                 fulfilmentLabel: "Local delivery",
                 steps: LEGACY_LOCAL,
