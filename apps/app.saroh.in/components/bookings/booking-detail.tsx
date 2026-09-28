@@ -14,6 +14,7 @@ import {
     deadlineText,
     paidLine,
     refundLine,
+    refundPolicyLine,
 } from "@/lib/services/booking-money";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
@@ -70,6 +71,8 @@ export function BookingDetailView({
     // What was paid online at booking, what is due, and any refund (E8).
     const paid = booking.money ? paidLine(booking.money) : null;
     const refund = booking.money ? refundLine(booking.money) : null;
+    // The business's refund policy, as it is set (E30, DEC-058).
+    const policy = refundPolicyLine(booking.money, !!booking.freeCancelUntil);
     const showPacks =
         packs !== undefined &&
         (packs.paidWith !== null ||
@@ -190,6 +193,11 @@ export function BookingDetailView({
                         <p className="mt-2 text-sm text-muted-foreground">
                             Free to cancel until{" "}
                             {deadlineText(booking.freeCancelUntil, timezone)}.
+                        </p>
+                    ) : null}
+                    {!cancelled && !past && policy ? (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {policy}
                         </p>
                     ) : null}
                     {retired && !cancelled && !past ? (

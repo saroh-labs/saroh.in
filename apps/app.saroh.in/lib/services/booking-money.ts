@@ -27,6 +27,16 @@ export interface BookingMoney {
     /** Left to pay at the visit; null for a pack's class, or once cancelled. */
     dueCents: number | null;
     refund: BookingRefund | null;
+    /**
+     * What a cancel could hand back now, never more than was received
+     * (DEC-058). Absent from an API older than E30: what was paid online.
+     */
+    refundableCents?: number;
+    /**
+     * The business's refund policy (E30, DEC-058): a cancel in time refunds
+     * what was paid online automatically. Absent from an older API: on.
+     */
+    refundInTimeCancels?: boolean;
 }
 
 /** What a cancel did with money paid online (`DELETE bookings/:id`). */
@@ -99,16 +109,49 @@ export function deadlineText(iso: string, timeZone: string): string {
         .replace("Sept", "Sep");
 }
 
+/** What a cancel could hand back: never more than was received. */
+function refundable(m: BookingMoney): number {
+    return m.refundableCents ?? m.paidOnlineCents;
+}
+
+/** "the ₹400 deposit", "the ₹800 paid online". */
+function theMoney(m: BookingMoney): string {
+    const amount = money(refundable(m), m.currency);
+    return m.deposit ? `the ${amount} deposit` : `the ${amount} paid online`;
+}
+
+/**
+ * The business's refund policy as the booking page states it (E30,
+ * DEC-058), or null when nothing paid online is left to refund. The
+ * free-cancel deadline, when the booking has one, is said just before it.
+ */
+export function refundPolicyLine(
+    m: BookingMoney | undefined,
+    hasDeadline: boolean,
+): string | null {
+    if (!m || m.refund || m.paidOnlineCents <= 0 || refundable(m) <= 0) {
+        return null;
+    }
+    if (m.refundInTimeCancels === false) {
+        return `Your refund policy: ${theMoney(m)} isn't refunded automatically if it's cancelled.`;
+    }
+    return hasDeadline
+        ? `Your refund policy: ${theMoney(m)} is refunded automatically if it's cancelled by then.`
+        : `Your refund policy: ${theMoney(m)} is refunded automatically if it's cancelled.`;
+}
+
 /** What cancelling now will do with money paid online, before it is done. */
 export interface CancelPlan {
     /** Past the free-cancel time fixed at booking. */
     late: boolean;
+    /** The cancel keeps the money: late, or the policy doesn't refund. */
+    keeps: boolean;
     /** "₹400". */
     amount: string;
     /** "deposit" or "payment". */
     what: "deposit" | "payment";
     body: string;
-    /** Late, and the caller may refund it anyway. */
+    /** Kept, and the caller may refund it anyway, by hand. */
     canOverride: boolean;
 }
 
@@ -116,7 +159,8 @@ export interface CancelPlan {
  * The cancel dialog's plan, or null when nothing was paid online (or it
  * has already gone back) and a cancel needs no word about money. The
  * deadline is the one fixed at booking (DEC-051); a booking with none is
- * never late.
+ * never late. In time, the business's refund policy decides (DEC-058); the
+ * amount is never more than was received.
  */
 export function cancelPlan(input: {
     money: BookingMoney | undefined;
@@ -126,24 +170,40 @@ export function cancelPlan(input: {
     canRefund: boolean;
 }): CancelPlan | null {
     const m = input.money;
-    if (!m || m.paidOnlineCents <= 0 || m.refund) return null;
-    const amount = money(m.paidOnlineCents, m.currency);
+    if (!m || m.paidOnlineCents <= 0 || m.refund || refundable(m) <= 0) {
+        return null;
+    }
+    const amount = money(refundable(m), m.currency);
     const what = m.deposit ? "deposit" : "payment";
     const late =
         !!input.freeCancelUntil &&
         input.now > new Date(input.freeCancelUntil).getTime();
-    if (!late) {
+    if (!late && m.refundInTimeCancels !== false) {
         return {
             late,
+            keeps: false,
             amount,
             what,
             canOverride: false,
             body: `It's before the free-cancel time, so the ${amount} ${what} is refunded to them.`,
         };
     }
+    if (!late) {
+        return {
+            late,
+            keeps: true,
+            amount,
+            what,
+            canOverride: input.canRefund,
+            body: input.canRefund
+                ? `Your refund policy doesn't refund cancellations automatically, so the ${amount} ${what} is kept. You can refund it anyway.`
+                : `Your refund policy doesn't refund cancellations automatically, so the ${amount} ${what} is kept. Only someone who can refund payments can give it back.`,
+        };
+    }
     const when = deadlineText(input.freeCancelUntil ?? "", input.timezone);
     return {
         late,
+        keeps: true,
         amount,
         what,
         canOverride: input.canRefund,

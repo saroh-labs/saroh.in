@@ -375,7 +375,7 @@ export default function BookingFlow({
         : pay === "NOW" || pay === "DEPOSIT"
           ? "Pay and book"
           : "Book";
-    const rules = rulesText(page.rules);
+    const rules = rulesText(page.rules, pay === "NOW" || pay === "DEPOSIT");
 
     // ── Watching a hold ─────────────────────────────────────────────────
 
