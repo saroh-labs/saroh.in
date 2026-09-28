@@ -286,6 +286,9 @@ model Organization {
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]
+
+  // Autopay mandates at the business's own provider (round-2 D11, D20).
+  paymentMandates PaymentMandate[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3360,6 +3363,10 @@ model Contact {
   // the business's site and answered by the team (round-2 A13). At most one.
   customerThread CustomerThread?
 
+  // The autopay mandates they authorised (round-2 D11). Never moved by a
+  // merge: the merged-away person's are cancelled (D20).
+  paymentMandates PaymentMandate[]
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -5031,6 +5038,10 @@ model CustomerSubscription {
   classesPerPeriod      Int?
   classesPerPeriodSetAt DateTime?
 
+  // Its autopay mandates (round-2 D11): at most one ACTIVE, and every one
+  // ends when the subscription does (D20).
+  paymentMandates PaymentMandate[]
+
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
@@ -5658,4 +5669,60 @@ model CustomerThreadMessage {
   @@index([threadId, createdAt])
   @@index([customerAccountId, createdAt])
   @@index([invoiceId, createdAt])
+}
+
+/// An autopay mandate at the business's own payment provider (round-2 D11,
+/// DEC-038): the customer's authorisation for the provider to charge one
+/// subscription's renewals. Saroh keeps only the provider's ids and what it
+/// returns as displayable; card and bank details never reach Saroh.
+///
+/// It belongs to exactly one subscription and ends with it (D20): every
+/// move of that subscription to CANCELLED, a privacy removal of the contact
+/// and a merge that retires the contact cancel it at the provider through
+/// `payments/mandates.service.ts` (`cancelFor`, or `cancelMandatesInTx`
+/// with the `mandate.cancel` job). It is marked CANCELLED before the
+/// provider answers, so it is never charged again; `cancelConfirmedAt` is
+/// set once the provider has said so (null: "being confirmed", DEC-026).
+///
+/// D20 built the smallest piece of D11's model it needs; D11 adds the
+/// set-up, the limit and the charge columns.
+model PaymentMandate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   CustomerSubscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The MerchantPaymentProvider it was set up with: "RAZORPAY" | "CASHFREE".
+  provider           String
+  // The provider's customer and mandate (or token) ids. Null while a set-up
+  // hasn't reached the provider; such a mandate is cancelled without a call.
+  providerCustomerId String?
+  providerMandateId  String?
+  // Only what the provider returns as displayable (a masked handle, the
+  // last four digits). Cleared by a privacy removal (C11).
+  displayHint        String?
+
+  // PENDING | ACTIVE | PAUSED | CANCELLED | FAILED
+  status            String    @default("PENDING")
+  activatedAt       DateTime?
+  cancelledAt       DateTime?
+  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER
+  cancelReason      String?
+  // When the provider confirmed the cancel. Null on a CANCELLED row: Saroh
+  // stopped charging it, and is still confirming with the provider.
+  cancelConfirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A subscription has at most one ACTIVE mandate.
+  @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))
+  @@index([organizationId])
+  @@index([organizationId, subscriptionId, status])
+  @@index([organizationId, contactId, status])
 }
