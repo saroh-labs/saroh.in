@@ -91,16 +91,13 @@ the backfill wrote stay; the old API sends them in the checkout handoff,
 which is what its checkout needed all along, so nothing breaks. Nothing
 needs undoing.
 
-### Cashfree (noted, not changed)
+### Payment methods (DEC-059)
 
 Cashfree's drop-in opens on the order's payment session, so it needs no
-public key and its setup is unchanged. It shows whatever methods the
-business's Cashfree account has on, because the order Saroh creates sets
-none (`providers/cashfree.provider.ts`), while Razorpay's window is limited
-to UPI and card (`packages/site-blocks/src/booking-flow/checkout.ts`). The
-booking page promises "UPI or card". Limiting Cashfree the same way would
-mean setting `order_meta.payment_methods` (for example `"upi,cc,dc"`) on the
-order; it is left for a decision.
+public key and its setup is unchanged. Neither provider's order sets any
+methods, and since D23 Razorpay's window isn't limited either: each shows the
+methods the business has switched on in its own account. Saroh's copy names
+no methods ("Pay online in the ‹provider› window").
 
 ---
 
