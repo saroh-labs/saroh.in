@@ -135,8 +135,10 @@ function openRazorpay(
     onOpen: (checkout: RazorpayCheckout) => boolean,
 ): void {
     const { handoff } = request;
-    // The checkout's key is the public key the business connected; the key
-    // id stays sealed on the API.
+    // The checkout's key is the connection's public key — for Razorpay, its
+    // key id, which setup stores beside the sealed pair (DEC-054). The API
+    // makes no order for a Razorpay connection without it, so a missing one
+    // here is a handoff it can't use.
     const key = text(handoff.publicKey);
     const orderId =
         text(handoff.clientParams.razorpayOrderId) ??
