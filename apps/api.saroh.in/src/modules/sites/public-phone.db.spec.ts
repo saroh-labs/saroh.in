@@ -196,7 +196,15 @@ describe("the business's public phone (real database)", () => {
     it("never serves a stored value that isn't E.164", async () => {
         // Past the API, the migration's CHECK refuses this; `db push` builds
         // the test schema without it, so the read's own re-check is what
-        // this proves.
+        // this proves. A schema that does have the CHECK (the RLS run adds
+        // it) already makes such a row impossible, so there is nothing left
+        // to prove there.
+        const [{ enforced }] = await prisma.$queryRaw<{ enforced: boolean }[]>`
+            SELECT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'BusinessProfile_phone_e164'
+            ) AS enforced`;
+        if (enforced) return;
         const odd = await business("Odd Number");
         await prisma.businessProfile.create({
             data: {

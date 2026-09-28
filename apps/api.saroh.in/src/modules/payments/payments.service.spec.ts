@@ -314,8 +314,8 @@ describe("PaymentsService.connectProvider — the public key (DEC-054)", () => {
         await expect(
             service.connectProvider(ctx(), {
                 provider: "RAZORPAY",
-                keyId: "rzp_live_AbC123",
-                keySecret: "rzp_live_AbC123",
+                keyId: "rzp_live_AbC123", // gitleaks:allow
+                keySecret: "rzp_live_AbC123", // gitleaks:allow
             }),
         ).rejects.toThrow(/secret is the key id/);
         expect(providerUpsert).not.toHaveBeenCalled();
