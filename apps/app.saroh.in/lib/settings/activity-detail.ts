@@ -13,6 +13,7 @@ import {
     text,
 } from "./activity-changes";
 import { detailsLabels, mergedMoves } from "./activity-customers";
+import { extrasRows } from "./activity-extras";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -283,6 +284,13 @@ function detailRows(
         case "membership.role.update":
             return {
                 rows: [row("Role", role(meta.from), role(meta.to))],
+                withoutValues: false,
+            };
+        case "membership.extras.update":
+            // A person's extra permissions (F17): what was given and what
+            // was taken away, in the owner's words.
+            return {
+                rows: extrasRows(meta).map((r) => row(r.label, null, r.value)),
                 withoutValues: false,
             };
         case "membership.remove":

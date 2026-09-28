@@ -1,11 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import type { InviteMemberInput } from "./members";
 import {
     dismissStorefrontTeamNotice as dismissStorefrontTeamNoticeApi,
     inviteMember as inviteMemberApi,
     removeMember as removeMemberApi,
     revokeInvitation as revokeInvitationApi,
+    setMemberExtraActions as setMemberExtraActionsApi,
     updateMemberRole as updateMemberRoleApi,
 } from "./members";
 
@@ -26,6 +29,16 @@ export async function updateMemberRole(
     input: { role: string; siteIds?: string[] },
 ) {
     return updateMemberRoleApi(userId, input);
+}
+
+/**
+ * A person's extra permissions (F17). Revalidates the layout: what someone
+ * holds decides what their rail shows.
+ */
+export async function setMemberExtraActions(userId: string, actions: string[]) {
+    const res = await setMemberExtraActionsApi(userId, actions);
+    if (res.ok) revalidatePath("/", "layout");
+    return res;
 }
 
 export async function removeMember(userId: string) {

@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationMember } from "@/lib/organizations/members";
+import type { RoleCatalogue } from "@/lib/organizations/roles";
 
 import { TeamScreen } from "./team-screen";
 
@@ -16,6 +17,7 @@ vi.mock("@/lib/organizations/member-actions", () => ({
     removeMember: vi.fn(),
     revokeInvitation: vi.fn(),
     updateMemberRole: vi.fn(),
+    setMemberExtraActions: vi.fn(),
 }));
 
 function member(
@@ -32,7 +34,10 @@ function member(
     };
 }
 
-function renderPeople(members: OrganizationMember[]) {
+function renderPeople(
+    members: OrganizationMember[],
+    catalogue: RoleCatalogue | null = null,
+) {
     return renderToString(
         createElement(TeamScreen, {
             organizationName: "Rye Bakery",
@@ -42,7 +47,7 @@ function renderPeople(members: OrganizationMember[]) {
             canManage: true,
             canEditRoles: true,
             roles: [],
-            catalogue: null,
+            catalogue,
             myActions: null,
         }),
     );
@@ -73,5 +78,44 @@ describe("TeamScreen People (F15)", () => {
             "xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]",
         );
         expect(html).not.toContain("_112px_minmax(0,1fr)_150px");
+    });
+});
+
+describe("TeamScreen People: extra permissions (F17)", () => {
+    const catalogue: RoleCatalogue = {
+        groups: ["sell"],
+        capabilities: [
+            { action: "order:refund", group: "sell", label: "Refund orders" },
+        ],
+    };
+    const people = (extras: string[]) => [
+        member({ userId: "u1", name: "Asha", role: "OWNER", isSelf: true }),
+        member({ userId: "u3", name: "Meera", extraActions: extras }),
+    ];
+
+    it("shows the column once one person has an extra, with its name", () => {
+        const html = renderPeople(people(["order:refund"]), catalogue);
+        expect(html).toContain("Extra permissions");
+        expect(html).toContain("Refund orders");
+        expect(html).toContain(
+            "xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]",
+        );
+        // Everyone else says none, in words for a screen reader.
+        expect(html).toContain("No extra permissions");
+        // Never a code.
+        expect(html).not.toContain("order:refund");
+    });
+
+    it("hides the column again when the last extra is removed", () => {
+        const html = renderPeople(people([]), catalogue);
+        expect(html).not.toContain("Extra permissions");
+        expect(html).toContain(
+            "xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]",
+        );
+    });
+
+    it("names the Edit button for the role and the permissions", () => {
+        const html = renderPeople(people([]), catalogue);
+        expect(html).toContain("role and permissions");
     });
 });
