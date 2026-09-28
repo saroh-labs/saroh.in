@@ -2001,6 +2001,15 @@ model StoreSettings {
   // Null is free. B9 prefills a change of fulfilment from it.
   localDeliveryFee Decimal? @db.Decimal(10, 2)
   shippingFee      Decimal? @db.Decimal(10, 2)
+
+  // Customers who share an email (DEC-055, C15). Set: from this moment on,
+  // a customer of this storefront who pays with an email that a contact
+  // made from another store customer already holds is linked to that
+  // contact on their own (`customer-workspace/same-email-link.ts`). Null
+  // leaves the pair for staff: the default, and every existing
+  // storefront's. Store customers from before it was set stay as they
+  // are, so turning it on never re-links a pair that already existed.
+  linkSameEmailSince DateTime?
 }
 
 model StoreFeatures {

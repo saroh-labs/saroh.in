@@ -100,6 +100,12 @@ export class StorefrontsController {
         @Body() dto: UpdateStorefrontDto,
     ) {
         authorize(ctx, "store:write");
+        // Linking customers who share an email decides whose orders join
+        // whose customer record (C15): a customer-record call, as a link
+        // made by hand is.
+        if (dto.linkSameEmailCustomers !== undefined) {
+            authorize(ctx, "contact:write");
+        }
         return this.storefronts.update(
             ctx.organizationId,
             storeId,

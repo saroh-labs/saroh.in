@@ -49,6 +49,8 @@ export const VALUE_FIELDS = [
     "pickupLateAfterMinutes",
     "localDeliveryLateAfterMinutes",
     "shippingLateAfterMinutes",
+    // Whether a storefront links customers who share an email (C15).
+    "linkSameEmailCustomers",
 ] as const;
 
 /**

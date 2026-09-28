@@ -67,6 +67,9 @@ export default async function StorefrontsPage({
                 }
                 canEdit={may("store:write")}
                 canClose={may("store:delete")}
+                // How customers who share an email are linked is a
+                // customer-record call too (C15): the API asks for both.
+                canLinkCustomers={may("store:write") && may("contact:write")}
             />
         </PageContainer>
     );

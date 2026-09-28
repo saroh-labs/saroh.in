@@ -112,6 +112,15 @@ export interface StorefrontSettings extends StorefrontSummary {
      * flag, G11/G13): the fees above are asked for only then.
      */
     siteShop: boolean;
+    /**
+     * Customers who share an email (DEC-055, C15): whether a customer of
+     * this storefront who pays with an email a store-made contact already
+     * holds is linked to it on their own (true), or left for staff (false,
+     * the default). `linkSameEmailSince` is when it was turned on: only
+     * customers made since are linked.
+     */
+    linkSameEmailCustomers: boolean;
+    linkSameEmailSince: string | null;
     /** The provider this storefront's checkout names, if it names one. */
     checkoutProvider: string | null;
     /**
@@ -270,6 +279,9 @@ export class StorefrontsService {
                 ? toMoneyString(settings.shippingFee)
                 : null,
             siteShop,
+            linkSameEmailCustomers: Boolean(settings?.linkSameEmailSince),
+            linkSameEmailSince:
+                settings?.linkSameEmailSince?.toISOString() ?? null,
             checkoutProvider: named,
             effectiveProvider: named
                 ? connected.some((p) => p.provider === named)
@@ -377,6 +389,17 @@ export class StorefrontsService {
                           : null,
                   }
                 : {}),
+            // Turning it on twice keeps the first time, as pausing does:
+            // the time is where "customers made since" starts (C15).
+            ...(dto.linkSameEmailCustomers !== undefined
+                ? {
+                      linkSameEmailSince: dto.linkSameEmailCustomers
+                          ? current.linkSameEmailSince
+                              ? new Date(current.linkSameEmailSince)
+                              : new Date()
+                          : null,
+                  }
+                : {}),
             ...(dto.checkoutProvider !== undefined
                 ? {
                       checkoutProvider:
@@ -462,7 +485,49 @@ export class StorefrontsService {
                 saved,
             );
         }
+        if (dto.linkSameEmailCustomers !== undefined && actorUserId) {
+            await this.recordSameEmail(
+                organizationId,
+                actorUserId,
+                current,
+                saved,
+            );
+        }
         return saved;
+    }
+
+    /**
+     * Customers who share an email turned on or off (C15), in Settings ›
+     * Activity: which storefront, and the setting as it was and became. A
+     * save that left it as it was records nothing.
+     */
+    private async recordSameEmail(
+        organizationId: string,
+        actorUserId: string,
+        before: StorefrontSettings,
+        after: StorefrontSettings,
+    ): Promise<void> {
+        const changes = recordableChanges([
+            {
+                field: "linkSameEmailCustomers",
+                before: before.linkSameEmailCustomers,
+                after: after.linkSameEmailCustomers,
+            },
+        ]);
+        if (changes.length === 0) return;
+        await this.audit?.record({
+            action: AuditAction.StorefrontSameEmailUpdate,
+            actorUserId,
+            organizationId,
+            targetType: "storefront",
+            targetId: after.id,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: ["linkSameEmailCustomers"],
+                storefront: after.name,
+                changes: changes as unknown as Prisma.InputJsonArray,
+            },
+        });
     }
 
     /**

@@ -86,7 +86,13 @@ organizations/:org/customers`: everyone who has paid (an order through a
   next payment (link reason `BACKFILL` or `PAYMENT`) — **unless a contact
   already holds their email**. Then nothing is linked on its own (#120): the
   list names them ("12 paying customers aren't linked to a contact yet ·
-  Review") and a person links them from the review sheet. So say "one list of
+  Review") and a person links them from the review sheet. **A storefront may
+  choose otherwise** (DEC-055, C15, Sell → Storefronts → Customers, off by
+  default): a customer of it who pays with an email held by a contact that
+  was itself made from a store customer is linked to that contact, through
+  `resolveContact` — never to a contact staff entered, a lead or a removed
+  one, never when the contact signs in without a verified email (DEC-049),
+  and never for a store customer made before the setting was turned on. So say "one list of
   customers", never that every order and booking is already one record:
   someone added by hand, or who ordered and hasn't paid, is in Contacts or on
   their storefront record, not in this list, and the list says so (§14,
