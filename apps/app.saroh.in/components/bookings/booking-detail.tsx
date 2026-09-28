@@ -10,6 +10,11 @@ import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatStatus } from "@/lib/format/status";
+import {
+    deadlineText,
+    paidLine,
+    refundLine,
+} from "@/lib/services/booking-money";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 
@@ -27,8 +32,11 @@ export function BookingDetailView({
     booking,
     past,
     packs,
+    canRefund = false,
 }: {
     booking: BookingDetail;
+    /** `payment:manage`: may refund money a late cancel keeps (E8). */
+    canRefund?: boolean;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -59,6 +67,9 @@ export function BookingDetailView({
     const madeBy = booking.events.find((e) => e.type === "BOOKED")?.actor?.name;
     // The link it was booked with — frozen on the booking, like its terms.
     const link = joinLink(booking);
+    // What was paid online at booking, what is due, and any refund (E8).
+    const paid = booking.money ? paidLine(booking.money) : null;
+    const refund = booking.money ? refundLine(booking.money) : null;
     const showPacks =
         packs !== undefined &&
         (packs.paidWith !== null ||
@@ -95,9 +106,18 @@ export function BookingDetailView({
                                         timezone={timezone}
                                         currentStartAt={booking.startAt}
                                         currentEndAt={booking.endAt}
+                                        freeCancelUntil={
+                                            booking.freeCancelUntil ?? null
+                                        }
                                     />
                                 )}
-                                <CancelBookingControl bookingId={booking.id} />
+                                <CancelBookingControl
+                                    bookingId={booking.id}
+                                    money={booking.money}
+                                    freeCancelUntil={booking.freeCancelUntil}
+                                    timezone={timezone}
+                                    canRefund={canRefund}
+                                />
                             </>
                         )}
                     </div>
@@ -145,6 +165,33 @@ export function BookingDetailView({
                             </span>
                         ) : null}
                     </div>
+                    {paid || refund ? (
+                        <div className="mt-3 grid gap-1 text-sm">
+                            {paid ? (
+                                <p className="tabular-nums">{paid}</p>
+                            ) : null}
+                            {refund ? (
+                                <p
+                                    className={
+                                        booking.money?.refund?.status ===
+                                        "FAILED"
+                                            ? "text-destructive"
+                                            : "text-muted-foreground"
+                                    }
+                                >
+                                    {refund}
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {/* The deadline fixed at booking (DEC-051): moving the
+                        booking never moves it, so it is said here. */}
+                    {!cancelled && !past && booking.freeCancelUntil ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Free to cancel until{" "}
+                            {deadlineText(booking.freeCancelUntil, timezone)}.
+                        </p>
+                    ) : null}
                     {retired && !cancelled && !past ? (
                         // A missing button with no explanation reads as a bug.
                         <p className="mt-3 text-sm text-muted-foreground">

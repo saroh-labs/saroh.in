@@ -5,6 +5,7 @@ import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { canRefundPayments } from "@/lib/services/booking-money";
 import { hasEnded } from "@/lib/services/booking-state";
 import type { BookingDetail } from "@/lib/services/service";
 import { getBooking } from "@/lib/services/service";
@@ -51,6 +52,7 @@ export default async function BookingPage({
             booking={booking}
             past={hasEnded(booking)}
             packs={await packsFor(booking)}
+            canRefund={canRefundPayments(await resolveActiveOrganization())}
         />
     );
 }
