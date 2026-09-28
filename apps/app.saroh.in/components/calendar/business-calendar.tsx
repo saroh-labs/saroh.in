@@ -22,6 +22,13 @@ import {
     shiftMonth,
 } from "@/lib/calendar/layers";
 import { wholeMoney } from "@/lib/calendar/money";
+import type { Edge } from "@/lib/calendar/range";
+import {
+    calendarRange,
+    dayShortcuts,
+    monthEdges,
+    openingDay,
+} from "@/lib/calendar/range";
 import type { CalendarMonth } from "@/lib/calendar/types";
 
 import { TONE_BORDER, TONE_FILL } from "./tones";
@@ -56,17 +63,25 @@ export function BusinessCalendar({
     data,
     today,
     thisMonth,
+    can,
 }: {
     data: CalendarMonth;
     /** "YYYY-MM-DD" and "YYYY-MM" now, in the business's zone. */
     today: string;
     thisMonth: string;
+    /** May take an order (`order:write`) or a booking (`booking:write`). */
+    can: { order: boolean; book: boolean };
 }) {
     const router = useRouter();
     const layers = layersFor(data);
+    const range = calendarRange(data.joinedAt, thisMonth);
     const [off, setOff] = useState<Off>({});
     const [selected, setSelected] = useState(() =>
-        data.days.some((d) => d.date === today) ? today : data.days[0]?.date,
+        openingDay(
+            data.days.map((d) => d.date),
+            today,
+            range,
+        ),
     );
     const [sheetOpen, setSheetOpen] = useState(false);
     const sheetWidths = useDaySheet();
@@ -96,11 +111,20 @@ export function BusinessCalendar({
                 timeZone={data.timezone}
                 currency={currency}
                 heading={heading}
+                shortcuts={dayShortcuts(day.date, {
+                    today,
+                    range,
+                    layers: data.layers,
+                    can,
+                })}
             />
         ) : null;
 
     const monthHref = (m: string) =>
         m === thisMonth ? "/calendar" : `/calendar?month=${m}`;
+    const edges = monthEdges(data.month, range);
+    const edgeNote = edges.before?.note ?? edges.after?.note;
+    const isThisMonth = data.month === thisMonth;
 
     return (
         <>
@@ -123,48 +147,53 @@ export function BusinessCalendar({
 
             <div className="!mt-0.5 flex flex-wrap items-center gap-1.5">
                 <div className="flex gap-1">
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="w-8 px-0"
+                    <MonthStep
+                        href={monthHref(shiftMonth(data.month, -1))}
+                        label="Previous month"
+                        edge={edges.before}
                     >
-                        <Link
-                            href={monthHref(shiftMonth(data.month, -1))}
-                            aria-label="Previous month"
-                        >
-                            <ChevronLeft className="size-4" />
-                        </Link>
-                    </Button>
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="px-[11px] text-[12.5px]"
-                    >
-                        <Link
-                            href="/calendar"
-                            aria-current={
-                                data.month === thisMonth ? "page" : undefined
-                            }
+                        <ChevronLeft className="size-4" />
+                    </MonthStep>
+                    {isThisMonth ? (
+                        // Already here: the design greys it and it does
+                        // nothing, rather than reloading the same month.
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            aria-current="date"
+                            className="px-[11px] text-[12.5px] disabled:text-muted-foreground disabled:opacity-100"
                         >
                             This month
-                        </Link>
-                    </Button>
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="w-8 px-0"
-                    >
-                        <Link
-                            href={monthHref(shiftMonth(data.month, 1))}
-                            aria-label="Next month"
+                        </Button>
+                    ) : (
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="px-[11px] text-[12.5px]"
                         >
-                            <ChevronRight className="size-4" />
-                        </Link>
-                    </Button>
+                            <Link href="/calendar">This month</Link>
+                        </Button>
+                    )}
+                    <MonthStep
+                        href={monthHref(shiftMonth(data.month, 1))}
+                        label="Next month"
+                        edge={edges.after}
+                    >
+                        <ChevronRight className="size-4" />
+                    </MonthStep>
                 </div>
+                {edgeNote ? (
+                    // Said on the page as well as on the button: a reason
+                    // only on hover is one a phone never shows.
+                    <span
+                        id="calendar-edge"
+                        className="text-[12px] text-muted-foreground"
+                    >
+                        {edgeNote}
+                    </span>
+                ) : null}
                 <span className="flex-1" />
                 <div
                     role="group"
@@ -242,6 +271,7 @@ export function BusinessCalendar({
                 <MonthGrid
                     month={data.month}
                     days={data.days}
+                    range={range}
                     layers={layers}
                     off={off}
                     today={today}
@@ -293,5 +323,45 @@ export function BusinessCalendar({
                 </SheetContent>
             </Sheet>
         </>
+    );
+}
+
+/**
+ * ‹ or ›: a link to the next month, or — at the edge of what the calendar
+ * reaches — a greyed button that stays focusable and says why.
+ */
+function MonthStep({
+    href,
+    label,
+    edge,
+    children,
+}: {
+    href: string;
+    label: string;
+    edge: Edge | null;
+    children: React.ReactNode;
+}) {
+    if (edge) {
+        return (
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-disabled
+                aria-label={label}
+                aria-describedby="calendar-edge"
+                title={edge.title}
+                className="w-8 cursor-default px-0 text-muted-foreground hover:bg-card hover:text-muted-foreground"
+            >
+                {children}
+            </Button>
+        );
+    }
+    return (
+        <Button asChild variant="outline" size="sm" className="w-8 px-0">
+            <Link href={href} aria-label={label}>
+                {children}
+            </Link>
+        </Button>
     );
 }

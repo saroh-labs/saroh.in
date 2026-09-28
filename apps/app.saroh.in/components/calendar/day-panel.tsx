@@ -1,5 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
@@ -10,6 +12,7 @@ import {
     itemsTotal,
 } from "@/lib/calendar/layers";
 import { toMajor, wholeMoney } from "@/lib/calendar/money";
+import type { Shortcut } from "@/lib/calendar/range";
 import type { CalendarDay, LayerKey } from "@/lib/calendar/types";
 
 import { TONE_FILL } from "./tones";
@@ -30,7 +33,8 @@ const LAYER_HOME: Record<LayerKey, string> = {
 /**
  * One day, grouped by layer, each thing a link to its record. The side panel
  * on the desk, the sheet between 760 and 1100px, and the list under the month
- * on a phone — one body, so the three cannot say different things.
+ * on a phone — one body, so the three cannot say different things. A day
+ * from today offers what can be made on it (E21).
  */
 export function DayPanel({
     day,
@@ -40,6 +44,7 @@ export function DayPanel({
     timeZone,
     currency,
     heading,
+    shortcuts = [],
 }: {
     day: CalendarDay;
     layers: LayerStyle[];
@@ -49,11 +54,17 @@ export function DayPanel({
     currency: string | null;
     /** The title's element: a plain heading, or the sheet's own title. */
     heading: (title: string) => React.ReactNode;
+    /** "New order", "Book": what this person may make on this day. */
+    shortcuts?: Shortcut[];
 }) {
     const n = dayCount(day, layers, off);
     const ahead = day.date > today;
     const groups = layers.filter(
         (l) => !off[l.key] && (day.layers[l.key]?.count ?? 0) > 0,
+    );
+    // Something is there, only under a layer switched off.
+    const hidden = layers.some(
+        (l) => off[l.key] && (day.layers[l.key]?.count ?? 0) > 0,
     );
 
     return (
@@ -67,9 +78,35 @@ export function DayPanel({
                     ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`
                     : ""}
             </p>
+            {shortcuts.length > 0 ? (
+                <div className="mb-1 mt-2 flex flex-wrap gap-1.5">
+                    {shortcuts.map((s) => (
+                        <Button
+                            key={s.label}
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 px-3 text-[12.5px] font-semibold"
+                        >
+                            <Link href={s.href}>
+                                <Plus
+                                    aria-hidden
+                                    className="size-3"
+                                    strokeWidth={2.2}
+                                />
+                                {s.label}
+                            </Link>
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
             {groups.length === 0 ? (
                 <p className="py-2.5 text-[13px] text-muted-foreground">
-                    Nothing on this day for the layers you have on.
+                    {hidden
+                        ? "Nothing on this day for the layers you have on."
+                        : day.date >= today
+                          ? "Nothing on this day yet."
+                          : "Nothing happened on this day."}
                 </p>
             ) : null}
             {groups.map((layer) => {

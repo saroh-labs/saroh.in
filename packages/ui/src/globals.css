@@ -238,7 +238,7 @@
         /* ---- calendar layers (Business Calendar) ----
            One fill per kind of dated thing, as the "Saroh Business Calendar"
            design draws them: umber for what the business mostly does, then
-           green, slate, clay, bronze and navy. Chips carry their count in
+           green, slate, clay, bronze, navy and stone (invoices). Chips carry their count in
            words on the fill, so colour only groups — it never says alone
            what a chip is. Paper-white text clears 4.5:1 on every fill. */
         --layer-1: 31 100% 22%; /* #6E3800 */
@@ -247,6 +247,7 @@
         --layer-4: 33 85% 31%; /* #91550C */
         --layer-5: 33 86% 26%; /* #7A4709 */
         --layer-6: 209 44% 27%; /* #264562 */
+        --layer-7: 42 9% 39%; /* #6B665A */
         --layer-foreground: 46 100% 98%; /* #FFFDF6 */
 
         /* ---- shape ----
@@ -391,6 +392,7 @@
         --layer-4: 33 85% 31%;
         --layer-5: 33 86% 26%;
         --layer-6: 209 44% 27%;
+        --layer-7: 42 9% 39%;
         --layer-foreground: 46 100% 98%;
 
         --shadow-color: 0 0% 0%;
