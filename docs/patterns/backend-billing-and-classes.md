@@ -351,6 +351,20 @@
   and a recorded change or an archive bumps the revision. **The staff list
   hides drafts unless asked** (`include=drafts` or `status=DRAFT`), so an
   app from before the Plan Editor never draws one as a live card.
+- **Pack drafts** (round-2 E14) follow the plan's rules on the same shared
+  helper, with the same routes under `class-packs` and the same editor
+  shape (`class-packs/{pack-drafts,pack-draft-view}.ts`). Only an ACTIVE
+  pack is sold: `assertPackOnSale` (`class-packs/pack-on-sale.ts`; a DRAFT
+  is a 409 "This pack isn't published yet"), and a list of packs a buyer
+  can choose filters by `PACKS_ON_SALE`. A pack's services are a draft
+  field too (a sorted id list; `sameValue` compares lists): a draft's are
+  written to `ClassPackService` directly, a live pack's wait in the pending
+  set, and sales and redemptions keep reading the published ones until
+  Publish. There are no pack events yet (E13 adds `PackEvent`), so who
+  moved the revision is kept on the pack itself (`revisedAt`,
+  `revisedById`; null for an operator, named Saroh support). E13 adds the
+  kind and first-pack-only fields to `PACK_DRAFT_FIELDS` and owns the kind
+  lock at publish.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one

@@ -299,6 +299,51 @@ the drafts first:
 SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
 ```
 
+## E14: pack drafts (wave 4; the Pack Editor, E18, ships in a later release)
+
+The Pack Editor's API, the same shape as D5's for plans:
+`POST class-packs/drafts`, `GET`/`PATCH :packId/draft`,
+`POST :packId/publish`, `POST :packId/discard` and `DELETE :packId?revision=`
+(a draft nobody bought). Every write carries the editor's `revision`; a stale
+one is a 409 `{ yours, current, changedBy, changedAt }` naming who saved
+since. Under the Class packs module (E12), like every pack route. The rules
+are in `docs/patterns/backend-billing-and-classes.md` ("Pack drafts").
+
+- **Migration** `20261015160000_pack_drafts`: five columns on `ClassPack`
+  (`pendingChanges`, `pendingChangedAt`, `draftRevision` default 0,
+  `revisedAt`, `revisedById`). Additive; every existing pack reads as live
+  with nothing pending.
+- **API before app.** Nothing in the app creates a draft until E18.
+- **Drafts are hidden from the old app.** `GET class-packs` with no filter
+  lists live and archived packs; a draft only with `?include=drafts` or
+  `?status=DRAFT`. E15/E18's Packs screen asks with `include=drafts`.
+- **Selling a DRAFT is a 409** "This pack isn't published yet". The image
+  before E14 already refused to sell any pack that isn't ACTIVE, and a draft
+  has no purchases to spend, so no reader needed to ship first.
+- **The old form's `PATCH :packId`, Archive and Sell again** refuse a draft,
+  and move the revision, so an editor open on the pack is told instead of
+  saving over it.
+
+### Verify
+
+1. `GET class-packs` on Pulse answers as before, with `hasPendingChanges:
+false` and `pendingChangedAt: null` on each.
+2. Once E18 is live (Northwind): a new pack saves as Draft, has no Sell, and
+   isn't in the sell dialog; Publish puts it on sale. On a live pack, a
+   changed price shows "Changes not published" and a sale still charges the
+   old price until Publish changes.
+
+### Rollback
+
+Safe for selling: the previous image refuses a non-ACTIVE pack, and ignores
+the new columns (a live pack's unpublished changes simply wait). Its
+unfiltered list shows drafts, though, as cards whose Sell answers 409. If
+E18 has been used, delete the drafts first or accept that:
+
+```sql
+SELECT count(*) FROM "ClassPack" WHERE status = 'DRAFT';
+```
+
 ## E20: the calendar reads a range (wave 3)
 
 `GET organizations/:org/calendar` takes `from`/`to` (local dates, both

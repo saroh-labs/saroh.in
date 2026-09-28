@@ -212,18 +212,30 @@ export class ModuleReadinessRegistry {
         return {
             key: "CLASS_PACKS",
             evaluate: async ({ organizationId }) => {
-                const [all, onSale] = await Promise.all([
-                    this.db.classPack.count({ where: { organizationId } }),
+                // A draft (E14) isn't published yet: it isn't a pack to sell.
+                const [all, onSale, drafts] = await Promise.all([
+                    this.db.classPack.count({
+                        where: { organizationId, status: { not: "DRAFT" } },
+                    }),
                     this.db.classPack.count({
                         where: { organizationId, status: "ACTIVE" },
                     }),
+                    this.db.classPack.count({
+                        where: { organizationId, status: "DRAFT" },
+                    }),
                 ]);
                 if (all === 0)
-                    return setup(
-                        "CLASS_PACKS_NO_PACK",
-                        "Make a pack to start selling them.",
-                        "/class-packs/new",
-                    );
+                    return drafts > 0
+                        ? setup(
+                              "CLASS_PACKS_NO_PACK",
+                              "Publish a pack to start selling it.",
+                              "/class-packs",
+                          )
+                        : setup(
+                              "CLASS_PACKS_NO_PACK",
+                              "Make a pack to start selling them.",
+                              "/class-packs/new",
+                          );
                 if (onSale === 0)
                     return setup(
                         "CLASS_PACKS_NONE_ON_SALE",

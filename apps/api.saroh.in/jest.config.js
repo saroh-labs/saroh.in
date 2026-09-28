@@ -248,6 +248,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        // E14: which packs are on sale; a DRAFT is refused.
+        "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
         // A10: spending a pack as the team and as the customer, mocked tx.
         "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
