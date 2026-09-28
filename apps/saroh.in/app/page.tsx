@@ -1,4 +1,5 @@
 import { cn } from "@saroh/ui/lib/utils";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ChainExplorer } from "@/components/home/chain-explorer";
@@ -19,6 +20,10 @@ import { CHAINS, COMING, HOME_SHOT, JOBS } from "@/lib/site-content";
  * clinic and a bakery, the five jobs, and what Saroh will not do — before
  * anyone has to ask.
  */
+export const metadata: Metadata = {
+    alternates: { canonical: "/" },
+};
+
 export default function Home() {
     const rail = JOBS.map((job) => ({
         key: job.key,

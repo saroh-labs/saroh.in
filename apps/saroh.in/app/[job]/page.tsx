@@ -42,6 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title: `${job.name} — Saroh`,
         description: job.lede,
         openGraph: { title: `${job.name} — Saroh`, description: job.lede },
+        alternates: { canonical: `/${job.key}` },
     };
 }
 
