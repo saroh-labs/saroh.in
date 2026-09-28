@@ -46,8 +46,55 @@ export interface AccountOrder {
     currency: string;
     open: boolean;
     status: string;
+    /** How it leaves: "Pick-up", "Shipping"… (A7). */
+    fulfilment: string;
     items: { name: string; quantity: number }[];
     moreItems: number;
+}
+
+/** One visit of a treatment bought as an order (A7). */
+export interface AccountOrderVisit {
+    number: number;
+    startAt: string | null;
+    timezone: string | null;
+    state: "done" | "booked" | "missed" | "to-book";
+}
+
+export interface AccountOrderLine {
+    name: string;
+    quantity: number;
+    kind: "product" | "service";
+    visits: AccountOrderVisit[] | null;
+}
+
+/** A step of an order's Track, as the API words it (A7). */
+export interface AccountTrackStep {
+    label: string;
+    state: "done" | "now" | "next";
+    line: string;
+    /** The first step carries when the order was placed. */
+    at: string | null;
+}
+
+/** One order and its Track (A7). */
+export interface AccountOrderDetail {
+    ref: string;
+    number: string;
+    placedAt: string;
+    total: string;
+    currency: string;
+    fulfilment: string;
+    state: "open" | "done" | "refunded" | "cancelled";
+    status: string;
+    lines: AccountOrderLine[];
+    steps: AccountTrackStep[];
+    courier: {
+        name: string | null;
+        trackingNumber: string | null;
+        trackingUrl: string | null;
+    } | null;
+    refund: string | null;
+    receipt: string | null;
 }
 
 export interface AccountPlan {
@@ -209,6 +256,43 @@ export function classesLine(classes: AccountClasses): string {
         );
     }
     return parts.join(" · ");
+}
+
+/** "20 Sep 2026 · ₹450", and how it leaves while it's on its way. */
+export function orderLine(order: AccountOrder): string {
+    const parts = [
+        accountDate(order.placedAt),
+        accountMoney(order.total, order.currency),
+    ];
+    if (order.open && order.fulfilment) parts.push(order.fulfilment);
+    return parts.filter(Boolean).join(" · ");
+}
+
+/** The mark in front of a step: ✓ done, ● now, ○ next (the design's). */
+export function stepMark(state: AccountTrackStep["state"]): string {
+    return state === "done" ? "✓" : state === "now" ? "●" : "○";
+}
+
+const VISIT_STATE: Record<AccountOrderVisit["state"], string> = {
+    done: "Done",
+    booked: "Booked",
+    missed: "Missed",
+    "to-book": "To book",
+};
+
+/** "Visit 2 · Mon 5 Oct, 10:00" and its word. */
+export function visitLine(visit: AccountOrderVisit): {
+    title: string;
+    state: string;
+} {
+    const when =
+        visit.startAt && visit.timezone
+            ? ` · ${bookingWhen(visit.startAt, visit.timezone)}`
+            : "";
+    return {
+        title: `Visit ${visit.number}${when}`,
+        state: VISIT_STATE[visit.state],
+    };
 }
 
 /** "#1019 · 2 × Sourdough, 1 × Rye and 2 more". */

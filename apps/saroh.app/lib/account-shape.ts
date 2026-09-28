@@ -5,10 +5,14 @@ import type {
     AccountHomeData,
     AccountNote,
     AccountOrder,
+    AccountOrderDetail,
+    AccountOrderLine,
+    AccountOrderVisit,
     AccountPlan,
     AccountReceipt,
     AccountTab,
     AccountTabKey,
+    AccountTrackStep,
     AccountView,
 } from "@saroh/site-blocks";
 
@@ -88,6 +92,7 @@ function isOrder(v: unknown): v is AccountOrder {
         isString(v.currency) &&
         isBoolean(v.open) &&
         isString(v.status) &&
+        isString(v.fulfilment) &&
         Array.isArray(v.items) &&
         v.items.every(
             (i) => isRecord(i) && isString(i.name) && isNumber(i.quantity),
@@ -168,6 +173,78 @@ export function homeResult(v: unknown): AccountHomeData | null {
         orders: v.orders === null ? null : block(v.orders, isOrders),
         plan: block(v.plan, orNull(isPlan)),
     };
+}
+
+/** The Orders tab's list (A7), or null when it isn't one. */
+export function ordersResult(v: unknown): AccountOrder[] | null {
+    return isOrders(v) ? v : null;
+}
+
+const VISIT_STATES = ["done", "booked", "missed", "to-book"] as const;
+const STEP_STATES = ["done", "now", "next"] as const;
+const ORDER_STATES = ["open", "done", "refunded", "cancelled"] as const;
+
+function isVisit(v: unknown): v is AccountOrderVisit {
+    return (
+        isRecord(v) &&
+        isNumber(v.number) &&
+        isNullableString(v.startAt) &&
+        isNullableString(v.timezone) &&
+        (VISIT_STATES as readonly unknown[]).includes(v.state)
+    );
+}
+
+function isOrderLine(v: unknown): v is AccountOrderLine {
+    return (
+        isRecord(v) &&
+        isString(v.name) &&
+        isNumber(v.quantity) &&
+        (v.kind === "product" || v.kind === "service") &&
+        (v.visits === null ||
+            (Array.isArray(v.visits) && v.visits.every(isVisit)))
+    );
+}
+
+function isStep(v: unknown): v is AccountTrackStep {
+    return (
+        isRecord(v) &&
+        isString(v.label) &&
+        (STEP_STATES as readonly unknown[]).includes(v.state) &&
+        isString(v.line) &&
+        isNullableString(v.at)
+    );
+}
+
+function isCourier(v: unknown): v is AccountOrderDetail["courier"] {
+    return (
+        v === null ||
+        (isRecord(v) &&
+            isNullableString(v.name) &&
+            isNullableString(v.trackingNumber) &&
+            isNullableString(v.trackingUrl))
+    );
+}
+
+/** One order's Track (A7), or null when it isn't one. */
+export function orderDetailResult(v: unknown): AccountOrderDetail | null {
+    if (!isRecord(v)) return null;
+    const ok =
+        isString(v.ref) &&
+        isString(v.number) &&
+        isString(v.placedAt) &&
+        isString(v.total) &&
+        isString(v.currency) &&
+        isString(v.fulfilment) &&
+        (ORDER_STATES as readonly unknown[]).includes(v.state) &&
+        isString(v.status) &&
+        Array.isArray(v.lines) &&
+        v.lines.every(isOrderLine) &&
+        Array.isArray(v.steps) &&
+        v.steps.every(isStep) &&
+        isCourier(v.courier) &&
+        isNullableString(v.refund) &&
+        isNullableString(v.receipt);
+    return ok ? (v as unknown as AccountOrderDetail) : null;
 }
 
 function isReceipt(v: unknown): v is AccountReceipt {

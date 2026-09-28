@@ -1536,6 +1536,15 @@ model Order {
   // site's checkout.
   checkoutKey String?
 
+  // The customer's site account when they placed it signed in: at the
+  // site's checkout (G13), or a treatment booked signed in (E9, A9). The
+  // account's Orders read it beside the contact's identity links, so an
+  // order it placed shows even when its store customer stands for someone
+  // else; "This isn't them" (A4) moves what it made (round 2, A7). A
+  // single-column key, as Booking's: RLS keeps it in the business.
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
   @@index([storeId])
@@ -1544,6 +1553,8 @@ model Order {
   // The calendar's Orders layer and Home's week read a business's orders
   // by when they were placed (round 2, E20).
   @@index([organizationId, createdAt])
+  // What an account ordered, newest first (A7).
+  @@index([customerAccountId, createdAt])
 }
 
 model OrderItem {
@@ -5479,6 +5490,8 @@ model CustomerAccount {
 
   // Bookings made signed in (A9).
   bookings Booking[]
+  // Orders placed signed in (A7).
+  orders   Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

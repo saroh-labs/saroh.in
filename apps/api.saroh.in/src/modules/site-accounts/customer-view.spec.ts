@@ -3,6 +3,7 @@ import {
     accountView,
     bookingView,
     noteView,
+    orderDetailView,
     orderView,
     packView,
     planView,
@@ -119,6 +120,8 @@ describe("the account's allow-list", () => {
             status: "PROCESSING",
             paymentStatus: "PAID",
             stage: "READY",
+            fulfilment: "PICKUP",
+            notes: "STAFF NOTE: owes money",
             items: [
                 { quantity: 2, product: { name: "Sourdough", ...noisy } },
                 { quantity: 1, product: { name: "Cinnamon bun" } },
@@ -136,6 +139,7 @@ describe("the account's allow-list", () => {
             currency: "INR",
             open: true,
             status: "Ready",
+            fulfilment: "Pick-up",
             items: [
                 { name: "Sourdough", quantity: 2 },
                 { name: "Cinnamon bun", quantity: 1 },
@@ -151,8 +155,280 @@ describe("the account's allow-list", () => {
             orderView({ ...row, status: "CANCELLED" } as never),
         ).toMatchObject({ open: false, status: "Cancelled" });
         expect(
-            orderView({ ...row, stage: "DELIVERED" } as never),
+            orderView({ ...row, stage: "COLLECTED" } as never),
+        ).toMatchObject({ open: false, status: "Collected" });
+        // Each type's own words (B2a): a digital order is "Paid", then "Sent".
+        expect(
+            orderView({ ...row, fulfilment: "DIGITAL", stage: "NEW" } as never),
+        ).toMatchObject({ open: true, status: "Paid", fulfilment: "Digital" });
+        expect(
+            orderView({
+                ...row,
+                fulfilment: "SHIPPING",
+                stage: "DELIVERED",
+            } as never),
         ).toMatchObject({ open: false, status: "Delivered" });
+    });
+
+    describe("an order's Track (A7)", () => {
+        const order = {
+            id: "ord_1",
+            orderId: "1019",
+            createdAt: new Date("2026-09-20T06:00:00Z"),
+            total: "450",
+            currency: "INR",
+            status: "PROCESSING",
+            paymentStatus: "PAID",
+            stage: "READY",
+            fulfilment: "PICKUP",
+            courierName: null,
+            trackingNumber: null,
+            trackingUrl: null,
+            notes: "STAFF NOTE: owes money",
+            deliveryPhone: "Other Attendee",
+            items: [
+                {
+                    quantity: 2,
+                    productId: "p1",
+                    serviceId: null,
+                    product: { name: "Sourdough", ...noisy },
+                    service: null,
+                },
+            ],
+            bookings: [],
+            invoices: [{ id: "inv_1" }],
+            transactions: [{ reference: "pay_ref_123" }],
+            ...noisy,
+        };
+
+        it("a pick-up that is ready is at the counter, with the order's number", () => {
+            const view = orderDetailView(order as never);
+            expect(view).toMatchObject({
+                ref: "ord_1",
+                number: "1019",
+                fulfilment: "Pick-up",
+                state: "open",
+                status: "Ready",
+                lines: [
+                    {
+                        name: "Sourdough",
+                        quantity: 2,
+                        kind: "product",
+                        visits: null,
+                    },
+                ],
+                courier: null,
+                refund: null,
+                receipt: "inv_1",
+            });
+            expect(view.steps).toEqual([
+                {
+                    label: "New",
+                    state: "done",
+                    line: "Done",
+                    at: "2026-09-20T06:00:00.000Z",
+                },
+                { label: "Preparing", state: "done", line: "Done", at: null },
+                {
+                    label: "Ready",
+                    state: "now",
+                    line: "Now · At the counter — show #1019",
+                    at: null,
+                },
+                {
+                    label: "Collected",
+                    state: "next",
+                    line: "Picked up",
+                    at: null,
+                },
+            ]);
+            expect(leaks(view)).toEqual([]);
+        });
+
+        it("a shipment shows the courier and tracking number once recorded", () => {
+            const shipped = {
+                ...order,
+                fulfilment: "SHIPPING",
+                stage: "HANDED_TO_COURIER",
+                status: "SHIPPED",
+            };
+            const before = orderDetailView(shipped as never);
+            expect(before.courier).toBeNull();
+            expect(before.steps[3]).toMatchObject({
+                label: "Handed to courier",
+                state: "now",
+                line: "Now · The courier has it",
+            });
+
+            const view = orderDetailView({
+                ...shipped,
+                courierName: "Delhivery",
+                trackingNumber: "DL12345",
+                trackingUrl: "https://track.example.in/DL12345",
+            } as never);
+            expect(view.courier).toEqual({
+                name: "Delhivery",
+                trackingNumber: "DL12345",
+                trackingUrl: "https://track.example.in/DL12345",
+            });
+            expect(view.steps[3].line).toBe("Now · Delhivery has it · DL12345");
+            expect(view.steps[4]).toMatchObject({
+                label: "Delivered",
+                state: "next",
+            });
+        });
+
+        it("drops a tracking link that isn't a web address", () => {
+            const view = orderDetailView({
+                ...order,
+                fulfilment: "SHIPPING",
+                stage: "HANDED_TO_COURIER",
+                courierName: "Delhivery",
+                trackingUrl: "javascript:alert(1)",
+            } as never);
+            expect(view.courier?.trackingUrl).toBeNull();
+        });
+
+        it("a pick-up never shows a courier, even with one typed", () => {
+            const view = orderDetailView({
+                ...order,
+                courierName: "Delhivery",
+            } as never);
+            expect(view.courier).toBeNull();
+        });
+
+        it("a refunded order shows what it reached as done, then the refund", () => {
+            const view = orderDetailView({
+                ...order,
+                fulfilment: "SHIPPING",
+                stage: "DELIVERED",
+                status: "DELIVERED",
+                paymentStatus: "REFUNDED",
+            } as never);
+            expect(view).toMatchObject({
+                state: "refunded",
+                status: "Refunded",
+                refund: "Money back in 5–7 days",
+            });
+            expect(view.steps.map((s) => [s.label, s.state])).toEqual([
+                ["New", "done"],
+                ["Preparing", "done"],
+                ["Ready", "done"],
+                ["Handed to courier", "done"],
+                ["Delivered", "done"],
+                ["Refunded", "done"],
+            ]);
+            expect(view.steps.at(-1)?.line).toBe("Money back in 5–7 days");
+
+            // Refunded before it left: it never claims it was delivered.
+            const early = orderDetailView({
+                ...order,
+                stage: "NEW",
+                status: "PENDING",
+                paymentStatus: "REFUNDED",
+            } as never);
+            expect(early.steps.map((s) => s.label)).toEqual([
+                "New",
+                "Refunded",
+            ]);
+        });
+
+        it("a cancelled order ends with Cancelled", () => {
+            const view = orderDetailView({
+                ...order,
+                stage: "PREPARING",
+                status: "CANCELLED",
+            } as never);
+            expect(view.state).toBe("cancelled");
+            expect(view.steps.map((s) => s.label)).toEqual([
+                "New",
+                "Preparing",
+                "Cancelled",
+            ]);
+        });
+
+        it("a collected order is done at every step", () => {
+            const view = orderDetailView({
+                ...order,
+                stage: "COLLECTED",
+                status: "DELIVERED",
+            } as never);
+            expect(view.state).toBe("done");
+            expect(view.status).toBe("Collected");
+            expect(view.steps.every((s) => s.state === "done")).toBe(true);
+        });
+
+        it("a treatment's line is the service and its visits, not a product", () => {
+            const view = orderDetailView({
+                ...order,
+                fulfilment: "APPOINTMENT_IN_PERSON",
+                stage: "NEW",
+                status: "PENDING",
+                items: [
+                    {
+                        quantity: 1,
+                        productId: null,
+                        serviceId: "svc_1",
+                        product: null,
+                        service: { name: "Root canal", visits: 3, ...noisy },
+                    },
+                ],
+                bookings: [
+                    {
+                        visitNumber: 1,
+                        startAt: new Date("2026-09-10T04:30:00Z"),
+                        timezone: "Asia/Kolkata",
+                        status: "CONFIRMED",
+                        outcome: "ATTENDED",
+                        intakeNote: "STAFF NOTE: owes money",
+                    },
+                    {
+                        visitNumber: 2,
+                        startAt: new Date("2026-09-24T04:30:00Z"),
+                        timezone: "Asia/Kolkata",
+                        status: "CANCELLED",
+                        outcome: null,
+                    },
+                    {
+                        visitNumber: 2,
+                        startAt: new Date("2026-09-28T04:30:00Z"),
+                        timezone: "Asia/Kolkata",
+                        status: "CONFIRMED",
+                        outcome: null,
+                    },
+                ],
+            } as never);
+            expect(view.fulfilment).toBe("Appointment, in person");
+            expect(view.status).toBe("Booked");
+            expect(view.lines).toEqual([
+                {
+                    name: "Root canal",
+                    quantity: 1,
+                    kind: "service",
+                    visits: [
+                        {
+                            number: 1,
+                            startAt: "2026-09-10T04:30:00.000Z",
+                            timezone: "Asia/Kolkata",
+                            state: "done",
+                        },
+                        {
+                            number: 2,
+                            startAt: "2026-09-28T04:30:00.000Z",
+                            timezone: "Asia/Kolkata",
+                            state: "booked",
+                        },
+                        {
+                            number: 3,
+                            startAt: null,
+                            timezone: null,
+                            state: "to-book",
+                        },
+                    ],
+                },
+            ]);
+            expect(leaks(view)).toEqual([]);
+        });
     });
 
     it("a plan says when it renews, pauses or ends", () => {

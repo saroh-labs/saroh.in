@@ -409,6 +409,7 @@ export class PublicCheckoutService {
         });
         if (!row) throw signedOut();
         return {
+            accountId: customer.accountId,
             email: row.email,
             contactId: row.contactId,
             firstName: row.contact.firstName,

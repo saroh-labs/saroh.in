@@ -2,15 +2,13 @@ import Link from "next/link";
 
 import type { AccountView, AccountHome as Home } from "./model";
 import {
-    accountDate,
-    accountMoney,
     bookingWhen,
     classesLine,
     firstName,
-    orderTitle,
     planLine,
     planPrice,
 } from "./model";
+import { OrderRow } from "./orders-list";
 import {
     AccountCard,
     AccountRow,
@@ -27,7 +25,7 @@ import {
  *
  * Move and Cancel on the next booking come with A6, "Order again" with the
  * shop (G13) and "Buy a pack" with A11: nothing here links to a page that
- * isn't there yet.
+ * isn't there yet. An order on its way has Track (A7).
  */
 export function AccountHome({
     account,
@@ -82,15 +80,11 @@ export function AccountHome({
                 >
                     {home.orders.ok ? (
                         home.orders.value.map((order) => (
-                            <AccountRow
+                            // Track opens on the Orders tab (A7).
+                            <OrderRow
                                 key={order.ref}
-                                title={orderTitle(order)}
-                                sub={`${accountDate(order.placedAt)} · ${accountMoney(order.total, order.currency)}`}
-                                tag={
-                                    <Tag tone={order.open ? "accent" : "quiet"}>
-                                        {order.status}
-                                    </Tag>
-                                }
+                                order={order}
+                                details={false}
                             />
                         ))
                     ) : (

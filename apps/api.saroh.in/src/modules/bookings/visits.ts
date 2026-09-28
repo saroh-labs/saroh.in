@@ -271,6 +271,8 @@ export async function startTreatmentInTx(
             tax: fromCents(taxCents),
             total: fromCents(priceCents),
             fulfilment: appointmentType(booking, service),
+            // Booked signed in: the account's Orders find it by this (A7).
+            customerAccountId: booking.customerAccountId,
             items: {
                 create: {
                     serviceId: service.id,

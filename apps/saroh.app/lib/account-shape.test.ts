@@ -5,6 +5,8 @@ import {
     homeResult,
     isAccountView,
     notesResult,
+    orderDetailResult,
+    ordersResult,
     receiptsResult,
     refusalMessage,
 } from "./account-shape";
@@ -88,6 +90,95 @@ describe("homeResult", () => {
             plan: { ok: false },
         });
         expect(homeResult(null)).toBe(null);
+    });
+});
+
+describe("orders and Track (A7)", () => {
+    const row = {
+        ref: "ord_1",
+        number: "1019",
+        placedAt: "2026-10-02T06:00:00.000Z",
+        total: "450.00",
+        currency: "INR",
+        open: true,
+        status: "Ready",
+        fulfilment: "Pick-up",
+        items: [{ name: "Sourdough", quantity: 2 }],
+        moreItems: 0,
+    };
+    const detail = {
+        ref: "ord_1",
+        number: "1019",
+        placedAt: "2026-10-02T06:00:00.000Z",
+        total: "450.00",
+        currency: "INR",
+        fulfilment: "Shipping",
+        state: "open",
+        status: "Handed to courier",
+        lines: [
+            { name: "Sourdough", quantity: 2, kind: "product", visits: null },
+            {
+                name: "Root canal",
+                quantity: 1,
+                kind: "service",
+                visits: [
+                    {
+                        number: 1,
+                        startAt: null,
+                        timezone: null,
+                        state: "to-book",
+                    },
+                ],
+            },
+        ],
+        steps: [
+            {
+                label: "New",
+                state: "done",
+                line: "Done",
+                at: "2026-10-02T06:00:00.000Z",
+            },
+            {
+                label: "Handed to courier",
+                state: "now",
+                line: "Now · Delhivery has it",
+                at: null,
+            },
+        ],
+        courier: {
+            name: "Delhivery",
+            trackingNumber: "DL1",
+            trackingUrl: null,
+        },
+        refund: null,
+        receipt: "inv_1",
+    };
+
+    it("reads the list only when every row checks, fulfilment included", () => {
+        expect(ordersResult([row])).toEqual([row]);
+        expect(ordersResult([])).toEqual([]);
+        const { fulfilment: _, ...before } = row;
+        expect(ordersResult([before])).toBe(null);
+        expect(ordersResult({ rows: [row] })).toBe(null);
+    });
+
+    it("reads a Track only in the shape it knows", () => {
+        expect(orderDetailResult(detail)).toEqual(detail);
+        expect(orderDetailResult({ ...detail, courier: null })).not.toBe(null);
+        expect(orderDetailResult({ ...detail, state: "lost" })).toBe(null);
+        expect(
+            orderDetailResult({
+                ...detail,
+                steps: [{ label: "New", state: "soon", line: "", at: null }],
+            }),
+        ).toBe(null);
+        expect(
+            orderDetailResult({
+                ...detail,
+                lines: [{ name: "X", quantity: 1, kind: "gift", visits: null }],
+            }),
+        ).toBe(null);
+        expect(orderDetailResult(null)).toBe(null);
     });
 });
 
