@@ -12,7 +12,8 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { CalendarNothing } from "@/components/calendar/calendar-nothing";
 import { DayPanel } from "@/components/calendar/day-panel";
-import { MonthGrid } from "@/components/calendar/month-grid";
+import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
+import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
 import {
     layersFor,
@@ -64,6 +65,7 @@ export function BusinessCalendar({
     today,
     thisMonth,
     can,
+    day: asked,
 }: {
     data: CalendarMonth;
     /** "YYYY-MM-DD" and "YYYY-MM" now, in the business's zone. */
@@ -71,18 +73,17 @@ export function BusinessCalendar({
     thisMonth: string;
     /** May take an order (`order:write`) or a booking (`booking:write`). */
     can: { order: boolean; book: boolean };
+    /** `?day=`: the day to open on, when a key crossed into this month. */
+    day?: string;
 }) {
     const router = useRouter();
     const layers = layersFor(data);
     const range = calendarRange(data.joinedAt, thisMonth);
     const [off, setOff] = useState<Off>({});
-    const [selected, setSelected] = useState(() =>
-        openingDay(
-            data.days.map((d) => d.date),
-            today,
-            range,
-        ),
-    );
+    const [selected, setSelected] = useState(() => {
+        const dates = data.days.map((d) => d.date);
+        return askedDay(asked, dates, range) ?? openingDay(dates, today, range);
+    });
     const [sheetOpen, setSheetOpen] = useState(false);
     const sheetWidths = useDaySheet();
 
@@ -99,6 +100,18 @@ export function BusinessCalendar({
     const pick = (date: string) => {
         setSelected(date);
         if (sheetWidths) setSheetOpen(true);
+    };
+
+    // A key moved the day: here, or — past this month's edge — in the month
+    // before or after, which opens on that day (E28).
+    const move = (date: string) => {
+        const m = date.slice(0, 7);
+        if (m === data.month) {
+            setSelected(date);
+            return;
+        }
+        const month = m === thisMonth ? "" : `month=${m}&`;
+        router.push(`/calendar?${month}day=${date}`, { scroll: false });
     };
 
     const panel = (heading: (title: string) => React.ReactNode) =>
@@ -279,16 +292,21 @@ export function BusinessCalendar({
                     currency={currency}
                     showTakings={showTakings}
                     onPick={pick}
+                    onMove={move}
                 />
                 {/* Beside the month on the desk, under it on a phone; a
                     sheet in between (below). */}
                 <div
                     id="calendar-day"
-                    aria-live="polite"
+                    role="region"
+                    aria-labelledby="calendar-day-title"
                     className="min-w-0 flex-[2_1_280px] rounded-xl border border-border bg-card px-4 py-3.5 max-[1099px]:min-[760px]:hidden min-[1100px]:sticky min-[1100px]:top-3"
                 >
                     {panel((title) => (
-                        <h2 className="font-display text-[16px] font-semibold tracking-[-0.02em]">
+                        <h2
+                            id="calendar-day-title"
+                            className="font-display text-[16px] font-semibold tracking-[-0.02em]"
+                        >
                             {title}
                         </h2>
                     ))}
@@ -311,12 +329,29 @@ export function BusinessCalendar({
             </p>
 
             <Sheet open={sheetOpen && sheetWidths} onOpenChange={setSheetOpen}>
+                {/* A dialog: Tab stays inside, Esc closes it. It opens on
+                    the day's title, and closing it puts focus back on the day
+                    in the grid rather than at the top of the page (E28). */}
                 <SheetContent
                     side="right"
                     className="w-[380px] max-w-full overflow-y-auto px-[18px] py-4 sm:max-w-[380px]"
+                    onOpenAutoFocus={(e) => {
+                        e.preventDefault();
+                        document
+                            .getElementById("calendar-sheet-title")
+                            ?.focus();
+                    }}
+                    onCloseAutoFocus={(e) => {
+                        e.preventDefault();
+                        if (day) dayButton(day.date)?.focus();
+                    }}
                 >
                     {panel((title) => (
-                        <SheetTitle className="pr-10 font-display text-[16px] font-semibold tracking-[-0.02em]">
+                        <SheetTitle
+                            id="calendar-sheet-title"
+                            tabIndex={-1}
+                            className="pr-10 font-display text-[16px] font-semibold tracking-[-0.02em] outline-none"
+                        >
                             {title}
                         </SheetTitle>
                     ))}
