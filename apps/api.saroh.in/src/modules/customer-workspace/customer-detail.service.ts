@@ -513,6 +513,7 @@ export class CustomerDetailService {
                 source: true,
                 createdAt: true,
                 mergedIntoId: true,
+                removedAt: true,
                 // The one that signs in; a merged or removed one does not.
                 customerAccounts: {
                     where: { status: { in: ["ACTIVE", "BLOCKED"] } },
@@ -526,7 +527,10 @@ export class CustomerDetailService {
                 },
             },
         });
-        if (!contact) throw new NotFoundException("Contact not found");
+        // Removed for a privacy request (C11): there is no one left to show.
+        if (!contact || contact.removedAt) {
+            throw new NotFoundException("Contact not found");
+        }
         // A merge's tombstone holds ids only (DEC-042); `read` sends the
         // page on to the survivor.
         if (contact.mergedIntoId) {

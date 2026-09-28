@@ -1,4 +1,8 @@
 import { fromMinor, toMoneyString } from "../../common/money";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention, OrderAttentionTag } from "./order-attention";
@@ -165,6 +169,9 @@ export function serializeOrderRow(
         .filter(Boolean)
         .join(" ")
         .trim();
+    // Their details were removed for a privacy request (C11): the order
+    // stays, under "Removed customer", with no email to show.
+    const removed = isRemovedStoreCustomer(order.customer);
 
     return {
         id: order.id,
@@ -180,10 +187,10 @@ export function serializeOrderRow(
         customer: order.customer
             ? {
                   id: order.customerId,
-                  name: customerName || null,
+                  name: removed ? REMOVED_CUSTOMER_NAME : customerName || null,
                   ...(view.contact
                       ? {
-                            email: order.customer.email,
+                            ...(removed ? {} : { email: order.customer.email }),
                             phone: order.customer.phone,
                         }
                       : {}),

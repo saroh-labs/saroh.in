@@ -47,17 +47,23 @@ interface Row {
     organizationId: string;
     mergedIntoId: string | null;
     email: string;
+    removedAt: Date | null;
 }
 
 /** A merge keeps the chain at one hop; this is only a backstop. */
 const MAX_HOPS = 3;
 
 /**
- * Removed for privacy. C11 adds `Contact.removedAt` and switches this to
- * read it; until then a removal is the `removed+<id>@removed.invalid`
- * placeholder (`contacts/contact-email.ts`), which no contact carries yet.
+ * Removed for privacy (C11): `Contact.removedAt` is set, and the email is
+ * the `removed+<id>@removed.invalid` placeholder (`contacts/contact-email.ts`).
+ * Either says so; a caller that didn't select `removedAt` still knows from
+ * the email.
  */
-export function isRemovedContact(row: { email: string }): boolean {
+export function isRemovedContact(row: {
+    email: string;
+    removedAt?: Date | null;
+}): boolean {
+    if (row.removedAt) return true;
     const email = row.email.trim().toLowerCase();
     return email.startsWith("removed+") && email.endsWith("@removed.invalid");
 }
@@ -69,11 +75,11 @@ async function lockRow(
 ): Promise<Row | null> {
     const rows = organizationId
         ? await db.$queryRaw<Row[]>`
-            SELECT id, "organizationId", "mergedIntoId", email FROM "Contact"
+            SELECT id, "organizationId", "mergedIntoId", email, "removedAt" FROM "Contact"
             WHERE id = ${contactId} AND "organizationId" = ${organizationId}
             FOR SHARE`
         : await db.$queryRaw<Row[]>`
-            SELECT id, "organizationId", "mergedIntoId", email FROM "Contact"
+            SELECT id, "organizationId", "mergedIntoId", email, "removedAt" FROM "Contact"
             WHERE id = ${contactId}
             FOR SHARE`;
     return rows[0] ?? null;

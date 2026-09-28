@@ -186,6 +186,24 @@
   (`mergedIntoId: null`). Every relation to `Contact` needs a rule in
   `merge-plan.ts` `MERGE_RULES`; `merge.relations.spec.ts` fails a new one
   without.
+- **Current** — **A privacy removal anonymises in place; a new personal
+  field needs a rule** (DEC-042, round-2 C11). "Remove their details"
+  (`customer-workspace/privacy-removal.service.ts`) keeps the contact row
+  (`removedAt`, the `removed+<id>@removed.invalid` placeholder, no name,
+  phone, company or address) so every key to it holds, and scrubs the
+  person wherever else they live: store customers only they hold, their
+  orders' recipient and note (never `deliveryState`, the place of supply),
+  messages, review invitations and reviews, bookings' booker details and
+  snapshot. Issued invoices keep their bill-to; leads and form entries are
+  the CRM's and stay. Autopay is cancelled at the provider first through
+  D20's `cancelFor` (`payments/mandate-gate.ts`), and nothing changes while
+  the provider hasn't confirmed; a contact's hard delete asks the same gate.
+  Lists and search leave a removed contact out (`removedAt: null`,
+  `notRetired`). Every relation to `Contact` needs a rule in
+  `privacy-removal-plan.ts` `REMOVAL_RULES` too (`merge.relations.spec.ts`),
+  and every personal-looking field on a model reachable from `Contact` or
+  `Customer` needs an entry in `personal-data.ts` — a rule, or "kept" and
+  why (`personal-data.spec.ts`).
 
 ## Money — **Current**
 
