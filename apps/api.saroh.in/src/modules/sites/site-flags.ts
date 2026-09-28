@@ -38,7 +38,10 @@ export type FlagType =
     | "unpublishedChanges"
     | "missingSeoDescription"
     | "brokenLink"
-    | "phoneWidth";
+    | "phoneWidth"
+    // The shop (G11), raised only while it is open for the business.
+    | "storefrontUnchosen"
+    | "reservedAddress";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -592,4 +595,54 @@ export function checkPage(page: FlagPageInput, allPagePaths: string[]): Flag[] {
     return page.sections.flatMap((section, index) =>
         checkSection(page, index, section, paths),
     );
+}
+
+// ---------------------------------------------------------------------------
+// The shop (G11)
+// ---------------------------------------------------------------------------
+
+/** What the shop's two checks need; the caller asks only while it is open. */
+export interface ShopFlagInput {
+    /** The site sells from an open storefront. */
+    storefrontChosen: boolean;
+    /** Open storefronts that list a published product. */
+    candidates: number;
+    /** The site's pages, to find one at the shop's address. */
+    pages: { id: string; path: string; hidden: boolean }[];
+    /** Whether a path is the shop's address or under it. */
+    isShopPath: (path: string) => boolean;
+}
+
+/**
+ * The shop's pre-publish flags (G11).
+ *
+ * - No storefront chosen while there is one to choose: `/shop`, the Product
+ *   grid and checkout render nothing live until it is answered.
+ * - A page at `/shop` (or under it): it keeps being served there, so nothing
+ *   live disappears, but the shop can't open at its address until the page
+ *   moves. The flag sits on that page and asks for a new address.
+ */
+export function checkShop(input: ShopFlagInput): Flag[] {
+    const flags: Flag[] = [];
+    if (!input.storefrontChosen && input.candidates > 0) {
+        flags.push({
+            type: "storefrontUnchosen",
+            message:
+                "Pick which storefront this site sells from. Until you do, the shop and its products don't show on the site.",
+            pageId: null,
+            sectionIndex: null,
+            field: "storefrontId",
+        });
+    }
+    for (const page of input.pages) {
+        if (page.hidden || !input.isShopPath(page.path)) continue;
+        flags.push({
+            type: "reservedAddress",
+            message: `${page.path} is where your shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
+            pageId: page.id,
+            sectionIndex: null,
+            field: "path",
+        });
+    }
+    return flags;
 }

@@ -8,6 +8,9 @@ jest.mock("@saroh/database", () => {
         ...actual,
         prisma: {
             site: { findFirst: jest.fn(), findMany: jest.fn() },
+            // The shop's rollout flag (G11), never configured here: off.
+            featureFlagOverride: { findUnique: jest.fn(async () => null) },
+            featureFlag: { findUnique: jest.fn(async () => null) },
         },
     };
 });

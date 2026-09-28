@@ -98,23 +98,64 @@ export function pagesShowing(
 
 /**
  * Every live page, across the business's sites, that shows the target.
- * Skips the read entirely while no block can show a product.
+ * Skips the read entirely while nothing can show a product.
+ *
+ * `shopOpen` (G11, the `SITE_SHOP` flag): each live site's `/shop` lists
+ * everything its sells-from storefront sells, so a product listed there is
+ * shown on that site's Shop page — unless a page of the merchant's own
+ * still sits at `/shop`, which the shop route keeps serving instead.
  */
 export async function websitePagesFor(
     organizationId: string,
     target: ShownTarget,
     blocks: Readonly<Record<string, ProductBlockReader>> = PRODUCT_BLOCKS,
+    shopOpen = false,
 ): Promise<WebsitePlacement> {
-    if (Object.keys(blocks).length === 0) {
+    if (Object.keys(blocks).length === 0 && !shopOpen) {
         return { showsProducts: false, pages: [] };
     }
     const sites = await liveSites(organizationId);
-    const pages = sites.flatMap((site) =>
-        pagesShowing(site.currentPublication?.snapshot, target, blocks).map(
+    const pages = sites.flatMap((site) => [
+        ...(shopOpen &&
+        target.productId !== null &&
+        site.storefront !== null &&
+        site.storefront.deletedAt === null &&
+        site.storefront.listings.some(
+            (l) => l.productId === target.productId,
+        ) &&
+        !hasPageAt(site.currentPublication?.snapshot, SHOP_PATH)
+            ? [
+                  {
+                      siteId: site.id,
+                      siteName: site.name,
+                      path: SHOP_PATH,
+                      title: "Shop",
+                  },
+              ]
+            : []),
+        ...pagesShowing(site.currentPublication?.snapshot, target, blocks).map(
             (page) => ({ siteId: site.id, siteName: site.name, ...page }),
         ),
-    );
+    ]);
     return { showsProducts: true, pages };
+}
+
+/** The shop's address on a merchant site (G11). */
+const SHOP_PATH = "/shop";
+
+/** Whether a live snapshot has a page of its own at `path`. */
+function hasPageAt(snapshot: unknown, path: string): boolean {
+    if (snapshot === null || typeof snapshot !== "object") return false;
+    const pages = (snapshot as { pages?: unknown }).pages;
+    return (
+        Array.isArray(pages) &&
+        pages.some(
+            (p) =>
+                p !== null &&
+                typeof p === "object" &&
+                (p as { path?: unknown }).path === path,
+        )
+    );
 }
 
 /**
@@ -169,6 +210,17 @@ function liveSites(organizationId: string) {
             id: true,
             name: true,
             currentPublication: { select: { snapshot: true } },
+            // Where it sells from (G11), and the published products listed
+            // there — what its `/shop` lists.
+            storefront: {
+                select: {
+                    deletedAt: true,
+                    listings: {
+                        where: { product: { status: "PUBLISHED" } },
+                        select: { productId: true },
+                    },
+                },
+            },
         },
     });
 }

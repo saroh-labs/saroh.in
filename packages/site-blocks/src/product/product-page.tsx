@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import type { ReactNode } from "react";
+import { createContext, useContext, useState } from "react";
 
 import { cn } from "../lib/utils";
 
@@ -16,6 +17,13 @@ import { cn } from "../lib/utils";
  * Picking a variant changes the price, the MRP and saving, the stock word and
  * the photo — the way a customer tries sizes. In `preview` mode the basket
  * button is shown but does nothing, and says so.
+ *
+ * Public mode (`preview={false}`, round-2 G11) is the merchant's live
+ * product page: no markers and no staff controls, and where the basket
+ * button sits, an `action` slot. The slot is empty until the bag and
+ * checkout (G13) fill it with Add to bag or "Ask about ordering"; whatever
+ * fills it reads the chosen variant, and whether it is sold out, with
+ * {@link useProductSelection}, so a server page can pass it as a plain node.
  *
  * `markers` draws numbered badges on each area so a panel beside the preview
  * can explain them (1 photos, 2 price, 3 variants and stock, 4 description and
@@ -132,6 +140,26 @@ export function stockLabel(
     return null;
 }
 
+/** What the visitor has chosen, for whatever fills the action slot. */
+export interface ProductSelection {
+    /** The variant picked; null for a product without variants. */
+    variantId: string | null;
+    /** The price shown for it. */
+    price: string;
+    /** Nothing of it can be sold now: the action is off. */
+    soldOut: boolean;
+}
+
+const SelectionContext = createContext<ProductSelection | null>(null);
+
+/**
+ * The chosen variant, inside a public product page's action slot. Null
+ * outside one.
+ */
+export function useProductSelection(): ProductSelection | null {
+    return useContext(SelectionContext);
+}
+
 function Marker({ n, show }: { n: number; show: boolean }) {
     if (!show) return null;
     return (
@@ -227,17 +255,22 @@ function Stars({ rating, className }: { rating: number; className?: string }) {
 
 export default function ProductPage({
     product,
-    markers = false,
+    markers: markersAsked = false,
     preview = true,
     locale = "en-IN",
-    onAddToBasket,
+    action,
 }: {
     product: ProductPageData;
+    /** Staff notes' numbered badges: the workspace preview only. */
     markers?: boolean;
+    /** The workspace preview (default); false is the live product page. */
     preview?: boolean;
     locale?: string;
-    onAddToBasket?: (variantId: string | null) => void;
+    /** The live page's action (G13 fills it); ignored in preview. */
+    action?: ReactNode;
 }) {
+    // The live page never draws staff notes, whatever it is handed.
+    const markers = preview && markersAsked;
     const firstAvailable =
         product.variants.find((v) => v.stock !== "SOLD_OUT") ??
         product.variants.at(0);
@@ -272,11 +305,7 @@ export default function ProductPage({
 
     function addToBasket() {
         if (soldOut) return;
-        if (preview) {
-            setNotice("This is a preview — nothing is added to a basket.");
-            return;
-        }
-        onAddToBasket?.(variant?.id ?? null);
+        setNotice("This is a preview — nothing is added to a basket.");
     }
 
     const details: { label: string; value: string }[] = [
@@ -490,21 +519,35 @@ export default function ProductPage({
                         </p>
                     ) : null}
 
-                    <button
-                        type="button"
-                        onClick={addToBasket}
-                        disabled={soldOut}
-                        className="bg-site-accent text-site-accent-fg mt-5 min-h-11 w-full rounded-[var(--site-radius,2px)] px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                    >
-                        {soldOut ? "Sold out" : "Add to basket"}
-                    </button>
-                    {notice ? (
-                        <p
-                            role="status"
-                            className="text-site-muted mt-2 text-xs"
+                    {preview ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={addToBasket}
+                                disabled={soldOut}
+                                className="bg-site-accent text-site-accent-fg mt-5 min-h-11 w-full rounded-[var(--site-radius,2px)] px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                            >
+                                {soldOut ? "Sold out" : "Add to basket"}
+                            </button>
+                            {notice ? (
+                                <p
+                                    role="status"
+                                    className="text-site-muted mt-2 text-xs"
+                                >
+                                    {notice}
+                                </p>
+                            ) : null}
+                        </>
+                    ) : action ? (
+                        <SelectionContext.Provider
+                            value={{
+                                variantId: variant?.id ?? null,
+                                price,
+                                soldOut,
+                            }}
                         >
-                            {notice}
-                        </p>
+                            <div className="mt-5">{action}</div>
+                        </SelectionContext.Provider>
                     ) : null}
 
                     {/* 4 — description and details */}

@@ -601,6 +601,9 @@ model Store {
   stockLevels  StockLevel[]
   stockEntries StockEntry[]
 
+  // The sites that sell from it (G11, `Site.storefrontId`).
+  sitesSellingHere Site[] @relation("SiteStorefront")
+
   // The target of (storeId, organizationId) foreign keys: a listing or a
   // stock row can only name a storefront of its own business.
   @@unique([id, organizationId])
@@ -2821,10 +2824,20 @@ model Site {
   // site, and so the host, it was made for.
   customerSessions CustomerSession[]
 
+  // The storefront this site sells from (G11): what `/shop`, the Product
+  // grid and checkout read. Set on its own only when the business has
+  // exactly one open storefront with listings (the migration's backfill and
+  // site creation); otherwise the merchant picks it in the site's settings.
+  // Closing that storefront clears it. NoAction, not SetNull: a composite
+  // SetNull would null organizationId too, and storefronts are soft-deleted.
+  storefrontId String?
+  storefront   Store?  @relation("SiteStorefront", fields: [storefrontId, organizationId], references: [id, organizationId], onDelete: NoAction)
+
   @@unique([organizationId, slug])
   // The target of (siteId, organizationId) foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])
+  @@index([storefrontId])
 }
 
 // Page — a routable page within a Site, identified by its `path`.

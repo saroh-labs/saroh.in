@@ -12,6 +12,7 @@ jest.mock("../capabilities/module-enforcement.guard", () => ({
 jest.mock("@saroh/database", () => {
     const tx = {
         store: { update: jest.fn() },
+        site: { updateMany: jest.fn() },
         storeSettings: { upsert: jest.fn() },
         stockLevel: { findMany: jest.fn(), count: jest.fn() },
         $queryRaw: jest.fn(),
@@ -64,6 +65,7 @@ const db = prisma as unknown as {
     $transaction: jest.Mock;
     __tx: {
         store: Record<string, jest.Mock>;
+        site: Record<string, jest.Mock>;
         storeSettings: Record<string, jest.Mock>;
         stockLevel: Record<string, jest.Mock>;
         $queryRaw: jest.Mock;
@@ -345,6 +347,14 @@ describe("StorefrontsService", () => {
         expect(db.__tx.store.update).toHaveBeenCalledWith({
             where: { id: "st_1" },
             data: { deletedAt: expect.any(Date) },
+        });
+    });
+
+    it("clears the choice of any site that sold from it (G11)", async () => {
+        await service.close("org_1", "st_1");
+        expect(db.__tx.site.updateMany).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", storefrontId: "st_1" },
+            data: { storefrontId: null },
         });
     });
 
