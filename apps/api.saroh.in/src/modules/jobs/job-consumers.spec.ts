@@ -6,11 +6,12 @@
  * nothing connects the two until a worker claims the row. When they disagree
  * the failure is silent in both directions:
  *
- *   - Enqueued with no consumer: `booking.notify` has been written on every
- *     booking and reschedule since S4-002, which left its handler to a later
- *     ticket. The registry's old no-op fallback let the worker mark every one
- *     DONE. Unhandled types now dead-letter as FAILED, which stops the queue
- *     reporting delivery — but only this spec stops the gap reopening.
+ *   - Enqueued with no consumer: `booking.notify` was written on every
+ *     booking and reschedule from S4-002, and its handler came only with
+ *     round-2 A14. The registry's old no-op fallback let the worker mark
+ *     every one DONE. Unhandled types now dead-letter as FAILED, which stops
+ *     the queue reporting delivery — but only this spec stops a gap
+ *     reopening.
  *   - Registered with no producer: S7-002 built and registered the
  *     `analytics.aggregate` handler, and nothing enqueues it.
  *
@@ -28,10 +29,7 @@ import { join, relative, sep } from "node:path";
  * consequence. Delete the entry in the commit that closes it — the last test
  * below fails until you do, so this list cannot quietly outlive the gap.
  */
-const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {
-    "booking.notify":
-        "Enqueued on every booking and reschedule since S4-002. No handler exists, so these jobs dead-letter and nobody is told a booking was made or moved.",
-};
+const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {};
 
 /** Registered, but nothing enqueues it. Same rules as above. */
 const KNOWN_WITHOUT_PRODUCER: Record<string, string> = {
@@ -119,6 +117,13 @@ describe("job producers and consumers agree", () => {
         // A scan that silently matches nothing would pass everything below.
         expect(produced.size).toBeGreaterThan(0);
         expect(consumed.size).toBeGreaterThan(0);
+    });
+
+    it("handles the customer notices (A14): booking.notify no longer dead-letters", () => {
+        for (const type of ["booking.notify", "customer.notify"]) {
+            expect(produced.has(type)).toBe(true);
+            expect(consumed.has(type)).toBe(true);
+        }
     });
 
     it("names every job type with a string literal or an exported constant", () => {

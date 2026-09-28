@@ -173,6 +173,10 @@ const NEVER: Record<string, string> = {
         "a signed-in customer's own orders — the tab follows Commerce, dark with the account area",
     "site-accounts/account-plan.controller.ts":
         "a signed-in customer's own plans and packs — the tab follows what's on sale, dark with the account area",
+    // A11: buying a class pack from the account. The service answers 404
+    // unless Class packs is rolled out and switched on (DEC-057, E12).
+    "class-packs/account-packs.controller.ts":
+        "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.

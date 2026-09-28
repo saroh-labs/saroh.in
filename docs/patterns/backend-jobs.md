@@ -40,8 +40,11 @@
   Reclaim is anchored on `lockedAt` (the claim), never `createdAt`.
 - **Current** — **A job that does two independent things is two jobs.** An
   enquiry enqueues `enquiry.notify` and `automation.run` separately.
-- **Adopted** — **Never enqueue a job the handler will no-op on.** Gap:
-  `booking.notify`.
+- **Adopted** — **Never enqueue a job the handler will no-op on.** A
+  pay-now hold is not told until it is paid, and a course's sessions are
+  not told one by one. Gap: an order step (`customer.notify`) and a booking
+  are queued whether or not the customer can be reached; the handler
+  decides (`site-accounts/notice-reach.ts`).
 - **Current** — **Recurring work is a self-rescheduling job** — there is no
   scheduler (`subscription.renew`, ADR-007). Each run ends by enqueueing the
   next; a partial unique index allows one PENDING run of the type, and
@@ -72,10 +75,31 @@ worker with `runOnce()`; the poll loop does not start under `NODE_ENV=test`.
 
 ## Known gaps
 
-| Type                  | Gap                                            | Consequence                                                                                    |
-| --------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `booking.notify`      | Enqueued on booking and reschedule; no handler | Nobody is told. The jobs dead-letter, and rows marked DONE before that change were never sent. |
-| `analytics.aggregate` | Handler registered; nothing enqueues it        | Rollups come only from the seed, so Insights tells real organizations no views were recorded.  |
+| Type                  | Gap                                     | Consequence                                                                                   |
+| --------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `analytics.aggregate` | Handler registered; nothing enqueues it | Rollups come only from the seed, so Insights tells real organizations no views were recorded. |
 
-Both are listed in `job-consumers.spec.ts`. Close a gap and delete its entry in
-the same commit. Both need a product decision first (`saroh-product.md`).
+It is listed in `job-consumers.spec.ts`. Close a gap and delete its entry in
+the same commit. It needs a product decision first (`saroh-product.md`).
+
+`booking.notify` was the other gap: enqueued on every booking and
+reschedule from S4-002 with no handler, so its jobs dead-lettered and
+nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
+
+## Customer notices — **Current** (A14)
+
+- **`booking.notify`** (booked, moved, cancelled, a hold paid) tells the
+  team when the customer moved or cancelled it themselves (a
+  `Notification`), and delegates the customer's side to
+  `CustomerNotifyService`. **`customer.notify`** carries an order step
+  (Ready, handed over), queued 10 seconds ahead so an Undo deletes it
+  unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer.
+- **Once per event.** Both claim a `CustomerNotice` row keyed to the event
+  (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
+  `createMany({ skipDuplicates })` before writing anything: a Postgres
+  transaction cannot carry on after a caught P2002, so never insert-and-catch
+  inside one.
+- **Re-read, then decide.** A booking cancelled since isn't confirmed, an
+  undone step isn't announced, and the contact goes through
+  `resolveContact` (a merge lands on the survivor; a removed contact hears
+  nothing).

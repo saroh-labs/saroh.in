@@ -14,8 +14,10 @@ import type {
 export type TimesResult =
     { ok: true; times: AccountTimes } | { ok: false; message: string };
 
+/** `told`: the business is told of the move (A14); absent before A14. */
 export type MoveResult =
-    { ok: true; booking: AccountBookingRow } | { ok: false; message: string };
+    | { ok: true; booking: AccountBookingRow; told?: boolean }
+    | { ok: false; message: string };
 
 export type CancelResult =
     { ok: true; result: AccountCancelResult } | { ok: false; message: string };

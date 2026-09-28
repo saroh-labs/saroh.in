@@ -85,6 +85,14 @@ a note saying so.
   as the email goes to the provider; the stored body keeps a slot, so
   `message:read` never shows the token. A suppressed send never makes the
   link, so the one already shared keeps working.
+- **Current** (A14) — **A confirmation proves an address.** When the email
+  of a booking confirmation, or an order's Ready or handover, is accepted
+  by the provider, and the contact made that booking or order online with
+  that very email, `message.send` stamps the contact's email verified
+  (`communications/confirmation-stamp.ts`, DEC-049). The notice ledger
+  (`CustomerNotice`) says which booking or order a message confirmed. A
+  failed send, a placeholder address or a booking made by staff stamps
+  nothing, and a stamp that fails never re-sends the email.
 - **Current** — **Storage keys are server-derived and tenant-scoped**
   (`org/<organizationId>/…`), and uploads are presigned PUTs checked against a
   content-type allowlist and a size cap.

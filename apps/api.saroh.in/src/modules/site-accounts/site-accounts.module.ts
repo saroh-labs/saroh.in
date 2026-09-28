@@ -1,6 +1,10 @@
+import type { OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
 import { sendSiteEmailChangedEmail } from "../../common/email";
+import { CommunicationsService } from "../communications/communications.service";
+import { JobHandlerRegistry } from "../jobs/job-handler.registry";
+import { JobsModule } from "../jobs/jobs.module";
 import { AccountAreaGuard } from "./account-area";
 import {
     AccountHomeService,
@@ -16,6 +20,11 @@ import { AccountController } from "./account.controller";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { CustomerAccountRepository } from "./customer-account.repository";
+import {
+    CUSTOMER_NOTIFY_TYPE,
+    CustomerNotifyHandler,
+    CustomerNotifyService,
+} from "./customer-notify.handler";
 import { CustomerSessionGuard } from "./customer-session.guard";
 import {
     EMAIL_CHANGED_SENDER,
@@ -40,9 +49,14 @@ import { ThreadsService } from "./threads.service";
  * and Track (`/me/orders`). A6's Bookings (`/me/bookings`) are served by
  * `BookingsModule`, which owns the booking writes they share with the team.
  * A13 adds the customer's message thread (`/me/messages`), which the
- * workspace answers through the exported `ThreadsService`.
+ * workspace answers through the exported `ThreadsService`. A14 tells
+ * customers about their own bookings and orders (`customer.notify`, and
+ * `CustomerNotifyService`, which `booking.notify` delegates to), in the
+ * thread and through the business's own email provider.
  */
 @Module({
+    // The notices' job is registered at boot.
+    imports: [JobsModule],
     controllers: [
         SignInController,
         SessionsController,
@@ -69,6 +83,13 @@ import { ThreadsService } from "./threads.service";
         SiteRelayGuard,
         CustomerSessionGuard,
         ThreadsService,
+        CustomerNotifyService,
+        CustomerNotifyHandler,
+        // D17's transactional path, which the notices' email goes through.
+        // Stateless, so provided here rather than importing
+        // CommunicationsModule, whose controller's guards would bring the
+        // organization and Better Auth wiring into this module.
+        CommunicationsService,
     ],
     exports: [
         AccountAreaGuard,
@@ -79,6 +100,20 @@ import { ThreadsService } from "./threads.service";
         CustomerSessionGuard,
         ThreadsService,
         AccountAreaGuard,
+        CustomerNotifyService,
     ],
 })
-export class SiteAccountsModule {}
+export class SiteAccountsModule implements OnModuleInit {
+    constructor(
+        private readonly registry: JobHandlerRegistry,
+        private readonly customerNotify: CustomerNotifyHandler,
+    ) {}
+
+    /** Wire the customer notice consumer into the job worker (A14). */
+    onModuleInit(): void {
+        this.registry.register(
+            CUSTOMER_NOTIFY_TYPE,
+            this.customerNotify.handle,
+        );
+    }
+}

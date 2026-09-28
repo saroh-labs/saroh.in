@@ -9,6 +9,11 @@ jest.mock("../../env", () => ({
     },
 }));
 
+// The confirmation stamp (A14) has its own spec; here only when it runs.
+jest.mock("./confirmation-stamp", () => ({
+    stampConfirmedEmail: jest.fn().mockResolvedValue(false),
+}));
+
 jest.mock("@saroh/database", () => ({
     prisma: {
         delivery: { findUnique: jest.fn(), update: jest.fn() },
@@ -22,6 +27,7 @@ import { prisma } from "@saroh/database";
 
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { encryptSecret } from "../payments/crypto";
+import { stampConfirmedEmail } from "./confirmation-stamp";
 import { MESSAGE_SEND_TYPE, MessageSendHandler } from "./message-send.handler";
 import {
     FakeCommsProvider,
@@ -263,5 +269,57 @@ describe("MessageSendHandler", () => {
 
         expect(registry.has("message.send")).toBe(true);
         expect(registry.get("message.send")).toBe(handler.handle);
+    });
+});
+
+describe("MessageSendHandler — a confirmation proves its address (A14)", () => {
+    const stamp = stampConfirmedEmail as jest.Mock;
+    const confirmation = {
+        ...message,
+        contactId: "ct_1",
+        template: "BOOKING_CONFIRMED",
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(confirmation);
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+    });
+
+    it("stamps once the provider accepted it", async () => {
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(new FakeCommsProvider("EMAIL")),
+        );
+        await handler.handle(job());
+        expect(stamp).toHaveBeenCalledTimes(1);
+        expect(stamp.mock.calls[0][1]).toBe(confirmation);
+    });
+
+    it("a failed send stamps nothing, and is retried", async () => {
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(
+                new FakeCommsProvider(
+                    "EMAIL",
+                    new Error("Email send failed (HTTP 500)"),
+                ),
+            ),
+        );
+        await expect(handler.handle(job())).rejects.toThrow();
+        expect(stamp).not.toHaveBeenCalled();
+    });
+
+    it("a stamp that fails leaves the send done: never a second email", async () => {
+        stamp.mockRejectedValueOnce(new Error("db down"));
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+        await expect(handler.handle(job())).resolves.toBeUndefined();
+        expect(fake.calls).toHaveLength(1);
+        expect(messageUpdate).toHaveBeenCalledWith({
+            where: { id: "msg_1" },
+            data: { status: "SENT" },
+        });
     });
 });

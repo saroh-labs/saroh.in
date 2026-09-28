@@ -531,7 +531,7 @@ export async function reserveInTx(
     // Where the history starts. No `fromStartAt`: there was no before.
     // The actor is whoever made it by hand; a booker who did it
     // themselves leaves it empty.
-    await tx.bookingEvent.create({
+    const booked = await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId,
@@ -542,14 +542,15 @@ export async function reserveInTx(
         select: { id: true },
     });
 
-    // A course session's booking is not notified: nothing sends these yet,
-    // and one enrolment would queue a dead letter per session (ADR-007).
+    // A course session's booking is not notified one by one: one enrolment
+    // books every session (ADR-007).
     if (course) return booking;
+    // A pay-now hold is confirmed, and told, once it is paid
+    // (`booking-hold.ts`).
+    if (booking.status !== "CONFIRMED") return booking;
 
-    // Transactional outbox: a committed booking always has a queued
-    // notification job. The handler never landed: the worker dead-letters
-    // booking.notify until one is registered (see
-    // jobs/job-consumers.spec.ts).
+    // Transactional outbox: a committed booking always has its notice
+    // queued. A14's `booking-notify.handler.ts` tells the customer.
     await tx.job.create({
         data: {
             organizationId,
@@ -558,6 +559,8 @@ export async function reserveInTx(
                 bookingId: booking.id,
                 serviceId,
                 contactId: contact.id,
+                reason: "booked",
+                eventId: booked.id,
             },
         },
     });

@@ -216,7 +216,7 @@ export async function moveFoundBooking(
                     data: { startAt, endAt },
                 });
                 // No actor is the customer themselves ("by the customer").
-                await tx.bookingEvent.create({
+                const event = await tx.bookingEvent.create({
                     data: {
                         bookingId: booking.id,
                         organizationId: actor.organizationId,
@@ -228,11 +228,9 @@ export async function moveFoundBooking(
                     select: { id: true },
                 });
                 // Same transactional outbox as booking: a committed move
-                // always has a queued notification job, so a failed send
-                // cannot drop it. It is NOT delivered yet: no handler is
-                // registered for booking.notify, so the worker dead-letters
-                // these jobs (see jobs/job-consumers.spec.ts), and until one
-                // is, nothing tells the booker their time moved.
+                // always has its notice queued, so a failed send cannot
+                // drop it. A14's `booking-notify.handler.ts` tells the
+                // customer, and the team when the customer moved it.
                 await tx.job.create({
                     data: {
                         organizationId: actor.organizationId,
@@ -242,6 +240,7 @@ export async function moveFoundBooking(
                             serviceId: service.id,
                             contactId: booking.contactId,
                             reason: "rescheduled",
+                            eventId: event.id,
                         },
                     },
                     select: { id: true },

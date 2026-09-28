@@ -292,6 +292,8 @@ model Organization {
   // A class pack's history and its holders' extensions (round-2 E13).
   packEvents     PackEvent[]
   packExtensions PackExtension[]
+  // The notices told about a customer's bookings and orders (round-2 A14).
+  customerNotices CustomerNotice[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -5813,4 +5815,41 @@ model PaymentMandate {
   @@index([organizationId])
   @@index([organizationId, subscriptionId, status])
   @@index([organizationId, contactId, status])
+}
+
+/// One notice about a customer's own booking or order, handled once
+/// (round-2 A14, R15): the ledger that makes `booking.notify` and
+/// `customer.notify` idempotent per event. It is written first, on the
+/// handler's transaction, with what the notice became: a SYSTEM message in
+/// the customer's thread, a transactional email (`Message`), and, for what
+/// the customer did themselves, a notice to the team (`Notification`).
+/// The send job reads it back to stamp a confirmation's email verified
+/// (DEC-049), and an order step's Undo reads it to know whether the
+/// customer was already told.
+model CustomerNotice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The event it is about, unique per business ("booking:<eventId>",
+  // "order:<orderEventId>", "team:booking:<eventId>").
+  eventKey String
+  // BOOKING_CONFIRMED | BOOKING_MOVED | BOOKING_CANCELLED | ORDER_READY |
+  // ORDER_HANDED_OVER | WAITLIST_OFFER | TEAM_TOLD
+  kind     String
+
+  // What it was about and what it became. Informational, no FK, like
+  // Notification.leadId: the record outlives nothing it could dangle from.
+  contactId       String?
+  bookingId       String?
+  orderId         String?
+  threadMessageId String?
+  messageId       String?
+  notificationId  String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, eventKey])
+  @@index([organizationId])
+  @@index([messageId])
 }

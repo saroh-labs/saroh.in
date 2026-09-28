@@ -34,6 +34,7 @@ import type {
     AccountBookingRow,
     AccountBookings,
     AccountCancelResult,
+    AccountMoveResult,
     AccountTimes,
     AccountTreatment,
 } from "./account-bookings-view";
@@ -178,14 +179,15 @@ export class AccountBookingsService {
      * Move the customer's booking to `startAt`: a one-to-one to a free time
      * with the same person, a class to another of its sessions (its credit
      * moves with it). The free-cancel deadline stays the one fixed at
-     * booking. The history reads "by the customer".
+     * booking. The history reads "by the customer", and the business is
+     * told (A14's `booking.notify`): `told`.
      */
     async move(
         ctx: Ctx,
         ref: string,
         startAtIso: string,
         now: Date = new Date(),
-    ): Promise<AccountBookingRow> {
+    ): Promise<AccountMoveResult> {
         const row = await this.ownRow(ctx, ref);
         const { booking, service, rules } = await this.movable(ctx, row, now);
         const startAt = new Date(startAtIso);
@@ -193,7 +195,10 @@ export class AccountBookingsService {
             throw new BadRequestException("startAt is not a valid instant");
         }
         if (startAt.getTime() === booking.startAt.getTime()) {
-            return this.rowWithActions(ctx, row, rules, now);
+            return {
+                ...(await this.rowWithActions(ctx, row, rules, now)),
+                told: false,
+            };
         }
         refuseOutsideWindow(startAt, now, rules);
         await moveFoundBooking(
@@ -207,7 +212,7 @@ export class AccountBookingsService {
                 refuseClosedTreatment: true,
             },
         );
-        return this.one(ctx, ref, now);
+        return { ...(await this.one(ctx, ref, now)), told: true };
     }
 
     /**
@@ -249,7 +254,7 @@ export class AccountBookingsService {
                 ),
         );
         const after = await this.ownRow(ctx, ref);
-        return cancelResultView(bookingRowView(after), done.money);
+        return cancelResultView(bookingRowView(after), done.money, done.told);
     }
 
     // ---- A treatment's next visit (E9, E10) ------------------------------
