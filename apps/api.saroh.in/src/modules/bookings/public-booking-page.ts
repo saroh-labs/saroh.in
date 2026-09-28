@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { paymentsOn } from "../invoices/payments-on";
+import { OPENS_CHECKOUT } from "../payments/public-key";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { Slot } from "./availability";
 import {
@@ -370,14 +371,18 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
     });
 }
 
-/** Payments on, and a provider connected to take the money. */
+/**
+ * Payments on, and a provider connected to take the money — one whose
+ * checkout window can open: a Razorpay connection still missing its public
+ * key id is not (DEC-054).
+ */
 export async function takesOnlinePayment(
     organizationId: string,
 ): Promise<boolean> {
     const [on, provider] = await Promise.all([
         paymentsOn(prisma, organizationId),
         prisma.merchantPaymentProvider.findFirst({
-            where: { organizationId, status: "CONNECTED" },
+            where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
             select: { id: true },
         }),
     ]);

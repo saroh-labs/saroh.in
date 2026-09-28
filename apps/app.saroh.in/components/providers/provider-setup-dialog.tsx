@@ -26,6 +26,7 @@ import {
     disconnectCommsProvider,
     disconnectPaymentProvider,
 } from "@/lib/providers/actions";
+import { needsPublicKey, RAZORPAY_KEY_ID } from "@/lib/providers/rows";
 import type {
     CommsChannel,
     ConnectedCommsProvider,
@@ -179,6 +180,12 @@ function PaymentsForm({
     const [keyId, setKeyId] = useState("");
     const [keySecret, setKeySecret] = useState("");
     const [publicKey, setPublicKey] = useState(current?.publicKey ?? "");
+    // Razorpay's key id is its public key (DEC-054): asked for once, checked
+    // here and again by the API, and never asked for a second time.
+    const razorpay = provider === "RAZORPAY";
+    const keyIdWrong =
+        razorpay && keyId.trim() !== "" && !RAZORPAY_KEY_ID.test(keyId.trim());
+    const missingKey = current ? needsPublicKey(current) : false;
     const [webhookSecret, setWebhookSecret] = useState("");
     const [saving, setSaving] = useState(false);
     const [confirming, setConfirming] = useState<PaymentProviderName | null>(
@@ -189,6 +196,7 @@ function PaymentsForm({
         keyId: useId(),
         secret: useId(),
         public: useId(),
+        keyHint: useId(),
         hook: useId(),
     };
 
@@ -199,7 +207,9 @@ function PaymentsForm({
             provider,
             keyId: keyId.trim(),
             keySecret: keySecret.trim(),
-            ...(publicKey.trim() ? { publicKey: publicKey.trim() } : {}),
+            ...(!razorpay && publicKey.trim()
+                ? { publicKey: publicKey.trim() }
+                : {}),
             ...(webhookSecret.trim()
                 ? { webhookSecret: webhookSecret.trim() }
                 : {}),
@@ -235,7 +245,9 @@ function PaymentsForm({
                 rows={connected.map((c) => ({
                     key: c.provider,
                     name: labelOfPayment(c.provider),
-                    detail: c.publicKey,
+                    detail: needsPublicKey(c)
+                        ? "No key id yet — enter the keys again below"
+                        : c.publicKey,
                     status: c.status,
                 }))}
                 onDisconnect={(key) =>
@@ -252,12 +264,21 @@ function PaymentsForm({
                     options={PAYMENT_PROVIDERS}
                 />
             </div>
+            {razorpay && missingKey ? (
+                <p className="rounded-[10px] bg-highlight-subtle px-3.5 py-3 text-[12.5px] leading-[1.45] text-highlight-subtle-foreground">
+                    Razorpay needs its key id to open your checkout window, and
+                    this connection was saved without one. Enter the key id and
+                    secret again to take payments online.
+                </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-3">
                 <SecretField
                     id={ids.keyId}
-                    label="Key ID"
+                    label={razorpay ? "Key ID (public)" : "Key ID"}
                     value={keyId}
                     onChange={setKeyId}
+                    invalid={keyIdWrong}
+                    describedBy={razorpay ? ids.keyHint : undefined}
                 />
                 <SecretField
                     id={ids.secret}
@@ -267,14 +288,30 @@ function PaymentsForm({
                     secret
                 />
             </div>
-            <SecretField
-                id={ids.public}
-                label="Public key"
-                value={publicKey}
-                onChange={setPublicKey}
-                optional
-                hint="Shown to the checkout; not a secret."
-            />
+            {razorpay ? (
+                <p
+                    id={ids.keyHint}
+                    className={cn(
+                        "-mt-2 text-[11.5px] leading-[1.45]",
+                        keyIdWrong
+                            ? "text-destructive"
+                            : "text-muted-foreground",
+                    )}
+                >
+                    {keyIdWrong
+                        ? "That isn't a Razorpay key id — it starts rzp_live_ or rzp_test_."
+                        : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+                </p>
+            ) : (
+                <SecretField
+                    id={ids.public}
+                    label="Public key"
+                    value={publicKey}
+                    onChange={setPublicKey}
+                    optional
+                    hint="Shown to the checkout; not a secret."
+                />
+            )}
             <SecretField
                 id={ids.hook}
                 label="Webhook signing secret"
@@ -291,7 +328,12 @@ function PaymentsForm({
                 </Button>
                 <Button
                     type="submit"
-                    disabled={saving || !keyId.trim() || !keySecret.trim()}
+                    disabled={
+                        saving ||
+                        !keyId.trim() ||
+                        !keySecret.trim() ||
+                        keyIdWrong
+                    }
                 >
                     {saving
                         ? "Connecting…"
@@ -571,6 +613,8 @@ function SecretField({
     secret,
     optional,
     hint,
+    invalid,
+    describedBy,
 }: {
     id: string;
     label: string;
@@ -579,7 +623,12 @@ function SecretField({
     secret?: boolean;
     optional?: boolean;
     hint?: string;
+    /** Marks the field wrong; the words saying why are `describedBy`'s. */
+    invalid?: boolean;
+    /** A hint rendered outside the field, e.g. below a row of two. */
+    describedBy?: string;
 }) {
+    const hintId = `${id}-hint`;
     return (
         <div className="grid gap-1.5">
             <Label htmlFor={id}>
@@ -597,10 +646,15 @@ function SecretField({
                 spellCheck={false}
                 value={value}
                 className="font-mono text-[12.5px]"
+                aria-invalid={invalid ? true : undefined}
+                aria-describedby={describedBy ?? (hint ? hintId : undefined)}
                 onChange={(e) => onChange(e.target.value)}
             />
             {hint ? (
-                <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                <p
+                    id={hintId}
+                    className="text-[11.5px] leading-[1.45] text-muted-foreground"
+                >
                     {hint}
                 </p>
             ) : null}

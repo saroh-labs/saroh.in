@@ -3,7 +3,23 @@ import { describe, expect, it } from "vitest";
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
 import type { ProviderRowsInput } from "./rows";
-import { buildProvidersView, dashboardFor } from "./rows";
+import { buildProvidersView, dashboardFor, RAZORPAY_KEY_ID } from "./rows";
+
+describe("Razorpay key id check", () => {
+    it("takes a test or live key id and nothing else", () => {
+        expect(RAZORPAY_KEY_ID.test("rzp_live_AbC123")).toBe(true);
+        expect(RAZORPAY_KEY_ID.test("rzp_test_AbC123")).toBe(true);
+        for (const wrong of [
+            "AbC123",
+            "rzp_prod_AbC123",
+            "rzp_live_",
+            "rzp_live_Ab C",
+            "secret_rzp_live_A",
+        ]) {
+            expect(RAZORPAY_KEY_ID.test(wrong)).toBe(false);
+        }
+    });
+});
 
 const HEALTH: ProviderHealth[] = [
     {
@@ -170,7 +186,10 @@ describe("provider rows", () => {
     it("names the storefronts that charge through each payment provider", () => {
         const view = buildProvidersView(
             input({
-                payments: [pay("RAZORPAY"), pay("CASHFREE")],
+                payments: [
+                    pay("RAZORPAY", "CONNECTED", "rzp_live_Rye1"),
+                    pay("CASHFREE"),
+                ],
                 checkout: [{ name: "Rye & Co.", provider: "RAZORPAY" }],
             }),
         );
@@ -178,6 +197,56 @@ describe("provider rows", () => {
         expect(razorpay.note).toBe("Takes card and UPI payments at Rye & Co.");
         expect(cashfree.note).toMatch(/no storefront's checkout uses it yet/);
         expect(view.available.some((e) => e.type === "Payments")).toBe(false);
+    });
+
+    it("says a Razorpay connection without its public key id needs attention (DEC-054)", () => {
+        for (const publicKey of [null, "", "  "]) {
+            const view = buildProvidersView(
+                input({
+                    payments: [pay("RAZORPAY", "CONNECTED", publicKey)],
+                    checkout: [{ name: "Rye & Co.", provider: "RAZORPAY" }],
+                }),
+            );
+            const [razorpay] = view.connected;
+            expect(razorpay.state).toBe("ATTENTION");
+            expect(razorpay.note).toMatch(/^Needs its key id/);
+            expect(razorpay.refs).toEqual([]);
+            // Still theirs: it can be managed, disconnected, and its keys
+            // entered again in the setup dialog opened on Razorpay.
+            expect(razorpay.manageHref).toBe("https://dashboard.razorpay.com");
+            expect(razorpay.target).toEqual({
+                kind: "payments",
+                provider: "RAZORPAY",
+            });
+            expect(razorpay.setup).toEqual({
+                kind: "payments",
+                provider: "RAZORPAY",
+            });
+            expect(view.available.map((e) => e.name)).not.toContain("Razorpay");
+        }
+    });
+
+    it("never asks a Cashfree or a disconnected Razorpay connection for a public key", () => {
+        const view = buildProvidersView(
+            input({
+                payments: [pay("RAZORPAY", "DISABLED"), pay("CASHFREE")],
+            }),
+        );
+        expect(view.connected.map((e) => [e.name, e.state])).toEqual([
+            ["Razorpay", "DISCONNECTED"],
+            ["Cashfree", "CONNECTED"],
+        ]);
+    });
+
+    it("reads a Razorpay connection with its public key as connected, and shows the key", () => {
+        const view = buildProvidersView(
+            input({ payments: [pay("RAZORPAY", "CONNECTED", "rzp_live_A1")] }),
+        );
+        const [razorpay] = view.connected;
+        expect(razorpay.state).toBe("CONNECTED");
+        expect(razorpay.refs).toEqual([
+            { label: "Public key", code: "rzp_live_A1" },
+        ]);
     });
 
     it("gives an SMTP relay Disconnect but no Manage", () => {

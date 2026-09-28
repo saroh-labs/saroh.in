@@ -42,6 +42,10 @@ const PILL: Record<ProviderRowState, { label: string; tone: string }> = {
         label: "Connected",
         tone: "bg-success-subtle text-success-subtle-foreground",
     },
+    ATTENTION: {
+        label: "Needs attention",
+        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+    },
     PENDING: {
         label: "Waiting for DNS",
         tone: "bg-highlight-subtle text-highlight-subtle-foreground",
@@ -87,6 +91,8 @@ export function ProviderRowView({
     const detailsId = useId();
     const connected = entry.state === "CONNECTED";
     const available = entry.state === "NOT_CONNECTED";
+    // Connected but not working yet: its keys are entered again right here.
+    const attention = entry.state === "ATTENTION";
     // Details has something to show: a reference, or the way to change keys.
     const hasDetails = entry.refs.length > 0 || connected;
 
@@ -164,7 +170,12 @@ export function ProviderRowView({
                         someone disconnected. Outline, all of them: a row
                         per provider would otherwise put several solid
                         buttons on one screen. */}
-                    {!connected ? setupDialog("Connect", false) : null}
+                    {!connected && !attention
+                        ? setupDialog("Connect", false)
+                        : null}
+                    {/* The one thing this row needs, so the one solid
+                        button on it. */}
+                    {attention ? setupDialog("Add key id", true) : null}
                     {entry.manageHref ? (
                         <Button asChild variant="outline" size="sm">
                             <a

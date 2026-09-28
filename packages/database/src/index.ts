@@ -27,3 +27,7 @@ export * from "./backfill/contact-attention";
 // The C2 paying-customer contacts backfill, exported for the same reason, and
 // for the API's payment path, which runs its per-customer rule.
 export * from "./backfill/paying-customer-contacts";
+// The D22 Razorpay public key backfill, exported so the API's integration
+// suite runs it with the API's own decrypt. Its command-line opener
+// (backfill/sealed-credentials.ts) is not exported.
+export * from "./backfill/razorpay-public-keys";
