@@ -11,6 +11,7 @@
  * Adapters MUST return stable machine codes and safe, plain-language messages —
  * never raw provider errors, secrets, or customer identifiers.
  */
+import type { OrgAction } from "../../organizations/organization-actions";
 import type { ModuleKey, ModuleReadiness } from "../module-registry";
 
 /** A reason a module is not fully ACTIVE. */
@@ -42,6 +43,30 @@ export interface ReadinessResult {
 export interface ReadinessInput {
     organizationId: string;
     projectId?: string;
+    /**
+     * Whether the viewer may read with this action. A blocker or an impact
+     * line that counts something says its number only to someone who may
+     * read what it counts (F13). Absent — a system caller — counts as yes.
+     */
+    may?: (action: OrgAction) => boolean;
+}
+
+/**
+ * One consequence of turning a module off, said before it happens (F13,
+ * default 56): what it counts, what stops and what stays. Counts are real,
+ * read at the moment of asking; a count that could not be read is `null`
+ * and its sentence says so, never zero. A line that counts nothing (a tab
+ * leaving the customer's account) has no `count` at all.
+ */
+export interface DeactivationImpactItem {
+    /** Stable machine code, e.g. "APPOINTMENTS_UPCOMING_BOOKINGS". */
+    code: string;
+    /** The module the line belongs to: the one turned off, or one going with it. */
+    moduleKey: ModuleKey;
+    /** The number counted; null when the read failed; absent when nothing is counted. */
+    count?: number | null;
+    /** One or two plain sentences: the count, what stops and what stays. */
+    message: string;
 }
 
 /** One module's readiness + safe-deactivation adapter. */

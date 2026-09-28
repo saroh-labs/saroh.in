@@ -32,6 +32,15 @@ function build() {
         archive: jest.fn().mockResolvedValue(undefined),
         selectForProject: jest.fn().mockResolvedValue(undefined),
         deselectForProject: jest.fn().mockResolvedValue(undefined),
+        impact: jest.fn((_ctx: unknown, moduleKey: string) =>
+            Promise.resolve({
+                moduleKey,
+                enabled: true,
+                goesWith: [],
+                items: [],
+                blockers: [],
+            }),
+        ),
     } as unknown as ModuleLifecycleService;
     return {
         controller: new CapabilitiesController(availability, lifecycle),
@@ -94,5 +103,22 @@ describe("CapabilitiesController", () => {
         const { controller, lifecycle } = build();
         await controller.disable(CTX, "CRM");
         expect(lifecycle.disable).toHaveBeenCalledWith(CTX, "CRM");
+    });
+
+    it("GET impact returns what turning the module off touches (F13)", async () => {
+        const { controller, lifecycle } = build();
+        const res = await controller.impact(CTX, "APPOINTMENTS");
+        expect(lifecycle.impact).toHaveBeenCalledWith(CTX, "APPOINTMENTS");
+        expect(res.data).toEqual(
+            expect.objectContaining({ moduleKey: "APPOINTMENTS" }),
+        );
+    });
+
+    it("GET impact 404s an unknown module", async () => {
+        const { controller, lifecycle } = build();
+        await expect(controller.impact(CTX, "NOPE")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(lifecycle.impact).not.toHaveBeenCalled();
     });
 });

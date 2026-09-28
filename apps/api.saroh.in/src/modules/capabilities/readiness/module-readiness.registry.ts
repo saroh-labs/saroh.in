@@ -13,8 +13,10 @@ import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ModuleKey } from "../module-registry";
+import { deactivationImpactOf } from "./module-deactivation-impact";
 import type {
     DeactivationBlocker,
+    DeactivationImpactItem,
     ModuleReadinessAdapter,
     ReadinessInput,
     ReadinessResult,
@@ -104,6 +106,18 @@ export class ModuleReadinessRegistry {
     ): Promise<DeactivationBlocker[]> {
         const adapter = this.adapters.get(key);
         return adapter ? adapter.deactivationBlockers(input) : [];
+    }
+
+    /**
+     * What turning the module off touches, with real counts (F13). Beside
+     * the blockers, never instead of them: an impact line informs, a
+     * blocker refuses. A module with nothing to count says nothing here.
+     */
+    deactivationImpact(
+        key: ModuleKey,
+        input: ReadinessInput,
+    ): Promise<DeactivationImpactItem[]> {
+        return deactivationImpactOf(this.db, key, input);
     }
 
     // --- adapters ---------------------------------------------------------
@@ -267,22 +281,25 @@ export class ModuleReadinessRegistry {
                     );
                 return active();
             },
-            deactivationBlockers: async ({ organizationId }) => {
+            deactivationBlockers: async ({ organizationId, may }) => {
                 const open = await this.db.order.count({
                     where: {
                         organizationId,
                         status: { in: [...OPEN_ORDER_STATES] },
                     },
                 });
-                if (open > 0)
-                    return [
-                        {
-                            code: "COMMERCE_OPEN_ORDERS",
-                            message: `Resolve ${open} open order(s) before disabling Commerce. Existing orders remain manageable.`,
-                            actionHref: "/commerce",
-                        },
-                    ];
-                return [];
+                if (open === 0) return [];
+                // The number only for someone who may read orders (F13).
+                const counts = !may || may("order:read") || may("order:stage");
+                return [
+                    {
+                        code: "COMMERCE_OPEN_ORDERS",
+                        message: counts
+                            ? `${open} open ${open === 1 ? "order needs" : "orders need"} sending or cancelling first. Orders already placed stay in Orders.`
+                            : "Some open orders need sending or cancelling first. Orders already placed stay in Orders.",
+                        actionHref: "/commerce/orders",
+                    },
+                ];
             },
         };
     }
