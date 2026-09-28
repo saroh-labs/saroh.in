@@ -220,3 +220,15 @@ export class PostMessageDto {
     })
     text!: string;
 }
+
+// ---- Bookings (A6) ----------------------------------------------------------
+
+/**
+ * A new time for one of the customer's bookings, or for a treatment's next
+ * visit. Only the time: the booking, its service and its person are the
+ * ones already booked, found by the path and the customer's session.
+ */
+export class AccountBookingTimeDto {
+    @IsISO8601()
+    startAt!: string;
+}

@@ -2,6 +2,8 @@ import { cache } from "react";
 
 import type {
     AccountBlock,
+    AccountBookingRow,
+    AccountBookings,
     AccountHomeData,
     AccountNote,
     AccountOrder,
@@ -12,6 +14,7 @@ import type {
     TrackLookup,
 } from "@saroh/site-blocks";
 
+import { bookingsResult, isBookingRow } from "./account-bookings-shape";
 import {
     homeResult,
     isAccountView,
@@ -129,6 +132,24 @@ export async function getOrder(orderId: string): Promise<TrackLookup> {
     }
     const order = orderDetailResult(read.body);
     return order ? { ok: true, order } : { ok: false, reason: "unavailable" };
+}
+
+/** The Bookings tab's lists (A6). A failed read stays failed, never "none". */
+export async function getBookings(): Promise<AccountBlock<AccountBookings>> {
+    const read = await readJson("me/bookings");
+    const value = read.ok ? bookingsResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+/**
+ * One of the customer's bookings (A6), for moving a class on the booking
+ * page. Null when it isn't theirs, they're signed out, or it can't be read.
+ */
+export async function getMyBooking(
+    ref: string,
+): Promise<AccountBookingRow | null> {
+    const read = await readJson(`me/bookings/${encodeURIComponent(ref)}`);
+    return read.ok && isBookingRow(read.body) ? read.body : null;
 }
 
 export type ReceiptLookup =

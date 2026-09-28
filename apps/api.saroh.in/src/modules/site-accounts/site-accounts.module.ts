@@ -37,9 +37,10 @@ import { ThreadsService } from "./threads.service";
  * calls (`AccountUnlinkService`). A5 adds the account area (`/me`: Me,
  * Home, receipts, health notes and the email change), dark behind
  * `SITE_ACCOUNT_AREA` until A6–A8 and A13 ship with it. A7 adds Orders
- * and Track (`/me/orders`). A13 adds the customer's message thread
- * (`/me/messages`), which the workspace answers through the exported
- * `ThreadsService`.
+ * and Track (`/me/orders`). A6's Bookings (`/me/bookings`) are served by
+ * `BookingsModule`, which owns the booking writes they share with the team.
+ * A13 adds the customer's message thread (`/me/messages`), which the
+ * workspace answers through the exported `ThreadsService`.
  */
 @Module({
     controllers: [
@@ -70,6 +71,7 @@ import { ThreadsService } from "./threads.service";
         ThreadsService,
     ],
     exports: [
+        AccountAreaGuard,
         CustomerAccountRepository,
         AccountUnlinkService,
         SiteRelayGuard,

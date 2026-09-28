@@ -63,9 +63,10 @@ describe("accountTabs", () => {
         ).toEqual(["Home", "Bookings", "Plan", "Messages", "Me"]);
     });
 
-    it("shows a tab only once its page has shipped: Home and Me in A5, Orders in A7, Plan in A8, Messages in A13", () => {
+    it("shows a tab only once its page has shipped: Home and Me in A5, Bookings in A6, Orders in A7, Plan in A8, Messages in A13", () => {
         expect([...SHIPPED_ACCOUNT_TABS]).toEqual([
             "home",
+            "bookings",
             "orders",
             "plan",
             "messages",
@@ -73,6 +74,7 @@ describe("accountTabs", () => {
         ]);
         expect(accountTabs(clinic)).toEqual([
             { key: "home", label: "Home" },
+            { key: "bookings", label: "Appointments" },
             { key: "messages", label: "Messages" },
             { key: "me", label: "Me" },
         ]);

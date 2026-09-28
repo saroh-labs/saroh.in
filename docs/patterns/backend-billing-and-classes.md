@@ -264,6 +264,14 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Cancel and move have one write each, whoever acts** (A6):
+  `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
+  from `BookingsService`, the customer from their account
+  (`site-accounts/account-bookings.service.ts`) with no actor, so the
+  history reads "by the customer". The customer's own rules sit on top: no
+  move inside the free-cancel window ("Call ‹business› to change this"), a
+  new time only where the booking page would offer it, and never a refund
+  by hand. A visit of a treatment takes its order's lock first.
 - **The anonymous `POST public/services/:id/book` answers 410** "Sign in to
   book" and reads no body (A9); bookings from a site go through
   `POST public/site-accounts/bookings`.

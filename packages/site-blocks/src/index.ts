@@ -206,6 +206,28 @@ export type {
     AccountView,
 } from "./account/model";
 export { AccountOrders, ORDERS_HREF, trackHref } from "./account/orders-list";
+// A6: the Bookings tab, its Move and Cancel sheets, and a class moved on the
+// booking page.
+export type {
+    CancelResult as AccountCancelAnswer,
+    MoveResult as AccountMoveAnswer,
+    TimesResult as AccountTimesAnswer,
+    VisitResult as AccountVisitAnswer,
+    BookingsApi,
+} from "./account/bookings-api";
+export { AccountBookingsTab } from "./account/bookings-list";
+export { BOOKINGS_HREF, moveClassHref } from "./account/bookings-model";
+export type {
+    AccountBookingRow,
+    AccountBookingState,
+    AccountBookings,
+    AccountCancelResult,
+    AccountCancelTerms,
+    AccountTimes,
+    AccountTreatment,
+    AccountTreatmentVisit,
+} from "./account/bookings-model";
+export { MoveClass } from "./account/move-class";
 export { AccountCard } from "./account/parts";
 export { PlanTab } from "./account/plan-tab";
 export type {

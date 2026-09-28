@@ -44,6 +44,7 @@ export interface AccountOffers {
  */
 export const SHIPPED_ACCOUNT_TABS: ReadonlySet<AccountTabKey> = new Set([
     "home",
+    "bookings",
     "orders",
     // A8: the plan and packs.
     "plan",

@@ -237,9 +237,10 @@ describe("Me", () => {
             email: atClinic.email,
             phone: null,
             businessName: "Kavi Dental",
-            // Home, Messages (A13) and Me have shipped; A6 adds Appointments.
+            // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
                 { key: "home", label: "Home" },
+                { key: "bookings", label: "Appointments" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
