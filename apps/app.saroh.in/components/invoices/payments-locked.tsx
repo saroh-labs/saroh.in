@@ -8,11 +8,12 @@ import type { LockedCopy } from "@/lib/invoices/access";
  * Payments' locked card (D18), after the Invoices, Invoice Detail and
  * Subscriptions designs: why this role can't open it, who can change that,
  * and the way back. Nothing is read for it, and there is nothing to retry.
- * Drawn like Order Detail's (`OrderLocked`).
+ * Drawn like Order Detail's (`OrderLocked`). It stands in for the whole
+ * page, so it is the page's `main`, as `PageContainer` would be.
  */
 export function PaymentsLocked({ title, text }: LockedCopy) {
     return (
-        <div className="px-4 py-[60px] sm:px-[22px]">
+        <main className="w-full px-4 py-[60px] sm:px-[22px]">
             <PermissionDeniedState
                 className="gap-[9px] border-border-strong py-9 sm:py-9"
                 title={title}
@@ -23,6 +24,6 @@ export function PaymentsLocked({ title, text }: LockedCopy) {
                     </Button>
                 }
             />
-        </div>
+        </main>
     );
 }
