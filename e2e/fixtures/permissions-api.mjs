@@ -51,6 +51,9 @@ const PRODUCT_ROLES = {
     },
     NOREAD: {
         role: "MEMBER",
+        // The API always sends the stored role's key; a role the business
+        // made is not a built-in one, whatever it is based on.
+        roleKey: "front_desk",
         roleLabel: "Front desk",
         actions: ["order:read", "booking:read"],
     },
