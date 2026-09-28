@@ -9,16 +9,21 @@ import { prisma } from "@saroh/database";
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { holdsPlace } from "../bookings/booking-hold";
+import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
 import { allows, authorize } from "../organizations/organization-policy";
 import { dateKey } from "../subscriptions/collections";
+import type { MoneyEntry, MoneySource } from "./money";
+import { moneyByDay, moneyCells, placeMoney } from "./money";
+import { readFees, readPaperMoney } from "./money-read";
 import type {
     CalendarDay,
     DatedItem,
     LayerKey,
+    MoneyCell,
     MoneyTotal,
     TakingEntry,
     ToActOn,
@@ -63,7 +68,12 @@ import { collectionsInMonth, upcomingRenewals } from "./schedules";
  * and `invoice:read`, ADR-008), and count each rupee once: orders plus paid
  * invoices that are not an order's own (ADR-008: every order has one).
  * Order amounts need `payment:read`; subscription and invoice amounts ride
- * with their own reads.
+ * with their own reads, and a booking's price with `booking:read` (DEC-039).
+ *
+ * Money in, out and due (plan 005 E19) go to `payment:read` alone: each
+ * item's `in`/`out`/`due`/`failed`, each day's `money` and the month's
+ * `money` with its entries (`money.ts`). They are all or nothing — a source
+ * they add up that could not be read leaves them out and names "Money".
  *
  * Takings are dated when the money moved, not when the order was placed: an
  * order's money on the day its invoice was paid (online or recorded by hand
@@ -93,8 +103,10 @@ import { collectionsInMonth, upcomingRenewals } from "./schedules";
  */
 
 export interface CalendarUnavailable {
-    /** A layer, or `takings` when only the takings could not be added up. */
-    source: LayerKey | "takings";
+    /**
+     * A layer, or `takings` / `money` when only those could not be added up.
+     */
+    source: LayerKey | "takings" | "money";
     label: string;
 }
 
@@ -125,6 +137,13 @@ export interface CalendarMonth {
      * could not be read; the app then sets no lower edge.
      */
     joinedAt: string | null;
+    /**
+     * `payment:read` only (plan 005 E19): the month's money in, out, due and
+     * failed per currency, and every entry that adds up to it, each rupee
+     * once (`money.ts`). `total` is null, and the entries empty, when a
+     * source could not be read.
+     */
+    money?: { total: MoneyCell[] | null; entries: MoneyEntry[] };
 }
 
 /**
@@ -238,6 +257,8 @@ export class CalendarService {
         const money =
             allows(ctx, "payment:read") && allows(ctx, "invoice:read");
         const orderAmounts = allows(ctx, "payment:read");
+        // Money in, out and due: the Payments scope alone (E19).
+        const cells = allows(ctx, "payment:read");
         const sees: Record<LayerKey, boolean> = {
             orders: on.has("COMMERCE") && allows(ctx, "order:read"),
             collections: on.has("PAYMENTS") && allows(ctx, "subscription:read"),
@@ -249,7 +270,8 @@ export class CalendarService {
         };
         const layers = LAYERS.filter((l) => sees[l]);
         // Orders are read for the takings too, where the layer is not shown.
-        const readOrders = on.has("COMMERCE") && (sees.orders || money);
+        const readOrders =
+            on.has("COMMERCE") && (sees.orders || money || cells);
         const readInvoices = sees.invoices;
 
         const unavailable: Unavailable = [];
@@ -335,6 +357,42 @@ export class CalendarService {
         }
 
         const failed = new Set(unavailable.map((u) => u.source));
+
+        // Money in, out and due: every source it adds up must have answered
+        // — the paper, the fees, the orders read and each layer shown (their
+        // Due) — or none of it is sent.
+        let moneyOut: CalendarMonth["money"];
+        let dayMoney: Map<string, MoneyCell[]> | null = null;
+        if (cells) {
+            const sources = await this.readMoney(
+                organizationId,
+                window,
+                zone.zone,
+            );
+            const known =
+                sources !== null &&
+                (!readOrders || orders !== null) &&
+                layers.every((l) => !failed.has(l));
+            if (known) {
+                const entries = placeMoney(items, [
+                    ...sources,
+                    ...(orders?.unpaperedSources ?? []),
+                ]).filter((e) => window.days.includes(e.date));
+                moneyOut = { total: moneyCells(entries), entries };
+                dayMoney = moneyByDay(window.days, entries);
+            } else {
+                moneyOut = { total: null, entries: [] };
+                // A layer shown and named already says what is missing;
+                // otherwise the money itself is named.
+                if (
+                    sources === null ||
+                    (readOrders && orders === null && !sees.orders)
+                ) {
+                    unavailable.push({ source: "money", label: "Money" });
+                }
+            }
+        }
+
         const totals: Partial<Record<LayerKey, number | null>> = {};
         for (const layer of layers) {
             totals[layer] = failed.has(layer)
@@ -356,6 +414,7 @@ export class CalendarService {
                 items,
                 toActOn,
                 takings,
+                money: dayMoney,
             }),
             toActOn,
             ...(money
@@ -368,7 +427,34 @@ export class CalendarService {
                 : {}),
             unavailable,
             joinedAt: created ? dayOf(created, zone.zone) : null,
+            ...(moneyOut ? { money: moneyOut } : {}),
         };
+    }
+
+    /**
+     * The paper's money and the providers' fees (`money-read.ts`), or null
+     * when either could not be read — a total with a missing part is not
+     * the total.
+     */
+    private async readMoney(
+        organizationId: string,
+        window: { start: Date; end: Date },
+        zone: string,
+    ): Promise<MoneySource[] | null> {
+        try {
+            const [paper, fees] = await Promise.all([
+                readPaperMoney(this.db, organizationId, window, zone),
+                readFees(this.db, organizationId, window, zone),
+            ]);
+            return [...paper, ...fees];
+        } catch (error) {
+            this.logger.error(
+                `Calendar money failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     /**
@@ -430,7 +516,12 @@ export class CalendarService {
         zone: string,
         amounts: boolean,
         money: boolean,
-    ): Promise<{ items: DatedItem[]; takings: TakingEntry[] }> {
+    ): Promise<{
+        items: DatedItem[];
+        takings: TakingEntry[];
+        /** Paid orders with no paper, as money in (E19). */
+        unpaperedSources: MoneySource[];
+    }> {
         const [rows, taken] = await Promise.all([
             this.db.order.findMany({
                 where: {
@@ -463,7 +554,23 @@ export class CalendarService {
                 ? this.readOrderTakings(organizationId, window, zone)
                 : Promise.resolve([]),
         ]);
+        // A paid order with no invoice (placed before orders were invoiced)
+        // has no payment date on record: when it was placed is the best
+        // there is, as it always was.
+        const unpapered = rows.filter(
+            (o) => o.paymentStatus === "PAID" && o.invoices.length === 0,
+        );
         return {
+            unpaperedSources: unpapered.map((o) => ({
+                date: dayOf(o.createdAt, zone),
+                kind: "order_paid" as const,
+                layer: "orders" as const,
+                title: o.orderId,
+                subtitle: personName(o.customer),
+                currency: o.currency,
+                cents: toMinor(o.total),
+                links: [{ type: "order" as const, id: o.id }],
+            })),
             items: rows.map((o) => ({
                 layer: "orders" as const,
                 date: dayOf(o.createdAt, zone),
@@ -484,20 +591,11 @@ export class CalendarService {
             })),
             takings: [
                 ...taken,
-                // A paid order with no invoice (placed before orders were
-                // invoiced) has no payment date on record: when it was
-                // placed is the best there is, as it always was.
-                ...(money ? rows : [])
-                    .filter(
-                        (o) =>
-                            o.paymentStatus === "PAID" &&
-                            o.invoices.length === 0,
-                    )
-                    .map((o) => ({
-                        date: dayOf(o.createdAt, zone),
-                        currency: o.currency,
-                        amount: o.total,
-                    })),
+                ...(money ? unpapered : []).map((o) => ({
+                    date: dayOf(o.createdAt, zone),
+                    currency: o.currency,
+                    amount: o.total,
+                })),
             ],
         };
     }
@@ -718,6 +816,12 @@ export class CalendarService {
                 amount: toMoneyString(c.total),
                 currency: c.currency,
             };
+            // Payment failed: the rule `failedCharge` uses — unpaid past
+            // due, on a subscription that has not been cancelled.
+            const failing =
+                c.dueAt !== null &&
+                sub.status !== "CANCELLED" &&
+                isPastDue(c, now);
             if (c.periodStart && inMonth(c.periodStart)) {
                 const date = dayOf(c.periodStart, zone);
                 raised.add(`${sub.id}@${date}`);
@@ -733,16 +837,19 @@ export class CalendarService {
                         ...amount,
                         link: { type: "subscription", id: sub.id },
                     },
+                    // Raised and not yet paid: still due, until it fails.
+                    ...(c.status === "ISSUED" && !failing
+                        ? {
+                              owes: {
+                                  kind: "renewal_due" as const,
+                                  currency: c.currency,
+                                  cents: toMinor(c.total),
+                              },
+                          }
+                        : {}),
                 });
             }
-            // Payment failed: the rule `failedCharge` uses — unpaid past
-            // due, on a subscription that has not been cancelled.
-            if (
-                c.dueAt &&
-                inMonth(c.dueAt) &&
-                sub.status !== "CANCELLED" &&
-                isPastDue(c, now)
-            ) {
+            if (c.dueAt && inMonth(c.dueAt) && failing) {
                 const date = dayOf(c.dueAt, zone);
                 items.push({
                     layer: "subscriptions",
@@ -755,6 +862,11 @@ export class CalendarService {
                         at: c.dueAt.toISOString(),
                         ...amount,
                         link: { type: "subscription", id: sub.id },
+                    },
+                    owes: {
+                        kind: "renewal_failed",
+                        currency: c.currency,
+                        cents: toMinor(c.total),
                     },
                 });
                 failed.push({
@@ -789,6 +901,12 @@ export class CalendarService {
                         at: at.toISOString(),
                         ...price,
                         link: { type: "subscription", id: s.id },
+                    },
+                    // A renewal still to come is money due.
+                    owes: {
+                        kind: "renewal_due",
+                        currency: s.currency,
+                        cents: toMinor(s.price),
                     },
                 });
             }
@@ -916,6 +1034,16 @@ export class CalendarService {
                         ...amount,
                         link,
                     },
+                    // Unpaid is due — overdue too, as money still owed —
+                    // except a renewal's charge past due, which failed.
+                    owes: {
+                        kind:
+                            late && inv.source === "SUBSCRIPTION"
+                                ? "renewal_failed"
+                                : "invoice_due",
+                        currency: inv.currency,
+                        cents: toMinor(inv.total),
+                    },
                 });
             }
             if (late) {
@@ -961,20 +1089,38 @@ export class CalendarService {
                 status: true,
                 outcome: true,
                 paidWith: true,
+                snapshot: true,
                 bookerName: true,
                 bookerEmail: true,
                 service: { select: { name: true } },
+                // Its own invoice (ADR-008): what was paid online for it,
+                // and whether a pay link still asks for the rest.
+                invoices: {
+                    where: { kind: "INVOICE", source: "BOOKING" },
+                    select: {
+                        status: true,
+                        paymentIntents: {
+                            where: { status: "SUCCEEDED" },
+                            select: { amountCents: true },
+                        },
+                    },
+                },
                 staff: { select: { name: true } },
                 contact: {
                     select: { firstName: true, lastName: true, email: true },
                 },
             },
         });
-        return rows.map((b) => {
+        const today = dayOf(now, zone);
+        return rows.map((b): DatedItem => {
             const held = b.status === "PENDING";
+            const date = dayOf(b.startAt, zone);
+            const { priceCents, currency } = bookingPrice(b.snapshot);
+            const owes = this.bookingOwes(b, held, date >= today);
             return {
                 layer: "bookings" as const,
-                date: dayOf(b.startAt, zone),
+                date,
+                ...(owes ? { owes } : {}),
                 item: {
                     id: b.id,
                     kind: held
@@ -997,10 +1143,47 @@ export class CalendarService {
                             .filter(Boolean)
                             .join(" · ") || null,
                     at: b.startAt.toISOString(),
+                    // Its price is part of the booking (DEC-039).
+                    ...(priceCents !== null && currency
+                        ? { amount: fromMinor(priceCents), currency }
+                        : {}),
                     link: { type: "booking" as const, id: b.id },
                 },
             };
         });
+    }
+
+    /**
+     * What a booking still asks for at the visit (default 50), for the
+     * calendar's Due: the price less what was paid online, on a booking
+     * that stands, from today on. A live hold is not booked yet, and a pay
+     * link still open is the invoice's Due, not the booking's too.
+     */
+    private bookingOwes(
+        b: {
+            status: string;
+            outcome: string | null;
+            paidWith: string | null;
+            snapshot: unknown;
+            invoices: {
+                status: string;
+                paymentIntents: { amountCents: number }[];
+            }[];
+        },
+        held: boolean,
+        ahead: boolean,
+    ): DatedItem["owes"] {
+        if (held || !ahead || b.outcome === "NO_SHOW") return undefined;
+        if (b.invoices.some((i) => i.status === "ISSUED")) return undefined;
+        const paidOnline = b.invoices
+            .filter((i) => i.status === "PAID" || i.status === "CREDITED")
+            .flatMap((i) => i.paymentIntents)
+            .reduce((n, p) => n + p.amountCents, 0);
+        const due = bookingDueCents(b, paidOnline);
+        const { currency } = bookingPrice(b.snapshot);
+        return due && currency
+            ? { kind: "booking_due", currency, cents: due }
+            : undefined;
     }
 
     /**

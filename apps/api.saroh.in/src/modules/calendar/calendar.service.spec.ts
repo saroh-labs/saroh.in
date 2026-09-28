@@ -119,6 +119,11 @@ interface Fixture {
     bookings?: object[];
     classes?: object[];
     failInvoices?: boolean;
+    /** The money read's paper (E19): paid invoices and credit notes. */
+    moneyPaper?: object[];
+    /** Payment intents with a reported fee (E19). */
+    fees?: object[];
+    failFees?: boolean;
     /** When the business was created; `"fail"` makes the read throw. */
     createdAt?: Date | "fail";
 }
@@ -136,12 +141,17 @@ function build(
     } as unknown as ModuleAvailabilityService;
 
     const invoiceRead = jest.fn(
-        (args: { where: { source?: string; orderId?: unknown } }) => {
+        (args: {
+            where: { source?: string; orderId?: unknown; status?: unknown };
+        }) => {
             if (args.where.source === "SUBSCRIPTION") {
                 return Promise.resolve(f.subscriptionInvoices ?? []);
             }
             if (args.where.orderId) {
                 return Promise.resolve(f.orderPaper ?? []);
+            }
+            if (args.where.status) {
+                return Promise.resolve(f.moneyPaper ?? []);
             }
             if (f.failInvoices) {
                 return Promise.reject(
@@ -185,12 +195,23 @@ function build(
             ),
         },
         invoice: { findMany: invoiceRead },
+        paymentIntent: {
+            findMany: jest.fn(() =>
+                f.failFees
+                    ? Promise.reject(new Error("fees unreadable"))
+                    : Promise.resolve(f.fees ?? []),
+            ),
+        },
         booking: {
             findMany: jest.fn(
                 (args: { where: { service: { capacity: { gt?: number } } } }) =>
                     Promise.resolve(
                         args.where.service.capacity.gt === undefined
-                            ? (f.bookings ?? [])
+                            ? (f.bookings ?? []).map((b) => ({
+                                  snapshot: {},
+                                  invoices: [],
+                                  ...b,
+                              }))
                             : (f.classes ?? []),
                     ),
             ),
@@ -363,6 +384,10 @@ describe("CalendarService.month", () => {
         expect(res.days[5].layers.subscriptions?.count).toBe(1);
         expect(res.takings).toEqual({ lead: "orders", total: null });
         expect(res.days[4]).not.toHaveProperty("takings");
+        // Its Due is missing, so no money is sent — and Invoices, named
+        // already, says why.
+        expect(res.money).toEqual({ total: null, entries: [] });
+        expect(res.days[4]).not.toHaveProperty("money");
     });
 
     it("a skipped collection is absent from the month", async () => {
@@ -706,5 +731,404 @@ describe("CalendarService.month", () => {
         expect(res.joinedAt).toBeNull();
         expect(res.totals.orders).toBe(1);
         expect(res.unavailable).toEqual([]);
+    });
+});
+
+/** A paid or credited piece of paper, as the money read selects it (E19). */
+function moneyPaper(over: {
+    id: string;
+    kind?: "INVOICE" | "SUPPLEMENTARY" | "CREDIT_NOTE";
+    total: string;
+    at: string;
+    orderId?: string | null;
+    source?: string;
+    bookingId?: string | null;
+    subscriptionId?: string | null;
+    relatedInvoiceId?: string | null;
+}) {
+    const kind = over.kind ?? "INVOICE";
+    return {
+        id: over.id,
+        number: `INV-${over.id}`,
+        kind,
+        source: over.source ?? (over.orderId ? "ORDER" : "MANUAL"),
+        total: over.total,
+        currency: "INR",
+        paidAt: kind === "CREDIT_NOTE" ? null : new Date(over.at),
+        issuedAt: new Date(over.at),
+        orderId: over.orderId ?? null,
+        bookingId: over.bookingId ?? null,
+        subscriptionId: over.subscriptionId ?? null,
+        relatedInvoiceId: over.relatedInvoiceId ?? null,
+        order: over.orderId ? { orderId: over.orderId.toUpperCase() } : null,
+        billToName: null,
+        contact: customer,
+    };
+}
+
+/** A payment intent with the fee its provider reported (E19). */
+function fee(over: {
+    feeCents: number;
+    capturedAt: string | null;
+    orderId?: string;
+    invoice?: object;
+}) {
+    return {
+        feeCents: over.feeCents,
+        currency: "INR",
+        updatedAt: new Date("2026-09-25T06:00:00Z"),
+        orderId: over.orderId ?? null,
+        order: over.orderId ? { orderId: over.orderId.toUpperCase() } : null,
+        invoice: over.invoice ?? null,
+        attempts: over.capturedAt
+            ? [{ createdAt: new Date(over.capturedAt) }]
+            : [],
+    };
+}
+
+type Month = Awaited<ReturnType<CalendarService["month"]>>;
+const dayOfMonth = (res: Month, d: string) =>
+    res.days.find((x) => x.date === d)!;
+
+/** An order paid on the 5th for 500, its invoice paid then. */
+const PAID_ON_5TH = moneyPaper({
+    id: "i1",
+    total: "500.00",
+    at: "2026-09-05T04:05:00Z",
+    orderId: "o1",
+});
+const REFUND_ON_5TH = moneyPaper({
+    id: "cn1",
+    kind: "CREDIT_NOTE",
+    total: "100.00",
+    at: "2026-09-05T09:00:00Z",
+    orderId: "o1",
+});
+
+describe("CalendarService.month — money in, out and due (E19)", () => {
+    it("a paid order, its refund and a reported fee: in, and out = refund + fee", async () => {
+        const { service } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z", { invoices: [{}] })],
+            moneyPaper: [PAID_ON_5TH, REFUND_ON_5TH],
+            fees: [
+                fee({
+                    feeCents: 1180,
+                    capturedAt: "2026-09-05T04:05:00Z",
+                    orderId: "o1",
+                }),
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        const fifth = dayOfMonth(res, "2026-09-05");
+
+        expect(fifth.money).toEqual([
+            {
+                currency: "INR",
+                in: 50000,
+                out: 11180,
+                net: 38820,
+                due: 0,
+                failed: 0,
+            },
+        ]);
+        expect(fifth.layers.orders?.items[0]).toMatchObject({
+            id: "o1",
+            in: 50000,
+            out: 11180,
+            outWhy: ["refund", "fee"],
+        });
+        expect(res.money?.total).toEqual(fifth.money);
+        expect(res.money?.entries.map((e) => [e.kind, e.itemId])).toEqual([
+            ["fee", "o1"],
+            ["order_paid", "o1"],
+            ["refund", "o1"],
+        ]);
+        // A quiet day has money, at nothing.
+        expect(dayOfMonth(res, "2026-09-06").money).toEqual([]);
+    });
+
+    it("no fee reported: none is guessed, and out is the refund alone", async () => {
+        const { service } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z", { invoices: [{}] })],
+            moneyPaper: [PAID_ON_5TH, REFUND_ON_5TH],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        const fifth = dayOfMonth(res, "2026-09-05");
+        expect(fifth.money?.[0]).toMatchObject({ in: 50000, out: 10000 });
+        expect(fifth.layers.orders?.items[0].outWhy).toEqual(["refund"]);
+    });
+
+    it("an order and its own invoice count once", async () => {
+        const own = {
+            ...OVERDUE,
+            id: "i1",
+            status: "PAID",
+            orderId: "o1",
+            paidAt: new Date("2026-09-05T04:05:00Z"),
+        };
+        const { service } = build(undefined, {
+            orders: [order("o1", "2026-09-05T04:00:00Z", { invoices: [{}] })],
+            invoices: [own],
+            moneyPaper: [PAID_ON_5TH],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.money?.total).toEqual([
+            expect.objectContaining({ in: 50000 }),
+        ]);
+        expect(dayOfMonth(res, "2026-09-05").layers.invoices?.count).toBe(0);
+    });
+
+    it("an order paid days after it was placed: the payment day's money, with no item to sit on", async () => {
+        const { service } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z", { invoices: [{}] })],
+            moneyPaper: [
+                { ...PAID_ON_5TH, paidAt: new Date("2026-09-07T04:00:00Z") },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(dayOfMonth(res, "2026-09-05").money).toEqual([]);
+        expect(
+            dayOfMonth(res, "2026-09-05").layers.orders?.items[0],
+        ).not.toHaveProperty("in");
+        expect(dayOfMonth(res, "2026-09-07").money?.[0].in).toBe(50000);
+        expect(res.money?.entries).toEqual([
+            expect.objectContaining({
+                date: "2026-09-07",
+                kind: "order_paid",
+                link: { type: "order", id: "o1" },
+                itemId: null,
+            }),
+        ]);
+    });
+
+    it("a paid invoice sits on its invoice; a fee on its pay link counts out", async () => {
+        const paid = {
+            ...OVERDUE,
+            id: "inv_p",
+            status: "PAID",
+            paidAt: new Date("2026-09-09T06:00:00Z"),
+        };
+        const paper = moneyPaper({
+            id: "inv_p",
+            total: "4000.00",
+            at: "2026-09-09T06:00:00Z",
+        });
+        const { service } = build(["PAYMENTS"], {
+            invoices: [paid],
+            moneyPaper: [paper],
+            fees: [
+                fee({
+                    feeCents: 9440,
+                    capturedAt: "2026-09-09T06:00:00Z",
+                    invoice: paper,
+                }),
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(
+            dayOfMonth(res, "2026-09-09").layers.invoices?.items[0],
+        ).toMatchObject({ in: 400000, out: 9440, outWhy: ["fee"] });
+        expect(dayOfMonth(res, "2026-09-09").money?.[0]).toMatchObject({
+            in: 400000,
+            out: 9440,
+            net: 390560,
+        });
+    });
+
+    it("due, and failed renewals totalled apart", async () => {
+        const failedCharge = {
+            ...RENEWAL_CHARGE,
+            id: "inv_f",
+            // Due on the 13th (IST), unpaid on the 20th: failed.
+            status: "ISSUED",
+            total: "1800",
+        };
+        const { service } = build(undefined, {
+            subs: [SUBSCRIBER],
+            subscriptionInvoices: [failedCharge],
+            invoices: [
+                {
+                    ...OVERDUE,
+                    id: "inv_d",
+                    dueAt: new Date("2026-09-28T06:00:00Z"),
+                },
+            ],
+            bookings: [
+                {
+                    id: "bk_1",
+                    startAt: new Date("2026-09-24T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: null,
+                    paidWith: "DESK",
+                    bookerName: null,
+                    bookerEmail: null,
+                    service: { name: "Physio" },
+                    staff: null,
+                    contact: customer,
+                    snapshot: {
+                        service: { priceCents: 150000, currency: "INR" },
+                        deposit: { cents: 50000 },
+                    },
+                    invoices: [
+                        {
+                            status: "PAID",
+                            paymentIntents: [{ amountCents: 50000 }],
+                        },
+                    ],
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+
+        // The charge failed on its due day; its renewal is not also due.
+        expect(dayOfMonth(res, "2026-09-13").money).toEqual([
+            expect.objectContaining({ due: 0, failed: 180000 }),
+        ]);
+        expect(dayOfMonth(res, "2026-09-06").money).toEqual([]);
+        // The rest of the booking's price, less its deposit.
+        expect(dayOfMonth(res, "2026-09-24").money?.[0].due).toBe(100000);
+        expect(
+            dayOfMonth(res, "2026-09-24").layers.bookings?.items[0],
+        ).toMatchObject({ amount: "1500.00", currency: "INR", due: 100000 });
+        expect(dayOfMonth(res, "2026-09-28").money?.[0].due).toBe(400000);
+        expect(res.money?.total).toEqual([
+            {
+                currency: "INR",
+                in: 0,
+                out: 0,
+                net: 0,
+                due: 500000,
+                failed: 180000,
+            },
+        ]);
+    });
+
+    it("a renewal still to come is due", async () => {
+        const { service } = build(["PAYMENTS"], {
+            subs: [
+                {
+                    ...SUBSCRIBER,
+                    currentPeriodEnd: new Date("2026-09-25T18:30:00Z"),
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(dayOfMonth(res, "2026-09-26").money).toEqual([
+            expect.objectContaining({ due: 120000 }),
+        ]);
+    });
+
+    it("a booking already past, one with a pay link open, and a live hold have no Due", async () => {
+        const base = {
+            status: "CONFIRMED",
+            outcome: null,
+            paidWith: "DESK",
+            bookerName: null,
+            bookerEmail: null,
+            service: { name: "Physio" },
+            staff: null,
+            contact: customer,
+            snapshot: { service: { priceCents: 150000, currency: "INR" } },
+        };
+        const { service } = build(["APPOINTMENTS"], {
+            bookings: [
+                {
+                    ...base,
+                    id: "past",
+                    startAt: new Date("2026-09-08T04:30:00Z"),
+                },
+                {
+                    ...base,
+                    id: "linked",
+                    startAt: new Date("2026-09-24T04:30:00Z"),
+                    invoices: [{ status: "ISSUED", paymentIntents: [] }],
+                },
+                {
+                    ...base,
+                    id: "held",
+                    status: "PENDING",
+                    startAt: new Date("2026-09-25T04:30:00Z"),
+                },
+            ],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.money?.total).toEqual([]);
+    });
+
+    it("a caller without payment:read: bookings with their prices, and no money cells", async () => {
+        const { service, db } = build(undefined, {
+            bookings: [
+                {
+                    id: "bk_1",
+                    startAt: new Date("2026-09-24T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: null,
+                    paidWith: "DESK",
+                    bookerName: null,
+                    bookerEmail: null,
+                    service: { name: "Physio" },
+                    staff: null,
+                    contact: customer,
+                    snapshot: {
+                        service: { priceCents: 150000, currency: "INR" },
+                    },
+                },
+            ],
+        });
+        const res = await service.month(MEMBER, "2026-09", NOW);
+        const item = dayOfMonth(res, "2026-09-24").layers.bookings?.items[0];
+        expect(item).toMatchObject({ amount: "1500.00", currency: "INR" });
+        for (const key of ["in", "out", "due", "failed", "outWhy"]) {
+            expect(item).not.toHaveProperty(key);
+        }
+        expect(res).not.toHaveProperty("money");
+        for (const d of res.days) expect(d).not.toHaveProperty("money");
+        expect(db.paymentIntent.findMany).not.toHaveBeenCalled();
+    });
+
+    it("payment:read alone gets the money, read from the paper whatever layers it sees", async () => {
+        const { service } = build(undefined, {
+            moneyPaper: [
+                moneyPaper({
+                    id: "inv_p",
+                    total: "2000.00",
+                    at: "2026-09-09T06:00:00Z",
+                }),
+            ],
+        });
+        const res = await service.month(
+            {
+                ...OWNER,
+                role: "CUSTOM",
+                actions: new Set(["org:read", "payment:read"]),
+            },
+            "2026-09",
+            NOW,
+        );
+        expect(res.layers).toEqual([]);
+        expect(res).not.toHaveProperty("takings");
+        expect(res.money?.entries).toEqual([
+            expect.objectContaining({
+                kind: "invoice_paid",
+                in: 200000,
+                link: { type: "invoice", id: "inv_p" },
+                itemId: null,
+            }),
+        ]);
+    });
+
+    it("the fees unreadable: no money, and Money named", async () => {
+        const { service } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+            failFees: true,
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.money).toEqual({ total: null, entries: [] });
+        expect(res.unavailable).toEqual([{ source: "money", label: "Money" }]);
+        expect(res.days[4]).not.toHaveProperty("money");
+        // The takings do not rest on the fees.
+        expect(res.takings?.total).toEqual([
+            { currency: "INR", amount: "250.00" },
+        ]);
     });
 });

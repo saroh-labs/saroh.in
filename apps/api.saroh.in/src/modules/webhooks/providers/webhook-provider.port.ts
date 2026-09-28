@@ -40,6 +40,12 @@ export interface NormalizedWebhookEvent {
     orderRef?: string;
     /** The provider payment id (stored so a later refund can reference it). */
     providerPaymentRef?: string;
+    /**
+     * On a successful payment: what the provider kept from it, in minor
+     * units, when its payload reports a fee (plan 005 E19, default 47).
+     * Absent when it reports none — Saroh never estimates one.
+     */
+    feeCents?: number;
     /** Present on refund events — the provider refund id to settle. */
     providerRefundId?: string;
     /**

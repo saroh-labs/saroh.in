@@ -312,6 +312,17 @@ export class WebhooksService {
         );
         if (!intent) return { applied: false };
 
+        const result = await this.applyOutcome(tx, intent, event);
+        const feeRecorded = await recordFee(tx, intent, event);
+        return { applied: result.applied || feeRecorded };
+    }
+
+    /** The money effect of one event on the intent it matched. */
+    private async applyOutcome(
+        tx: Tx,
+        intent: IntentRow,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
         // An invoice's pay link (U13): the same outcomes, applied to the
         // invoice instead of an order.
         if (intent.invoiceId) {
@@ -1042,6 +1053,29 @@ async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
     return rows[0]?.status ?? intent.status;
+}
+
+/**
+ * Keep the fee the provider reported on a captured payment (plan 005 E19,
+ * default 47), once. Whatever the payment settled — an order, an invoice,
+ * or money owed back — the provider kept its fee, so it is recorded on every
+ * success that reports one. The first report stands: Razorpay sends
+ * `payment.captured` and `order.paid` for one payment, and a replay repeats
+ * both. No reported fee writes nothing — never an estimate.
+ */
+async function recordFee(
+    tx: Tx,
+    intent: IntentRow,
+    event: NormalizedWebhookEvent,
+): Promise<boolean> {
+    if (event.outcome !== "SUCCEEDED" || event.feeCents === undefined) {
+        return false;
+    }
+    const { count } = await tx.paymentIntent.updateMany({
+        where: { id: intent.id, feeCents: null },
+        data: { feeCents: event.feeCents },
+    });
+    return count > 0;
 }
 
 /**

@@ -53,7 +53,9 @@ export class CashfreeWebhookProvider implements WebhookProvider {
                 payment?: {
                     cf_payment_id?: string | number;
                     payment_status?: string;
+                    charges_details?: CashfreeCharges;
                 };
+                charges_details?: CashfreeCharges;
                 refund?: {
                     cf_refund_id?: string | number;
                     refund_id?: string;
@@ -99,6 +101,9 @@ export class CashfreeWebhookProvider implements WebhookProvider {
             // submitted at create), so reconcile matches on the order ref.
             orderRef,
             providerPaymentRef,
+            feeCents: feeOf(
+                body.data?.charges_details ?? payment?.charges_details,
+            ),
             providerRefundId,
             refundAmountCents: majorToMinor(refund?.refund_amount),
             refundReference: reference === "" ? undefined : reference,
@@ -128,6 +133,26 @@ function outcomeFor(eventType: string, refundStatus?: string): WebhookOutcome {
         return "IGNORED";
     }
     return "IGNORED";
+}
+
+/** Cashfree's charges on a payment, in rupees (a number or decimal text). */
+interface CashfreeCharges {
+    service_charge?: number | string | null;
+    service_tax?: number | string | null;
+}
+
+/**
+ * The fee Cashfree reports on a successful payment (default 47): its
+ * service charge plus the tax on it, in minor units. No service charge, or
+ * one that isn't a plain amount, is no fee — never an estimate.
+ */
+function feeOf(charges: CashfreeCharges | undefined): number | undefined {
+    if (!charges) return undefined;
+    const charge = majorToMinor(charges.service_charge ?? undefined);
+    if (charge === undefined) return undefined;
+    const tax =
+        charges.service_tax == null ? 0 : majorToMinor(charges.service_tax);
+    return tax === undefined ? undefined : charge + tax;
 }
 
 /**
