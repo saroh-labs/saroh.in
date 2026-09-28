@@ -5,13 +5,15 @@ import { cn } from "@saroh/ui/lib/utils";
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
+import { pickMeta } from "@/lib/orders/new-order";
 
 import { SMALL_BUTTON, StepCard } from "./parts";
 
 /**
  * Who it is for (B13): E4's shared picker, with Walk-in turned on — search
  * by name or phone, "+ Add ‹typed› as a new customer" (by email), or a
- * walk-in's name and phone, with no record. Once someone is picked, the
+ * walk-in: a name alone makes no record, and a phone keeps them as a
+ * customer (B13b). Once someone is picked, the
  * design's card: their name, how to reach them, Change, and their Needs
  * attention in red. A Member reads a picked customer's email with
  * `contact:read` alone, as the picker's search does.
@@ -42,11 +44,7 @@ export function CustomerStep({
             </StepCard>
         );
     }
-    const meta =
-        pick.kind === "walk-in"
-            ? ["Walk-in", pick.phone.trim()].filter(Boolean).join(" · ")
-            : [pick.phone, pick.email].filter(Boolean).join(" · ") ||
-              "No contact details";
+    const meta = pickMeta(pick);
     return (
         <StepCard title="Customer">
             <div className="flex items-center gap-2.5">

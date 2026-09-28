@@ -35,7 +35,8 @@ const SHOWN = 8;
  * first, 8 shown; "+ Add ‹typed› as a new customer"; and, once someone is
  * picked, their Needs attention (C1), sensitive entries only for a viewer
  * who may see them and otherwise counted. New booking uses it, and New order
- * (B13) will, with `allowWalkIn` for a customer who leaves no record.
+ * (B13) does, with `allowWalkIn` for a customer who leaves only a name (a
+ * phone keeps them as a customer, B13b).
  *
  * The search runs on the API and normalises there (C2's `duplicates.ts`);
  * nothing here matches a phone or an email itself. Adding someone new asks
@@ -59,7 +60,10 @@ export function CustomerPicker({
     onPick: (pick: CustomerPick | null) => void;
     /** Offer "+ Add ‹typed› as a new customer". */
     allowAdd?: boolean;
-    /** Offer "Walk-in": a name and a phone, no record (B13). */
+    /**
+     * Offer "Walk-in": a name, and a phone that keeps them as a customer
+     * (B13, B13b).
+     */
     allowWalkIn?: boolean;
     /** The viewer holds `contact:read`. */
     canSearch?: boolean;
@@ -260,7 +264,8 @@ export function CustomerPicker({
                         {pickName(pickedShown)}
                         {pickedShown.kind === "new"
                             ? " · new"
-                            : pickedShown.kind === "walk-in"
+                            : pickedShown.kind === "walk-in" &&
+                                !pickedShown.phone.trim()
                               ? " · walk-in"
                               : ""}
                     </Chip>
