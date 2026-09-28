@@ -8,6 +8,7 @@ import type {
     AttentionInput,
     SuggestionInput,
 } from "./attention";
+import type { MergeBody, MergePreview, MergeResult } from "./merge";
 import type { UnlinkPreview } from "./site-account";
 
 /**
@@ -16,7 +17,7 @@ import type { UnlinkPreview } from "./site-account";
  * explicit and reversible, and only exact email/phone produce a suggestion.
  */
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "DETAILS";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE" | "DETAILS";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -25,10 +26,7 @@ export interface TimelineEvent {
     moduleKey: string;
 }
 
-/**
- * A store customer to link. The API also suggests other contacts to merge
- * (`?include=contacts`, C2); this screen doesn't ask for them yet.
- */
+/** A store customer to link (#120). */
 export interface IdentitySuggestion {
     kind: "customer";
     customerId: string;
@@ -36,6 +34,20 @@ export interface IdentitySuggestion {
     email: string;
     matchedOn: ("email" | "phone")[];
 }
+
+/** Another contact who is likely the same person (C2): merge them (C10). */
+export interface DuplicateSuggestion {
+    kind: "contact";
+    contactId: string;
+    name: string | null;
+    /** Never a reserved placeholder. */
+    email: string | null;
+    matchedOn: ("email" | "phone")[];
+    /** They sign in on the business's website. */
+    signsIn: boolean;
+}
+
+export type Suggestion = IdentitySuggestion | DuplicateSuggestion;
 
 export type WorkspaceResult = { ok: true } | { ok: false; error: string };
 
@@ -50,17 +62,62 @@ export async function getTimeline(contactId: string): Promise<TimelineEvent[]> {
     return ((await res.json()) as { events: TimelineEvent[] }).events;
 }
 
+/**
+ * Store customers to link and, with `includeContacts`, other contacts to
+ * merge (`?include=contacts`, C2). Each item says its `kind`.
+ */
 export async function getSuggestions(
     contactId: string,
-): Promise<IdentitySuggestion[]> {
+    { includeContacts = false }: { includeContacts?: boolean } = {},
+): Promise<Suggestion[]> {
     const base = await orgBase();
     if (!base) return [];
     const res = await apiFetch(
-        `${base}/customers/${encodeURIComponent(contactId)}/suggestions`,
+        `${base}/customers/${encodeURIComponent(contactId)}/suggestions` +
+            (includeContacts ? "?include=contacts" : ""),
     );
     if (res.status === 404) return [];
     if (!res.ok) throw new Error(`GET suggestions failed: ${res.status}`);
-    return (await res.json()) as IdentitySuggestion[];
+    return (await res.json()) as Suggestion[];
+}
+
+const mergePath = (contactId: string, otherId: string) =>
+    `/customers/${encodeURIComponent(contactId)}/merge/${encodeURIComponent(otherId)}`;
+
+/**
+ * What merging `otherId` with this customer would do (C9), keeping
+ * `survivorId` — or, left out, the one the API offers: the older record.
+ */
+export async function getMergePreview(
+    contactId: string,
+    otherId: string,
+    survivorId?: string,
+): Promise<CrmResult<MergePreview>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const query = survivorId
+        ? `?${new URLSearchParams({ survivorId }).toString()}`
+        : "";
+    const res = await apiFetch(
+        `${base}${mergePath(contactId, otherId)}/preview${query}`,
+    );
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: data as MergePreview };
+    return toFailure(data, "Couldn't check what the merge would do.");
+}
+
+/** Merge the two into `body.survivorId` (C9). Final. */
+export function mergeContacts(
+    contactId: string,
+    otherId: string,
+    body: MergeBody,
+): Promise<CrmResult<MergeResult>> {
+    return mutate<MergeResult>(
+        mergePath(contactId, otherId),
+        "POST",
+        body,
+        "Couldn't merge them. Nothing has changed.",
+    );
 }
 
 export async function linkCustomer(

@@ -4,6 +4,9 @@ import { Button } from "@saroh/ui/button";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { duplicateLine } from "@/lib/customer-workspace/merge";
+import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
+
 /**
  * A store customer with exactly this email that nobody has linked. Saroh
  * never joins them on its own (saroh-product: no claimed unification); a
@@ -52,6 +55,53 @@ export function PossibleMatch({
                     An owner or admin can link them.
                 </span>
             )}
+        </div>
+    );
+}
+
+/**
+ * Another record that looks like the same person (C2's suggestions, C10):
+ * a quiet line with Merge for whoever may merge. Saroh suggests and never
+ * merges on its own (DEC-042); there is no Dismiss this round.
+ */
+export function DuplicateNotice({
+    duplicates,
+    onMerge,
+}: {
+    duplicates: DuplicateSuggestion[];
+    /** Absent for a role without `customer:merge`. */
+    onMerge?: (duplicate: DuplicateSuggestion) => void;
+}) {
+    if (!duplicates.length) return null;
+    return (
+        <div className="mb-4 grid gap-1.5">
+            {duplicates.slice(0, 3).map((dup) => (
+                <div
+                    key={dup.contactId}
+                    role="note"
+                    className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-card px-[13px] py-2.5"
+                >
+                    <span className="flex-[1_1_240px] text-[13px] text-foreground/75">
+                        <strong className="font-semibold text-foreground">
+                            Looks like the same person:
+                        </strong>{" "}
+                        {duplicateLine(dup)}
+                    </span>
+                    {onMerge ? (
+                        <Button
+                            variant="outline"
+                            onClick={() => onMerge(dup)}
+                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                        >
+                            Merge…
+                        </Button>
+                    ) : (
+                        <span className="text-[12px] text-muted-foreground">
+                            An owner or admin can merge them.
+                        </span>
+                    )}
+                </div>
+            ))}
         </div>
     );
 }

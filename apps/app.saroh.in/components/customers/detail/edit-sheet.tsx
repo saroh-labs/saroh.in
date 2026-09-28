@@ -48,12 +48,15 @@ export function EditSheet({
     onOpenChange,
     contact,
     signsInWith,
+    onMerge,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     contact: CustomerDetail["contact"];
     /** Their website account's email, when they sign in. */
     signsInWith: string | null;
+    /** Offer to merge with whoever holds the email (`customer:merge`). */
+    onMerge?: (holder: EmailHolder) => void;
 }) {
     const router = useRouter();
     const [initial] = useState(() => draftFrom(contact));
@@ -115,18 +118,34 @@ export function EditSheet({
     }
 
     const common = { id, draft, set };
-    const emailNote = refusal?.holder ? (
-        <Link
-            href={`/customers/${encodeURIComponent(refusal.holder.contactId)}`}
-            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
-        >
-            See {refusal.holder.name ?? "their record"}
-        </Link>
-    ) : signsInWith ? (
-        signInNote(signsInWith)
-    ) : (
-        "Receipts go here."
-    );
+    const holder = refusal?.holder;
+    const emailNote =
+        holder && onMerge ? (
+            // The same person twice (C10): offer the merge, which lets them
+            // pick this email for the record that stays. What was typed here
+            // can't be saved as it stands, so the sheet makes way for it.
+            <button
+                type="button"
+                onClick={() => {
+                    close(true);
+                    onMerge(holder);
+                }}
+                className="cursor-pointer rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
+            >
+                Merge with {holder.name ?? "their record"}
+            </button>
+        ) : holder ? (
+            <Link
+                href={`/customers/${encodeURIComponent(holder.contactId)}`}
+                className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
+            >
+                See {holder.name ?? "their record"}
+            </Link>
+        ) : signsInWith ? (
+            signInNote(signsInWith)
+        ) : (
+            "Receipts go here."
+        );
 
     return (
         <Sheet

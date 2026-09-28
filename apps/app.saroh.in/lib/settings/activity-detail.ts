@@ -11,6 +11,7 @@ import {
     recordedChanges,
     text,
 } from "./activity-changes";
+import { detailsLabels, mergedMoves } from "./activity-customers";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -46,6 +47,12 @@ export interface ActivityDetail {
     /** True for a save from before values were kept (#509). */
     withoutValues: boolean;
 }
+
+/** What a merge did with the website sign-in (C9's `account`). */
+const ACCOUNT_OUTCOME: Partial<Record<string, string>> = {
+    move: "Moved to the record kept",
+    retire: "The other sign-in was retired",
+};
 
 /** What a storefront's fulfilment change names each field (B17). */
 const FULFILMENT_FIELD_LABEL: Partial<Record<string, string>> = {
@@ -301,6 +308,29 @@ function detailRows(
                     event.action === "business.stock-tracking.on",
                     meta,
                     true,
+                ),
+                withoutValues: false,
+            };
+        case "customer.merged": {
+            const moves = mergedMoves(meta);
+            const account = ACCOUNT_OUTCOME[text(meta.account) ?? ""];
+            return {
+                rows: [
+                    row(
+                        "Moved to the record kept",
+                        null,
+                        moves.length ? moves.join(", ") : "Nothing",
+                    ),
+                    ...(account ? [row("Website sign-in", null, account)] : []),
+                ],
+                withoutValues: false,
+            };
+        }
+        case "customer.details.changed":
+            // Names only: a person's details are never kept (DEC-035).
+            return {
+                rows: detailsLabels(meta).map((label) =>
+                    row(label, null, null),
                 ),
                 withoutValues: false,
             };
