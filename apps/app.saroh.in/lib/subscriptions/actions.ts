@@ -6,7 +6,7 @@ import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
 import type { PlanValues } from "./plan-drafts";
 import * as drafts from "./plan-drafts";
-import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
+import type { PauseChoice, SubscribeInput } from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may, and what a subscription may become. */
@@ -86,12 +86,6 @@ export async function loadSubscriptionEvents(id: string, cursor: string) {
     return api.listSubscriptionEvents(id, cursor);
 }
 
-export async function createPlan(input: PlanInput) {
-    return then(api.createPlan(input));
-}
-export async function updatePlan(id: string, input: PlanInput) {
-    return then(api.updatePlan(id, input));
-}
 /**
  * Archive, or sell again. The Plans tab's Undo calls it with the opposite,
  * so one action serves both ways (D3).

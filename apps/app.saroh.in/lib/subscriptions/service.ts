@@ -205,16 +205,6 @@ export interface Renewals {
     issuedToday: number;
 }
 
-export interface PlanInput {
-    name?: string;
-    description?: string | null;
-    price?: string;
-    currency?: string;
-    interval?: Interval;
-    /** 1–60; null is as many as they like. */
-    classesPerMonth?: number | null;
-}
-
 export interface SubscribeInput {
     contactId: string;
     planId: string;
@@ -332,19 +322,26 @@ async function optionalRead<T>(
     }
 }
 
-export async function listPlans(): Promise<Plan[]> {
+/**
+ * The plans on sale and archived. `drafts` adds the drafts too: the Plan
+ * Editor checks a name against every plan that isn't archived.
+ */
+export async function listPlans({ drafts = false } = {}): Promise<Plan[]> {
     const base = await orgBase();
     if (!base) return [];
-    return (await getJson<Plan[]>(`${base}/subscription-plans`)) ?? [];
+    const query = drafts ? "?include=drafts" : "";
+    return (await getJson<Plan[]>(`${base}/subscription-plans${query}`)) ?? [];
 }
 
 /**
  * The plans, as the Plans tab reads them: a failed read is named in the tab
- * and costs nothing else, so the subscriptions still show (D3).
+ * and costs nothing else, so the subscriptions still show (D3). Drafts
+ * included (D7): the API leaves them out unless asked, for apps older than
+ * the Plan Editor, which would draw a draft as a live card (D5).
  */
 export async function listPlansOptional(): Promise<Optional<Plan[]>> {
     return optionalRead<Plan[]>((base) =>
-        apiFetch(`${base}/subscription-plans`),
+        apiFetch(`${base}/subscription-plans?include=drafts`),
     );
 }
 
@@ -542,17 +539,6 @@ export function cancelPlanChange(id: string) {
         undefined,
         "Could not keep the current plan.",
     );
-}
-export function createPlan(input: PlanInput) {
-    return send<Plan>(
-        "/subscription-plans",
-        "POST",
-        input,
-        "Could not save that plan.",
-    );
-}
-export function updatePlan(id: string, input: PlanInput) {
-    return send<Plan>(plan(id), "PATCH", input, "Could not save that plan.");
 }
 export function setPlanArchived(id: string, archived: boolean) {
     return send<Plan>(
