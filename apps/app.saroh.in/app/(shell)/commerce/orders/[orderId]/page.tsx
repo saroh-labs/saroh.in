@@ -4,6 +4,7 @@ import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
@@ -56,7 +57,14 @@ export default async function OrderPage({
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     const contactId = order.customer?.contactId ?? null;
-    const [notes, payments, reviewState] = await Promise.all([
+    // A pay link (B11) is offered only to someone who may change the order,
+    // on an order that shows money, and only while a provider can open the
+    // checkout window (DEC-054).
+    const payOnline =
+        may("order:write") && order.money
+            ? hasPaymentProvider().catch(() => false)
+            : Promise.resolve(false);
+    const [notes, payments, reviewState, canPayOnline] = await Promise.all([
         contactId
             ? getAllergyNotes(contactId)
             : Promise.resolve<AllergyNote[]>([]),
@@ -67,6 +75,7 @@ export default async function OrderPage({
         may("order:read")
             ? invitationState(order.id).catch(() => null)
             : Promise.resolve(null),
+        payOnline,
     ]);
 
     return (
@@ -78,6 +87,8 @@ export default async function OrderPage({
                 stage: may("order:stage"),
                 write: may("order:write"),
                 refund: may("payment:manage"),
+                payOnline: canPayOnline,
+                manageProviders: may("payment:manage"),
             }}
             customerHref={
                 contactId

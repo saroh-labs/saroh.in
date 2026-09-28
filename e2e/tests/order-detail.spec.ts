@@ -383,6 +383,69 @@ test.describe("shipping on order detail", () => {
         ).toBeVisible();
     });
 
+    test("a pay link: shown once, then replaced (B11)", async ({ page }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        // An unpaid order: made, never marked paid. Northwind's Cashfree
+        // connection can open a checkout, so a link can be made.
+        const headers = {
+            "x-organization-id": NORTHWIND,
+            origin: urls.APP_URL,
+        };
+        const made = await page.request.post(
+            `${urls.API_URL}/stores/${NW_STORE}/orders`,
+            {
+                headers,
+                data: {
+                    customerId: "seed_customer_6",
+                    items: [
+                        {
+                            productId: "seed_product_11",
+                            variantId: "seed_variant_11_0",
+                            quantity: 1,
+                        },
+                    ],
+                },
+            },
+        );
+        expect(made.ok()).toBe(true);
+        const { id } = (await made.json()) as { id: string };
+        await page.goto(`/commerce/orders/${id}`);
+
+        const money = page.getByRole("region", { name: "Money" });
+        await money.getByRole("button", { name: "Make a pay link" }).click();
+        const address = money.locator("code");
+        await expect(address).toContainText("/pay/o/");
+        const first = (await address.textContent()) ?? "";
+        await expect(
+            money.getByText("Shown this once — copy it now."),
+        ).toBeVisible();
+
+        // The customer's page reads the order, by the token alone.
+        const token = first.split("/pay/o/")[1];
+        const read = await page.request.get(
+            `${urls.API_URL}/public/order-pay/${token}`,
+        );
+        expect(read.ok()).toBe(true);
+        expect(await read.json()).toMatchObject({ status: "DUE" });
+
+        // After a reload the address is gone: only when it was made shows.
+        await page.reload();
+        await expect(money.getByText(/^Pay link made/)).toBeVisible();
+        await expect(money.locator("code")).toHaveCount(0);
+
+        // A new link says the old one stops working, and it does.
+        await money.getByRole("button", { name: "New pay link" }).click();
+        await page.getByRole("button", { name: "Make a new link" }).click();
+        await expect(money.locator("code")).toContainText("/pay/o/");
+        await expect(money.locator("code")).not.toHaveText(first);
+        const old = await page.request.get(
+            `${urls.API_URL}/public/order-pay/${token}`,
+        );
+        expect(old.status()).toBe(404);
+    });
+
     test("a local delivery never asks for a courier", async ({ page }) => {
         test.setTimeout(90_000);
         await signIn(page);

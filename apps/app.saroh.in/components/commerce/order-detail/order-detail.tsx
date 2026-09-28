@@ -34,6 +34,7 @@ import { MoneyCard } from "./money-card";
 import { OrderCrumbs, OrderHeading } from "./order-header";
 import type { PillTone } from "./parts";
 import { actionClass } from "./parts";
+import { PayLinkBlock, usePayLink } from "./pay-link";
 import { RefundPanel } from "./refund-panel";
 import { KitchenStepper } from "./stepper";
 import type { TimelineStep } from "./timeline";
@@ -48,6 +49,13 @@ export interface OrderPermissions {
     write: boolean;
     /** Refund (`payment:manage`). */
     refund: boolean;
+    /**
+     * A provider can open the checkout window, so a pay link can be made
+     * (B11, DEC-054). Making one also takes `write`.
+     */
+    payOnline?: boolean;
+    /** May connect a provider in Settings (`payment:manage`). */
+    manageProviders?: boolean;
 }
 
 const STANDING: Record<string, { label: string; tone: PillTone }> = {
@@ -129,6 +137,17 @@ export function OrderDetail({
         setPanel,
     });
     const { hold, busy } = kitchen;
+
+    // The pay link (B11): for an order still owed money, made by someone
+    // who may change orders. Its address is shown once, to its maker.
+    const madeAt = order.payLinkCreatedAt ?? null;
+    const payLink = usePayLink({ orderId: order.id, first, madeAt });
+    const owed =
+        order.status !== "CANCELLED" &&
+        (order.paymentStatus === "UNPAID" ||
+            order.paymentStatus === "FAILED") &&
+        Number(order.money?.due ?? 0) > 0;
+    const linkable = can.write && owed;
 
     const advance = () => {
         if (!next || hold) return;
@@ -248,6 +267,10 @@ export function OrderDetail({
                         first={first}
                         canRecord={can.write}
                         onCash={() => setMenu({ kind: "payment", to: "PAID" })}
+                        onSendLink={
+                            linkable && can.payOnline ? payLink.ask : undefined
+                        }
+                        sending={payLink.busy}
                     />
                 ) : null}
                 <KitchenStepper
@@ -401,12 +424,25 @@ export function OrderDetail({
                                     can.refund ? kitchen.retryRefund : undefined
                                 }
                                 busy={busy}
+                                payLink={
+                                    linkable ? (
+                                        <PayLinkBlock
+                                            link={payLink}
+                                            madeAt={madeAt}
+                                            ready={can.payOnline ?? false}
+                                            canManage={
+                                                can.manageProviders ?? false
+                                            }
+                                        />
+                                    ) : null
+                                }
                             />
                         ) : null}
                         {aside}
                     </div>
                 </div>
             </div>
+            {payLink.dialog}
         </main>
     );
 }

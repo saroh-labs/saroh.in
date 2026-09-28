@@ -175,6 +175,21 @@ export function refundOrderLines(
 }
 
 /**
+ * Make the order's pay link (B11) — or a new one, which stops the old one
+ * working. The address comes back this once; the API keeps only its hash.
+ */
+export function createOrderPayLink(
+    orderId: string,
+): Promise<CrmResult<{ url: string; payLinkCreatedAt: string }>> {
+    return mutate(
+        path(orderId, "/pay-link"),
+        "POST",
+        {},
+        "The pay link wasn't made. Try again.",
+    );
+}
+
+/**
  * Try again a refund the provider hasn't answered for. The API asks the
  * provider for it first and sends it again only if the provider has none.
  */
