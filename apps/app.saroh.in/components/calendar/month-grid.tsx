@@ -3,6 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useRef } from "react";
 
+import type { CellOff } from "@/lib/calendar/days-off";
 import { gridKeyTarget, isGridKey } from "@/lib/calendar/grid-keys";
 
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
@@ -51,7 +52,9 @@ export function dayButton(date: string): HTMLButtonElement | null {
  * Below 760px each chip is a dot per layer, red when something needs acting
  * on, and the tapped day is listed under the month. A day the calendar does
  * not reach — before the business joined, or past what can be planned — is
- * greyed and cannot be picked.
+ * greyed and cannot be picked. A day off says so under its date — "Closed",
+ * "Dr. Pillai off", "2 off" (E24) — and is striped when the business is
+ * closed or the person the team filter picked is off.
  *
  * From the keyboard it is one tab stop (E28): the picked day holds it, and
  * the arrows, Home/End (the week) and PageUp/PageDown (the month) move it,
@@ -69,6 +72,7 @@ export function MonthGrid({
     selected,
     currency,
     money,
+    offs,
     onPick,
     onMove,
 }: {
@@ -83,6 +87,8 @@ export function MonthGrid({
     currency: string | null;
     /** Each day's money, for the layers switched on; null: none drawn. */
     money: Map<string, MoneySum> | null;
+    /** Who is off each day, by date (E24); a day nobody is off is absent. */
+    offs: Map<string, CellOff>;
     onPick: (date: string) => void;
     /** A key moved to this day — in this month, or the one before or after. */
     onMove: (date: string) => void;
@@ -159,6 +165,7 @@ export function MonthGrid({
                         const on = day.date === selected;
                         const chips = dayChips(day, layers, off, today);
                         const sum = money?.get(day.date);
+                        const dayOff = offs.get(day.date);
                         const cash =
                             currency && money
                                 ? cellMoney(sum, currency)
@@ -172,6 +179,7 @@ export function MonthGrid({
                                     ? `${n} ${n === 1 ? "thing" : "things"}`
                                     : "nothing"
                             }`,
+                            dayOff?.title ?? null,
                             problem?.text ?? null,
                             sum?.in && currency
                                 ? `${minorMoney(sum.in, currency)} in`
@@ -201,7 +209,14 @@ export function MonthGrid({
                                         ? "cursor-default bg-neutral-50 dark:bg-muted"
                                         : on
                                           ? "bg-brand-subtle ring-2 ring-inset ring-highlight"
-                                          : "bg-card hover:bg-muted",
+                                          : "bg-card hover:bg-muted active:bg-muted/70",
+                                    // Closed, or the person picked is off:
+                                    // stripes over the day's own fill, so
+                                    // hover still shows (E24).
+                                    dayOff?.striped &&
+                                        !outside &&
+                                        !on &&
+                                        "bg-[repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--neutral-50))_6px_12px)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--muted))_6px_12px)]",
                                 )}
                             >
                                 <span className="flex items-baseline gap-1.5">
@@ -243,6 +258,17 @@ export function MonthGrid({
                                         </span>
                                     ) : null}
                                 </span>
+                                {dayOff ? (
+                                    // Said in the label too; a phone's cell
+                                    // has no room for it (the design).
+                                    <span
+                                        aria-hidden
+                                        title={dayOff.title}
+                                        className="mt-0.5 block truncate text-[10.5px] font-semibold text-muted-foreground max-[759px]:hidden"
+                                    >
+                                        {dayOff.text}
+                                    </span>
+                                ) : null}
                                 {/* Desk: chips in words. */}
                                 <span
                                     aria-hidden

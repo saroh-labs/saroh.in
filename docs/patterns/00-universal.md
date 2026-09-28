@@ -127,10 +127,15 @@ each with why it stops there:
   in their own `lib/calendar/problems.ts`, and E23 the money (in, out,
   due, the strip and the day's line) in `lib/calendar/money.ts` and the
   export in `lib/calendar/export.ts`, rather than grow it; the month
-  summary and the item lines are its next seams.
+  summary and the item lines are its next seams. E24 left it untouched:
+  days off are `lib/calendar/days-off.ts`, and the team filter's
+  narrowing of the month is `lib/calendar/team.ts`.
   `components/calendar/business-calendar.tsx` (404 after E22) went back
   under when E23 took the switches row to `layer-switches.tsx` and the
-  month strip to `month-strip.tsx`.
+  month strip to `month-strip.tsx`; E24 (388) moved the ‹ › month steps
+  to `month-step.tsx` to make room for the team filter, whose select is
+  `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
+  which needed nothing new from the API.
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
