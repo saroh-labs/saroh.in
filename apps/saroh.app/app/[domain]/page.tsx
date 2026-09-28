@@ -9,6 +9,7 @@ import {
     getSiteForHost,
 } from "@/lib/publication";
 import { getPlansFeed } from "@/lib/site-plans";
+import { getProductGridFeeds } from "@/lib/site-product-grids";
 
 /**
  * Tenant site home (S2-006).
@@ -37,11 +38,12 @@ export default async function SiteHomePage({
         notFound();
     }
 
-    // The Journal's posts (G10) and the plans on sale (G9), each read only
-    // when the page draws its block.
-    const [journal, plans] = await Promise.all([
+    // The Journal's posts (G10), the plans on sale (G9) and each Product
+    // grid's products (G12), each read only when the page draws its block.
+    const [journal, plans, productGrids] = await Promise.all([
         getJournalFeed(home.sections, resolved.snapshot, resolved.siteId),
         getPlansFeed(home.sections, resolved.snapshot, resolved.siteId),
+        getProductGridFeeds(home.sections, resolved.siteId),
     ]);
 
     return (
@@ -52,6 +54,7 @@ export default async function SiteHomePage({
             siteId={resolved.siteId}
             journal={journal}
             plans={plans}
+            productGrids={productGrids}
         />
     );
 }

@@ -9,6 +9,7 @@ import type {
     RenderedHero,
     RenderedJournal,
     RenderedPlans,
+    RenderedProductGrid,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -21,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
     SAMPLE_PLANS,
     SAMPLE_POSTS,
+    SAMPLE_PRODUCTS,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
@@ -33,6 +35,7 @@ import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import JournalSection from "./blocks/journal";
 import PlansSection from "./blocks/plans";
+import ProductGridSection from "./blocks/product-grid";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -444,6 +447,36 @@ describe("block rendering", () => {
         );
         expect(screen.queryByText("Most chosen")).toBeNull();
         expect(screen.getAllByText("Ask to join")).toHaveLength(3);
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // Sample products rather than a fetch: the page serving the site reads
+    // each grid's own and hands them in (G12).
+    it("productGrid", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={
+                    BLOCK_META.productGrid.fixtures
+                        .default as RenderedProductGrid
+                }
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(3);
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("productGrid, picked, two, no prices", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={
+                    BLOCK_META.productGrid.cases.picked as RenderedProductGrid
+                }
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
+        expect(screen.queryByText("₹950")).toBeNull();
         expect(container.innerHTML).toMatchSnapshot();
     });
 

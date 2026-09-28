@@ -19,6 +19,7 @@ export {
     BlockFixturePreview,
     SAMPLE_PLANS,
     SAMPLE_POSTS,
+    SAMPLE_PRODUCTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
@@ -52,6 +53,13 @@ export {
     plansOf,
 } from "./blocks/plans";
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
+export {
+    PRODUCT_GRID_TITLE,
+    default as ProductGridSection,
+    productCardsOf,
+    productGridQuery,
+} from "./blocks/product-grid";
+export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";

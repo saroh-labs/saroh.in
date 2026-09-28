@@ -6,6 +6,7 @@ import type {
     RenderedBooking,
     RenderedJournal,
     RenderedPlans,
+    RenderedProductGrid,
     RenderedServicesList,
     RenderedVisitUs,
     SectionType,
@@ -18,10 +19,12 @@ import type { JournalPost } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
 import type { PublicPlan } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
+import ProductGridSection from "./blocks/product-grid";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
 import type { PublicVisit } from "./blocks/visit-us";
 import VisitUsSection from "./blocks/visit-us";
+import type { ShopListingCard } from "./product/shop-listing";
 import SectionRenderer from "./section-renderer";
 
 /**
@@ -150,6 +153,50 @@ export const SAMPLE_PLANS: PublicPlan[] = [
 ];
 
 /**
+ * Products for previewing `productGrid` where there are none: the catalog
+ * and the Add-section picker (G12). One comes in sizes and one has sold
+ * out, so both lines show; none has a photo, so nothing is fetched.
+ */
+export const SAMPLE_PRODUCTS: ShopListingCard[] = [
+    {
+        slug: "sourdough",
+        name: "Sourdough loaf",
+        currency: "INR",
+        price: "250.00",
+        mrp: null,
+        priceFrom: true,
+        image: null,
+        variantTitles: ["Small", "Large"],
+        blurb: "Slow rye, baked at dawn. Keeps a week.",
+        soldOut: false,
+    },
+    {
+        slug: "almond-croissant",
+        name: "Almond croissant",
+        currency: "INR",
+        price: "140.00",
+        mrp: null,
+        priceFrom: false,
+        image: null,
+        variantTitles: [],
+        blurb: "Twice-baked, with frangipane.",
+        soldOut: true,
+    },
+    {
+        slug: "house-blend-beans",
+        name: "House blend beans",
+        currency: "INR",
+        price: "950.00",
+        mrp: null,
+        priceFrom: false,
+        image: null,
+        variantTitles: ["250 g"],
+        blurb: null,
+        soldOut: false,
+    },
+];
+
+/**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
  * in the viewer's own time zone as the block itself would show them.
  */
@@ -236,6 +283,12 @@ const LIVE_DATA_PREVIEWS: Partial<
         <PlansSection
             content={content as RenderedPlans}
             feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+        />
+    ),
+    productGrid: (content) => (
+        <ProductGridSection
+            content={content as RenderedProductGrid}
+            feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
         />
     ),
     visitUs: (content) => (
