@@ -6,7 +6,6 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
-import { DateTime } from "luxon";
 
 import { structuredLogger } from "../../common/logging/structured-logger";
 import type { ModuleKey } from "../capabilities/module-registry";
@@ -15,10 +14,11 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
 import {
-    ALLOWANCE_SELECT,
-    classesAllowance,
-    HAS_ALLOWANCE_WHERE,
-} from "../subscriptions/classes-allowance";
+    readClasses,
+    readLatestOrders,
+    readNextBooking,
+    readPlan,
+} from "./account-home-reads";
 import type { AccountOffers } from "./account-tabs";
 import { accountTabs } from "./account-tabs";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -33,16 +33,7 @@ import type {
     AccountView,
     Block,
 } from "./customer-view";
-import {
-    accountView,
-    bookingView,
-    noteView,
-    ORDER_ROW_ITEMS,
-    orderView,
-    packView,
-    planView,
-    receiptView,
-} from "./customer-view";
+import { accountView, noteView, receiptView } from "./customer-view";
 import type { AddNoteDto, UpdateDetailsDto } from "./dto";
 
 /**
@@ -73,7 +64,6 @@ export const MAX_WAITING_NOTES = 10;
 const LABEL_MAX = 60;
 
 const RECEIPT_ROWS = 20;
-const HOME_ORDERS = 2;
 
 type Ctx = Pick<CustomerContext, "organizationId" | "contactId" | "accountId">;
 
@@ -218,177 +208,23 @@ export class AccountHomeService {
     }
 
     /** The next confirmed booking from now on, or null. */
-    async nextBooking(ctx: Ctx, now: Date): Promise<AccountBooking | null> {
-        const row = await prisma.booking.findFirst({
-            where: {
-                organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
-                status: "CONFIRMED",
-                startAt: { gte: now },
-            },
-            orderBy: { startAt: "asc" },
-            select: {
-                id: true,
-                startAt: true,
-                endAt: true,
-                timezone: true,
-                locationType: true,
-                service: { select: { name: true } },
-                staff: { select: { name: true } },
-            },
-        });
-        return row ? bookingView(row) : null;
+    nextBooking(ctx: Ctx, now: Date): Promise<AccountBooking | null> {
+        return readNextBooking(ctx, now);
     }
 
-    /**
-     * Classes left: this month's membership allowance (D10) and every live
-     * pack with classes in it. Null when there is neither.
-     */
-    async classes(ctx: Ctx, now: Date): Promise<AccountClasses | null> {
-        const { organizationId, contactId } = ctx;
-        const [sub, packs] = await Promise.all([
-            prisma.customerSubscription.findFirst({
-                where: {
-                    organizationId,
-                    contactId,
-                    status: { not: "CANCELLED" },
-                    ...HAS_ALLOWANCE_WHERE,
-                },
-                orderBy: { createdAt: "desc" },
-                select: {
-                    id: true,
-                    status: true,
-                    timezone: true,
-                    ...ALLOWANCE_SELECT,
-                    plan: { select: { name: true, classesPerMonth: true } },
-                },
-            }),
-            prisma.packPurchase.findMany({
-                where: { organizationId, contactId, expiresAt: { gt: now } },
-                orderBy: { expiresAt: "asc" },
-                select: {
-                    credits: true,
-                    expiresAt: true,
-                    pack: { select: { name: true } },
-                    _count: {
-                        select: {
-                            redemptions: { where: { reversedAt: null } },
-                        },
-                    },
-                },
-            }),
-        ]);
-
-        let membership: AccountClasses["membership"] = null;
-        const perMonth = sub ? classesAllowance(sub) : null;
-        if (sub && perMonth !== null) {
-            const month = DateTime.fromJSDate(now)
-                .setZone(sub.timezone)
-                .startOf("month");
-            const next = month.plus({ months: 1 });
-            const used = await prisma.booking.count({
-                where: {
-                    organizationId,
-                    subscriptionId: sub.id,
-                    startAt: {
-                        gte: month.toUTC().toJSDate(),
-                        lt: next.toUTC().toJSDate(),
-                    },
-                    OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
-                },
-            });
-            const paused = sub.status === "PAUSED";
-            membership = {
-                plan: sub.plan.name,
-                perMonth,
-                left: paused ? 0 : Math.max(0, perMonth - used),
-                resetsAt: next.toUTC().toJSDate().toISOString(),
-                paused,
-            };
-        }
-        const livePacks = packs
-            .map((p) =>
-                packView({
-                    credits: p.credits,
-                    used: p._count.redemptions,
-                    expiresAt: p.expiresAt,
-                    pack: p.pack,
-                }),
-            )
-            .filter((p) => p.left > 0);
-        if (!membership && livePacks.length === 0) return null;
-        return { membership, packs: livePacks };
+    /** Classes left: the membership's month and live packs, or null. */
+    classes(ctx: Ctx, now: Date): Promise<AccountClasses | null> {
+        return readClasses(ctx, now);
     }
 
-    /**
-     * The customer's latest orders: those of every store customer linked to
-     * their contact (C2's identity links, confirmed by staff or made while
-     * signed in).
-     */
-    async latestOrders(
-        ctx: Ctx,
-        take: number = HOME_ORDERS,
-    ): Promise<AccountOrder[]> {
-        const links = await prisma.customerIdentityLink.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
-            },
-            select: { customerId: true },
-        });
-        if (links.length === 0) return [];
-        const rows = await prisma.order.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                customerId: { in: links.map((l) => l.customerId) },
-            },
-            orderBy: { createdAt: "desc" },
-            take,
-            select: {
-                id: true,
-                orderId: true,
-                createdAt: true,
-                total: true,
-                currency: true,
-                status: true,
-                paymentStatus: true,
-                stage: true,
-                _count: { select: { items: true } },
-                items: {
-                    take: ORDER_ROW_ITEMS,
-                    orderBy: { id: "asc" },
-                    select: {
-                        quantity: true,
-                        product: { select: { name: true } },
-                    },
-                },
-            },
-        });
-        return rows.map(orderView);
+    /** The latest orders of the store customers linked to the contact. */
+    latestOrders(ctx: Ctx): Promise<AccountOrder[]> {
+        return readLatestOrders(ctx);
     }
 
     /** The customer's live membership, or null. */
-    async plan(ctx: Ctx): Promise<AccountPlan | null> {
-        const row = await prisma.customerSubscription.findFirst({
-            where: {
-                organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
-                status: { in: ["ACTIVE", "PAUSED"] },
-            },
-            orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                status: true,
-                price: true,
-                currency: true,
-                interval: true,
-                currentPeriodEnd: true,
-                cancelAtPeriodEnd: true,
-                pausedUntil: true,
-                plan: { select: { name: true } },
-            },
-        });
-        return row ? planView(row) : null;
+    plan(ctx: Ctx): Promise<AccountPlan | null> {
+        return readPlan(ctx);
     }
 
     // ---- Receipts --------------------------------------------------------
