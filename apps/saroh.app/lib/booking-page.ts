@@ -1,9 +1,13 @@
+import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { BookingPageData } from "@saroh/site-blocks";
-import { isBookingPage } from "@saroh/site-blocks";
+import type { BookingPageData, PublicVisit } from "@saroh/site-blocks";
+import { isBookingPage, isPublicVisit } from "@saroh/site-blocks";
 
 import { env } from "@/env";
+
+import { servedHost } from "./origin";
+import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
 const API_URL =
     env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
@@ -43,3 +47,45 @@ export const getBookingPage = cache(async function getBookingPage(
         ? { ok: true, page: body }
         : { ok: false, reason: "unavailable" };
 });
+
+/**
+ * The booking page header's facts (E6): the business's place, hours and
+ * public phone, from G8's public visit read — the same read, and so the same
+ * words, as the site's Visit us block.
+ *
+ *   GET /public/sites/:siteId/visit
+ *
+ * Read beside the booking page, never cached (a phone removed in Settings ›
+ * Business stops showing at once). The call carries the signed relay
+ * (ADR-011) so the API's per-visitor limit counts the visitor, not this
+ * server; with no secret to sign with it goes unsigned, and the API counts
+ * this server instead.
+ *
+ * Never takes the page down: anything but a good answer is null, and the
+ * header then names the business only.
+ */
+export async function getBookingVisit(
+    siteId: string,
+): Promise<PublicVisit | null> {
+    try {
+        const requestHeaders = await headers();
+        const sent: Record<string, string> = { accept: "application/json" };
+        const host = servedHost(requestHeaders);
+        try {
+            const relay = host ? relayFor(requestHeaders, host) : null;
+            if (relay) sent[SITE_RELAY_HEADER] = relay;
+        } catch {
+            // No SITE_RELAY_SECRET here: read unsigned rather than not at all.
+        }
+        const res = await fetch(
+            `${API_URL}/public/sites/${encodeURIComponent(siteId)}/visit`,
+            { cache: "no-store", headers: sent },
+        );
+        if (!res.ok) return null;
+        const body: unknown = await res.json().catch(() => null);
+        // Narrowed, not cast (#264).
+        return isPublicVisit(body) ? body : null;
+    } catch {
+        return null;
+    }
+}
