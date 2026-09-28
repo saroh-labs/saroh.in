@@ -543,6 +543,20 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
         "Could not cancel that.",
     );
 }
+/**
+ * Retry a failed renewal with a new pay link (`POST :id/retry`): the old
+ * link stops, nothing is charged or sent, and the link comes back once for
+ * the merchant to copy (Home's "Retry by pay link", F4).
+ */
+export function retrySubscription(id: string) {
+    return send<{ invoiceId: string; url: string }>(
+        `${sub(id)}/retry`,
+        "POST",
+        {},
+        "Couldn't make a new pay link. Nothing changed.",
+    );
+}
+
 export function keepSubscription(id: string) {
     return send<Subscription>(
         `${sub(id)}/keep`,

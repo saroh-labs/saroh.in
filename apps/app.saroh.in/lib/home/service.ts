@@ -16,12 +16,34 @@ export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
  */
 export type HomeTone = "bad" | "due" | "info";
 
-/** What an inline action will do (F4); F3's rows carry none yet. */
+/**
+ * What an inline action on a Needs-you row will do (F4). The API sends one
+ * only to a viewer who may do it, only when the write can take it, with
+ * words that say who is told and how (`home-inline.ts`). Each calls its
+ * target's own endpoint; see `lib/home/inline-actions.ts` for how it runs.
+ */
 export interface HomeInline {
     kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    /** The row's button. */
     label: string;
+    /** What will happen, and who is told. */
     confirm: string;
+    /** The confirm's button. */
+    yes: string;
+    /** What the row says once done. */
+    done: string;
+    /** A message leaves the business: held ten seconds first. */
+    sends: boolean;
+    /** Whether Undo is offered (never once a message has left). */
     undoable: boolean;
+    /** The order, subscription, invoice or contact it acts on. */
+    target: string;
+    /** The customer's first name, for the words after; null without one. */
+    person: string | null;
+    /** MARK_SENT: the step it moves the order to. */
+    stage?: string;
+    /** RETRY: how; only "PAY_LINK" until D13's autopay. */
+    via?: "PAY_LINK";
 }
 
 /**
