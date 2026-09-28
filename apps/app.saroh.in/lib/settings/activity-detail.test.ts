@@ -239,6 +239,34 @@ describe("activityDetail — what changed", () => {
         ]);
     });
 
+    it("tells linking customers who share an email as it was and became (C15)", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "storefront.same-email.update",
+                    metadata: {
+                        fields: ["linkSameEmailCustomers"],
+                        storefront: "Rye Online",
+                        changes: [
+                            {
+                                field: "linkSameEmailCustomers",
+                                before: false,
+                                after: true,
+                            },
+                        ],
+                    },
+                }),
+                KOLKATA,
+            ).changes,
+        ).toEqual([
+            {
+                label: "Link customers who share an email, Rye Online",
+                before: "Off",
+                after: "On",
+            },
+        ]);
+    });
+
     it("tells a storefront's hours, a module, a plan and a role", () => {
         const rows = (e: Partial<AuditEventRow>) =>
             activityDetail(event(e), KOLKATA).changes;

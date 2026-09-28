@@ -47,7 +47,8 @@ import type {
 } from "@/lib/stores/storefronts";
 
 import { FulfilmentSection } from "./fulfilment-section";
-import { Note, Section } from "./storefront-section";
+import { SameEmailSection } from "./same-email-section";
+import { Note, Section, ToggleRow } from "./storefront-section";
 
 /**
  * The currencies offered before a storefront's first order: the ones Saroh's
@@ -99,6 +100,7 @@ export function StorefrontsScreen({
     canCreate,
     canEdit,
     canClose,
+    canLinkCustomers = false,
 }: {
     businessName: string;
     storefronts: StorefrontSummary[];
@@ -108,6 +110,8 @@ export function StorefrontsScreen({
     canCreate: boolean;
     canEdit: boolean;
     canClose: boolean;
+    /** May change how customers who share an email are linked (C15). */
+    canLinkCustomers?: boolean;
 }) {
     // A business with one storefront sees "your storefront"; the list
     // appears once there are several (ADR-010), and New while the plan
@@ -174,6 +178,7 @@ export function StorefrontsScreen({
                             businessName={businessName}
                             canEdit={canEdit}
                             canClose={canClose}
+                            canLinkCustomers={canEdit && canLinkCustomers}
                         />
                     ) : (
                         <FailedState
@@ -258,11 +263,13 @@ function StorefrontDetail({
     businessName,
     canEdit,
     canClose,
+    canLinkCustomers,
 }: {
     store: StorefrontSettings;
     businessName: string;
     canEdit: boolean;
     canClose: boolean;
+    canLinkCustomers: boolean;
 }) {
     const router = useRouter();
     const [store, setStore] = useState(initial);
@@ -313,6 +320,13 @@ function StorefrontDetail({
                 />
             ) : null}
             <BehaviourSection {...shared} />
+            <SameEmailSection
+                store={store}
+                canEdit={canLinkCustomers}
+                pending={pending}
+                save={save}
+                setStore={setStore}
+            />
             {canClose || canEdit ? (
                 <ClosingSection
                     {...shared}
@@ -1221,54 +1235,6 @@ function BehaviourSection({
                 keyed in here and paid by link.
             </Note>
         </Section>
-    );
-}
-
-function ToggleRow({
-    id,
-    label,
-    note,
-    later,
-    checked,
-    disabled,
-    onChange,
-}: {
-    id: string;
-    label: string;
-    note: string;
-    /** Saved, but nothing reads it until customers can check out alone. */
-    later?: boolean;
-    checked: boolean;
-    disabled: boolean;
-    onChange: (checked: boolean) => void;
-}) {
-    return (
-        <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-                <span className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor={id} className="text-[13.5px] font-medium">
-                        {label}
-                    </Label>
-                    {later ? (
-                        <Badge variant="neutral">Not live yet</Badge>
-                    ) : null}
-                </span>
-                <p
-                    id={`${id}-note`}
-                    className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
-                >
-                    {note}
-                </p>
-            </div>
-            <Switch
-                id={id}
-                checked={checked}
-                disabled={disabled}
-                aria-describedby={`${id}-note`}
-                onCheckedChange={onChange}
-                className="mt-0.5 shrink-0"
-            />
-        </div>
     );
 }
 

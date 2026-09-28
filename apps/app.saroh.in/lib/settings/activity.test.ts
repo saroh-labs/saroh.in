@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { formatRecent } from "@/lib/format/datetime";
 
 import type { AuditEventRow } from "./activity";
-import { activityLine, activityLines } from "./activity";
+import { ACTIVITY_ACTIONS, activityLine, activityLines } from "./activity";
 import { FIELD_PHRASES } from "./activity-changes";
 
 const sanjay = { name: "Sanjay", email: "sanjay@ryeandco.in" };
@@ -253,6 +253,29 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { fields: ["fulfilmentTypes"], changes: [] },
             }),
         ).toBe("Sanjay changed how orders leave → Storefronts");
+    });
+
+    it("says a storefront turned linking customers who share an email on or off (C15)", () => {
+        const sameEmail = (before: boolean, after: boolean) =>
+            said({
+                action: "storefront.same-email.update",
+                targetType: "storefront",
+                targetId: "st_1",
+                metadata: {
+                    fields: ["linkSameEmailCustomers"],
+                    storefront: "Rye Online",
+                    changes: [
+                        { field: "linkSameEmailCustomers", before, after },
+                    ],
+                },
+            });
+        expect(sameEmail(false, true)).toBe(
+            "Sanjay turned on linking customers who share an email at Rye Online → Storefronts",
+        );
+        expect(sameEmail(true, false)).toBe(
+            "Sanjay turned off linking customers who share an email at Rye Online → Storefronts",
+        );
+        expect(ACTIVITY_ACTIONS).toContain("storefront.same-email.update");
     });
 
     it("says opening hours, modules and plans", () => {

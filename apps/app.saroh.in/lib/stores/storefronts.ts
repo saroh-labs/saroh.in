@@ -88,6 +88,14 @@ export interface StorefrontSettings extends StorefrontSummary {
     shippingFee?: string | null;
     /** Whether the business's website shop is open (G13); absent before it. */
     siteShop?: boolean;
+    /**
+     * Customers who share an email (C15, DEC-055): linked on their own
+     * (true) or left for staff (false, the default). Absent from an API
+     * that predates it, when the screen doesn't offer it.
+     */
+    linkSameEmailCustomers?: boolean;
+    /** When it was turned on: only customers made since are linked. */
+    linkSameEmailSince?: string | null;
     checkoutProvider: string | null;
     /** What checkout will really charge through; `null` means it cannot. */
     effectiveProvider: string | null;
@@ -113,6 +121,7 @@ export type StorefrontInput = Partial<
         | "fulfilmentTypes"
         | "localDeliveryFee"
         | "shippingFee"
+        | "linkSameEmailCustomers"
     > & { paused: boolean; lateAfterMinutes: Partial<LateAfterMinutes> }
 >;
 

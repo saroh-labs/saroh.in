@@ -59,6 +59,7 @@ export const ACTIVITY_ACTIONS = [
     "profile.update",
     "storefront.hours.update",
     "storefront.fulfilment.update",
+    "storefront.same-email.update",
     "organization.module.enabled",
     "organization.module.disabled",
     "organization.plan.changed",
@@ -232,6 +233,23 @@ export function activityLine(
                     href: STOREFRONTS_HREF(event.targetId),
                 },
             );
+        }
+        case "storefront.same-email.update": {
+            // Customers who share an email linked on their own, or not (C15).
+            const where = text(meta.storefront);
+            const after = recordedChanges(meta)?.find(
+                (c) => c.field === "linkSameEmailCustomers",
+            )?.after;
+            const what =
+                after === true
+                    ? "turned on linking customers who share an email"
+                    : after === false
+                      ? "turned off linking customers who share an email"
+                      : "changed how customers who share an email are linked";
+            return line(`${what}${where ? ` at ${where}` : ""}`, {
+                label: "Storefronts",
+                href: STOREFRONTS_HREF(event.targetId),
+            });
         }
         case "organization.module.enabled":
             return line(
