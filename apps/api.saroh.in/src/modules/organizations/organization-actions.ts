@@ -52,6 +52,11 @@ export type OrgAction =
     | "form:write"
     | "contact:read"
     | "contact:write"
+    // Merge two customers into one (DEC-042, C9). Its own power from the day
+    // it shipped, never implied by `contact:write`: a merge can't be undone,
+    // and a business lets staff fix a phone number long before it lets them
+    // join two people's histories. OWNER/ADMIN only.
+    | "customer:merge"
     | "lead:read"
     | "lead:write"
     | "pipeline:read"
@@ -142,6 +147,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "form:write",
     "contact:read",
     "contact:write",
+    "customer:merge",
     "lead:read",
     "lead:write",
     "pipeline:read",
