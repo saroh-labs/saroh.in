@@ -683,3 +683,152 @@ describe("a module page whose module is off (G15)", () => {
         ).toHaveAttribute("href", "/preview/tok");
     });
 });
+
+/**
+ * A list section's display options (G16): Show as, Photos, Descriptions,
+ * Prices, Highlight and the Button, as the Site Editor sets them. Each one
+ * absent is what the block drew before (the snapshots above), so only what
+ * each option changes is asserted here.
+ */
+describe("list sections' display options (G16)", () => {
+    const SERVICES = [
+        {
+            id: "svc-cut",
+            name: "Cut and finish",
+            description: "Wash, cut and blow-dry.",
+            durationMinutes: 45,
+            priceCents: 3800,
+            currency: "INR",
+        },
+        {
+            id: "svc-colour",
+            name: "Colour",
+            description: "Root to tip.",
+            durationMinutes: 90,
+            priceCents: 6500,
+            currency: "INR",
+        },
+    ];
+    const WITH_PHOTO = SAMPLE_PRODUCTS.map((p, i) => ({
+        ...p,
+        image:
+            i === 0
+                ? { url: "https://img.test/loaf.jpg", alt: "A loaf" }
+                : null,
+    }));
+
+    it("draws services as cards whose button opens the flow at each service", () => {
+        render(
+            <ServicesListSection
+                content={{
+                    serviceIds: ["svc-cut", "svc-colour"],
+                    layout: "cards",
+                    buttonLabel: "Choose a time",
+                }}
+                services={SERVICES}
+                bookHref="/book"
+            />,
+        );
+        const cut = screen.getByRole("link", {
+            name: "Choose a time: Cut and finish",
+        });
+        expect(cut).toHaveAttribute("href", "/book?service=svc-cut");
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
+        expect(screen.getByText("Wash, cut and blow-dry.")).toBeTruthy();
+    });
+
+    it("switches Services to a list without prices or descriptions", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={{
+                    serviceIds: ["svc-cut"],
+                    layout: "list",
+                    showPrices: false,
+                    showDescriptions: false,
+                }}
+                services={SERVICES.slice(0, 1)}
+                bookHref="/book"
+            />,
+        );
+        expect(container.textContent).not.toContain("₹");
+        expect(screen.queryByText("Wash, cut and blow-dry.")).toBeNull();
+        // The list keeps each service's own "Book".
+        expect(
+            screen.getByRole("link", { name: "Book Cut and finish" }),
+        ).toHaveAttribute("href", "/book?service=svc-cut");
+    });
+
+    it("shows the merchant's button words on the editor's canvas too", () => {
+        render(
+            <ServicesListSection
+                content={{ serviceIds: ["svc-cut"], buttonLabel: "Reserve" }}
+                services={SERVICES.slice(0, 1)}
+            />,
+        );
+        expect(screen.getByText("Reserve")).toBeTruthy();
+        expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("lays plans out one per row, without prices and with no highlight", () => {
+        const { container } = render(
+            <PlansSection
+                content={{
+                    layout: "list",
+                    showPrices: false,
+                    highlight: "none",
+                }}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/contact" }}
+            />,
+        );
+        expect(container.querySelector("ul")?.className).toContain(
+            "grid-cols-1",
+        );
+        expect(container.textContent).not.toContain("350");
+        expect(screen.queryByText("Most chosen")).toBeNull();
+    });
+
+    it("draws products as a list with the photo on the left", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={{ layout: "list", buttonLabel: "Add to bag" }}
+                feed={{ products: WITH_PHOTO, basePath: "/shop" }}
+            />,
+        );
+        const rows = container.querySelectorAll("li > a");
+        expect(rows[0].className).toContain(
+            "[grid-template-columns:minmax(96px,28%)_minmax(0,1fr)]",
+        );
+        // No photo, no photo column.
+        expect(rows[1].className).not.toContain("grid-template-columns");
+        expect(screen.getAllByText("Add to bag")).toHaveLength(3);
+    });
+
+    it("hides products' photos and lines when asked", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={{ showPhotos: false, showDescriptions: false }}
+                feed={{ products: WITH_PHOTO, basePath: "/shop" }}
+            />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(
+            container.querySelector("[aria-hidden='true'].h-\\[130px\\]"),
+        ).toBeNull();
+        expect(screen.queryByText("Slow rye, baked at dawn.")).toBeNull();
+    });
+
+    it("lists posts one per row, each ending in the merchant's button", () => {
+        const { container } = render(
+            <JournalSection
+                content={{ layout: "list", buttonLabel: "Read" }}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/journal" }}
+            />,
+        );
+        expect(container.querySelector("ul")?.className).toContain(
+            "grid-cols-1",
+        );
+        expect(screen.getAllByText("Read").length).toBe(
+            container.querySelectorAll("li").length,
+        );
+    });
+});
