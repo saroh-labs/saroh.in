@@ -248,7 +248,11 @@ function QuickViewBody({ order }: { order: OrderRead }) {
             ? `/customers/${encodeURIComponent(c.contactId)}`
             : customerHref(order.store.id, c.id)
         : null;
-    const reach = c ? [c.phone, c.email].filter(Boolean).join(" · ") : "";
+    // A walk-in (B13) has no record to open: their name and phone only.
+    const walkIn = !c ? (order.walkIn ?? null) : null;
+    const reach = c
+        ? [c.phone, c.email].filter(Boolean).join(" · ")
+        : (walkIn?.phone ?? "");
 
     return (
         <>
@@ -361,6 +365,8 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                         >
                             {c.name ?? c.email ?? "Customer"}
                         </Link>
+                    ) : walkIn ? (
+                        <span>Walk-in · {walkIn.name}</span>
                     ) : (
                         <span>Their record is gone</span>
                     )}

@@ -228,7 +228,7 @@ export async function createCheckoutOrder(
                 // Only this account's own twin: a key another account used
                 // is never handed over.
                 if (
-                    raced.customer.email.trim().toLowerCase() !==
+                    raced.customer?.email.trim().toLowerCase() !==
                     account.email.trim().toLowerCase()
                 ) {
                     throw new ConflictException(

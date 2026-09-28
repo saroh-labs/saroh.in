@@ -8,6 +8,7 @@ import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
+import { walkInOf } from "./walk-in";
 
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14): the
@@ -166,6 +167,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         /** When their first order was placed. */
         firstOrderAt: Date | null;
     } | null;
+    /**
+     * A walk-in (B13): someone served at the counter with no customer
+     * record, so `customer` is null. Their phone, like a customer's own,
+     * only with `contact:read`. Null on every order with a customer.
+     */
+    walkIn: { name: string; phone: string | null } | null;
     /** Null when no address was ever given. */
     deliveryAddress: DeliveryAddressDto | null;
     notes: string | null;
@@ -238,6 +245,8 @@ export interface RawOrderRead {
     courierName: string | null;
     trackingNumber: string | null;
     payLinkCreatedAt?: Date | null;
+    walkInName?: string | null;
+    walkInPhone?: string | null;
     deliveryName: string | null;
     deliveryPhone: string | null;
     deliveryLine1: string | null;
@@ -474,6 +483,10 @@ export function serializeOrderRead(
                   firstOrderAt: order.customer.orders?.[0]?.createdAt ?? null,
               }
             : null,
+        walkIn: walkInOf(
+            { ...order, customerId: order.customer?.id ?? null },
+            opts.contact,
+        ),
         deliveryAddress: hasAddress ? address : null,
         notes: order.notes,
         trackingUrl: order.trackingUrl,

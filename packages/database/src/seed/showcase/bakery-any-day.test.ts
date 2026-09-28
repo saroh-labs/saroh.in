@@ -81,7 +81,8 @@ function reviewable(now: Date): { bought: Bought[]; a: PlanInput } {
         ) {
             return [];
         }
-        const c = customers.get(o.customerId);
+        // Every seeded order names its customer; none is a walk-in (B13).
+        const c = o.customerId ? customers.get(o.customerId) : undefined;
         if (!c) throw new Error(`No customer ${o.customerId}`);
         return [
             {

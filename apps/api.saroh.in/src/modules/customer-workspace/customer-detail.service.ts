@@ -29,6 +29,7 @@ import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { realOrderWhere } from "../orders/open-orders";
 import type { OrderLineKind } from "../orders/order-line";
 import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
+import { hasCustomer } from "../orders/walk-in";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
@@ -961,7 +962,8 @@ export class CustomerDetailService {
                 currency: p.currency,
                 sum: p._sum.total,
             })),
-            rows: rows.map((o) => ({
+            // Read by the person's customers, so never a walk-in (B13).
+            rows: rows.filter(hasCustomer).map((o) => ({
                 id: o.id,
                 number: o.orderId,
                 placedAt: o.createdAt.toISOString(),

@@ -48,6 +48,7 @@ import { useArrival } from "./use-arrival";
 import type { Panel } from "./use-kitchen";
 import { useKitchen } from "./use-kitchen";
 import { useOrderChanges } from "./use-order-changes";
+import { NoCustomerCard } from "./walk-in-card";
 
 export interface OrderPermissions {
     /** Move kitchen stages (`order:stage`) — a Member may. */
@@ -123,7 +124,7 @@ export function OrderDetail({
     const clock = useClock(30_000);
 
     const number = `#${order.orderId}`;
-    const first = firstName(order.customer?.name);
+    const first = firstName(order.customer?.name ?? order.walkIn?.name);
     const currency = order.money?.currency ?? "INR";
     const format = (n: number) => formatMoneyMajor(n, currency) ?? String(n);
     const kitchenSteps = stepsOf(order);
@@ -504,10 +505,14 @@ export function OrderDetail({
                                 orderNote={order.notes}
                             />
                         ) : (
-                            <p className="rounded-xl border border-border bg-card px-4 py-[13px] text-[12.5px] text-muted-foreground">
-                                This customer&apos;s record is gone. The order
-                                keeps what was bought.
-                            </p>
+                            <NoCustomerCard
+                                walkIn={order.walkIn ?? null}
+                                contact={can.contact ?? true}
+                                address={delivery ? addressText : null}
+                                shipment={shipment}
+                                onChangeTracking={() => setPanel("tracking")}
+                                orderNote={order.notes}
+                            />
                         )}
                         {money ? (
                             <MoneyCard

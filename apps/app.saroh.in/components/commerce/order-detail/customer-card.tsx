@@ -8,7 +8,7 @@ import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
 import { FOCUS, Panel } from "./parts";
 
-function initials(name: string): string {
+export function initials(name: string): string {
     const letters = name
         .split(/[\s&@.]+/)
         .filter((w) => /^[A-Za-zÀ-ÿ0-9]/.test(w))
@@ -213,7 +213,7 @@ function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
  * link when there is one; "No tracking number yet · Add" until it is typed.
  * Our own driver has no number to wait for.
  */
-function TrackingRow({
+export function TrackingRow({
     shipment,
     onChange,
 }: {

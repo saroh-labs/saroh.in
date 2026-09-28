@@ -304,7 +304,8 @@ export class ContactsService {
 
         const newestByCustomer = new Map<string, Date>();
         for (const row of newest) {
-            if (row._max.createdAt) {
+            // `customerId IN (…)` never matches a walk-in's null (B13).
+            if (row.customerId && row._max.createdAt) {
                 newestByCustomer.set(row.customerId, row._max.createdAt);
             }
         }
@@ -325,6 +326,7 @@ export class ContactsService {
         });
 
         for (const order of orders) {
+            if (!order.customerId) continue;
             // Re-check the pair: the `IN` above matches any customer at any of
             // the collected instants, so a coincidental timestamp collision
             // between two customers would otherwise cross-attribute an order.

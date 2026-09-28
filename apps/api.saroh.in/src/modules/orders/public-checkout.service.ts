@@ -238,7 +238,10 @@ export class PublicCheckoutService {
                 select: { id: true, customer: { select: { email: true } } },
             });
             if (existing) {
-                if (!sameEmail(existing.customer.email, account.email)) {
+                if (
+                    !existing.customer ||
+                    !sameEmail(existing.customer.email, account.email)
+                ) {
                     throw new ConflictException(
                         "That checkout isn't yours. Start again.",
                     );
@@ -317,7 +320,10 @@ export class PublicCheckoutService {
                     },
                 },
             });
-            if (!order || !sameEmail(order.customer.email, account.email)) {
+            if (
+                !order?.customer ||
+                !sameEmail(order.customer.email, account.email)
+            ) {
                 notFound();
             }
             const refusals = order.paymentIntents.flatMap((i) =>

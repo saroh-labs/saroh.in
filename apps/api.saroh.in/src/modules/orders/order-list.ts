@@ -29,6 +29,9 @@ const logger = new Logger("OrderList");
 /** Rows per page (default 87). */
 export const ORDER_PAGE_SIZE = 50;
 
+/** A walk-in's Needs attention (B13): none, since there is nobody to note. */
+const NO_ATTENTION: OrderAttention = { entries: [], hiddenSensitiveCount: 0 };
+
 export interface OrderListPage {
     rows: OrderRowDto[];
     /** Per tab, under every filter but the tab (default 87). */
@@ -147,6 +150,9 @@ export async function listOrderRows(
                   id: true,
                   orderId: true,
                   customerId: true,
+                  // A walk-in's name and phone (B13), when there is no customer.
+                  walkInName: true,
+                  walkInPhone: true,
                   status: true,
                   paymentStatus: true,
                   stage: true,
@@ -223,7 +229,7 @@ export async function listOrderRows(
         caller.viewer
             ? rowAttention(
                   caller.viewer,
-                  loaded.map((o) => o.customerId),
+                  loaded.flatMap((o) => (o.customerId ? [o.customerId] : [])),
               )
             : Promise.resolve(undefined),
     ]);
@@ -241,7 +247,10 @@ export async function listOrderRows(
                                   ? undefined
                                   : attention === null
                                     ? null
-                                    : (attention.get(o.customerId) ?? null),
+                                    : o.customerId
+                                      ? (attention.get(o.customerId) ?? null)
+                                      : // A walk-in has no Needs attention (B13).
+                                        NO_ATTENTION,
                           now,
                           lateThresholds: thresholdsFor(thresholds, o.store.id),
                       }),

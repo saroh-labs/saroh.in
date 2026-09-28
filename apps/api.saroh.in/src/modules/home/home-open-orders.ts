@@ -7,6 +7,7 @@ import {
 } from "../orders/late-thresholds";
 import { openOrderSql } from "../orders/open-orders";
 import { lateSettingsJoin, lateSql } from "../orders/order-list-filters";
+import { orderPartyName } from "../orders/walk-in";
 import type { HomeEvidence, HomeTone } from "./home-model";
 import { EVIDENCE_LIMIT, personName } from "./home-model";
 import { openOrderWords } from "./home-order-rows";
@@ -72,7 +73,10 @@ export async function readOpenOrders(
     for (const { id } of picked) {
         const row = byId.get(id);
         if (!row) continue;
-        const who = personName(row.customer);
+        // A walk-in (B13) has no customer, only the name they gave.
+        const who = row.customer
+            ? personName(row.customer)
+            : orderPartyName(row);
         evidence.push({
             id: row.id,
             title: row.orderId,

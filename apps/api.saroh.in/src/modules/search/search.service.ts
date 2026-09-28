@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { orderPartyName } from "../orders/walk-in";
 import { allows } from "../organizations/organization-policy";
 
 /**
@@ -231,6 +232,13 @@ export class SearchService {
                 AND: terms(query).map((term) => ({
                     OR: [
                         { orderId: { contains: term, mode: "insensitive" } },
+                        // A walk-in (B13), by the name they gave.
+                        {
+                            walkInName: {
+                                contains: term,
+                                mode: "insensitive",
+                            },
+                        },
                         {
                             customer: {
                                 is: {
@@ -274,6 +282,7 @@ export class SearchService {
                         email: true,
                     },
                 },
+                walkInName: true,
             },
         });
 
@@ -281,7 +290,7 @@ export class SearchService {
             kind: "order" as const,
             id: row.id,
             title: row.orderId,
-            subtitle: `${personName(row.customer)} · ${row.status.toLowerCase()}`,
+            subtitle: `${orderPartyName(row, { label: true })} · ${row.status.toLowerCase()}`,
             href: `/commerce/orders/${row.id}?storefront=${row.storeId}`,
         }));
     }
