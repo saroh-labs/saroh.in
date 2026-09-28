@@ -92,7 +92,8 @@ export function layersFor(month: Pick<CalendarMonth, "layers" | "totals">) {
         }));
 }
 
-const LABELS: Record<
+/** A layer's words; money's kinds are named by them too (E23). */
+export const LABELS: Record<
     LayerKey,
     (shop: boolean) => Pick<LayerStyle, "label" | "one" | "many">
 > = {
@@ -181,13 +182,6 @@ export function mainCurrency(month: CalendarMonth): string | null {
         }
     }
     return null;
-}
-
-/** A day's takings in the main currency, in major units (0 when none). */
-export function dayTakings(day: CalendarDay, currency: string | null): number {
-    if (!currency || !day.takings) return 0;
-    const hit = day.takings.find((t) => t.currency === currency);
-    return hit ? toMajor(hit.amount) : 0;
 }
 
 /** Where a dated thing opens. */
