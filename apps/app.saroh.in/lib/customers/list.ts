@@ -70,6 +70,11 @@ export interface CustomerRow {
     signsIn: boolean;
     possibleDuplicate: boolean;
     offers: boolean;
+    /**
+     * Added on the list by hand (DEC-056, C14): shown before they have
+     * paid. Absent from an API before C14.
+     */
+    addedByHand?: boolean;
     attention: CustomerAttentionTag[];
     hiddenSensitiveCount: number;
     returning?: boolean;
@@ -368,6 +373,14 @@ export function lastSub(
         return { text: "Signs in on your website", open: false };
     }
     return null;
+}
+
+/**
+ * The Last order column for someone with no order yet: "Added by hand" for
+ * a person the merchant added on the list (the design's words), else "—".
+ */
+export function noOrderText(row: CustomerRow): string {
+    return row.addedByHand ? "Added by hand" : "—";
 }
 
 /**
