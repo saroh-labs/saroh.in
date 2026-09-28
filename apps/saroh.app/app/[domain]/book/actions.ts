@@ -5,10 +5,15 @@ import type {
     BookResult,
     CreditAnswer,
     SignedInBookRequest,
+    WaitlistJoined,
+    WaitlistPlaces,
 } from "@saroh/site-blocks";
 import {
     isBookResult,
     isCreditAnswer,
+    isWaitlistJoined,
+    isWaitlistLeft,
+    isWaitlistPlaces,
     OFFLINE_RESULT,
     resultOf,
 } from "@saroh/site-blocks";
@@ -94,5 +99,110 @@ export async function creditFor(
         call.res.status,
         await call.res.json().catch(() => null),
         isCreditAnswer,
+    );
+}
+
+// ── A full class's waitlist (round-2 A12) ────────────────────────────────
+
+/** A session named by the browser: a service id and an instant. */
+function sessionOf(
+    request: unknown,
+): { serviceId: string; startAt: string } | null {
+    const r = (request && typeof request === "object" ? request : {}) as Record<
+        string,
+        unknown
+    >;
+    const serviceId = typeof r.serviceId === "string" ? r.serviceId.trim() : "";
+    const startAt = typeof r.startAt === "string" ? r.startAt.trim() : "";
+    if (
+        !serviceId ||
+        serviceId.length > MAX_ID ||
+        !startAt ||
+        Number.isNaN(Date.parse(startAt))
+    ) {
+        return null;
+    }
+    return { serviceId, startAt };
+}
+
+/**
+ * The signed-in customer's places in line for one service's classes:
+ * `GET public/site-accounts/waitlist`. Without a session they hold none —
+ * not an error.
+ */
+export async function waitlistFor(
+    request: unknown,
+): Promise<BookingResult<WaitlistPlaces>> {
+    if (!(await siteOrigin())) {
+        return { ok: false, status: 403, message: TROUBLE };
+    }
+    const r = (request && typeof request === "object" ? request : {}) as Record<
+        string,
+        unknown
+    >;
+    const serviceId = typeof r.serviceId === "string" ? r.serviceId.trim() : "";
+    if (!serviceId || serviceId.length > MAX_ID) {
+        return { ok: false, status: 400, message: TROUBLE };
+    }
+    const query = new URLSearchParams({ serviceId });
+    const call = await accountFetch(`waitlist?${query}`);
+    if (!call) return { ok: true, value: { places: [] } };
+    if (!call.ok) return OFFLINE_RESULT;
+    return resultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWaitlistPlaces,
+    );
+}
+
+/** Join a full class's line: `POST public/site-accounts/waitlist`. */
+export async function joinWaitlist(
+    request: unknown,
+): Promise<BookingResult<WaitlistJoined>> {
+    if (!(await siteOrigin())) {
+        return { ok: false, status: 403, message: TROUBLE };
+    }
+    const body = sessionOf(request);
+    if (!body) return { ok: false, status: 400, message: TROUBLE };
+    const call = await accountFetch("waitlist", { method: "POST", body });
+    if (!call) {
+        return {
+            ok: false,
+            status: 401,
+            message: "Sign in to join the waitlist.",
+            reason: "signed-out",
+        };
+    }
+    if (!call.ok) return OFFLINE_RESULT;
+    return resultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWaitlistJoined,
+    );
+}
+
+/** Leave it: `POST public/site-accounts/waitlist/leave`. */
+export async function leaveWaitlist(
+    request: unknown,
+): Promise<BookingResult<{ left: boolean }>> {
+    if (!(await siteOrigin())) {
+        return { ok: false, status: 403, message: TROUBLE };
+    }
+    const body = sessionOf(request);
+    if (!body) return { ok: false, status: 400, message: TROUBLE };
+    const call = await accountFetch("waitlist/leave", { method: "POST", body });
+    if (!call) {
+        return {
+            ok: false,
+            status: 401,
+            message: "Sign in again to leave the waitlist.",
+            reason: "signed-out",
+        };
+    }
+    if (!call.ok) return OFFLINE_RESULT;
+    return resultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isWaitlistLeft,
     );
 }

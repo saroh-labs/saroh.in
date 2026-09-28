@@ -9,6 +9,7 @@ import type {
 } from "../model";
 import { visitsOf } from "../model";
 import { card, focusRing, quietFill } from "../styles";
+import type { WaitlistPlace } from "../waitlist";
 import { OneToOne } from "./one-to-one";
 import { Sessions } from "./sessions";
 import { StepHead } from "./step-head";
@@ -30,6 +31,7 @@ export function WhenStep({
     onDay,
     onStart,
     onMore,
+    waitlist,
 }: {
     daysState: DaysState;
     days: BookingDays | null;
@@ -47,6 +49,11 @@ export function WhenStep({
     onDay: (date: string) => void;
     onStart: (start: BookingStart) => void;
     onMore: () => void;
+    /**
+     * A full class's waitlist (A12): full sessions can be chosen to join
+     * it, and say where the customer stands. Absent: full is full.
+     */
+    waitlist?: { placeOf: (startAt: string) => WaitlistPlace | undefined };
 }) {
     return (
         <div className={card}>
@@ -113,6 +120,7 @@ export function WhenStep({
                     duration={service.durationMinutes}
                     chosen={chosen}
                     onPick={onStart}
+                    waitlist={waitlist}
                 />
             ) : null}
         </div>

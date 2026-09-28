@@ -2,6 +2,8 @@ import { cn } from "../../lib/utils";
 import type { BookingStart } from "../model";
 import { dateIn, dateText, dayParts, placesText, timeIn } from "../model";
 import { focusRing, optionClasses, quietFill } from "../styles";
+import type { WaitlistPlace } from "../waitlist";
+import { fullSessionText } from "../waitlist";
 
 export function Sessions({
     sessions,
@@ -11,6 +13,7 @@ export function Sessions({
     duration,
     chosen,
     onPick,
+    waitlist,
 }: {
     sessions: BookingStart[];
     more: boolean;
@@ -19,6 +22,12 @@ export function Sessions({
     duration: number;
     chosen: BookingStart | null;
     onPick: (start: BookingStart) => void;
+    /**
+     * A full class's waitlist (A12): a full session can be chosen, to join
+     * its line, and says "Full — join waitlist", their place in line, or
+     * that a place is held for them. Absent: a full session is closed.
+     */
+    waitlist?: { placeOf: (startAt: string) => WaitlistPlace | undefined };
 }) {
     if (sessions.length === 0) {
         return (
@@ -32,6 +41,9 @@ export function Sessions({
             {sessions.map((s) => {
                 const on = chosen?.startAt === s.startAt;
                 const left = s.placesLeft ?? 0;
+                const full = left <= 0;
+                const closed = full && !waitlist;
+                const place = full ? waitlist?.placeOf(s.startAt) : undefined;
                 const date = dateIn(s.startAt, zone);
                 const { dow, n } = dayParts(date);
                 const end = timeIn(
@@ -46,11 +58,11 @@ export function Sessions({
                         type="button"
                         role="radio"
                         aria-checked={on}
-                        disabled={left <= 0}
+                        disabled={closed}
                         onClick={() => onPick(s)}
                         className={cn(
                             optionClasses(on),
-                            left <= 0 && "cursor-not-allowed opacity-70",
+                            closed && "cursor-not-allowed opacity-70",
                         )}
                     >
                         <span
@@ -80,14 +92,18 @@ export function Sessions({
                         <span
                             className={cn(
                                 "whitespace-nowrap text-[13px] font-semibold",
-                                left <= 0
-                                    ? "text-site-muted"
-                                    : left <= 3
-                                      ? "text-site-fg"
-                                      : "text-site-body",
+                                place?.status === "OFFERED"
+                                    ? "text-site-fg"
+                                    : full
+                                      ? "text-site-muted"
+                                      : left <= 3
+                                        ? "text-site-fg"
+                                        : "text-site-body",
                             )}
                         >
-                            {placesText(left)}
+                            {full && waitlist
+                                ? fullSessionText(place, zone)
+                                : placesText(left)}
                         </span>
                     </button>
                 );
