@@ -342,6 +342,9 @@ describe("the packs list", () => {
             // Live: time and classes left.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: future,
                 _count: { redemptions: 3 },
@@ -349,6 +352,9 @@ describe("the packs list", () => {
             // Used up.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: future,
                 _count: { redemptions: 10 },
@@ -356,13 +362,21 @@ describe("the packs list", () => {
             // Expired.
             {
                 packId: "pack_1",
+                contactId: "c_1",
+                price: "2200",
+                currency: "INR",
                 credits: 10,
                 expiresAt: new Date("2026-01-01T00:00:00Z"),
                 _count: { redemptions: 0 },
             },
         ]);
         const [view] = await service.listPacks(owner, {});
-        expect(view).toMatchObject({ sold: 3, activeHolders: 1 });
+        expect(view).toMatchObject({
+            sold: 3,
+            activeHolders: 1,
+            people: 1,
+            takings: [{ currency: "INR", amount: "6600.00" }],
+        });
         expect(db.packPurchase!.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { organizationId: "org_1", packId: { in: ["pack_1"] } },
@@ -952,6 +966,8 @@ describe("kind, first pack only, paid by and the reads (E13)", () => {
             kind: "CLASSES",
             firstPackOnly: false,
             creditsLeft: 0,
+            people: 0,
+            takings: [],
         });
     });
 });

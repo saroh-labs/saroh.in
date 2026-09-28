@@ -66,6 +66,7 @@ import {
 } from "./pack-kind";
 import { assertPackOnSale, PACK_DRAFT } from "./pack-on-sale";
 import type {
+    MoneyTotal,
     PackCounts,
     PackHolderView,
     PackOverview,
@@ -119,6 +120,10 @@ export interface PackView {
     activeHolders: number;
     /** Classes (or sessions) left across those purchases (E13). */
     creditsLeft: number;
+    /** People holding a live purchase: one person with two counts once (E15). */
+    people: number;
+    /** What its sales were sold for, per currency (E15). `pack:read` covers it. */
+    takings: MoneyTotal[];
     /** A live pack holds unpublished changes (E14): "Changes not published". */
     hasPendingChanges: boolean;
     /**
@@ -975,6 +980,8 @@ export class ClassPacksService {
             sold: holders?.sold ?? 0,
             activeHolders: holders?.active ?? 0,
             creditsLeft: holders?.creditsLeft ?? 0,
+            people: holders?.people ?? 0,
+            takings: holders?.takings ?? [],
             hasPendingChanges: pending,
             pendingChangedAt:
                 row.status === PACK_DRAFT || pending
