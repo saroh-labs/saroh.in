@@ -9,9 +9,9 @@ import {
     MaxLength,
 } from "class-validator";
 
-import type { BookingLocationType, BookPay } from "../bookings/dto";
+import type { AccountBookPay, BookingLocationType } from "../bookings/dto";
 import {
-    BOOK_PAY,
+    ACCOUNT_BOOK_PAY,
     BOOKING_LOCATION_TYPES,
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
@@ -88,10 +88,26 @@ export class AccountBookDto {
     @MaxLength(64)
     staffId?: string;
 
-    /** NOW, DEPOSIT (E8) or DESK; the amount is always the server's. */
+    /**
+     * NOW, DEPOSIT (E8), DESK, or CREDIT (A10): one class from the pack or
+     * membership the credit read offered, named below. The amount is always
+     * the server's.
+     */
     @IsOptional()
-    @IsIn(BOOK_PAY)
-    pay?: BookPay;
+    @IsIn(ACCOUNT_BOOK_PAY)
+    pay?: AccountBookPay;
+
+    /** Paying with CREDIT from a pack: the purchase the page was offered. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    packPurchaseId?: string;
+
+    /** Paying with CREDIT from a membership: the one the page was offered. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    subscriptionId?: string;
 
     @IsOptional()
     @IsIn(BOOKING_LOCATION_TYPES, {
@@ -104,4 +120,14 @@ export class AccountBookDto {
     @IsString()
     @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
     intakeNote?: string;
+}
+
+/** The credit read (A10): what a customer could pay a class with, and when. */
+export class AccountCreditQueryDto {
+    @IsString()
+    @MaxLength(64)
+    serviceId!: string;
+
+    @IsISO8601()
+    startAt!: string;
 }

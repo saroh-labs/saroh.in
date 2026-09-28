@@ -237,7 +237,8 @@
   an unnumbered booking invoice out of the invoice list and customer paper.
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
-  CONFIRMED with `paidWith` DESK. No credits online (ADR-008).
+  CONFIRMED with `paidWith` DESK. A class credit online is below (A10,
+  ADR-011).
 - **A deposit rides the same hold** (E8, default 39). `pay: "DEPOSIT"` makes
   the hold's draft invoice for `depositCents(price, depositMode)`, worked
   out on the server, and the snapshot records `deposit.cents`; the rest is
@@ -378,6 +379,26 @@
   before the business's free-cancellation window; after it (**Adopted**,
   ADR-008) the cancel is late and the credit stays used.
   Balance is derived (credits − live redemptions).
+- **A class credit online** (round-2 A10, ADR-011;
+  `bookings/booking-credit.ts`). Only a signed-in customer, on
+  `public/site-accounts`. The API decides the offer
+  (`GET …/bookings/credit`, `offeredCredit`): a membership's class first —
+  ACTIVE, an allowance with one left in the class's month, and only for a
+  class (capacity > 1); a membership with no allowance is not a class plan
+  and never pays online — then the pack the desk would spend (soonest to
+  expire, covers the service, a class left, valid at the start), and no
+  pack while Class packs is off. The booking (`pay: "CREDIT"` with
+  `packPurchaseId` or `subscriptionId`) spends it on the reservation's
+  transaction through the desk's own `redeemPackInTx` / `useMembershipInTx`
+  with `actor: "customer"`: the booking is written, then the purchase (or
+  subscription) is locked and counted, so a refusal takes the booking back.
+  For a customer, someone else's pack or membership is a 404, a named one is
+  required (never "whichever"), and every refusal carries
+  `details.reason: "credit-gone"` in their words, so the page re-reads its
+  offer and keeps the time. A lost serialization race is retried once
+  (`reserve`'s `retryOnce`), so two tabs spending the last class get one
+  booking and one "no classes left". The booking reads at the desk exactly
+  as a desk-made one (`paidWith`, the redemption, the money).
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).

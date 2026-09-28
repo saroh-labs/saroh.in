@@ -14,6 +14,12 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { isValidSlotStart } from "./availability";
+import type { PublicCredit } from "./booking-credit";
+import {
+    creditChoiceOf,
+    offeredCredit,
+    spendCreditInTx,
+} from "./booking-credit";
 import type { HoldState } from "./booking-hold";
 import {
     createHoldInvoiceInTx,
@@ -53,7 +59,7 @@ import {
     toPublicBooking,
 } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
-import type { BookInput, ReserveWith } from "./reservation";
+import type { BookInput, CreditChoice, ReserveWith } from "./reservation";
 import {
     alreadyBooked,
     bookingByKey,
@@ -327,9 +333,17 @@ export class PublicBookingsService {
             : given;
         // How they pay, as the service allows it (E8): a deposit service is
         // paid online, in part or in full; any other never takes a deposit.
+        // A credit (A10) pays the class whatever its price or deposit, and
+        // only for someone signed in: it is their own pack or membership.
+        const askedPay = asked.pay;
+        const credit =
+            askedPay === "CREDIT" ? creditOf(asked, service, signedIn) : null;
         const input: BookInput = {
             ...asked,
-            pay: payAtBooking(service, asked.pay),
+            pay:
+                askedPay === "CREDIT"
+                    ? askedPay
+                    : payAtBooking(service, askedPay),
         };
         // Where and the note are checked before anything is held (E7): an
         // answer to Where the service can't give, or a note past its length.
@@ -445,6 +459,12 @@ export class PublicBookingsService {
             throw err;
         }
         if (input.pay === "DESK") person.paidWith = "DESK";
+        // Paid with a credit (A10): said on the booking as the desk says it.
+        if (credit) {
+            person.paidWith = credit.kind === "PACK" ? "PACK" : "MEMBERSHIP";
+            person.subscriptionId =
+                credit.kind === "MEMBERSHIP" ? credit.subscriptionId : null;
+        }
 
         // 6. Atomic, serializable reservation (see the method doc for WHY) —
         //    with the hold's invoice in the same transaction for pay now.
@@ -458,9 +478,27 @@ export class PublicBookingsService {
             payToken: null,
         };
         const also = {
-            onRace: "This slot is fully booked",
+            // With a credit, the race lost may have been the pack's (or the
+            // month's) last class; tried again, the answer says which.
+            onRace: credit
+                ? "That changed while you were booking. Try again."
+                : "This slot is fully booked",
+            retryOnce: credit !== null,
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
+                if (credit) {
+                    // The contact the booking resolved to (C9): a credit is
+                    // only ever spent by the person who holds it.
+                    await spendCreditInTx(tx, {
+                        organizationId: service.organizationId,
+                        bookingId: booking.id,
+                        contactId: booking.contactId ?? "",
+                        serviceId: service.id,
+                        startAt,
+                        credit,
+                    });
+                    return;
+                }
                 if (!price || !booking.contactId) return;
                 const hold = await createHoldInvoiceInTx(tx, {
                     organizationId: service.organizationId,
@@ -527,6 +565,36 @@ export class PublicBookingsService {
     }
 
     /**
+     * The credit a signed-in customer could pay a class with (A10): the
+     * pay step asks once a time is chosen, and books with what it is given.
+     * Another business's service is as good as missing; nothing is held.
+     */
+    async creditFor(
+        signedIn: SignedInCustomer,
+        serviceId: string,
+        startAtISO: string,
+    ): Promise<{ credit: PublicCredit | null }> {
+        const { service } = await loadBookableService(serviceId, {
+            bookingPage: true,
+        });
+        if (service.organizationId !== signedIn.organizationId) {
+            throw new NotFoundException("Service not found");
+        }
+        const startAt = new Date(startAtISO);
+        if (Number.isNaN(startAt.getTime())) {
+            throw new BadRequestException("startAt is not a valid instant");
+        }
+        return {
+            credit: await offeredCredit(prisma, {
+                organizationId: service.organizationId,
+                contactId: signedIn.contactId,
+                service,
+                startAt,
+            }),
+        };
+    }
+
+    /**
      * The booking request as the signed-in customer's account makes it
      * (A9): the account's verified email, and its contact's name and phone.
      * Read in the business's RLS context the customer route runs in.
@@ -588,11 +656,14 @@ export class PublicBookingsService {
         const paidAs =
             existing.paidWith === "DESK"
                 ? "DESK"
-                : existing.paidWith === "PAID" || existing.holdExpiresAt
-                  ? paidADeposit(existing.snapshot)
-                      ? "DEPOSIT"
-                      : "NOW"
-                  : undefined;
+                : existing.paidWith === "PACK" ||
+                    existing.paidWith === "MEMBERSHIP"
+                  ? "CREDIT"
+                  : existing.paidWith === "PAID" || existing.holdExpiresAt
+                    ? paidADeposit(existing.snapshot)
+                        ? "DEPOSIT"
+                        : "NOW"
+                    : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
                 input.bookerEmail.trim().toLowerCase() ||
@@ -654,6 +725,24 @@ export class PublicBookingsService {
             currency: service.currency,
         };
     }
+}
+
+/**
+ * The credit a CREDIT booking names (A10): only someone signed in has one,
+ * and it must name exactly one pack or membership (`creditChoiceOf`).
+ */
+function creditOf(
+    asked: BookInput,
+    service: Pick<Service, "capacity">,
+    signedIn: SignedInCustomer | undefined,
+): CreditChoice {
+    if (!signedIn) {
+        throw new BadRequestException({
+            message: "Sign in to use a credit.",
+            field: "pay",
+        });
+    }
+    return creditChoiceOf(asked, service);
 }
 
 /**
