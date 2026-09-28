@@ -17,6 +17,7 @@ import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
 import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
 import {
@@ -873,6 +874,7 @@ export class SubscriptionsService {
             await log("ENDED", {
                 data: { at: sub.currentPeriodEnd.toISOString() },
             });
+            await endMandates(tx, sub.organizationId, id);
             return;
         }
 
@@ -949,6 +951,7 @@ export class SubscriptionsService {
                     },
                 });
                 await this.log(tx, ctx, id)("CANCELLED");
+                await endMandates(tx, ctx.organizationId, id);
                 return;
             }
             // A booked plan change is kept, so Keep (the undo) restores it.
@@ -1012,6 +1015,7 @@ export class SubscriptionsService {
                     },
                 });
                 await log("CANCELLED");
+                await endMandates(tx, member.organizationId, id);
                 return { outcome: "now", endsAt: now, timezone: sub.timezone };
             }
             await tx.customerSubscription.update({
@@ -1538,6 +1542,7 @@ export class SubscriptionsService {
                 await log("ENDED", {
                     data: { at: sub.currentPeriodEnd.toISOString() },
                 });
+                await endMandates(tx, sub.organizationId, id);
                 return "ended";
             }
 
@@ -2177,4 +2182,22 @@ export function periodLabel(period: Period, timezone: string): string {
     });
     const sameYear = start.year === last.year;
     return `${start.toFormat(sameYear ? "d LLL" : "d LLL yyyy")} – ${last.toFormat("d LLL yyyy")}`;
+}
+
+/**
+ * A subscription that moved to CANCELLED takes its autopay with it (D20):
+ * called on every such move, in its transaction, after its event. The
+ * mandate is cancelled in Saroh now and at the provider by a job after
+ * commit, so a provider timeout never undoes the cancel.
+ */
+function endMandates(
+    tx: Tx,
+    organizationId: string,
+    subscriptionId: string,
+): Promise<unknown> {
+    return cancelMandatesInTx(
+        tx,
+        { organizationId, subscriptionId },
+        "SUBSCRIPTION_ENDED",
+    );
 }

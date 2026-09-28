@@ -99,6 +99,15 @@ a note saying so.
   `UNKNOWN` (network, timeout, 5xx, 429, 409, a duplicate id — the row stays
   PENDING, money held). Try-again asks the provider first (`findRefund`) and
   re-sends only when it has none. Never match a refund by amount alone.
+- **Current** (D20) — **Autopay is an optional capability of the merchant
+  port.** `MerchantProvider.mandates?: MandateCapability`; a provider
+  without it never offers autopay (`supportsMandates`). So far it has only
+  `cancel` (D11 adds set-up, charge and status; D19 the Razorpay adapter),
+  and the fake implements it. Adapters throw `MandateCallError` with
+  `REFUSED` or `UNKNOWN`, as refunds do; cancelling a mandate the provider
+  has already cancelled is a success. Saroh marks a mandate CANCELLED before
+  it asks, so an unsure answer never leaves it chargeable
+  (`payments/mandates.service.ts`).
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
@@ -119,8 +128,9 @@ a note saying so.
   `refund_amount` (rupees, parsed as decimal text) are on `data.refund`.
 - **Adopted** — **Classify every negative outcome** — genuinely empty, provider
   error, rate limited, not configured — and never let a failed or partial call
-  become "nothing found" or "done". Gap: refund calls classify their failures
-  (`RefundCallError`, above); every other provider call throws a plain error,
+  become "nothing found" or "done". Gap: refund and mandate calls classify
+  their failures (`RefundCallError`, `MandateCallError`, above); every other
+  provider call throws a plain error,
   and a refund's `status` is still the provider's raw string. There is no
   shared outcome classification.
 - **Adopted** — **No fallback that can produce a plausible wrong answer.** When a
