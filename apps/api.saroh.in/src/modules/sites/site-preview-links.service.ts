@@ -4,6 +4,8 @@ import { createHash, randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import type { PublicModulePageStates } from "./module-pages";
+import { publicModulePageStates } from "./module-pages";
 import { sanitizeRichHtml } from "./sanitize";
 import { assertSiteInOrg } from "./site-access";
 import type { SiteSnapshot } from "./sites.service";
@@ -69,6 +71,14 @@ export interface PreviewView {
      */
     siteId: string;
     expiresAt: Date;
+    /**
+     * Whether each module page in the draft shows now (G19), exactly as the
+     * live read says it (G15), so a reviewer sees the menu the live site
+     * will draw: a Shop page while Commerce is off is out of the preview's
+     * menu too. Present only when the draft holds a module page, so a
+     * preview without them reads as before.
+     */
+    modules?: PublicModulePageStates;
 }
 
 /**
@@ -293,11 +303,19 @@ export class SitePreviewLinksService {
             throw new NotFoundException("No preview at this address");
         }
 
+        const snapshot = this.sites.buildSnapshot(site, new Date());
+        // Module pages follow their module live, as on the site (G15, G19);
+        // the organization comes from the link, never from the caller.
+        const modules = await publicModulePageStates(
+            snapshot,
+            link.organizationId,
+        );
         return {
-            snapshot: this.sites.buildSnapshot(site, new Date()),
+            snapshot,
             site: { name: site.name },
             siteId: link.siteId,
             expiresAt: link.expiresAt,
+            ...(modules ? { modules } : {}),
         };
     }
 

@@ -125,6 +125,15 @@ export interface NavigablePage {
  *   (Shop, Book, Prices, Journal, Contact). Its title is its menu name.
  *
  * A site with no module pages resolves exactly as it did before them.
+ *
+ * **Whether a module is on is not decided here (G19).** Every module page
+ * is resolved with its `kind`, whether its module is on or off at publish,
+ * and the site drops the entry at view time while the public read says the
+ * module is off (`siteMenu` in site-blocks, from `publicModulePageStates`).
+ * Dropping it here would freeze the menu at publish: a module turned off
+ * would keep its entry until the next publish, and one turned back on would
+ * stay missing. A hand-made entry to a free-form page carries no kind, so
+ * no module ever takes it out.
  */
 export function resolveSiteNavigation(
     navigation: SiteNavigation | null,

@@ -46,7 +46,7 @@ export default async function PreviewLayout({
     }
 
     const base = `/preview/${encodeURIComponent(token)}`;
-    const { snapshot, siteName, expiresAt } = preview;
+    const { snapshot, siteName, expiresAt, modules } = preview;
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
@@ -55,6 +55,9 @@ export default async function PreviewLayout({
             <SiteHeader
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}
+                // The menu the live site would draw now (G19): a module
+                // page whose module is off is out of it here too.
+                modules={modules}
                 basePath={base}
             />
 

@@ -311,6 +311,8 @@ function impactDb(
         stores?: string[];
         products?: number;
         openOrders?: number;
+        /** Each live site's published pages (G19), or a failed read. */
+        livePages?: { kind?: string; title?: string }[][] | Error;
     } = {},
 ) {
     const give = (v: number | Error | undefined) =>
@@ -344,6 +346,15 @@ function impactDb(
                         ? (opts.sellingSites ?? 0)
                         : (opts.liveSites ?? 0),
                 ),
+            ),
+            findMany: jest.fn(() =>
+                opts.livePages instanceof Error
+                    ? Promise.reject(opts.livePages)
+                    : Promise.resolve(
+                          (opts.livePages ?? []).map((pages) => ({
+                              currentPublication: { snapshot: { pages } },
+                          })),
+                      ),
             ),
         },
         store: {
@@ -583,6 +594,109 @@ describe("deactivationImpact (F13)", () => {
         shopRollout.mockResolvedValue(false);
         const items = await impact(impactDb({ sellingSites: 2 }), "COMMERCE");
         expect(items.map((i) => i.code)).not.toContain("COMMERCE_SITE_SHOP");
+    });
+
+    it("Commerce: the website stops showing its Shop page, by its menu name (G19)", async () => {
+        const db = impactDb({
+            livePages: [
+                [
+                    { title: "Home" },
+                    { kind: "SHOP", title: "Shop" },
+                    { kind: "BOOK", title: "Book" },
+                ],
+            ],
+        });
+        const items = await impact(db, "COMMERCE");
+        expect(items).toContainEqual({
+            code: "COMMERCE_SITE_SHOP_PAGE",
+            moduleKey: "COMMERCE",
+            count: 1,
+            message: "Your website stops showing Shop.",
+        });
+        // Only live sites are read, and only this business's.
+        const where = (db as unknown as { site: { findMany: jest.Mock } }).site
+            .findMany.mock.calls[0][0].where;
+        expect(where).toEqual({
+            organizationId: "org_1",
+            deletedAt: null,
+            currentPublicationId: { not: null },
+        });
+    });
+
+    it("Commerce names the Shop page as the merchant titled it", async () => {
+        const items = await impact(
+            impactDb({ livePages: [[{ kind: "SHOP", title: "Bakes" }]] }),
+            "COMMERCE",
+        );
+        expect(
+            items.find((i) => i.code === "COMMERCE_SITE_SHOP_PAGE")?.message,
+        ).toBe("Your website stops showing Bakes.");
+    });
+
+    it("Commerce says nothing of a Shop page the website hasn't published", async () => {
+        const items = await impact(
+            impactDb({ livePages: [[{ title: "Home" }, { title: "About" }]] }),
+            "COMMERCE",
+        );
+        expect(items.map((i) => i.code)).not.toContain(
+            "COMMERCE_SITE_SHOP_PAGE",
+        );
+    });
+
+    it("Commerce says nothing of a Shop page while the shop isn't rolled out (DEC-057)", async () => {
+        shopRollout.mockResolvedValue(false);
+        const items = await impact(
+            impactDb({ livePages: [[{ kind: "SHOP", title: "Shop" }]] }),
+            "COMMERCE",
+        );
+        expect(items.map((i) => i.code)).not.toContain(
+            "COMMERCE_SITE_SHOP_PAGE",
+        );
+    });
+
+    it("Appointments: the website stops showing its Book page (G19)", async () => {
+        const items = await impact(
+            impactDb({
+                bookings: 2,
+                livePages: [[{ kind: "BOOK", title: "Classes" }]],
+            }),
+            "APPOINTMENTS",
+        );
+        expect(items.map((i) => [i.code, i.message])).toEqual([
+            [
+                "APPOINTMENTS_UPCOMING_BOOKINGS",
+                "2 upcoming bookings stay booked; the booking page stops taking new ones.",
+            ],
+            [
+                "APPOINTMENTS_SITE_BOOK_PAGE",
+                "Your website stops showing Classes.",
+            ],
+        ]);
+    });
+
+    it("a website that can't be read says so, and a viewer who can't read sites is told nothing about it", async () => {
+        const failed = await impact(
+            impactDb({ livePages: new Error("timeout") }),
+            "APPOINTMENTS",
+        );
+        expect(
+            failed.find((i) => i.code === "APPOINTMENTS_SITE_BOOK_PAGE"),
+        ).toEqual({
+            code: "APPOINTMENTS_SITE_BOOK_PAGE",
+            moduleKey: "APPOINTMENTS",
+            count: null,
+            message:
+                "We couldn't check your website. If it has a Book page, it stops showing.",
+        });
+
+        const hidden = await impact(
+            impactDb({ livePages: [[{ kind: "BOOK", title: "Book" }]] }),
+            "APPOINTMENTS",
+            (a) => a === "booking:read",
+        );
+        expect(hidden.map((i) => i.code)).not.toContain(
+            "APPOINTMENTS_SITE_BOOK_PAGE",
+        );
     });
 
     it("Website: a live site stays up as last published", async () => {

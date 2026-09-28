@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PreviewGone } from "@/components/preview-gone";
-import { PageSections } from "@saroh/site-blocks";
+import { ModulePageUnavailable, PageSections } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
+import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
     getPreviewByToken,
@@ -46,6 +47,12 @@ export default async function PreviewPage({
 
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
+
+    // A module page whose module is off says so, as its live address will
+    // (G15, G19), rather than showing what publishing wouldn't.
+    if (moduleOff(page, preview.modules)) {
+        return <ModulePageUnavailable business={preview.snapshot.site.name} />;
+    }
 
     // The draft's posts (G10), as the preview's own index shows them, and
     // the plans on sale now (G9) and each Product grid's products (G12): a
