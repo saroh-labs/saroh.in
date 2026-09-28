@@ -37,13 +37,14 @@ describe("OrganizationOrdersController", () => {
         .fn()
         .mockResolvedValue({ types: [], steps: [], product: null });
     const searchProducts = jest.fn().mockResolvedValue({ products: [] });
+    const readOrder = jest.fn();
     const controller = new OrganizationOrdersController(
         {
             listRows,
             filterOptions,
             searchProducts,
         } as unknown as OrdersService,
-        {} as unknown as OrderKitchenService,
+        { read: readOrder } as unknown as OrderKitchenService,
         {} as unknown as OrderPayLinkService,
     );
 
@@ -216,6 +217,53 @@ describe("OrganizationOrdersController", () => {
             );
             expect(filterOptions).not.toHaveBeenCalled();
             expect(searchProducts).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("the quick view's read (B5)", () => {
+        const order = {
+            id: "o1",
+            customer: {
+                id: "c1",
+                name: "Asha Rao",
+                phone: "+91 98765 43210",
+                email: "asha@example.in",
+                contactId: null,
+                orderCount: 1,
+                firstOrderAt: null,
+            },
+        };
+
+        beforeEach(() => {
+            readOrder.mockReset();
+            readOrder.mockResolvedValue(order);
+        });
+
+        it("is Order Detail's read, whole, without ?view=quick", async () => {
+            const counter = as("MEMBER", {
+                roleKey: "counter",
+                actions: resolveCapabilities("counter", ["order:stage"]),
+            });
+            await expect(controller.read(counter, "o1")).resolves.toBe(order);
+            expect(readOrder).toHaveBeenCalledWith(counter, "o1");
+        });
+
+        it("keeps the customer's phone and email for a role that reads contacts", async () => {
+            const read = await controller.read(as("OWNER"), "o1", "quick");
+            expect(read.customer).toMatchObject({
+                phone: "+91 98765 43210",
+                email: "asha@example.in",
+            });
+        });
+
+        it("leaves them out for one that doesn't", async () => {
+            const counter = as("MEMBER", {
+                roleKey: "counter",
+                actions: resolveCapabilities("counter", ["order:stage"]),
+            });
+            const read = await controller.read(counter, "o1", "quick");
+            expect(read.customer?.phone).toBeNull();
+            expect(read.customer).not.toHaveProperty("email");
         });
     });
 });

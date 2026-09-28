@@ -29,6 +29,7 @@ import {
 } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrderPayLinkService } from "./order-pay-link.service";
+import { quickViewOf } from "./order-row";
 import { OrdersService } from "./orders.service";
 
 /**
@@ -129,13 +130,24 @@ export class OrganizationOrdersController {
         return this.orders.searchProducts(ctx.organizationId, query.q);
     }
 
-    /** One order as Order Detail shows it; money only with a money read. */
+    /**
+     * One order as Order Detail shows it; money only with a money read.
+     *
+     * `?view=quick` is the Orders list's quick view (B5): the same read,
+     * with the customer's phone and email left out without `contact:read`,
+     * as the list's rows leave them out (`quickViewOf`). Any other value is
+     * the full read, so an older app is unaffected.
+     */
     @Get(":orderId")
-    read(
+    async read(
         @OrgContext() ctx: OrganizationContext,
         @Param("orderId") orderId: string,
+        @Query("view") view?: string,
     ) {
-        return this.kitchen.read(ctx, orderId);
+        const read = await this.kitchen.read(ctx, orderId);
+        return view === "quick"
+            ? quickViewOf(read, { contact: allows(ctx, "contact:read") })
+            : read;
     }
 
     /** Move to the next kitchen stage (`order:stage`). */
