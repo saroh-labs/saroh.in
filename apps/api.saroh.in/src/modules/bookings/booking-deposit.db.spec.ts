@@ -118,8 +118,8 @@ beforeAll(async () => {
     ).id;
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
-        publicKey: "rzp_public",
-        keyId: "rzp_key",
+        publicKey: "rzp_test_Deposit1",
+        keyId: "rzp_test_Deposit1",
         keySecret: "rzp_secret",
         webhookSecret: WEBHOOK_SECRET,
     });
