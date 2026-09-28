@@ -340,6 +340,7 @@ export function CalendarScreen({
                     for (const b of seats) {
                         const res = await cancelBooking(b.id, {
                             returnCredit: true,
+                            closesClass: true,
                         });
                         if (!res.ok) {
                             failed += 1;

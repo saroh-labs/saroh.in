@@ -9,6 +9,7 @@ import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canReadOrders, canRefundPayments } from "@/lib/services/booking-money";
 import { hasEnded } from "@/lib/services/booking-state";
+import { readClassWaitlist } from "@/lib/services/class-waitlist";
 import type { BookingDetail } from "@/lib/services/service";
 import { getBooking } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -57,6 +58,7 @@ export default async function BookingPage({
             packs={await packsFor(booking)}
             canRefund={canRefundPayments(organization)}
             canReadOrder={canReadOrders(organization)}
+            waitlist={await waitlistFor(booking)}
         />
     );
 }
@@ -96,4 +98,14 @@ async function packsFor(booking: BookingDetail) {
         })),
         canWrite,
     };
+}
+
+/**
+ * A class's line for this session (A12): read for a class still to come,
+ * null when the read failed, and nothing for a one-to-one or a class that
+ * has happened.
+ */
+async function waitlistFor(booking: BookingDetail) {
+    if (booking.service.capacity <= 1 || hasEnded(booking)) return undefined;
+    return readClassWaitlist(booking.serviceId, booking.startAt);
 }
