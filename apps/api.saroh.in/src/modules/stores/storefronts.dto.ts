@@ -184,6 +184,16 @@ export class UpdateStorefrontDto {
     @IsBoolean()
     paused?: boolean;
 
+    /**
+     * Customers who share an email (DEC-055, C15): true links a customer
+     * of this storefront who pays with an email a store-made contact
+     * already holds to that contact on their own; false leaves the pair for
+     * staff. Needs `contact:write` as well as `store:write`.
+     */
+    @IsOptional()
+    @IsBoolean()
+    linkSameEmailCustomers?: boolean;
+
     /** A connected provider's name, or `null` to use the business's only one. */
     @IsOptional()
     @Transform(({ value }: { value: unknown }) =>

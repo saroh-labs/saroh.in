@@ -579,3 +579,144 @@ describe("opening hours in Settings › Activity (#509)", () => {
         expect(record).not.toHaveBeenCalled();
     });
 });
+
+describe("customers who share an email (C15, DEC-055)", () => {
+    const service = new StorefrontsService();
+    const upserted = (i: number) =>
+        db.__tx.storeSettings.upsert!.mock.calls[i][0] as {
+            create: Record<string, unknown>;
+            update: Record<string, unknown>;
+        };
+
+    it("leaves them for staff by default, for a new storefront and an existing one", async () => {
+        await expect(service.get("org_1", "st_1")).resolves.toMatchObject({
+            linkSameEmailCustomers: false,
+            linkSameEmailSince: null,
+        });
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
+            taxRate: "0",
+            linkSameEmailSince: null,
+        });
+        await expect(service.get("org_1", "st_1")).resolves.toMatchObject({
+            linkSameEmailCustomers: false,
+        });
+    });
+
+    it("turns on with the time it was turned on, keeps that time when turned on again, and clears it off", async () => {
+        await service.update("org_1", "st_1", { linkSameEmailCustomers: true });
+        const on = upserted(0).update.linkSameEmailSince;
+        expect(on).toBeInstanceOf(Date);
+        // The first save also creates the row carrying it.
+        expect(upserted(0).create.linkSameEmailSince).toBe(on);
+
+        const since = new Date("2026-10-01T09:00:00.000Z");
+        db.storeSettings.findUnique!.mockResolvedValue({
+            fulfilmentTypes: [],
+            taxRate: "0",
+            linkSameEmailSince: since,
+        });
+        await service.update("org_1", "st_1", { linkSameEmailCustomers: true });
+        expect(upserted(1).update.linkSameEmailSince).toEqual(since);
+
+        await service.update("org_1", "st_1", {
+            linkSameEmailCustomers: false,
+        });
+        expect(upserted(2).update.linkSameEmailSince).toBeNull();
+    });
+
+    it("leaves the setting alone when a save doesn't send it", async () => {
+        await service.update("org_1", "st_1", { tipsEnabled: true });
+        expect(upserted(0).update).not.toHaveProperty("linkSameEmailSince");
+    });
+
+    it("writes a settings-audit entry naming the storefront, only when it changed", async () => {
+        const record = jest.fn().mockResolvedValue(undefined);
+        const audited = new StorefrontsService({ record } as never);
+        db.storeSettings
+            .findUnique!.mockResolvedValueOnce(null)
+            .mockResolvedValue({
+                fulfilmentTypes: [],
+                taxRate: "0",
+                linkSameEmailSince: new Date(),
+            });
+
+        await audited.update(
+            "org_1",
+            "st_1",
+            { linkSameEmailCustomers: true },
+            "user_1",
+        );
+        expect(record).toHaveBeenCalledWith({
+            action: "storefront.same-email.update",
+            actorUserId: "user_1",
+            organizationId: "org_1",
+            targetType: "storefront",
+            targetId: "st_1",
+            outcome: "SUCCESS",
+            metadata: {
+                fields: ["linkSameEmailCustomers"],
+                storefront: "High Street",
+                changes: [
+                    {
+                        field: "linkSameEmailCustomers",
+                        before: false,
+                        after: true,
+                    },
+                ],
+            },
+        });
+
+        // Saved as it already was: nothing to record.
+        record.mockClear();
+        await audited.update(
+            "org_1",
+            "st_1",
+            { linkSameEmailCustomers: true },
+            "user_1",
+        );
+        expect(record).not.toHaveBeenCalled();
+    });
+
+    describe("who may change it", () => {
+        const update = jest.fn().mockResolvedValue({});
+        const controller = new StorefrontsController({
+            update,
+        } as unknown as StorefrontsService);
+        beforeEach(() => update.mockClear());
+
+        it("lets an Owner or Admin change it", async () => {
+            await controller.update(as("ADMIN"), "st_1", {
+                linkSameEmailCustomers: true,
+            });
+            expect(update).toHaveBeenCalled();
+        });
+
+        it("needs contact:write as well as store:write", async () => {
+            const shopOnly = as("MEMBER", {
+                roleKey: "shop-manager",
+                actions: resolveCapabilities("shop-manager", [
+                    "store:read",
+                    "store:write",
+                ]),
+            });
+            expect(() =>
+                controller.update(shopOnly, "st_1", {
+                    linkSameEmailCustomers: true,
+                }),
+            ).toThrow(ForbiddenException);
+            expect(update).not.toHaveBeenCalled();
+            // The rest of the storefront is still theirs to change.
+            await controller.update(shopOnly, "st_1", { name: "x" });
+            expect(update).toHaveBeenCalled();
+        });
+
+        it("refuses a Member", () => {
+            expect(() =>
+                controller.update(as("MEMBER"), "st_1", {
+                    linkSameEmailCustomers: false,
+                }),
+            ).toThrow(ForbiddenException);
+        });
+    });
+});
