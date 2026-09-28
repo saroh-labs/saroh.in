@@ -14,7 +14,6 @@ import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
     HomeAction,
-    HomeBooking,
     HomeEvidence,
     HomeInput,
     HomeModel,
@@ -22,7 +21,7 @@ import type {
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
-import { EVIDENCE_LIMIT, holds, personName } from "./home-model";
+import { EVIDENCE_LIMIT, holds } from "./home-model";
 import type { RefundReason } from "./home-money-sources";
 import {
     failedRenewals,
@@ -43,7 +42,10 @@ import {
     viewerOf,
 } from "./home-people-sources";
 import { readReviews } from "./home-reviewer";
+import type { HomeSchedule } from "./home-schedule";
+import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
+import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
 import { readToday, todayScope } from "./home-today";
 import { readWeek, weekScope } from "./home-week";
 
@@ -63,6 +65,8 @@ export type {
     HomeReviewSite,
     HomeSeverity,
     HomeSinceItem,
+    HomeStaff,
+    HomeStaffStore,
     HomeToday,
     HomeTodayItem,
     HomeTone,
@@ -80,9 +84,6 @@ const SEVERITY_RANK: Record<HomeSeverity, number> = {
     SETUP: 2,
     SUGGESTION: 3,
 };
-
-/** How far ahead the schedule band looks. */
-const UPCOMING_LIMIT = 8;
 
 /**
  * Home read model (cross-product UX #119, Task 4).
@@ -173,8 +174,15 @@ export class HomeService {
 
         // NOT guarded. Availability decides what Home is even allowed to show;
         // without it there is no page to degrade, and guessing would risk
-        // emitting an action for a module the actor cannot see.
-        const views = await this.availability.listViews(input);
+        // emitting an action for a module the actor cannot see. Nor is a
+        // staff member's narrowing (F11, `home-staff.ts`): without it, Home
+        // can't tell their storefronts' work from the rest.
+        const [views, staffView] = await Promise.all([
+            this.availability.listViews(input),
+            isStaffView(input) ? readStaffNarrow(this.db, input) : null,
+        ]);
+        const narrow = staffView?.narrow ?? WHOLE_BUSINESS;
+        const stores = narrow.storeIds;
         const actions: HomeAction[] = [];
 
         // Setup / attention actions straight from module readiness.
@@ -314,29 +322,24 @@ export class HomeService {
                               // `order:stage` moves it without seeing it
                               // (DEC-024).
                               money: holds(input, "order:read"),
+                              storeIds: stores,
                           }),
                       noEvidence,
                   )
                 : skip<OpenOrders>(noEvidence),
             available.has("APPOINTMENTS")
-                ? guard(
+                ? guard<HomeSchedule>(
                       { moduleKey: "APPOINTMENTS", label: "Schedule" },
-                      async () => {
-                          const [next, total] = await Promise.all([
-                              this.upcomingBookings(input.organizationId, now),
-                              this.db.booking.count({
-                                  where: {
-                                      organizationId: input.organizationId,
-                                      status: "CONFIRMED",
-                                      startAt: { gte: now },
-                                  },
-                              }),
-                          ]);
-                          return { upcoming: next, total };
-                      },
-                      { upcoming: [] as HomeBooking[], total: 0 },
+                      () =>
+                          readSchedule(
+                              this.db,
+                              input.organizationId,
+                              now,
+                              narrow,
+                          ),
+                      NO_SCHEDULE,
                   )
-                : skip({ upcoming: [] as HomeBooking[], total: 0 }),
+                : skip(NO_SCHEDULE),
             // The business's day, in its zone (F5): bookings, classes,
             // pick-ups.
             scope
@@ -347,7 +350,14 @@ export class HomeService {
                               : "COMMERCE",
                           label: "Today",
                       },
-                      () => readToday(this.db, input, scope, { now, zone }),
+                      () =>
+                          readToday(
+                              this.db,
+                              input,
+                              scope,
+                              { now, zone },
+                              narrow,
+                          ),
                       null,
                   )
                 : skip(null),
@@ -355,7 +365,14 @@ export class HomeService {
             // zone.
             guard(
                 { moduleKey: "HOME", label: "The last 24 hours" },
-                () => readLastDay(this.db, input, available, { now, zone }),
+                () =>
+                    readLastDay(
+                        this.db,
+                        input,
+                        available,
+                        { now, zone },
+                        stores,
+                    ),
                 lastDayHeader(now, zone),
             ),
             // Money taken through an invoice's pay link after the invoice
@@ -422,6 +439,7 @@ export class HomeService {
                               this.db,
                               stockChecks,
                               input.organizationId,
+                              stores,
                           ),
                       null,
                   )
@@ -440,10 +458,13 @@ export class HomeService {
                 ? guard(
                       { moduleKey: "HOME", label: "This week" },
                       () =>
-                          readWeek(this.db, input.organizationId, week, {
-                              now,
-                              zone,
-                          }),
+                          readWeek(
+                              this.db,
+                              input.organizationId,
+                              week,
+                              { now, zone },
+                              stores,
+                          ),
                       null,
                   )
                 : skip(null),
@@ -452,7 +473,8 @@ export class HomeService {
             available.has("COMMERCE") && holds(input, "product-review:read")
                 ? guard(
                       { moduleKey: "COMMERCE", label: "Reviews" },
-                      () => lowStarReviews(this.db, input.organizationId),
+                      () =>
+                          lowStarReviews(this.db, input.organizationId, stores),
                       null,
                   )
                 : skip(null),
@@ -602,7 +624,10 @@ export class HomeService {
         await this.inline?.decorate(actions, input, now);
 
         return {
-            view: "business",
+            // A staff member's Home is the business's rows, narrowed (F11).
+            ...(staffView
+                ? { view: "staff" as const, staff: staffView.staff }
+                : { view: "business" as const }),
             actions,
             primaryAction: actions[0] ?? null,
             hasAnyModule: views.some((v) => v.readiness !== "DISABLED"),
@@ -749,37 +774,5 @@ export class HomeService {
             });
         }
         return { count, evidence, reason };
-    }
-
-    /** The next confirmed bookings from now, each in the zone it was made in. */
-    private async upcomingBookings(
-        organizationId: string,
-        now: Date,
-    ): Promise<HomeBooking[]> {
-        const rows = await this.db.booking.findMany({
-            where: {
-                organizationId,
-                status: "CONFIRMED",
-                startAt: { gte: now },
-            },
-            orderBy: { startAt: "asc" },
-            take: UPCOMING_LIMIT,
-            include: { service: true, contact: true },
-        });
-
-        return rows.map((row) => ({
-            id: row.id,
-            startAt: row.startAt.toISOString(),
-            endAt: row.endAt.toISOString(),
-            timezone: row.timezone,
-            serviceName: row.service.name,
-            who:
-                (row.contact ? personName(row.contact) : null) ??
-                row.bookerName?.trim() ??
-                row.bookerEmail?.trim() ??
-                null,
-            status: row.status,
-            href: "/bookings",
-        }));
     }
 }

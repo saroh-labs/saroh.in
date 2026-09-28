@@ -344,10 +344,31 @@ export interface HomeWeek {
 }
 
 /**
- * Whose Home this is (F9): the business's, or a Reviewer's, which carries
- * only the sites they were asked to review. F11 adds the staff landing.
+ * Whose Home this is: the business's; a Reviewer's, which carries only the
+ * sites they were asked to review (F9); or a staff member's, narrowed to
+ * the storefronts they work on and their own diary (F11).
  */
-export type HomeView = "business" | "reviewer";
+export type HomeView = "business" | "reviewer" | "staff";
+
+/** A storefront a staff member's Home is narrowed to (F11). */
+export interface HomeStaffStore {
+    id: string;
+    name: string;
+}
+
+/**
+ * What a staff member's Home covers (F11), for the header's "Hill Road
+ * only". Which rows they see is still their own capabilities'.
+ */
+export interface HomeStaff {
+    /**
+     * The storefronts they work on, by name; null for every storefront —
+     * none assigned, or all of them.
+     */
+    stores: HomeStaffStore[] | null;
+    /** Today shows their own bookings: they are on the diary. */
+    ownDiary: boolean;
+}
 
 /** A page of a site a Reviewer was asked to review (F9). */
 export interface HomeReviewPage {
@@ -389,6 +410,8 @@ export interface HomeReviewSite {
 export interface HomeModel {
     /** Whose Home this is; `reviewer` sends `reviews` and nothing else. */
     view: HomeView;
+    /** What a staff member's Home is narrowed to; only on `view: "staff"`. */
+    staff?: HomeStaff;
     /**
      * A Reviewer's sites (F9), present only on `view: "reviewer"`. Empty
      * when they have none — or when the read failed, which `unavailable`

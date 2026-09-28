@@ -5,6 +5,7 @@ import type { HomeSetup } from "@/components/home/home-dashboard";
 import { HomeDashboard } from "@/components/home/home-dashboard";
 import { HomeHeader } from "@/components/home/home-header";
 import { ReviewerHome } from "@/components/home/reviewer-home";
+import { StaffHome } from "@/components/home/staff-home";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
@@ -69,6 +70,22 @@ export default async function Home() {
     // question needs to know what may be turned on and by whom. Everyone
     // else never pays for the read.
     const modules = home.hasAnyModule ? null : await listModules();
+
+    // A staff member's Home (F11): their storefronts and their own diary,
+    // each part as their role allows. No setup checklist to read.
+    if (home.view === "staff") {
+        return (
+            <PageContainer width="full">
+                <StaffHome
+                    home={home}
+                    modules={modules}
+                    name={session.user.name}
+                    businessName={business?.name ?? "This business"}
+                />
+            </PageContainer>
+        );
+    }
+
     const setup = home.hasAnyModule ? await loadSetup(business) : null;
 
     return (

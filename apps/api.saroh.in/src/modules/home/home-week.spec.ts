@@ -208,10 +208,17 @@ describe("weekScope", () => {
         });
     });
 
-    it("asks for both money reads before takings", () => {
-        // `payment:read` alone reads no figure here: the takings' rows are
-        // invoices.
-        expect(weekScope(holding(["payment:read"]), ALL)).toBeNull();
+    it("gives takings to payment:read alone, linked to the Calendar (F11)", () => {
+        // The permission matrix: Home's takings are `payment:read`'s. The
+        // invoices behind them are `invoice:read`'s, so without it the
+        // figure opens the Calendar's money instead.
+        expect(weekScope(holding(["payment:read"]), ALL)).toEqual({
+            takings: true,
+            bookings: false,
+            orders: false,
+            owed: false,
+            takingsIn: "calendar",
+        });
         expect(
             weekScope(holding(["payment:read", "invoice:read"]), ALL),
         ).toEqual({

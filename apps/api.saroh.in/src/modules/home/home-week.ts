@@ -4,7 +4,7 @@ import { DateTime } from "luxon";
 import { toMinor } from "../../common/money";
 import { NOT_A_BOOKING_HOLD, OWED_WHERE } from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
-import { sinceHref } from "./home-last-day";
+import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type {
     HomeInput,
     HomeWeek,
@@ -13,13 +13,15 @@ import type {
     HomeWeekTakings,
 } from "./home-model";
 import { holds } from "./home-model";
+import { onOneStore, storeWhere } from "./home-staff";
 
 /**
  * Home's "This week" (round 2, F7): the week's money and work in a few
  * figures, each for whoever holds its own read.
  *
- * - **Takings so far** (`payment:read` and `invoice:read`, as the Last 24
- *   hours' money): what came in since Monday, net of refunds, against the
+ * - **Takings so far** (`payment:read`, as the Last 24 hours' money; its
+ *   link opens the invoices counted for someone who also holds
+ *   `invoice:read`, else the Calendar's money — F11): what came in since Monday, net of refunds, against the
  *   same days last week. Each rupee once: an order's money is its invoice
  *   (ADR-008, every order has one), so paid invoices alone count it; a
  *   refund is its credit note, taken off on the day it was issued.
@@ -57,6 +59,11 @@ export interface WeekScope {
     bookings: boolean;
     orders: boolean;
     owed: boolean;
+    /**
+     * Takings read by someone who may not open the invoices behind them:
+     * the figure links to the Calendar's money instead (F11).
+     */
+    takingsIn?: "calendar";
 }
 
 export function weekScope(
@@ -65,16 +72,19 @@ export function weekScope(
 ): WeekScope | null {
     if (input.organizationRole === "REVIEWER") return null;
     const payments = available.has("PAYMENTS");
+    // Takings are `payment:read`'s alone (the permission matrix; F11): a
+    // person given it sees what came in, whether or not they read invoices.
+    const takings = payments && holds(input, "payment:read");
     const scope: WeekScope = {
-        takings:
-            payments &&
-            holds(input, "payment:read") &&
-            holds(input, "invoice:read"),
+        takings,
         bookings: available.has("APPOINTMENTS") && holds(input, "booking:read"),
         orders:
             available.has("COMMERCE") &&
             (holds(input, "order:read") || holds(input, "order:stage")),
         owed: payments && holds(input, "invoice:read"),
+        ...(takings && !holds(input, "invoice:read")
+            ? { takingsIn: "calendar" as const }
+            : {}),
     };
     return Object.values(scope).some(Boolean) ? scope : null;
 }
@@ -308,13 +318,16 @@ async function readOwed(
 /**
  * The whole block for one viewer: only the figures their reads allow, the
  * rest absent (never zero). Throws when a read fails; `HomeService` names
- * "This week" and sends none.
+ * "This week" and sends none. A staff member's orders are their
+ * storefronts' (F11, `storeIds`); the money is the business's, and isn't
+ * narrowed.
  */
 export async function readWeek(
     db: Db,
     organizationId: string,
     scope: WeekScope,
     clock: { now: Date; zone: string },
+    storeIds: readonly string[] | null = null,
 ): Promise<HomeWeek> {
     const w = weekWindows(clock.now, clock.zone);
     const monday = w.start.toISOString();
@@ -343,6 +356,7 @@ export async function readWeek(
                 ? db.order.count({
                       where: {
                           organizationId,
+                          ...storeWhere(storeIds),
                           createdAt: { gte: w.start },
                           ...realOrderWhere(),
                       },
@@ -356,7 +370,9 @@ export async function readWeek(
         week.takings = takingsFigures(
             thisMoney,
             lastMoney,
-            sinceHref(WEEK_PATHS.TAKINGS, monday),
+            scope.takingsIn === "calendar"
+                ? MONEY_ON_THE_CALENDAR
+                : sinceHref(WEEK_PATHS.TAKINGS, monday),
         );
     }
     if (bookings !== null && lastBookings !== null) {
@@ -369,7 +385,7 @@ export async function readWeek(
     if (orders !== null) {
         week.orders = {
             count: orders,
-            href: sinceHref(WEEK_PATHS.ORDERS, monday),
+            href: sinceHref(onOneStore(WEEK_PATHS.ORDERS, storeIds), monday),
         };
     }
     if (owed) week.owed = owed;
