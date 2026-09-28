@@ -624,7 +624,8 @@ export class OrganizationMembersService {
      * Their storefront roles go too (DEC-048): one roster underneath, so
      * someone off the team is off every storefront of this business. Deleted
      * in the same serializable transaction as the last-owner check, so a
-     * refused removal leaves every storefront role where it was.
+     * refused removal leaves every storefront role where it was. Their
+     * storefront invitations still pending are revoked with them.
      */
     async remove(ctx: OrganizationContext, userId: string) {
         authorize(ctx, "member:remove");
@@ -676,6 +677,25 @@ export class OrganizationMembersService {
                         store: { organizationId: ctx.organizationId },
                     },
                 });
+                // Their storefront invites still waiting go too: accepting
+                // one would put them back on the team (F16).
+                const person = await tx.user.findUnique({
+                    where: { id: userId },
+                    select: { email: true },
+                });
+                if (person?.email) {
+                    await tx.storeInvitation.updateMany({
+                        where: {
+                            status: "PENDING",
+                            email: {
+                                equals: person.email,
+                                mode: "insensitive",
+                            },
+                            store: { organizationId: ctx.organizationId },
+                        },
+                        data: { status: "REVOKED" },
+                    });
+                }
                 return {
                     revokedLinks: count,
                     storefrontRoles: storefronts.count,

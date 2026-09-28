@@ -27,6 +27,8 @@ jest.mock("@saroh/database", () => ({
         session: { groupBy: jest.fn() },
         sitePreviewLink: { updateMany: jest.fn() },
         storeMembers: { findMany: jest.fn(), deleteMany: jest.fn() },
+        storeInvitation: { updateMany: jest.fn() },
+        user: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
         organizationRole: { findUnique: jest.fn() },
         $transaction: jest.fn(),
@@ -56,6 +58,8 @@ const db = prisma as unknown as {
     session: Record<string, jest.Mock>;
     sitePreviewLink: Record<string, jest.Mock>;
     storeMembers: Record<string, jest.Mock>;
+    storeInvitation: Record<string, jest.Mock>;
+    user: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
     organizationRole: Record<string, jest.Mock>;
     $transaction: jest.Mock;
@@ -91,6 +95,8 @@ beforeEach(() => {
     db.session.groupBy.mockResolvedValue([]);
     db.storeMembers.findMany.mockResolvedValue([]);
     db.storeMembers.deleteMany.mockResolvedValue({ count: 0 });
+    db.storeInvitation.updateMany.mockResolvedValue({ count: 0 });
+    db.user.findUnique.mockResolvedValue({ email: "leaver@example.test" });
 });
 
 describe("who may touch the roster", () => {

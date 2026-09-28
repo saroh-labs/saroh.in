@@ -103,6 +103,9 @@ describe("storefront people join the team (DB, F16)", () => {
             "MEMBER_ALREADY",
             "CLERK",
             "LEGACY",
+            "INVITER",
+            "JOINER",
+            "LEAVER",
         ]) {
             await user(who);
         }
@@ -471,6 +474,123 @@ describe("storefront people join the team (DB, F16)", () => {
                     where: { userId: users.OWNER! },
                 }),
             ).toBe(1);
+        });
+    });
+
+    describe("an invite is checked again when it is accepted", () => {
+        it("refuses one whose inviter can no longer bring people onto the team", async () => {
+            await prisma.storeOwner.create({
+                data: {
+                    storeId: otherStoreId,
+                    userId: users.INVITER!,
+                    role: "OWNER",
+                },
+            });
+            await prisma.membership.create({
+                data: {
+                    organizationId: orgId,
+                    userId: users.INVITER!,
+                    role: "ADMIN",
+                },
+            });
+            await members.createInvitation(
+                otherStoreId,
+                users.INVITER!,
+                emails.JOINER!,
+                "VIEWER",
+            );
+            // Since the invite went out, the inviter lost member:invite.
+            await prisma.membership.update({
+                where: {
+                    organizationId_userId: {
+                        organizationId: orgId,
+                        userId: users.INVITER!,
+                    },
+                },
+                data: { role: "MEMBER" },
+            });
+            const invite = await prisma.storeInvitation.findFirstOrThrow({
+                where: { storeId: otherStoreId, email: emails.JOINER! },
+            });
+            await expect(
+                members.acceptInvitation(invite.token, {
+                    id: users.JOINER!,
+                    email: emails.JOINER!,
+                }),
+            ).rejects.toThrow(/can no longer be accepted/);
+            expect(await membershipOf("JOINER")).toBeNull();
+            expect(
+                await prisma.storeMembers.count({
+                    where: { userId: users.JOINER! },
+                }),
+            ).toBe(0);
+            expect(
+                (
+                    await prisma.storeInvitation.findUniqueOrThrow({
+                        where: { id: invite.id },
+                    })
+                ).status,
+            ).toBe("PENDING");
+        });
+
+        it("removing someone from Team revokes the storefront invites waiting for them", async () => {
+            await prisma.membership.create({
+                data: {
+                    organizationId: orgId,
+                    userId: users.LEAVER!,
+                    role: "MEMBER",
+                },
+            });
+            await members.createInvitation(
+                storeId,
+                users.OWNER!,
+                emails.LEAVER!.toUpperCase(),
+                "EDITOR",
+            );
+            const invite = await prisma.storeInvitation.findFirstOrThrow({
+                where: {
+                    storeId,
+                    email: emails.LEAVER!.toUpperCase(),
+                },
+            });
+
+            await team.remove(await as("OWNER"), users.LEAVER!);
+            expect(
+                (
+                    await prisma.storeInvitation.findUniqueOrThrow({
+                        where: { id: invite.id },
+                    })
+                ).status,
+            ).toBe("REVOKED");
+            await expect(
+                members.acceptInvitation(invite.token, {
+                    id: users.LEAVER!,
+                    email: emails.LEAVER!,
+                }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(await membershipOf("LEAVER")).toBeNull();
+        });
+
+        it("accepting twice is the one acceptance", async () => {
+            await members.createInvitation(
+                storeId,
+                users.OWNER!,
+                emails.JOINER!,
+                "VIEWER",
+            );
+            const invite = await prisma.storeInvitation.findFirstOrThrow({
+                where: { storeId, email: emails.JOINER! },
+            });
+            const who = { id: users.JOINER!, email: emails.JOINER! };
+            const [a, b] = await Promise.all([
+                members.acceptInvitation(invite.token, who),
+                members.acceptInvitation(invite.token, who),
+            ]);
+            expect(a).toEqual({ storeId });
+            expect(b).toEqual({ storeId });
+            expect(await membershipOf("JOINER")).toEqual({
+                role: "storefront-team",
+            });
         });
     });
 });

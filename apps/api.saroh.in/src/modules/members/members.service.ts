@@ -289,11 +289,41 @@ export class MembersService {
             );
         }
 
+        // Accepting puts them on the business's team (F16), so the inviter
+        // must still be allowed to bring someone on — an invite sent before
+        // that rule, or by someone whose reach has since shrunk, is not
+        // enough on its own.
+        try {
+            await this.assertMayBringOntoTeam(
+                invite.storeId,
+                invite.invitedById,
+            );
+        } catch (err) {
+            if (!(err instanceof ForbiddenException)) throw err;
+            throw new ForbiddenException(
+                "This invitation can no longer be accepted. Ask the business for a new one.",
+            );
+        }
+
         // Already an owner? Just mark accepted, don't add a staff row.
         const alreadyOwner = await this.isOwner(invite.storeId, user.id);
         // One transaction: the storefront role, the team membership and its
         // Activity entry land together or not at all (DEC-048).
-        await prisma.$transaction(async (tx) => {
+        const outcome = await prisma.$transaction(async (tx) => {
+            // Claimed first, and only while still PENDING: a revoke (or a
+            // removal from the team) that landed meanwhile, or a second
+            // accept, changes nothing here.
+            const claimed = await tx.storeInvitation.updateMany({
+                where: { id: invite.id, status: "PENDING" },
+                data: { status: "ACCEPTED" },
+            });
+            if (claimed.count === 0) {
+                const now = await tx.storeInvitation.findUnique({
+                    where: { id: invite.id },
+                    select: { status: true },
+                });
+                return now?.status === "ACCEPTED" ? "already" : "gone";
+            }
             if (!alreadyOwner) {
                 await tx.storeMembers.upsert({
                     where: {
@@ -319,11 +349,11 @@ export class MembersService {
                 source: "invite",
                 actorUserId: user.id,
             });
-            await tx.storeInvitation.update({
-                where: { id: invite.id },
-                data: { status: "ACCEPTED" },
-            });
+            return "accepted";
         });
+        if (outcome === "gone") {
+            throw new NotFoundException("Invitation not found");
+        }
         return { storeId: invite.storeId };
     }
 
