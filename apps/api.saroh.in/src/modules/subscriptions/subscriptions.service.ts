@@ -16,6 +16,7 @@ import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
 import {
     collectionDates,
@@ -224,7 +225,8 @@ const SUBSCRIPTION_SELECT = {
     organizationId: true,
     status: true,
     planId: true,
-    plan: { select: { id: true, name: true } },
+    // Its classes a month, taken at each renewal (D10).
+    plan: { select: { id: true, name: true, classesPerMonth: true } },
     contactId: true,
     contact: {
         select: { id: true, firstName: true, lastName: true, email: true },
@@ -250,6 +252,7 @@ const SUBSCRIPTION_SELECT = {
             price: true,
             currency: true,
             interval: true,
+            classesPerMonth: true,
         },
     },
     createdAt: true,
@@ -283,6 +286,8 @@ interface Terms {
     price: string;
     currency: string;
     interval: Interval;
+    /** The plan's classes a month, which the period takes (D10). */
+    classesPerMonth: number | null;
 }
 
 /**
@@ -489,6 +494,9 @@ export class SubscriptionsService {
                         collectionWeekday: dto.collectionWeekday ?? null,
                         collectionNote: orNull(dto.collectionNote),
                         createdByUserId: ctx.userId,
+                        // The plan's classes a month, until the next
+                        // renewal takes them again (D10).
+                        ...allowanceData(plan.classesPerMonth, now),
                     },
                     select: { id: true },
                 });
@@ -704,6 +712,8 @@ export class SubscriptionsService {
                 currentPeriodStart: period.start,
                 currentPeriodEnd: period.end,
                 ...this.termsData(sub, terms),
+                // A new period is a renewal: it takes the classes too (D10).
+                ...allowanceData(terms.classesPerMonth, now),
             },
         });
         await this.logPlanChanged(log, sub, terms);
@@ -1229,6 +1239,9 @@ export class SubscriptionsService {
                     currentPeriodEnd: period.end,
                     ...(anchor !== sub.anchorAt ? { anchorAt: anchor } : {}),
                     ...this.termsData(sub, terms),
+                    // The new period's classes: the plan's as they stand
+                    // now, or the booked plan's (D10).
+                    ...allowanceData(terms.classesPerMonth, now),
                 },
             });
             await this.logPlanChanged(log, sub, terms);
@@ -1295,6 +1308,9 @@ export class SubscriptionsService {
             price: toMoneyString(sub.price),
             currency: sub.currency,
             interval: sub.interval as Interval,
+            // Price and interval are the subscription's own snapshot; its
+            // classes are the plan's as they stand now (D10).
+            classesPerMonth: sub.plan.classesPerMonth,
         };
         const next = sub.pendingPlan;
         if (!next) return own;
@@ -1313,6 +1329,7 @@ export class SubscriptionsService {
             price: toMoneyString(next.price),
             currency: next.currency,
             interval: next.interval as Interval,
+            classesPerMonth: next.classesPerMonth,
         };
     }
 
@@ -1655,7 +1672,7 @@ export class SubscriptionsService {
         return {
             id: row.id,
             status: row.status,
-            plan: row.plan,
+            plan: { id: row.plan.id, name: row.plan.name },
             contact: {
                 id: row.contact.id,
                 name: contactName(row.contact),
