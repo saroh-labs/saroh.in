@@ -357,4 +357,75 @@ test.describe("product editor", () => {
             await removeProducts(page.request, LEELA, taken);
         }
     });
+
+    test("how it's fulfilled: picked in Details, saved, and said on the product page (B12)", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const name = `Linen Table Runner ${testInfo.project.name}`;
+
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        await removeProducts(page.request, LEELA, name);
+
+        try {
+            const made = await page.request.post(api(""), {
+                headers: orgHeader,
+                data: { name, price: "1299", currency: "INR" },
+            });
+            expect(made.ok()).toBe(true);
+            const { id } = (await made.json()) as { id: string };
+
+            // 1. None picked: every way its storefronts offer.
+            await page.goto(
+                `/commerce/products/${id}/edit?storefront=${STORE}`,
+            );
+            const details = page.getByRole("region", {
+                name: /How to use|Ready time/,
+            });
+            const chips = details.getByRole("group", {
+                name: "How it's fulfilled",
+            });
+            for (const way of [
+                "Pick-up",
+                "Local delivery",
+                "Shipping",
+                "Digital",
+            ]) {
+                await expect(
+                    chips.getByRole("button", { name: way, exact: true }),
+                ).toHaveAttribute("aria-pressed", "false");
+            }
+            await expect(
+                details.getByText(/every way its storefronts offer/),
+            ).toBeVisible();
+
+            // 2. Shipping and Pick-up, picked out of order, save in table order.
+            await chips.getByRole("button", { name: "Shipping" }).click();
+            await chips.getByRole("button", { name: "Pick-up" }).click();
+            await expect(
+                details.getByText("An order with it offers only these ways."),
+            ).toBeVisible();
+            await details
+                .getByRole("button", { name: "Save", exact: true })
+                .click();
+            await expect(page.getByText("All changes saved")).toBeVisible();
+            const read = await page.request.get(api(`/${id}`), {
+                headers: orgHeader,
+            });
+            const { fulfilmentTypes } = (await read.json()) as {
+                fulfilmentTypes: string[];
+            };
+            expect(fulfilmentTypes).toEqual(["PICKUP", "SHIPPING"]);
+
+            // 3. The product page's Details says it.
+            await page.goto(`/commerce/products/${id}?storefront=${STORE}`);
+            await expect(
+                page.getByRole("heading", { name, level: 1 }),
+            ).toBeVisible();
+            await expect(page.getByText("Pick-up, Shipping")).toBeVisible();
+        } finally {
+            await removeProducts(page.request, LEELA, name);
+        }
+    });
 });

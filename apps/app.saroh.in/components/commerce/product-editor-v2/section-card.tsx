@@ -12,7 +12,7 @@ import { useEditor } from "./editor-state";
 const SAVES: Record<SectionKey, string> = {
     basics: "Saves the name, address, price and category.",
     description: "Saves the description and key points.",
-    details: "Saves how to use it and what it is made of.",
+    details: "Saves how to use it, what it is made of and how it's fulfilled.",
     madeby: "Saves who makes it, the warranty and the returns rule.",
     photos: "Saves the photos, the videos and their order.",
     visibility: "",

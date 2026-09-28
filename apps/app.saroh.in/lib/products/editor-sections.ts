@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isHsnSac, rateOption } from "@/lib/invoices/gst";
+import { inTableOrder } from "@/lib/products/fulfilment-types";
 import type {
     ProductDetail,
     ProductImage,
@@ -201,6 +202,9 @@ export const detailsSchema = z.object({
     materials: text(LIMITS.materials),
     showHowToUse: z.boolean(),
     showMaterials: z.boolean(),
+    fulfilmentTypes: z.array(
+        z.enum(["PICKUP", "LOCAL_DELIVERY", "SHIPPING", "DIGITAL"]),
+    ),
 });
 export type DetailsValues = z.infer<typeof detailsSchema>;
 
@@ -210,6 +214,7 @@ export function detailsFrom(p: ProductDetail): DetailsValues {
         materials: p.materials ?? "",
         showHowToUse: shown(p.shopFields, "howToUse"),
         showMaterials: shown(p.shopFields, "materials"),
+        fulfilmentTypes: inTableOrder(p.fulfilmentTypes ?? []),
     };
 }
 
@@ -222,6 +227,7 @@ export function detailsPatch(v: DetailsValues): ProductPatch {
             howToUse: v.showHowToUse,
             materials: v.showMaterials,
         },
+        fulfilmentTypes: inTableOrder(v.fulfilmentTypes),
     };
 }
 
