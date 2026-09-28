@@ -102,6 +102,15 @@ describe("redactUrl", () => {
         );
     });
 
+    it("hides an order pay link's token (B11)", () => {
+        expect(redactUrl("/public/order-pay/tok_ABC-123/payment-intent")).toBe(
+            "/public/order-pay/[token]/payment-intent",
+        );
+        expect(redactUrl("/public/order-pay/tok_ABC-123?x=1")).toBe(
+            "/public/order-pay/[token]?x=1",
+        );
+    });
+
     it("hides a pay-now hold's token (U19)", () => {
         expect(redactUrl("/public/services/holds/tok_ABC-123")).toBe(
             "/public/services/holds/[token]",

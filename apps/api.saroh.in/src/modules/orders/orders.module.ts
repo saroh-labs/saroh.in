@@ -6,6 +6,7 @@ import { DiscountsModule } from "../discounts/discounts.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { StoresModule } from "../stores/stores.module";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
@@ -21,7 +22,7 @@ import { OrganizationOrdersController } from "./organization-orders.controller";
         PaymentsModule,
     ],
     controllers: [OrdersController, OrganizationOrdersController],
-    providers: [OrdersService, OrderKitchenService],
+    providers: [OrdersService, OrderKitchenService, OrderPayLinkService],
     exports: [OrdersService],
 })
 export class OrdersModule {}

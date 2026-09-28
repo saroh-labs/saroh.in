@@ -7,10 +7,22 @@ import { env } from "../../env";
  * the modules that issue invoices do not load the app's env.
  */
 export function payLinkUrl(token: string): string {
+    return `${rendererBase()}/pay/${token}`;
+}
+
+/**
+ * Where a customer opens an order's pay link (plan B, B11): the same apex,
+ * `/pay/o/<token>` — an order's page, not an invoice's.
+ */
+export function orderPayLinkUrl(token: string): string {
+    return `${rendererBase()}/pay/o/${token}`;
+}
+
+function rendererBase(): string {
     const base =
         env.RENDERER_URL ??
         (env.NODE_ENV === "development"
             ? "https://saroh.app.localhost"
             : "https://saroh.app");
-    return `${base.replace(/\/$/, "")}/pay/${token}`;
+    return base.replace(/\/$/, "");
 }

@@ -192,7 +192,12 @@ describe("WebhooksService signature verification", () => {
         // Order.paymentStatus moved to PAID (through the state machine).
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "PAID" },
+            data: {
+                paymentStatus: "PAID",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
         // Intent settled + a CAPTURED attempt records the provider payment id.
         expect(intentUpdate).toHaveBeenCalledWith({
@@ -416,7 +421,12 @@ describe("WebhooksService refund settlement", () => {
         );
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "REFUNDED" },
+            data: {
+                paymentStatus: "REFUNDED",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
         // The refund path attached the provider's id and wrote the step.
         expect(orderEventCreate).not.toHaveBeenCalled();
@@ -462,7 +472,12 @@ describe("WebhooksService refund settlement", () => {
 
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "REFUNDED" },
+            data: {
+                paymentStatus: "REFUNDED",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
     });
 
