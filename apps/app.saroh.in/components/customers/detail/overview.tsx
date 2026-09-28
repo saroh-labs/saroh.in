@@ -40,6 +40,7 @@ export function Overview({
     onStop,
     onOrders,
     onBookings,
+    onSellPack,
 }: {
     d: CustomerDetail;
     /** Needs attention's card (C5), first: what to know before serving them. */
@@ -51,6 +52,8 @@ export function Overview({
     onStop: () => void;
     onOrders: (filter: OrderFilter) => void;
     onBookings: () => void;
+    /** Sell them a pack (C7); absent when this viewer may not. */
+    onSellPack?: () => void;
 }) {
     const rows = d.orders?.rows ?? [];
     const orders = d.orders !== undefined;
@@ -67,7 +70,7 @@ export function Overview({
             {d.bookings !== undefined ? (
                 <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
                     {d.stats.classesLeft !== undefined ? (
-                        <ClassesLeft d={d} now={now} />
+                        <ClassesLeft d={d} now={now} onSell={onSellPack} />
                     ) : null}
                     <NextBooking d={d} now={now} onAll={onBookings} />
                 </div>
@@ -196,7 +199,15 @@ function OrderTile({
     );
 }
 
-function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
+function ClassesLeft({
+    d,
+    now,
+    onSell,
+}: {
+    d: CustomerDetail;
+    now: Date;
+    onSell?: () => void;
+}) {
     const cl = d.stats.classesLeft;
     const m = cl?.allowance ?? null;
     // Its classes from the next renewal, when they change (D10).
@@ -206,12 +217,16 @@ function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
         <section className={CARD} aria-label="Classes left">
             <div className="flex items-baseline gap-2">
                 <span className={cn(LABEL, "flex-1")}>Classes left</span>
-                <Link
-                    href="/class-packs"
-                    className="text-[12.5px] font-semibold text-brand hover:text-foreground"
-                >
-                    Sell a pack
-                </Link>
+                {/* The sell dialog with them chosen (C7), not a trip away. */}
+                {onSell ? (
+                    <button
+                        type="button"
+                        onClick={onSell}
+                        className="rounded-[4px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
+                    >
+                        Sell a pack
+                    </button>
+                ) : null}
             </div>
             {cl ? (
                 <>
@@ -226,7 +241,7 @@ function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
                     {m ? (
                         <Link
                             href={`/billing/subscriptions/${m.subscriptionId}`}
-                            className="mt-2.5 block border-t border-foreground/10 pb-2 pt-2.5 text-foreground hover:text-brand"
+                            className="mt-2.5 block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-brand/80"
                         >
                             <div className="flex items-baseline gap-2.5">
                                 <span className="flex-1 text-[13.5px] font-semibold">
@@ -262,9 +277,10 @@ function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
                         </Link>
                     ) : null}
                     {packs.map((p) => (
-                        <div
+                        <Link
                             key={p.name + p.sub}
-                            className="border-t border-foreground/10 pb-2 pt-2.5"
+                            href={p.href}
+                            className="block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-brand/80"
                         >
                             <div className="flex items-baseline gap-2.5">
                                 <span className="flex-1 text-[13.5px] font-semibold">
@@ -285,7 +301,7 @@ function ClassesLeft({ d, now }: { d: CustomerDetail; now: Date }) {
                             >
                                 {p.sub}
                             </div>
-                        </div>
+                        </Link>
                     ))}
                     {!m && !packs.length ? (
                         <p className="mt-2 text-pretty text-[13px] text-muted-foreground">

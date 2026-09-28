@@ -181,12 +181,13 @@ describe("the tabs, by business kind", () => {
         ]);
     });
 
-    it("gives a bookings business Bookings and Membership", () => {
+    it("gives a bookings business Bookings, Packs and Membership", () => {
         const d = gym();
         expect(kindOf(d)).toBe("bookings");
         expect(tabsFor(d).map((t) => t.label)).toEqual([
             "Overview",
             "Bookings",
+            "Packs",
             "Membership",
             "Invoices",
             "Notes",
@@ -197,7 +198,39 @@ describe("the tabs, by business kind", () => {
         const d = gym();
         delete d.subscriptions;
         delete d.invoices;
+        delete d.packs;
         expect(tabsFor(d).map((t) => t.key)).toEqual(["over", "bk", "notes"]);
+    });
+
+    it("counts every pack on the Packs tab, and none when the read failed (C7)", () => {
+        const pack = {
+            id: "pp1",
+            pack: { id: "p", name: "10 classes" },
+            credits: 10,
+            used: 3,
+            left: 7,
+            expiresAt: "2026-10-12T00:00:00Z",
+            boughtAt: "2026-09-01T00:00:00Z",
+            standing: "ACTIVE" as const,
+        };
+        const withTwo = gym({
+            packs: {
+                from: "contact",
+                rows: [pack, { ...pack, id: "pp2", standing: "EXPIRED" }],
+            },
+        });
+        expect(tabsFor(withTwo).find((t) => t.key === "pk")?.count).toBe(2);
+        expect(
+            tabsFor(gym({ packs: null })).find((t) => t.key === "pk")?.count,
+        ).toBeNull();
+        // Class packs off, Appointments off, or no `pack:read`: no tab, and
+        // an old link to ?tab=pk opens Overview.
+        const none = gym();
+        delete none.packs;
+        const tabs = tabsFor(none);
+        expect(tabs.map((t) => t.key)).not.toContain("pk");
+        expect(tabFromQuery("pk", tabs)).toBe("over");
+        expect(tabFromQuery("pk", tabsFor(withTwo))).toBe("pk");
     });
 
     it("keeps a failed source's tab, without a count", () => {
@@ -217,6 +250,7 @@ describe("the tabs, by business kind", () => {
         expect(tabs.map((t) => t.key)).toEqual([
             "over",
             "bk",
+            "pk",
             "sub",
             "inv",
             "msg",
@@ -581,6 +615,8 @@ describe("a gym customer's bookings and classes", () => {
         expect(lines[0]).toEqual(
             expect.objectContaining({
                 name: "5 classes pack",
+                // Each opens its Pack Detail (C7).
+                href: "/class-packs/p",
                 left: "Ended",
                 sub: "Ran out 1 Sep with 2 unused",
             }),
