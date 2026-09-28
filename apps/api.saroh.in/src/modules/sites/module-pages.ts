@@ -120,3 +120,57 @@ export async function addableModulePageKinds(
     );
     return missing.filter((_, i) => states[i]?.state === "on");
 }
+
+/**
+ * A published module page's state as the live site reads it (G15): `on`
+ * draws it; `off` takes it out of the menu and shows "This isn't available
+ * right now" at its address. A module that isn't rolled out for the
+ * business is `off` too: the site never shows it (DEC-057), and never says
+ * which module it was.
+ */
+export type PublicModulePageState = "on" | "off";
+
+export type PublicModulePageStates = Partial<
+    Record<ModulePageKind, PublicModulePageState>
+>;
+
+/** The module page kinds a publication snapshot holds, in the menu's order. */
+export function snapshotModulePageKinds(snapshot: unknown): ModulePageKind[] {
+    const pages = (snapshot as { pages?: unknown } | null)?.pages;
+    if (!Array.isArray(pages)) return [];
+    const present = new Set<string>();
+    for (const page of pages) {
+        const kind = (page as { kind?: unknown } | null)?.kind;
+        if (typeof kind === "string") present.add(kind);
+    }
+    return MODULE_PAGE_KINDS.filter((kind) => present.has(kind));
+}
+
+/**
+ * Each module page's state, for the kinds a publication holds (G15). Read
+ * with the publication on every public read, so turning a module off takes
+ * its page off the site at once, without a republish.
+ *
+ * A snapshot with no module pages asks nothing and gets null, so a site
+ * without them reads exactly as it did before. A state that can't be read
+ * is left out, and the renderer then shows the page: it never guesses a
+ * module off, as the workspace's module gate fails open.
+ */
+export async function publicModulePageStates(
+    snapshot: unknown,
+    organizationId: string,
+): Promise<PublicModulePageStates | null> {
+    const kinds = snapshotModulePageKinds(snapshot);
+    if (kinds.length === 0) return null;
+    const states = await Promise.all(
+        kinds.map((kind) =>
+            modulePageState(kind, organizationId).catch(() => null),
+        ),
+    );
+    const out: PublicModulePageStates = {};
+    kinds.forEach((kind, i) => {
+        const state = states[i];
+        if (state) out[kind] = state.state === "on" ? "on" : "off";
+    });
+    return out;
+}

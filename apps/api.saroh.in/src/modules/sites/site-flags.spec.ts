@@ -784,6 +784,23 @@ describe("module pages and reserved addresses (G14)", () => {
         expect(reserved(flags)).toEqual([]);
     });
 
+    it("flags a free-form page at /account, which the account area's route owns (G15)", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "acct", path: "/account" }),
+                    page([], { id: "accounts", path: "/accounts" }),
+                ],
+            }),
+        );
+        expect(reserved(flags).map((f) => [f.pageId, f.message])).toEqual([
+            [
+                "acct",
+                "This page can't be seen: /account is where your customers see their account. Change its address so visitors can reach it.",
+            ],
+        ]);
+    });
+
     it("doesn't ask for a module page, or one kept out of the menu, to be added to it", () => {
         const flags = checkSite(
             site({

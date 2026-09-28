@@ -2,19 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
-import { PageSections } from "@saroh/site-blocks";
+import { PublishedPage } from "@/components/published-page";
+import { ModulePageUnavailable } from "@saroh/site-blocks";
 
-import { publicApiUrl } from "@/lib/api-url";
+import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
-    getJournalFeed,
     getPublishedPosts,
     getSiteForHost,
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
-import { getPlansFeed } from "@/lib/site-plans";
-import { getProductGridFeeds } from "@/lib/site-product-grids";
 
 /**
  * Tenant sub-page (S2-006).
@@ -117,23 +115,12 @@ export default async function SitePostPage({
         notFound();
     }
 
-    // The Journal's posts (G10), the plans on sale (G9) and each Product
-    // grid's products (G12), each read only when the page draws its block.
-    const [journal, plans, productGrids] = await Promise.all([
-        getJournalFeed(page.sections, snapshot, siteId),
-        getPlansFeed(page.sections, snapshot, siteId),
-        getProductGridFeeds(page.sections, siteId),
-    ]);
+    // A Prices, Journal or Contact page whose module is off (G15): said in
+    // words with a way home, so a shared link still lands somewhere. (Book
+    // and Shop pages never reach here: `/book` and `/shop` are routes.)
+    if (moduleOff(page, resolved.modules)) {
+        return <ModulePageUnavailable business={snapshot.site.name} />;
+    }
 
-    return (
-        <PageSections
-            sections={page.sections}
-            apiUrl={publicApiUrl()}
-            bookHref="/book"
-            siteId={siteId}
-            journal={journal}
-            plans={plans}
-            productGrids={productGrids}
-        />
-    );
+    return <PublishedPage page={page} snapshot={snapshot} siteId={siteId} />;
 }

@@ -1,15 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { PageSections } from "@saroh/site-blocks";
-
-import { publicApiUrl } from "@/lib/api-url";
-import {
-    findHomePage,
-    getJournalFeed,
-    getSiteForHost,
-} from "@/lib/publication";
-import { getPlansFeed } from "@/lib/site-plans";
-import { getProductGridFeeds } from "@/lib/site-product-grids";
+import { PublishedPage } from "@/components/published-page";
+import { findHomePage, getSiteForHost } from "@/lib/publication";
 
 /**
  * Tenant site home (S2-006).
@@ -38,23 +30,11 @@ export default async function SiteHomePage({
         notFound();
     }
 
-    // The Journal's posts (G10), the plans on sale (G9) and each Product
-    // grid's products (G12), each read only when the page draws its block.
-    const [journal, plans, productGrids] = await Promise.all([
-        getJournalFeed(home.sections, resolved.snapshot, resolved.siteId),
-        getPlansFeed(home.sections, resolved.snapshot, resolved.siteId),
-        getProductGridFeeds(home.sections, resolved.siteId),
-    ]);
-
     return (
-        <PageSections
-            sections={home.sections}
-            apiUrl={publicApiUrl()}
-            bookHref="/book"
+        <PublishedPage
+            page={home}
+            snapshot={resolved.snapshot}
             siteId={resolved.siteId}
-            journal={journal}
-            plans={plans}
-            productGrids={productGrids}
         />
     );
 }

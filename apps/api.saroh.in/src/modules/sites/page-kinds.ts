@@ -98,9 +98,17 @@ export const MODULE_PAGE_DEFAULTS: Record<ModulePageKind, KindDefaults> = {
  *
  * `/book` is the booking page and `/shop` the shop, each a route of its own
  * that a Book or Shop module page dresses; `/checkout` is where a customer
- * pays. Everything under them belongs to the route too (`/book/…`,
- * `/shop/<product>`, `/checkout/<order>`). Only the module page of that kind
- * may sit at the address itself, and nothing may sit under it.
+ * pays; `/account` is the customer's account area (G15). Everything under
+ * them belongs to the route too (`/book/…`, `/shop/<product>`,
+ * `/checkout/<order>`, `/account/bookings`). Only the module page of that
+ * kind may sit at the address itself, and nothing may sit under it.
+ *
+ * `/account` is reserved whether or not the account area is switched on
+ * (`SITE_ACCOUNT_AREA`, saroh.app's switch): the renderer's static
+ * `account` route wins over a page there either way, answering the area
+ * when it is on and a 404 when it is off, so a page at /account has never
+ * been seen since A5. Reserving it lets the editor say so rather than
+ * publish a page nobody can reach.
  *
  * `purpose` finishes the sentence "/book is …" in the merchant's words.
  */
@@ -112,6 +120,11 @@ export const RESERVED_PAGE_PATHS: readonly {
     { root: "/book", kind: "BOOK", purpose: "your booking page" },
     { root: "/shop", kind: "SHOP", purpose: "your shop" },
     { root: "/checkout", kind: null, purpose: "where your customers pay" },
+    {
+        root: "/account",
+        kind: null,
+        purpose: "where your customers see their account",
+    },
 ];
 
 /** The reserved address a path sits at or under, or null. */

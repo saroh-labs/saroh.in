@@ -203,6 +203,8 @@ export default async function SiteLayout({
             <SiteHeader
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}
+                // A module page leaves the menu while its module is off (G15).
+                modules={resolved.modules}
                 action={action}
                 account={account}
                 bag={bag}

@@ -1034,11 +1034,13 @@ describe("SitesService public read (drafts never leak)", () => {
             where: { subdomain: "acme", deletedAt: null },
             select: {
                 id: true,
+                organizationId: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
             },
         });
+        // No module pages: nothing is added to the read (G15).
         expect(result).toEqual({
             snapshot: { pages: [] },
             publishedAt,

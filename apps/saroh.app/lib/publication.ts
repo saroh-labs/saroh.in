@@ -1,7 +1,8 @@
-import type { JournalFeed } from "@saroh/site-blocks";
+import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 
 import { env } from "@/env";
 import { journalFeed } from "@/lib/journal-feed";
+import { modulePageStatesOf } from "@/lib/module-pages";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -47,6 +48,12 @@ export interface PublicationPage {
     title: string | null;
     isHome: boolean;
     sections: Section[];
+    /**
+     * A module page's kind (G14): `BOOK`, `SHOP`, `PRICES`, `JOURNAL` or
+     * `CONTACT`. Absent on a free-form page and on every page published
+     * before module pages (`lib/module-pages.ts`).
+     */
+    kind?: string;
 }
 
 /**
@@ -108,9 +115,11 @@ export interface PublicationSite {
     /**
      * The site's menu (#206), already RESOLVED by the publisher to labels and
      * paths over the pages in this snapshot. Absent or empty means no menu;
-     * the header then shows the site name alone, as it always has.
+     * the header then shows the site name alone, as it always has. A module
+     * page's entry carries its kind (G14), so the header can drop it while
+     * its module is off (G15).
      */
-    navigation?: { label: string; href: string }[] | null;
+    navigation?: { label: string; href: string; kind?: string }[] | null;
 }
 
 /**
@@ -129,12 +138,22 @@ interface PublicSiteView {
     publishedAt: string;
     /** Present since #232; the post routes ask for posts by it. */
     siteId?: string;
+    /**
+     * Whether each module page shows now (G15), read live beside the
+     * snapshot. Present only when the snapshot holds a module page.
+     */
+    modules?: unknown;
 }
 
-/** A resolved site: what to render, and the id its posts hang off (#232). */
+/**
+ * A resolved site: what to render, the id its posts hang off (#232), and
+ * whether each of its module pages shows now (G15; null when it has none,
+ * or from an API that predates them, and every page then shows).
+ */
 export interface ResolvedSite {
     snapshot: PublicationSnapshot;
     siteId: string | null;
+    modules: ModulePageStates | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -615,5 +634,9 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
     if (!res.ok) return null;
     const body = (await res.json().catch(() => null)) as PublicSiteView | null;
     if (!body?.snapshot) return null;
-    return { snapshot: body.snapshot, siteId: body.siteId ?? null };
+    return {
+        snapshot: body.snapshot,
+        siteId: body.siteId ?? null,
+        modules: modulePageStatesOf(body.modules),
+    };
 }

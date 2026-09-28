@@ -560,3 +560,60 @@ describe("module pages (G14, real database)", () => {
         ).rejects.toBeInstanceOf(ConflictException);
     });
 });
+
+describe("module pages on the public site read (G15, real database)", () => {
+    it("says each published module page is on while its module is", async () => {
+        const b = await business();
+        await sites.createPage(b.ctx, b.siteId, { kind: "BOOK" });
+        await sites.createPage(b.ctx, b.siteId, { kind: "JOURNAL" });
+        await sites.publishSite(b.ctx, b.siteId);
+
+        const view = await sites.getPublicationBySiteId(b.siteId);
+        expect(view.modules).toEqual({ BOOK: "on", JOURNAL: "on" });
+    });
+
+    it("says a Book page is off once Appointments is switched off, without a republish", async () => {
+        const b = await business();
+        await sites.createPage(b.ctx, b.siteId, { kind: "BOOK" });
+        await sites.publishSite(b.ctx, b.siteId);
+
+        await prisma.organizationModule.create({
+            data: {
+                organizationId: b.ctx.organizationId,
+                moduleKey: "APPOINTMENTS",
+                status: "DISABLED",
+            },
+        });
+        const view = await sites.getPublicationBySiteId(b.siteId);
+        expect(view.modules).toEqual({ BOOK: "off" });
+    });
+
+    it("says off, naming nothing, when the module is no longer rolled out (DEC-057)", async () => {
+        const b = await business();
+        await sites.createPage(b.ctx, b.siteId, { kind: "BOOK" });
+        await sites.publishSite(b.ctx, b.siteId);
+
+        await prisma.featureFlagOverride.deleteMany({
+            where: {
+                organizationId: b.ctx.organizationId,
+                flagKey: "MODULE_APPOINTMENTS",
+            },
+        });
+        const view = await sites.getPublicationBySiteId(b.siteId);
+        expect(view.modules).toEqual({ BOOK: "off" });
+    });
+
+    it("adds nothing to the read of a site without module pages", async () => {
+        const b = await business();
+        await freePage(b, "/about", "About");
+        await sites.publishSite(b.ctx, b.siteId);
+
+        const view = await sites.getPublicationBySiteId(b.siteId);
+        expect(view).not.toHaveProperty("modules");
+        expect(Object.keys(view).sort()).toEqual([
+            "publishedAt",
+            "siteId",
+            "snapshot",
+        ]);
+    });
+});
