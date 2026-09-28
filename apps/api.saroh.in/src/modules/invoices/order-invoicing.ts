@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { stateName } from "./gst-states";
@@ -365,6 +366,12 @@ async function writeCorrection(
     },
 ): Promise<{ id: string; number: string }> {
     const profile = await loadTaxProfile(tx, original.organizationId);
+    // A refund webhook can land after the person was merged (C9): the
+    // correction goes to the survivor, as the original did when the merge
+    // moved it. The bill-to below stays as printed on the original.
+    const contact = original.contactId
+        ? await resolveContact(tx, original.contactId, original.organizationId)
+        : null;
     // The series follows the business now; the paper follows the original.
     const number = await numberFor(
         tx,
@@ -382,7 +389,7 @@ async function writeCorrection(
             source: original.orderId ? "ORDER" : "MANUAL",
             relatedInvoiceId: original.id,
             orderId: original.orderId,
-            contactId: original.contactId,
+            contactId: contact?.id ?? null,
             paymentRefundId: extra.paymentRefundId ?? null,
             billToName: original.billToName,
             billToEmail: original.billToEmail,

@@ -4,6 +4,7 @@ import { Injectable } from "@nestjs/common";
 import type { CustomerAccount, Prisma } from "@saroh/database";
 
 import { reservedAccountEmail } from "../contacts/contact-email";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import {
     CustomerAccountRepository,
     normaliseAccountEmail,
@@ -15,8 +16,8 @@ import {
  * A4 owns this file. A2 built `linkOrCreate`, the one call a verified code
  * needs; A4 reviewed it against the plan, stamps a verified link, and adds
  * the workspace badge and "This isn't them" (`account-unlink.service.ts`,
- * `unlink-plan.ts`). C9 routes the contact through `resolveContact` at the
- * seam below (`resolveLinkTarget`).
+ * `unlink-plan.ts`). C9 routes the contact through `resolveContact`
+ * (`resolveLinkTarget`, below).
  *
  * The rule, for a verified email `e` in one business:
  * - an ACTIVE account holds `e` → sign in to it;
@@ -53,17 +54,19 @@ export function maskEmail(email: string): string {
 const MAX_MERGE_HOPS = 5;
 
 /**
- * THE SEAM FOR C9's `resolveContact`. Every contact id `linkOrCreate` links
- * an account to passes through here. Until C9 lands merges don't exist, so
- * the contact is itself; C9 replaces the body with
- * `resolveContact(tx, contactId)` (`FOR SHARE`, one hop through
- * `mergedIntoId`) so a sign-in racing a merge lands on the survivor.
+ * Every contact id `linkOrCreate` links an account to passes through here:
+ * C9's `resolveContact` (`FOR SHARE`, one hop through `mergedIntoId`), so a
+ * sign-in racing a merge lands on the survivor, and a merged-away contact
+ * is never linked. A contact that has gone (or been removed for privacy)
+ * resolves to null, and the sign-in makes a separate contact instead.
  */
-export function resolveLinkTarget(
-    _tx: Prisma.TransactionClient,
+export async function resolveLinkTarget(
+    tx: Prisma.TransactionClient,
     contactId: string,
-): Promise<string> {
-    return Promise.resolve(contactId);
+): Promise<string | null> {
+    const resolved = await resolveContact(tx, contactId);
+    if (!resolved || resolved.removed) return null;
+    return resolved.id;
 }
 
 @Injectable()
@@ -106,8 +109,10 @@ export class AccountLinkingService {
         }
 
         const holder = holders.length === 1 ? holders[0] : undefined;
-        if (holder?.emailVerifiedAt) {
-            const target = await resolveLinkTarget(tx, holder.id);
+        const target = holder?.emailVerifiedAt
+            ? await resolveLinkTarget(tx, holder.id)
+            : null;
+        if (target) {
             const taken = await this.accounts.findLiveForContact(
                 organizationId,
                 target,
