@@ -1,6 +1,5 @@
 import { hashClientIp } from "../../common/client-ip";
-import { signSiteRelay } from "../site-accounts/site-relay";
-import { visitorKey } from "./public-catalogue.controller";
+import { signSiteRelay, visitorKey } from "../site-accounts/site-relay";
 import {
     allergenText,
     blurbOf,

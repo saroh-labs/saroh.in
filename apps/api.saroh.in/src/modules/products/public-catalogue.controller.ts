@@ -1,12 +1,6 @@
 import { Controller, Get, Header, Headers, Ip, Param } from "@nestjs/common";
 
-import { hashClientIp } from "../../common/client-ip";
-import type { SiteRelay } from "../site-accounts/site-relay";
-import {
-    SITE_RELAY_HEADER,
-    verifySiteRelay,
-} from "../site-accounts/site-relay";
-import { siteRelaySecret } from "../site-accounts/site-secrets";
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type {
     PublicCatalogue,
     PublicProduct,
@@ -56,30 +50,5 @@ export class PublicCatalogueController {
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicProduct> {
         return this.catalogue.product(siteId, slug, visitorKey(ip, relay));
-    }
-}
-
-/**
- * The address a limit counts, hashed: the relayed visitor's when the relay
- * checks, else the caller's own.
- */
-export function visitorKey(
-    ip: string | undefined,
-    relay: string | undefined,
-    secret: () => string = siteRelaySecret,
-): string | undefined {
-    if (relay) {
-        const checked = relayOrNull(relay, secret);
-        if (checked) return checked.clientHash;
-    }
-    return hashClientIp(ip);
-}
-
-function relayOrNull(relay: string, secret: () => string): SiteRelay | null {
-    try {
-        return verifySiteRelay(relay, secret());
-    } catch {
-        // No secret configured on this instance: count the caller instead.
-        return null;
     }
 }
