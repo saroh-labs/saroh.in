@@ -48,7 +48,10 @@ import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { AuditService } from "../audit/audit.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { OrganizationContextService } from "../organizations/organization-context.service";
+import { OrganizationMembersService } from "../organizations/organization-members.service";
 import type { OrgAction } from "../organizations/organization-policy";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
@@ -522,5 +525,64 @@ describe("the storefront's status write: order:edit, and order:refund to cancel"
                 }),
             ),
         ).toBe(cancel);
+    });
+});
+
+/**
+ * A person's extra permissions (F17, DEC-039): a Member given `order:refund`
+ * refunds and still can't edit an order, resolved the way the guard resolves
+ * every request, and loses it on the next request once it is taken away.
+ */
+describe("an extra permission for one person (F17)", () => {
+    const contexts = new OrganizationContextService();
+    const audit = { record: jest.fn() } as unknown as AuditService;
+    const members = new OrganizationMembersService(audit);
+    let memberId = "";
+
+    beforeAll(async () => {
+        memberId = (
+            await prisma.user.create({
+                data: { email: `f17-member-${tag}@example.com` },
+            })
+        ).id;
+        await prisma.membership.create({
+            data: { organizationId: orgId, userId: memberId, role: "MEMBER" },
+        });
+    });
+
+    it("refunds, still can't edit, and loses it when taken away", async () => {
+        const owner = await contexts.resolve(ownerId, orgId);
+        await members.setExtraActions(owner, memberId, {
+            actions: ["order:refund"],
+        });
+
+        const given = await contexts.resolve(memberId, orgId);
+        const id = await freshOrder();
+        expect(
+            await gate(() =>
+                controller.cancel(given, id, {
+                    idempotencyKey: `f17-${id}`,
+                }),
+            ),
+        ).toBe("allowed");
+        const other = await freshOrder();
+        expect(
+            await gate(() =>
+                controller.edit(given, other, { notes: "No sesame" }),
+            ),
+        ).toBe("refused");
+        // The refund shows the order it refunds (implied `order:read`).
+        expect(await gate(() => controller.read(given, other))).toBe("allowed");
+
+        await members.setExtraActions(owner, memberId, { actions: [] });
+        const taken = await contexts.resolve(memberId, orgId);
+        const third = await freshOrder();
+        expect(
+            await gate(() =>
+                controller.cancel(taken, third, {
+                    idempotencyKey: `f17-${third}`,
+                }),
+            ),
+        ).toBe("refused");
     });
 });

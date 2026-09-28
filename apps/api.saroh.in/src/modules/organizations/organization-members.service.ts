@@ -21,13 +21,21 @@ import {
 } from "../audit/audit.service";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
-import type { InviteMemberDto, UpdateMemberRoleDto } from "./members.dto";
+import type {
+    InviteMemberDto,
+    SetExtraActionsDto,
+    UpdateMemberRoleDto,
+} from "./members.dto";
 import type { OrgAction } from "./organization-actions";
 import {
     allows,
     authorize,
+    extraActionsFor,
     isBuiltInRole,
+    isNeverExtra,
+    outOfReach,
     resolveCapabilities,
+    REVIEWER_EXTRA_ACTIONS,
     withinReach,
 } from "./organization-policy";
 
@@ -71,6 +79,14 @@ export interface MemberView {
      * left out.
      */
     storefronts: StorefrontRoleView[];
+    /**
+     * What this person holds beyond their role (F17, DEC-039): their extra
+     * permissions as action keys, leaving out any their role already grants
+     * (an extra the role gives is not an extra) and anything that can't be
+     * held as one. Empty for almost everyone; Team shows its column only
+     * when someone has one.
+     */
+    extraActions: OrgAction[];
 }
 
 export interface StorefrontRoleView {
@@ -123,13 +139,14 @@ export class OrganizationMembersService {
         authorize(ctx, "member:read");
         const seesActivity = allows(ctx, "member:remove");
 
-        const [memberships, grants, storefrontRoles, sessions] =
+        const [memberships, grants, storefrontRoles, sessions, roleRows] =
             await Promise.all([
                 prisma.membership.findMany({
                     where: { organizationId: ctx.organizationId },
                     select: {
                         userId: true,
                         role: true,
+                        extraActions: true,
                         user: { select: { name: true, email: true } },
                     },
                 }),
@@ -169,8 +186,15 @@ export class OrganizationMembersService {
                           _max: { updatedAt: true },
                       })
                     : Promise.resolve([]),
+                // The business's own roles, to leave out of each person's
+                // extras whatever their role already grants (F17).
+                prisma.organizationRole.findMany({
+                    where: { organizationId: ctx.organizationId },
+                    select: { key: true, actions: true },
+                }),
             ]);
 
+        const roleActions = new Map(roleRows.map((r) => [r.key, r.actions]));
         const lastActive = new Map(
             sessions.map((s) => [s.userId, s._max.updatedAt]),
         );
@@ -200,6 +224,13 @@ export class OrganizationMembersService {
             isSelf: m.userId === ctx.userId,
             lastActiveAt: lastActive.get(m.userId) ?? null,
             storefronts: storefrontsOf.get(m.userId) ?? [],
+            // A built-in's permissions are the shipped policy (a stored row
+            // for one is a rename at most), as the reach checks read them.
+            extraActions: extrasBeyondRole(
+                m.role,
+                isBuiltInRole(m.role) ? null : roleActions.get(m.role),
+                m.extraActions,
+            ),
         }));
     }
 
@@ -545,14 +576,21 @@ export class OrganizationMembersService {
         // Both ends. Changing someone who can do more than you is how a role
         // takes over the business from below; giving a role that can do more
         // than you is how it promotes itself.
+        // The person as they stand counts their extras (F17): someone given
+        // more than their role is judged on everything they can do.
         await this.assertWithinReach(ctx, membership.role, "change", {
             mustExist: false,
+            extras: membership.extraActions,
         });
         await this.assertWithinReach(ctx, dto.role, "give someone");
         const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
         if (membership.role === "OWNER" && dto.role !== "OWNER") {
             await this.assertNotLastOwner(ctx.organizationId, userId, "demote");
         }
+        // A Reviewer holds nothing beyond the website (DEC-006): moving
+        // someone to Reviewer drops any extra that isn't a review power.
+        const kept = extraActionsFor(dto.role, membership.extraActions);
+        const extrasChanged = kept.length !== membership.extraActions.length;
 
         await prisma.$transaction(
             async (tx) => {
@@ -563,7 +601,10 @@ export class OrganizationMembersService {
                             userId,
                         },
                     },
-                    data: { role: dto.role },
+                    data: {
+                        role: dto.role,
+                        ...(extrasChanged ? { extraActions: kept } : {}),
+                    },
                 });
                 // Replaced outright, and dropped entirely for a role that is
                 // not REVIEWER: a stale grant would keep a former reviewer's
@@ -612,6 +653,144 @@ export class OrganizationMembersService {
     }
 
     /**
+     * Set a person's extra permissions: the whole list they should hold
+     * beyond their role (F17, DEC-039; permission matrix §5).
+     *
+     * `member:role:update` is necessary, not sufficient. The reach rule holds
+     * for every actor, an Owner included:
+     *
+     *  - nobody changes their own extras — an owner who wants more changes
+     *    role, through someone else;
+     *  - nobody changes the extras of someone who can already do more than
+     *    they can (the person's role AND current extras, implied holds
+     *    counted), the rule role changes already follow;
+     *  - nobody gives what they don't hold: everything the person could do
+     *    afterwards must be within the actor's reach, implied holds counted,
+     *    so an extra can't carry a power it implies past the rule;
+     *  - an owner-only power (closing the business) is never an extra, and a
+     *    Reviewer is given nothing beyond reviewing websites (DEC-006).
+     *
+     * An extra the role already grants is not stored. Taking one away is
+     * always within reach once the person is. The write is conditional on the
+     * role and the list being as they were checked, so a change made by
+     * someone else in between is never silently overwritten. Every change is
+     * audited, naming who made it, what was given and what was taken away.
+     */
+    async setExtraActions(
+        ctx: OrganizationContext,
+        userId: string,
+        dto: SetExtraActionsDto,
+    ) {
+        if (!allows(ctx, "member:role:update")) {
+            throw new ForbiddenException(
+                "Your role can't change what people can do.",
+            );
+        }
+        if (userId === ctx.userId) {
+            throw new ForbiddenException(
+                "Your role can't change your own permissions — no role can. Ask someone else on the team.",
+            );
+        }
+
+        const membership = await this.requireMembership(ctx, userId);
+        const wanted = [...new Set(dto.actions)].filter((a): a is OrgAction =>
+            CAPABILITY_BY_ACTION.has(a as OrgAction),
+        );
+
+        const ownerOnly = wanted.filter(isNeverExtra);
+        if (ownerOnly.length > 0) {
+            throw new BadRequestException(
+                `${listed(labelsOf(ownerOnly))} stays with the owner. It can't be given as an extra permission.`,
+            );
+        }
+        if (
+            membership.role === "REVIEWER" &&
+            wanted.some((a) => !REVIEWER_EXTRA_ACTIONS.includes(a))
+        ) {
+            throw new BadRequestException(
+                "A reviewer only looks at the websites they were asked to review, so they can't be given anything beyond that.",
+            );
+        }
+
+        const { organizationId } = ctx;
+        const [roleSet, before] = await Promise.all([
+            this.actionsOf(organizationId, membership.role, false),
+            this.actionsOf(
+                organizationId,
+                membership.role,
+                false,
+                membership.extraActions,
+            ),
+        ]);
+        if (!withinReach(ctx, before)) {
+            throw new ForbiddenException(
+                "Your role can't change the permissions of someone who can do more than you can.",
+            );
+        }
+
+        const next = wanted.filter((a) => !roleSet.has(a)).sort();
+        const after = await this.actionsOf(
+            organizationId,
+            membership.role,
+            false,
+            next,
+        );
+        const beyond = outOfReach(ctx, after);
+        if (beyond.length > 0) {
+            const ticked = beyond.filter((a) => next.includes(a));
+            throw new ForbiddenException(
+                `Your role can't give a permission you don't have: ${listed(labelsOf(ticked.length > 0 ? ticked : beyond))}.`,
+            );
+        }
+
+        const current = extraActionsFor(
+            membership.role,
+            membership.extraActions,
+        ).filter((a) => !roleSet.has(a));
+        const given = next.filter((a) => !current.includes(a));
+        const taken = current.filter((a) => !next.includes(a));
+        if (given.length === 0 && taken.length === 0) {
+            return { userId, extraActions: next };
+        }
+
+        const { count } = await prisma.membership.updateMany({
+            where: {
+                organizationId,
+                userId,
+                role: membership.role,
+                extraActions: { equals: membership.extraActions },
+            },
+            data: { extraActions: next },
+        });
+        if (count === 0) {
+            throw new ConflictException(
+                "Someone changed this person's role or permissions while you were editing. Reload to see them, then try again.",
+            );
+        }
+
+        await this.audit.record({
+            action: AuditAction.MembershipExtrasUpdate,
+            actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
+            organizationId,
+            targetType: "membership",
+            targetId: userId,
+            outcome: AuditOutcome.Success,
+            // Keys to read back, labels to say in Activity as they were
+            // called when it happened.
+            metadata: {
+                role: membership.role,
+                given,
+                taken,
+                givenLabels: labelsOf(given),
+                takenLabels: labelsOf(taken),
+            },
+        });
+
+        return { userId, extraActions: next };
+    }
+
+    /**
      * Remove someone from the organization.
      *
      * Their share links go with them (#284): a preview link is a URL that works
@@ -633,6 +812,7 @@ export class OrganizationMembersService {
         const membership = await this.requireMembership(ctx, userId);
         await this.assertWithinReach(ctx, membership.role, "remove", {
             mustExist: false,
+            extras: membership.extraActions,
         });
         if (membership.role === "OWNER") {
             await this.assertNotLastOwner(ctx.organizationId, userId, "remove");
@@ -728,7 +908,7 @@ export class OrganizationMembersService {
                     userId,
                 },
             },
-            select: { role: true },
+            select: { role: true, extraActions: true },
         });
         if (!membership) {
             throw new NotFoundException(
@@ -823,27 +1003,39 @@ export class OrganizationMembersService {
         ctx: OrganizationContext,
         roleKey: string,
         verb: string,
-        { mustExist = true }: { mustExist?: boolean } = {},
+        {
+            mustExist = true,
+            extras,
+        }: { mustExist?: boolean; extras?: readonly string[] } = {},
     ): Promise<void> {
         const theirs = await this.actionsOf(
             ctx.organizationId,
             roleKey,
             mustExist,
+            extras,
         );
         if (!withinReach(ctx, theirs)) {
             throw new ForbiddenException(
-                `You cannot ${verb} a role that can do more than you can.`,
+                extras && extraActionsFor(roleKey, extras).length > 0
+                    ? `You cannot ${verb} someone who can do more than you can.`
+                    : `You cannot ${verb} a role that can do more than you can.`,
             );
         }
     }
 
-    /** What a role in this business may do; 400 if it must exist and does not. */
+    /**
+     * What a role in this business may do, with a person's extras when
+     * given (F17); 400 if the role must exist and does not.
+     */
     private async actionsOf(
         organizationId: string,
         roleKey: string,
         mustExist: boolean,
+        extras?: readonly string[],
     ): Promise<ReadonlySet<OrgAction>> {
-        if (isBuiltInRole(roleKey)) return resolveCapabilities(roleKey);
+        if (isBuiltInRole(roleKey)) {
+            return resolveCapabilities(roleKey, null, extras);
+        }
         const row = await prisma.organizationRole.findUnique({
             where: { organizationId_key: { organizationId, key: roleKey } },
             select: { actions: true },
@@ -854,8 +1046,34 @@ export class OrganizationMembersService {
                 field: "role",
             });
         }
-        return resolveCapabilities(roleKey, row?.actions);
+        return resolveCapabilities(roleKey, row?.actions, extras);
     }
+}
+
+/**
+ * A person's extras that add something: what can be held as an extra
+ * (`extraActionsFor`), less whatever their role already grants. An extra the
+ * role gives is not an extra; Team never shows one as such.
+ */
+function extrasBeyondRole(
+    roleKey: string,
+    stored: readonly string[] | null | undefined,
+    extras: readonly string[],
+): OrgAction[] {
+    const own = extraActionsFor(roleKey, extras);
+    if (own.length === 0) return [];
+    const role = resolveCapabilities(roleKey, stored);
+    return own.filter((a) => !role.has(a)).sort();
+}
+
+/** Permissions as the owner reads them: "Refund orders, See invoices". */
+function labelsOf(actions: readonly OrgAction[]): string[] {
+    return actions.map((a) => CAPABILITY_BY_ACTION.get(a)?.label ?? a);
+}
+
+/** "Refund orders, See invoices and Export orders". */
+function listed(labels: readonly string[]): string {
+    return new Intl.ListFormat("en", { type: "conjunction" }).format(labels);
 }
 
 /** Narrow a stored role string, defaulting the unrecognized to MEMBER. */

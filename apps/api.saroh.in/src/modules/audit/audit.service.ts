@@ -15,6 +15,10 @@ export const AuditAction = {
     MembershipAccept: "membership.accept",
     MembershipRemove: "membership.remove",
     MembershipRoleUpdate: "membership.role.update",
+    // A person's extra permissions given or taken away (F17, DEC-039),
+    // naming who did it. Metadata lists the action keys and their labels
+    // (`given`, `taken`, `givenLabels`, `takenLabels`) and the person's role.
+    MembershipExtrasUpdate: "membership.extras.update",
     // Someone on a storefront put on the business's team as Storefront team
     // (F16, DEC-048), by accepting a storefront invite or by the backfill.
     // Written in the join's own transaction by `joinTeamFromStorefront`

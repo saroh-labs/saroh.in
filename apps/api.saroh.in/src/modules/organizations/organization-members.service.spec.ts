@@ -9,6 +9,7 @@ jest.mock("@saroh/database", () => ({
             count: jest.fn(),
             upsert: jest.fn(),
             update: jest.fn(),
+            updateMany: jest.fn(),
             delete: jest.fn(),
         },
         organizationInvitation: {
@@ -30,7 +31,7 @@ jest.mock("@saroh/database", () => ({
         storeInvitation: { updateMany: jest.fn() },
         user: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
-        organizationRole: { findUnique: jest.fn() },
+        organizationRole: { findUnique: jest.fn(), findMany: jest.fn() },
         $transaction: jest.fn(),
     },
 }));
@@ -39,6 +40,12 @@ jest.mock("../../common/email", () => ({
     sendOrganizationInvitationEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { sendOrganizationInvitationEmail } from "../../common/email";
@@ -47,8 +54,10 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
 import { OrganizationMembersService } from "./organization-members.service";
+import { builtInActions, resolveCapabilities } from "./organization-policy";
 
 const db = prisma as unknown as {
     membership: Record<string, jest.Mock>;
@@ -97,6 +106,8 @@ beforeEach(() => {
     db.storeMembers.deleteMany.mockResolvedValue({ count: 0 });
     db.storeInvitation.updateMany.mockResolvedValue({ count: 0 });
     db.user.findUnique.mockResolvedValue({ email: "leaver@example.test" });
+    db.organizationRole.findMany.mockResolvedValue([]);
+    db.membership.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("who may touch the roster", () => {
@@ -476,7 +487,10 @@ describe("accepting", () => {
 
 describe("the last owner", () => {
     it("cannot be demoted", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         db.membership.count.mockResolvedValue(0);
 
         await expect(
@@ -486,7 +500,10 @@ describe("the last owner", () => {
     });
 
     it("cannot be removed", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         db.membership.count.mockResolvedValue(0);
 
         await expect(service.remove(ctx(), "user_owner")).rejects.toThrow(
@@ -496,7 +513,10 @@ describe("the last owner", () => {
     });
 
     it("can be demoted once there is another owner", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         db.membership.count.mockResolvedValue(1);
 
         await service.updateRole(ctx(), "user_owner", { role: "ADMIN" });
@@ -509,7 +529,10 @@ describe("the last owner", () => {
 
 describe("changing a role", () => {
     it("drops every reviewer grant when the role is no longer REVIEWER", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "REVIEWER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
 
         await service.updateRole(ctx(), "user_2", { role: "MEMBER" });
 
@@ -521,7 +544,10 @@ describe("changing a role", () => {
     });
 
     it("replaces the granted sites rather than adding to them", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "REVIEWER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
         db.site.findMany.mockResolvedValue([{ id: "site_2" }]);
 
         await service.updateRole(ctx(), "user_2", {
@@ -545,7 +571,10 @@ describe("changing a role", () => {
 
 describe("removing someone", () => {
     beforeEach(() => {
-        db.membership.findUnique.mockResolvedValue({ role: "REVIEWER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
     });
 
     it("takes their grants and their live share links with them", async () => {
@@ -583,7 +612,10 @@ describe("removing someone", () => {
     });
 
     it("keeps an only owner's storefront roles when refusing to remove them", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         db.membership.count.mockResolvedValue(0);
 
         await expect(service.remove(ctx(), "user_owner")).rejects.toThrow(
@@ -593,7 +625,10 @@ describe("removing someone", () => {
     });
 
     it("checks the last owner again inside the transaction", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         // Another owner before the transaction; none left inside it.
         db.membership.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
 
@@ -677,7 +712,10 @@ describe("invented roles on the roster", () => {
     });
 
     it("will not let an invented role promote anyone to Admin", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "stock-clerk" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "stock-clerk",
+            extraActions: [],
+        });
         db.organizationRole.findUnique.mockResolvedValue({
             actions: ["member:role:update"],
         });
@@ -690,7 +728,10 @@ describe("invented roles on the roster", () => {
 
     it("will not let an invented role change the Owner", async () => {
         // Demoting from below is the other half of a takeover.
-        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
         const actor = clerk(["member:role:update"]);
         await expect(
             service.updateRole(actor, "user_owner", { role: "MEMBER" }),
@@ -699,7 +740,10 @@ describe("invented roles on the roster", () => {
     });
 
     it("will not let an invented role remove an Admin", async () => {
-        db.membership.findUnique.mockResolvedValue({ role: "ADMIN" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "ADMIN",
+            extraActions: [],
+        });
         const actor = clerk(["member:remove", "member:read"]);
         await expect(service.remove(actor, "user_admin")).rejects.toThrow(
             /cannot remove a role that can do more/,
@@ -710,7 +754,10 @@ describe("invented roles on the roster", () => {
     it("lets a role act on roles within its own reach", async () => {
         // A shift lead with the roster and orders may move someone onto the
         // Stock clerk role, which can do less than they can.
-        db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+        });
         db.organizationRole.findUnique.mockResolvedValue({
             actions: ["order:read"],
         });
@@ -741,7 +788,10 @@ describe("invented roles on the roster", () => {
     it("still lets someone be changed whose role was since removed", async () => {
         // Their current key names nothing; it resolves to the floor instead of
         // locking them into a role nobody can edit them out of.
-        db.membership.findUnique.mockResolvedValue({ role: "deleted-role" });
+        db.membership.findUnique.mockResolvedValue({
+            role: "deleted-role",
+            extraActions: [],
+        });
         await service.updateRole(ctx("OWNER"), "user_x", { role: "MEMBER" });
         expect(db.membership.update).toHaveBeenCalled();
     });
@@ -750,14 +800,20 @@ describe("invented roles on the roster", () => {
         it("an Admin can no longer make someone an Owner", async () => {
             // Deliberate: Owner can close the business and Admin cannot. An
             // Owner is made by an Owner.
-            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            db.membership.findUnique.mockResolvedValue({
+                role: "MEMBER",
+                extraActions: [],
+            });
             await expect(
                 service.updateRole(ctx("ADMIN"), "user_x", { role: "OWNER" }),
             ).rejects.toThrow(/can do more than you can/);
         });
 
         it("an Owner still can", async () => {
-            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            db.membership.findUnique.mockResolvedValue({
+                role: "MEMBER",
+                extraActions: [],
+            });
             await service.updateRole(ctx("OWNER"), "user_x", { role: "OWNER" });
             expect(db.membership.update.mock.calls[0][0].data).toEqual({
                 role: "OWNER",
@@ -765,7 +821,10 @@ describe("invented roles on the roster", () => {
         });
 
         it("an Admin can still manage everyone below Owner", async () => {
-            db.membership.findUnique.mockResolvedValue({ role: "MEMBER" });
+            db.membership.findUnique.mockResolvedValue({
+                role: "MEMBER",
+                extraActions: [],
+            });
             await service.updateRole(ctx("ADMIN"), "user_x", { role: "ADMIN" });
             expect(db.membership.update).toHaveBeenCalled();
         });
@@ -819,5 +878,272 @@ describe("preview — the role an invitation actually grants", () => {
         expect(preview.roleLabel).toBeNull();
         expect(preview.grants).toBeNull();
         expect(db.organizationRole.findUnique).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * Extra permissions per person (F17, DEC-039; matrix §5). `member:role:update`
+ * is necessary, not sufficient: the reach rule holds for every actor.
+ */
+describe("extra permissions per person (F17)", () => {
+    /**
+     * A custom "Manager": a Member's bundle, plus reading orders and
+     * changing and removing people. It can't refund.
+     */
+    const MANAGER = [
+        ...builtInActions("MEMBER"),
+        "order:read",
+        "member:role:update",
+        "member:remove",
+    ];
+    const manager = (): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "user_manager",
+        role: "MEMBER",
+        roleKey: "manager",
+        actions: resolveCapabilities("manager", MANAGER),
+    });
+    const admin = (): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "user_admin",
+        role: "ADMIN",
+        roleKey: "ADMIN",
+    });
+    const person = (role: string, extraActions: string[] = []) =>
+        db.membership.findUnique.mockResolvedValue({ role, extraActions });
+    const audited = () =>
+        (audit.record as jest.Mock).mock.calls.filter(
+            ([e]) => e.action === "membership.extras.update",
+        );
+
+    it("lets an Admin give a Member a power they hold, and audits it", async () => {
+        person("MEMBER");
+
+        const res = await service.setExtraActions(admin(), "user_2", {
+            actions: ["payment:manage"],
+        });
+
+        expect(res).toEqual({
+            userId: "user_2",
+            extraActions: ["payment:manage"],
+        });
+        expect(db.membership.updateMany).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                userId: "user_2",
+                role: "MEMBER",
+                extraActions: { equals: [] },
+            },
+            data: { extraActions: ["payment:manage"] },
+        });
+        const [[event]] = audited();
+        expect(event).toMatchObject({
+            actorUserId: "user_admin",
+            organizationId: "org_1",
+            targetType: "membership",
+            targetId: "user_2",
+            outcome: "SUCCESS",
+            metadata: {
+                role: "MEMBER",
+                given: ["payment:manage"],
+                taken: [],
+                // In the owner's words, as the catalogue says it.
+                givenLabels: [
+                    CAPABILITY_BY_ACTION.get("payment:manage")?.label,
+                ],
+            },
+        });
+    });
+
+    it("audits a removal, and takes the power away", async () => {
+        person("MEMBER", ["order:refund"]);
+
+        const res = await service.setExtraActions(admin(), "user_2", {
+            actions: [],
+        });
+
+        expect(res.extraActions).toEqual([]);
+        expect(db.membership.updateMany.mock.calls[0][0].data).toEqual({
+            extraActions: [],
+        });
+        expect(audited()[0][0].metadata).toMatchObject({
+            given: [],
+            taken: ["order:refund"],
+            takenLabels: [expect.stringMatching(/refund/i)],
+        });
+    });
+
+    it("refuses org:delete as an extra (400), even from an Owner", async () => {
+        person("ADMIN");
+        await expect(
+            service.setExtraActions(ctx("OWNER"), "user_2", {
+                actions: ["org:delete"],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses anyone without member:role:update (403), in words", async () => {
+        person("MEMBER");
+        await expect(
+            service.setExtraActions(ctx("MEMBER"), "user_2", {
+                actions: ["order:refund"],
+            }),
+        ).rejects.toThrow("Your role can't change what people can do.");
+    });
+
+    it("refuses a Manager giving a power they don't hold (403)", async () => {
+        person("MEMBER");
+        const refused = service.setExtraActions(manager(), "user_2", {
+            actions: ["order:refund"],
+        });
+        await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+            service.setExtraActions(manager(), "user_2", {
+                actions: ["order:refund"],
+            }),
+        ).rejects.toThrow(/^Your role can't give a permission you don't have/);
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("counts implied holds: an extra can't carry a power past the rule", async () => {
+        // The Manager holds order:read, but not what payment:manage implies.
+        person("MEMBER");
+        await expect(
+            service.setExtraActions(manager(), "user_2", {
+                actions: ["payment:manage"],
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("lets a Manager give what they hold", async () => {
+        person("MEMBER");
+        await expect(
+            service.setExtraActions(manager(), "user_2", {
+                actions: ["order:read"],
+            }),
+        ).resolves.toEqual({ userId: "user_2", extraActions: ["order:read"] });
+    });
+
+    it("refuses anyone, an Owner included, setting their own extras (403)", async () => {
+        person("OWNER");
+        for (const actor of [ctx("OWNER"), admin(), manager()]) {
+            await expect(
+                service.setExtraActions(actor, actor.userId, { actions: [] }),
+            ).rejects.toThrow(/your own permissions/);
+        }
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a Manager changing an Admin's extras, even one they hold (403)", async () => {
+        person("ADMIN");
+        await expect(
+            service.setExtraActions(manager(), "user_admin", {
+                actions: ["order:read"],
+            }),
+        ).rejects.toThrow(/someone who can do more than you can/);
+    });
+
+    it("counts a person's current extras when judging who they are", async () => {
+        // A Member the Manager could reach by role, but given a refund.
+        person("MEMBER", ["order:refund"]);
+        await expect(
+            service.setExtraActions(manager(), "user_2", { actions: [] }),
+        ).rejects.toThrow(/someone who can do more than you can/);
+        await expect(
+            service.updateRole(manager(), "user_2", { role: "MEMBER" }),
+        ).rejects.toThrow(/someone who can do more than you can/);
+        await expect(service.remove(manager(), "user_2")).rejects.toThrow(
+            /can do more than you can/,
+        );
+    });
+
+    it("gives a Reviewer nothing beyond reviewing websites (400)", async () => {
+        person("REVIEWER");
+        await expect(
+            service.setExtraActions(admin(), "user_2", {
+                actions: ["payment:read"],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("stores nothing the role already grants, and skips a no-op", async () => {
+        person("MEMBER");
+        const res = await service.setExtraActions(admin(), "user_2", {
+            actions: ["booking:read", "contact:read"],
+        });
+        expect(res.extraActions).toEqual([]);
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+        expect(audited()).toHaveLength(0);
+    });
+
+    it("refuses to overwrite a change made meanwhile (409)", async () => {
+        person("MEMBER");
+        db.membership.updateMany.mockResolvedValueOnce({ count: 0 });
+        await expect(
+            service.setExtraActions(admin(), "user_2", {
+                actions: ["order:refund"],
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(audited()).toHaveLength(0);
+    });
+
+    it("404s someone not in the business", async () => {
+        db.membership.findUnique.mockResolvedValue(null);
+        await expect(
+            service.setExtraActions(admin(), "user_gone", { actions: [] }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("drops a non-review extra when someone is made a Reviewer", async () => {
+        person("MEMBER", ["order:refund"]);
+        db.site.findMany.mockResolvedValue([{ id: "site_1" }]);
+
+        await service.updateRole(ctx("OWNER"), "user_2", {
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+
+        expect(db.membership.update.mock.calls[0][0].data).toEqual({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+    });
+
+    it("keeps extras through any other role change", async () => {
+        person("MEMBER", ["order:refund"]);
+        await service.updateRole(ctx("OWNER"), "user_2", { role: "ADMIN" });
+        expect(db.membership.update.mock.calls[0][0].data).toEqual({
+            role: "ADMIN",
+        });
+    });
+
+    it("lists each person's extras beyond their role", async () => {
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "user_2",
+                role: "MEMBER",
+                // contact:read comes with Member; not an extra.
+                extraActions: ["order:refund", "contact:read", "gone:away"],
+                user: { name: "Ravi", email: "ravi@example.test" },
+            },
+            {
+                userId: "user_3",
+                role: "stock-clerk",
+                extraActions: ["store:read", "invoice:read"],
+                user: { name: "Asha", email: "asha@example.test" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.organizationRole.findMany.mockResolvedValue([
+            { key: "stock-clerk", actions: ["store:read"] },
+        ]);
+
+        const roster = await service.list(ctx("OWNER"));
+
+        expect(roster.map((m) => [m.userId, m.extraActions])).toEqual([
+            ["user_2", ["order:refund"]],
+            ["user_3", ["invoice:read"]],
+        ]);
     });
 });

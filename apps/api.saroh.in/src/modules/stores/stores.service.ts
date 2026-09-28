@@ -263,7 +263,7 @@ export class StoresService {
     ): Promise<boolean> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { role: true },
+            select: { role: true, extraActions: true },
         });
         if (!membership) return false;
         // Resolved from the business's own role, not from the role's name. A
@@ -281,9 +281,12 @@ export class StoresService {
                   },
                   select: { actions: true },
               });
-        return resolveCapabilities(membership.role, stored?.actions).has(
-            action,
-        );
+        // The person's own extras count too (F17).
+        return resolveCapabilities(
+            membership.role,
+            stored?.actions,
+            membership.extraActions,
+        ).has(action);
     }
 
     /** Original read authorization: owner OR member, else 404. */

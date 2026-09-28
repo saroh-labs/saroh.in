@@ -7,6 +7,7 @@ import {
     Param,
     Patch,
     Post,
+    Put,
     UseGuards,
 } from "@nestjs/common";
 
@@ -16,7 +17,11 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
-import { InviteMemberDto, UpdateMemberRoleDto } from "./members.dto";
+import {
+    InviteMemberDto,
+    SetExtraActionsDto,
+    UpdateMemberRoleDto,
+} from "./members.dto";
 import { OrganizationMembersService } from "./organization-members.service";
 import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
 
@@ -90,6 +95,20 @@ export class OrganizationMembersController {
         @Body() dto: UpdateMemberRoleDto,
     ) {
         return this.members.updateRole(ctx, userId, dto);
+    }
+
+    /**
+     * A person's extra permissions, the whole list (F17). Under
+     * `member:role:update` and the reach rule; audited.
+     */
+    @Put("organizations/:organizationId/members/:userId/extra-actions")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    setExtraActions(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("userId") userId: string,
+        @Body() dto: SetExtraActionsDto,
+    ) {
+        return this.members.setExtraActions(ctx, userId, dto);
     }
 
     @Delete("organizations/:organizationId/members/:userId")

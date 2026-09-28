@@ -201,8 +201,8 @@ export function allows(ctx: OrganizationContext, action: OrgAction): boolean {
  *
  * The reach rule (DEC-039, F19): nobody grants a power they don't hold, and
  * nobody changes a role or a person that can do more than they can. Members
- * (who can be put in which role), roles (what a role may be given) and, next,
- * a person's extra permissions all ask this one question, so the answer can
+ * (who can be put in which role), roles (what a role may be given) and a
+ * person's extra permissions (F17) all ask this one question, so the answer can
  * never differ between them.
  *
  * Implied holds count, because `allows` reads the actor's resolved set: an
@@ -241,18 +241,87 @@ export function withinReach(
  *    outlives the role it names (the key is deliberately not a foreign key),
  *    so a renamed or deleted role leaves someone seeing LESS than they
  *    expected rather than locked out of a business they belong to.
+ *
+ * `extras` are the person's own extra permissions (F17, DEC-039; matrix §5):
+ * the role's set and the extras, united, filtered to actions that exist and
+ * may be given as an extra (`extraActionsFor`), then `withImplied`. An extra
+ * only ever adds; taking a power away is a role change. With no extras the
+ * answer is exactly the role's, so nobody without one resolves differently.
  */
 export function resolveCapabilities(
     roleKey: string,
     stored?: readonly string[] | null,
+    extras?: readonly string[] | null,
+): ReadonlySet<OrgAction> {
+    const role = roleCapabilities(roleKey, stored);
+    const own = extraActionsFor(roleKey, extras);
+    if (own.length === 0) return role;
+    return withImplied(new Set<OrgAction>([...role, ...own]));
+}
+
+/** What the role alone grants: cases 1–3 above. */
+function roleCapabilities(
+    roleKey: string,
+    stored?: readonly string[] | null,
 ): ReadonlySet<OrgAction> {
     if (stored) {
-        const known = new Set<string>(ORG_ACTIONS);
-        return withImplied(
-            new Set(stored.filter((a): a is OrgAction => known.has(a))),
-        );
+        return withImplied(new Set(stored.filter(isKnownAction)));
     }
     return isBuiltInRole(roleKey) ? CAPABILITIES[roleKey] : CAPABILITIES.MEMBER;
+}
+
+const KNOWN_ACTIONS: ReadonlySet<string> = new Set(ORG_ACTIONS);
+
+function isKnownAction(action: string): action is OrgAction {
+    return KNOWN_ACTIONS.has(action);
+}
+
+/**
+ * Never an extra, for anyone: the powers only the built-in Owner holds
+ * (`ownerOnly` in the catalogue — closing the business). Written here as
+ * well as there because the policy must not trust a stored list to have
+ * been vetted by the write path; `capability-catalogue.spec.ts` keeps the
+ * two in step.
+ */
+const NEVER_EXTRA: ReadonlySet<OrgAction> = new Set<OrgAction>(["org:delete"]);
+
+/**
+ * What a Reviewer may hold as an extra: the website review powers and
+ * nothing more (DEC-006). A Reviewer is an outside pair of eyes on one site;
+ * an extra must not turn them into staff. These are the three the role
+ * already holds, so in practice a Reviewer has no extra to be given — the
+ * list exists so a stored row can never widen one.
+ */
+export const REVIEWER_EXTRA_ACTIONS: readonly OrgAction[] = [
+    "site:read",
+    "site:comment",
+    "site:approve",
+];
+
+/**
+ * The extras a person with this role may hold: the stored list filtered to
+ * actions that exist, never an owner-only one, and for a Reviewer only the
+ * website review powers. Unknown strings are dropped, as role lists are.
+ */
+export function extraActionsFor(
+    roleKey: string,
+    extras?: readonly string[] | null,
+): OrgAction[] {
+    if (!extras || extras.length === 0) return [];
+    const reviewer = roleKey === "REVIEWER";
+    return [
+        ...new Set(
+            extras
+                .filter(isKnownAction)
+                .filter((a) => !NEVER_EXTRA.has(a))
+                .filter((a) => !reviewer || REVIEWER_EXTRA_ACTIONS.includes(a)),
+        ),
+    ];
+}
+
+/** Whether an action can ever be given to one person as an extra. */
+export function isNeverExtra(action: OrgAction): boolean {
+    return NEVER_EXTRA.has(action);
 }
 
 /**
@@ -295,6 +364,12 @@ const ORDER_POWERS: readonly OrgAction[] = [
  * selling a pack was always its, and `pack:sell` → `pack:read`, since a
  * sale shows the pack it sells; applied in that order, so `pack:write`
  * reaches `pack:read` through `pack:sell`.
+ *
+ * A person's extras (F17) go through the same rules: `resolveCapabilities`
+ * unites the role's set with the extras and runs this over the union, so a
+ * Member given `order:refund` also reads the order it refunds, and one given
+ * `pack:write` sells and sees packs. No line here changed for F17; built-in
+ * roles with no extras still skip it and resolve to the shipped map.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("store:write")) set.add("inventory:write");
