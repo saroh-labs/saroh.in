@@ -25,23 +25,63 @@ export default function RichTextSection({
 }: {
     content: RenderedRichText;
 }) {
+    const text =
+        content.format === "html" ? (
+            <div
+                /* Typography's own greys are replaced by the merchant's
+                   text colour (#189), and `dark:prose-invert` is gone with
+                   them: once a palette is chosen, a visitor's OS setting
+                   must not repaint a storefront its owner picked. */
+                className="prose prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-none"
+                // Sanitized at publish (see the safety note above).
+                dangerouslySetInnerHTML={{ __html: content.value }}
+            />
+        ) : (
+            <div className="prose prose-p:text-site-fg/80 max-w-none">
+                <p className="whitespace-pre-wrap">{content.value}</p>
+            </div>
+        );
+
+    /*
+     * Without a photo this is the single column it has always been, markup
+     * and all: every text block published before photos existed draws
+     * exactly as it did (the G5 snapshot holds it).
+     */
+    const image = content.image?.src ? content.image : null;
+    if (!image) {
+        return (
+            <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                {text}
+            </section>
+        );
+    }
+
+    /*
+     * With a photo (G7) the block widens to hold it beside the text, on the
+     * side the merchant chose — the right unless they said left. On a phone
+     * the two stack, photo first, the way a card reads.
+     */
+    const left = content.imageSide === "left";
     return (
-        <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            {content.format === "html" ? (
-                <div
-                    /* Typography's own greys are replaced by the merchant's
-                       text colour (#189), and `dark:prose-invert` is gone with
-                       them: once a palette is chosen, a visitor's OS setting
-                       must not repaint a storefront its owner picked. */
-                    className="prose prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-none"
-                    // Sanitized at publish (see the safety note above).
-                    dangerouslySetInnerHTML={{ __html: content.value }}
+        <section className="mx-auto w-full max-w-screen-lg px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+            <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
+                {/* Remote publication images from arbitrary tenant origins —
+                    a plain <img>, as the hero's, avoids next/image's
+                    per-domain allowlist. */}
+                <img
+                    src={image.src}
+                    alt={image.alt ?? ""}
+                    width={image.width}
+                    height={image.height}
+                    loading="lazy"
+                    className={
+                        left
+                            ? "h-auto w-full rounded-[var(--site-radius)] object-cover"
+                            : "h-auto w-full rounded-[var(--site-radius)] object-cover md:order-last"
+                    }
                 />
-            ) : (
-                <div className="prose prose-p:text-site-fg/80 max-w-none">
-                    <p className="whitespace-pre-wrap">{content.value}</p>
-                </div>
-            )}
+                <div className="min-w-0">{text}</div>
+            </div>
         </section>
     );
 }

@@ -123,6 +123,82 @@ describe("richText v1", () => {
         expect(result.success).toBe(false);
     });
 
+    describe("its photo (G7)", () => {
+        it("keeps a photo and the side it sits on through a save", () => {
+            const result = parseSectionContent("richText", 1, {
+                format: "html",
+                value: "<p>Our story</p>",
+                image: {
+                    src: "https://cdn.example.com/counter.jpg",
+                    alt: "The counter",
+                    width: 800,
+                    height: 600,
+                },
+                imageSide: "left",
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data).toMatchObject({
+                    image: {
+                        src: "https://cdn.example.com/counter.jpg",
+                        alt: "The counter",
+                    },
+                    imageSide: "left",
+                });
+            }
+        });
+
+        it("still validates old content with neither field", () => {
+            const result = parseSectionContent("richText", 1, {
+                format: "html",
+                value: "<p>Written before photos</p>",
+                padding: 48,
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data).not.toHaveProperty("image");
+                expect(result.data).not.toHaveProperty("imageSide");
+            }
+        });
+
+        it("saves a photo not yet described, so autosave never loses it", () => {
+            // Alt text is required at publish (the pre-publish check), not
+            // at save: the merchant picks the photo before describing it.
+            const result = parseSectionContent("richText", 1, {
+                value: "<p>x</p>",
+                image: { src: "https://cdn.example.com/a.jpg" },
+            });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(
+                    (result.data as { image: { alt: string } }).image.alt,
+                ).toBe("");
+            }
+        });
+
+        it("refuses a photo with no address", () => {
+            const result = parseSectionContent("richText", 1, {
+                value: "<p>x</p>",
+                image: { src: "", alt: "Nothing" },
+            });
+            expect(result.success).toBe(false);
+        });
+
+        it("refuses a side other than left or right", () => {
+            const result = parseSectionContent("richText", 1, {
+                value: "<p>x</p>",
+                imageSide: "top",
+            });
+            expect(result.success).toBe(false);
+        });
+
+        it("does not sanitize the photo — only `value` is HTML", () => {
+            expect(getSectionContract("richText", 1)?.sanitizedFields).toEqual([
+                "value",
+            ]);
+        });
+    });
+
     it("is flagged as requiring sanitization on its `value` field", () => {
         expect(requiresSanitization("richText", 1)).toBe(true);
         expect(getSectionContract("richText", 1)?.sanitizedFields).toEqual([
