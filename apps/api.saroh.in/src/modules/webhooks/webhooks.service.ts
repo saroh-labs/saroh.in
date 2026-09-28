@@ -23,6 +23,7 @@ import {
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import type { PaymentStatus } from "../orders/dto";
+import { finishCancelInTx } from "../orders/order-cancel";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
@@ -674,7 +675,10 @@ export class WebhooksService {
         // Refunded in full: whatever of the invoice no refund credited is
         // credited now, and it reads CREDITED.
         if (moved) await creditRestOfOrder(tx, orderId, "Refunded", null);
-        return { applied: moved || applied };
+        // The last part of a cancel's refund, heard here first: the order
+        // is marked cancelled now (B9), under the lock this call holds.
+        const cancelled = await finishCancelInTx(tx, orderId, null);
+        return { applied: moved || applied || cancelled };
     }
 
     /**
@@ -736,11 +740,16 @@ export class WebhooksService {
         // Paid in full online and every rupee of it back: the treatment's
         // order is refunded, and books no more visits. A balance recorded
         // by hand was not handed back here, so that order stays as it is.
+        let moved = false;
         if (orderId && (await this.treatmentRefundedInFull(tx, orderId))) {
-            const moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
-            return { applied: settled.applied || moved };
+            moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
         }
-        return settled;
+        // A treatment cancelled with its deposit refunded (B9): cancelled
+        // once the provider has answered for all of it.
+        const cancelled = orderId
+            ? await finishCancelInTx(tx, orderId, null)
+            : false;
+        return { ...settled, applied: settled.applied || moved || cancelled };
     }
 
     /**

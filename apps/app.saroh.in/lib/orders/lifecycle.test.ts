@@ -307,6 +307,31 @@ describe("eventText", () => {
         ).toBe("Undone — back to preparing");
     });
 
+    it("says a change of how it leaves whole (B9)", () => {
+        expect(
+            eventText(
+                ev({
+                    kind: "EDIT",
+                    note: "Changed from Pick-up to Local delivery",
+                }),
+                money,
+            ),
+        ).toBe("Changed from Pick-up to Local delivery");
+        expect(
+            eventText(ev({ kind: "EDIT", note: "notes changed" }), money),
+        ).toBe("Edited · notes changed");
+    });
+
+    it("says why an order was cancelled, when it was given (B9)", () => {
+        const cancelled = (note: string | null) =>
+            ev({ kind: "STATUS", toStatus: "CANCELLED", note });
+        expect(eventText(cancelled(null), money)).toBe("Cancelled");
+        expect(eventText(cancelled("Late"), money)).toBe("Cancelled · late");
+        expect(eventText(cancelled("Box arrived crushed"), money)).toBe(
+            "Cancelled · Box arrived crushed",
+        );
+    });
+
     it("names the courier it went with", () => {
         expect(
             eventText(

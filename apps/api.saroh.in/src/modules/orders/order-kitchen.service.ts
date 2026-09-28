@@ -38,6 +38,7 @@ import {
 import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
+import { changeOptionsFor } from "./order-change-options";
 import {
     adjustReservation,
     applyInventoryTransition,
@@ -123,7 +124,7 @@ export class OrderKitchenService {
                   })
                 : [];
         const money = allows(ctx, "payment:read");
-        return serializeOrderRead(order, {
+        const read = serializeOrderRead(order, {
             money,
             owedBack: money
                 ? await owedBackOn(prisma, ctx.organizationId, order.id)
@@ -143,6 +144,23 @@ export class OrderKitchenService {
                 ? { returnable: await returnableUnits(prisma, order.id) }
                 : {}),
         });
+        // What "Change how it's fulfilled…" and "Cancel order…" may offer
+        // now (B9), in its own file: the API decides, the app draws.
+        // A failure here leaves them out rather than failing the read: the
+        // screen then offers neither.
+        let change = null;
+        try {
+            change = await changeOptionsFor(
+                prisma,
+                ctx.organizationId,
+                order.id,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `An order's change options couldn't be read: ${String(error)}`,
+            );
+        }
+        return change ? { ...read, next: { ...read.next, ...change } } : read;
     }
 
     /**
@@ -1072,7 +1090,7 @@ const READ_INCLUDE = {
  * Take the order's row lock and load what every kitchen write needs. Scoped
  * to the caller's organization: another business's order is a 404.
  */
-async function lockOrder(
+export async function lockOrder(
     tx: Prisma.TransactionClient,
     ctx: OrganizationContext,
     orderId: string,

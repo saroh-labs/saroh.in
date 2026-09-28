@@ -26,7 +26,10 @@ import type { Sellable } from "@/lib/orders/sellables";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
+import { changeAccess } from "@/lib/orders/fulfilment-change";
+
 import { ChangeCard, PaymentBanner } from "./change-panels";
+import { ChangeSheets } from "./change-sheets";
 import { CourierPanel } from "./courier-panel";
 import { CustomerCard } from "./customer-card";
 import { EditPanel } from "./edit-panel";
@@ -44,6 +47,7 @@ import { OrderTimeline } from "./timeline";
 import { useArrival } from "./use-arrival";
 import type { Panel } from "./use-kitchen";
 import { useKitchen } from "./use-kitchen";
+import { useOrderChanges } from "./use-order-changes";
 
 export interface OrderPermissions {
     /** Move kitchen stages (`order:stage`) — a Member may. */
@@ -160,12 +164,30 @@ export function OrderDetail({
     // who may change orders. Its address is shown once, to its maker.
     const madeAt = order.payLinkCreatedAt ?? null;
     const payLink = usePayLink({ orderId: order.id, first, madeAt });
+    // Owed: unpaid, or paid online and changed since to cost more (B9) —
+    // not a site checkout's order, whose difference is taken at the counter.
     const owed =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "UNPAID" ||
-            order.paymentStatus === "FAILED") &&
+            order.paymentStatus === "FAILED" ||
+            (order.paymentStatus === "PAID" &&
+                !order.money?.recordedByHand &&
+                !order.placedOnline)) &&
         Number(order.money?.due ?? 0) > 0;
     const linkable = can.write && owed;
+    const changes = useOrderChanges({
+        order,
+        first,
+        currency,
+        refundTo,
+        setPanel,
+        startHold: kitchen.startHold,
+        onOwed:
+            can.write && can.payOnline && !order.placedOnline
+                ? payLink.ask
+                : undefined,
+    });
+    const change = changeAccess(order, can);
 
     const advance = () => {
         if (!next || hold) return;
@@ -203,6 +225,7 @@ export function OrderDetail({
                     paymentStatus={order.paymentStatus}
                     pending={menu}
                     onPendingChange={setMenu}
+                    withCancel={change.cancel === undefined}
                 />
             ) : null}
             {next && !hold ? (
@@ -319,14 +342,20 @@ export function OrderDetail({
                 {hold?.kind === "refund" ? (
                     <HoldCard
                         hold={hold}
-                        title={(s) =>
-                            `Refunding ${format(hold.amount ?? 0)} in ${s}s`
+                        title={
+                            hold.words?.title ??
+                            ((s) =>
+                                `Refunding ${format(hold.amount ?? 0)} in ${s}s`)
                         }
-                        body={`Back to ${refundTo}. Once it goes, money can only come back as a new charge.`}
-                        nowLabel="Refund now"
+                        body={
+                            hold.words?.body ??
+                            `Back to ${refundTo}. Once it goes, money can only come back as a new charge.`
+                        }
+                        nowLabel={hold.words?.nowLabel ?? "Refund now"}
                         onUndo={() =>
                             kitchen.cancelHold(
-                                "Refund cancelled. Nothing was sent back.",
+                                hold.words?.undone ??
+                                    "Refund cancelled. Nothing was sent back.",
                             )
                         }
                         onNow={kitchen.commitHold}
@@ -417,13 +446,39 @@ export function OrderDetail({
                                 onRefund={kitchen.startRefund}
                             />
                         ) : null}
+                        {panel === "fulfilment" || panel === "cancel" ? (
+                            <ChangeSheets
+                                panel={panel}
+                                order={order}
+                                number={number}
+                                first={first}
+                                refundTo={refundTo}
+                                remaining={remaining}
+                                linkable={
+                                    can.write &&
+                                    (can.payOnline ?? false) &&
+                                    !order.placedOnline
+                                }
+                                format={money ? format : null}
+                                changes={changes}
+                                onClose={() => setPanel(null)}
+                            />
+                        ) : null}
                         {can.write || can.refund ? (
                             <ChangeCard
                                 canEdit={can.write}
                                 editable={order.next.editable}
                                 canRefund={refundBlock}
+                                fulfilment={change.fulfilment}
+                                cancel={
+                                    hold && change.cancel !== undefined
+                                        ? "A change is on its way."
+                                        : change.cancel
+                                }
                                 onEdit={() => setPanel("edit")}
                                 onRefund={() => setPanel("refund")}
+                                onFulfilment={() => setPanel("fulfilment")}
+                                onCancel={() => setPanel("cancel")}
                             />
                         ) : null}
                         <OrderTimeline steps={steps} />

@@ -4,7 +4,12 @@ import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 import type { CourierFields } from "./courier";
 import type { DetailAllergyNote } from "./lifecycle";
 import { allergyNotesFrom } from "./lifecycle";
-import type { AllergyNote, KitchenStage, OrderRead } from "./read";
+import type {
+    AllergyNote,
+    FulfilmentType,
+    KitchenStage,
+    OrderRead,
+} from "./read";
 
 /**
  * One order's kitchen flow, scoped by the active organization (ADR-008, U6):
@@ -244,5 +249,69 @@ export function retryOrderRefund(
         "POST",
         {},
         "We couldn't check on the refund. Nothing was sent twice — try again in a minute.",
+    );
+}
+
+export interface ChangeFulfilmentInput {
+    fulfilment: FulfilmentType;
+    /** The delivery charge now, as money ("40.00"). */
+    shipping: string;
+    address?: EditOrderInput["address"];
+    /** Say so in the customer's messages. */
+    tell?: boolean;
+    idempotencyKey?: string;
+}
+
+export interface ChangeFulfilmentOutcome {
+    differenceCents: number;
+    /** Still to take (+), now due, or handed back (-). */
+    settleCents: number;
+    byHand: boolean;
+    refund: { amountCents: number; status: string } | null;
+    moneyError: string | null;
+    told: boolean;
+}
+
+/**
+ * "Change how it's fulfilled…" (B9): the new way and the delivery charge
+ * staff typed; the API works the difference out and charges or refunds it.
+ */
+export function changeOrderFulfilment(
+    orderId: string,
+    input: ChangeFulfilmentInput,
+): Promise<CrmResult<ChangeFulfilmentOutcome>> {
+    return mutate(
+        path(orderId, "/fulfilment"),
+        "POST",
+        input,
+        "How it's fulfilled wasn't changed. Try again.",
+    );
+}
+
+export interface CancelOutcome {
+    cancelled: boolean;
+    refund: {
+        amountCents: number;
+        currency: string;
+        beingConfirmed: boolean;
+        partlyRefused: boolean;
+    } | null;
+    byHand: { amountCents: number; currency: string } | null;
+    told: boolean;
+}
+
+/**
+ * "Cancel order…" (B9): a refund in full, and the order kept as cancelled.
+ * `idempotencyKey` makes a retry find the refund the first one made.
+ */
+export function cancelOrderInFull(
+    orderId: string,
+    input: { reason: string | null; idempotencyKey: string; tell?: boolean },
+): Promise<CrmResult<CancelOutcome>> {
+    return mutate(
+        path(orderId, "/cancel"),
+        "POST",
+        input,
+        "The order wasn't cancelled. Nothing was sent back.",
     );
 }

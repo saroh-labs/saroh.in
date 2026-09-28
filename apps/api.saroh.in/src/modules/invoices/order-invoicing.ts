@@ -865,6 +865,10 @@ export async function invoiceSupersededPayment(
  * the price and rate the line was bought at, referencing the order's
  * invoice. Never an edit to the invoice itself. Nothing when the order has
  * no invoice yet (unpaid: its invoice, when it comes, is the edited order).
+ *
+ * A change of delivery charge (B9, "Change how it's fulfilled") is a line
+ * with no product: it names its own rate and SAC, the business's delivery
+ * ones, as the order's invoice bills delivery.
  */
 export async function correctOrderInvoiceForEdit(
     tx: Tx,
@@ -872,10 +876,14 @@ export async function correctOrderInvoiceForEdit(
         orderId: string;
         changes: {
             orderItemId: string | null;
-            productId: string;
+            /** Null for a delivery charge, which brings its own rate. */
+            productId: string | null;
             description: string;
             deltaQuantity: number;
             unitCents: number;
+            /** The line's rate and code when it has no product. */
+            rateBps?: number | null;
+            code?: string | null;
         }[];
         note: string | null;
         createdByUserId: string | null;
@@ -899,19 +907,27 @@ export async function correctOrderInvoiceForEdit(
     });
     if (!original) return none;
 
+    const productIds = input.changes.flatMap((c) =>
+        c.productId ? [c.productId] : [],
+    );
     const products = await tx.product.findMany({
-        where: { id: { in: input.changes.map((c) => c.productId) } },
+        where: { id: { in: productIds } },
         select: { id: true, gstRate: true, hsnCode: true },
     });
     const byProduct = new Map(products.map((p) => [p.id, p]));
-    const line = (c: (typeof input.changes)[number], quantity: number) => ({
-        description: c.description,
-        quantity,
-        unitCents: c.unitCents,
-        rateBps: rateToBps(byProduct.get(c.productId)?.gstRate ?? null),
-        code: byProduct.get(c.productId)?.hsnCode ?? null,
-        orderItemId: c.orderItemId,
-    });
+    const line = (c: (typeof input.changes)[number], quantity: number) => {
+        const product = c.productId ? byProduct.get(c.productId) : undefined;
+        return {
+            description: c.description,
+            quantity,
+            unitCents: c.unitCents,
+            rateBps: c.productId
+                ? rateToBps(product?.gstRate ?? null)
+                : (c.rateBps ?? null),
+            code: c.productId ? (product?.hsnCode ?? null) : (c.code ?? null),
+            orderItemId: c.orderItemId,
+        };
+    };
     const up = input.changes
         .filter((c) => c.deltaQuantity > 0)
         .map((c) => line(c, c.deltaQuantity));

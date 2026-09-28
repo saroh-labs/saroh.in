@@ -307,6 +307,9 @@ export function eventText(
         case "UNDO":
             return `Undone — back to ${stage(e.toStage).toLowerCase()}`;
         case "EDIT":
+            // A change of how it leaves (B9) says it whole: "Changed from
+            // Pick-up to Local delivery".
+            if (e.note?.startsWith("Changed from ")) return e.note;
             return e.note ? `Edited · ${e.note}` : "Edited";
         case "REFUND": {
             const amount =
@@ -320,7 +323,13 @@ export function eventText(
             return `${said} · ${listed ? why.charAt(0).toLowerCase() + why.slice(1) : why}`;
         }
         case "STATUS": {
-            if (e.toStatus === "CANCELLED") return "Cancelled";
+            if (e.toStatus === "CANCELLED") {
+                // Why, when a cancel gave one (B9): "Cancelled · late".
+                const why = e.note?.trim();
+                if (!why) return "Cancelled";
+                const listed = REFUND_REASONS.some((r) => r.label === why);
+                return `Cancelled · ${listed ? why.charAt(0).toLowerCase() + why.slice(1) : why}`;
+            }
             const label =
                 e.toStatus && e.toStatus in STATUS_LABEL
                     ? STATUS_LABEL[e.toStatus as OrderStatus]

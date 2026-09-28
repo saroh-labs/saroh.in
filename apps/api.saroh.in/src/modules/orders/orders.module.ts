@@ -13,6 +13,8 @@ import {
     CLOSE_ABANDONED_CHECKOUT_TYPE,
     CloseAbandonedCheckoutHandler,
 } from "./close-abandoned-checkout.handler";
+import { OrderCancelService } from "./order-cancel.service";
+import { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersController } from "./orders.controller";
@@ -44,6 +46,8 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrdersService,
         OrderKitchenService,
         OrderPayLinkService,
+        OrderFulfilmentChangeService,
+        OrderCancelService,
         PublicCheckoutService,
         CloseAbandonedCheckoutHandler,
     ],

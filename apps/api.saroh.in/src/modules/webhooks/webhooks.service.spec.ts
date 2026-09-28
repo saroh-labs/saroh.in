@@ -541,8 +541,9 @@ describe("WebhooksService refund settlement", () => {
         });
 
         expect(result).toEqual({ status: "processed", changed: true });
-        // Matched on the same order, never by amount.
-        expect(refundFindFirst).toHaveBeenLastCalledWith({
+        // Matched on the same order, never by amount. (The call after it
+        // asks whether a cancel waits on this refund, B9.)
+        expect(refundFindFirst).toHaveBeenCalledWith({
             where: {
                 id: "rf_1",
                 organizationId: "org_1",

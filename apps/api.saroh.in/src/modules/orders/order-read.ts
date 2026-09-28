@@ -2,6 +2,7 @@ import { toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention } from "./order-attention";
+import type { ChangeOptions } from "./order-change-types";
 import type { OrderLineKind } from "./order-line";
 import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
@@ -190,7 +191,7 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         undo: { eventId: string; until: Date } | null;
         /** Items, address and fulfilment can still change. */
         editable: boolean;
-    };
+    } & Partial<ChangeOptions>;
     /** Null for a role without a money read. */
     money: OrderMoneyDto | null;
     /**

@@ -32,7 +32,7 @@ import { useState, useTransition } from "react";
 
 import { usePayLink } from "@/components/commerce/order-detail/pay-link";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { updateOrder } from "@/lib/orders/actions";
+import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
@@ -82,8 +82,11 @@ export function OrderRowMenu({
 
     const cancel = () =>
         startTransition(async () => {
-            const res = await updateOrder(row.store.id, row.id, {
-                status: "CANCELLED",
+            // The one cancel (B9): nothing was paid, so nothing goes back;
+            // a treatment's visits are cancelled with it.
+            const res = await cancelOrder(row.id, {
+                reason: null,
+                idempotencyKey: crypto.randomUUID(),
             });
             if (!res.ok) {
                 showError(res.error);
