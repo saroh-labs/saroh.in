@@ -200,7 +200,12 @@ function NewOrderBody({
     const shownProblem = o.lines.length > 0 ? (refusal ?? o.problem) : null;
     return (
         <>
-            <div className="grid min-h-0 flex-1 content-start gap-3.5 overflow-y-auto px-[18px] py-4">
+            {/*
+              Rows are max-content: the Items card clips its corners
+              (overflow-hidden), which lets a grid row shrink it to nothing
+              once the steps outgrow a phone's height.
+            */}
+            <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-3.5 overflow-y-auto px-[18px] py-4">
                 {stores.length > 1 ? (
                     <div>
                         <div className="mb-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -289,7 +294,11 @@ function NewOrderBody({
                     onDiscount={o.setDiscount}
                 />
             </div>
-            <div className="border-t border-border bg-card px-[18px] py-3">
+            <div
+                role="group"
+                aria-label="Order total"
+                className="border-t border-border bg-card px-[18px] py-3"
+            >
                 <div className="mb-[9px] flex items-baseline gap-2.5">
                     <span className="flex-1 text-[12.5px] text-muted-foreground">
                         {sumLine(o, storeName)}
