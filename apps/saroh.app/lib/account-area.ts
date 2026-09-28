@@ -8,8 +8,6 @@ import type {
     AccountView,
 } from "@saroh/site-blocks";
 
-import { env } from "@/env";
-
 import {
     homeResult,
     isAccountView,
@@ -30,15 +28,17 @@ import { isPayInvoice } from "./invoice-pay-shape";
  * `SITE_ACCOUNT_AREA`, the server half that keeps the area private; switch
  * the API on first, then this app. Both stay off until A6–A8 and A13 have
  * shipped (waves plan, release boundary 4). Readers of this switch: this
- * file only; delete it with the API's once the area has been on a release.
+ * file (`accountAreaOn`, defined in `account-area-switch.ts` so the edge
+ * middleware can read it too) and `middleware.ts`, which answers `/account`
+ * with a real 404 while it is off — the page's own `notFound()` comes too
+ * late for a status, after `[domain]/loading.tsx` has started the stream.
+ * Delete it with the API's once the area has been on a release.
  *
  * Every read goes through `accountFetch`: the session cookie, forwarded
  * with the signed relay, and a cleared cookie when the API says the session
  * is over. Every answer is checked (`account-shape.ts`) before a page sees it.
  */
-export function accountAreaOn(): boolean {
-    return env.SITE_ACCOUNT_AREA === "on";
-}
+export { accountAreaOn } from "./account-area-switch";
 
 async function readJson(
     path: string,
