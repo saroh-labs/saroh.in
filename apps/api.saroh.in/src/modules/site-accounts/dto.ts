@@ -17,6 +17,7 @@ import {
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
 } from "../bookings/dto";
+import { MESSAGE_MAX } from "./thread-store";
 
 /**
  * The two bodies site sign-in takes (round-2 plan A, A2). Email is the only
@@ -180,5 +181,29 @@ export class AddNoteDto {
     @IsString()
     @MinLength(1, { message: "Write your note" })
     @MaxLength(500, { message: "Keep it to 500 characters" })
+    text!: string;
+}
+
+/**
+ * A message in the customer's thread (A13), from either side: plain text,
+ * trimmed, with control characters other than line breaks and tabs taken
+ * out. Never HTML: it is stored as written and drawn as text.
+ */
+export const threadText = ({ value }: { value: unknown }) =>
+    typeof value === "string"
+        ? value
+              // eslint-disable-next-line no-control-regex
+              .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+              .replace(/\r\n?/g, "\n")
+              .trim()
+        : value;
+
+export class PostMessageDto {
+    @Transform(threadText)
+    @IsString()
+    @MinLength(1, { message: "Write your message" })
+    @MaxLength(MESSAGE_MAX, {
+        message: `Keep it to ${MESSAGE_MAX.toLocaleString("en-IN")} characters`,
+    })
     text!: string;
 }

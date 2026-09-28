@@ -1,6 +1,7 @@
 import { Test } from "@nestjs/testing";
 
 import { AccountHomeService } from "./account-home.service";
+import { AccountMessagesController } from "./account-messages.controller";
 import { AccountUnlinkService } from "./account-unlink.service";
 import { AccountController } from "./account.controller";
 import { SignInController } from "./sign-in.controller";
@@ -17,14 +18,18 @@ describe("SiteAccountsModule", () => {
         await module.close();
     });
 
-    it("resolves the account area (A5), with health notes closed until C12", async () => {
+    it("resolves the account area (A5) and its messages (A13), with health notes open", async () => {
         const module = await Test.createTestingModule({
             imports: [SiteAccountsModule],
         }).compile();
         expect(module.get(AccountController)).toBeInstanceOf(AccountController);
+        expect(module.get(AccountMessagesController)).toBeInstanceOf(
+            AccountMessagesController,
+        );
         const home = module.get(AccountHomeService);
+        // Open since A13 worded C12's staff card per source (default 12).
         expect((home as unknown as { notesOpen: boolean }).notesOpen).toBe(
-            false,
+            true,
         );
         await module.close();
     });

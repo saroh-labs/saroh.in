@@ -163,6 +163,13 @@ const NEVER: Record<string, string> = {
     // stay reachable whichever are off: Me, receipts and sign-out.
     "site-accounts/account.controller.ts":
         "a signed-in customer's own account on a published site — modules checked per tab",
+    // A13: the customer's message thread. Every business can be written
+    // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
+    // a module, on both sides.
+    "site-accounts/account-messages.controller.ts":
+        "a signed-in customer's own thread with the business — dark with the account area, not a module",
+    "customer-workspace/threads.controller.ts":
+        "the team's side of a customer's thread — message:read / message:write, dark with the account area",
     // G11: a site's shop. Commerce being off is checked by the service
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":

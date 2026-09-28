@@ -2,6 +2,7 @@ import { accountTabs } from "./account-tabs";
 import {
     accountView,
     bookingView,
+    messageView,
     noteView,
     orderView,
     packView,
@@ -68,6 +69,7 @@ describe("the account's allow-list", () => {
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: false,
+            unreadMessages: 2,
         });
         expect(view).toEqual({
             name: "Farah Khan",
@@ -76,11 +78,13 @@ describe("the account's allow-list", () => {
             businessName: "Kavi Dental",
             tabs: [
                 { key: "home", label: "Home" },
+                { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: false,
+            unreadMessages: 2,
         });
         expect(leaks(view)).toEqual([]);
     });
@@ -264,5 +268,54 @@ describe("the account's allow-list", () => {
 
     it("fails when a serializer spreads a row (the check itself works)", () => {
         expect(leaks({ ...noisy })).not.toEqual([]);
+    });
+
+    it("a message says who it is from — them or the business — never which staff member", () => {
+        const staff = messageView({
+            id: "msg_1",
+            author: "STAFF",
+            body: "See you at 10.",
+            createdAt: new Date("2026-10-05T04:30:00Z"),
+            authorUserId: "user_staff_id",
+            organizationId: "org_secret_id",
+            threadId: "thread_1",
+            event: null,
+            invoiceId: null,
+            ...noisy,
+        } as never);
+        expect(staff).toEqual({
+            ref: "msg_1",
+            from: "business",
+            text: "See you at 10.",
+            sentAt: "2026-10-05T04:30:00.000Z",
+        });
+        expect(leaks(staff)).toEqual([]);
+
+        const mine = messageView({
+            id: "msg_2",
+            author: "CUSTOMER",
+            body: "<b>Can I move it?</b>",
+            createdAt: new Date("2026-10-05T04:31:00Z"),
+            customerAccountId: "contact_secret_id",
+        } as never);
+        // Stored and sent as written: the site draws it as text, not HTML.
+        expect(mine).toEqual({
+            ref: "msg_2",
+            from: "me",
+            text: "<b>Can I move it?</b>",
+            sentAt: "2026-10-05T04:31:00.000Z",
+        });
+        expect(leaks(mine)).toEqual([]);
+
+        const saroh = messageView({
+            id: "msg_3",
+            author: "SYSTEM",
+            body: "Invoice RC-0001 for ₹2,400.00 is ready to pay.",
+            createdAt: new Date("2026-10-05T04:32:00Z"),
+            event: "INVOICE_SENT",
+            invoiceId: "inv_1",
+        } as never);
+        expect(saroh.from).toBe("business");
+        expect(Object.keys(saroh)).toEqual(["ref", "from", "text", "sentAt"]);
     });
 });

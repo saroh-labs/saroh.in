@@ -149,7 +149,7 @@ export class InvoiceSendService {
      *   is an address to send to (the bill-to email, or a verified account
      *   email when the bill-to is a placeholder);
      * - `thread` when the account thread is live (the `ACCOUNT_THREAD` flag
-     *   and A14's poster) and the contact has an active site account;
+     *   and A13's poster) and the contact has an active site account;
      * - both, one, or neither: with neither there is no Send.
      * A pay link needs a connected payment provider, so without one there
      * is nothing to send.
@@ -343,30 +343,53 @@ export class InvoiceSendService {
         invoiceId: string,
         now: Date,
     ): Promise<string | null> {
-        const last = await db.message.findFirst({
-            where: {
-                invoiceId,
-                template: { in: INVOICE_TEMPLATES },
-                status: { in: WENT },
-                createdAt: { gt: new Date(now.getTime() - DAY_MS) },
-            },
-            orderBy: { createdAt: "desc" },
-            select: { createdAt: true },
-        });
-        return last
-            ? new Date(last.createdAt.getTime() + DAY_MS).toISOString()
+        const since = new Date(now.getTime() - DAY_MS);
+        // An email that went, or a post into the account thread (A13): a
+        // thread-only send counts the same.
+        const [email, post] = await Promise.all([
+            db.message.findFirst({
+                where: {
+                    invoiceId,
+                    template: { in: INVOICE_TEMPLATES },
+                    status: { in: WENT },
+                    createdAt: { gt: since },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { createdAt: true },
+            }),
+            db.customerThreadMessage.findFirst({
+                where: {
+                    invoiceId,
+                    event: { in: INVOICE_TEMPLATES },
+                    createdAt: { gt: since },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { createdAt: true },
+            }),
+        ]);
+        const times = [email?.createdAt, post?.createdAt]
+            .filter((at): at is Date => at !== undefined)
+            .map((at) => at.getTime());
+        return times.length > 0
+            ? new Date(Math.max(...times) + DAY_MS).toISOString()
             : null;
     }
 
     private async alreadySent(db: Db, invoiceId: string): Promise<boolean> {
-        const sent = await db.message.count({
-            where: {
-                invoiceId,
-                template: { in: INVOICE_TEMPLATES },
-                status: { in: WENT },
-            },
-        });
-        return sent > 0;
+        const [emails, posts] = await Promise.all([
+            db.message.count({
+                where: {
+                    invoiceId,
+                    template: { in: INVOICE_TEMPLATES },
+                    status: { in: WENT },
+                },
+            }),
+            // A post into the account thread is a send too (A13).
+            db.customerThreadMessage.count({
+                where: { invoiceId, event: { in: INVOICE_TEMPLATES } },
+            }),
+        ]);
+        return emails + posts > 0;
     }
 
     /** The thread is offered only once it is live and they have an account. */

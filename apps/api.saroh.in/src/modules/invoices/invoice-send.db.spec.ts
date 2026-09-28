@@ -40,6 +40,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
+import { AccountThreadPosterService } from "../site-accounts/thread-poster";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
 import { hashPayToken } from "./pay-token";
@@ -416,6 +417,61 @@ describe("sending an invoice (real database)", () => {
                 expect(
                     await prisma.message.count({ where: { invoiceId: id } }),
                 ).toBe(0);
+            } finally {
+                await comms.connectProvider(owner, {
+                    channel: "EMAIL",
+                    provider: "RESEND",
+                    fromAddress: "hello@rye.example",
+                    credentials: { apiKey: "re_test_key" },
+                });
+            }
+        });
+
+        it("A13's poster writes the invoice into the thread, and a thread-only send counts once", async () => {
+            await prisma.featureFlag.create({
+                data: { key: "ACCOUNT_THREAD", enabledByDefault: true },
+            });
+            await comms.disconnectProvider(owner, "EMAIL");
+            try {
+                const withThread = new InvoiceSendService(
+                    invoices,
+                    comms,
+                    new AccountThreadPosterService(),
+                );
+                const id = await issued(accountContact);
+                const res = await withThread.send(owner, id);
+                expect(res).toEqual({
+                    channels: ["thread"],
+                    email: null,
+                    thread: true,
+                });
+                const posts = await prisma.customerThreadMessage.findMany({
+                    where: { invoiceId: id },
+                    include: { thread: { select: { contactId: true } } },
+                });
+                expect(posts).toHaveLength(1);
+                expect(posts[0]).toMatchObject({
+                    author: "SYSTEM",
+                    event: "INVOICE_SENT",
+                    authorUserId: "user_1",
+                    thread: { contactId: accountContact },
+                });
+                expect(posts[0].body).toMatch(
+                    /^Invoice .+ for ₹2,400\.00 is ready to pay\./,
+                );
+                // The pay link is never in a message that is kept.
+                expect(posts[0].body).not.toMatch(/pay\//);
+
+                // Once sent, by the thread alone: a second send is refused,
+                // and a reminder the same day waits (D17's rules hold).
+                await expect(withThread.send(owner, id)).rejects.toThrow(
+                    "This invoice has been sent. Send a reminder instead.",
+                );
+                await expect(withThread.remind(owner, id)).rejects.toThrow(
+                    /One reminder a day/,
+                );
+                const read = await withThread.readFor(owner.organizationId, id);
+                expect(read.send.nextReminderAt).not.toBeNull();
             } finally {
                 await comms.connectProvider(owner, {
                     channel: "EMAIL",

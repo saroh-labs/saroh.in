@@ -35,6 +35,7 @@ import type {
 } from "./customer-view";
 import { accountView, noteView, receiptView } from "./customer-view";
 import type { AddNoteDto, UpdateDetailsDto } from "./dto";
+import { unreadCount } from "./thread-store";
 
 /**
  * The account area's reads and the customer's own changes to their details
@@ -53,10 +54,11 @@ import type { AddNoteDto, UpdateDetailsDto } from "./dto";
 /**
  * Whether a customer's health note can be sent (default 12): only once staff
  * can see and act on suggestions from customers (C12). Until then Me has no
- * "Add a health note" and the route is a 404. C12 flips the default.
+ * "Add a health note" and the route is a 404. Open since A13: C12's staff
+ * card names where each note came from ("from their account").
  */
 export const CUSTOMER_NOTES_OPEN = Symbol("CUSTOMER_NOTES_OPEN");
-export const CUSTOMER_NOTES_OPEN_DEFAULT = false;
+export const CUSTOMER_NOTES_OPEN_DEFAULT = true;
 
 /** A customer can have this many notes waiting for the team at once. */
 export const MAX_WAITING_NOTES = 10;
@@ -97,7 +99,16 @@ export class AccountHomeService {
             },
         });
         if (!account) throw new NotFoundException();
-        const offers = await this.offers(ctx);
+        const [offers, unreadMessages] = await Promise.all([
+            this.offers(ctx),
+            // The tab's dot (A13); a failed count never hides the account.
+            unreadCount(
+                prisma,
+                ctx.organizationId,
+                ctx.contactId,
+                "customer",
+            ).catch(() => 0),
+        ]);
         return accountView({
             account,
             contact: account.contact,
@@ -106,6 +117,7 @@ export class AccountHomeService {
             offers,
             bookingsLabel: offers.bookingsLabel,
             healthNotes: this.notesOpen,
+            unreadMessages,
         });
     }
 
@@ -170,7 +182,7 @@ export class AccountHomeService {
             appointments,
             orders,
             plans: livePlans > 0 || ownPlan > 0,
-            // Every business can be written to; A13 builds the thread.
+            // Every business can be written to (A13).
             messages: true,
             bookingsLabel: classes > 0 ? "Bookings" : "Appointments",
         };

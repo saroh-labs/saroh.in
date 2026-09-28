@@ -32,6 +32,8 @@ export interface AccountView {
     bookingsLabel: "Bookings" | "Appointments";
     /** Whether "Add a health note" shows (once staff can act on it, C12). */
     healthNotes: boolean;
+    /** Messages from the business they haven't opened yet (A13): the tab's dot. */
+    unreadMessages: number;
 }
 
 export interface AccountBooking {
@@ -113,6 +115,25 @@ export interface AccountNote {
     state: "SENT" | "ON_RECORD";
 }
 
+/**
+ * One message in the customer's thread with the business (A13), as they
+ * see it: who it is from — them, or the business, never which staff member
+ * — its words and when. Plain text: the site draws it as text, never HTML.
+ */
+export interface AccountMessage {
+    ref: string;
+    from: "me" | "business";
+    text: string;
+    sentAt: string;
+}
+
+export interface AccountThread {
+    /** Oldest first: the newest ones (`THREAD_ROWS` in threads.service). */
+    messages: AccountMessage[];
+    /** Older messages exist beyond these. */
+    earlier: boolean;
+}
+
 // ---- Serializers ------------------------------------------------------------
 
 interface Named {
@@ -141,6 +162,7 @@ export function accountView(input: {
     offers: { appointments: boolean; orders: boolean; plans: boolean };
     bookingsLabel: "Bookings" | "Appointments";
     healthNotes: boolean;
+    unreadMessages: number;
 }): AccountView {
     return {
         name: personName(input.contact),
@@ -155,6 +177,7 @@ export function accountView(input: {
         },
         bookingsLabel: input.bookingsLabel,
         healthNotes: input.healthNotes,
+        unreadMessages: Math.max(0, Math.trunc(input.unreadMessages)),
     };
 }
 
@@ -312,5 +335,19 @@ export function noteView(row: {
         text: row.detail ?? row.label,
         sentAt: row.createdAt.toISOString(),
         state: row.status === "ACTIVE" ? "ON_RECORD" : "SENT",
+    };
+}
+
+export function messageView(row: {
+    id: string;
+    author: string;
+    body: string;
+    createdAt: Date;
+}): AccountMessage {
+    return {
+        ref: row.id,
+        from: row.author === "CUSTOMER" ? "me" : "business",
+        text: row.body,
+        sentAt: row.createdAt.toISOString(),
     };
 }

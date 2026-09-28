@@ -13,12 +13,12 @@ import { maskEmail } from "../site-accounts/account-linking.service";
  *
  * `merge.relations.spec.ts` reads the Prisma schema and fails when a
  * relation to `Contact` has no rule in {@link MERGE_RULES}, so a new table
- * that names a contact can't be forgotten. The rules for `CustomerThread`
- * (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11) are in the
- * customers plan; whichever of those units lands after C9 adds its row here
- * and its move in the service:
- * - `CustomerThread`: the survivor's thread absorbs the other's messages in
- *   time order, and the other thread row is deleted;
+ * that names a contact can't be forgotten. `CustomerThread` (A13) has its
+ * row: the survivor's thread absorbs the other's messages in time order,
+ * and the other thread row is deleted (`site-accounts/thread-store.ts`,
+ * `absorbThread`). The rules for `ClassWaitlistEntry` (A12) and
+ * `PaymentMandate` (D11) are in the customers plan; whichever of those
+ * units lands after C9 adds its row here and its move in the service:
  * - `ClassWaitlistEntry`: same class, the better place stays (OFFERED, then
  *   the earlier position); a second hold is released through
  *   `waitlist.offer`; different classes re-point;
@@ -47,7 +47,9 @@ export type MergeRuleKind =
     /** "This isn't them" follows the person to the survivor. */
     | "unlinked-from"
     /** Tombstones of the merged contact point at the survivor instead. */
-    | "tombstones";
+    | "tombstones"
+    /** One thread: the survivor's absorbs the other's messages (A13). */
+    | "absorb-thread";
 
 export interface MergeRule {
     kind: MergeRuleKind;
@@ -113,6 +115,10 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
     "Contact.mergedIntoId": {
         kind: "tombstones",
         note: "Earlier tombstones point at the survivor, so a chain is one hop.",
+    },
+    "CustomerThread.contactId": {
+        kind: "absorb-thread",
+        note: "One thread: the survivor's takes the other's messages in time order (A13).",
     },
 };
 
