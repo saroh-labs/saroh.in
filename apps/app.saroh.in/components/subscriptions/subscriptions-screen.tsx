@@ -16,6 +16,7 @@ import type {
     Plan,
     Subscription,
     SubscriptionCharge,
+    SubscriptionSettings,
 } from "@/lib/subscriptions/service";
 import type { ListTab, ScreenTab } from "@/lib/subscriptions/view";
 import {
@@ -59,6 +60,7 @@ export function SubscriptionsScreen({
     initialTab,
     openSubscribe,
     nowIso,
+    settings = null,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
@@ -77,6 +79,8 @@ export function SubscriptionsScreen({
     /** `?subscribe=1`, from the command menu. */
     openSubscribe?: boolean;
     nowIso: string;
+    /** "Members can pause from their account" (A8); null when unread. */
+    settings?: SubscriptionSettings | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -244,6 +248,7 @@ export function SubscriptionsScreen({
                         plans={planRead}
                         canWrite={canWrite}
                         showClasses={showClasses}
+                        settings={settings}
                     />
                 ) : (
                     <>

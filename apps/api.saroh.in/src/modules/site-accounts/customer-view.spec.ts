@@ -1,13 +1,16 @@
 import { accountTabs } from "./account-tabs";
 import {
+    accountPackView,
     accountView,
     bookingView,
     noteView,
     orderDetailView,
     orderView,
     packView,
+    planMessages,
     planView,
     receiptView,
+    subscriptionView,
 } from "./customer-view";
 
 /**
@@ -441,11 +444,13 @@ describe("the account's allow-list", () => {
             currentPeriodEnd: new Date("2026-10-18T00:00:00Z"),
             cancelAtPeriodEnd: false,
             pausedUntil: null,
+            timezone: "Asia/Kolkata",
             plan: { name: "Unlimited", ...noisy },
             ...noisy,
         };
         const view = planView(row as never);
         expect(view).toEqual({
+            timezone: "Asia/Kolkata",
             ref: "sub_1",
             name: "Unlimited",
             price: "2500.00",
@@ -536,6 +541,151 @@ describe("the account's allow-list", () => {
                 createdAt: new Date(),
             }),
         ).toMatchObject({ text: "Blood thinners", state: "ON_RECORD" });
+    });
+
+    describe("the Plan tab (A8)", () => {
+        const row = {
+            id: "sub_1",
+            status: "ACTIVE",
+            price: "2500",
+            currency: "INR",
+            interval: "MONTH",
+            timezone: "Asia/Kolkata",
+            currentPeriodEnd: new Date("2026-10-17T18:30:00Z"),
+            cancelAtPeriodEnd: false,
+            pausedUntil: null,
+            plan: { name: "Unlimited", ...noisy },
+            classesPerPeriod: 8,
+            ...noisy,
+        };
+        const overdue = {
+            id: "inv_secret",
+            number: "PF-0007",
+            total: "2500",
+            currency: "INR",
+            dueAt: new Date("2026-09-20T00:00:00Z"),
+            payTokenHash: "pay_ref_123",
+            ...noisy,
+        };
+
+        it("a plan says its classes, what is overdue and what the member may do — no invoice id", () => {
+            const view = subscriptionView({
+                row: row as never,
+                classes: {
+                    perMonth: 8,
+                    left: 5,
+                    resetsAt: "2026-10-31T18:30:00.000Z",
+                    paused: false,
+                    ...noisy,
+                } as never,
+                payNow: overdue as never,
+                membersCanPause: true,
+            });
+            expect(view).toEqual({
+                ref: "sub_1",
+                name: "Unlimited",
+                price: "2500.00",
+                currency: "INR",
+                interval: "MONTH",
+                timezone: "Asia/Kolkata",
+                status: "ACTIVE",
+                renewsAt: "2026-10-17T18:30:00.000Z",
+                pausedUntil: null,
+                endsAt: null,
+                classes: {
+                    perMonth: 8,
+                    left: 5,
+                    resetsAt: "2026-10-31T18:30:00.000Z",
+                },
+                payNow: {
+                    total: "2500.00",
+                    currency: "INR",
+                    dueAt: "2026-09-20T00:00:00.000Z",
+                },
+                canPause: true,
+                canResume: false,
+                canCancel: true,
+            });
+            expect(leaks(view)).toEqual([]);
+            expect(JSON.stringify(view)).not.toContain("inv_secret");
+            expect(JSON.stringify(view)).not.toContain("PF-0007");
+        });
+
+        it("pausing off, paused, or set to end changes what the member may do", () => {
+            const base = { classes: null, payNow: null };
+            expect(
+                subscriptionView({
+                    ...base,
+                    row: row as never,
+                    membersCanPause: false,
+                }),
+            ).toMatchObject({ canPause: false, canCancel: true });
+            expect(
+                subscriptionView({
+                    ...base,
+                    row: {
+                        ...row,
+                        status: "PAUSED",
+                        pausedUntil: new Date("2026-10-25T18:30:00Z"),
+                    } as never,
+                    membersCanPause: true,
+                }),
+            ).toMatchObject({
+                canPause: false,
+                canResume: true,
+                canCancel: true,
+                pausedUntil: "2026-10-25T18:30:00.000Z",
+            });
+            expect(
+                subscriptionView({
+                    ...base,
+                    row: { ...row, cancelAtPeriodEnd: true } as never,
+                    membersCanPause: true,
+                }),
+            ).toMatchObject({ canCancel: false, canPause: true });
+        });
+
+        it("a used-up pack stays listed, marked not live", () => {
+            const pack = accountPackView({
+                credits: 5,
+                used: 5,
+                expiresAt: new Date("2026-12-01T00:00:00Z"),
+                pack: { name: "5 classes", ...noisy } as never,
+                ...noisy,
+            } as never);
+            expect(pack).toEqual({
+                name: "5 classes",
+                credits: 5,
+                left: 0,
+                expiresAt: "2026-12-01T00:00:00.000Z",
+                live: false,
+            });
+            expect(leaks(pack)).toEqual([]);
+        });
+
+        it("says each change in the member's words, on the plan's own day", () => {
+            const tz = "Asia/Kolkata";
+            // The start of 26 Oct in Kolkata is 25 Oct in UTC.
+            const day = new Date("2026-10-25T18:30:00Z");
+            expect(planMessages.paused(day, tz)).toBe(
+                "Paused until 26 Oct 2026. Nothing is charged till then.",
+            );
+            expect(planMessages.resumed(false, day, tz)).toBe(
+                "Resumed. Your next payment is on 26 Oct 2026.",
+            );
+            expect(planMessages.resumed(true, day, tz)).toBe(
+                "Resumed. Your plan starts again today and renews on 26 Oct 2026.",
+            );
+            expect(planMessages.cancelled("scheduled", day, tz)).toBe(
+                "Cancelled. You keep it until 26 Oct 2026, and nothing more is charged.",
+            );
+            expect(planMessages.cancelled("already", day, tz)).toBe(
+                "Your plan is already set to end on 26 Oct 2026. Nothing more is charged.",
+            );
+            expect(planMessages.cancelled("now", day, tz)).toBe(
+                "Cancelled. Nothing more is charged.",
+            );
+        });
     });
 
     it("fails when a serializer spreads a row (the check itself works)", () => {

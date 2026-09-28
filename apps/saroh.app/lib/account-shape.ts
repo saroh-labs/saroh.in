@@ -8,8 +8,11 @@ import type {
     AccountOrderDetail,
     AccountOrderLine,
     AccountOrderVisit,
+    AccountPack,
     AccountPlan,
+    AccountPlanTab,
     AccountReceipt,
+    AccountSubscription,
     AccountTab,
     AccountTabKey,
     AccountTrackStep,
@@ -112,7 +115,9 @@ function isPlan(v: unknown): v is AccountPlan {
         (v.status === "ACTIVE" || v.status === "PAUSED") &&
         isNullableString(v.renewsAt) &&
         isNullableString(v.pausedUntil) &&
-        isNullableString(v.endsAt)
+        isNullableString(v.endsAt) &&
+        // A8 adds it; an API before A8 leaves it out.
+        (v.timezone === undefined || isString(v.timezone))
     );
 }
 
@@ -275,6 +280,120 @@ export function isNote(v: unknown): v is AccountNote {
 
 export function notesResult(v: unknown): AccountNote[] | null {
     return Array.isArray(v) && v.every(isNote) ? v : null;
+}
+
+// ---- The Plan tab (A8) ------------------------------------------------------
+
+function isSubscription(v: unknown): v is AccountSubscription {
+    if (!isPlan(v)) return false;
+    const r = v as unknown as Rec;
+    const c = r.classes;
+    const p = r.payNow;
+    return (
+        (c === null ||
+            (isRecord(c) &&
+                isNumber(c.perMonth) &&
+                isNumber(c.left) &&
+                isString(c.resetsAt))) &&
+        (p === null ||
+            (isRecord(p) &&
+                isString(p.total) &&
+                isString(p.currency) &&
+                isNullableString(p.dueAt))) &&
+        isBoolean(r.canPause) &&
+        isBoolean(r.canResume) &&
+        isBoolean(r.canCancel)
+    );
+}
+
+function isPack(v: unknown): v is AccountPack {
+    return (
+        isRecord(v) &&
+        isString(v.name) &&
+        isNumber(v.credits) &&
+        isNumber(v.left) &&
+        isString(v.expiresAt) &&
+        isBoolean(v.live)
+    );
+}
+
+/**
+ * The Plan tab, or null when it came back in a shape we don't know. Each
+ * part that failed, or came back strange, stays "couldn't be loaded".
+ */
+export function planTabResult(v: unknown): AccountPlanTab | null {
+    if (!isRecord(v) || !Array.isArray(v.pauseWeeks)) return null;
+    if (!v.pauseWeeks.every(isNumber)) return null;
+    return {
+        subscriptions: block(
+            v.subscriptions,
+            (x): x is AccountSubscription[] =>
+                Array.isArray(x) && x.every(isSubscription),
+        ),
+        packs: block(
+            v.packs,
+            (x): x is AccountPack[] => Array.isArray(x) && x.every(isPack),
+        ),
+        pauseWeeks: v.pauseWeeks,
+    };
+}
+
+/** What a pause, resume or cancel answered: the message and the tab now. */
+export function planChangeAnswer(
+    status: number,
+    body: unknown,
+    fallback: string,
+):
+    | { ok: true; message: string; tab: AccountPlanTab }
+    | { ok: false; message: string } {
+    if (status === 200 && isRecord(body) && isString(body.message)) {
+        const tab = planTabResult(body.tab);
+        if (tab) return { ok: true, message: body.message, tab };
+    }
+    return { ok: false, message: planRefusal(status, body, fallback) };
+}
+
+/** What "Pay now" answered: the new link to send the member to. */
+export function payNowAnswer(
+    status: number,
+    body: unknown,
+    fallback: string,
+): { ok: true; url: string } | { ok: false; message: string } {
+    if (status === 200 && isRecord(body) && isString(body.url)) {
+        try {
+            const url = new URL(body.url);
+            // Only ever a pay page: never somewhere else the API was told.
+            if (
+                (url.protocol === "https:" || url.protocol === "http:") &&
+                url.pathname.startsWith("/pay/")
+            ) {
+                return { ok: true, url: url.toString() };
+            }
+        } catch {
+            // Not a URL: refused below.
+        }
+    }
+    return { ok: false, message: planRefusal(status, body, fallback) };
+}
+
+/**
+ * The account's plan refusals are written for the member (409 and 403 from
+ * `account-plan.service.ts`), so they are passed on; a 404 is the plan no
+ * longer being theirs to change; anything else is the page's own sentence.
+ */
+function planRefusal(status: number, body: unknown, fallback: string): string {
+    const error = isRecord(body) && isRecord(body.error) ? body.error : null;
+    if (
+        (status === 409 || status === 403) &&
+        isString(error?.message) &&
+        error.message.trim()
+    ) {
+        return error.message;
+    }
+    if (status === 404) {
+        return "That plan isn't on your account any more. Refresh the page.";
+    }
+    return refusalMessage(status, body, fallback);
 }
 
 /**

@@ -195,6 +195,30 @@ export class InvoicesService {
         id: string,
     ): Promise<{ token: string }> {
         authorize(ctx, "invoice:write");
+        return this.mintPayLink(db, ctx.organizationId, id);
+    }
+
+    /**
+     * A fresh pay link for a member's own overdue invoice, from their
+     * account on the business's site (round-2 A8): the same link a team
+     * member makes, replacing the old one, so the customer never meets a
+     * stale link. There is no team member to authorize: the caller has
+     * already found the invoice by the member's own contact.
+     */
+    async payLinkForCustomer(
+        db: Tx,
+        organizationId: string,
+        id: string,
+    ): Promise<{ token: string }> {
+        return this.mintPayLink(db, organizationId, id);
+    }
+
+    private async mintPayLink(
+        db: Tx,
+        organizationId: string,
+        id: string,
+    ): Promise<{ token: string }> {
+        const ctx = { organizationId };
         const current = await this.read(ctx.organizationId, id, db);
         this.assertOwnPaper(current, "given a pay link");
         if (current.status !== "ISSUED") {

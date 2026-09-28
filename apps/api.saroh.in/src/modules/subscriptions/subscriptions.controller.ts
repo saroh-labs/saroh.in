@@ -35,6 +35,7 @@ import {
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
+    SubscriptionSettingsDto,
 } from "./dto";
 import { SubscriptionsService } from "./subscriptions.service";
 
@@ -195,6 +196,20 @@ export class SubscriptionsController {
     @Get("renewals")
     renewals(@OrgContext() ctx: OrganizationContext) {
         return this.subscriptions.renewals(ctx);
+    }
+
+    /** "Members can pause from their account" (A8); before `:subscriptionId` too. */
+    @Get("settings")
+    settings(@OrgContext() ctx: OrganizationContext) {
+        return this.subscriptions.settings(ctx);
+    }
+
+    @Patch("settings")
+    updateSettings(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SubscriptionSettingsDto,
+    ) {
+        return this.subscriptions.updateSettings(ctx, dto);
     }
 
     @Get(":subscriptionId")

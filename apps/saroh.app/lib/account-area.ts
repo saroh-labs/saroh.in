@@ -5,6 +5,7 @@ import type {
     AccountHomeData,
     AccountNote,
     AccountOrder,
+    AccountPlanTab,
     AccountReceipt,
     AccountView,
     TrackLookup,
@@ -16,6 +17,7 @@ import {
     notesResult,
     orderDetailResult,
     ordersResult,
+    planTabResult,
     receiptsResult,
 } from "./account-shape";
 import { accountFetch } from "./customer-session";
@@ -80,6 +82,12 @@ export const getAccount = cache(async (): Promise<AccountLookup> => {
 export async function getAccountHome(): Promise<AccountHomeData | null> {
     const read = await readJson("me/home");
     return read.ok ? homeResult(read.body) : null;
+}
+
+/** The Plan tab (A8), or null when it couldn't be read at all. */
+export async function getPlanTab(): Promise<AccountPlanTab | null> {
+    const read = await readJson("me/plan");
+    return read.ok ? planTabResult(read.body) : null;
 }
 
 export async function getReceipts(): Promise<AccountBlock<AccountReceipt[]>> {

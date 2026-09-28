@@ -12,8 +12,9 @@ import { useState, useTransition } from "react";
 import { setPlanArchived } from "@/lib/subscriptions/actions";
 import type { PlanCardView } from "@/lib/subscriptions/plan-cards";
 import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
-import type { Plan } from "@/lib/subscriptions/service";
+import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { MembersPauseRow } from "./members-pause-row";
 import { Pill } from "./pill";
 import { PlanDialog } from "./plan-dialog";
 
@@ -35,10 +36,16 @@ export function PlansTab({
     plans,
     canWrite,
     showClasses,
+    settings = null,
 }: {
     plans: Plan[] | null;
     canWrite: boolean;
     showClasses: boolean;
+    /**
+     * "Members can pause from their account" (A8): its row shows once
+     * customers have an account on the site, and not when unread.
+     */
+    settings?: SubscriptionSettings | null;
 }) {
     const router = useRouter();
     const [editing, setEditing] = useState<Plan | "new" | null>(null);
@@ -87,6 +94,12 @@ export function PlansTab({
 
     return (
         <>
+            {settings?.accountArea ? (
+                <MembersPauseRow
+                    on={settings.membersCanPause}
+                    canWrite={canWrite}
+                />
+            ) : null}
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
                 <p className="flex-[1_1_280px] text-pretty text-[13px] text-foreground/75">
                     Changing a price only changes what&apos;s sold next.
