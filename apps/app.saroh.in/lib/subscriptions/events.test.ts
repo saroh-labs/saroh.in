@@ -146,6 +146,21 @@ describe("changeWhat", () => {
         expect(what({ kind: "SOMETHING_NEW" })).toBe("Changed");
     });
 
+    it("says why autopay was cancelled (D20)", () => {
+        const cancelled = (reason?: string) =>
+            what({ kind: "MANDATE_CANCELLED", data: { reason } });
+        expect(cancelled("SUBSCRIPTION_ENDED")).toBe(
+            "Autopay cancelled — subscription ended",
+        );
+        expect(cancelled("MERGED")).toBe(
+            "Autopay cancelled — customers merged",
+        );
+        expect(cancelled("PRIVACY_REMOVAL")).toBe(
+            "Autopay cancelled — their details were removed",
+        );
+        expect(cancelled()).toBe("Autopay cancelled");
+    });
+
     it("never breaks on data it didn't expect", () => {
         expect(what({ kind: "PLAN_CHANGE_BOOKED", data: { to: 3 } })).toBe(
             "Booked a plan change",
