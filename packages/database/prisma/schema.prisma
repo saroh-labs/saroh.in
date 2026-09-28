@@ -3287,6 +3287,18 @@ model Contact {
   mergedFrom   Contact[] @relation("ContactMerge")
   mergedAt     DateTime?
 
+  // Their postal address, as staff keep it on the edit sheet (C8, R10).
+  // Never copied into orders already placed; New order may prefill from it.
+  // `country` is ISO 3166-1 alpha-2. In India `state` is the GST state's
+  // name and `postalCode` a six-digit PIN (checked by the API). A merge
+  // fills it from the other contact, whole, when the survivor has none.
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same

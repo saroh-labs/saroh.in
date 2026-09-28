@@ -324,6 +324,13 @@ export interface CustomerDetail {
         email: string;
         phone: string | null;
         company: string | null;
+        /** Their postal address (C8); each line null when not kept. */
+        addressLine1: string | null;
+        addressLine2: string | null;
+        city: string | null;
+        state: string | null;
+        postalCode: string | null;
+        country: string | null;
         source: string | null;
         createdAt: string;
     };
@@ -492,6 +499,12 @@ export class CustomerDetailService {
                 email: true,
                 phone: true,
                 company: true,
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                state: true,
+                postalCode: true,
+                country: true,
                 source: true,
                 createdAt: true,
                 mergedIntoId: true,
@@ -704,6 +717,12 @@ export class CustomerDetailService {
                 email: shownEmail,
                 phone: contact.phone,
                 company: contact.company,
+                addressLine1: contact.addressLine1,
+                addressLine2: contact.addressLine2,
+                city: contact.city,
+                state: contact.state,
+                postalCode: contact.postalCode,
+                country: contact.country,
                 source: contact.source,
                 createdAt: contact.createdAt.toISOString(),
             },

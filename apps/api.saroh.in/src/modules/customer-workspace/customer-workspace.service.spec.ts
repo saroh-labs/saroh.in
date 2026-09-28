@@ -334,14 +334,19 @@ describe("CustomerWorkspaceService", () => {
     it("shows a merge into this person on the timeline, from its audit row (C9)", async () => {
         const { svc, db } = make();
         db.auditEvent.findMany.mockResolvedValue([
-            { createdAt: new Date("2026-09-28T10:00:00Z") },
+            {
+                action: "customer.merged",
+                createdAt: new Date("2026-09-28T10:00:00Z"),
+            },
         ]);
         const { events } = await svc.timeline(CTX, "c1");
         expect(db.auditEvent.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
                     organizationId: "org_1",
-                    action: "customer.merged",
+                    action: {
+                        in: ["customer.merged", "customer.details.changed"],
+                    },
                     targetType: "contact",
                     targetId: "c1",
                 },
@@ -351,6 +356,23 @@ describe("CustomerWorkspaceService", () => {
             type: "MERGE",
             at: "2026-09-28T10:00:00.000Z",
             title: "Merged with a duplicate",
+            moduleKey: "CRM",
+        });
+    });
+
+    it("notes a staff edit of their details on the timeline (C8)", async () => {
+        const { svc, db } = make();
+        db.auditEvent.findMany.mockResolvedValue([
+            {
+                action: "customer.details.changed",
+                createdAt: new Date("2026-09-29T08:00:00Z"),
+            },
+        ]);
+        const { events } = await svc.timeline(CTX, "c1");
+        expect(events).toContainEqual({
+            type: "DETAILS",
+            at: "2026-09-29T08:00:00.000Z",
+            title: "Details changed",
             moduleKey: "CRM",
         });
     });
