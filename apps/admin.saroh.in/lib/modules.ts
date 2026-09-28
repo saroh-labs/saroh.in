@@ -9,6 +9,7 @@ export const MODULE_OPTIONS = [
     { key: "CRM", label: "CRM" },
     { key: "APPOINTMENTS", label: "Appointments" },
     { key: "COURSES", label: "Courses" },
+    { key: "CLASS_PACKS", label: "Class packs" },
     { key: "COMMERCE", label: "Commerce" },
     { key: "PAYMENTS", label: "Payments" },
     { key: "COMMUNICATIONS", label: "Communications" },

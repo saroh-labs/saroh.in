@@ -23,6 +23,12 @@ export const FlagKey = {
     MODULE_CRM: "MODULE_CRM",
     MODULE_APPOINTMENTS: "MODULE_APPOINTMENTS",
     MODULE_COURSES: "MODULE_COURSES",
+    /**
+     * Class packs became their own module in round 2 (E12, default 44). The
+     * `class-packs-module` backfill registers this flag with Appointments'
+     * value, so no business that sold packs under Appointments loses them.
+     */
+    MODULE_CLASS_PACKS: "MODULE_CLASS_PACKS",
     MODULE_COMMERCE: "MODULE_COMMERCE",
     MODULE_PAYMENTS: "MODULE_PAYMENTS",
     MODULE_COMMUNICATIONS: "MODULE_COMMUNICATIONS",
@@ -80,6 +86,7 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
     MODULE_CRM: MODULE_ROLLOUT("CRM"),
     MODULE_APPOINTMENTS: MODULE_ROLLOUT("Appointments"),
     MODULE_COURSES: MODULE_ROLLOUT("Courses"),
+    MODULE_CLASS_PACKS: MODULE_ROLLOUT("Class packs"),
     MODULE_COMMERCE: MODULE_ROLLOUT("Commerce"),
     MODULE_PAYMENTS: MODULE_ROLLOUT("Payments"),
     MODULE_COMMUNICATIONS: MODULE_ROLLOUT("Communications"),

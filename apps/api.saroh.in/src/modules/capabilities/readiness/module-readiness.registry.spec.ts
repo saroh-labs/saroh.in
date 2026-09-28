@@ -21,6 +21,16 @@ function dbWith(counts: Record<string, number>) {
                 ),
             ),
         },
+        // Class packs asks twice: all of them, then the ones on sale.
+        classPack: {
+            count: jest.fn((args?: { where?: { status?: string } }) =>
+                Promise.resolve(
+                    args?.where?.status === "ACTIVE"
+                        ? (counts.packOnSale ?? 0)
+                        : (counts.classPack ?? 0),
+                ),
+            ),
+        },
         store: model("store"),
         product: model("product"),
         order: model("order"),
@@ -78,6 +88,34 @@ describe("ModuleReadinessRegistry", () => {
                 )
             ).readiness,
         ).toBe("ACTIVE");
+    });
+
+    it("Class packs: needs a pack, then one on sale", async () => {
+        expect(
+            (await registry({}).evaluate("CLASS_PACKS", input)).blockers[0]
+                ?.code,
+        ).toBe("CLASS_PACKS_NO_PACK");
+        expect(
+            (await registry({ classPack: 2 }).evaluate("CLASS_PACKS", input))
+                .blockers[0]?.code,
+        ).toBe("CLASS_PACKS_NONE_ON_SALE");
+        expect(
+            (
+                await registry({ classPack: 2, packOnSale: 1 }).evaluate(
+                    "CLASS_PACKS",
+                    input,
+                )
+            ).readiness,
+        ).toBe("ACTIVE");
+    });
+
+    it("Class packs: turning it off is never blocked", async () => {
+        await expect(
+            registry({ classPack: 3 }).deactivationBlockers(
+                "CLASS_PACKS",
+                input,
+            ),
+        ).resolves.toEqual([]);
     });
 
     it("Appointments: needs a service then availability", async () => {
