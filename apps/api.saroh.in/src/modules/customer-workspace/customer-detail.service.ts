@@ -47,7 +47,15 @@ import {
     notedAllergens,
 } from "./contact-notes.service";
 import { requireCustomerPower } from "./customer-access";
+import type { DetailPack } from "./customer-detail-packs";
+import { readContactPacks } from "./customer-detail-packs";
 import { normaliseEmail } from "./duplicates";
+
+export type {
+    DetailPack,
+    DetailPackExtension,
+    DetailPackUse,
+} from "./customer-detail-packs";
 
 /**
  * One read of a customer (U8, R17), rooted on the CRM contact — the record
@@ -228,22 +236,6 @@ export interface DetailInvoice {
     issuedAt: string | null;
     dueAt: string | null;
     paidAt: string | null;
-}
-
-export interface DetailPack {
-    id: string;
-    pack: { id: string; name: string };
-    credits: number;
-    used: number;
-    left: number;
-    /** Use-by: the classes left lapse after this. */
-    expiresAt: string;
-    /** When it was bought. */
-    boughtAt: string;
-    standing: "ACTIVE" | "USED_UP" | "EXPIRED";
-    /** What it sold for: `pack:read` shows prices. */
-    price: string;
-    currency: string;
 }
 
 export interface DetailStats {
@@ -579,7 +571,12 @@ export class CustomerDetailService {
         const wants = {
             orders: commerce && allows(ctx, "order:read"),
             bookings: on.has("APPOINTMENTS") && allows(ctx, "booking:read"),
-            packs: on.has("APPOINTMENTS") && allows(ctx, "pack:read"),
+            // Class packs is its own module on Appointments (E12); one Saroh
+            // hasn't rolled out is never shown (DEC-057), and it reads as off.
+            packs:
+                on.has("APPOINTMENTS") &&
+                on.has("CLASS_PACKS") &&
+                allows(ctx, "pack:read"),
             subscriptions:
                 on.has("PAYMENTS") && allows(ctx, "subscription:read"),
             invoices: on.has("PAYMENTS") && allows(ctx, "invoice:read"),
@@ -666,7 +663,7 @@ export class CustomerDetailService {
                 : skip,
             wants.packs
                 ? attempt("packs", () =>
-                      this.readPacks(organizationId, contactId),
+                      readContactPacks(this.db, organizationId, contactId),
                   )
                 : skip,
             // Classes a month are a count, not money: whoever reads the
@@ -1209,61 +1206,6 @@ export class CustomerDetailService {
                 currency: p.currency,
                 sum: p._sum.total,
             })),
-        };
-    }
-
-    private async readPacks(organizationId: string, contactId: string) {
-        const now = new Date();
-        const rows = await this.db.packPurchase.findMany({
-            where: { organizationId, contactId },
-            orderBy: { createdAt: "desc" },
-            take: ROWS,
-            select: {
-                id: true,
-                credits: true,
-                price: true,
-                currency: true,
-                expiresAt: true,
-                createdAt: true,
-                pack: { select: { id: true, name: true } },
-                _count: {
-                    select: { redemptions: { where: { reversedAt: null } } },
-                },
-            },
-        });
-        let classesLeft = 0;
-        let nextExpiry: Date | null = null;
-        const views = rows.map((p): DetailPack => {
-            const used = p._count.redemptions;
-            const left = Math.max(0, p.credits - used);
-            const expired = p.expiresAt <= now;
-            if (!expired && left > 0) {
-                classesLeft += left;
-                if (!nextExpiry || p.expiresAt < nextExpiry)
-                    nextExpiry = p.expiresAt;
-            }
-            return {
-                id: p.id,
-                pack: p.pack,
-                credits: p.credits,
-                used,
-                left,
-                expiresAt: p.expiresAt.toISOString(),
-                boughtAt: p.createdAt.toISOString(),
-                standing: expired
-                    ? "EXPIRED"
-                    : left === 0
-                      ? "USED_UP"
-                      : "ACTIVE",
-                // `pack:read` shows prices (matrix §2).
-                price: toMoneyString(p.price),
-                currency: p.currency,
-            };
-        });
-        return {
-            rows: views,
-            classesLeft,
-            nextExpiry: (nextExpiry as Date | null)?.toISOString() ?? null,
         };
     }
 

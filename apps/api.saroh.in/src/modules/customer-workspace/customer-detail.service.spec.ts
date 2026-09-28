@@ -104,7 +104,31 @@ const PACK = {
     currency: "INR",
     expiresAt: FUTURE,
     createdAt: LONG_AGO,
-    pack: { id: "pack_1", name: "10 classes" },
+    paidBy: "UPI",
+    pack: { id: "pack_1", name: "10 classes", kind: "CLASSES" },
+    extensions: [{ days: 14, reason: "Knee injury", createdAt: PAST }],
+    redemptions: [
+        {
+            reversedAt: null,
+            booking: {
+                id: "bk_1",
+                startAt: FUTURE,
+                status: "CONFIRMED",
+                outcome: null,
+                service: { id: "svc_1", name: "Spin class" },
+            },
+        },
+        {
+            reversedAt: PAST,
+            booking: {
+                id: "bk_0",
+                startAt: PAST,
+                status: "CANCELLED",
+                outcome: null,
+                service: { id: "svc_1", name: "Spin class" },
+            },
+        },
+    ],
     _count: { redemptions: 4 },
 };
 
@@ -123,9 +147,13 @@ const INVOICE = {
 };
 
 type Views = { key: string; readiness: string }[];
-const ALL_ON: Views = ["CRM", "COMMERCE", "APPOINTMENTS", "PAYMENTS"].map(
-    (key) => ({ key, readiness: "ACTIVE" }),
-);
+const ALL_ON: Views = [
+    "CRM",
+    "COMMERCE",
+    "APPOINTMENTS",
+    "CLASS_PACKS",
+    "PAYMENTS",
+].map((key) => ({ key, readiness: "ACTIVE" }));
 
 const ATTENTION_NUTS = {
     id: "att_nuts",
@@ -810,6 +838,155 @@ describe("CustomerDetailService", () => {
         expect(detail.stats.spent).toEqual([
             { currency: "INR", amount: "1650.00" },
         ]);
+    });
+
+    describe("class packs (C7)", () => {
+        it("reads each pack whole: its kind, how it was paid, the days given and the classes spent", async () => {
+            const { svc, db } = make();
+
+            const detail = await svc.detail(OWNER, "c1");
+
+            expect(detail.packs?.rows[0]).toEqual({
+                id: "pp_1",
+                pack: { id: "pack_1", name: "10 classes", kind: "CLASSES" },
+                credits: 10,
+                used: 4,
+                left: 6,
+                expiresAt: FUTURE.toISOString(),
+                boughtAt: LONG_AGO.toISOString(),
+                standing: "ACTIVE",
+                price: "3000.00",
+                currency: "INR",
+                paidBy: "UPI",
+                extensions: [
+                    {
+                        days: 14,
+                        reason: "Knee injury",
+                        createdAt: PAST.toISOString(),
+                    },
+                ],
+                uses: [
+                    {
+                        bookingId: "bk_1",
+                        startAt: FUTURE.toISOString(),
+                        service: { id: "svc_1", name: "Spin class" },
+                        state: "BOOKED",
+                    },
+                    {
+                        bookingId: "bk_0",
+                        startAt: PAST.toISOString(),
+                        service: { id: "svc_1", name: "Spin class" },
+                        state: "CREDIT_BACK",
+                    },
+                ],
+            });
+            const query = db.packPurchase.findMany.mock.calls[0][0];
+            expect(query.where).toEqual({
+                organizationId: "org_1",
+                contactId: "c1",
+            });
+            // `used` counts only the classes not given back (ADR-007).
+            expect(query.select._count).toEqual({
+                select: { redemptions: { where: { reversedAt: null } } },
+            });
+        });
+
+        it("leaves 7 of a pack of 10 with 3 used, and counts them into classes left", async () => {
+            const { svc, db } = make();
+            db.packPurchase.findMany.mockResolvedValue([
+                { ...PACK, _count: { redemptions: 3 } },
+            ]);
+
+            const detail = await svc.detail(OWNER, "c1");
+
+            expect(detail.packs?.rows[0]).toEqual(
+                expect.objectContaining({ used: 3, left: 7 }),
+            );
+            expect(detail.stats.classesLeft).toEqual(
+                expect.objectContaining({
+                    total: 7,
+                    packs: 7,
+                    nextExpiry: FUTURE.toISOString(),
+                }),
+            );
+        });
+
+        it("keeps an expired pack's unused classes out of classes left", async () => {
+            const { svc, db } = make();
+            db.packPurchase.findMany.mockResolvedValue([
+                { ...PACK, expiresAt: PAST, _count: { redemptions: 2 } },
+            ]);
+
+            const detail = await svc.detail(OWNER, "c1");
+
+            expect(detail.packs?.rows[0]).toEqual(
+                expect.objectContaining({ left: 8, standing: "EXPIRED" }),
+            );
+            expect(detail.stats.classesLeft).toEqual(
+                expect.objectContaining({
+                    total: 0,
+                    packs: 0,
+                    nextExpiry: null,
+                }),
+            );
+        });
+
+        it("reads no packs with Appointments off", async () => {
+            const { svc, db } = make(
+                ALL_ON.map((v) =>
+                    v.key === "APPOINTMENTS"
+                        ? { ...v, readiness: "DISABLED" }
+                        : v,
+                ),
+            );
+
+            const detail = await svc.detail(OWNER, "c1");
+
+            expect(detail).not.toHaveProperty("packs");
+            expect(detail.stats).not.toHaveProperty("classesLeft");
+            expect(db.packPurchase.findMany).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            [
+                "switched off, or not rolled out (DEC-057)",
+                ALL_ON.map((v) =>
+                    v.key === "CLASS_PACKS"
+                        ? { ...v, readiness: "DISABLED" }
+                        : v,
+                ),
+            ],
+            [
+                "missing from the module list",
+                ALL_ON.filter((v) => v.key !== "CLASS_PACKS"),
+            ],
+        ])("reads no packs when Class packs is %s", async (_why, views) => {
+            const { svc, db } = make(views);
+
+            const detail = await svc.detail(OWNER, "c1");
+
+            expect(detail).not.toHaveProperty("packs");
+            expect(detail.stats).not.toHaveProperty("classesLeft");
+            expect(db.packPurchase.findMany).not.toHaveBeenCalled();
+            // The diary is still there.
+            expect(detail.bookings?.upcoming).toHaveLength(1);
+        });
+
+        it("reads no packs without pack:read, even with the diary", async () => {
+            const { svc, db } = make();
+            const desk: OrganizationContext = {
+                ...OWNER,
+                role: "MEMBER",
+                roleKey: "desk",
+                actions: new Set<OrgAction>(["contact:read", "booking:read"]),
+            };
+
+            const detail = await svc.detail(desk, "c1");
+
+            expect(detail).not.toHaveProperty("packs");
+            expect(db.packPurchase.findMany).not.toHaveBeenCalled();
+            expect(detail.bookings?.upcoming).toHaveLength(1);
+        });
     });
 
     it("does not state spent when a source it sums failed", async () => {
