@@ -1633,6 +1633,11 @@ export interface World {
     links: Prisma.CustomerIdentityLinkCreateManyInput[];
     notes: Prisma.ContactNoteCreateManyInput[];
     noteAllergens: Prisma.ContactNoteAllergenCreateManyInput[];
+    /**
+     * Needs attention (C1): Priya's sesame allergy as an entry, which Order
+     * Detail's allergy check and the Orders list's tag read (B15).
+     */
+    attention: Prisma.ContactAttentionCreateManyInput[];
     docs: DocSpec[];
     /** What the lines hold and sold, the shelves' numbers and the stock log. */
     stock: StockPlan;
@@ -1678,6 +1683,7 @@ export function planWorld(input: PlanInput): World {
         links: [],
         notes: [],
         noteAllergens: [],
+        attention: [],
         docs: [],
     };
     // A customer belongs to a storefront: Online's are their own rows.
@@ -2588,6 +2594,23 @@ export function planWorld(input: PlanInput): World {
         allergenId: input.allergenId.Sesame,
         organizationId: orgId,
     });
+    // The same allergy on her Needs attention, as the C1 backfill makes it
+    // from the note: what the order screens read (B15).
+    w.attention.push({
+        id: sid("attention", "priya", 0),
+        organizationId: orgId,
+        contactId: contactId("priya"),
+        kind: "ALLERGY",
+        label: "Sesame",
+        detail: "Use the plain bun tray.",
+        allergenId: input.allergenId.Sesame,
+        sensitive: false,
+        source: "STAFF",
+        status: "ACTIVE",
+        createdByUserId: input.counterUserId,
+        createdAt: noteAt(11, 8 * 60 + 15),
+        updatedAt: noteAt(11, 8 * 60 + 15),
+    });
 
     // --- what the lines hold and sold, and the stock log they write
     const stock = planStock({
@@ -2626,6 +2649,7 @@ async function writeWorld(prisma: Db, orgId: string, w: World) {
     await prisma.customerIdentityLink.createMany({ data: w.links });
     await prisma.contactNote.createMany({ data: w.notes });
     await prisma.contactNoteAllergen.createMany({ data: w.noteAllergens });
+    await prisma.contactAttention.createMany({ data: w.attention });
     await writeDocuments(prisma, orgId, w.docs);
 }
 
