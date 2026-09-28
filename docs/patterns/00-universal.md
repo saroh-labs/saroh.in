@@ -74,7 +74,7 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,409 after E19 and E20, whose range,
+  (1,173), `calendar/calendar.service.ts` (1,411 after E19, E20 and B13, whose range,
   days-off and payments reads already sit in their own files; split next),
   `orders/order-kitchen.service.ts` (1,138 after B2b–B15 and B9), `staff/staff.service.ts` (744).
   B9 kept its change of fulfilment and its cancel out of the kitchen
@@ -82,16 +82,25 @@ each with why it stops there:
   its money; `order-cancel.service.ts`, `order-cancel.ts`,
   `order-change-options.ts`, `order-customer-note.ts`); it added only the
   read's change options and exported `lockOrder`. The edit is the next cut.
-- `payments/payments.service.ts` (2,042 after B8, B9 and E8) — every money
+  B13 (walk-ins, New order v2) left it untouched: who the order is for, the
+  counter payment and the ways a cart may leave are `orders/new-order.ts`,
+  and how a walk-in reads everywhere is `orders/walk-in.ts`.
+- `orders/orders.service.ts` (683 after B13) and `orders/dto.ts` (583) —
+  the storefront-scoped create, its pricing, discount code and stock
+  promise in one serializable write, and the order DTOs. B13 added only the
+  calls into `new-order.ts` and the DTO's optional fields, whose classes are
+  in `new-order.dto.ts`. The create's pricing is the next seam.
+- `payments/payments.service.ts` (2,045 after B8, B9, E8 and B13's null-safe
+  customer check) — every money
   path of an order (intents, refunds and their two phases, the pay link's
   intent) shares one private refund core and provider call; B9 added only
   a thin `refundOrderForCancel` onto that core and the cancel's finish in
   `recordRefundTaken`. Refunds as their own service is the seam.
-- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (546
-  after B8, B11 and B9) — the page's panels share its one `panel` and hold
-  state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
-  `cancel-panel.tsx` and `use-order-changes.ts`; the header and the money
-  column are the next seams.
+- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (551
+  after B8, B11, B9 and B13) — the page's panels share its one `panel` and
+  hold state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
+  `cancel-panel.tsx` and `use-order-changes.ts`, and B13's walk-in card to
+  `walk-in-card.tsx`; the header and the money column are the next seams.
 - The calendar's `lib/calendar/layers.ts` (449) and
   `components/calendar/business-calendar.tsx` (404) — the layers' order,
   tones, words and day lines, and the screen's month, switches and day
