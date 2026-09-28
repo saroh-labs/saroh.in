@@ -7,8 +7,10 @@ import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { allows, authorize } from "../organizations/organization-policy";
+import { emailHeldBy, planContactEdit } from "./contact-edit";
 import type { ContactSearchResult } from "./contact-search";
 import { SEARCH_LIMIT, searchContacts } from "./contact-search";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
@@ -436,9 +438,16 @@ export class ContactsService {
     }
 
     /**
-     * Patch a contact's descriptive fields (never its email identity). Authorizes
-     * `contact:write`; cross-tenant or missing ids 404 before any write. Only the
-     * fields present in the DTO are applied — a sparse patch.
+     * Patch a contact: name, phone, company, email and address (C8), as
+     * `contact-edit.ts` works out. Authorizes `contact:write`; cross-tenant
+     * or missing ids 404 before any write. Only the fields present in the
+     * DTO are applied — a sparse patch.
+     *
+     * An email another contact holds is a 409 naming them. A changed email
+     * clears the verified stamp (DEC-049) and leaves a site account's
+     * sign-in email alone. What changed is recorded for the timeline
+     * ("Details changed"), by name only; an edit that changes nothing
+     * writes nothing.
      */
     async update(
         ctx: OrganizationContext,
@@ -447,21 +456,50 @@ export class ContactsService {
     ): Promise<Contact> {
         authorize(ctx, "contact:write");
 
-        await this.requireOwned(ctx, contactId);
+        const current = await this.requireOwned(ctx, contactId);
+        const edit = planContactEdit(current, dto);
+        if (edit.changed.length === 0) return current;
 
-        return prisma.contact.update({
-            where: { id: contactId },
-            data: {
-                ...(dto.firstName !== undefined
-                    ? { firstName: dto.firstName }
-                    : {}),
-                ...(dto.lastName !== undefined
-                    ? { lastName: dto.lastName }
-                    : {}),
-                ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
-                ...(dto.company !== undefined ? { company: dto.company } : {}),
-            },
-        });
+        if (edit.email) {
+            const holder = await prisma.contact.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { not: contactId },
+                    email: { equals: edit.email, mode: "insensitive" },
+                },
+                select: { id: true, firstName: true, lastName: true },
+            });
+            if (holder) throw emailHeldBy(holder);
+        }
+
+        try {
+            return await prisma.$transaction(async (tx) => {
+                const updated = await tx.contact.update({
+                    where: { id: contactId },
+                    data: edit.data,
+                });
+                await tx.auditEvent.create({
+                    data: {
+                        action: AuditAction.CustomerDetailsChanged,
+                        actorUserId: ctx.userId,
+                        organizationId: ctx.organizationId,
+                        targetType: "contact",
+                        targetId: contactId,
+                        outcome: "SUCCESS",
+                        metadata: auditMetadata(ctx.roleKey, {
+                            fields: edit.changed,
+                        }),
+                    },
+                });
+                return updated;
+            });
+        } catch (err) {
+            // Lost a race for the email to another write.
+            if ((err as { code?: string }).code === "P2002") {
+                throw emailHeldBy(null);
+            }
+            throw err;
+        }
     }
 
     /**

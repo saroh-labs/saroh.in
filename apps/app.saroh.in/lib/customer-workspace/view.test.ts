@@ -350,6 +350,13 @@ describe("a shop customer's overview", () => {
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
         );
+        // The address kept on their record comes first (C8).
+        expect(deliveryAddress(rows, "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
+        );
+        expect(deliveryAddress([order()], "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
+        );
     });
 
     it("writes an order's lines, and how many more", () => {

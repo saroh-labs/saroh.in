@@ -1,8 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import {
     Sheet,
     SheetContent,
@@ -10,59 +8,73 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { showError, showUndo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { updateContact } from "@/lib/contacts/actions";
+import { saveDetailsAction } from "@/lib/customer-workspace/actions";
+import type { CustomerDetail } from "@/lib/customer-workspace/detail";
+import type {
+    DetailsDraft,
+    DetailsKey,
+} from "@/lib/customer-workspace/details";
+import {
+    detailsPatch,
+    detailsProblems,
+    draftFrom,
+    signInNote,
+} from "@/lib/customer-workspace/details";
+import type { EmailHolder } from "@/lib/customer-workspace/service";
 
-export interface Details {
-    firstName: string;
-    lastName: string;
-    phone: string;
-    company: string;
+import { AddressFields, TextField } from "./edit-fields";
+
+interface Refusal {
+    field: DetailsKey;
+    message: string;
+    holder?: EmailHolder;
 }
 
-const FIELDS: {
-    key: keyof Details;
-    label: string;
-    type: string;
-    note?: string;
-}[] = [
-    { key: "firstName", label: "First name", type: "text" },
-    { key: "lastName", label: "Last name", type: "text" },
-    { key: "phone", label: "Phone", type: "tel" },
-    { key: "company", label: "Company", type: "text" },
-];
-
 /**
- * Edit details, as the design's side sheet: the fields, Save with Undo, and
- * a question before unsaved changes are thrown away. The email is shown but
- * not edited — it is how their enquiries, bookings and store customers find
- * them, and changing it would quietly split one person into two.
+ * Edit details, as the design's side sheet (C8): name, email, phone,
+ * company and the delivery address, Save with Undo, and a question before
+ * unsaved changes are thrown away.
+ *
+ * The email is unique per business: one another customer holds is refused
+ * on the field, naming them. When they sign in on the website, the sheet
+ * says that sign-in keeps its own email (DEC-049, ADR-011).
  */
 export function EditSheet({
     open,
     onOpenChange,
-    contactId,
-    email,
-    initial,
+    contact,
+    signsInWith,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    contactId: string;
-    email: string;
-    initial: Details;
+    contact: CustomerDetail["contact"];
+    /** Their website account's email, when they sign in. */
+    signsInWith: string | null;
 }) {
     const router = useRouter();
-    const [fields, setFields] = useState(initial);
+    const [initial] = useState(() => draftFrom(contact));
+    const [draft, setDraft] = useState(initial);
+    const [refusal, setRefusal] = useState<Refusal | null>(null);
     const [asking, setAsking] = useState(false);
     const [saving, setSaving] = useState(false);
     const id = useId();
-    const changed = (Object.keys(fields) as (keyof Details)[]).filter(
-        (k) => fields[k].trim() !== initial[k],
-    );
-    const dirty = changed.length > 0;
-    const nameBad = !fields.firstName.trim() && !fields.lastName.trim();
+    const patch = detailsPatch(initial, draft);
+    const dirty = Object.keys(patch).length > 0;
+    const problems = detailsProblems(draft);
+    const blocked = Object.keys(problems).length > 0;
+    const errors: Partial<Record<DetailsKey, string>> = {
+        ...problems,
+        ...(refusal ? { [refusal.field]: refusal.message } : {}),
+    };
+
+    const set = (k: DetailsKey, value: string) => {
+        setDraft((x) => ({ ...x, [k]: value }));
+        setRefusal((r) => (r?.field === k ? null : r));
+    };
 
     const close = (force = false) => {
         if (dirty && !force) {
@@ -74,24 +86,47 @@ export function EditSheet({
     };
 
     async function save() {
-        if (!dirty || nameBad) return;
+        if (!dirty || blocked || saving) return;
         setSaving(true);
-        const input = Object.fromEntries(
-            changed.map((k) => [k, fields[k].trim()]),
-        );
-        const before = Object.fromEntries(changed.map((k) => [k, initial[k]]));
-        const res = await updateContact(contactId, input);
+        const res = await saveDetailsAction(contact.id, patch);
         setSaving(false);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) {
+            if (res.field && res.field in initial) {
+                setRefusal({
+                    field: res.field as DetailsKey,
+                    message: res.error,
+                    holder: res.holder,
+                });
+                return;
+            }
+            return showError(res.error);
+        }
         onOpenChange(false);
         router.refresh();
+        const before = Object.fromEntries(
+            (Object.keys(patch) as DetailsKey[]).map((k) => [k, initial[k]]),
+        ) as Partial<DetailsDraft>;
         showUndo("Details saved.", () => {
-            void updateContact(contactId, before).then((back) => {
+            void saveDetailsAction(contact.id, before).then((back) => {
                 if (!back.ok) showError(back.error);
                 router.refresh();
             });
         });
     }
+
+    const common = { id, draft, set };
+    const emailNote = refusal?.holder ? (
+        <Link
+            href={`/customers/${encodeURIComponent(refusal.holder.contactId)}`}
+            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
+        >
+            See {refusal.holder.name ?? "their record"}
+        </Link>
+    ) : signsInWith ? (
+        signInNote(signsInWith)
+    ) : (
+        "Receipts go here."
+    );
 
     return (
         <Sheet
@@ -105,57 +140,63 @@ export function EditSheet({
                         Edit details
                     </SheetTitle>
                     <SheetDescription className="sr-only">
-                        Change their name, phone and company.
+                        Change their name, email, phone, company and delivery
+                        address.
                     </SheetDescription>
                 </div>
                 <form
                     id={id}
+                    noValidate
                     onSubmit={(e) => {
                         e.preventDefault();
                         void save();
                     }}
                     className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-[18px] py-4"
                 >
-                    {FIELDS.map((f) => {
-                        const bad = f.key === "firstName" && nameBad;
-                        return (
-                            <div key={f.key} className="grid gap-1.5">
-                                <Label
-                                    htmlFor={`${id}-${f.key}`}
-                                    className="text-[12.5px] font-medium"
-                                >
-                                    {f.label}
-                                </Label>
-                                <Input
-                                    id={`${id}-${f.key}`}
-                                    type={f.type}
-                                    value={fields[f.key]}
-                                    aria-invalid={bad || undefined}
-                                    maxLength={f.key === "phone" ? 40 : 160}
-                                    onChange={(e) =>
-                                        setFields((x) => ({
-                                            ...x,
-                                            [f.key]: e.target.value,
-                                        }))
-                                    }
-                                    className="h-[38px] rounded-[9px] text-[14px]"
-                                />
-                                {bad ? (
-                                    <span className="text-[11.5px] text-destructive-subtle-foreground">
-                                        A customer needs a name.
-                                    </span>
-                                ) : null}
-                            </div>
-                        );
-                    })}
-                    <div className="grid gap-1.5">
-                        <span className="text-[12.5px] font-medium">Email</span>
-                        <span className="text-[14px]">{email}</span>
-                        <span className="text-[11.5px] text-muted-foreground">
-                            Stays as it is — it is how their enquiries, bookings
-                            and orders find them.
+                    <TextField
+                        {...common}
+                        k="firstName"
+                        label="First name"
+                        maxLength={120}
+                        error={errors.firstName}
+                    />
+                    <TextField
+                        {...common}
+                        k="lastName"
+                        label="Last name"
+                        maxLength={120}
+                    />{" "}
+                    <TextField
+                        {...common}
+                        k="email"
+                        label="Email"
+                        type="email"
+                        maxLength={200}
+                        autoComplete="off"
+                        error={errors.email}
+                        note={emailNote}
+                    />
+                    {refusal?.field === "email" && refusal.holder ? (
+                        <span className="-mt-2 text-[11.5px] text-muted-foreground">
+                            {emailNote}
                         </span>
-                    </div>
+                    ) : null}
+                    <TextField
+                        {...common}
+                        k="phone"
+                        label="Phone"
+                        type="tel"
+                        maxLength={40}
+                        error={errors.phone}
+                    />
+                    <TextField
+                        {...common}
+                        k="company"
+                        label="Company"
+                        maxLength={160}
+                        error={errors.company}
+                    />
+                    <AddressFields {...common} errors={errors} />
                 </form>
                 {asking ? (
                     <div
@@ -197,7 +238,7 @@ export function EditSheet({
                     <Button
                         type="submit"
                         form={id}
-                        disabled={!dirty || nameBad || saving}
+                        disabled={!dirty || blocked || saving}
                         className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                     >
                         {saving ? "Saving…" : "Save"}

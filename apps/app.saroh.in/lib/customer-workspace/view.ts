@@ -391,9 +391,16 @@ export function howTheyGet(rows: DetailOrder[]): string {
     return `Collects at ${where} — ${collected.length} of ${rows.length} orders. The rest were delivered.`;
 }
 
-/** Where their last delivery went. */
-export function deliveryAddress(rows: DetailOrder[]): string {
+/**
+ * Their delivery address: the one kept on their record (C8, as one line),
+ * else where their last delivery went.
+ */
+export function deliveryAddress(
+    rows: DetailOrder[],
+    kept: string | null = null,
+): string {
     return (
+        kept ??
         rows.find((o) => o.delivery)?.delivery ??
         "No address — they have only collected."
     );

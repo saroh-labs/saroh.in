@@ -50,7 +50,7 @@ export interface ContactDuplicateSuggestion {
 export type Suggestion = IdentitySuggestion | ContactDuplicateSuggestion;
 
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE" | "DETAILS";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -310,25 +310,41 @@ export class CustomerWorkspaceService {
                 });
         }
 
-        // A merge into this person (C9): the audit row names them as the
-        // target. It is about the person, not a module, so it always shows.
-        const merges = await this.db.auditEvent.findMany({
+        // A merge into this person (C9), or staff editing their details
+        // (C8): the audit row names them as the target. It is about the
+        // person, not a module, so it always shows.
+        const personal = await this.db.auditEvent.findMany({
             where: {
                 organizationId: ctx.organizationId,
-                action: AuditAction.CustomerMerged,
+                action: {
+                    in: [
+                        AuditAction.CustomerMerged,
+                        AuditAction.CustomerDetailsChanged,
+                    ],
+                },
                 targetType: "contact",
                 targetId: contactId,
             },
-            select: { createdAt: true },
+            select: { action: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
             take: 50,
         });
-        for (const merge of merges)
-            events.push({
-                type: "MERGE",
-                at: merge.createdAt.toISOString(),
-                title: "Merged with a duplicate",
-                moduleKey: "CRM",
-            });
+        for (const row of personal)
+            events.push(
+                row.action === AuditAction.CustomerMerged
+                    ? {
+                          type: "MERGE",
+                          at: row.createdAt.toISOString(),
+                          title: "Merged with a duplicate",
+                          moduleKey: "CRM",
+                      }
+                    : {
+                          type: "DETAILS",
+                          at: row.createdAt.toISOString(),
+                          title: "Details changed",
+                          moduleKey: "CRM",
+                      },
+            );
 
         events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
         return { events };
