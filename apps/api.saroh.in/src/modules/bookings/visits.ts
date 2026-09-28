@@ -110,6 +110,39 @@ export async function requireTreatmentStorefront(
     return store;
 }
 
+/** Why a service of more than one visit can't be saved (E10). */
+export const TREATMENT_NEEDS_STOREFRONT =
+    "Treatments are sold as orders — add a storefront first.";
+
+/**
+ * The Service Editor's rule (E10): a service of more than one visit is a
+ * treatment, sold as an order, so it needs a storefront to sell from, and
+ * it is one-to-one (a class is booked a session at a time). Asked when a
+ * service is made a treatment — created with visits, or raised from one —
+ * so a service that already is one still saves when its storefront is
+ * closed later; the booking page refuses it then (E9).
+ */
+export async function assertTreatmentSellable(
+    service: Pick<Service, "organizationId" | "siteId">,
+    input: { visits: number; capacity: number; wasTreatment: boolean },
+): Promise<void> {
+    if (input.visits <= 1) return;
+    if (input.capacity > 1) {
+        throw new BadRequestException({
+            message:
+                "Visits are for one-to-one services. A class is booked a session at a time.",
+            details: { field: "visits" },
+        });
+    }
+    if (input.wasTreatment) return;
+    if (!(await treatmentStorefront(prisma, service))) {
+        throw new ConflictException({
+            message: TREATMENT_NEEDS_STOREFRONT,
+            details: { reason: "no-storefront", field: "visits" },
+        });
+    }
+}
+
 /** The email a treatment's bill goes to, or the refusal that asks for one. */
 export function treatmentEmail(email: string | null | undefined): string {
     const normalised = normaliseEmail(email);

@@ -71,9 +71,12 @@ import {
 import type { ServiceView } from "./service-fields";
 import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
+import type { TreatmentView } from "./treatment-view";
+import { treatmentOf, treatmentOrderSelect } from "./treatment-view";
 import { useMembershipInTx } from "./use-membership";
 import type { BookVisitInput } from "./visits";
 import {
+    assertTreatmentSellable,
     bookVisit,
     isTreatment,
     startTreatmentInTx,
@@ -111,6 +114,9 @@ const bookingDetailInclude = {
     },
     // Who takes it (U3) — the name the diary shows, never their hours.
     staff: { select: { id: true, name: true } },
+    // The treatment it is a visit of (E10): read for `treatment`, then
+    // dropped, so the answer carries the view and never the order row.
+    order: { select: treatmentOrderSelect },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{
@@ -123,8 +129,9 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * money worked out on the server (E8).
  */
 export type BookingDetailView = (
-    BookingDetail | WithoutIntakeNote<BookingDetail>
-) & { money: BookingMoney };
+    | Omit<BookingDetail, "order">
+    | WithoutIntakeNote<Omit<BookingDetail, "order">>
+) & { money: BookingMoney; treatment: TreatmentView | null };
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -153,6 +160,7 @@ const diarySelect = {
             durationMinutes: true,
             priceCents: true,
             currency: true,
+            visits: true,
         },
     },
     // Name and email only: `booking:read` is not `contact:read`.
@@ -166,6 +174,9 @@ const diarySelect = {
             purchase: { select: { pack: { select: { name: true } } } },
         },
     },
+    // A visit of a treatment (E10): "Visit 2 of 3" and its order.
+    visitNumber: true,
+    order: { select: treatmentOrderSelect },
 } satisfies Prisma.BookingSelect;
 
 /**
@@ -270,6 +281,15 @@ export class BookingsService {
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
+        // A treatment needs a storefront to sell from (E10, DEC-050).
+        await assertTreatmentSellable(
+            { organizationId: ctx.organizationId, siteId: dto.siteId ?? null },
+            {
+                visits: dto.visits ?? 1,
+                capacity: dto.capacity ?? 1,
+                wasTreatment: false,
+            },
+        );
 
         const created = await prisma.service.create({
             data: {
@@ -381,6 +401,14 @@ export class BookingsService {
                         : service.meetingUrl,
                 ),
             );
+        }
+        if (dto.visits !== undefined || dto.capacity !== undefined) {
+            // A treatment needs a storefront to sell from (E10, DEC-050).
+            await assertTreatmentSellable(service, {
+                visits: dto.visits ?? service.visits,
+                capacity: dto.capacity ?? service.capacity,
+                wasTreatment: isTreatment(service),
+            });
         }
         if (dto.visits !== undefined) data.visits = dto.visits;
         if (dto.showOnBookingPage !== undefined) {
@@ -955,8 +983,11 @@ export class BookingsService {
         // the business's refund policy the screen states (E30).
         const rules = await loadBookingRules(prisma, ctx.organizationId);
         const money = await bookingMoney(prisma, booking, rules);
+        // A visit of a treatment (E10): which visit, and the next to book.
+        const { order, ...rest } = booking;
+        const treatment = treatmentOf({ ...rest, order });
         // The booker's note (E7) only behind C1's sensitive gate.
-        return { ...intakeNoteFor(ctx, booking), money };
+        return { ...intakeNoteFor(ctx, rest), money, treatment };
     }
 
     /**
