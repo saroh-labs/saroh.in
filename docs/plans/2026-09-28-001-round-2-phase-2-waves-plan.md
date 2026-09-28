@@ -102,16 +102,18 @@ one exists.
 - **CP-3:** keeps D5's draft writers and D7 in different releases.
 
 ### Wave 4
-- **4a:** B9 #568 · B15 #574 · C10 #587 · E10 #623 (also fixes the
+- **4a:** B15 #574 · C10 #587 · E10 #623 (also fixes the
   `/contacts/:id` link on booking detail) · A7 #548 · A8 #549 (weeks only) ·
   E14 #627 · D7 #599 · D19 #604 · G9 #672 (needs D5, which is live)
 - **4b:** A6 #547, after E10 (`bookings.service.ts`) · A13 #554, after C10
-  (`customer-workspace/actions.ts`).
+  (`customer-workspace/actions.ts`) · B9 #568, after A13 (its "tell the
+  customer" notice uses Messages).
 - The account area's flag (A5–A8, A13) switches on at the release after
   wave 4.
 
 ### Wave 5
-- **5a:** B13 #572 · A14 #555 · D20 #612 · E22 #635 · G12 #675 · E13 #626 ·
+- **5a:** B13 #572 · A14 #555 · D20 #612 (adds the `cancelFor` call to C9's
+  merge path, which merged before it) · E22 #635 · G12 #675 · E13 #626 ·
   A11 #552 · F10 #653 (readers first; see boundary 9) · D15 #608
 - **5b:** C11 #588, after D20, wiring `cancelFor` · B14 #573, after A14
   (`order-kitchen.service.ts`).
@@ -148,7 +150,7 @@ one exists.
 | F20 | An optional public phone on the business profile (additive), checked as E.164 (`+91…`) and shown on the site once set. A field in Settings → Business, with a `settings-audit` entry. `businessPublicPhone(site)` in `site-host.ts` is filled in, and saving it refreshes the site's cached pages so a removed number stops showing. It unblocks G8's Call button, E6's header and A2/A9's "call ‹Business›" copy. | 1a |
 | D22 | Settings › Providers asks for the Razorpay public key id, and the API returns it for E11's checkout. **An idempotent script fills `PaymentProvider.publicKey` from the sealed `keyId` for existing Razorpay connections, and it runs before the "needs attention" state goes live**, so no merchant loses online pay. | 1a |
 | D21 | The readers that refuse DRAFT (subscribe, the site's plan reads, "Sell again"). They are live from CP-1, before any draft writer. | 1a |
-| C15 | A per-storefront setting for same-email customers: link automatically, or leave for staff (the default; existing stores keep it). The incoming customer's storefront's setting applies. Links go through C9's `resolveContact`. **Automatic linking never widens what a site account can see unless the contact's email is verified (DEC-049); otherwise it only suggests the pair.** Turning it on doesn't re-link existing pairs. | 6a |
+| C15 | A per-storefront setting for same-email customers: link automatically, or leave for staff (the default; existing stores keep it). The incoming customer's storefront's setting applies. **It links only to a contact that was itself made from a store customer (DEC-055)**, never to a staff-entered contact or lead. Links go through C9's `resolveContact`. **Automatic linking never widens what a site account can see unless the contact's email is verified (DEC-049); otherwise it only suggests the pair.** Turning it on doesn't re-link existing pairs. | 6a |
 
 ## Release boundaries
 
