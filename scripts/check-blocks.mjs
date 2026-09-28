@@ -152,6 +152,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // review page: a Saroh surface in the business's palette, drawing no block.
     "apps/saroh.app/app/pay/[token]/page.tsx",
     "apps/saroh.app/components/invoice-pay.tsx",
+    // An order's pay link (plan B, B11): the invoice pay page's twin for an
+    // order, the same category and drawing no block.
+    "apps/saroh.app/app/pay/o/[token]/page.tsx",
+    "apps/saroh.app/components/order-pay.tsx",
     "apps/saroh.app/components/provider-handoff.tsx",
     "apps/saroh.app/components/post-view.tsx",
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
