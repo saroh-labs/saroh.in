@@ -122,6 +122,37 @@ test("REVIEWER's Home is what was sent to them for review, and nothing about the
     await expect(page).toHaveURL(/\/sites\/site_1\/review\?page=page_1$/);
 });
 
+test("a staff member lands on their storefront's work, and the header says so (F11)", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "STAFF");
+    await page.goto("/");
+    await expect(
+        page.getByText(
+            "Friday 18 September · Permission tests · Hill Road only",
+            {
+                exact: true,
+            },
+        ),
+    ).toBeVisible();
+    // Their own work, as a row that opens it.
+    const row = page.getByRole("link", { name: /Send order #1042/ });
+    await expect(row).toHaveAttribute(
+        "href",
+        "/commerce/orders/ord_1?storefront=store_1",
+    );
+    await expect(row).toHaveCSS("cursor", "pointer");
+    // No switch on Home, no setup steps that aren't theirs, and no code.
+    await expect(page.getByRole("radiogroup", { name: "Store" })).toHaveCount(
+        0,
+    );
+    await expect(
+        page.getByRole("heading", { name: "Get ready to take money" }),
+    ).toHaveCount(0);
+    await expect(page.getByText(/order:stage|payment:read/)).toHaveCount(0);
+});
+
 test("production 403 uses the editor permission boundary", async ({
     page,
     context,
