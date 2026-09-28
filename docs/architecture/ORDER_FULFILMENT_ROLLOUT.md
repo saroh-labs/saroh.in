@@ -352,12 +352,49 @@ and a copy grown to 200,767 orders.
 
 ---
 
+## Beside release 2 · product fulfilment types (B12)
+
+Not one of the three releases: it adds a column and changes no enum value.
+It needs release 1's values and ships with release 2 or after it, always
+before release 3 (the phase-2 waves plan puts B12 ahead of B2d).
+
+- **Migration** `20261012100000_product_fulfilment_types`: `ALTER TABLE
+"Product" ADD COLUMN "fulfilmentTypes" "OrderFulfilment"[] DEFAULT '{}'`.
+  A catalogue change under a brief ACCESS EXCLUSIVE lock on `Product` with
+  a constant default: no rewrite, constant time. Every existing product
+  reads as empty, which means every way its storefronts offer, so no order
+  changes what it offers. The previous image never selects the column, so
+  it keeps serving during the migration, and **rollback** is deploying the
+  previous tag (the column stays, unused).
+- **Only the new names are ever stored**: PICKUP, LOCAL_DELIVERY, SHIPPING
+  or DIGITAL (never COLLECT or DELIVERY, never an appointment type — a
+  service is never a Product, DEC-050). Release 3's cast of this column
+  therefore finds nothing to convert. Verify (read-only; no rows):
+
+    ```sql
+    SELECT id FROM "Product"
+    WHERE NOT ("fulfilmentTypes" <@ ARRAY['PICKUP', 'LOCAL_DELIVERY', 'SHIPPING', 'DIGITAL']::"OrderFulfilment"[]);
+    ```
+
+- **What changes for callers:** the product reads carry `fulfilmentTypes`
+  (table order; empty means every way its storefronts offer), and create
+  and the section PATCH take it (400 for any other value). Creating an
+  order, or editing one's way or adding a line, is refused with 409 when an
+  item's own list leaves the way out ("Chocolate cake isn't sold for
+  Shipping. It allows Pick-up and Local delivery only."). A product with no
+  list refuses nothing, as before. `allowedTypes` in `orders/fulfilment.ts`
+  is the intersection B13, B9 and G13 answer with.
+- **The app follows the API**: the editor's "How it's fulfilled" chips send
+  the field, which an API before B12 refuses.
+
+---
+
 ## Release 3 · contract (B2d)
 
 To be filled in by B2d: the contract migration re-runs the backfill for
 stragglers, fails loudly if any COLLECT or DELIVERY remains, builds the new
 type without them, casts `Order.fulfilment`, `StoreSettings.fulfilmentTypes`
-and `Product.fulfilmentTypes` (if B12 has shipped) to it, and swaps the
+and `Product.fulfilmentTypes` (B12, which ships first) to it, and swaps the
 names. The cast rewrites `Order` under an ACCESS EXCLUSIVE lock: measure how
 long on a production-sized copy and record it here before choosing the
 window.
