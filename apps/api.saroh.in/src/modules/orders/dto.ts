@@ -393,6 +393,13 @@ const blankToUndefined = ({ value }: { value: unknown }) => {
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * The Orders list's date presets (B4), read in the business's zone:
+ * today, yesterday, the last 7 days (today included) and this month.
+ */
+export const DATE_PRESETS = ["today", "yesterday", "7d", "month"] as const;
+export type DatePreset = (typeof DATE_PRESETS)[number];
+
+/**
  * `GET organizations/:org/orders` (plan B, B1). Without `v=2` only `storeId`
  * is read and the route answers today's bare array; with it, every filter
  * applies and the answer is `{ rows, counts, nextCursor }`.
@@ -457,6 +464,27 @@ export class ListOrdersQuery {
     @IsIn(["true", "false"], { message: "late is true or false" })
     late?: "true" | "false";
 
+    /**
+     * What the row's pill says, as a key: a step's word ("ready",
+     * "handed-to-courier") or "refunded" / "cancelled" (B4). The keys the
+     * business's orders show come from `GET …/orders/filters`; an unknown
+     * one matches nothing.
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @Matches(/^[a-z0-9-]{1,40}$/, { message: "Unknown step" })
+    step?: string;
+
+    /** A date preset in the business's zone (B4); not with `from`/`to`. */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(DATE_PRESETS, { message: "Unknown date range" })
+    date?: DatePreset;
+
     /** A calendar day in the business's zone. */
     @IsOptional()
     @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
@@ -489,4 +517,25 @@ export class ListOrdersQuery {
     @IsString()
     @MaxLength(64)
     cursor?: string;
+}
+
+/**
+ * `GET organizations/:org/orders/filters` (B4): what the filter bar offers.
+ * `productId` names the product a shared link filters on, for its name.
+ */
+export class OrderFilterOptionsQuery {
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    productId?: string;
+}
+
+/** `GET organizations/:org/orders/products` (B4): the product picker's search. */
+export class OrderProductsQuery {
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(100)
+    q?: string;
 }
