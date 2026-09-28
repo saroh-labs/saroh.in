@@ -107,20 +107,28 @@ function make() {
 }
 
 describe("canSeeSensitive", () => {
-    it("is contact:write until C13 gives it its own capability", () => {
+    it("is customer:sensitive: Owner and Admin, and whoever is granted it (C13)", () => {
         expect(canSeeSensitive(OWNER)).toBe(true);
         expect(canSeeSensitive(ADMIN)).toBe(true);
         expect(canSeeSensitive(MEMBER)).toBe(false);
-        const frontDesk = {
+        const practitioner = {
             ...MEMBER,
-            actions: new Set<OrgAction>(["contact:read", "contact:write"]),
+            actions: new Set<OrgAction>(["contact:read", "customer:sensitive"]),
         };
-        expect(canSeeSensitive(frontDesk)).toBe(true);
+        expect(canSeeSensitive(practitioner)).toBe(true);
         const counter = {
             ...OWNER,
             actions: new Set<OrgAction>(["contact:read"]),
         };
         expect(canSeeSensitive(counter)).toBe(false);
+    });
+
+    it("is not implied by contact:write: a front desk edits, and reads no medical notes", () => {
+        const frontDesk = {
+            ...MEMBER,
+            actions: new Set<OrgAction>(["contact:read", "contact:write"]),
+        };
+        expect(canSeeSensitive(frontDesk)).toBe(false);
     });
 });
 
@@ -228,11 +236,27 @@ describe("attentionSuggestionsFor", () => {
         });
     });
 
-    it("gives a custom role holding contact:write the sensitive ones too, until C13", async () => {
+    it("gives a writer without customer:sensitive only the ones that aren't sensitive (C13)", async () => {
         const db = make();
         const writer = {
             ...MEMBER,
             actions: new Set<OrgAction>(["contact:read", "contact:write"]),
+        };
+        await attentionSuggestionsFor(writer, "c1", db as never);
+        expect(
+            db.contactAttention.findMany.mock.calls[0][0].where,
+        ).toHaveProperty("sensitive", false);
+    });
+
+    it("gives a writer holding customer:sensitive the sensitive ones too", async () => {
+        const db = make();
+        const writer = {
+            ...MEMBER,
+            actions: new Set<OrgAction>([
+                "contact:read",
+                "contact:write",
+                "customer:sensitive",
+            ]),
         };
         await attentionSuggestionsFor(writer, "c1", db as never);
         expect(

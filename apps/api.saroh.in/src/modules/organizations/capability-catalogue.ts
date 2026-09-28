@@ -226,11 +226,23 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "form:write", group: "website", label: "Change website forms" },
 
     // — Contacts ——————————————————————————————————————————————
-    { action: "contact:read", group: "contacts", label: "See contacts" },
+    {
+        action: "contact:read",
+        group: "contacts",
+        label: "See customers and contacts",
+        note: "Name, phone, email, address, notes and what the team must know. Search by any of them. Medical and other sensitive notes need their own permission.",
+    },
     {
         action: "contact:write",
         group: "contacts",
-        label: "Add and edit contacts",
+        label: "Edit customers and contacts",
+        note: "Details, notes and what the team must know. Includes deleting a record with no orders or invoices. Whoever can edit can also see.",
+    },
+    {
+        action: "customer:sensitive",
+        group: "contacts",
+        label: "See sensitive notes",
+        note: "Medical and other notes marked sensitive, and notes left when booking online. Without it, the team is told a note is there but not what it says.",
     },
     {
         action: "customer:merge",

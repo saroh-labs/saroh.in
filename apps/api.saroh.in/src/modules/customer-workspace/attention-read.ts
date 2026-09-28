@@ -57,12 +57,14 @@ export interface AttentionRead {
 }
 
 /**
- * Whether this viewer sees sensitive entries. `contact:write` (Owner and
- * Admin by default) until C13 gives it its own capability,
- * `customer:sensitive` (permission matrix Q2): then this one line changes.
+ * Whether this viewer sees sensitive entries: `customer:sensitive` (C13,
+ * permission matrix Q2), held by Owner and Admin by default and grantable to
+ * a practitioner. Not implied by `contact:write`, so a front desk that edits
+ * a patient's details still doesn't read their medical notes. Every surface
+ * that shows Needs attention or an intake note asks this one seam.
  */
 export function canSeeSensitive(ctx: OrganizationContext): boolean {
-    return allows(ctx, "contact:write");
+    return allows(ctx, "customer:sensitive");
 }
 
 export const ATTENTION_SELECT = {

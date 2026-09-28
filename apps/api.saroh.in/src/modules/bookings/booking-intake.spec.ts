@@ -93,11 +93,19 @@ describe("the note, read by staff", () => {
     });
 
     it("follows the role's own capabilities, not only its name", () => {
-        const custom: OrganizationContext = {
-            ...ctx("FRONT_DESK"),
-            actions: new Set(["booking:read", "contact:write"]),
+        const practitioner: OrganizationContext = {
+            ...ctx("PRACTITIONER"),
+            actions: new Set(["booking:read", "customer:sensitive"]),
         };
-        expect(intakeNoteFor(custom, row)).toEqual(row);
+        expect(intakeNoteFor(practitioner, row)).toEqual(row);
+    });
+
+    it("never to a front desk that edits customers but can't see sensitive notes (C13)", () => {
+        const frontDesk: OrganizationContext = {
+            ...ctx("FRONT_DESK"),
+            actions: new Set(["booking:write", "contact:write"]),
+        };
+        expect(intakeNoteFor(frontDesk, row)).toEqual({ id: "bk_1" });
     });
 
     it("comes off a row entirely", () => {
