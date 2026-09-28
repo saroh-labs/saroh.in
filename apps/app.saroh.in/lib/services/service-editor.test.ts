@@ -5,6 +5,7 @@ import type { ServiceDraft } from "./service-editor";
 import {
     bookingPageNote,
     changedSections,
+    depositNote,
     draftOf,
     fromMinor,
     glance,
@@ -80,6 +81,7 @@ describe("draftOf", () => {
             where: "IN_PERSON",
             meetingUrl: "",
             price: "1200",
+            deposit: "PERCENT_50",
             staffIds: ["st_a", "st_b"],
             showOnBookingPage: true,
             taking: true,
@@ -153,7 +155,9 @@ describe("serviceProblems", () => {
     });
 
     it("takes 0 as free, and refuses a price that isn't a number", () => {
-        expect(serviceProblems(draft({ price: "0" }), true)).toEqual([]);
+        expect(
+            serviceProblems(draft({ price: "0", deposit: "NONE" }), true),
+        ).toEqual([]);
         expect(serviceProblems(draft({ price: "12,00.5.0" }), true)).toEqual([
             "Write the price as a number, like 1200.",
         ]);
@@ -207,7 +211,7 @@ describe("serviceProblems", () => {
 });
 
 describe("serviceInput", () => {
-    it("sends the fields as the API takes them, and never visits or the deposit", () => {
+    it("sends the fields as the API takes them, the deposit's mode, and never visits", () => {
         const input = serviceInput(
             draft({ where: "EITHER", meetingUrl: " https://meet.x/y " }),
             "INR",
@@ -227,9 +231,11 @@ describe("serviceInput", () => {
             locationType: "EITHER",
             meetingUrl: "https://meet.x/y",
             showOnBookingPage: true,
+            depositMode: "PERCENT_50",
         });
         expect(input).not.toHaveProperty("visits");
-        expect(input).not.toHaveProperty("depositMode");
+        // Never an amount: the server works the deposit out (E8).
+        expect(input).not.toHaveProperty("depositCents");
     });
 
     it("clears the link in person, a class sends its places, blank GST clears", () => {
@@ -413,5 +419,49 @@ describe("staffFor and needsMeetingLink", () => {
         expect(needsMeetingLink("ONLINE")).toBe(true);
         expect(needsMeetingLink("EITHER")).toBe(true);
         expect(needsMeetingLink("IN_PERSON")).toBe(false);
+    });
+});
+
+describe("At booking, they pay (E8)", () => {
+    it("opens on the saved deposit, and a new service takes nothing", () => {
+        expect(draft().deposit).toBe("PERCENT_50");
+        expect(draftOf(null, [], "Asia/Kolkata").deposit).toBe("NONE");
+    });
+
+    it("works the split out from the price as typed, in the design's words", () => {
+        expect(depositNote("NONE", "1200", "INR")).toBe(
+            "No card needed to book. No-shows cost you the slot.",
+        );
+        expect(depositNote("PERCENT_25", "1,200", "INR")).toBe(
+            "They pay ₹300 when booking, and the rest (₹900) at the visit. Refunded if they cancel in time.",
+        );
+        expect(depositNote("PERCENT_50", "999.99", "INR")).toBe(
+            "They pay ₹500 when booking, and the rest (₹499.99) at the visit. Refunded if they cancel in time.",
+        );
+        expect(depositNote("FULL", "1200", "INR")).toBe(
+            "They pay ₹1,200 when booking. Refunded if they cancel in time.",
+        );
+    });
+
+    it("refuses a deposit on a free service, as the API does", () => {
+        expect(
+            serviceProblems(
+                draft({ price: "0", deposit: "PERCENT_25" }),
+                false,
+            ),
+        ).toContain(
+            "A deposit is part of the price. Set a price first, or take nothing at booking.",
+        );
+        expect(
+            serviceProblems(draft({ price: "0", deposit: "NONE" }), false),
+        ).not.toContain(
+            "A deposit is part of the price. Set a price first, or take nothing at booking.",
+        );
+    });
+
+    it("counts a changed deposit as a change to Price", () => {
+        expect(changedSections(draft(), draft({ deposit: "FULL" }))).toEqual([
+            "Price",
+        ]);
     });
 });

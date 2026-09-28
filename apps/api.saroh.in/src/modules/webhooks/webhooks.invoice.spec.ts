@@ -30,6 +30,9 @@ jest.mock("@saroh/database", () => {
         paymentAttempt: { create: jest.fn() },
         paymentRefund: {
             findFirst: jest.fn(),
+            // The credit note's read of a settled refund (E8): a booking's
+            // is specced against a real database (public-booking.db.spec).
+            findUnique: jest.fn().mockResolvedValue(null),
             findUniqueOrThrow: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),

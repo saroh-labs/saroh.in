@@ -238,6 +238,30 @@
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
   CONFIRMED with `paidWith` DESK. No credits online (ADR-008).
+- **A deposit rides the same hold** (E8, default 39). `pay: "DEPOSIT"` makes
+  the hold's draft invoice for `depositCents(price, depositMode)`, worked
+  out on the server, and the snapshot records `deposit.cents`; the rest is
+  due at the visit (`booking-money.ts`). A service with a deposit is never
+  booked to pay at the desk (`payAtBooking`), and a FULL deposit is paying
+  now. The public read serves `depositCents`, never the mode.
+- **The free-cancel deadline is fixed at booking** (`Booking.freeCancelUntil`,
+  DEC-051), written by `reserveInTx` from the rule of that moment. A move
+  never changes it; `isLateCancel` reads it, falling back to the start and
+  today's rule for bookings made before the column.
+- **A cancel in time refunds money paid online for the booking, once**
+  (`payments/booking-refund.ts`). Lock order: the booking invoice's intents
+  (`lockBookingIntentsInTx`), then `lockBookingInTx`; re-read the booking,
+  and only a booking not yet cancelled reserves one PENDING `PaymentRefund`
+  keyed `deposit-refund:<bookingId>` in the cancel's transaction. The cancel
+  sends it after commit (`sendAutomaticRefund`, DEC-026); the refund webhook
+  settles it and makes the credit note on the booking's invoice
+  (`creditNoteForRefund`, DEC-023). A late cancel keeps the money; the
+  business's `returnCredit` override refunds it only with `payment:manage`.
+  A visit of a treatment has no booking invoice, so it never refunds here
+  (DEC-050): its money goes back through the order.
+- **The anonymous `POST public/services/:id/book` answers 410** "Sign in to
+  book" and reads no body (A9); bookings from a site go through
+  `POST public/site-accounts/bookings`.
 
 ## Subscriptions — **Current**
 

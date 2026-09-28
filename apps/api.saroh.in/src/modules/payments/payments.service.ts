@@ -735,6 +735,12 @@ export class PaymentsService {
      * provider makes once. Only a PENDING row not yet taken is sent; the
      * refund webhook confirms it (DEC-026). No person asked for it, so no
      * permission — the caller is the payment webhook.
+     *
+     * A booking cancelled in time sends its refund the same way (E8,
+     * DEC-051): `booking-refund.ts` reserves the row inside the cancel,
+     * keyed per booking, and the cancel sends it here once it commits.
+     * The booking's `booking:write` is the permission; its credit note
+     * follows the provider's confirmation, in the refund webhook.
      */
     async sendAutomaticRefund(
         organizationId: string,

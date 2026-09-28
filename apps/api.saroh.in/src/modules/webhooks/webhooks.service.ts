@@ -326,7 +326,7 @@ export class WebhooksService {
                 case "FAILED":
                     return this.applyIntentFailure(tx, intent);
                 case "REFUNDED":
-                    return this.settleRefund(tx, intent, event);
+                    return this.applyInvoiceRefund(tx, intent, event);
                 case "REFUND_FAILED":
                     return this.failProviderRefund(tx, intent, event);
                 default:
@@ -616,6 +616,25 @@ export class WebhooksService {
             0,
         );
         return captured > 0 && refunded >= captured;
+    }
+
+    /**
+     * A refund of an invoice's payment settled: the refund row, and — for
+     * a booking's own invoice, a deposit or price handed back on a cancel
+     * in time (E8) — its credit note, now that the provider has confirmed
+     * it (DEC-023). Keyed on the refund, so never twice. Other invoices
+     * keep their status and no note, as before.
+     */
+    private async applyInvoiceRefund(
+        tx: Tx,
+        intent: IntentRow,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        const settled = await this.settleRefund(tx, intent, event);
+        if (settled.refundId && settled.settledNow) {
+            await creditNoteForRefund(tx, settled.refundId);
+        }
+        return settled;
     }
 
     /**

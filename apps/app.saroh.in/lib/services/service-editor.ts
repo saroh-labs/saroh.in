@@ -4,9 +4,9 @@
  * the words around it. Pure and client-safe, so the editor and its tests
  * agree.
  *
- * Visits and "At booking, they pay" are not here yet: the editor offers
- * them from E10 and E8, when the booking page honours them, and saving
- * never sends either, so a service keeps whatever the API holds.
+ * Visits are not here yet: the editor offers them from E10, when the
+ * booking page honours them, and saving never sends them, so a service
+ * keeps whatever the API holds. "At booking, they pay" arrived with E8.
  */
 
 import { formatMoney } from "@/lib/format/money";
@@ -14,6 +14,7 @@ import { rateOption } from "@/lib/invoices/gst";
 
 import type {
     CreateServiceInput,
+    DepositMode,
     LocationType,
     Service,
     UpdateServiceInput,
@@ -45,6 +46,8 @@ export interface ServiceDraft {
     // Price
     /** As typed: "1200", "1,200", "499.50"; 0 is free, blank is unset. */
     price: string;
+    /** What is paid at booking (E8): nothing, a share, or all of it. */
+    deposit: DepositMode;
     // Who takes it
     staffIds: string[];
     // The booking page, and taking bookings
@@ -121,6 +124,7 @@ export function draftOf(
             where: "IN_PERSON",
             meetingUrl: "",
             price: "",
+            deposit: "NONE",
             staffIds: [],
             showOnBookingPage: true,
             taking: true,
@@ -141,6 +145,7 @@ export function draftOf(
         where: service.locationType,
         meetingUrl: service.meetingUrl ?? "",
         price: fromMinor(service.priceCents),
+        deposit: service.depositMode,
         staffIds: [...staffIds].sort(),
         showOnBookingPage: service.showOnBookingPage,
         taking: service.status === "ACTIVE",
@@ -194,6 +199,11 @@ export function serviceProblems(
     if (price === null) problems.push("Add a price (0 if it's free).");
     else if (Number.isNaN(price)) {
         problems.push("Write the price as a number, like 1200.");
+    } else if (draft.deposit !== "NONE" && price === 0) {
+        // The API's own sentence (E8): a deposit is a share of a price.
+        problems.push(
+            "A deposit is part of the price. Set a price first, or take nothing at booking.",
+        );
     }
     if (hasStaff && draft.staffIds.length === 0) {
         problems.push("Pick who takes it.");
@@ -210,8 +220,9 @@ export function serviceProblems(
 }
 
 /**
- * What saving sends. Never visits or the deposit (E8 and E10 add those),
- * and the link only for a service that can happen online.
+ * What saving sends. Never visits (E10 adds them), and the link only for a
+ * service that can happen online. The deposit is its mode; the amount is
+ * always the server's (E8).
  */
 export function serviceInput(
     draft: ServiceDraft,
@@ -234,6 +245,7 @@ export function serviceInput(
         locationType: draft.where,
         meetingUrl: online ? draft.meetingUrl.trim() : null,
         showOnBookingPage: draft.showOnBookingPage,
+        depositMode: draft.deposit,
     };
 }
 
@@ -252,7 +264,7 @@ export function serviceUpdate(
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
     ["Time", ["minutes", "gap", "places", "where", "meetingUrl"]],
-    ["Price", ["price"]],
+    ["Price", ["price", "deposit"]],
     ["Who takes it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
@@ -348,6 +360,38 @@ export function timeNote(kind: ServiceKind, hasStaff: boolean): string {
     return hasStaff
         ? "Fills the free time of whoever takes it, with the gap kept free after."
         : "Books in its own weekly hours, set under More settings, with the gap kept free after.";
+}
+
+/** Each deposit's share of the price, in percent — the server's too. */
+const DEPOSIT_PERCENT: Record<DepositMode, number> = {
+    NONE: 0,
+    PERCENT_25: 25,
+    PERCENT_50: 50,
+    FULL: 100,
+};
+
+/**
+ * The note under "At booking, they pay" (the design's): what a customer
+ * pays when booking and at the visit, worked out from the price as typed,
+ * rounded to the paisa as the server rounds it.
+ */
+export function depositNote(
+    deposit: DepositMode,
+    price: string,
+    currency: string,
+): string {
+    if (deposit === "NONE") {
+        return "No card needed to book. No-shows cost you the slot.";
+    }
+    const minor = toMinor(price);
+    const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
+    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
+    const money = (n: number) => formatMoney(n, currency) ?? "";
+    const split =
+        deposit === "FULL"
+            ? `They pay ${money(now)} when booking.`
+            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) at the visit.`;
+    return `${split} Refunded if they cancel in time.`;
 }
 
 /** The note under Where. */

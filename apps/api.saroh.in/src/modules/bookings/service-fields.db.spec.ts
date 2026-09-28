@@ -112,15 +112,22 @@ describe("service fields (E1, real database)", () => {
 
         const page = await publicBookings.publicBookingPage(siteId);
         const shown = page.services.find((s) => s.id === made.id);
-        // Either isn't online-only; the page asks Where for it (E7).
-        expect(shown).toMatchObject({ online: false, where: "EITHER" });
+        // Either isn't online-only; the page asks Where for it (E7). The
+        // booking page serves the deposit the server worked out (E8), never
+        // the mode; visits wait for E10.
+        expect(shown).toMatchObject({
+            online: false,
+            where: "EITHER",
+            depositCents: 600_025,
+        });
+        expect(JSON.stringify(shown)).not.toMatch(
+            /visits|depositMode|showOnBookingPage/i,
+        );
         const [listItem] = await publicBookings.publicServices([made.id]);
-        for (const pub of [shown, listItem]) {
-            expect(pub).toBeDefined();
-            expect(JSON.stringify(pub)).not.toMatch(
-                /visits|deposit|showOnBookingPage/i,
-            );
-        }
+        expect(listItem).toBeDefined();
+        expect(JSON.stringify(listItem)).not.toMatch(
+            /visits|deposit|showOnBookingPage/i,
+        );
     });
 
     it("leaves a hidden service off the booking page and the services list, and keeps it for staff", async () => {

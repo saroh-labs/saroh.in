@@ -8,6 +8,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PaymentsModule } from "../payments/payments.module";
 import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { BookingsController } from "./bookings.controller";
@@ -44,6 +45,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         AnalyticsCoreModule,
         CapabilitiesModule,
         JobsModule,
+        // Sends a cancel's refund of money paid online (E8).
+        PaymentsModule,
         // The customer session guard for signed-in booking (A9).
         SiteAccountsModule,
     ],

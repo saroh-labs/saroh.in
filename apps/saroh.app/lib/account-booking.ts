@@ -32,7 +32,11 @@ export function accountBookingBody(
     const startAt = text(r.startAt, 40);
     const idempotencyKey = text(r.idempotencyKey, MAX_KEY);
     if (!serviceId || !startAt || !idempotencyKey) return null;
-    if (r.pay !== "NOW" && r.pay !== "DESK") return null;
+    // A deposit (E8) is one of the page's ways to pay; its amount is the
+    // server's.
+    if (r.pay !== "NOW" && r.pay !== "DEPOSIT" && r.pay !== "DESK") {
+        return null;
+    }
     if (
         r.locationType !== undefined &&
         r.locationType !== "IN_PERSON" &&
