@@ -66,6 +66,11 @@ async function pickTime(
     await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
     const serviceId =
         new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+    // The furthest day with free times, never today: late in the day today
+    // may have fewer free times left than the test picks from.
+    const openDays = page.getByRole("radio", { name: /times? free/ });
+    await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
+    await openDays.nth((await openDays.count()) - 1).click();
     const times = page.locator('[role="radiogroup"] button[role="radio"]', {
         hasText: /^\d{2}:\d{2}$/,
     });
