@@ -5,6 +5,7 @@ import {
     InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
+import type { PageKind } from "@saroh/database";
 import {
     getSectionContract,
     parseSectionContent,
@@ -40,6 +41,10 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
+import { addableModulePageKinds } from "./module-pages";
+import type { ModulePageKind } from "./page-kinds";
+import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
@@ -161,6 +166,10 @@ export interface PageView {
     isHome: boolean;
     /** Hidden pages stay in the draft and are omitted from the snapshot. */
     hidden: boolean;
+    /** FREE, or the module page this is (G14). */
+    kind: PageKind;
+    /** "Show in menu" (G14). */
+    inMenu: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -371,7 +380,18 @@ export interface SiteDetailView {
         isHome: boolean;
         /** Hidden pages stay in the draft and never reach the snapshot (#197). */
         hidden: boolean;
+        /** FREE, or the module page this is (G14). */
+        kind: PageKind;
+        /** "Show in menu" (G14). */
+        inMenu: boolean;
     }[];
+    /**
+     * The module pages this caller could add to the site now (G14): kinds
+     * whose module is on and that the site doesn't have yet, in menu order.
+     * Empty for a caller without `site:update`. A kind whose module isn't
+     * rolled out for the business is never listed (DEC-057).
+     */
+    addablePageKinds: ModulePageKind[];
     /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
@@ -471,6 +491,10 @@ const draftSiteSelect = {
             path: true,
             title: true,
             isHome: true,
+            // A module page travels with its kind (G14), and whether it
+            // shows in the menu decides the resolved navigation.
+            kind: true,
+            inMenu: true,
             versions: {
                 where: { status: "DRAFT" },
                 orderBy: { createdAt: "desc" },
@@ -940,6 +964,8 @@ export class SitesService {
                         title: true,
                         isHome: true,
                         hidden: true,
+                        kind: true,
+                        inMenu: true,
                     },
                 },
             },
@@ -986,6 +1012,12 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            addablePageKinds: allows(ctx, "site:update")
+                ? await addableModulePageKinds(
+                      ctx.organizationId,
+                      site.pages.map((p) => p.kind),
+                  )
+                : [],
         };
     }
 
@@ -1770,6 +1802,11 @@ export class SitesService {
                 path: page.path,
                 title: page.title,
                 isHome: page.isHome,
+                // A module page says what it is (G14), so the site can draw
+                // it at its route. A free-form page carries nothing new, so
+                // every snapshot of a site without module pages is byte for
+                // byte what it was.
+                ...(isModulePageKind(page.kind) ? { kind: page.kind } : {}),
                 sections,
             };
         });
@@ -2587,6 +2624,8 @@ export class SitesService {
                         path: true,
                         title: true,
                         hidden: true,
+                        kind: true,
+                        inMenu: true,
                         updatedAt: true,
                         versions: {
                             where: { status: "DRAFT" },
@@ -2650,6 +2689,8 @@ export class SitesService {
                 path: page.path,
                 title: page.title,
                 hidden: page.hidden,
+                kind: page.kind,
+                inMenu: page.inMenu,
                 // `versions` is the latest draft or empty; a page with no draft
                 // has no sections to check rather than being an error.
                 sections: page.versions.flatMap((v) => v.sections),
@@ -2741,25 +2782,38 @@ export class SitesService {
                 "The path / already belongs to this site's home page. Choose another, for example /about.",
             );
         }
-        await assertPathIsFree(siteId, dto.path);
 
-        const page = await prisma.page.create({
+        // A module page (G14) starts with its kind's sections.
+        if (isModulePageKind(dto.kind)) {
+            const site = await prisma.site.findFirst({
+                where: { id: siteId, organizationId: ctx.organizationId },
+                select: { id: true, name: true },
+            });
+            if (!site)
+                throw new NotFoundException(`Site "${siteId}" not found`);
+            return createModulePage(ctx, site, dto.kind, dto);
+        }
+
+        // The DTO requires both for a free-form page; checked again so the
+        // service never trusts that it ran.
+        if (dto.path === undefined || dto.title === undefined) {
+            throw new BadRequestException(
+                "A page needs a title and an address.",
+            );
+        }
+        await assertPathIsFree(siteId, dto.path, { title: dto.title });
+
+        return prisma.page.create({
             data: {
                 siteId,
                 organizationId: ctx.organizationId,
                 path: dto.path,
                 title: dto.title,
                 isHome: false,
+                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
             },
-            select: {
-                id: true,
-                path: true,
-                title: true,
-                isHome: true,
-                hidden: true,
-            },
+            select: PAGE_VIEW_SELECT,
         });
-        return page;
     }
 
     /**
@@ -2779,7 +2833,13 @@ export class SitesService {
 
         const page = await prisma.page.findFirst({
             where: { id: pageId, siteId, organizationId: ctx.organizationId },
-            select: { id: true, path: true, isHome: true },
+            select: {
+                id: true,
+                path: true,
+                isHome: true,
+                title: true,
+                kind: true,
+            },
         });
         if (!page) {
             throw new NotFoundException(`Page "${pageId}" not found`);
@@ -2791,12 +2851,26 @@ export class SitesService {
                     "The home page has to stay at /. Rename it if you want it called something else.",
                 );
             }
+            // A Book or Shop page is its route's (G14): its title and menu
+            // name change, its address never does.
+            if (
+                isModulePageKind(page.kind) &&
+                MODULE_PAGE_DEFAULTS[page.kind].fixedPath
+            ) {
+                throw new BadRequestException({
+                    message: `This page is always at ${page.path}. You can change its title.`,
+                    details: { field: "path", reason: "fixed" },
+                });
+            }
             if (dto.path === "/") {
                 throw new BadRequestException(
                     "The path / already belongs to this site's home page.",
                 );
             }
-            await assertPathIsFree(siteId, dto.path);
+            await assertPathIsFree(siteId, dto.path, {
+                kind: page.kind,
+                title: dto.title ?? page.title,
+            });
         }
 
         if (dto.hidden === true && page.isHome) {
@@ -2812,14 +2886,9 @@ export class SitesService {
                 ...(dto.title === undefined ? {} : { title: dto.title }),
                 ...(dto.path === undefined ? {} : { path: dto.path }),
                 ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
+                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
             },
-            select: {
-                id: true,
-                path: true,
-                title: true,
-                isHome: true,
-                hidden: true,
-            },
+            select: PAGE_VIEW_SELECT,
         });
     }
 
