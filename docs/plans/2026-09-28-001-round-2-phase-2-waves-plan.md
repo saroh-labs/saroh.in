@@ -3,6 +3,7 @@ title: "Round 2, phase 2: build waves"
 type: feat
 status: active
 date: 2026-09-28
+deepened: 2026-09-28
 origin: docs/plans/2026-09-26-000-round-2-overview.md
 ---
 
@@ -32,176 +33,175 @@ the release boundaries.
 
 | Chain | Order |
 |---|---|
-| Policy (`organization-policy.ts`, `organization-roles.service.ts`) | F19 → B16 → C13 → E26 → F17 |
-| Customer workspace | C9 → C12 → C8 → C10 → C11 → C15 → C13 → C6 → C7 |
+| Policy (`organization-policy.ts`, `organization-roles.service.ts`, `capability-catalogue.ts`) | F19 → C9 → C11 → B16 → C13 → E26 → F17 |
+| Customer workspace | C9 → C12 → C8 → C10 → C11 → C15 → C13 → C6 → C7 → C14 |
 | Booking flow (`packages/site-blocks/src/booking-flow/**`) | E8 → E6 → A10 → E10 |
 | `home.service` | F9 → F7 → F2 → F4 → F11 |
 | Calendar grid | E21 → E28 → E22 → E23 → E24 → E25 → E27 |
-| Section contract | G7 → G9 → G10 → G12 → G14 → G20 |
-| Order module | B12 → B2d → B9 → B13 → B6 |
+| Section contract | G7 → G10 → G9 → G12 → G14 → G20 → G16 |
+| Order module (and `payments.service.ts` where they touch it) | B12 → B2d → E9 → B9 → B13 → B6 |
 | `subscriptions.service` | D21 → D10 → D5 → D20 → D13 |
 | Communications | D17 → A14 |
 
-Two changes from the overview's order:
-- **B12 runs ahead of B2d.** B12 only writes the new values; B2d only drops
-  the old ones.
-- **F7 runs ahead of F2.** F7 has no dependency on F2.
+Changes from the overview's order, each checked against plans B, E and F:
+- **B12 runs ahead of B2d.** B12 stores only new values, so B2d's migration
+  always casts `Product.fulfilmentTypes` (B12 has shipped by then).
+- **F7 runs ahead of F2.** F7 depends only on F6.
+- **E8 runs ahead of E6** in the booking flow. Neither depends on the other.
+- **D10 runs before D5, and D20 before D13.** D13 depends on D20; D10 only on D9.
+- **B6 runs last** in the order module. It depends only on B1 and B2c.
+- **E9 is an order-module slot.** It shares `orders/serialize.ts`,
+  `order-read.ts`, `order-refunds.ts` and `payments.service.ts` with B2d, B8,
+  B9 and B11.
+
+**Sub-waves.** A wave's "a" units run in parallel from its start. A "b" unit
+starts once the named "a" units have merged, because it shares files with
+them. `schema.prisma` and `job-handler.registry.ts` edits are additive in
+every wave; each migration is re-timestamped at merge (overview rollout
+rule 5).
 
 ## Implementation Units (by wave)
 
+A **CP** (checkpoint) is a release of `development` to production, made
+before the next wave merges. The Release boundaries section says why each
+one exists.
+
 ### Wave 1
-- F19 #662: the security fix, and the head of the policy chain.
-- F20 (new): the public business phone (DEC-053).
-- D22 (new): the Razorpay public key id (DEC-054).
-- D21 (new): the DRAFT readers, split out of D5.
-- C9 #586: owns `resolveContact`. It finishes A2's `linkOrCreate` and moves
-  C3's `notRetired`.
-- E8 #621: deposits. It also turns the anonymous booking route to 410, since
-  A9 is in production.
-- G11 #674: hidden until G13 ships.
-- B12 #571
-- E12 #625
-- G7 #670: also passes `siteId` to `PageSections` (the G1–G4 follow-up).
-- E21 #634
-- F9 #652
+- **1a:** F19 #662 (security fix, heads Policy) · F20 (new, DEC-053) · D22
+  (new, DEC-054) · D21 (new, DRAFT readers) · E8 #621 (deposits; the
+  anonymous booking route answers 410) · G11 #674 (hidden until G13) · B12
+  #571 · E12 #625 · G7 #670 (also passes `siteId` to `PageSections`) · E21
+  #634 · F9 #652
+- **1b:** C9 #586, after F19, E8 and D21. It shares the policy files,
+  booking services and the subscriptions writes with them. It owns
+  `resolveContact`, finishes A2's `linkOrCreate` and moves C3's `notRetired`.
+- **CP-1:** #693 (B2c, B10) and wave 1.
+
+### B2d, alone
+- B2d #561, merged by itself after CP-1, then released through
+  `ORDER_FULFILMENT_ROLLOUT.md` release 3 (**CP-B2d**). It also removes the
+  Orders list's old shape. Wave 2 builds in parallel but merges after CP-B2d.
 
 ### Wave 2
-- B2d #561: only after B2c's release is in production.
-- B11 #570
-- B4 #563
-- B8 #567: also takes DEC-056's Reviewer locked card and B10's free-text
-  "Other" courier.
-- C12 #589
-- E9 #622
-- E6 #619: shows F20's phone, and calls through the signed relay header.
-- D6 #598
-- D17 #610
-- E28 #641
-- D10 #602: the allowance fallback, and the fix for "Paused until" a day
-  that has passed.
-- E19 #632
+- **2a:** B11 #570 · B4 #563 · B8 #567 (also takes DEC-056's Reviewer locked
+  card and B10's free-text "Other" courier) · C12 #589 · E6 #619 (shows F20's
+  phone, and calls through the signed relay header) · D6 #598 · D17 #610 ·
+  E28 #641 · D10 #602 (the allowance fallback, and the fix for "Paused
+  until" a day that has passed)
+- **2b:** E19 #632, after B11 (`webhooks.service.ts`).
+- **CP-2:** a manual release. D10's allowance backfill is re-run after the
+  deploy (overview rule 4). The checklist lives in D10's PR and in
+  `docs/architecture/`.
 
 ### Wave 3
-- B9 #568
-- B5 #564
-- C8 #585
-- A10 #551
-- A5 #546: off until A6–A8 and A13 land.
-- D5 #597: the draft writers, after D21 is in production.
-- G9 #672
-- E20 #633
-- G13 #676: must not add `placedOnline` again.
-- D11 #603: blocked on credentials.
-- F7 #650
-- F16 #659
+- **3a:** E9 #622 (order-module slot) · B5 #564 · C8 #585 · A10 #551 · A5 #546
+  (behind an environment flag, off until the end of wave 4) · D5 #597 (the
+  draft writers; D21 has been live since CP-1) · G10 #673 · E20 #633 · G13
+  #676 (must not add `placedOnline` again) · D11 #603 (blocked on
+  credentials) · F7 #650 · F16 #659
+- **CP-3:** keeps D5's draft writers and D7 in different releases.
 
 ### Wave 4
-- B13 #572
-- B15 #574
-- C10 #587
-- E10 #623: also fixes the `/contacts/:id` link on booking detail.
-- A6 #547
-- A7 #548
-- A8 #549: accepts weeks only.
-- A13 #554
-- E14 #627
-- D7 #599
-- D19 #604
-- G10 #673
+- **4a:** B9 #568 · B15 #574 · C10 #587 · E10 #623 (also fixes the
+  `/contacts/:id` link on booking detail) · A7 #548 · A8 #549 (weeks only) ·
+  E14 #627 · D7 #599 · D19 #604 · G9 #672 (needs D5, which is live)
+- **4b:** A6 #547, after E10 (`bookings.service.ts`) · A13 #554, after C10
+  (`customer-workspace/actions.ts`).
+- The account area's flag (A5–A8, A13) switches on at the release after
+  wave 4.
 
 ### Wave 5
-- B6 #565: merges after A14.
-- C11 #588: merges after D20.
-- A14 #555
-- D20 #612
-- E22 #635
-- G12 #675
-- E13 #626
-- A11 #552
-- B14 #573
-- F10 #653
-- D15 #608
+- **5a:** B13 #572 · A14 #555 · D20 #612 · E22 #635 · G12 #675 · E13 #626 ·
+  A11 #552 · F10 #653 (readers first; see boundary 9) · D15 #608
+- **5b:** C11 #588, after D20, wiring `cancelFor` · B14 #573, after A14
+  (`order-kitchen.service.ts`).
+- **CP-5:** D20 is in production before D13's charging merges.
 
 ### Wave 6
-- B16 #575
-- C15 (new): the per-storefront same-email setting (DEC-055).
-- D13 #606
-- E23 #636
-- G14 #677
-- F2 #645
-- E15 #628
-- E16 #629
-- E18 #631
-- D16 #609
-- F13 #656
-- A12 #553
+- **6a:** B6 #565 (A14 has merged) · B16 #575 · C15 (new, DEC-055) · D13
+  #606 · E23 #636 · G14 #677 · F2 #645 · E15 #628 · E18 #631 · F13 #656 ·
+  A12 #553
+- **6b:** D16 #609, after D13 (`invoices.controller.ts`).
 
 ### Wave 7
-- C13 #590: "Returning" counts only what the viewer can read (DEC-056).
-- E24 #637
-- G15 #678
-- F4 #647
-- D12 #605
-- E17 #630
-- D18 #611
-- F12 #655: also brings back the Settings checklist nudges (DEC-056).
+- **7a:** C13 #590 ("Returning" counts only what the viewer can read,
+  DEC-056) · E24 #637 · G15 #678 · F4 #647 · D12 #605 (no Join entry point;
+  G20 adds it) · E17 #630 · E16 #629 · D18 #611 · F12 #655 (brings back the
+  Settings checklist nudges, DEC-056)
+- **CP-7:** G15's renderer is in production before G16 lets merchants create
+  module pages.
 
 ### Wave 8
-- E26 #639
-- C6 #583
-- E25 #638
-- G20 #683
-- G16 #679
-- F11 #654
-- D14 #607
-- F14 #657
+- E26 #639 · C6 #583 · E25 #638 · G20 #683 (wires D12's Join entry point) ·
+  F11 #654 · D14 #607 · F14 #657
 
 ### Wave 9
-- F17 #660
-- C7 #584
-- C14 #591: also makes "Add customer" create a contact only (DEC-056), and
-  makes Spent net of partial refunds.
-- E27 #640
-- G19 #682
+- **9a:** F17 #660 · C7 #584 · E27 #640 · G19 #682 · G16 #679
+- **9b:** C14 #591, after C7 (the detail screen). It also makes "Add
+  customer" create a contact only (DEC-056), and makes Spent net of partial
+  refunds.
 
 ## New units
 
 | ID | Scope | Wave |
 |---|---|---|
-| F20 | An optional `publicPhone` on the business profile (additive), a field for it in Settings → Business, and `businessPublicPhone(site)` in `site-host.ts` filled in. It lets G8's Call button and A2/A9's "call ‹Business›" copy work. Hidden when unset. | 1 |
-| D22 | Settings › Providers asks for the Razorpay public key id, and the API returns it for E11's checkout. A connection without it reads as needing attention. | 1 |
-| D21 | The readers that refuse DRAFT (subscribe, the site's plan reads, "Sell again"). They reach production before any draft writer. | 1 |
-| C15 | A per-storefront setting for same-email customers: link automatically, or leave for staff (the default). It drives C2's backfill and suggestions and C10's merge. | 6 |
+| F20 | An optional public phone on the business profile (additive), checked as E.164 (`+91…`) and shown on the site once set. A field in Settings → Business, with a `settings-audit` entry. `businessPublicPhone(site)` in `site-host.ts` is filled in, and saving it refreshes the site's cached pages so a removed number stops showing. It unblocks G8's Call button, E6's header and A2/A9's "call ‹Business›" copy. | 1a |
+| D22 | Settings › Providers asks for the Razorpay public key id, and the API returns it for E11's checkout. **An idempotent script fills `PaymentProvider.publicKey` from the sealed `keyId` for existing Razorpay connections, and it runs before the "needs attention" state goes live**, so no merchant loses online pay. | 1a |
+| D21 | The readers that refuse DRAFT (subscribe, the site's plan reads, "Sell again"). They are live from CP-1, before any draft writer. | 1a |
+| C15 | A per-storefront setting for same-email customers: link automatically, or leave for staff (the default; existing stores keep it). The incoming customer's storefront's setting applies. Links go through C9's `resolveContact`. **Automatic linking never widens what a site account can see unless the contact's email is verified (DEC-049); otherwise it only suggests the pair.** Turning it on doesn't re-link existing pairs. | 6a |
 
 ## Release boundaries
 
-1. B2c (#693) is in production before B2d merges. B2d ships as its own
-   release, and it also removes the Orders list's old shape.
-2. D21 is in production before D5, D7, E14, E13 or E18 merges.
-3. D10: for one release, a subscription with no allowance reads the plan's
-   value. Re-run the backfill after that deploy. A follow-up removes the
-   fallback once no unset rows remain.
-4. The account area (A5–A8, A13) goes live together at the end of wave 4.
-5. G11 and G12 stay hidden until G13 ships.
-6. D17's thread channel and F4's Reply wait until A13 is in production.
-   E22's Retry and reminder wait until D13 and D17 are. Autopay shows only
-   where `supportsMandates` is true.
-7. The API ships before the app for B4, B15, E19, E20 and G14.
-8. G15's renderer is in production before G16 lets merchants create module
-   pages.
+1. **CP-1** takes B2c to production, one release before B2d. **CP-B2d**
+   releases B2d alone, through the manual release-3 checklist.
+2. **D21 is live (CP-1) before D5, D7, E14, E13 or E18 merge.** D5's writers
+   and D7 are in different releases (CP-3). D7 moves the app off D5's
+   temporary `PATCH :planId`; the route is removed at least one checkpoint
+   later (follow-up Z6).
+3. **D10** is a manual release (CP-2). The backfill is re-run after deploy,
+   and the fallback is removed once no unset rows remain (follow-up Z1).
+4. **The account area (A5–A8, A13)** ships behind an environment flag and
+   switches on after wave 4. Releases between waves 3 and 4 stay safe.
+5. **G11 and G12 stay hidden until G13 ships.**
+6. **Messaging and payments switches.**
+   - D17's thread channel and F4's Reply wait until A13 is live.
+   - E22's Retry and reminder wait until D13 and D17 are live.
+   - **`supportsMandates` stays false in production until D11 and D19 pass a
+     Razorpay test-mode run.**
+   - D13 charges only after D20 is live (CP-5).
+7. **The API ships before the app** for B4, B15, E19, E20, G14, F20, D22,
+   C15, E8, B12 and D5. The `saroh.app` renderer deploys after the API for
+   E6 and F20.
+8. **G15's renderer is live (CP-7) before G16 merges.**
+9. **F10** changes `company` to `pvt`, which the previous API refuses. The
+   API accepts `pvt` a release before the migration writes it, and `company`
+   is accepted for one release after (follow-up Z4).
+10. **E8 deposits.** Once a deposit has been taken, rolling back below CP-1
+    means refunding deposits by hand (DEC-051). Before CP-1, check that the
+    production renderer includes A9 (it has since #537), so no cached page
+    still posts to the anonymous route that E8 closes.
+
+## Deferred to follow-up work (the contract steps)
+
+| ID | Step | When |
+|---|---|---|
+| Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later |
+| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later |
+| Z3 | Remove the calendar's month-query alias | After E20 is live |
+| Z4 | Remove the `company` business-type alias | A release after F10 |
+| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it |
+| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 |
 
 ## Risks and open questions
 
 - **D11 needs a Razorpay test account with UPI Autopay, and its webhook
   secret.** D11 gates D19, D20, D13, D12, D14 and F4's Retry. Until then
-  they are built against the fake provider.
+  these are built against the fake provider, and `supportsMandates` stays
+  false in production (boundary 6).
 - **D22 and E11 need Razorpay test keys** for a real checkout check.
 - **A14 and F14 need production SMTP**, and WhatsApp credentials if alerts
   use WhatsApp.
 - **Matrix Q2:** is `customer:sensitive` its own capability? It must be
   answered before wave 7 (C13). Proposed: yes.
-- **C15:** what do existing stores default to (proposed: leave for staff)?
-  Does automatic linking also need a verified email (DEC-049)?
-- **F20:** is the phone shown by default once set, and is it checked as
-  `+91…`?
-- **B8:** build B7's "Share your storefront" button, or drop it?
+- **B8:** build B7's "Share your storefront" button, or drop it? Proposed:
+  build it, in B8.
