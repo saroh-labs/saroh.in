@@ -1,12 +1,12 @@
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { realOrderWhere } from "../orders/open-orders";
 import {
     ALLOWANCE_SELECT,
     classesAllowance,
     HAS_ALLOWANCE_WHERE,
 } from "../subscriptions/classes-allowance";
+import { readOrders } from "./account-orders.service";
 import type { CustomerContext } from "./customer-context.decorator";
 import type {
     AccountBooking,
@@ -14,13 +14,7 @@ import type {
     AccountOrder,
     AccountPlan,
 } from "./customer-view";
-import {
-    bookingView,
-    ORDER_ROW_ITEMS,
-    orderView,
-    packView,
-    planView,
-} from "./customer-view";
+import { bookingView, packView, planView } from "./customer-view";
 
 /**
  * Home's reads in the customer's account (round-2 plan A, A5), one per
@@ -144,53 +138,15 @@ export async function readClasses(
 }
 
 /**
- * The customer's latest orders: those of every store customer linked to
- * their contact (C2's identity links, confirmed by staff or made while
- * signed in).
+ * The customer's latest orders: the same orders the Orders tab lists
+ * (`account-orders.service.ts`, A7) — those of every store customer linked
+ * to their contact, and those the account placed signed in.
  */
-export async function readLatestOrders(
-    ctx: Ctx,
+export function readLatestOrders(
+    ctx: Ctx & Pick<CustomerContext, "accountId">,
     take: number = HOME_ORDERS,
 ): Promise<AccountOrder[]> {
-    const links = await prisma.customerIdentityLink.findMany({
-        where: {
-            organizationId: ctx.organizationId,
-            contactId: ctx.contactId,
-        },
-        select: { customerId: true },
-    });
-    if (links.length === 0) return [];
-    const rows = await prisma.order.findMany({
-        where: {
-            organizationId: ctx.organizationId,
-            customerId: { in: links.map((l) => l.customerId) },
-            // Never an abandoned site checkout (B1).
-            ...realOrderWhere(),
-        },
-        orderBy: { createdAt: "desc" },
-        take,
-        select: {
-            id: true,
-            orderId: true,
-            createdAt: true,
-            total: true,
-            currency: true,
-            status: true,
-            paymentStatus: true,
-            stage: true,
-            _count: { select: { items: true } },
-            items: {
-                take: ORDER_ROW_ITEMS,
-                orderBy: { id: "asc" },
-                select: {
-                    quantity: true,
-                    product: { select: { name: true } },
-                    service: { select: { name: true } },
-                },
-            },
-        },
-    });
-    return rows.map(orderView);
+    return readOrders(ctx, take);
 }
 
 /** The customer's live membership, or null. */

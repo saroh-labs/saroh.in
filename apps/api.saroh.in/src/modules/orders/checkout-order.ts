@@ -20,6 +20,8 @@ import { fromCents, withGstRates } from "./order-pricing";
 
 /** The signed-in site account a checkout is for (ADR-011). */
 export interface SiteAccount {
+    /** The account itself, named on the order it places (A7). */
+    accountId: string;
     email: string;
     contactId: string;
     firstName: string | null;
@@ -177,6 +179,8 @@ export async function createCheckoutOrder(
                         notes: dto.notes ?? null,
                         placedOnline: true,
                         checkoutKey: dto.key,
+                        // The account's Orders find it by this (A7).
+                        customerAccountId: account.accountId,
                         ...(address
                             ? {
                                   deliveryName: address.name ?? null,

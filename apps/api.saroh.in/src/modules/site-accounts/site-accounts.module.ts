@@ -8,6 +8,8 @@ import {
     CUSTOMER_NOTES_OPEN_DEFAULT,
 } from "./account-home.service";
 import { AccountLinkingService } from "./account-linking.service";
+import { AccountOrdersController } from "./account-orders.controller";
+import { AccountOrdersService } from "./account-orders.service";
 import { AccountUnlinkService } from "./account-unlink.service";
 import { AccountController } from "./account.controller";
 import { ChallengeVerifier } from "./challenge";
@@ -32,11 +34,18 @@ import { SiteRelayGuard } from "./site-relay";
  * contact linking, and "This isn't them", which the customer workspace
  * calls (`AccountUnlinkService`). A5 adds the account area (`/me`: Me,
  * Home, receipts, health notes and the email change), dark behind
- * `SITE_ACCOUNT_AREA` until A6–A8 and A13 ship with it.
+ * `SITE_ACCOUNT_AREA` until A6–A8 and A13 ship with it. A7 adds Orders
+ * and Track (`/me/orders`).
  */
 @Module({
-    controllers: [SignInController, SessionsController, AccountController],
+    controllers: [
+        SignInController,
+        SessionsController,
+        AccountController,
+        AccountOrdersController,
+    ],
     providers: [
+        AccountOrdersService,
         CustomerAccountRepository,
         AccountLinkingService,
         AccountUnlinkService,

@@ -1,6 +1,10 @@
 import { toMoneyString } from "../../common/money";
-import { lineName } from "../orders/order-line";
+import type { OrderStage } from "../orders/dto";
+import { goesByCourier } from "../orders/fulfilment";
+import { isServiceLine, lineName } from "../orders/order-line";
 import type { AccountTab } from "./account-tabs";
+import type { TrackState, TrackStep } from "./account-track";
+import { orderTrack, REFUND_LINE } from "./account-track";
 
 /**
  * What a signed-in customer may see of their own record (ADR-011 "What the
@@ -54,11 +58,57 @@ export interface AccountOrder {
     currency: string;
     /** Still on its way, rather than done, refunded or cancelled. */
     open: boolean;
-    /** What the customer reads for where it is. */
+    /** What the customer reads for where it is: its step, or how it ended. */
     status: string;
+    /** How it leaves: "Pick-up", "Shipping"… (A7). */
+    fulfilment: string;
     items: { name: string; quantity: number }[];
     /** Lines beyond the ones listed. */
     moreItems: number;
+}
+
+/** One visit of a treatment bought as an order (E9; A7). */
+export interface AccountOrderVisit {
+    number: number;
+    /** Null for a visit not booked yet. */
+    startAt: string | null;
+    timezone: string | null;
+    state: "done" | "booked" | "missed" | "to-book";
+}
+
+export interface AccountOrderLine {
+    /** The product's name, or the service's for a treatment (E9). */
+    name: string;
+    quantity: number;
+    kind: "product" | "service";
+    /** A treatment's visits, in order; null on a product's line. */
+    visits: AccountOrderVisit[] | null;
+}
+
+/** One order with its Track (A7). */
+export interface AccountOrderDetail {
+    ref: string;
+    number: string;
+    placedAt: string;
+    total: string;
+    currency: string;
+    fulfilment: string;
+    state: TrackState;
+    status: string;
+    lines: AccountOrderLine[];
+    /** Its type's steps, each done, now or next, with its line. */
+    steps: TrackStep[];
+    /** Who took it and its number, once staff record them (DEC-045). */
+    courier: {
+        name: string | null;
+        trackingNumber: string | null;
+        /** Only an http(s) link staff typed; anything else is dropped. */
+        trackingUrl: string | null;
+    } | null;
+    /** "Money back in 5–7 days" on a refunded order. */
+    refund: string | null;
+    /** The paid invoice's ref, for its receipt; null until there is one. */
+    receipt: string | null;
 }
 
 export interface AccountPlan {
@@ -183,21 +233,14 @@ export function bookingView(row: {
     };
 }
 
-const STAGE_WORDS: Record<string, string> = {
-    NEW: "Received",
-    PREPARING: "Being prepared",
-    READY: "Ready",
-    COLLECTED: "Collected",
-    HANDED_TO_COURIER: "With the courier",
-    OUT_FOR_DELIVERY: "Out for delivery",
-    DELIVERED: "Delivered",
-    SENT: "Sent",
-};
-const FINISHED_STAGES = new Set(["COLLECTED", "DELIVERED", "SENT"]);
-
 /** How many lines an order row lists by name. */
 export const ORDER_ROW_ITEMS = 3;
 
+/**
+ * An order row. Its status is the step its own fulfilment type is at
+ * ("Preparing", "Ready"), or how it ended ("Collected", "Refunded"), from
+ * the same table the Track reads (`account-track.ts`, A7).
+ */
 export function orderView(row: {
     id: string;
     orderId: string;
@@ -207,6 +250,7 @@ export function orderView(row: {
     status: string;
     paymentStatus: string;
     stage: string;
+    fulfilment: string;
     items: {
         quantity: number;
         product: { name: string } | null;
@@ -214,8 +258,16 @@ export function orderView(row: {
     }[];
     _count: { items: number };
 }): AccountOrder {
-    const refunded = row.paymentStatus === "REFUNDED";
-    const cancelled = row.status === "CANCELLED";
+    const track = orderTrack({
+        number: row.orderId,
+        placedAt: row.createdAt,
+        fulfilment: row.fulfilment,
+        stage: row.stage,
+        status: row.status,
+        paymentStatus: row.paymentStatus,
+        courierName: null,
+        trackingNumber: null,
+    });
     const listed = row.items.slice(0, ORDER_ROW_ITEMS);
     return {
         ref: row.id,
@@ -223,18 +275,149 @@ export function orderView(row: {
         placedAt: row.createdAt.toISOString(),
         total: toMoneyString(row.total),
         currency: row.currency,
-        open: !refunded && !cancelled && !FINISHED_STAGES.has(row.stage),
-        status: refunded
-            ? "Refunded"
-            : cancelled
-              ? "Cancelled"
-              : (STAGE_WORDS[row.stage] ?? "Received"),
+        open: track.state === "open",
+        status: track.status,
+        fulfilment: track.fulfilment,
         items: listed.map((i) => ({
             // A treatment's line bills a service, not a product (E9).
             name: lineName(i) ?? "",
             quantity: i.quantity,
         })),
         moreItems: Math.max(0, row._count.items - listed.length),
+    };
+}
+
+/** A link staff typed, only when it is http(s): never a script or data URL. */
+export function webLink(value: string | null): string | null {
+    const text = value?.trim();
+    if (!text) return null;
+    try {
+        const url = new URL(text);
+        return url.protocol === "https:" || url.protocol === "http:"
+            ? url.toString()
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+interface VisitRow {
+    visitNumber: number | null;
+    startAt: Date;
+    timezone: string;
+    status: string;
+    outcome: string | null;
+}
+
+/**
+ * A treatment's visits (E9): each booked, done or missed, and those not
+ * booked yet. A cancelled visit leaves its number free, so the booking
+ * that stands for it now is the one shown.
+ */
+export function visitsView(
+    total: number,
+    bookings: readonly VisitRow[],
+): AccountOrderVisit[] {
+    const live = new Map<number, VisitRow>();
+    for (const b of bookings) {
+        if (b.visitNumber === null || b.status !== "CONFIRMED") continue;
+        live.set(b.visitNumber, b);
+    }
+    const count = Math.max(total, 0, ...live.keys());
+    const visits: AccountOrderVisit[] = [];
+    for (let n = 1; n <= count; n++) {
+        const b = live.get(n);
+        visits.push(
+            b
+                ? {
+                      number: n,
+                      startAt: b.startAt.toISOString(),
+                      timezone: b.timezone,
+                      state:
+                          b.outcome === "ATTENDED"
+                              ? "done"
+                              : b.outcome === "NO_SHOW"
+                                ? "missed"
+                                : "booked",
+                  }
+                : {
+                      number: n,
+                      startAt: null,
+                      timezone: null,
+                      state: "to-book",
+                  },
+        );
+    }
+    return visits;
+}
+
+/** One order and its Track (A7). */
+export function orderDetailView(row: {
+    id: string;
+    orderId: string;
+    createdAt: Date;
+    total: { toString(): string };
+    currency: string;
+    status: string;
+    paymentStatus: string;
+    stage: string;
+    fulfilment: string;
+    courierName: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+    items: {
+        quantity: number;
+        productId: string | null;
+        serviceId: string | null;
+        product: { name: string } | null;
+        service: { name: string; visits: number } | null;
+    }[];
+    bookings: VisitRow[];
+    /** Its paid invoice, newest first; at most the first is read. */
+    invoices: { id: string }[];
+}): AccountOrderDetail {
+    const track = orderTrack({
+        number: row.orderId,
+        placedAt: row.createdAt,
+        fulfilment: row.fulfilment,
+        stage: row.stage,
+        status: row.status,
+        paymentStatus: row.paymentStatus,
+        courierName: row.courierName,
+        trackingNumber: row.trackingNumber,
+    });
+    const courierName = blankToNull(row.courierName);
+    const trackingNumber = blankToNull(row.trackingNumber);
+    const trackingUrl = webLink(row.trackingUrl);
+    const byCourier = goesByCourier(row.fulfilment, row.stage as OrderStage);
+    return {
+        ref: row.id,
+        number: row.orderId,
+        placedAt: row.createdAt.toISOString(),
+        total: toMoneyString(row.total),
+        currency: row.currency,
+        fulfilment: track.fulfilment,
+        state: track.state,
+        status: track.status,
+        lines: row.items.map((i): AccountOrderLine => {
+            const service = isServiceLine(i);
+            return {
+                name: lineName(i) ?? "",
+                quantity: i.quantity,
+                kind: service ? "service" : "product",
+                visits:
+                    service && i.service
+                        ? visitsView(i.service.visits, row.bookings)
+                        : null,
+            };
+        }),
+        steps: track.steps,
+        courier:
+            byCourier && (courierName || trackingNumber || trackingUrl)
+                ? { name: courierName, trackingNumber, trackingUrl }
+                : null,
+        refund: track.state === "refunded" ? REFUND_LINE : null,
+        receipt: row.invoices[0]?.id ?? null,
     };
 }
 

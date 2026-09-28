@@ -1,5 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { realOrderWhere } from "../orders/open-orders";
+
 /**
  * What moves when staff say "This isn't them" about a site account (A4,
  * DEC-049; round-2 plan A).
@@ -14,7 +16,9 @@ import type { Prisma } from "@saroh/database";
  * unit that first writes it with the account on it:
  * - bookings with `customerAccountId` (A9), and the invoices billing them,
  *   so the money follows the booking (review C-1);
- * - orders and identity links made while signed in (G13);
+ * - orders placed signed in, with the identity links they made (A7:
+ *   `Order.customerAccountId`, written by G13's checkout and E9's
+ *   treatments);
  * - thread messages the customer wrote (A13);
  * - waitlist entries (A12);
  * - mandates (D11).
@@ -128,12 +132,84 @@ function bookingInvoices(scope: UnlinkScope, bookingOn: string[]) {
 }
 
 /**
+ * The identity links the account's own orders made (A7): a store customer
+ * linked to the contact being left, since the account linked, by the
+ * account's signed-in checkout (`SITE_ACCOUNT`, G13) or its treatment
+ * booking (`BOOKING`, E9), whose orders include one the account placed.
+ * A link staff made, a payment made or the backfill made stays.
+ */
+function accountMadeLinks(scope: UnlinkScope) {
+    return {
+        organizationId: scope.organizationId,
+        contactId: scope.fromContactId,
+        reason: { in: ["SITE_ACCOUNT" as const, "BOOKING" as const] },
+        createdAt: { gte: scope.since },
+        customer: {
+            orders: {
+                some: {
+                    organizationId: scope.organizationId,
+                    customerAccountId: scope.accountId,
+                    createdAt: { gte: scope.since },
+                },
+            },
+        },
+    };
+}
+
+/** The account's real orders on those links (never an abandoned checkout). */
+async function ordersOnMovingLinks(
+    tx: Prisma.TransactionClient,
+    scope: UnlinkScope,
+): Promise<{ count: number; linkIds: string[] }> {
+    const links = await tx.customerIdentityLink.findMany({
+        where: accountMadeLinks(scope),
+        select: { id: true, customerId: true },
+    });
+    if (links.length === 0) return { count: 0, linkIds: [] };
+    const count = await tx.order.count({
+        where: {
+            organizationId: scope.organizationId,
+            customerAccountId: scope.accountId,
+            createdAt: { gte: scope.since },
+            customerId: { in: links.map((l) => l.customerId) },
+            AND: [realOrderWhere()],
+        },
+    });
+    return { count, linkIds: links.map((l) => l.id) };
+}
+
+/**
+ * Orders the customer placed signed in (A7). An order names no contact: it
+ * is the contact's through its store customer's identity link, so the link
+ * the account's own order made moves to the new contact, and the order with
+ * it. The account keeps reading the order by its `customerAccountId`
+ * wherever the link sits.
+ */
+export const ORDERS_MOVER: UnlinkMover = {
+    key: "orders",
+    model: "Order",
+    noun: ["order", "orders"],
+    count: async (tx, scope) => (await ordersOnMovingLinks(tx, scope)).count,
+    move: async (tx, scope) => {
+        const { count, linkIds } = await ordersOnMovingLinks(tx, scope);
+        if (linkIds.length > 0) {
+            await tx.customerIdentityLink.updateMany({
+                where: { id: { in: linkIds } },
+                data: { contactId: scope.toContactId },
+            });
+        }
+        return count;
+    },
+};
+
+/**
  * The records that move with the account. A9 adds the first, bookings made
  * signed in; each unit above adds its own, with a db test.
  */
 export const UNLINK_MOVERS: readonly UnlinkMover[] = [
     BOOKINGS_MOVER,
     BOOKING_INVOICES_MOVER,
+    ORDERS_MOVER,
 ];
 
 /**

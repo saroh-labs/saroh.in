@@ -505,6 +505,15 @@ describe("starting a checkout and paying (G13)", () => {
                 linkedByUserId: null,
             },
         ]);
+        // The order names the account that placed it (A7).
+        expect(
+            (
+                await prisma.order.findUniqueOrThrow({
+                    where: { id: orderId },
+                    select: { customerAccountId: true },
+                })
+            ).customerAccountId,
+        ).toBe(account.id);
         // Its close is written, a day out.
         const job = await prisma.job.findFirstOrThrow({
             where: {

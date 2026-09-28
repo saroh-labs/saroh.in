@@ -19,6 +19,7 @@ import {
     readNextBooking,
     readPlan,
 } from "./account-home-reads";
+import { ownOrdersWhere } from "./account-orders.service";
 import type { AccountOffers } from "./account-tabs";
 import { accountTabs } from "./account-tabs";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -231,14 +232,18 @@ export class AccountHomeService {
 
     // ---- Receipts --------------------------------------------------------
 
-    /** Paid invoices billed to the customer, newest first. */
+    /** Paid invoices billed to the customer or their orders, newest first. */
     async receipts(ctx: Ctx): Promise<AccountReceipt[]> {
         const rows = await prisma.invoice.findMany({
             where: {
                 organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
                 status: "PAID",
                 number: { not: null },
+                // Billed to the customer, or their own order's (A7).
+                OR: [
+                    { contactId: ctx.contactId },
+                    { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
+                ],
             },
             orderBy: [{ paidAt: "desc" }, { issuedAt: "desc" }],
             take: RECEIPT_ROWS,
@@ -263,9 +268,14 @@ export class AccountHomeService {
             where: {
                 id: invoiceId,
                 organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
                 status: "PAID",
                 number: { not: null },
+                // Billed to the customer, or the invoice of one of their
+                // own orders (A7): an order's invoice names no contact.
+                OR: [
+                    { contactId: ctx.contactId },
+                    { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
+                ],
             },
             select: { id: true },
         });
