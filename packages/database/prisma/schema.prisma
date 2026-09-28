@@ -277,6 +277,11 @@ model Organization {
 
   // Everything done to a subscription, append-only (plan 2026-09-26-004, D9).
   subscriptionEvents SubscriptionEvent[]
+
+  // When an owner or admin dismissed Team's one-time notice naming the
+  // storefront people the F16 backfill put on the team (DEC-048). Null: not
+  // dismissed. Only people added after it are listed again.
+  storefrontTeamNoticeDismissedAt DateTime?
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
