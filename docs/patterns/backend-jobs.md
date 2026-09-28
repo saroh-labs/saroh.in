@@ -99,6 +99,11 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `createMany({ skipDuplicates })` before writing anything: a Postgres
   transaction cannot carry on after a caught P2002, so never insert-and-catch
   inside one.
+- **A bulk move queues each order's notice as a single move does** (B6).
+  `orders.stage-batch.commit` commits a held batch ten seconds after it
+  is written; each line goes through `order-stage-write.ts`, so every
+  moved order gets its own `customer.notify`, and Undo all takes each one
+  back or reports `told`.
 - **Re-read, then decide.** A booking cancelled since isn't confirmed, an
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears

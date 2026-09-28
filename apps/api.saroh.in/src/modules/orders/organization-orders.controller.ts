@@ -34,6 +34,8 @@ import { OrderFulfilmentChangeService } from "./order-fulfilment-change.service"
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrderPayLinkService } from "./order-pay-link.service";
 import { quickViewOf } from "./order-row";
+import { CreateStageBatchDto } from "./order-stage-batch.dto";
+import { OrderStageBatchService } from "./order-stage-batch.service";
 import { OrdersService } from "./orders.service";
 
 /**
@@ -76,6 +78,7 @@ export class OrganizationOrdersController {
         private readonly payLinks: OrderPayLinkService,
         private readonly fulfilment: OrderFulfilmentChangeService,
         private readonly cancels: OrderCancelService,
+        private readonly batches: OrderStageBatchService,
     ) {}
 
     @Get()
@@ -144,6 +147,56 @@ export class OrganizationOrdersController {
     ) {
         listAccess(ctx);
         return this.orders.searchProducts(ctx.organizationId, query.q);
+    }
+
+    /**
+     * Bulk kitchen moves (B6, `order:stage`): hold a batch the list made,
+     * read it back, send it now, cancel it while held, or undo it all.
+     * Declared before `:orderId`, whose routes would otherwise read "stage"
+     * as an order id.
+     */
+    @Post("stage/batches")
+    @HttpCode(200)
+    createBatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateStageBatchDto,
+    ) {
+        return this.batches.create(ctx, dto);
+    }
+
+    @Get("stage/batches/:batchId")
+    readBatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("batchId") batchId: string,
+    ) {
+        return this.batches.get(ctx, batchId);
+    }
+
+    @Post("stage/batches/:batchId/commit")
+    @HttpCode(200)
+    commitBatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("batchId") batchId: string,
+    ) {
+        return this.batches.commit(ctx, batchId);
+    }
+
+    @Post("stage/batches/:batchId/cancel")
+    @HttpCode(200)
+    cancelBatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("batchId") batchId: string,
+    ) {
+        return this.batches.cancel(ctx, batchId);
+    }
+
+    @Post("stage/batches/:batchId/undo")
+    @HttpCode(200)
+    undoBatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("batchId") batchId: string,
+    ) {
+        return this.batches.undo(ctx, batchId);
     }
 
     /**

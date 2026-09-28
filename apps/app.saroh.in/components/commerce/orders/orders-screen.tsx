@@ -1,11 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
@@ -23,17 +22,20 @@ import {
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
+import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
 import { OrderFilters } from "./order-filters";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
+import { SearchField } from "./order-search";
 import { OrderTabs } from "./order-tabs";
 import {
     OrdersAttentionPartial,
     OrdersEmpty,
     OrdersHeading,
 } from "./orders-states";
+import { useOrderSelection } from "./use-order-selection";
 
 /**
  * Sell → Orders, after the "Saroh Orders Screen" design (plan B, B3): every
@@ -48,7 +50,8 @@ import {
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. At the desk a row opens its quick view and has a row menu (B5,
  * `order-quick-view.tsx`, `order-row-menu.tsx`); on a phone the card opens
- * the order, as the design draws it. Bulk moves are B6. Loading, failed,
+ * the order, as the design draws it. With `order:stage`, rows can be
+ * selected and moved a step together (B6, `bulk-bar.tsx`). Loading, failed,
  * locked and every empty list are in `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
@@ -119,6 +122,9 @@ export function OrdersScreen({
         newOrder?.openOnArrival === true && stores.length > 0 && !kitchen,
     );
     const peek = rows.find((r) => r.id === peekId) ?? null;
+    // Bulk moves (B6): whoever moves kitchen steps; the API decides again.
+    const pick = useOrderSelection(rows, ordersHref(query, {}));
+    const selectable = can.stage;
 
     const go = useCallback(
         (patch: Partial<OrdersQuery>) =>
@@ -231,13 +237,21 @@ export function OrdersScreen({
                     <>
                         {/* The desk: one grid, heads over rows. */}
                         <div className="rounded-[11px] border border-border bg-card max-[759px]:hidden">
-                            <OrderGridHead money={money} />
+                            <OrderGridHead
+                                money={money}
+                                select={selectable ? pick.head : undefined}
+                            />
                             <ul aria-label="Orders">
                                 {rows.map((row) => (
                                     <OrderGridRow
                                         key={row.id}
                                         row={row}
                                         showStore={many && !store}
+                                        select={
+                                            selectable
+                                                ? pick.row(row)
+                                                : undefined
+                                        }
                                         open={row.id === peekId}
                                         onOpen={() => setPeekId(row.id)}
                                         menu={
@@ -257,11 +271,17 @@ export function OrdersScreen({
                                     key={row.id}
                                     row={row}
                                     showStore={many && !store}
+                                    select={
+                                        selectable ? pick.row(row) : undefined
+                                    }
                                 />
                             ))}
                         </ul>
                     </>
                 )}
+                {selectable ? (
+                    <BulkBar selected={pick.selected} onClear={pick.clear} />
+                ) : null}
             </div>
 
             <OrderQuickView
@@ -321,64 +341,6 @@ function PageLink({ href, label }: { href: string | null; label: string }) {
                 {label}
             </Link>
         </Button>
-    );
-}
-
-/**
- * Search by order number or customer name (and email or phone for a role
- * that reads contacts — the API decides). It covers every order, not the
- * page on screen, so it goes into the address after a pause in typing.
- */
-function SearchField({
-    query,
-    go,
-}: {
-    query: OrdersQuery;
-    go: (patch: Partial<OrdersQuery>) => void;
-}) {
-    const [text, setText] = useState(query.q);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const field = useRef<HTMLInputElement | null>(null);
-    // The address changed elsewhere (Clear search, the back button): say so
-    // — but never over what someone is still typing.
-    useEffect(() => {
-        if (document.activeElement !== field.current) setText(query.q);
-    }, [query.q]);
-    useEffect(
-        () => () => {
-            if (timer.current) clearTimeout(timer.current);
-        },
-        [],
-    );
-
-    function search(value: string) {
-        setText(value);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => go({ q: value.trim() }), 300);
-    }
-
-    return (
-        <div className="relative min-w-[200px] max-w-[320px] flex-1">
-            <Search
-                aria-hidden
-                className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-                ref={field}
-                type="search"
-                value={text}
-                onChange={(e) => search(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === "Escape" && text) {
-                        e.preventDefault();
-                        search("");
-                    }
-                }}
-                placeholder="Search orders"
-                aria-label="Search orders"
-                className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
-            />
-        </div>
     );
 }
 

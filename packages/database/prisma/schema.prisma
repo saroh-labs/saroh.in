@@ -294,6 +294,8 @@ model Organization {
   packExtensions PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
   customerNotices CustomerNotice[]
+  // Bulk kitchen moves held on the server, then committed (round-2 B6).
+  orderStageBatches OrderStageBatch[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -5903,4 +5905,76 @@ model CustomerNotice {
   @@unique([organizationId, eventKey])
   @@index([organizationId])
   @@index([messageId])
+}
+
+// ============================================================================
+// BULK KITCHEN MOVES (round-2 B6)
+// ============================================================================
+
+enum OrderStageBatchStatus {
+  HELD
+  COMMITTED
+  CANCELLED
+}
+
+/// Many orders moved a step at once from the Orders list (round-2 B6, R11).
+/// The batch is written HELD with its lines and its commit job ten seconds
+/// on, in one transaction, so a closed tab loses nothing; "Send now" or the
+/// job commits it, each line in its own order-locked transaction through
+/// the single-order stage write. `id` is the client's `batchId`: a retry of
+/// the same id returns what is stored and never moves anything twice.
+model OrderStageBatch {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  status   OrderStageBatchStatus @default(HELD)
+  // When the job commits it, unless "Send now" or "Undo all" came first.
+  commitAt DateTime
+  // Who asked. Not a foreign key, like OrderEvent.actorUserId: the steps
+  // are written in their name.
+  actorUserId String
+
+  committedAt DateTime?
+  cancelledAt DateTime?
+  // "Undo all" after the commit.
+  undoneAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  lines OrderStageBatchLine[]
+
+  @@index([organizationId])
+}
+
+/// One order in a batch: the step it was asked to take from where the list
+/// showed it, and what became of it. `result` is null until the commit
+/// reaches it: MOVED | MOVED_BY_SOMEONE_ELSE | NOT_FOUND | REFUSED |
+/// CANCELLED (Undo all reached it first). `undoResult`: UNDONE | REFUSED.
+model OrderStageBatchLine {
+  id             String @id @default(cuid())
+  organizationId String
+
+  batchId String
+  batch   OrderStageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  // As the client sent it. Not a foreign key: an id from another business
+  // is recorded as NOT_FOUND, and moves nothing.
+  orderId   String
+  position  Int
+  fromStage OrderStage
+  toStage   OrderStage
+
+  result       String?
+  reason       String?
+  stageEventId String?
+
+  undoResult  String?
+  undoReason  String?
+  undoEventId String?
+  // The customer had already been told when it was undone (A14).
+  told        Boolean?
+
+  @@unique([batchId, orderId])
+  @@index([organizationId])
 }

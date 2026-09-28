@@ -19,6 +19,7 @@ import type { OrderCancelService } from "./order-cancel.service";
 import type { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrderPayLinkService } from "./order-pay-link.service";
+import type { OrderStageBatchService } from "./order-stage-batch.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -42,6 +43,13 @@ describe("OrganizationOrdersController", () => {
     const readOrder = jest.fn();
     const changeFulfilment = jest.fn().mockResolvedValue({ id: "ord_1" });
     const cancelOrder = jest.fn().mockResolvedValue({ id: "ord_1" });
+    const batches = {
+        create: jest.fn().mockResolvedValue({ id: "b1" }),
+        get: jest.fn().mockResolvedValue({ id: "b1" }),
+        commit: jest.fn().mockResolvedValue({ id: "b1" }),
+        cancel: jest.fn().mockResolvedValue({ id: "b1" }),
+        undo: jest.fn().mockResolvedValue({ id: "b1" }),
+    };
     const controller = new OrganizationOrdersController(
         {
             listRows,
@@ -52,6 +60,7 @@ describe("OrganizationOrdersController", () => {
         {} as unknown as OrderPayLinkService,
         { change: changeFulfilment } as unknown as OrderFulfilmentChangeService,
         { cancel: cancelOrder } as unknown as OrderCancelService,
+        batches as unknown as OrderStageBatchService,
     );
 
     const as = (
@@ -337,6 +346,32 @@ describe("OrganizationOrdersController", () => {
             const dto = { reason: "Late", idempotencyKey: "k1" };
             await controller.cancel(owner, "o1", dto);
             expect(cancelOrder).toHaveBeenCalledWith(owner, "o1", dto);
+        });
+    });
+
+    describe("B6: bulk kitchen moves", () => {
+        it("hands each batch route to its service with the caller", async () => {
+            const member = as("MEMBER");
+            const dto = {
+                batchId: "0f8fad5b-d9cb-469f-a165-70867728950e",
+                lines: [
+                    {
+                        orderId: "o1",
+                        from: "PREPARING" as const,
+                        to: "READY" as const,
+                    },
+                ],
+            };
+            await controller.createBatch(member, dto);
+            expect(batches.create).toHaveBeenCalledWith(member, dto);
+            await controller.readBatch(member, "b1");
+            expect(batches.get).toHaveBeenCalledWith(member, "b1");
+            await controller.commitBatch(member, "b1");
+            expect(batches.commit).toHaveBeenCalledWith(member, "b1");
+            await controller.cancelBatch(member, "b1");
+            expect(batches.cancel).toHaveBeenCalledWith(member, "b1");
+            await controller.undoBatch(member, "b1");
+            expect(batches.undo).toHaveBeenCalledWith(member, "b1");
         });
     });
 });
