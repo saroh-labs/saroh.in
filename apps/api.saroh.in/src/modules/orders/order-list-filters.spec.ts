@@ -12,7 +12,11 @@ import {
     lateSql,
     orderConditions,
     paymentStandingOf,
+    presetRange,
     searchSql,
+    stepKey,
+    stepPairs,
+    stepSql,
     tabCondition,
     ts,
 } from "./order-list-filters";
@@ -256,6 +260,155 @@ describe("ListOrdersQuery", () => {
         { fulfilment: "COLLECT" },
         { fulfilment: "delivery" },
         { attention: "true" },
+    ])("refuses %o", async (value) => {
+        await expect(parse(value)).rejects.toThrow(BadRequestException);
+    });
+});
+
+describe("the Step filter (B4)", () => {
+    const text = (s: { sql: string }) => s.sql.replace(/\s+/g, " ");
+
+    it("keys a step's word for a URL", () => {
+        expect(stepKey("Handed to courier")).toBe("handed-to-courier");
+        expect(stepKey("New")).toBe("new");
+        expect(stepKey("Out for delivery")).toBe("out-for-delivery");
+    });
+
+    it("matches every pair whose pill says the word, and no other", () => {
+        const handed = stepPairs("handed-to-courier");
+        expect(handed).toEqual(
+            expect.arrayContaining([
+                "SHIPPING.HANDED_TO_COURIER",
+                // A local delivery handed over the old way reads the same.
+                "LOCAL_DELIVERY.HANDED_TO_COURIER",
+                "DELIVERY.HANDED_TO_COURIER",
+            ]),
+        );
+        expect(handed.some((p) => p.startsWith("PICKUP."))).toBe(false);
+
+        // "New" is not Digital's first step ("Paid") nor an appointment's
+        // ("Booked"), though all three are stage NEW.
+        const fresh = stepPairs("new");
+        expect(fresh).toContain("PICKUP.NEW");
+        expect(fresh).toContain("COLLECT.NEW");
+        expect(fresh).not.toContain("DIGITAL.NEW");
+        expect(fresh).not.toContain("APPOINTMENT_ONLINE.NEW");
+        const paid = stepPairs("paid");
+        expect(paid).toContain("DIGITAL.NEW");
+        expect(paid.every((p) => p.startsWith("DIGITAL."))).toBe(true);
+        const booked = stepPairs("booked");
+        expect(booked).toEqual(
+            expect.arrayContaining([
+                "APPOINTMENT_IN_PERSON.NEW",
+                "APPOINTMENT_ONLINE.NEW",
+            ]),
+        );
+        expect(booked.every((p) => p.startsWith("APPOINTMENT_"))).toBe(true);
+    });
+
+    it("matches a stage a type has no step for where the pill places it", () => {
+        // A pick-up the legacy status PATCH marked DELIVERED reads Collected.
+        expect(stepPairs("collected")).toContain("PICKUP.DELIVERED");
+        expect(stepPairs("delivered")).not.toContain("PICKUP.DELIVERED");
+    });
+
+    it("never counts a refunded or cancelled order at a step", () => {
+        const s = stepSql("ready");
+        expect(text(s)).toContain(`NOT o."paymentStatus" = 'REFUNDED'`);
+        expect(text(s)).toContain("NOT o.status::text = 'CANCELLED'");
+        expect(s.values).toEqual([stepPairs("ready")]);
+    });
+
+    it("reads Refunded and Cancelled as the pill does, money first", () => {
+        expect(text(stepSql("refunded"))).toBe(
+            `o."paymentStatus" = 'REFUNDED'`,
+        );
+        expect(text(stepSql("cancelled"))).toBe(
+            `(NOT o."paymentStatus" = 'REFUNDED' AND o.status::text = 'CANCELLED')`,
+        );
+    });
+
+    it("matches nothing for a word no order shows", () => {
+        expect(stepPairs("teleported")).toEqual([]);
+        expect(stepSql("teleported").sql).toBe("FALSE");
+    });
+
+    it("joins the order's conditions", () => {
+        const s = orderConditions(
+            "org_1",
+            { step: "ready" },
+            { contact: false },
+            {},
+        );
+        expect(text(s)).toContain("o.fulfilment::text || '.' || o.stage::text");
+    });
+});
+
+describe("presetRange — the date presets in the business's zone (B4)", () => {
+    // 00:30 IST on 1 October is still 30 September in UTC.
+    const now = new Date("2026-09-30T19:00:00.000Z");
+    const iso = (r: { gte: Date; lt: Date }) => [
+        r.gte.toISOString(),
+        r.lt.toISOString(),
+    ];
+
+    it("today is the business's today, midnight to midnight", () => {
+        expect(iso(presetRange("today", "Asia/Kolkata", now))).toEqual([
+            "2026-09-30T18:30:00.000Z",
+            "2026-10-01T18:30:00.000Z",
+        ]);
+    });
+
+    it("yesterday is the whole day before", () => {
+        expect(iso(presetRange("yesterday", "Asia/Kolkata", now))).toEqual([
+            "2026-09-29T18:30:00.000Z",
+            "2026-09-30T18:30:00.000Z",
+        ]);
+    });
+
+    it("the last 7 days are today and the six before it", () => {
+        expect(iso(presetRange("7d", "Asia/Kolkata", now))).toEqual([
+            "2026-09-24T18:30:00.000Z",
+            "2026-10-01T18:30:00.000Z",
+        ]);
+    });
+
+    it("this month starts on the 1st in the business's zone", () => {
+        // In India it is already 1 October: the month is one day old.
+        expect(iso(presetRange("month", "Asia/Kolkata", now))).toEqual([
+            "2026-09-30T18:30:00.000Z",
+            "2026-10-01T18:30:00.000Z",
+        ]);
+        expect(presetRange("month", "UTC", now).gte.toISOString()).toBe(
+            "2026-09-01T00:00:00.000Z",
+        );
+    });
+
+    it("reads an unknown zone as India's", () => {
+        expect(iso(presetRange("today", "Mars/Olympus", now))).toEqual(
+            iso(presetRange("today", "Asia/Kolkata", now)),
+        );
+    });
+});
+
+describe("ListOrdersQuery — B4's step and date", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const parse = (value: Record<string, unknown>) =>
+        pipe.transform(value, {
+            type: "query",
+            metatype: ListOrdersQuery,
+        }) as Promise<ListOrdersQuery>;
+
+    it("takes a step key and a date preset, in any case", async () => {
+        const q = await parse({ step: " Handed-To-Courier ", date: "7D" });
+        expect(q.step).toBe("handed-to-courier");
+        expect(q.date).toBe("7d");
+    });
+
+    it.each([
+        { step: "ready; drop table" },
+        { step: "x".repeat(41) },
+        { date: "fortnight" },
     ])("refuses %o", async (value) => {
         await expect(parse(value)).rejects.toThrow(BadRequestException);
     });

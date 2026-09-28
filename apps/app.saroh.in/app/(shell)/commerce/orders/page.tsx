@@ -5,7 +5,10 @@ import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
 import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
-import { listOrderRows } from "@/lib/orders/business-service";
+import {
+    getOrderFilterOptions,
+    listOrderRows,
+} from "@/lib/orders/business-service";
 import {
     orderListParams,
     ordersHref,
@@ -25,8 +28,8 @@ import { listBusinessStores } from "@/lib/stores/service";
  * the rail badges and this list the same fact.
  *
  * The address is the list's state (`list-query.ts`): the tab, the search, the
- * storefront and the page. A link from before B3 (`?view=unfulfilled`) still
- * lands on the tab it meant.
+ * storefront, the filters (B4) and the page. A link from before B3
+ * (`?view=unfulfilled`) still lands on the tab it meant.
  *
  * Someone holding neither `order:read` nor `order:stage` gets the locked card
  * before anything is read (B7). The list read failing is the page failing
@@ -58,13 +61,15 @@ export default async function OrdersPage({
 
     const query = readOrdersQuery(params);
     const storesRead = listBusinessStores();
-    const [page, stores, openByStore] = await Promise.all([
+    const [page, stores, openByStore, filterOptions] = await Promise.all([
         listOrderRows(orderListParams(query)),
         storesRead,
         // Counted beside the page, not after it.
         storesRead.then((all) =>
             all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
         ),
+        // What the filter bar offers (B4); null leaves its menus out.
+        getOrderFilterOptions(query.product ?? undefined),
     ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
@@ -86,6 +91,7 @@ export default async function OrdersPage({
                 // A Member reaches the list through `order:stage` alone
                 // (DEC-024) and gets the kitchen's view of it.
                 kitchen={!access.money}
+                filterOptions={filterOptions}
             />
         </PageContainer>
     );

@@ -119,4 +119,27 @@ describe("OrdersEmpty", () => {
         expect(html).toContain("Show all orders");
         expect(html).not.toContain("No orders yet");
     });
+
+    it("says which filters found nothing, and offers to clear them (B4)", () => {
+        const html = renderToStaticMarkup(
+            <OrdersEmpty
+                query={readOrdersQuery({
+                    fulfilment: "shipping",
+                    date: "7d",
+                    tab: "open",
+                })}
+                storeName={null}
+                options={{
+                    types: [{ type: "SHIPPING", label: "Shipping" }],
+                    steps: [],
+                    product: null,
+                }}
+                go={noop}
+            />,
+        );
+        expect(html).toContain("No shipping orders in the last 7 days");
+        expect(html).toContain("Clear filters");
+        expect(html).not.toContain("Nothing left to fulfil");
+        expect(html).not.toContain("No orders yet");
+    });
 });

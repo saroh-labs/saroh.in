@@ -34,6 +34,7 @@ import {
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import type { OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
+import { orderFilterOptions, searchOrderProducts } from "./order-list-options";
 import { retireOrderPayLinkInTx } from "./order-pay-link";
 import {
     fromCents,
@@ -94,6 +95,20 @@ export class OrdersService {
         view: { money: boolean; contact: boolean },
     ) {
         return listOrderRows(organizationId, query, view);
+    }
+
+    /**
+     * What the Orders list's filter bar offers (B4): the ways and steps the
+     * business's orders show, and the name of the product a link names.
+     * See `order-list-options.ts`.
+     */
+    filterOptions(organizationId: string, productId?: string) {
+        return orderFilterOptions(organizationId, productId);
+    }
+
+    /** The product picker's search (B4), over products on real orders. */
+    searchProducts(organizationId: string, q?: string) {
+        return searchOrderProducts(organizationId, q);
     }
 
     async get(storeId: string, orderId: string, userId: string) {
