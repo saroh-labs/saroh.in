@@ -1523,7 +1523,14 @@ model Order {
   payTokenHash     String?   @unique
   payLinkCreatedAt DateTime?
 
+  // The key the site's checkout sheet sent when it started this order (G13):
+  // a double tap or a retry with the same key finds this order and its
+  // intent instead of making a second. Null on every order not started at a
+  // site's checkout.
+  checkoutKey String?
+
   @@unique([storeId, orderId])
+  @@unique([storeId, checkoutKey])
   @@index([storeId])
   @@index([customerId])
   @@index([organizationId])
@@ -1927,6 +1934,12 @@ model StoreSettings {
   // When the one-time "Pick-up orders now count as late after 2 hours"
   // notice on Orders was dismissed for this storefront (B17).
   lateRuleNoticeDismissedAt     DateTime?
+
+  // The shop's delivery fee (G13): a flat amount added to an order's
+  // `shipping` when the site's checkout picks Local delivery or Shipping.
+  // Null is free. B9 prefills a change of fulfilment from it.
+  localDeliveryFee Decimal? @db.Decimal(10, 2)
+  shippingFee      Decimal? @db.Decimal(10, 2)
 }
 
 model StoreFeatures {
