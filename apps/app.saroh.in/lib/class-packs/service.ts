@@ -42,6 +42,8 @@ export interface PackPurchase {
     /** Null when sold with Payments off, or not readable by this person. */
     invoiceId: string | null;
     createdAt: string;
+    /** How the sale was paid (E13); null or absent when not recorded. */
+    paidBy?: "CASH" | "UPI" | "CARD" | "BANK" | "ONLINE" | "NONE" | null;
 }
 
 export interface PackInput {
@@ -162,11 +164,19 @@ export function setPackArchived(id: string, archived: boolean) {
             : "Could not put that pack back on sale.",
     );
 }
-export function sellPack(id: string, contactId: string) {
+/**
+ * Sell a pack at the desk, with how it was paid (E13, E15): a record of
+ * what the desk took, never a limit on how anyone pays (DEC-059).
+ */
+export function sellPack(
+    id: string,
+    contactId: string,
+    paidBy?: "CASH" | "UPI" | "CARD" | "BANK" | "NONE",
+) {
     return send<PackPurchase>(
         `${packPath(id)}/sell`,
         "POST",
-        { contactId },
+        { contactId, ...(paidBy ? { paidBy } : {}) },
         "Could not sell that pack.",
     );
 }

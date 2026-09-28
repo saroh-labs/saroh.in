@@ -64,11 +64,16 @@ export interface PackCounts {
     active: number;
     /** Classes (or sessions) left across those. */
     creditsLeft: number;
+    /** People holding a live purchase of it: one person with two counts once (E15). */
+    people: number;
+    /** What every sale was sold for, per currency (E15, the card's "taken"). */
+    takings: MoneyTotal[];
 }
 
 /**
- * Per pack: times sold, live purchases, and classes left on them. A pack
- * never sold is missing from the map.
+ * Per pack: times sold, live purchases, the classes left on them, the
+ * people holding them, and what it has taken. A pack never sold is missing
+ * from the map.
  */
 export async function packCounts(
     organizationId: string,
@@ -81,26 +86,41 @@ export async function packCounts(
         where: { organizationId, packId: { in: packIds } },
         select: {
             packId: true,
+            contactId: true,
             credits: true,
             expiresAt: true,
+            price: true,
+            currency: true,
             _count: {
                 select: { redemptions: { where: { reversedAt: null } } },
             },
         },
     });
+    const byPack = new Map<string, typeof rows>();
     for (const r of rows) {
-        const c = counts.get(r.packId) ?? {
-            sold: 0,
-            active: 0,
-            creditsLeft: 0,
-        };
-        c.sold += 1;
-        const left = Math.max(0, r.credits - r._count.redemptions);
-        if (r.expiresAt > now && left > 0) {
-            c.active += 1;
-            c.creditsLeft += left;
+        const list = byPack.get(r.packId) ?? [];
+        list.push(r);
+        byPack.set(r.packId, list);
+    }
+    for (const [packId, sales] of byPack) {
+        const people = new Set<string>();
+        let active = 0;
+        let creditsLeft = 0;
+        for (const r of sales) {
+            const left = Math.max(0, r.credits - r._count.redemptions);
+            if (r.expiresAt > now && left > 0) {
+                active += 1;
+                creditsLeft += left;
+                people.add(r.contactId);
+            }
         }
-        counts.set(r.packId, c);
+        counts.set(packId, {
+            sold: sales.length,
+            active,
+            creditsLeft,
+            people: people.size,
+            takings: totals(sales),
+        });
     }
     return counts;
 }

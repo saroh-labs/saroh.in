@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { DeskPaidBy } from "./sell-words";
 import type { PackInput, PackPurchase } from "./service";
 import * as api from "./service";
 
@@ -30,8 +31,12 @@ export async function updatePack(id: string, input: PackInput) {
 export async function setPackArchived(id: string, archived: boolean) {
     return then(api.setPackArchived(id, archived));
 }
-export async function sellPack(id: string, contactId: string) {
-    return then(api.sellPack(id, contactId));
+export async function sellPack(
+    id: string,
+    contactId: string,
+    paidBy?: DeskPaidBy,
+) {
+    return then(api.sellPack(id, contactId, paidBy));
 }
 
 /**
