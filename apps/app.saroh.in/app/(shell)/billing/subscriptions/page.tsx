@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import {
     getRenewals,
+    getSubscriptionSettings,
     listChargesBySubscription,
     listPlansOptional,
     listSubscriptions,
@@ -58,10 +59,11 @@ export default async function SubscriptionsPage({
             listPlansOptional(),
             modulesOrUnknown(),
         ]);
-    const [contacts, renewals, charges] = await Promise.all([
+    const [contacts, renewals, charges, settings] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         getRenewals().catch(() => null),
         listChargesBySubscription(),
+        getSubscriptionSettings(),
     ]);
     const plans = planRead.state === "ok" ? planRead.data : null;
     const appointments = modules
@@ -97,6 +99,7 @@ export default async function SubscriptionsPage({
                 initialTab={screenTabFromQuery(params.tab ?? params.view)}
                 openSubscribe={canWrite && params.subscribe === "1"}
                 nowIso={now.toISOString()}
+                settings={settings}
             />
         </PageContainer>
     );
