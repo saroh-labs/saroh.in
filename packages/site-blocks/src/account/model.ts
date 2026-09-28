@@ -23,6 +23,11 @@ export interface AccountView {
     offers: { appointments: boolean; orders: boolean; plans: boolean };
     bookingsLabel: "Bookings" | "Appointments";
     healthNotes: boolean;
+    /**
+     * Messages from the business not yet opened (A13): the Messages tab's
+     * dot. Absent from an API that predates it: read as none.
+     */
+    unreadMessages?: number;
 }
 
 /** A read that failed says so; it never reads as "none". */
@@ -94,6 +99,21 @@ export interface AccountNote {
     text: string;
     sentAt: string;
     state: "SENT" | "ON_RECORD";
+}
+
+/** One message in the customer's thread with the business (A13). */
+export interface AccountMessage {
+    ref: string;
+    from: "me" | "business";
+    text: string;
+    sentAt: string;
+}
+
+export interface AccountThread {
+    /** Oldest first. */
+    messages: AccountMessage[];
+    /** Older messages exist beyond these. */
+    earlier: boolean;
 }
 
 // ---- Words ------------------------------------------------------------------
@@ -218,4 +238,50 @@ export function orderTitle(order: AccountOrder): string {
         .join(", ");
     const more = order.moreItems > 0 ? ` and ${order.moreItems} more` : "";
     return `#${order.number}${lines ? ` · ${lines}${more}` : ""}`;
+}
+
+/**
+ * Under a message: who it is from and when — "You · 10:05", "Kavi Dental ·
+ * Yesterday", "Kavi Dental · 3 Oct" — in the visitor's own time. `now` is
+ * passed in so the words don't change between the server and the browser.
+ */
+export function messageMeta(
+    message: AccountMessage,
+    businessName: string,
+    now: Date,
+    timeZone?: string,
+): string {
+    const who = message.from === "me" ? "You" : businessName;
+    const at = new Date(message.sentAt);
+    if (Number.isNaN(at.getTime())) return who;
+    const day = (d: Date) =>
+        new Intl.DateTimeFormat("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            timeZone,
+        }).format(d);
+    const today = day(now);
+    const yesterday = day(new Date(now.getTime() - 86_400_000));
+    let when: string;
+    if (day(at) === today) {
+        when = new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            timeZone,
+        }).format(at);
+    } else if (day(at) === yesterday) {
+        when = "Yesterday";
+    } else {
+        when = new Intl.DateTimeFormat("en-GB", {
+            day: "numeric",
+            month: "short",
+            ...(at.getFullYear() !== now.getFullYear()
+                ? { year: "numeric" as const }
+                : {}),
+            timeZone,
+        }).format(at);
+    }
+    return `${who} · ${when}`;
 }

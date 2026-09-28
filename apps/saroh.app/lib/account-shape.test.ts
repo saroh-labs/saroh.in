@@ -4,9 +4,11 @@ import {
     emailChangeAnswer,
     homeResult,
     isAccountView,
+    isMessage,
     notesResult,
     receiptsResult,
     refusalMessage,
+    threadResult,
 } from "./account-shape";
 
 /**
@@ -175,5 +177,68 @@ describe("refusalMessage", () => {
             ),
         ).toBe("fallback");
         expect(refusalMessage(400, null, "fallback")).toBe("fallback");
+    });
+});
+
+describe("the message thread (A13)", () => {
+    const THREAD = {
+        messages: [
+            {
+                ref: "m1",
+                from: "business",
+                text: "Your crown is ready.",
+                sentAt: "2026-10-04T09:00:00.000Z",
+            },
+            {
+                ref: "m2",
+                from: "me",
+                text: "Thanks!",
+                sentAt: "2026-10-04T10:00:00.000Z",
+            },
+        ],
+        earlier: false,
+    };
+
+    it("reads the API's thread, and refuses one it doesn't know", () => {
+        expect(threadResult(THREAD)).toEqual(THREAD);
+        expect(threadResult({ messages: [], earlier: false })).toEqual({
+            messages: [],
+            earlier: false,
+        });
+        expect(
+            threadResult({
+                ...THREAD,
+                messages: [{ ...THREAD.messages[0], from: "staff" }],
+            }),
+        ).toBe(null);
+        expect(threadResult({ messages: THREAD.messages })).toBe(null);
+        expect(threadResult(null)).toBe(null);
+    });
+
+    it("a message is exactly its four fields' kinds", () => {
+        expect(isMessage(THREAD.messages[1])).toBe(true);
+        expect(isMessage({ ...THREAD.messages[1], text: 3 })).toBe(false);
+    });
+
+    it("Me's unread count is read when sent, and optional from an older API", () => {
+        expect(isAccountView({ ...ACCOUNT, unreadMessages: 2 })).toBe(true);
+        expect(isAccountView({ ...ACCOUNT, unreadMessages: "2" })).toBe(false);
+    });
+
+    it("passes on the too-many sentence (429)", () => {
+        expect(
+            refusalMessage(
+                429,
+                {
+                    error: {
+                        message:
+                            "You're sending messages quickly. Wait a minute, then try again.",
+                    },
+                },
+                "fallback",
+            ),
+        ).toBe(
+            "You're sending messages quickly. Wait a minute, then try again.",
+        );
     });
 });

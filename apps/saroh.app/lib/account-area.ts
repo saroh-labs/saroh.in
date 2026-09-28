@@ -5,6 +5,7 @@ import type {
     AccountHomeData,
     AccountNote,
     AccountReceipt,
+    AccountThread,
     AccountView,
 } from "@saroh/site-blocks";
 
@@ -13,6 +14,7 @@ import {
     isAccountView,
     notesResult,
     receiptsResult,
+    threadResult,
 } from "./account-shape";
 import { accountFetch } from "./customer-session";
 import type { PayInvoice } from "./invoice-pay-shape";
@@ -81,6 +83,13 @@ export async function getAccountHome(): Promise<AccountHomeData | null> {
 export async function getReceipts(): Promise<AccountBlock<AccountReceipt[]>> {
     const read = await readJson("me/receipts");
     const value = read.ok ? receiptsResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+/** The customer's thread with the business (A13); reading it opens it. */
+export async function getThread(): Promise<AccountBlock<AccountThread>> {
+    const read = await readJson("me/messages");
+    const value = read.ok ? threadResult(read.body) : null;
     return value ? { ok: true, value } : { ok: false };
 }
 
