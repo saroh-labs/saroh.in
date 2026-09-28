@@ -16,6 +16,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { requireCustomerPower } from "../customer-workspace/customer-access";
 import { authorize } from "../organizations/organization-policy";
 import { InviteReviewsDto, ReplyDto } from "./dto";
 import { ProductReviewsService } from "./product-reviews.service";
@@ -37,9 +38,17 @@ export class ProductReviewsController {
         @OrgContext() ctx: OrganizationContext,
         @Query("productId") productId?: string,
         @Query("status") status?: string,
+        @Query("contactId") contactId?: string,
     ) {
         authorize(ctx, "product-review:read");
-        return this.reviews.list(ctx.organizationId, { productId, status });
+        // One customer's reviews (C6, Customer Detail) reads that customer
+        // too, and a refusal says so in words.
+        if (contactId) requireCustomerPower(ctx, "contact:read");
+        return this.reviews.list(ctx.organizationId, {
+            productId,
+            status,
+            contactId,
+        });
     }
 
     @Get("summary")
