@@ -108,3 +108,21 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
+
+## Team alerts — **Current** (F14)
+
+- **`team.alert`** tells the business's own team, as each person chose in
+  Settings › Your profile (`notifications/alert-preferences.ts`). A
+  producer calls `enqueueTeamAlert(tx, …)` on its own transaction
+  (`notifications/team-alerts.ts`): a new order (the create, and an online
+  checkout's payment), an invoice's pay link failing (the webhook), an
+  invitation accepted. `booking.notify` writes its team notice itself (A14)
+  and queues `team.alert` with that notice's id for the email only.
+- **One notice, filtered per person.** The bell is one org-wide
+  `Notification`; `NotificationsService` leaves out, per viewer, the types
+  of rows they turned the bell off for or can't read. Email goes through
+  the business's own provider (`queueTransactional`, recipient
+  `TEAM_MEMBER`) to each member whose role reads it and who has email on.
+- **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
+  `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
+  that went through after all, or someone who left again is not announced.
