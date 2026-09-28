@@ -244,6 +244,18 @@ function detailRows(
                     : [],
                 withoutValues: false,
             };
+        case "membership.storefront-join":
+            return {
+                rows: [
+                    ...(role(meta.role)
+                        ? [row("Role", null, role(meta.role))]
+                        : []),
+                    ...(text(meta.storefront)
+                        ? [row("From storefront", null, text(meta.storefront))]
+                        : []),
+                ],
+                withoutValues: false,
+            };
         case "membership.role.update":
             return {
                 rows: [row("Role", role(meta.from), role(meta.to))],

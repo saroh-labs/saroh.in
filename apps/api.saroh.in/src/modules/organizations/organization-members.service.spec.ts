@@ -26,6 +26,7 @@ jest.mock("@saroh/database", () => ({
         site: { findMany: jest.fn() },
         session: { groupBy: jest.fn() },
         sitePreviewLink: { updateMany: jest.fn() },
+        storeMembers: { findMany: jest.fn(), deleteMany: jest.fn() },
         organization: { findUnique: jest.fn() },
         organizationRole: { findUnique: jest.fn() },
         $transaction: jest.fn(),
@@ -54,6 +55,7 @@ const db = prisma as unknown as {
     site: Record<string, jest.Mock>;
     session: Record<string, jest.Mock>;
     sitePreviewLink: Record<string, jest.Mock>;
+    storeMembers: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
     organizationRole: Record<string, jest.Mock>;
     $transaction: jest.Mock;
@@ -87,6 +89,8 @@ beforeEach(() => {
     db.siteReviewer.deleteMany.mockResolvedValue({ count: 0 });
     db.sitePreviewLink.updateMany.mockResolvedValue({ count: 0 });
     db.session.groupBy.mockResolvedValue([]);
+    db.storeMembers.findMany.mockResolvedValue([]);
+    db.storeMembers.deleteMany.mockResolvedValue({ count: 0 });
 });
 
 describe("who may touch the roster", () => {
@@ -115,6 +119,59 @@ describe("who may touch the roster", () => {
             /may not perform/,
         );
         await expect(service.list(ctx("MEMBER"))).resolves.toEqual([]);
+    });
+
+    it("shows each person's storefront roles under them (DEC-048)", async () => {
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "user_2",
+                role: "storefront-team",
+                user: { name: "Ravi", email: "ravi@example.test" },
+            },
+            {
+                userId: "user_owner",
+                role: "OWNER",
+                user: { name: "Priya", email: "priya@example.test" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.storeMembers.findMany.mockResolvedValue([
+            {
+                userId: "user_2",
+                role: "VIEWER",
+                store: { id: "store_hill", name: "Hill Road" },
+            },
+            {
+                userId: "user_2",
+                role: "MANAGER",
+                store: { id: "store_market", name: "Market" },
+            },
+        ]);
+
+        const roster = await service.list(ctx("OWNER"));
+
+        // This business's open storefronts only.
+        expect(db.storeMembers.findMany.mock.calls[0][0].where).toEqual({
+            store: { organizationId: "org_1", deletedAt: null },
+        });
+        expect(roster.map((m) => [m.userId, m.storefronts])).toEqual([
+            [
+                "user_2",
+                [
+                    {
+                        storeId: "store_hill",
+                        name: "Hill Road",
+                        role: "VIEWER",
+                    },
+                    {
+                        storeId: "store_market",
+                        name: "Market",
+                        role: "MANAGER",
+                    },
+                ],
+            ],
+            ["user_owner", []],
+        ]);
     });
 
     it("keeps pending invitations to those who can send them", async () => {
@@ -497,7 +554,48 @@ describe("removing someone", () => {
             revokedAt: null,
         });
         expect(links.data.revokedAt).toBeInstanceOf(Date);
-        expect(result).toEqual({ removed: true, revokedLinks: 2 });
+        expect(result).toEqual({
+            removed: true,
+            revokedLinks: 2,
+            storefrontRoles: 0,
+        });
+    });
+
+    it("takes their storefront roles in this business with them (DEC-048)", async () => {
+        db.storeMembers.deleteMany.mockResolvedValue({ count: 2 });
+
+        const result = await service.remove(ctx(), "user_2");
+
+        // Scoped to this business's storefronts, never another's.
+        expect(db.storeMembers.deleteMany).toHaveBeenCalledWith({
+            where: { userId: "user_2", store: { organizationId: "org_1" } },
+        });
+        expect(result).toMatchObject({ storefrontRoles: 2 });
+        expect(db.$transaction.mock.calls[0][1]).toEqual({
+            isolationLevel: "Serializable",
+        });
+    });
+
+    it("keeps an only owner's storefront roles when refusing to remove them", async () => {
+        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        db.membership.count.mockResolvedValue(0);
+
+        await expect(service.remove(ctx(), "user_owner")).rejects.toThrow(
+            /only owner/i,
+        );
+        expect(db.storeMembers.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("checks the last owner again inside the transaction", async () => {
+        db.membership.findUnique.mockResolvedValue({ role: "OWNER" });
+        // Another owner before the transaction; none left inside it.
+        db.membership.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+        await expect(service.remove(ctx(), "user_owner")).rejects.toThrow(
+            /only owner/i,
+        );
+        expect(db.membership.delete).not.toHaveBeenCalled();
+        expect(db.storeMembers.deleteMany).not.toHaveBeenCalled();
     });
 
     it("leaves their notes and approvals alone", async () => {

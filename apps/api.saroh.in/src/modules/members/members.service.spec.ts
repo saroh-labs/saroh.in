@@ -41,6 +41,10 @@ describe("MembersService (dev DB)", () => {
                 },
             })
         ).id;
+        // A storefront invite needs `member:invite` in the business (F16).
+        await prisma.membership.create({
+            data: { organizationId: orgId, userId: ownerId, role: "OWNER" },
+        });
         const store = await stores.createForUser(ownerId, orgId, {
             name: "Members Test",
             slug: `memtest-${process.pid}`,
@@ -53,6 +57,15 @@ describe("MembersService (dev DB)", () => {
         await prisma.storeMembers.deleteMany({ where: { storeId } });
         await prisma.storeOwner.deleteMany({ where: { storeId } });
         await prisma.store.deleteMany({ where: { id: storeId } });
+        await prisma.auditEvent.deleteMany({
+            where: { organizationId: orgId },
+        });
+        await prisma.membership.deleteMany({
+            where: { organizationId: orgId },
+        });
+        await prisma.organizationRole.deleteMany({
+            where: { organizationId: orgId },
+        });
         await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({
             where: { email: { in: [ownerEmail, inviteeEmail, strangerEmail] } },

@@ -462,6 +462,44 @@ describe("activityLine — the team", () => {
         ).toBe("Priya removed aditya@ryeandco.in from the team → Team");
     });
 
+    it("says who joined from a storefront, and who the backfill added (F16)", () => {
+        const labels = { "storefront-team": "Storefront team" };
+        expect(
+            said(
+                {
+                    action: "membership.storefront-join",
+                    actor: { name: "Meera", email: "meera@ryeandco.in" },
+                    targetType: "membership",
+                    metadata: {
+                        role: "storefront-team",
+                        storefront: "Hill Road",
+                        source: "invite",
+                    },
+                },
+                labels,
+            ),
+        ).toBe(
+            "Meera joined the team as Storefront team, from Hill Road → Team",
+        );
+        expect(
+            said(
+                {
+                    action: "membership.storefront-join",
+                    actor: { name: "Ravi", email: "ravi@ryeandco.in" },
+                    targetType: "membership",
+                    metadata: {
+                        role: "storefront-team",
+                        storefront: "Market",
+                        source: "backfill",
+                    },
+                },
+                labels,
+            ),
+        ).toBe(
+            "Ravi was added to the team as Storefront team, from Market → Team",
+        );
+    });
+
     it("opens the Team page on its people", () => {
         expect(
             activityLine(event({ action: "membership.remove" }))?.where.href,
