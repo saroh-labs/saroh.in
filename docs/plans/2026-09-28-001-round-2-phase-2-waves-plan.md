@@ -12,8 +12,8 @@ origin: docs/plans/2026-09-26-000-round-2-overview.md
 ## Overview
 
 Phase 1 (48 units) is in production; B2c and B10 are in #693. This plan
-orders phase 2's 88 units, plus 4 new units for the 2026-09-28 decisions
-(DEC-053–056), into 9 waves. Each wave runs as parallel worktree agents, one
+orders phase 2's 88 units, plus 6 new units for the 2026-09-28 decisions
+(DEC-053–059), into 9 waves. Each wave runs as parallel worktree agents, one
 unit each (`~/Desktop/mohit/saroh-designs/R2-UNIT-BRIEF.md`). They merge into
 `feat/round-2-phase-2` in dependency order, then into `development`. The unit
 scopes are in plans 001–007. This plan decides only order, the new units and
@@ -35,7 +35,7 @@ the release boundaries.
 |---|---|
 | Policy (`organization-policy.ts`, `organization-roles.service.ts`, `capability-catalogue.ts`) | F19 → C9 → C11 → B16 → C13 → E26 → F17 |
 | Customer workspace | C9 → C12 → C8 → C10 → C11 → C15 → C13 → C6 → C7 → C14 |
-| Booking flow (`packages/site-blocks/src/booking-flow/**`) | E8 → E6 → A10 → E10 |
+| Booking flow (`packages/site-blocks/src/booking-flow/**`) | E8 → E6 → D23 → A10 → E10 |
 | `home.service` | F9 → F7 → F2 → F4 → F11 |
 | Calendar grid | E21 → E28 → E22 → E23 → E24 → E25 → E27 |
 | Section contract | G7 → G10 → G9 → G12 → G14 → G20 → G16 |
@@ -89,6 +89,7 @@ one exists.
   E28 #641 · D10 #602 (the allowance fallback, and the fix for "Paused
   until" a day that has passed)
 - **2b:** E19 #632, after B11 (`webhooks.service.ts`).
+- **2b:** E30 (new, DEC-058), after B11 (`payments.service.ts`). D23 (new, DEC-059), after E6 (booking flow).
 - **CP-2:** a manual release. D10's allowance backfill is re-run after the
   deploy (overview rule 4). The checklist lives in D10's PR and in
   `docs/architecture/`.
@@ -150,6 +151,8 @@ one exists.
 | F20 | An optional public phone on the business profile (additive), checked as E.164 (`+91…`) and shown on the site once set. A field in Settings → Business, with a `settings-audit` entry. `businessPublicPhone(site)` in `site-host.ts` is filled in, and saving it refreshes the site's cached pages so a removed number stops showing. It unblocks G8's Call button, E6's header and A2/A9's "call ‹Business›" copy. | 1a |
 | D22 | Settings › Providers asks for the Razorpay public key id, and the API returns it for E11's checkout. **An idempotent script fills `PaymentProvider.publicKey` from the sealed `keyId` for existing Razorpay connections, and it runs before the "needs attention" state goes live**, so no merchant loses online pay. | 1a |
 | D21 | The readers that refuse DRAFT (subscribe, the site's plan reads, "Sell again"). They are live from CP-1, before any draft writer. | 1a |
+| E30 | The business's policy for cancellations made in time (DEC-058): a booking setting ("refund what they paid online automatically", or not; the default is refund), read by E8's cancel path instead of always refunding. A refund never goes beyond what was received. The cancel dialog and booking page state the policy. | 2b |
+| D23 | Payment methods are the account's (DEC-059): remove Razorpay's UPI-and-card-only display block in `booking-flow/checkout.ts`, and replace "UPI or card" copy across the booking flow with neutral copy (or the methods the provider reports). | 2b |
 | C15 | A per-storefront setting for same-email customers: link automatically, or leave for staff (the default; existing stores keep it). The incoming customer's storefront's setting applies. **It links only to a contact that was itself made from a store customer (DEC-055)**, never to a staff-entered contact or lead. Links go through C9's `resolveContact`. **Automatic linking never widens what a site account can see unless the contact's email is verified (DEC-049); otherwise it only suggests the pair.** Turning it on doesn't re-link existing pairs. | 6a |
 
 ## Release boundaries
