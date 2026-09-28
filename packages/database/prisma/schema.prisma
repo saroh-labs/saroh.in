@@ -1453,7 +1453,7 @@ model Order {
   // stage move maps to a status move (order-stage.ts), and every move is an
   // OrderEvent. Existing orders were backfilled from their status.
   stage      OrderStage      @default(NEW)
-  fulfilment OrderFulfilment @default(COLLECT)
+  fulfilment OrderFulfilment @default(PICKUP)
 
   // Where a DELIVERY order goes. `deliveryState` is also the place of
   // supply for GST when no bill-to state is set (U5).
@@ -1582,8 +1582,9 @@ enum OrderStage {
 // How an order leaves (DEC-045). COLLECT and DELIVERY are the legacy words
 // for PICKUP and LOCAL_DELIVERY: release 1 (B2a) adds the six types beside
 // them and still writes only the legacy two, release 2 (B2c) switches every
-// row and write to the new names, and release 3 (B2d) drops COLLECT and
-// DELIVERY. Read it through `typeOf` in orders/fulfilment.ts, never raw.
+// row and write to the new names (20261011160000), and release 3 (B2d)
+// drops COLLECT and DELIVERY. Read it through `typeOf` in
+// orders/fulfilment.ts, never raw.
 enum OrderFulfilment {
   COLLECT
   DELIVERY

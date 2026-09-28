@@ -1,6 +1,7 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 
+import type { CourierFields } from "./courier";
 import type { DetailAllergyNote } from "./lifecycle";
 import { allergyNotesFrom } from "./lifecycle";
 import type { AllergyNote, KitchenStage, OrderRead } from "./read";
@@ -57,15 +58,42 @@ export async function getAllergyNotes(
 const path = (orderId: string, rest = "") =>
     `/orders/${encodeURIComponent(orderId)}${rest}`;
 
+/**
+ * A move to the next step. The handover to a courier carries who took it
+ * and their number and link, all optional (B2b, B10); no other step takes
+ * them.
+ */
+export interface MoveStageInput extends CourierFields {
+    to: KitchenStage;
+    note?: string;
+}
+
 export function moveOrderStage(
     orderId: string,
-    input: { to: KitchenStage; trackingUrl?: string; note?: string },
+    input: MoveStageInput,
 ): Promise<CrmResult<{ eventId: string; stage: string }>> {
     return mutate(
         path(orderId, "/stage"),
         "POST",
         input,
         "The order didn't move. Try again.",
+    );
+}
+
+/**
+ * Fill in or correct the courier, number or link on an order handed to a
+ * courier (`order:stage`). Null clears one. Each change is a step on the
+ * timeline.
+ */
+export function saveOrderCourier(
+    orderId: string,
+    input: CourierFields,
+): Promise<CrmResult<{ eventId: string | null }>> {
+    return mutate(
+        path(orderId),
+        "PATCH",
+        input,
+        "The tracking details weren't saved. Try again.",
     );
 }
 

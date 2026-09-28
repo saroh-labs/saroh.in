@@ -692,6 +692,22 @@ export async function checkRye(
             .map((b) => ({ id: b.id })),
     );
 
+    // B2c (DEC-045): the seed writes the types' own names, and each order
+    // stands on a step its type has: out for delivery is a local delivery's,
+    // handed to a courier a shipment's.
+    fail(
+        "orders in the legacy words COLLECT or DELIVERY, or on another type's step",
+        await prisma.$queryRaw<Row[]>`
+            SELECT o.id, o.fulfilment::text AS fulfilment, o.stage::text AS stage
+            FROM "Order" o
+            WHERE o."organizationId" = ${orgId} AND (
+                o.fulfilment::text IN ('COLLECT', 'DELIVERY')
+                OR (o.stage = 'COLLECTED' AND o.fulfilment::text <> 'PICKUP')
+                OR (o.stage = 'OUT_FOR_DELIVERY'
+                    AND o.fulfilment::text <> 'LOCAL_DELIVERY')
+                OR (o.stage = 'HANDED_TO_COURIER'
+                    AND o.fulfilment::text <> 'SHIPPING'))`,
+    );
     fail(
         "paid orders without exactly one invoice, or unpaid ones with one",
         await prisma.$queryRaw<Row[]>`
@@ -866,11 +882,20 @@ export async function checkRye(
         "orders delivered earlier": await has(prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "Order" WHERE "organizationId" = ${orgId}
               AND stage = 'DELIVERED' AND "createdAt" < ${today}::timestamp`),
-        "a delivery with the courier, its address and tracking link":
+        "a shipment with the courier, its address and tracking link":
             await has(prisma.$queryRaw<Row[]>`
                 SELECT COUNT(*) AS n FROM "Order" WHERE "organizationId" = ${orgId}
                   AND stage = 'HANDED_TO_COURIER' AND "trackingUrl" IS NOT NULL
                   AND "deliveryLine1" IS NOT NULL`),
+        // B2c: the bakery's own rider takes local deliveries out.
+        "a local delivery taken out for delivery": await has(prisma.$queryRaw<
+            Row[]
+        >`
+            SELECT COUNT(*) AS n FROM "OrderEvent" e
+            JOIN "Order" o ON o.id = e."orderId"
+            WHERE e."organizationId" = ${orgId} AND e.kind = 'STAGE'
+              AND e."toStage" = 'OUT_FOR_DELIVERY'
+              AND o.fulfilment = 'LOCAL_DELIVERY'`),
         "an order today whose payment failed": await has(prisma.$queryRaw<
             Row[]
         >`
