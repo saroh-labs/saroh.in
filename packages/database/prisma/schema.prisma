@@ -5331,7 +5331,7 @@ model ClassPack {
   validityDays Int
   price        Decimal @db.Decimal(12, 2)
   currency     String
-  status       String  @default("ACTIVE") // ACTIVE | ARCHIVED
+  status       String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED (E14)
 
   services  ClassPackService[]
   purchases PackPurchase[]
@@ -5340,6 +5340,23 @@ model ClassPack {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+
+  // Drafts (round-2 E14, `common/drafts/`, as a plan's in D5). A live pack's
+  // unpublished changes: only the fields that differ from the published
+  // columns (and services), which sales keep reading. Null when there are
+  // none. A DRAFT pack writes its columns directly and never holds a set.
+  pendingChanges   Json?
+  // When the pending set (or a draft's columns) was last saved. Null once
+  // published or discarded.
+  pendingChangedAt DateTime?
+  // Bumped by every draft save, publish, discard and pack write, so an
+  // editor holding an older revision is refused instead of overwriting (#285).
+  draftRevision    Int       @default(0)
+  // Who moved the revision last, and when: named in a stale editor's 409.
+  // No foreign key: a teammate who leaves keeps their saves; a Saroh
+  // operator's is never stored (DEC-035), so a time with no person is theirs.
+  revisedAt        DateTime?
+  revisedById      String?
 }
 
 model ClassPackService {

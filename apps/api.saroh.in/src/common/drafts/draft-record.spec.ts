@@ -8,6 +8,7 @@ import {
     pickPatch,
     readPending,
     samePending,
+    sameValue,
 } from "./draft-record";
 
 type Values = {
@@ -199,5 +200,53 @@ describe("assertRevision", () => {
         expect(() => assertRevision(6, held, "plan")).toThrow(
             ConflictException,
         );
+    });
+});
+
+describe("a list field (a pack's services, E14)", () => {
+    type Pack = { name: string; serviceIds: readonly string[] };
+    const PACK_FIELDS = ["name", "serviceIds"] as const;
+    const pack: Pack = { name: "10 classes", serviceIds: ["a", "b"] };
+
+    it("compares lists by their items", () => {
+        expect(sameValue(["a", "b"], ["a", "b"])).toBe(true);
+        expect(sameValue(["a", "b"], ["a"])).toBe(false);
+        expect(sameValue(["a", "b"], ["b", "a"])).toBe(false);
+        expect(sameValue([], null)).toBe(false);
+        expect(sameValue("a", ["a"])).toBe(false);
+    });
+
+    it("holds a changed list, and drops one put back as it is live", () => {
+        const held = nextPending(PACK_FIELDS, pack, null, {
+            serviceIds: ["a", "b", "c"],
+        });
+        expect(held).toEqual({ serviceIds: ["a", "b", "c"] });
+        expect(
+            nextPending(PACK_FIELDS, pack, held, { serviceIds: ["a", "b"] }),
+        ).toBeNull();
+    });
+
+    it("diffs and matches pending sets by the list's items", () => {
+        expect(
+            diffValues(PACK_FIELDS, pack, { ...pack, serviceIds: ["a"] }),
+        ).toEqual({ serviceIds: [["a", "b"], ["a"]] });
+        expect(
+            diffValues(PACK_FIELDS, pack, { ...pack, serviceIds: ["a", "b"] }),
+        ).toEqual({});
+        expect(
+            samePending<Pack>({ serviceIds: ["a"] }, { serviceIds: ["a"] }),
+        ).toBe(true);
+        expect(
+            samePending<Pack>({ serviceIds: ["a"] }, { serviceIds: ["b"] }),
+        ).toBe(false);
+    });
+
+    it("reads a stored list, and drops one holding anything but ids", () => {
+        expect(
+            readPending<Pack>(PACK_FIELDS, { serviceIds: ["a", "c"] }),
+        ).toEqual({ serviceIds: ["a", "c"] });
+        expect(
+            readPending<Pack>(PACK_FIELDS, { serviceIds: ["a", 3] }),
+        ).toBeNull();
     });
 });
