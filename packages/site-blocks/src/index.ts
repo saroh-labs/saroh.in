@@ -166,6 +166,7 @@ export { AccountEntry } from "./account/account-entry";
 export { AccountHome } from "./account/account-home";
 export { Me } from "./account/me";
 export type { DetailsResult, MeApi, MeProps, NoteResult } from "./account/me";
+// The Plan tab (plan A, A8).
 export type {
     Block as AccountBlock,
     AccountBooking,
@@ -173,13 +174,23 @@ export type {
     AccountHome as AccountHomeData,
     AccountNote,
     AccountOrder,
+    AccountPack,
     AccountPlan,
+    AccountPlanTab,
     AccountReceipt,
+    AccountSubscription,
     AccountTab,
     AccountTabKey,
     AccountView,
 } from "./account/model";
 export { AccountCard } from "./account/parts";
+export { PlanTab } from "./account/plan-tab";
+export type {
+    PayNowResult,
+    PlanApi,
+    PlanChangeResult,
+    PlanTabProps,
+} from "./account/plan-tab";
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
 
 export { destructiveAlertClasses } from "./alert";

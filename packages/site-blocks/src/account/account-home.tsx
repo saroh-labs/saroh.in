@@ -38,6 +38,8 @@ export function AccountHome({
 }) {
     const first = firstName(account.name);
     const clinic = account.bookingsLabel === "Appointments";
+    // The Plan tab's page (A8), linked only when this business shows it.
+    const planTab = account.tabs.some((t) => t.key === "plan");
     return (
         <div className="grid gap-3.5">
             <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
@@ -101,7 +103,20 @@ export function AccountHome({
 
             {home.plan.ok ? (
                 home.plan.value ? (
-                    <AccountCard labelledBy="account-plan" title="Membership">
+                    <AccountCard
+                        labelledBy="account-plan"
+                        title="Membership"
+                        actions={
+                            planTab ? (
+                                <Link
+                                    href="/account/plan"
+                                    className={buttonClasses(false)}
+                                >
+                                    Manage plan
+                                </Link>
+                            ) : undefined
+                        }
+                    >
                         <AccountRow
                             title={`${home.plan.value.name} · ${planPrice(home.plan.value)}`}
                             sub={planLine(home.plan.value)}
