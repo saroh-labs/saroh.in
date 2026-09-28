@@ -104,4 +104,20 @@ describe("the bag in the browser", () => {
         expect(() => addToBag("p", sourdough)).not.toThrow();
         expect(addToBag("p", sourdough)[0]?.quantity).toBe(2);
     });
+
+    it("goes back to storage after a refused write, so another tab's changes show", () => {
+        vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+            throw new Error("full");
+        });
+        addToBag("m", sourdough);
+        // Storage takes the next write, and the page's copy is let go.
+        expect(addToBag("m", sourdough)[0]?.quantity).toBe(2);
+        // Another tab changes the bag.
+        window.localStorage.setItem(
+            "saroh.bag.m",
+            JSON.stringify([{ ...sourdough, quantity: 5 }]),
+        );
+        expect(readBag("m")[0]?.quantity).toBe(5);
+        expect(addToBag("m", sourdough)[0]?.quantity).toBe(6);
+    });
 });

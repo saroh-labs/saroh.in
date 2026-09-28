@@ -85,6 +85,9 @@ export function writeBag(site: string, items: readonly BagItem[]): void {
     try {
         if (items.length === 0) window.localStorage.removeItem(keyOf(site));
         else window.localStorage.setItem(keyOf(site), JSON.stringify(items));
+        // Stored again: storage is the bag once more, so another tab's
+        // changes show and no refused write pins an old one.
+        memory.delete(site);
     } catch {
         // Storage refused: this visit's bag still lives in the listeners'
         // snapshot below.

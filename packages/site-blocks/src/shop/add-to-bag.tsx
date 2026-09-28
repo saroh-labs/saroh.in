@@ -12,7 +12,7 @@ import { addToBag, openBag } from "./bag-store";
  * G13): Add to bag, for the option the visitor picked. Off, reading "Sold
  * out", when none of it can be sold now. After adding, it says so and
  * offers the bag, the way the design's toast does, without leaving the
- * page.
+ * page; a bag already holding its most lines says it is full instead.
  *
  * It sits in `ProductPage`'s action slot and reads the choice with
  * `useProductSelection`, so the server page passes it as a plain node.
@@ -34,6 +34,7 @@ export function AddToBag({
 }) {
     const selection = useProductSelection();
     const [added, setAdded] = useState<string | null>(null);
+    const [full, setFull] = useState(false);
     if (!selection) return null;
 
     const what = selection.variantTitle
@@ -42,12 +43,19 @@ export function AddToBag({
 
     function add() {
         if (!selection || selection.soldOut) return;
-        addToBag(site, {
+        const bag = addToBag(site, {
             listingId,
             variantId: selection.variantId,
             quantity: 1,
         });
-        setAdded(what);
+        // A full bag keeps what it had: say so, never "added".
+        const inBag = bag.some(
+            (i) =>
+                i.listingId === listingId &&
+                i.variantId === selection.variantId,
+        );
+        setFull(!inBag);
+        setAdded(inBag ? what : null);
     }
 
     return (
@@ -64,6 +72,26 @@ export function AddToBag({
                       ? "Add another"
                       : "Add to bag"}
             </button>
+            {full ? (
+                <p
+                    role="status"
+                    className="text-site-body mt-2 flex flex-wrap items-center gap-x-2 text-sm"
+                >
+                    <span>
+                        Your bag is full. Take something out to add this.
+                    </span>
+                    <button
+                        type="button"
+                        onClick={openBag}
+                        className={cn(
+                            "text-site-fg cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:no-underline",
+                            focusRing,
+                        )}
+                    >
+                        View bag
+                    </button>
+                </p>
+            ) : null}
             {added ? (
                 <p
                     role="status"
