@@ -633,6 +633,125 @@ describe("who may book signed in", () => {
     });
 });
 
+describe("a class credit online, over HTTP (A10)", () => {
+    /** A 5-class pack for the business's class, sold to this contact. */
+    async function packFor(biz: Business, contactId: string, credits = 5) {
+        const pack = await prisma.classPack.create({
+            data: {
+                organizationId: biz.organizationId,
+                name: `${credits} classes`,
+                credits,
+                validityDays: 90,
+                price: "2000",
+                currency: "INR",
+                services: {
+                    create: {
+                        organizationId: biz.organizationId,
+                        serviceId: biz.yoga,
+                    },
+                },
+            },
+        });
+        return prisma.packPurchase.create({
+            data: {
+                organizationId: biz.organizationId,
+                packId: pack.id,
+                contactId,
+                credits,
+                price: "2000",
+                currency: "INR",
+                expiresAt: new Date(Date.now() + 90 * 86_400_000),
+            },
+        });
+    }
+
+    function creditRead(biz: Business, token: string, startAt: Date) {
+        const q = new URLSearchParams({
+            serviceId: biz.yoga,
+            startAt: startAt.toISOString(),
+        });
+        return call("GET", `/public/site-accounts/bookings/credit?${q}`, {
+            host: biz.host,
+            token,
+        });
+    }
+
+    it("offers the pack, and books the class with it: 201, paid with the pack", async () => {
+        const biz = await business("Pulse Fitness");
+        const { token, account } = await signIn(biz.host);
+        const purchase = await packFor(biz, account.contactId);
+        const at = nextMonday(7);
+
+        const offered = await creditRead(biz, token, at);
+        expect(offered.status).toBe(200);
+        expect(offered.body.credit).toMatchObject({
+            kind: "PACK",
+            id: purchase.id,
+            name: "5 classes",
+            left: 5,
+        });
+
+        const res = await book(biz, token, {
+            serviceId: biz.yoga,
+            startAt: at.toISOString(),
+            pay: "CREDIT",
+            packPurchaseId: purchase.id,
+        });
+
+        expect(res.status).toBe(201);
+        expect(res.body).toMatchObject({ state: "CONFIRMED", payToken: null });
+        const booking = await prisma.booking.findFirstOrThrow({
+            where: { serviceId: biz.yoga, customerAccountId: account.id },
+            include: { packRedemption: true },
+        });
+        expect(booking.paidWith).toBe("PACK");
+        expect(booking.packRedemption?.purchaseId).toBe(purchase.id);
+        expect((await creditRead(biz, token, at)).body.credit).toMatchObject({
+            left: 4,
+        });
+    });
+
+    it("answers someone else's pack with a 404 the page reads as credit-gone", async () => {
+        const biz = await business("Pulse Fitness");
+        const other = await signIn(biz.host);
+        const purchase = await packFor(biz, other.account.contactId);
+        const { token } = await signIn(biz.host);
+
+        const res = await book(biz, token, {
+            serviceId: biz.yoga,
+            startAt: nextMonday(7).toISOString(),
+            pay: "CREDIT",
+            packPurchaseId: purchase.id,
+        });
+
+        expect(res.status).toBe(404);
+        expect(errorOf(res.body).details?.reason).toBe("credit-gone");
+    });
+
+    it("reads no credit without a session, and none for another business's service", async () => {
+        const kavi = await business("Kavi Dental");
+        const pulse = await business("Pulse Fitness");
+        const { token } = await signIn(kavi.host);
+
+        const q = new URLSearchParams({
+            serviceId: pulse.yoga,
+            startAt: nextMonday(7).toISOString(),
+        });
+        const noSession = await call(
+            "GET",
+            `/public/site-accounts/bookings/credit?${q}`,
+            { host: kavi.host },
+        );
+        expect(noSession.status).toBe(401);
+        const elsewhere = await call(
+            "GET",
+            `/public/site-accounts/bookings/credit?${q}`,
+            { host: kavi.host, token },
+        );
+        expect(elsewhere.status).toBe(404);
+    });
+});
+
 describe("'This isn't them' after booking signed in", () => {
     it("moves the booking the account made, and leaves the one staff made", async () => {
         const biz = await business();

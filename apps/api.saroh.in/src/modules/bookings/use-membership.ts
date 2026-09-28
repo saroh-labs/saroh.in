@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { CREDIT_GONE } from "../class-packs/redeem-pack";
 import {
     ALLOWANCE_SELECT,
     classesAllowance,
@@ -20,10 +21,38 @@ export interface MembershipUse {
     contactId: string;
     subscriptionId: string;
     startAt: Date;
+    /**
+     * Who is spending the class: the team (the default), or the customer on
+     * the business's site (A10). For a customer, someone else's membership
+     * is missing (404), one with no classes a month pays no class online —
+     * a plan with no allowance is not a class plan — and every refusal says
+     * `credit-gone` in their own words.
+     */
+    actor?: "team" | "customer";
 }
 
-function refuse(message: string): never {
+function refuse(message: string, actor: MembershipUse["actor"]): never {
+    if (actor === "customer") {
+        throw new BadRequestException({
+            message,
+            details: { field: "subscriptionId", reason: CREDIT_GONE },
+        });
+    }
     throw new BadRequestException({ message, field: "subscriptionId" });
+}
+
+function missing(actor: MembershipUse["actor"]): never {
+    throw new NotFoundException(
+        actor === "customer"
+            ? {
+                  message: "That membership was not found",
+                  details: { field: "subscriptionId", reason: CREDIT_GONE },
+              }
+            : {
+                  message: "That membership was not found",
+                  field: "subscriptionId",
+              },
+    );
 }
 
 /**
@@ -42,6 +71,7 @@ export async function useMembershipInTx(
     tx: Tx,
     input: MembershipUse,
 ): Promise<void> {
+    const customer = input.actor === "customer";
     const sub = await tx.customerSubscription.findFirst({
         where: {
             id: input.subscriptionId,
@@ -56,44 +86,82 @@ export async function useMembershipInTx(
             plan: { select: { name: true, classesPerMonth: true } },
         },
     });
-    if (!sub) {
-        throw new NotFoundException({
-            message: "That membership was not found",
-            field: "subscriptionId",
-        });
-    }
+    if (!sub) missing(input.actor);
     if (sub.contactId !== input.contactId) {
-        refuse("That membership belongs to someone else.");
+        // A customer is never told whose it is, or that it exists.
+        if (customer) missing(input.actor);
+        refuse("That membership belongs to someone else.", input.actor);
     }
     if (sub.status !== "ACTIVE") {
+        const paused = sub.status === "PAUSED";
         refuse(
-            sub.status === "PAUSED"
-                ? "That membership is paused."
-                : "That membership has ended.",
+            customer
+                ? paused
+                    ? "Your membership is paused."
+                    : "Your membership has ended."
+                : paused
+                  ? "That membership is paused."
+                  : "That membership has ended.",
+            input.actor,
         );
     }
     await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${sub.id} FOR UPDATE`;
 
     const allowance = classesAllowance(sub);
+    if (allowance === null && customer) {
+        refuse(
+            "Your membership doesn't include classes to book online.",
+            input.actor,
+        );
+    }
     if (allowance !== null) {
-        const local = DateTime.fromJSDate(input.startAt, {
-            zone: sub.timezone,
-        });
-        const monthStart = local.startOf("month").toUTC().toJSDate();
-        const monthEnd = local.endOf("month").toUTC().toJSDate();
-        const used = await tx.booking.count({
-            where: {
-                subscriptionId: sub.id,
-                id: { not: input.bookingId },
-                startAt: { gte: monthStart, lte: monthEnd },
-                OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
-            },
-        });
+        const used = await classesUsedInMonth(
+            tx,
+            sub,
+            input.startAt,
+            input.bookingId,
+        );
         if (used >= allowance) {
-            throw new ConflictException({
-                message: `${sub.plan.name} includes ${allowance} ${allowance === 1 ? "class" : "classes"} a month, and this month's are used.`,
-                field: "subscriptionId",
-            });
+            throw new ConflictException(
+                customer
+                    ? {
+                          message:
+                              "Your membership's classes for that month are used.",
+                          details: {
+                              field: "subscriptionId",
+                              reason: CREDIT_GONE,
+                          },
+                      }
+                    : {
+                          message: `${sub.plan.name} includes ${allowance} ${allowance === 1 ? "class" : "classes"} a month, and this month's are used.`,
+                          field: "subscriptionId",
+                      },
+            );
         }
     }
+}
+
+/**
+ * The membership's classes used in the calendar month of `startAt`, in its
+ * own timezone: confirmed bookings and classes cancelled late. The booking
+ * being paid is left out. Shared with the credit read (A10), so the page
+ * offers exactly what this would allow.
+ */
+export async function classesUsedInMonth(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    sub: { id: string; timezone: string },
+    startAt: Date,
+    excludeBookingId?: string,
+): Promise<number> {
+    const local = DateTime.fromJSDate(startAt, { zone: sub.timezone });
+    const monthStart = local.startOf("month").toUTC().toJSDate();
+    const monthEnd = local.endOf("month").toUTC().toJSDate();
+    return db.booking.count({
+        where: {
+            subscriptionId: sub.id,
+            ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+            startAt: { gte: monthStart, lte: monthEnd },
+            OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
+        },
+    });
 }

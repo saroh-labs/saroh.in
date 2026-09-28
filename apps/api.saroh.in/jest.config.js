@@ -245,6 +245,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        // A10: spending a pack as the team and as the customer, mocked tx.
+        "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

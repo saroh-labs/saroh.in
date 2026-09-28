@@ -257,8 +257,11 @@ export function whereText(
 
 // ── Paying at booking (U19, E8) ──────────────────────────────────────────
 
-/** How the booker pays: it all now, the deposit now, or at the desk. */
-export type BookPay = "NOW" | "DEPOSIT" | "DESK";
+/**
+ * How the booker pays: it all now, the deposit now, at the desk, or with a
+ * class credit of their own (A10).
+ */
+export type BookPay = "NOW" | "DEPOSIT" | "DESK" | "CREDIT";
 
 /** One way to pay, as the pay step offers it. */
 export interface PayChoice {
@@ -267,6 +270,103 @@ export interface PayChoice {
     sub: string;
     /** What it takes at booking, in words: "₹400". */
     amount: string;
+    /** A short word beside it: "Included" for a membership's class. */
+    tag?: string;
+}
+
+// ── A class credit (A10) ─────────────────────────────────────────────────
+
+/**
+ * The one credit the API offers a signed-in customer for this class at this
+ * time (`GET public/site-accounts/bookings/credit`): a class from their pack,
+ * or from their membership's month. The page books with what it was given
+ * and never picks one itself.
+ */
+export type OfferedCredit =
+    | {
+          kind: "PACK";
+          id: string;
+          /** The pack's name: "10 classes". */
+          name: string;
+          left: number;
+          /** The last day it can be used, `YYYY-MM-DD`. */
+          useBy: string;
+      }
+    | {
+          kind: "MEMBERSHIP";
+          id: string;
+          /** The plan's name. */
+          name: string;
+          left: number;
+          allowance: number;
+          /** When that month's classes start again, `YYYY-MM-DD`. */
+          resetsOn: string;
+      };
+
+/** The credit read's answer: a credit, or none. */
+export interface CreditAnswer {
+    credit: OfferedCredit | null;
+}
+
+const isDate = (v: unknown) => isStr(v) && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+function isCredit(v: unknown): v is OfferedCredit {
+    if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !isNum(v.left)) {
+        return false;
+    }
+    if (v.kind === "PACK") return isDate(v.useBy);
+    return v.kind === "MEMBERSHIP" && isNum(v.allowance) && isDate(v.resetsOn);
+}
+
+export function isCreditAnswer(v: unknown): v is CreditAnswer {
+    return isObj(v) && (v.credit === null || isCredit(v.credit));
+}
+
+/** "10 classes pack", or "Membership": what the credit comes from. */
+function creditSource(credit: OfferedCredit): string {
+    if (credit.kind === "MEMBERSHIP") return "Membership";
+    return /\bpack$/i.test(credit.name) ? credit.name : `${credit.name} pack`;
+}
+
+/**
+ * The pay step's "Use 1 credit" (the Pulse Fitness design): listed first
+ * and chosen by default, nothing to pay. "10 classes pack · use by 12 Nov",
+ * or "Membership · resets 1 Oct" with "Included" beside it.
+ */
+export function creditChoice(
+    credit: OfferedCredit,
+    currency: string | null,
+): PayChoice {
+    const when =
+        credit.kind === "PACK"
+            ? `use by ${dateText(credit.useBy)}`
+            : `resets ${dateText(credit.resetsOn)}`;
+    return {
+        pay: "CREDIT",
+        label: `Use 1 credit (${credit.left} left)`,
+        sub: `${creditSource(credit)} · ${when}`,
+        amount: formatMoney(0, currency ?? "INR") ?? "₹0",
+        ...(credit.kind === "MEMBERSHIP" ? { tag: "Included" } : {}),
+    };
+}
+
+/**
+ * The confirmation's line once a credit paid for the class: "Used 1 credit
+ * from your 10 classes pack — 9 left, use by 12 Nov." or "… from your
+ * membership — 3 left in October." (the class's month, which may not be
+ * this one).
+ */
+export function creditUsedText(credit: OfferedCredit): string {
+    const left = Math.max(0, credit.left - 1);
+    const from = creditSource(credit).toLowerCase();
+    if (credit.kind === "PACK") {
+        return `Used 1 credit from your ${from} — ${left} left, use by ${dateText(credit.useBy)}.`;
+    }
+    const month = new Intl.DateTimeFormat("en-GB", {
+        month: "long",
+        timeZone: "UTC",
+    }).format(new Date(civil(credit.resetsOn).getTime() - 86_400_000));
+    return `Used 1 credit from your ${from} — ${left} left in ${month}.`;
 }
 
 /**

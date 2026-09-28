@@ -4,11 +4,13 @@ import { PayOption } from "./pay-option";
 import { StepHead } from "./step-head";
 
 /**
- * Step 4: how they pay — now, online through the business's own provider
- * (E11, DEC-059), the deposit now and the rest at the visit (E8), or at the
- * desk. The choices and their words come from `payChoices`: a class is
- * "for this class", an appointment is paid "now", and a service that takes
- * a deposit is never paid at the desk (Pulse Fitness, Kavi Dental).
+ * Step 4: how they pay — with a class credit of their own, first and chosen
+ * by default when the API offers one (A10, the Pulse Fitness design); now,
+ * online through the business's own provider (E11, DEC-059); the deposit now
+ * and the rest at the visit (E8); or at the desk. The choices and their
+ * words come from `payChoices` and `creditChoice`: a class is "for this
+ * class", an appointment is paid "now", and a service that takes a deposit
+ * is never paid at the desk (Pulse Fitness, Kavi Dental).
  */
 export function PayStep({
     choices,
@@ -29,6 +31,7 @@ export function PayStep({
                         on={pay === choice.pay}
                         label={choice.label}
                         sub={choice.sub}
+                        tag={choice.tag}
                         onPick={() => onPick(choice.pay)}
                     />
                 ))}

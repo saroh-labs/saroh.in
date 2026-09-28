@@ -13,8 +13,10 @@ import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
-import type { BookSignedIn, Result } from "./api";
+import type { BookSignedIn, CreditFor, Result } from "./api";
 import {
+    CREDIT_GONE,
+    creditRequest,
     fetchDays,
     fetchHold,
     OFFLINE_RESULT,
@@ -44,6 +46,8 @@ import type {
 } from "./model";
 import {
     asksWhere,
+    creditChoice,
+    creditUsedText,
     dateIn,
     dateText,
     depositUnpayable,
@@ -63,6 +67,7 @@ import { ServiceStep } from "./steps/service-step";
 import { WhenStep } from "./steps/when-step";
 import { card } from "./styles";
 import { PhoneBar, SummaryAside } from "./summary";
+import { useCredit } from "./use-credit";
 
 /**
  * The customer's booking page on a merchant's site (U19), `/<domain>/book`:
@@ -82,9 +87,10 @@ import { PhoneBar, SummaryAside } from "./summary";
  *
  * Pay now holds the place for 15 minutes while the booker pays through the
  * business's own provider; the page watches the hold and confirms when the
- * provider's webhook does. Pay at the desk books it outright. No credits
- * online yet (A10): packs and memberships are used at the desk or by the
- * team in the calendar.
+ * provider's webhook does. Pay at the desk books it outright. A signed-in
+ * customer with a class credit — a pack that covers it, or a membership's
+ * class that month — is offered "Use 1 credit" first (A10); the API says
+ * which (`useCredit`), and the booking spends it at once.
  *
  * Drawn from `--site-*` only (gate G2): the merchant's palette, never
  * Saroh's. Nothing here promises an email or a text — Saroh sends neither.
@@ -107,6 +113,13 @@ const SESSIONS_SHOWN = 10;
 const SIGNED_OUT = "Your sign-in has ended. Sign in again to book.";
 
 /**
+ * Signed in, they turned out to hold a credit for this class (A10): the page
+ * stops before booking so they never pay for what their credit covers.
+ */
+const CREDIT_FOUND =
+    "You have a class credit for this, so we've picked it. Book with 1 credit, or choose another way to pay.";
+
+/**
  * Signing in on the business's site (A9): always on, never a guest path.
  * The app that draws the page passes its server actions in, since the
  * session lives in a host-only cookie only the site's server can read.
@@ -120,6 +133,11 @@ export interface BookingAccount {
     signIn: SignInApi;
     /** Book, with the session. */
     book: BookSignedIn;
+    /**
+     * The class credit they could pay with, with the session (A10). Absent:
+     * no credit is ever offered, and booking works as before.
+     */
+    credit?: CreditFor;
     /** "Not you?": sign out of this site. */
     signOut: () => Promise<{ ok: boolean }>;
 }
@@ -313,10 +331,25 @@ export default function BookingFlow({
     const price = service
         ? formatMoney(service.priceCents, service.currency)
         : null;
+    // A class credit of their own (A10), once signed in with a time chosen:
+    // the API says which, and it is offered first.
+    const {
+        credit,
+        reload: reloadCredit,
+        ask: askCredit,
+    } = useCredit(
+        account.credit,
+        customer?.email ?? null,
+        service?.id ?? null,
+        chosenStart?.startAt ?? null,
+    );
     // The ways this service may be paid (E8): the one chosen, else the
     // first — and a service that takes a deposit is never at the desk.
     const choices = service
-        ? payChoices(service, page.payOnline, page.businessName)
+        ? [
+              ...(credit ? [creditChoice(credit, service.currency)] : []),
+              ...payChoices(service, page.payOnline, page.businessName),
+          ]
         : [];
     const chosenPay =
         choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
@@ -358,13 +391,15 @@ export default function BookingFlow({
         : "";
 
     const dueLabel =
-        pay === "DEPOSIT"
-            ? "Deposit now"
-            : pay === "NOW"
-              ? "To pay now"
-              : price
-                ? "Pay at the desk"
-                : "To pay";
+        pay === "CREDIT"
+            ? "Uses 1 credit"
+            : pay === "DEPOSIT"
+              ? "Deposit now"
+              : pay === "NOW"
+                ? "To pay now"
+                : price
+                  ? "Pay at the desk"
+                  : "To pay";
     const due =
         chosenPay?.amount ??
         price ??
@@ -374,18 +409,22 @@ export default function BookingFlow({
     // design's "Continue to sign in"); the booking follows the code.
     const confirmLabel = !customer
         ? "Continue to sign in"
-        : pay === "DEPOSIT"
-          ? `Pay ${payingNow} deposit and book`
-          : pay === "NOW"
-            ? `Pay ${price ?? ""} and book`
-            : price
-              ? "Book — pay at the desk"
-              : "Book";
+        : pay === "CREDIT"
+          ? "Book with 1 credit"
+          : pay === "DEPOSIT"
+            ? `Pay ${payingNow} deposit and book`
+            : pay === "NOW"
+              ? `Pay ${price ?? ""} and book`
+              : price
+                ? "Book — pay at the desk"
+                : "Book";
     const barLabel = !customer
         ? "Continue to sign in"
-        : pay === "NOW" || pay === "DEPOSIT"
-          ? "Pay and book"
-          : "Book";
+        : pay === "CREDIT"
+          ? "Book with 1 credit"
+          : pay === "NOW" || pay === "DEPOSIT"
+            ? "Pay and book"
+            : "Book";
     const rules = rulesText(page.rules, pay === "NOW" || pay === "DEPOSIT");
 
     // ── Watching a hold ─────────────────────────────────────────────────
@@ -505,8 +544,23 @@ export default function BookingFlow({
     };
 
     /** Signed in from the sheet: book straight away, on what was chosen. */
-    const signedIn = (who: SignedInCustomer) => {
+    const signedIn = async (who: SignedInCustomer) => {
         setCustomer(who);
+        // A credit that covers this class (A10): shown and chosen, and
+        // nothing booked or charged until they say so.
+        if (service && chosenStart && pay !== "CREDIT") {
+            const offered = await askCredit(
+                who.email,
+                service.id,
+                chosenStart.startAt,
+            );
+            if (offered) {
+                attemptKey.current = null;
+                setPayChoice("CREDIT");
+                setSubmitError(CREDIT_FOUND);
+                return;
+            }
+        }
         void submit(who, true);
     };
 
@@ -541,11 +595,21 @@ export default function BookingFlow({
                 idempotencyKey: attemptKey.current,
                 staffId: chosenStart.staffId ?? undefined,
                 pay,
+                ...(pay === "CREDIT" ? creditRequest(credit) : {}),
                 ...extras,
             })
             .catch((): Result<BookResult> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === CREDIT_GONE) {
+                // Spent or changed meanwhile (another tab, the desk): say
+                // so, keep the time, and ask again what they can pay with.
+                attemptKey.current = null;
+                setPayChoice(null);
+                setSubmitError(result.message);
+                reloadCredit();
+                return;
+            }
             if (result.reason === "already-booked") {
                 // Theirs already: nothing to pick again, nothing to retry.
                 attemptKey.current = null;
@@ -606,6 +670,8 @@ export default function BookingFlow({
             paid: false,
             price,
             rest: null,
+            creditText:
+                pay === "CREDIT" && credit ? creditUsedText(credit) : null,
             when: whenText,
             first: firstName,
         });
@@ -975,7 +1041,7 @@ export default function BookingFlow({
                 options={account.options}
                 api={account.signIn}
                 purpose="book"
-                onSignedIn={signedIn}
+                onSignedIn={(who) => void signedIn(who)}
             />
         </div>
     );

@@ -20,7 +20,7 @@ import {
     signOut,
     verifySignInCode,
 } from "../account/actions";
-import { bookSignedIn } from "./actions";
+import { bookSignedIn, creditFor } from "./actions";
 
 /**
  * The customer's booking page on a merchant's site (U19): `/<domain>/book`,
@@ -105,6 +105,7 @@ export default async function BookPage({
                     verifyCode: verifySignInCode,
                 },
                 book: bookSignedIn,
+                credit: creditFor,
                 signOut,
             }}
             apiUrl={publicApiUrl()}
