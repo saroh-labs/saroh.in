@@ -42,6 +42,7 @@ import TestimonialsSection from "./blocks/testimonials";
 import VisitUsSection from "./blocks/visit-us";
 import BookingFlow from "./booking-flow/booking-flow";
 import type { BookingPageData } from "./booking-flow/model";
+import { ModulePageUnavailable } from "./module-page-unavailable";
 import { SiteTheme } from "./site-theme";
 import { SITE_FONT_STACK, siteFontFamily } from "./tailwind-preset";
 
@@ -639,5 +640,46 @@ describe("the merchant's type (H1)", () => {
         }
         expect(SITE_FONT_STACK).toContain('"Noto Sans Devanagari"');
         expect(SITE_FONT_STACK).not.toMatch(/Geist|Bricolage|Grotesk|Mono/);
+    });
+});
+
+describe("a module page whose module is off (G15)", () => {
+    it("says it isn't available right now, with a link home, naming no module", () => {
+        const { container } = render(
+            <ModulePageUnavailable business="Pulse Fitness" />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "This isn't available right now",
+            }),
+        ).toBeInTheDocument();
+        expect(container.textContent).toContain(
+            "Pulse Fitness isn't offering this on their site at the moment.",
+        );
+        expect(container.textContent).not.toMatch(
+            /Appointments|Commerce|Payments|module/i,
+        );
+        const home = screen.getByRole("link", { name: "Go to the home page" });
+        expect(home).toHaveAttribute("href", "/");
+        // The site's own palette, with visible focus and pressed states.
+        expect(home).toHaveClass(
+            "bg-site-accent",
+            "text-site-accent-fg",
+            "focus-visible:ring-2",
+            "active:opacity-80",
+        );
+    });
+
+    it("leads home inside a preview", () => {
+        render(
+            <ModulePageUnavailable
+                business="Pulse Fitness"
+                homeHref="/preview/tok"
+            />,
+        );
+        expect(
+            screen.getByRole("link", { name: "Go to the home page" }),
+        ).toHaveAttribute("href", "/preview/tok");
     });
 });

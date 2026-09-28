@@ -274,7 +274,9 @@ export type { TrackLookup } from "./account/track-sheet";
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader, footerLine } from "./site-chrome";
-export type { SiteFooterContent } from "./site-chrome";
+export { SiteFooter, SiteHeader, footerLine, siteMenu } from "./site-chrome";
+export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
+// A module page's address while its module is off (G15).
+export { ModulePageUnavailable } from "./module-page-unavailable";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";
