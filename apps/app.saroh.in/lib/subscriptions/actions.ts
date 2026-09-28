@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
+import type { PlanValues } from "./plan-drafts";
+import * as drafts from "./plan-drafts";
 import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
 import * as api from "./service";
 
@@ -104,4 +106,32 @@ export async function setPlanArchived(id: string, archived: boolean) {
  */
 export async function loadPlanEvents(planId: string, cursor: string) {
     return api.listPlanEvents(planId, cursor);
+}
+
+// — The Plan Editor (D5 → D7): the editor shell's adapter calls these. ———
+// Each write refreshes the Plans tab and Plan Detail, which show a draft and
+// "Unpublished changes"; the read refreshes nothing.
+
+/** Read a plan for the editor, and again for Reload after a conflict. */
+export async function loadPlanDraft(id: string) {
+    return drafts.loadPlanDraft(id);
+}
+export async function createPlanDraft(values: Partial<PlanValues>) {
+    return then(drafts.createPlanDraft(values));
+}
+export async function savePlanDraft(
+    id: string,
+    values: Partial<PlanValues>,
+    revision: number,
+) {
+    return then(drafts.savePlanDraft(id, values, revision));
+}
+export async function publishPlan(id: string, revision: number) {
+    return then(drafts.publishPlan(id, revision));
+}
+export async function discardPlanChanges(id: string, revision: number) {
+    return then(drafts.discardPlanChanges(id, revision));
+}
+export async function deletePlanDraft(id: string, revision: number) {
+    return then(drafts.deletePlanDraft(id, revision));
 }

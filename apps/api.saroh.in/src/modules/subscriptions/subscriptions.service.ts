@@ -38,6 +38,7 @@ import type {
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PlanDraftDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -51,9 +52,18 @@ import {
 } from "./pause-until";
 import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
+import type { PlanEditorView } from "./plan-draft-view";
+import { readPlanEditor } from "./plan-draft-view";
+import {
+    createPlanDraft,
+    deletePlanDraft,
+    discardPlanChanges,
+    publishPlan,
+    savePlanDraft,
+} from "./plan-drafts";
 import type { PlanEventsPage } from "./plan-events";
 import { listPlanEvents, planActor } from "./plan-events";
-import { assertPlanOnSale } from "./plan-on-sale";
+import { assertPlanOnSale, PLAN_DRAFT } from "./plan-on-sale";
 import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
@@ -313,10 +323,14 @@ export class SubscriptionsService {
         query: ListPlansQueryDto,
     ): Promise<PlanView[]> {
         authorize(ctx, "subscription:read");
-        return planViews(
-            ctx.organizationId,
-            query.status ? { status: query.status } : {},
-        );
+        // Drafts only when asked for (D5): an app before the Plan Editor
+        // lists plans without a filter and would draw a draft as live.
+        const where: Prisma.SubscriptionPlanWhereInput = query.status
+            ? { status: query.status }
+            : query.include === "drafts"
+              ? {}
+              : { status: { not: PLAN_DRAFT } };
+        return planViews(ctx.organizationId, where);
     }
 
     async getPlan(ctx: OrganizationContext, id: string): Promise<PlanView> {
@@ -352,6 +366,79 @@ export class SubscriptionsService {
         authorize(ctx, "subscription:write");
         await setPlanStatusRow(ctx.organizationId, planActor(ctx), id, status);
         return readPlan(ctx.organizationId, id);
+    }
+
+    // — Plan drafts (D5): the Plan Editor's read and writes ———————————
+
+    /** A plan as the editor reads it: values, what's live, the revision. */
+    async getPlanEditor(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<PlanEditorView> {
+        authorize(ctx, "subscription:read");
+        return readPlanEditor(ctx.organizationId, id);
+    }
+
+    /** The editor's first save of a new plan: a DRAFT nobody can buy. */
+    async createPlanDraft(
+        ctx: OrganizationContext,
+        dto: PlanInputDto,
+    ): Promise<PlanEditorView> {
+        authorize(ctx, "subscription:write");
+        const id = await createPlanDraft(
+            ctx.organizationId,
+            planActor(ctx),
+            dto,
+        );
+        return readPlanEditor(ctx.organizationId, id);
+    }
+
+    /** Autosave: a draft's fields, or a live plan's unpublished changes. */
+    async savePlanDraft(
+        ctx: OrganizationContext,
+        id: string,
+        dto: PlanDraftDto,
+    ): Promise<PlanEditorView> {
+        authorize(ctx, "subscription:write");
+        await savePlanDraft(ctx.organizationId, planActor(ctx), id, dto);
+        return readPlanEditor(ctx.organizationId, id);
+    }
+
+    /** Put a draft on sale, or make a live plan's changes its terms. */
+    async publishPlan(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<PlanEditorView> {
+        authorize(ctx, "subscription:write");
+        await publishPlan(ctx.organizationId, planActor(ctx), id, revision);
+        return readPlanEditor(ctx.organizationId, id);
+    }
+
+    /** Drop a live plan's unpublished changes. */
+    async discardPlanChanges(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<PlanEditorView> {
+        authorize(ctx, "subscription:write");
+        await discardPlanChanges(
+            ctx.organizationId,
+            planActor(ctx),
+            id,
+            revision,
+        );
+        return readPlanEditor(ctx.organizationId, id);
+    }
+
+    /** Delete a draft nobody has bought. */
+    async deletePlanDraft(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<void> {
+        authorize(ctx, "subscription:write");
+        await deletePlanDraft(ctx.organizationId, id, revision);
     }
 
     /** A plan's history, newest first (D2). */
