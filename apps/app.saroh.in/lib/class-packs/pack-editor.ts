@@ -73,10 +73,9 @@ export function kindOfService(s: { capacity: number }): PackKind {
 
 /**
  * Whether Pack Detail (`/class-packs/:id`, E16) exists, so the editor offers
- * "View pack" for a live pack as the design does. E16 builds the page and
- * turns this on; until then the link would lead nowhere, so it isn't shown.
+ * "View pack" for a live pack as the design does. On since E16 built it.
  */
-export const PACK_DETAIL_PAGE = false as boolean;
+export const PACK_DETAIL_PAGE = true as boolean;
 
 /** The header's and the leave dialog's words for a pack (D6's `EditorCopy`). */
 export const PACK_COPY: EditorCopy = {
