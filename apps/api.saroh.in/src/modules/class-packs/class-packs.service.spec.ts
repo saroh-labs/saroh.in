@@ -217,6 +217,18 @@ describe("selling a pack", () => {
         expect(tx.packPurchase!.create).not.toHaveBeenCalled();
     });
 
+    it("refuses to sell a draft, as not published yet (E14)", async () => {
+        db.classPack!.findFirst!.mockResolvedValue({
+            ...PACK,
+            status: "DRAFT",
+        });
+        await expect(
+            service.sell(owner, "pack_1", { contactId: "c_1" }),
+        ).rejects.toThrow("This pack isn't published yet");
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
     it("answers another business's pack or contact with a 404", async () => {
         db.classPack!.findFirst!.mockResolvedValue(null);
         await expect(
@@ -600,5 +612,73 @@ describe("who may", () => {
             service.removeFromBooking(member, "bk_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses a Member the Pack Editor's read and writes (E14)", async () => {
+        const calls = [
+            service.getPackEditor(member, "pack_1"),
+            service.createPackDraft(member, { name: "Draft" }),
+            service.savePackDraft(member, "pack_1", { revision: 0 }),
+            service.publishPack(member, "pack_1", 0),
+            service.discardPackChanges(member, "pack_1", 0),
+            service.deletePackDraft(member, "pack_1", 0),
+        ];
+        for (const call of calls) {
+            await expect(call).rejects.toBeInstanceOf(ForbiddenException);
+        }
+        expect(db.$transaction).not.toHaveBeenCalled();
+    });
+});
+
+describe("drafts in the packs list (E14)", () => {
+    it("leaves drafts out unless asked, so an older app never draws one", async () => {
+        await service.listPacks(owner, {});
+        expect(db.classPack!.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    status: { not: "DRAFT" },
+                },
+            }),
+        );
+
+        await service.listPacks(owner, { include: "drafts" });
+        expect(db.classPack!.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ where: { organizationId: "org_1" } }),
+        );
+
+        await service.listPacks(owner, { status: "DRAFT" });
+        expect(db.classPack!.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", status: "DRAFT" },
+            }),
+        );
+    });
+
+    it("says when a live pack holds unpublished changes", async () => {
+        const saved = new Date("2026-10-15T10:00:00Z");
+        db.classPack!.findMany!.mockResolvedValue([
+            {
+                ...PACK,
+                pendingChanges: { price: "5000.00" },
+                pendingChangedAt: saved,
+            },
+            {
+                ...PACK,
+                id: "pack_2",
+                pendingChanges: null,
+                pendingChangedAt: null,
+            },
+        ]);
+        const [changed, clean] = await service.listPacks(owner, {});
+        expect(changed).toMatchObject({
+            hasPendingChanges: true,
+            pendingChangedAt: saved.toISOString(),
+            price: "4500.00",
+        });
+        expect(clean).toMatchObject({
+            hasPendingChanges: false,
+            pendingChangedAt: null,
+        });
     });
 });

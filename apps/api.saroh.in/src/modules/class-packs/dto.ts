@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
     IsArray,
@@ -71,10 +71,51 @@ export class PackInputDto {
     serviceIds?: string[];
 }
 
+/** What the staff list can be filtered to, drafts included (E14). */
+export const PACK_LIST_STATUSES = ["DRAFT", ...PACK_STATUSES] as const;
+export type PackListStatus = (typeof PACK_LIST_STATUSES)[number];
+
+/**
+ * The staff Packs list. With no `status`, it lists live and archived packs
+ * but not drafts, as every app before the Pack Editor (E18) expects: an
+ * older Packs screen would draw a draft as a pack on sale. The editor's app
+ * asks for them with `include=drafts` (everything) or `status=DRAFT`.
+ */
 export class ListPacksQueryDto {
     @IsOptional()
-    @IsIn(PACK_STATUSES)
-    status?: PackStatus;
+    @IsIn(PACK_LIST_STATUSES)
+    status?: PackListStatus;
+
+    @IsOptional()
+    @IsIn(["drafts"])
+    include?: "drafts";
+}
+
+/** The draft revision an editor holds, sent with every draft write (#285). */
+export class PackRevisionDto {
+    @IsInt({ message: "Reload the pack and try again" })
+    @Min(0)
+    revision!: number;
+}
+
+/**
+ * An autosave from the Pack Editor (E14): the fields in view and the
+ * revision it holds. On a DRAFT it writes the pack; on a live pack it writes
+ * the unpublished changes, and sales keep the published terms. A field sent
+ * as null is one the editor has emptied (a draft not priced yet).
+ */
+export class PackDraftDto extends PackInputDto {
+    @IsInt({ message: "Reload the pack and try again" })
+    @Min(0)
+    revision!: number;
+}
+
+/** Deleting a draft names the revision in the query: a DELETE has no body. */
+export class DeletePackDraftQueryDto {
+    @Type(() => Number)
+    @IsInt({ message: "Reload the pack and try again" })
+    @Min(0)
+    revision!: number;
 }
 
 export class SellPackDto {

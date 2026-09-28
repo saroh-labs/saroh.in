@@ -2,8 +2,17 @@
 // global ValidationPipe runs. The service decides the rest.
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
+import "reflect-metadata";
 
-import { PackInputDto, SellPackDto, UsePackDto } from "./dto";
+import {
+    DeletePackDraftQueryDto,
+    ListPacksQueryDto,
+    PackDraftDto,
+    PackInputDto,
+    PackRevisionDto,
+    SellPackDto,
+    UsePackDto,
+} from "./dto";
 
 async function refused<T extends object>(
     cls: new () => T,
@@ -75,5 +84,57 @@ describe("what a class pack accepts", () => {
         expect(
             await refused(UsePackDto, { packPurchaseId: "x".repeat(65) }),
         ).toContain("packPurchaseId");
+    });
+});
+
+describe("the Pack Editor's drafts (E14)", () => {
+    it("lists drafts only when asked", async () => {
+        expect(await refused(ListPacksQueryDto, {})).toEqual([]);
+        expect(await refused(ListPacksQueryDto, { status: "DRAFT" })).toEqual(
+            [],
+        );
+        expect(await refused(ListPacksQueryDto, { include: "drafts" })).toEqual(
+            [],
+        );
+        expect(
+            await refused(ListPacksQueryDto, { include: "everything" }),
+        ).toContain("include");
+        expect(await refused(ListPacksQueryDto, { status: "LIVE" })).toContain(
+            "status",
+        );
+    });
+
+    it("needs the revision the editor holds on every write", async () => {
+        expect(await refused(PackDraftDto, { name: "10 classes" })).toContain(
+            "revision",
+        );
+        expect(
+            await refused(PackDraftDto, { name: "10 classes", revision: 3 }),
+        ).toEqual([]);
+        expect(await refused(PackRevisionDto, { revision: -1 })).toContain(
+            "revision",
+        );
+        expect(await refused(PackRevisionDto, { revision: 0 })).toEqual([]);
+    });
+
+    it("lets an autosave empty what a draft hasn't set yet", async () => {
+        expect(
+            await refused(PackDraftDto, {
+                revision: 1,
+                price: null,
+                credits: null,
+                validityDays: null,
+                serviceIds: null,
+            }),
+        ).toEqual([]);
+    });
+
+    it("reads a delete's revision from the query string", async () => {
+        expect(
+            await refused(DeletePackDraftQueryDto, { revision: "2" }),
+        ).toEqual([]);
+        expect(await refused(DeletePackDraftQueryDto, {})).toContain(
+            "revision",
+        );
     });
 });
