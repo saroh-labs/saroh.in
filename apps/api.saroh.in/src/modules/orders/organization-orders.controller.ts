@@ -27,6 +27,9 @@ import {
     OrderProductsQuery,
     UndoStageDto,
 } from "./dto";
+import { OrderCancelService } from "./order-cancel.service";
+import { CancelOrderDto, ChangeFulfilmentDto } from "./order-change.dto";
+import { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrderPayLinkService } from "./order-pay-link.service";
 import { quickViewOf } from "./order-row";
@@ -70,6 +73,8 @@ export class OrganizationOrdersController {
         private readonly orders: OrdersService,
         private readonly kitchen: OrderKitchenService,
         private readonly payLinks: OrderPayLinkService,
+        private readonly fulfilment: OrderFulfilmentChangeService,
+        private readonly cancels: OrderCancelService,
     ) {}
 
     @Get()
@@ -199,6 +204,37 @@ export class OrganizationOrdersController {
             orderId,
         );
         return { url: orderPayLinkUrl(token), payLinkCreatedAt };
+    }
+
+    /**
+     * "Change how it's fulfilled…" (B9): until handover, to a way every
+     * item allows and the storefront offers, with the delivery charge staff
+     * type; the difference is charged or refunded. `order:write` (and
+     * `payment:manage` when a paid order's money moves).
+     */
+    @Post(":orderId/fulfilment")
+    @HttpCode(200)
+    changeFulfilment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Body() dto: ChangeFulfilmentDto,
+    ) {
+        return this.fulfilment.change(ctx, orderId, dto);
+    }
+
+    /**
+     * "Cancel order…" (B9): a refund in full, and the order kept as
+     * cancelled. Refused from its handover on. `order:write`, and
+     * `payment:manage` when money goes back.
+     */
+    @Post(":orderId/cancel")
+    @HttpCode(200)
+    cancel(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Body() dto: CancelOrderDto,
+    ) {
+        return this.cancels.cancel(ctx, orderId, dto);
     }
 
     /** Change lines, fulfilment, address or notes (`order:write`). */

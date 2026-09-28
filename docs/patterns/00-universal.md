@@ -73,7 +73,22 @@ each with why it stops there:
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,409 after E19 and E20, whose range,
   days-off and payments reads already sit in their own files; split next),
-  `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
+  `orders/order-kitchen.service.ts` (1,138 after B2b–B15 and B9), `staff/staff.service.ts` (744).
+  B9 kept its change of fulfilment and its cancel out of the kitchen
+  service (`order-fulfilment-change.service.ts`, 402, one transaction and
+  its money; `order-cancel.service.ts`, `order-cancel.ts`,
+  `order-change-options.ts`, `order-customer-note.ts`); it added only the
+  read's change options and exported `lockOrder`. The edit is the next cut.
+- `payments/payments.service.ts` (2,042 after B8, B9 and E8) — every money
+  path of an order (intents, refunds and their two phases, the pay link's
+  intent) shares one private refund core and provider call; B9 added only
+  a thin `refundOrderForCancel` onto that core and the cancel's finish in
+  `recordRefundTaken`. Refunds as their own service is the seam.
+- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (546
+  after B8, B11 and B9) — the page's panels share its one `panel` and hold
+  state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
+  `cancel-panel.tsx` and `use-order-changes.ts`; the header and the money
+  column are the next seams.
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format

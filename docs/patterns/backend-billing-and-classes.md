@@ -159,6 +159,29 @@
   back) writes a RETURNED entry then; a refund that fails puts nothing back.
   A line-less refund (the provider's dashboard) releases only when it brings
   the order to fully refunded; an edit's difference never does.
+- **Cancel is a refund in full (round-2 B9, `orders/order-cancel.ts`).**
+  An order paid online is cancelled through the one refund path
+  (`PaymentsService.refundOrderForCancel`, everything left by line); its
+  refund rows carry the key `order-cancel:<order>:<request>`, and the order
+  is marked CANCELLED only once nothing taken online is left and the
+  provider has answered for every refund (`finishCancelInTx`). Every path
+  that learns of a refund calls it under the order's lock — the cancel
+  itself (`recordRefundTaken`), try-again, the `payments.send-refund` job
+  the cancel writes for an unanswered part, and the refund webhook — so a
+  lost answer keeps the order open with the money held, and whichever
+  hears last finishes it once. Its stock comes back as each refund is
+  confirmed (above), never on the cancel. Unpaid or paid by hand, it is
+  cancelled at once and its stock released there. A treatment's visits
+  still to come are cancelled with it (`bookings/treatment-cancel.ts`).
+  Refused from the handover on, and once a visit was attended.
+- **Changing how an order is fulfilled (B9)** re-prices only its delivery
+  charge, typed by staff, under the order's lock. On an order paid online
+  more is a supplementary invoice and the difference is owed — the order's
+  pay link takes it (`payLinkStanding` reads a paid order that owes more as
+  DUE, except a site checkout's, whose first payment held its stock) — and
+  less is a refund of the difference (`forEdit`) with a credit note, as an
+  edit's. The invoice correction is a line with no product, at the
+  business's delivery rate and SAC.
 - **A kitchen undo of a fulfilment** reverses each line's sale and holds it
   again, refused once a line has a confirmed refund or the order a RETURNED
   entry. An edit refuses a variant the order's storefront doesn't sell and

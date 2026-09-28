@@ -15,6 +15,8 @@ import { ForbiddenException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { OrderCancelService } from "./order-cancel.service";
+import type { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrderPayLinkService } from "./order-pay-link.service";
 import type { OrdersService } from "./orders.service";
@@ -38,6 +40,8 @@ describe("OrganizationOrdersController", () => {
         .mockResolvedValue({ types: [], steps: [], product: null });
     const searchProducts = jest.fn().mockResolvedValue({ products: [] });
     const readOrder = jest.fn();
+    const changeFulfilment = jest.fn().mockResolvedValue({ id: "ord_1" });
+    const cancelOrder = jest.fn().mockResolvedValue({ id: "ord_1" });
     const controller = new OrganizationOrdersController(
         {
             listRows,
@@ -46,6 +50,8 @@ describe("OrganizationOrdersController", () => {
         } as unknown as OrdersService,
         { read: readOrder } as unknown as OrderKitchenService,
         {} as unknown as OrderPayLinkService,
+        { change: changeFulfilment } as unknown as OrderFulfilmentChangeService,
+        { cancel: cancelOrder } as unknown as OrderCancelService,
     );
 
     const as = (
@@ -312,6 +318,25 @@ describe("OrganizationOrdersController", () => {
             const read = await controller.read(counter, "o1", "quick");
             expect(read.customer?.phone).toBeNull();
             expect(read.customer).not.toHaveProperty("email");
+        });
+    });
+
+    describe("B9: change how it's fulfilled, and cancel", () => {
+        it("hands the change to its service with the caller and the body", async () => {
+            const owner = as("OWNER");
+            const dto = {
+                fulfilment: "LOCAL_DELIVERY" as const,
+                shipping: "40",
+            };
+            await controller.changeFulfilment(owner, "o1", dto);
+            expect(changeFulfilment).toHaveBeenCalledWith(owner, "o1", dto);
+        });
+
+        it("hands the cancel to its service with the caller and the body", async () => {
+            const owner = as("OWNER");
+            const dto = { reason: "Late", idempotencyKey: "k1" };
+            await controller.cancel(owner, "o1", dto);
+            expect(cancelOrder).toHaveBeenCalledWith(owner, "o1", dto);
         });
     });
 });
