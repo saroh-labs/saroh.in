@@ -4,16 +4,23 @@ import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
+import { env } from "@/env";
 import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
 import { listOrderRows } from "@/lib/orders/business-service";
 import {
     orderListParams,
+    ordersEmptyCopy,
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { storefrontShareUrl } from "@/lib/orders/share";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { listSites } from "@/lib/sites/service";
 import { listBusinessStores } from "@/lib/stores/service";
+
+/** Where a merchant's subdomain lives, as the Website screen reads it. */
+const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 /**
  * Sell → Orders: every order in the business, a page at a time (plan B, B3).
@@ -72,6 +79,16 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
+    // No orders yet: "Share your storefront" copies the live site's address
+    // (B7's first run, built in B8). Only then is the site read, and a read
+    // that fails just leaves the button out.
+    const shareUrl =
+        page.rows.length === 0 &&
+        ordersEmptyCopy(query, null).kind === "first-run"
+            ? await listSites()
+                  .then((sites) => storefrontShareUrl(sites, ROOT_DOMAIN))
+                  .catch(() => null)
+            : null;
 
     return (
         <PageContainer width="full">
@@ -86,6 +103,7 @@ export default async function OrdersPage({
                 // A Member reaches the list through `order:stage` alone
                 // (DEC-024) and gets the kitchen's view of it.
                 kitchen={!access.money}
+                shareUrl={shareUrl}
             />
         </PageContainer>
     );

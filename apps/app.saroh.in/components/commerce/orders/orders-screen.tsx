@@ -49,6 +49,7 @@ export function OrdersScreen({
     openByStore,
     businessName,
     kitchen = false,
+    shareUrl = null,
 }: {
     query: OrdersQuery;
     /** The page on screen, read on the server. */
@@ -67,6 +68,11 @@ export function OrdersScreen({
      * is not theirs to do.
      */
     kitchen?: boolean;
+    /**
+     * The live site's address, for the first-run "Share your storefront"
+     * (B7, built in B8); null when there is none to share.
+     */
+    shareUrl?: string | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -171,6 +177,7 @@ export function OrdersScreen({
                         query={query}
                         storeName={store?.name ?? firstStore?.name ?? null}
                         go={go}
+                        shareUrl={shareUrl}
                     />
                 ) : (
                     <>
