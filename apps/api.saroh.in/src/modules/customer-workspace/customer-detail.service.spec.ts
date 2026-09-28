@@ -348,6 +348,7 @@ describe("CustomerDetailService", () => {
                 items: [
                     {
                         productId: "prod_1",
+                        kind: "product",
                         name: "Sourdough loaf",
                         variant: "800g",
                         quantity: 2,

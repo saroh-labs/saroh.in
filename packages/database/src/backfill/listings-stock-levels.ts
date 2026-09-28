@@ -417,7 +417,12 @@ async function linkOrderLines(
                             variantId: null,
                             productId: {
                                 in: Array.from(
-                                    new Set(lines.map((l) => l.productId)),
+                                    new Set(
+                                        // A service line (E9) has no product.
+                                        lines.flatMap((l) =>
+                                            l.productId ? [l.productId] : [],
+                                        ),
+                                    ),
                                 ),
                             },
                         },

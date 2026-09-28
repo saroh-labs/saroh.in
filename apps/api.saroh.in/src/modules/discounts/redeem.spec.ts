@@ -188,3 +188,36 @@ describe("redeem", () => {
         });
     });
 });
+
+describe("redeem: a treatment's service line (E9)", () => {
+    const withService = order({
+        lines: [
+            {
+                productId: null,
+                categoryId: null,
+                unitCents: 1_200_000,
+                quantity: 1,
+            },
+        ],
+    });
+
+    it("a product-scoped code never matches a service line", () => {
+        expect(
+            redeem(
+                code({ appliesTo: "PRODUCT", productIds: ["p_1"] }),
+                withService,
+                NOW,
+            ),
+        ).toEqual({ ok: false, reason: "NO_MATCH" });
+    });
+
+    it("a collection code never matches it either", () => {
+        expect(
+            redeem(
+                code({ appliesTo: "COLLECTION", categoryIds: ["c_bread"] }),
+                withService,
+                NOW,
+            ),
+        ).toEqual({ ok: false, reason: "NO_MATCH" });
+    });
+});

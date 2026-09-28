@@ -37,6 +37,11 @@ export interface BookingMoney {
      * what was paid online automatically. Absent from an older API: on.
      */
     refundInTimeCancels?: boolean;
+    /**
+     * A visit of a treatment (E9, DEC-050): the order its money is on. A
+     * visit never refunds on its own. Absent from an API before E9.
+     */
+    treatmentOrderId?: string | null;
 }
 
 /** What a cancel did with money paid online (`DELETE bookings/:id`). */
@@ -47,7 +52,13 @@ export interface CancelMoney {
         status: "SENT" | "CONFIRMING" | "REFUSED";
     } | null;
     kept: { amountCents: number; currency: string } | null;
+    /** A visit of a treatment (E9): its money stays on this order. */
+    treatmentOrderId?: string | null;
 }
+
+/** What a cancel of a treatment's visit says about money (E9, DEC-050). */
+export const TREATMENT_REFUNDED_FROM_ORDER =
+    "Money for this treatment is refunded from its order.";
 
 type Org = Awaited<ReturnType<typeof resolveActiveOrganization>>;
 
@@ -55,6 +66,13 @@ type Org = Awaited<ReturnType<typeof resolveActiveOrganization>>;
 export function canRefundPayments(organization: Org): boolean {
     return organization?.actions
         ? organization.actions.includes("payment:manage")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+}
+
+/** `order:read`: may open an order, a treatment's among them (E9). */
+export function canReadOrders(organization: Org): boolean {
+    return organization?.actions
+        ? organization.actions.includes("order:read")
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
 }
 
@@ -142,6 +160,11 @@ export function refundPolicyLine(
 
 /** What cancelling now will do with money paid online, before it is done. */
 export interface CancelPlan {
+    /**
+     * A visit of a treatment (E9): nothing is refunded by the cancel, and
+     * the dialog points to the order its money is on.
+     */
+    treatmentOrderId?: string;
     /** Past the free-cancel time fixed at booking. */
     late: boolean;
     /** The cancel keeps the money: late, or the policy doesn't refund. */
@@ -170,6 +193,19 @@ export function cancelPlan(input: {
     canRefund: boolean;
 }): CancelPlan | null {
     const m = input.money;
+    // A visit of a treatment never refunds on its own (E9, DEC-050): the
+    // slot is freed, and its money comes back only through its order.
+    if (m?.treatmentOrderId) {
+        return {
+            late: false,
+            keeps: false,
+            amount: "",
+            what: "payment",
+            canOverride: false,
+            body: `The visit is cancelled and its time freed. ${TREATMENT_REFUNDED_FROM_ORDER}`,
+            treatmentOrderId: m.treatmentOrderId,
+        };
+    }
     if (!m || m.paidOnlineCents <= 0 || m.refund || refundable(m) <= 0) {
         return null;
     }
@@ -236,6 +272,9 @@ export function cancelledMessage(m: CancelMoney | undefined): {
                     ? `Booking cancelled. ${amount} is being refunded.`
                     : `Booking cancelled. The ${amount} refund is being confirmed with the payment provider.`,
         };
+    }
+    if (m?.treatmentOrderId) {
+        return { tone: "success", title: "Visit cancelled" };
     }
     if (m?.kept) {
         return {

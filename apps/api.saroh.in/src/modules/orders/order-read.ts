@@ -1,6 +1,8 @@
 import { toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { OrderLineKind } from "./order-line";
+import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
@@ -46,7 +48,13 @@ export interface AllergenRef {
 
 export interface OrderLineDto {
     id: string;
-    productId: string;
+    /** Null on a service line (E9): it bills `serviceId` instead. */
+    productId: string | null;
+    /** The service a treatment's line bills (E9, DEC-050); null otherwise. */
+    serviceId: string | null;
+    /** What the line bills, so the screen doesn't branch on ids. */
+    kind: OrderLineKind;
+    /** The product's name, or the service's. */
     name: string | null;
     variantTitle: string | null;
     /** The variant's SKU, where the line names a variant. */
@@ -232,7 +240,9 @@ export interface RawOrderRead {
     } | null;
     items: {
         id: string;
-        productId: string;
+        productId: string | null;
+        serviceId?: string | null;
+        service?: { name: string } | null;
         quantity: number;
         price: DecimalLike;
         product: {
@@ -272,6 +282,11 @@ export interface RawOrderRead {
         undoesEventId: string | null;
         createdAt: Date;
     }[];
+    /**
+     * Paid, with part of it recorded by hand: a treatment's balance taken at
+     * the clinic after its deposit online (E9, `treatment-ledger.ts`).
+     */
+    balanceByHand?: boolean;
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
@@ -440,7 +455,9 @@ export function serializeOrderRead(
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,
-            name: i.product?.name ?? null,
+            serviceId: i.serviceId ?? null,
+            kind: lineKind(i),
+            name: lineName(i),
             variantTitle: i.variant?.title ?? null,
             sku: i.variant?.sku ?? null,
             imageUrl:
@@ -492,13 +509,23 @@ export function serializeOrderRead(
                 fulfilment: order.fulfilment as OrderFulfilment,
             }),
             undo: undoableStep(order.events, opts.now),
-            editable: canEditItems({
-                stage,
-                status: order.status,
-                paymentStatus: order.paymentStatus,
-            }),
+            // A treatment's order changes through its visits (E9).
+            editable:
+                canEditItems({
+                    stage,
+                    status: order.status,
+                    paymentStatus: order.paymentStatus,
+                }) && !order.items.some(isServiceLine),
         },
-        invoices: opts.invoiceRead ? (order.invoices ?? []) : null,
+        // Only who each document is: a read may load more of them.
+        invoices: opts.invoiceRead
+            ? (order.invoices ?? []).map((i) => ({
+                  id: i.id,
+                  number: i.number,
+                  kind: i.kind,
+                  status: i.status,
+              }))
+            : null,
         money: opts.money
             ? {
                   currency: order.currency,
@@ -507,9 +534,10 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid: byHand
-                      ? toMoneyString(order.total)
-                      : money(capturedCents),
+                  paid:
+                      byHand || order.balanceByHand
+                          ? toMoneyString(order.total)
+                          : money(capturedCents),
                   refunded: money(refundedCents),
                   due: byHand
                       ? "0.00"
@@ -552,10 +580,16 @@ export function amountDueCents(
             amountCents: number;
             refunds: { amountCents: number; forEdit?: boolean }[];
         }[];
+        /** A treatment's balance recorded by hand (E9): nothing is due. */
+        balanceByHand?: boolean;
     },
     capturedCents?: number,
 ): number {
-    if (order.status === "CANCELLED" || order.paymentStatus === "REFUNDED") {
+    if (
+        order.status === "CANCELLED" ||
+        order.paymentStatus === "REFUNDED" ||
+        order.balanceByHand
+    ) {
         return 0;
     }
     const captured =

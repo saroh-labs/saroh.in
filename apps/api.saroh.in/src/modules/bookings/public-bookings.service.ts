@@ -65,6 +65,12 @@ import {
 } from "./reservation";
 import { depositCents } from "./service-fields";
 import { serviceStaff } from "./staff-availability";
+import {
+    isTreatment,
+    requireTreatmentStorefront,
+    startTreatmentInTx,
+    treatmentEmail,
+} from "./visits";
 
 /**
  * A customer signed in on the business's site (A9): who `CustomerSessionGuard`
@@ -332,6 +338,13 @@ export class PublicBookingsService {
             ...asked,
             pay: payAtBooking(service, asked.pay),
         };
+        // A treatment is sold as one order (E9, DEC-050): with nowhere to
+        // sell it, or no email to bill, it is refused before anything is
+        // held.
+        const treatmentStore = isTreatment(service)
+            ? await requireTreatmentStorefront(service)
+            : null;
+        if (treatmentStore) treatmentEmail(input.bookerEmail);
         // Where and the note are checked before anything is held (E7): an
         // answer to Where the service can't give, or a note past its length.
         const place = bookingLocation(service.locationType, input.locationType);
@@ -466,6 +479,14 @@ export class PublicBookingsService {
                 // record for staff (C12). A pay-now hold's waits for the
                 // payment (`confirmHoldInTx`).
                 await suggestFromBookingNoteInTx(tx, booking);
+                // The treatment's order, with this booking its visit 1.
+                const sold = treatmentStore
+                    ? await startTreatmentInTx(tx, {
+                          service,
+                          booking,
+                          storeId: treatmentStore.id,
+                      })
+                    : null;
                 if (!price || !booking.contactId) return;
                 const hold = await createHoldInvoiceInTx(tx, {
                     organizationId: service.organizationId,
@@ -485,6 +506,15 @@ export class PublicBookingsService {
                         sacCode: service.sacCode,
                     },
                     startAt,
+                    // A treatment's pay-now invoice is its order's (E9).
+                    ...(sold
+                        ? {
+                              order: {
+                                  orderId: sold.orderId,
+                                  orderItemId: sold.orderItemId,
+                              },
+                          }
+                        : {}),
                 });
                 made.payToken = hold.payToken;
             },
@@ -527,6 +557,12 @@ export class PublicBookingsService {
         // An idempotency race replays the winner, which made its own token.
         if (made.bookingId !== booking.id) {
             return this.replay(booking, input, place, now);
+        }
+        // A treatment's visit 1 names its order, written after the booking.
+        if (treatmentStore) {
+            booking = await prisma.booking.findUniqueOrThrow({
+                where: { id: booking.id },
+            });
         }
         return { booking, payToken: made.payToken };
     }

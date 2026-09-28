@@ -12,6 +12,7 @@ import {
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
 import { courseSeatsHeld } from "./course-seats";
+import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
 
 /**
  * Pay now on the booking page (U19, ADR-008): a PENDING booking that holds
@@ -130,6 +131,11 @@ export async function createHoldInvoiceInTx(
             sacCode: string | null;
         };
         startAt: Date;
+        /**
+         * A treatment's order (E9, DEC-050): this invoice is the order's,
+         * and its line bills the order's service line.
+         */
+        order?: { orderId: string; orderItemId: string };
     },
 ): Promise<{ invoiceId: string; payToken: string }> {
     const profile = await loadTaxProfile(tx, input.organizationId);
@@ -145,6 +151,7 @@ export async function createHoldInvoiceInTx(
                 unitCents: input.service.priceCents,
                 rateBps: rateToBps(input.service.gstRate?.toString() ?? null),
                 code: input.service.sacCode,
+                orderItemId: input.order?.orderItemId ?? null,
             },
         ],
         profile,
@@ -159,6 +166,7 @@ export async function createHoldInvoiceInTx(
             kind: "INVOICE",
             source: "BOOKING",
             bookingId: input.bookingId,
+            orderId: input.order?.orderId ?? null,
             contactId: input.contactId,
             billToName: input.billToName,
             billToEmail: input.billToEmail,
@@ -236,6 +244,7 @@ export async function releaseHoldInTx(
             status: true,
             startAt: true,
             holdExpiresAt: true,
+            orderId: true,
         },
     });
     if (booking?.status !== "PENDING") return false;
@@ -273,6 +282,10 @@ export async function releaseHoldInTx(
             payTokenHash: null,
         },
     });
+    // A treatment whose first visit was never paid was never sold (E9).
+    if (booking.orderId) {
+        await cancelUnsoldTreatmentInTx(tx, booking.orderId, actorUserId);
+    }
     return true;
 }
 
@@ -360,7 +373,7 @@ export async function confirmHoldInTx(
             status: "DRAFT",
             source: "BOOKING",
         },
-        select: { id: true, bookingId: true },
+        select: { id: true, bookingId: true, orderId: true, total: true },
     });
     if (!invoice?.bookingId) return "released";
     await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${invoice.bookingId} FOR UPDATE`;
@@ -420,5 +433,17 @@ export async function confirmHoldInTx(
             ...input.payment,
         },
     });
+    // A treatment paid in full at booking (E9): its order is paid. A
+    // deposit leaves the rest due on the order.
+    if (invoice.orderId) {
+        await tx.order.updateMany({
+            where: {
+                id: invoice.orderId,
+                paymentStatus: "UNPAID",
+                total: { lte: invoice.total },
+            },
+            data: { paymentStatus: "PAID", paidAt: now },
+        });
+    }
     return "confirmed";
 }

@@ -100,11 +100,20 @@ async function loadLines(
         orderBy: { id: "asc" },
         select: LINE_SELECT,
     });
-    return rows.map(({ product, order, ...line }) => ({
-        ...line,
-        productName: product.name,
-        storeId: order.storeId,
-    }));
+    // A service line (E9, DEC-050) holds no stock: every flow here leaves
+    // it out.
+    return rows.flatMap(({ product, productId, order, ...line }) =>
+        product && productId
+            ? [
+                  {
+                      ...line,
+                      productId,
+                      productName: product.name,
+                      storeId: order.storeId,
+                  },
+              ]
+            : [],
+    );
 }
 
 function heldRowIds(lines: readonly Line[]): string[] {
@@ -587,7 +596,8 @@ export async function returnablePlan(
     // A product that no longer counts stock takes nothing back.
     const untracked = await untrackedAmong(
         tx,
-        items.map((i) => i.productId),
+        // A service line (E9) has no product and puts nothing back.
+        items.flatMap((i) => (i.productId ? [i.productId] : [])),
     );
     const rowLeft = new Map<string, number>();
     for (const rowId of new Set(
@@ -603,7 +613,7 @@ export async function returnablePlan(
     const lines = new Map(
         items.map((i) => [
             i.id,
-            i.stockLevelId && !untracked.has(i.productId)
+            i.productId && i.stockLevelId && !untracked.has(i.productId)
                 ? Math.max(
                       0,
                       Math.min(

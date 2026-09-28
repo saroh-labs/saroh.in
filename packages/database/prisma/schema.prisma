@@ -1523,6 +1523,9 @@ model Order {
   payTokenHash     String?   @unique
   payLinkCreatedAt DateTime?
 
+  // A treatment's visits (E9, DEC-050): one booking per visit.
+  bookings Booking[]
+
   @@unique([storeId, orderId])
   @@index([storeId])
   @@index([customerId])
@@ -1534,8 +1537,12 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  // What the line bills: a product, or a service (a treatment, E9,
+  // DEC-050). Exactly one is set, CHECKed (`OrderItem_bills_one_thing`). A
+  // service line holds no stock (`stockRow` NONE), has no variant and a
+  // quantity of 1, and takes its GST from the service.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   // The variant bought. Null on lines from before per-variant stock, and on
   // products without variants; those move the product's own stock.
@@ -1570,9 +1577,15 @@ model OrderItem {
   // The invoice lines that bill it (U5): a line refund credits these.
   invoiceLines InvoiceLine[]
 
+  // The service a treatment's line bills (E9, DEC-050). Restrict: services
+  // are soft-deleted, so the row stays and the order keeps its line.
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
   @@index([orderId])
   @@index([variantId])
   @@index([stockLevelId])
+  @@index([serviceId])
   // Lines holding stock, for the held-stock check (#511): few of all lines.
   @@index([stockLevelId], map: "OrderItem_holding_idx", where: raw("\"heldQuantity\" <> 0"))
 }
@@ -2484,6 +2497,8 @@ enum CustomerLinkReason {
   PAYMENT
   // They placed the order signed in on the business's site (A4, G13).
   SITE_ACCOUNT
+  // They booked a treatment, which is sold as an order (E9, DEC-050).
+  BOOKING
 }
 
 // ContactNote: what the team has written down about a person (U8, ADR-008).
@@ -3655,6 +3670,9 @@ model Service {
   // hidden service is still booked by staff.
   showOnBookingPage Boolean @default(true)
 
+  // The order lines that bill it: a treatment sold as an order (E9).
+  orderItems OrderItem[]
+
   @@index([organizationId])
   @@index([siteId])
 }
@@ -3788,6 +3806,15 @@ model Booking {
   // is judged by its start and today's rules, as before.
   freeCancelUntil DateTime?
 
+  // A visit of a treatment (E9, DEC-050): the order that sold the whole
+  // treatment, and which visit this is (1, 2, …). An order always has its
+  // visit number, CHECKed (`Booking_visit_of_order`). SetNull keeps the
+  // booking, and the number it had, if the order goes. A visit never refunds on its own: money comes back through
+  // the order's refund.
+  orderId     String?
+  order       Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  visitNumber Int?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -3809,6 +3836,10 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
+  // One live booking per visit of a treatment (E9): two people booking
+  // visit 2 at once can't both win. A cancelled visit leaves it, so the
+  // visit can be booked again; bookings with no order coexist.
+  @@unique([orderId, visitNumber], map: "Booking_one_live_visit", where: raw("status <> 'CANCELLED'"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a

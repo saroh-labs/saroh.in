@@ -534,3 +534,23 @@ export class BookingsRangeQueryDto {
     @MaxLength(64)
     staffId?: string;
 }
+
+/**
+ * Book the next visit of a treatment (E9, DEC-050): which visit, when, and
+ * optionally with whom. A body is JSON, so the number arrives as one.
+ */
+export class BookVisitDto {
+    @IsInt()
+    @Min(1)
+    @Max(12)
+    visitNumber!: number;
+
+    @IsISO8601()
+    startAt!: string;
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    staffId?: string;
+}

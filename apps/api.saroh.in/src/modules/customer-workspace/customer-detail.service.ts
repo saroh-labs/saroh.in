@@ -26,6 +26,8 @@ import {
 } from "../invoices/invoice-state";
 import type { FulfilmentType } from "../orders/fulfilment";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
+import type { OrderLineKind } from "../orders/order-line";
+import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
@@ -144,7 +146,9 @@ export interface DetailOrder {
     itemCount: number;
     /** What was bought, line by line (up to ORDER_LINES), for "usually buys". */
     items: {
-        productId: string;
+        /** Null on a treatment's line (E9, DEC-050): it bills a service. */
+        productId: string | null;
+        kind: OrderLineKind;
         name: string;
         variant: string | null;
         quantity: number;
@@ -929,6 +933,7 @@ export class CustomerDetailService {
                             productId: true,
                             quantity: true,
                             product: { select: { name: true } },
+                            ...LINE_SERVICE_SELECT,
                             variant: { select: { title: true } },
                         },
                     },
@@ -959,7 +964,8 @@ export class CustomerDetailService {
                 itemCount: o._count.items,
                 items: o.items.map((i) => ({
                     productId: i.productId,
-                    name: i.product.name,
+                    kind: lineKind(i),
+                    name: lineName(i) ?? "",
                     variant: i.variant?.title ?? null,
                     quantity: i.quantity,
                 })),

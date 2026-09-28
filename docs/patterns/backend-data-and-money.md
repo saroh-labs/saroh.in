@@ -85,6 +85,19 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **An order line bills a product or a service, never both**
+  (DEC-050, round-2 E9). `OrderItem.productId` is nullable beside
+  `serviceId`, and `OrderItem_bills_one_thing` CHECKs exactly one. A
+  service line is a treatment sold as one order (Appointment type): quantity
+  1, `stockRow` NONE, no variant, GST from the Service. Read a line's name
+  and kind through `orders/order-line.ts` (`lineName`, `lineKind`,
+  `PRODUCT_LINES` for stock, reviews and discounts), never `item.product`
+  alone. Its visits are bookings (`Booking.orderId`, `visitNumber`, one live
+  booking per visit by the partial unique `Booking_one_live_visit`), and a
+  visit never refunds on its own: visit 1's pay-now invoice names the order
+  (`treatment-ledger.ts` counts its payments as the order's), so
+  `bookingPaymentInTx` never finds it. `bookings/visits.ts` sells and books
+  them.
 - **Current** — **A new shelf never changes how a product counts** (#513,
   PR #533 review). `stock.service` makes a missing row only under the
   product's lock, re-reads Track stock there, and refuses (409) a variant's

@@ -79,6 +79,9 @@ export const KAVI_MODULES = [
     "CRM",
     "WEBSITE",
     "PAYMENTS",
+    // A treatment is sold as an order (E9, DEC-050): its orders live in
+    // Commerce, at the clinic's one storefront.
+    "COMMERCE",
 ] as const;
 
 // --- Services --------------------------------------------------------------------

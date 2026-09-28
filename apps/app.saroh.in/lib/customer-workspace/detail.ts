@@ -47,7 +47,10 @@ export interface DetailOrder {
     paymentStatus: string;
     itemCount: number;
     items: {
-        productId: string;
+        /** Null on a treatment's line (E9): it bills a service. */
+        productId: string | null;
+        /** What the line bills; absent from an API before E9. */
+        kind?: "product" | "service";
         name: string;
         variant: string | null;
         quantity: number;

@@ -7,7 +7,7 @@ import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { canRefundPayments } from "@/lib/services/booking-money";
+import { canReadOrders, canRefundPayments } from "@/lib/services/booking-money";
 import { hasEnded } from "@/lib/services/booking-state";
 import type { BookingDetail } from "@/lib/services/service";
 import { getBooking } from "@/lib/services/service";
@@ -49,12 +49,14 @@ export default async function BookingPage({
     // Read through the data layer, which is where this codebase keeps clock
     // reads. A past appointment offers different controls (#241), but nothing
     // about its OUTCOME is decided by the clock — only a person sets that.
+    const organization = await resolveActiveOrganization();
     return (
         <BookingDetailView
             booking={booking}
             past={hasEnded(booking)}
             packs={await packsFor(booking)}
-            canRefund={canRefundPayments(await resolveActiveOrganization())}
+            canRefund={canRefundPayments(organization)}
+            canReadOrder={canReadOrders(organization)}
         />
     );
 }

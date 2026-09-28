@@ -346,6 +346,8 @@ export function favourites(rows: DetailOrder[]): Favourite[] {
     for (const o of rows) {
         const seen = new Set<string>();
         for (const i of o.items) {
+            // A treatment's line (E9) bills a service, not a product.
+            if (!i.productId) continue;
             const f = byProduct.get(i.productId) ?? {
                 name: i.name,
                 orders: 0,

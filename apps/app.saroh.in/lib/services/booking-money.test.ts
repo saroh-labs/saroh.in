@@ -4,11 +4,13 @@ import type { BookingMoney } from "./booking-money";
 import {
     cancelledMessage,
     cancelPlan,
+    canReadOrders,
     canRefundPayments,
     deadlineText,
     paidLine,
     refundLine,
     refundPolicyLine,
+    TREATMENT_REFUNDED_FROM_ORDER,
 } from "./booking-money";
 
 const money = (over: Partial<BookingMoney> = {}): BookingMoney => ({
@@ -286,6 +288,72 @@ describe("cancelledMessage", () => {
             }).title,
         ).toBe("Booking cancelled. The ₹400 paid is kept.");
         expect(cancelledMessage(undefined).title).toBe("Booking cancelled");
+    });
+});
+
+describe("a visit of a treatment (E9, DEC-050)", () => {
+    const visit = money({
+        paidOnlineCents: 1_200_000,
+        deposit: false,
+        refundableCents: 0,
+        treatmentOrderId: "ord_1",
+    });
+
+    it("never refunds on its own: the dialog points to its order", () => {
+        const plan = cancelPlan({
+            money: visit,
+            freeCancelUntil: DEADLINE,
+            timezone: ZONE,
+            now: Date.parse("2026-09-10T00:00:00.000Z"),
+            canRefund: true,
+        });
+        expect(plan).toMatchObject({
+            keeps: false,
+            canOverride: false,
+            treatmentOrderId: "ord_1",
+        });
+        expect(plan?.body).toContain(TREATMENT_REFUNDED_FROM_ORDER);
+        expect(TREATMENT_REFUNDED_FROM_ORDER).toBe(
+            "Money for this treatment is refunded from its order.",
+        );
+    });
+
+    it("says the same late, and with nothing paid online", () => {
+        for (const m of [visit, { ...visit, paidOnlineCents: 0 }]) {
+            expect(
+                cancelPlan({
+                    money: m,
+                    freeCancelUntil: DEADLINE,
+                    timezone: ZONE,
+                    now: Date.parse("2026-09-30T00:00:00.000Z"),
+                    canRefund: false,
+                })?.body,
+            ).toContain(TREATMENT_REFUNDED_FROM_ORDER);
+        }
+    });
+
+    it("the toast says the visit was cancelled, and nothing about a refund", () => {
+        expect(
+            cancelledMessage({
+                refund: null,
+                kept: null,
+                treatmentOrderId: "ord_1",
+            }),
+        ).toEqual({ tone: "success", title: "Visit cancelled" });
+    });
+});
+
+describe("canReadOrders", () => {
+    it("reads order:read, or an owner or admin without custom roles", () => {
+        type Org = Parameters<typeof canReadOrders>[0];
+        const org = (over: Record<string, unknown>) =>
+            ({ id: "o", name: "Kavi", ...over }) as unknown as Org;
+        expect(canReadOrders(org({ role: "OWNER" }))).toBe(true);
+        expect(canReadOrders(org({ role: "MEMBER" }))).toBe(false);
+        expect(
+            canReadOrders(org({ role: "MEMBER", actions: ["order:read"] })),
+        ).toBe(true);
+        expect(canReadOrders(null)).toBe(false);
     });
 });
 
