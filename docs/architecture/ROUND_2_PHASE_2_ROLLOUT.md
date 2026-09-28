@@ -249,3 +249,52 @@ creates or renews meanwhile is left unset or stale:
 **Before deploying this release again, run the backfill once more** (step 4) and check step 6. After Z1 has removed the fallback, rolling back below
 this release means running the backfill before re-deploying, or members
 the old API added would read as unlimited.
+
+## D5: the plan draft writers (wave 3; CP-3 keeps them apart from D7)
+
+The Plan Editor's API: `POST subscription-plans/drafts` (a new plan starts
+as a DRAFT), `GET`/`PATCH :planId/draft` (read and autosave),
+`POST :planId/publish`, `POST :planId/discard` and `DELETE :planId` (a
+draft nobody bought). Every write carries the editor's `revision`; a stale
+one is a 409 naming who saved since. The rules are in
+`docs/patterns/backend-billing-and-classes.md` ("Plan drafts").
+
+- **Migration** `20261014150000_plan_drafts`: four columns on
+  `SubscriptionPlan` (`pendingChanges`, `pendingChangedAt`,
+  `pendingChangedById`, `draftRevision` default 0). Additive; every
+  existing plan reads as live with nothing pending.
+- **D21 must be in production first** (it has been since CP-1): the readers
+  that refuse a DRAFT. An image older than CP-1 would sell one.
+- **API before app.** Nothing in the app creates a draft until D7's Plan
+  Editor, which ships in a later release than this one (CP-3).
+- **Drafts are hidden from the old app.** `GET subscription-plans` with no
+  filter lists live and archived plans only; a draft is listed only with
+  `?include=drafts` (everything) or `?status=DRAFT`. A workspace from before
+  D7 never asks, so if D7 is rolled back after drafts exist, its Plans tab
+  doesn't draw a draft as a live card. D7's Plans tab asks with
+  `include=drafts`.
+- **The old form's `PATCH :planId` stays** until follow-up Z6 (a checkpoint
+  after D7). It refuses a draft, and a change through it moves the draft
+  revision, so an editor open on the plan is told instead of saving over it.
+
+### Verify
+
+1. `GET subscription-plans` on a business with plans answers as before, now
+   with `pendingChangedAt: null` on each.
+2. Once D7 is live: a new plan saves as Draft and isn't on the site or in
+   Subscribe someone; Publish puts it on sale. On a live plan, a changed
+   price shows "Unpublished changes" and Subscribe still charges the old
+   price until Publish changes.
+
+### Rollback
+
+To CP-1 or later (the D21 readers): safe. Those images refuse a DRAFT
+everywhere it could be sold, and ignore the new columns, so a live plan's
+unpublished changes simply wait. Their unfiltered Plans list shows drafts
+again, which is why D7 ships in a later release than this one. Below CP-1:
+not safe once any DRAFT row exists (it would be sold); archive or delete
+the drafts first:
+
+```sql
+SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
+```

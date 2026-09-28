@@ -325,6 +325,27 @@
   lists plans for sale — the site's plan lists and blocks — filters by
   `PLANS_ON_SALE`. "Sell again" and Archive refuse a DRAFT; a draft goes on
   sale only by being published.
+- **Plan drafts** (round-2 D5). The shared rules are in
+  `common/drafts/draft-record.ts`, which class packs reuse in E14. The Plan
+  Editor's first save makes a DRAFT (`subscriptions/plan-drafts.ts`); its autosaves
+  write the draft's columns and record no event. A live plan's autosaves
+  write `pendingChanges` — only the fields that differ from the published
+  columns, null when none — and buyers keep reading the published columns
+  until Publish. Every editor write takes the plan's row lock (Publish takes
+  the name lock first), checks the `revision` it carries against
+  `draftRevision`, and bumps it; a stale one is a 409 with details
+  `{ yours, current, changedBy, changedAt }` (`changedBy` a display name,
+  Saroh support for an operator) and writes nothing. No other refusal
+  carries those keys: the editor shell reads them as "Priya changed this
+  plan". A name another plan has, or no price, is kept on autosave, listed
+  in the read's `problems`, and refused at Publish as a 409 on that field.
+  Publishing a draft records PUBLISHED; publishing a live plan's changes
+  records the change as the old form did (PRICE_CHANGED, …); Discard
+  records DRAFT_DISCARDED. Delete is for a DRAFT nobody is on or switching
+  to. The old whole-plan `PATCH :planId` stays until Z6: it refuses a draft,
+  and a recorded change or an archive bumps the revision. **The staff list
+  hides drafts unless asked** (`include=drafts` or `status=DRAFT`), so an
+  app from before the Plan Editor never draws one as a live card.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one
