@@ -128,4 +128,47 @@ test.describe("invoices", () => {
         await page.keyboard.press("Escape");
         await expect(look).toHaveCount(0);
     });
+
+    test("narrow the list by what each invoice was for (D18)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+
+        // The chips: All and each source Northwind has. It sells, and the
+        // test above writes by hand, so both are there.
+        await page.goto("/billing/invoices");
+        const chips = page.getByRole("radiogroup", {
+            name: "What it was for",
+        });
+        await expect(chips).toBeVisible();
+        const byHand = chips.getByRole("radio", { name: "By hand" });
+        await expect(byHand).toHaveCSS("cursor", "pointer");
+        await byHand.click();
+        await expect(byHand).toHaveAttribute("aria-checked", "true");
+        await expect(page).toHaveURL(/[?&]source=MANUAL\b/);
+        // Every row left is one written by hand, or a correction to one.
+        const rows = page.getByRole("button", { name: /Written by hand/ });
+        await expect(rows.first()).toBeVisible();
+
+        // It is part of the address, so a reload keeps it.
+        await page.reload();
+        await expect(
+            chips.getByRole("radio", { name: "By hand" }),
+        ).toHaveAttribute("aria-checked", "true");
+        await chips.getByRole("radio", { name: "All" }).click();
+        await expect(page).not.toHaveURL(/source=/);
+
+        // One pack's invoices, from Pack Detail: none sold is said, not
+        // shown as an empty business, and the whole list is one click back.
+        await page.goto("/billing/invoices?pack=no-such-pack");
+        await expect(
+            page.getByText("No invoices for this pack yet"),
+        ).toBeVisible();
+        await expect(page.getByText("Showing 0 for this pack")).toBeVisible();
+        await expect(chips).toHaveCount(0);
+        await page.getByRole("link", { name: "Show all invoices" }).click();
+        await expect(page).toHaveURL(/\/billing\/invoices$/);
+        await expect(chips).toBeVisible();
+    });
 });
