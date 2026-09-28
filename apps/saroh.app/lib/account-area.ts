@@ -1,0 +1,104 @@
+import { cache } from "react";
+
+import type {
+    AccountBlock,
+    AccountHomeData,
+    AccountNote,
+    AccountReceipt,
+    AccountView,
+} from "@saroh/site-blocks";
+
+import { env } from "@/env";
+
+import {
+    homeResult,
+    isAccountView,
+    notesResult,
+    receiptsResult,
+} from "./account-shape";
+import { accountFetch } from "./customer-session";
+import type { PayInvoice } from "./invoice-pay-shape";
+import { isPayInvoice } from "./invoice-pay-shape";
+
+/**
+ * The customer account area on a merchant's site, from this server's side
+ * (round-2 plan A, A5).
+ *
+ * **The switch.** `SITE_ACCOUNT_AREA=on` shows the header's Sign in / account
+ * entry on every site and serves `/account`; anything else — unset included
+ * — hides both, and `/account` is a 404. The API has its own
+ * `SITE_ACCOUNT_AREA`, the server half that keeps the area private; switch
+ * the API on first, then this app. Both stay off until A6–A8 and A13 have
+ * shipped (waves plan, release boundary 4). Readers of this switch: this
+ * file only; delete it with the API's once the area has been on a release.
+ *
+ * Every read goes through `accountFetch`: the session cookie, forwarded
+ * with the signed relay, and a cleared cookie when the API says the session
+ * is over. Every answer is checked (`account-shape.ts`) before a page sees it.
+ */
+export function accountAreaOn(): boolean {
+    return env.SITE_ACCOUNT_AREA === "on";
+}
+
+async function readJson(
+    path: string,
+): Promise<
+    | { ok: true; body: unknown }
+    | { ok: false; reason: "signed-out" | "missing" | "unavailable" }
+> {
+    const call = await accountFetch(path);
+    if (!call) return { ok: false, reason: "signed-out" };
+    if (!call.ok) return { ok: false, reason: "unavailable" };
+    const { res } = call;
+    if (res.status === 401) return { ok: false, reason: "signed-out" };
+    if (res.status === 404) return { ok: false, reason: "missing" };
+    if (!res.ok) return { ok: false, reason: "unavailable" };
+    return { ok: true, body: await res.json().catch(() => null) };
+}
+
+export type AccountLookup =
+    | { ok: true; account: AccountView }
+    | { ok: false; reason: "signed-out" | "missing" | "unavailable" };
+
+/**
+ * The signed-in customer's account, once per request (the layout and the
+ * page both need it). "missing" is the API's switch being off.
+ */
+export const getAccount = cache(async (): Promise<AccountLookup> => {
+    const read = await readJson("me");
+    if (!read.ok) return read;
+    return isAccountView(read.body)
+        ? { ok: true, account: read.body }
+        : { ok: false, reason: "unavailable" };
+});
+
+/** Home's blocks, or null when Home itself couldn't be read. */
+export async function getAccountHome(): Promise<AccountHomeData | null> {
+    const read = await readJson("me/home");
+    return read.ok ? homeResult(read.body) : null;
+}
+
+export async function getReceipts(): Promise<AccountBlock<AccountReceipt[]>> {
+    const read = await readJson("me/receipts");
+    const value = read.ok ? receiptsResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+export async function getNotes(): Promise<AccountBlock<AccountNote[]>> {
+    const read = await readJson("me/notes");
+    const value = read.ok ? notesResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+export type ReceiptLookup =
+    | { ok: true; receipt: PayInvoice }
+    | { ok: false; reason: "missing" | "unavailable" | "signed-out" };
+
+/** One receipt, as the pay link's paper. Another customer's is "missing". */
+export async function getReceipt(invoiceId: string): Promise<ReceiptLookup> {
+    const read = await readJson(`me/receipts/${encodeURIComponent(invoiceId)}`);
+    if (!read.ok) return read;
+    return isPayInvoice(read.body)
+        ? { ok: true, receipt: read.body }
+        : { ok: false, reason: "unavailable" };
+}

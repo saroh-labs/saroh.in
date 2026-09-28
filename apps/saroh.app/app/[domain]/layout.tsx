@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { SiteTheme } from "@saroh/site-blocks";
+import type { SignedInCustomer } from "@saroh/site-blocks";
+import { AccountEntry, SiteTheme } from "@saroh/site-blocks";
 
+import { accountAreaOn } from "@/lib/account-area";
 import { getBookingPage } from "@/lib/booking-page";
+import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
     getPublicationForHost,
@@ -11,6 +14,12 @@ import {
     shareImages,
 } from "@/lib/publication";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
+
+import {
+    loadSignInOptions,
+    requestSignInCode,
+    verifySignInCode,
+} from "./account/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -114,6 +123,26 @@ export default async function SiteLayout({
         shopServes: false,
     });
 
+    /*
+     * The header's Sign in / account entry (A5, G17's account slot), on
+     * every site once the account area is switched on (SITE_ACCOUNT_AREA).
+     * Who is signed in is read only when there is a session cookie; a read
+     * that fails leaves the visitor signed out, never the page down.
+     */
+    const account = accountAreaOn() ? (
+        <AccountEntry
+            customer={await getSignedInCustomer().catch(
+                (): SignedInCustomer | null => null,
+            )}
+            businessName={snapshot.site.name}
+            api={{
+                requestCode: requestSignInCode,
+                verifyCode: verifySignInCode,
+            }}
+            loadOptions={loadSignInOptions}
+        />
+    ) : undefined;
+
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <SiteTheme variables={snapshot.site.styleVariables} />
@@ -121,6 +150,7 @@ export default async function SiteLayout({
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}
                 action={action}
+                account={account}
             />
 
             <div>{children}</div>
