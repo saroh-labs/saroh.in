@@ -33,6 +33,8 @@ export interface PublishablePage {
     path: string;
     title: string;
     isHome: boolean;
+    /** A module page's kind (G14); absent for a free-form page. */
+    kind?: string;
     sections: PublishableSection[];
 }
 
@@ -205,6 +207,8 @@ export interface DraftPageRow {
     path: string;
     title: string;
     isHome: boolean;
+    /** FREE, or the module page this is (G14). */
+    kind?: string;
     /** The page's latest DRAFT version, or empty when it has none. */
     versions: { sections: DraftSectionRow[] }[];
 }
@@ -228,6 +232,7 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
         path: page.path,
         title: page.title,
         isHome: page.isHome,
+        ...(page.kind && page.kind !== "FREE" ? { kind: page.kind } : {}),
         sections: page.versions.flatMap((version) =>
             version.sections.map((section) => {
                 const result = toPublishableSection(section, resolvePage);
@@ -309,6 +314,10 @@ function pageList(pages: readonly unknown[]): unknown[] {
             path: typeof p.path === "string" ? p.path : null,
             title: typeof p.title === "string" ? p.title : null,
             isHome: p.isHome === true,
+            // A module page's kind (G14); a free-form page, and every page
+            // of a snapshot from before module pages, has none.
+            kind:
+                typeof p.kind === "string" && p.kind !== "FREE" ? p.kind : null,
         }))
         .sort((a, b) => String(a.path).localeCompare(String(b.path)));
 }
@@ -323,7 +332,10 @@ function pageList(pages: readonly unknown[]): unknown[] {
  */
 export function pendingSiteChanges(
     draftSite: Record<string, unknown>,
-    draftPages: readonly Pick<PublishablePage, "path" | "title" | "isHome">[],
+    draftPages: readonly Pick<
+        PublishablePage,
+        "path" | "title" | "isHome" | "kind"
+    >[],
     snapshot: unknown,
 ): SiteChangeKind[] {
     const shape = (

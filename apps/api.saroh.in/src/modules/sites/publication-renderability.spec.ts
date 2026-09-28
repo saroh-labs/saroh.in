@@ -88,3 +88,35 @@ describe("checkRenderability (#283)", () => {
         },
     );
 });
+
+describe("module pages in a snapshot (G14)", () => {
+    it("draws a module page's sections, and names its kind when one can't be", () => {
+        expect(
+            checkRenderability({
+                pages: [
+                    { path: "/", sections: [hero] },
+                    {
+                        path: "/journal",
+                        kind: "JOURNAL",
+                        sections: [
+                            {
+                                type: "journal",
+                                content: { title: "Journal", count: 6 },
+                            },
+                        ],
+                    },
+                    {
+                        path: "/book",
+                        kind: "BOOK",
+                        sections: [{ type: "servicesList", content: {} }],
+                    },
+                ],
+            }),
+        ).toEqual({
+            renderable: false,
+            unrenderable: [
+                { path: "/book", index: 0, type: "servicesList", kind: "BOOK" },
+            ],
+        });
+    });
+});

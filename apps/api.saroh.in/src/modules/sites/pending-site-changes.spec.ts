@@ -116,3 +116,28 @@ describe("pendingSiteChanges", () => {
         },
     );
 });
+
+describe("pendingSiteChanges with module pages (G14)", () => {
+    it("reads a free-form page as unchanged against a snapshot from before kinds", () => {
+        const draft = livePages.map((p) => ({ ...p, kind: "FREE" }));
+        expect(pendingSiteChanges(liveSite, draft, snapshot())).toEqual([]);
+    });
+
+    it("counts a page becoming a module page, or a new one, as a page-list change", () => {
+        const withBook = [
+            ...livePages,
+            { ...page("/book", "Book"), kind: "BOOK" },
+        ];
+        expect(pendingSiteChanges(liveSite, withBook, snapshot())).toEqual([
+            "pages",
+        ]);
+        // Published with it: nothing left to publish.
+        expect(
+            pendingSiteChanges(
+                liveSite,
+                withBook,
+                snapshot(liveSite, withBook),
+            ),
+        ).toEqual([]);
+    });
+});
