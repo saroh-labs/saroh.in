@@ -60,6 +60,16 @@ export interface CreditService {
     id: string;
     capacity: number;
     timezone: string;
+    /** More than one: a treatment, sold as one order and never on a credit. */
+    visits: number;
+}
+
+/**
+ * A treatment (more than one visit) is sold as one order and paid on it
+ * (E9, DEC-050) — never with a pack or a membership, online as at the desk.
+ */
+function isTreatmentService(service: { visits?: number }): boolean {
+    return (service.visits ?? 1) > 1;
 }
 
 /**
@@ -94,6 +104,8 @@ export async function offeredCredit(
         input.organizationId,
     );
     if (!contact || contact.removed) return null;
+    // A treatment is paid on its order, never with a credit (DEC-050).
+    if (isTreatmentService(input.service)) return null;
     const who = { organizationId: input.organizationId, contactId: contact.id };
 
     if (isClassService(input.service)) {
@@ -194,8 +206,15 @@ function refuse(message: string): never {
  */
 export function creditChoiceOf(
     given: { packPurchaseId?: string; subscriptionId?: string },
-    service: { capacity: number },
+    service: { capacity: number; visits?: number },
 ): CreditChoice {
+    // As the desk refuses it (`bookByHand`): a treatment is sold as one
+    // order, and a credit would book visit 1 with no order behind it.
+    if (isTreatmentService(service)) {
+        refuse(
+            "A treatment is paid for on its order, not with a pack or a membership.",
+        );
+    }
     const { packPurchaseId, subscriptionId } = given;
     if (packPurchaseId && subscriptionId) {
         refuse("A class is paid with one credit. Choose one.");

@@ -774,7 +774,7 @@ export class PublicBookingsService {
  */
 function creditOf(
     asked: BookInput,
-    service: Pick<Service, "capacity">,
+    service: Pick<Service, "capacity" | "visits">,
     signedIn: SignedInCustomer | undefined,
 ): CreditChoice {
     if (!signedIn) {

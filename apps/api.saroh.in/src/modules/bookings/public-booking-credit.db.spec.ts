@@ -32,6 +32,8 @@ const MONDAY = 1;
 let owner: OrganizationContext;
 let hiit: string;
 let pt: string;
+/** Three visits: a treatment, sold as one order (E9). */
+let course: string;
 let people = 0;
 let keys = 0;
 
@@ -56,13 +58,19 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
-    const service = (name: string, capacity: number, from: number) =>
+    const service = (
+        name: string,
+        capacity: number,
+        from: number,
+        visits = 1,
+    ) =>
         prisma.service.create({
             data: {
                 organizationId: org.id,
                 name,
                 durationMinutes: 60,
                 capacity,
+                visits,
                 priceCents: 50_000,
                 currency: "INR",
                 timezone: "UTC",
@@ -78,6 +86,7 @@ beforeAll(async () => {
         });
     hiit = (await service("HIIT circuit", 20, 7)).id;
     pt = (await service("Personal training", 1, 9)).id;
+    course = (await service("Physio course", 1, 11, 3)).id;
 });
 
 /** A signed-in customer of the business: a contact and its site account. */
@@ -509,6 +518,30 @@ describe("booking with a credit (A10)", () => {
                 subscriptionId: sub.id,
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("never offers or spends a credit on a treatment, which is paid on its order (E9)", async () => {
+        const who = await customer();
+        const sold = await packFor(who, 5, 90, [course]);
+        expect(
+            (
+                await publicBookings.creditFor(
+                    who,
+                    course,
+                    nextMonday(11).toISOString(),
+                )
+            ).credit,
+        ).toBeNull();
+
+        await expect(
+            bookWith(who, nextMonday(11), { packPurchaseId: sold.id }, course),
+        ).rejects.toThrow(
+            "A treatment is paid for on its order, not with a pack or a membership.",
+        );
+        expect(await left(sold.id)).toBe(5);
+        expect(
+            await prisma.booking.count({ where: { serviceId: course } }),
+        ).toBe(0);
     });
 
     it("the last class spent from two tabs at once: one booking, and the other is refused", async () => {

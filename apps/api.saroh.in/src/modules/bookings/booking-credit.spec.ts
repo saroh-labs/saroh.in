@@ -54,6 +54,27 @@ describe("the credit a booking names (A10)", () => {
         expect.assertions(1);
     });
 
+    it("refuses any credit for a treatment, which is paid on its order (E9)", () => {
+        const treatment = { capacity: 1, visits: 3 };
+        expect(() =>
+            creditChoiceOf({ packPurchaseId: "pp_1" }, treatment),
+        ).toThrow(
+            "A treatment is paid for on its order, not with a pack or a membership.",
+        );
+        expect(() =>
+            creditChoiceOf(
+                { subscriptionId: "sub_1" },
+                { ...treatment, capacity: 8 },
+            ),
+        ).toThrow(BadRequestException);
+        expect(
+            creditChoiceOf(
+                { packPurchaseId: "pp_1" },
+                { capacity: 1, visits: 1 },
+            ),
+        ).toEqual({ kind: "PACK", packPurchaseId: "pp_1" });
+    });
+
     it("calls a service of more than one place a class", () => {
         expect(isClassService(CLASS)).toBe(true);
         expect(isClassService(ONE_TO_ONE)).toBe(false);
