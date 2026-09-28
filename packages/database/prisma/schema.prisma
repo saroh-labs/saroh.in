@@ -4038,6 +4038,12 @@ model PaymentIntent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // What the provider kept from this payment, in minor units, as its own
+  // capture report says (plan 005 E19, default 47): Razorpay's `fee` (GST
+  // included), Cashfree's service charge plus its tax. Null when the
+  // provider reported none — never an estimate.
+  feeCents Int?
+
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])

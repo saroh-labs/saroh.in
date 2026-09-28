@@ -46,7 +46,9 @@ export class RazorpayWebhookProvider implements WebhookProvider {
         const body = (payload ?? {}) as {
             event?: string;
             payload?: {
-                payment?: { entity?: { id?: string; order_id?: string } };
+                payment?: {
+                    entity?: { id?: string; order_id?: string; fee?: number };
+                };
                 refund?: {
                     entity?: {
                         id?: string;
@@ -75,6 +77,10 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             outcome: outcomeFor(eventType),
             providerIntentId: payment?.order_id,
             providerPaymentRef: payment?.id,
+            // Paise, GST included, on the captured payment (`payment.captured`
+            // and `order.paid` both carry it). Absent or not a whole number:
+            // no fee is recorded, never a guess (default 47).
+            feeCents: wholeNumber(payment?.fee),
             providerRefundId: refund?.id,
             // Paise already. Saroh's reference rides in `receipt`, and in
             // `notes` as a second copy (DEC-026).
