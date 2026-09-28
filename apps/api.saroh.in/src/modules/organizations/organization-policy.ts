@@ -103,8 +103,10 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
 /**
  * What a MEMBER holds beyond the read-only floor (DEC-024, amends DEC-020):
  * the kitchen. Someone at the counter reads an order's kitchen view — items,
- * stage, notes, who it is for, never money — and moves its stage. Refunds and
- * edits stay `payment:manage` / `order:write`, which a Member does not hold.
+ * stage, notes, who it is for, never money — and moves its stage. Taking,
+ * changing, refunding and exporting orders are `order:create`, `order:edit`,
+ * `order:refund` and `order:export` (B16), which a Member does not hold; the
+ * Member default bundle is F18's to change.
  *
  * Kept apart from the floor because it is a write: the floor is what every
  * reading role shares, and this is one narrow thing a Member may DO.
@@ -251,12 +253,42 @@ export function resolveCapabilities(
 }
 
 /**
+ * What `order:write` was split into (DEC-039, B16): a role saved with the old
+ * umbrella keeps taking, changing and exporting orders.
+ */
+const ORDER_WRITE_PARTS: readonly OrgAction[] = [
+    "order:create",
+    "order:edit",
+    "order:export",
+];
+
+/** The order powers that each show the whole order they act on. */
+const ORDER_POWERS: readonly OrgAction[] = [
+    "order:create",
+    "order:edit",
+    "order:refund",
+    "order:export",
+];
+
+/**
  * Powers a role holds because it holds a wider one. `store:write` has always
  * covered setting stock, so a role saved before `inventory:write` existed
  * (#513) — or saved without it since — keeps counting.
+ *
+ * The order split (B16, matrix §2): `order:write` → `order:create`,
+ * `order:edit` and `order:export`; `payment:manage` → `order:refund`, since
+ * refunds were always its; and each of the four → `order:read`, because a
+ * power over an order shows the whole order (matrix §1 rule 2). Applied in
+ * that order, so `order:write` and `payment:manage` reach `order:read`
+ * through their parts. `order:stage` does not imply `order:read` until F18.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("store:write")) set.add("inventory:write");
+    if (set.has("order:write")) {
+        for (const part of ORDER_WRITE_PARTS) set.add(part);
+    }
+    if (set.has("payment:manage")) set.add("order:refund");
+    if (ORDER_POWERS.some((power) => set.has(power))) set.add("order:read");
     return set;
 }
 

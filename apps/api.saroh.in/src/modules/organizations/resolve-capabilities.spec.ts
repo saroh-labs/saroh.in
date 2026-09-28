@@ -23,9 +23,9 @@ describe("resolveCapabilities", () => {
     it("uses the business's own list when it has one", () => {
         const set = resolveCapabilities("stock-clerk", [
             "order:read",
-            "order:write",
+            "contact:read",
         ]);
-        expect([...set].sort()).toEqual(["order:read", "order:write"]);
+        expect([...set].sort()).toEqual(["contact:read", "order:read"]);
     });
 
     it("drops a stored action that does not exist", () => {
@@ -131,6 +131,81 @@ describe("allows / authorize", () => {
             actions: new Set<never>(),
         });
         expect(() => authorize(actor, "order:read")).toThrow(/stock-clerk/);
+    });
+});
+
+/**
+ * The order split (DEC-039, B16; matrix §2). `order:write` implies
+ * `order:create`, `order:edit` and `order:export`; `payment:manage` implies
+ * `order:refund`; each of the four implies `order:read`. So a role saved
+ * before the split keeps what it could do, and a power over an order shows
+ * the whole order. `order:stage` stays apart until F18.
+ */
+describe("the split order powers (B16)", () => {
+    const parts = [
+        "order:create",
+        "order:edit",
+        "order:refund",
+        "order:export",
+    ] as const;
+
+    it("a role saved with order:write before the split still takes, changes and exports", () => {
+        const set = resolveCapabilities("senior", ["order:write"]);
+        for (const action of [
+            "order:create",
+            "order:edit",
+            "order:export",
+            "order:read",
+        ] as const) {
+            expect(set.has(action)).toBe(true);
+        }
+        // Refunds were never order:write's.
+        expect(set.has("order:refund")).toBe(false);
+    });
+
+    it("payment:manage keeps refunding orders, and sees them", () => {
+        const set = resolveCapabilities("cashier", ["payment:manage"]);
+        expect(set.has("order:refund")).toBe(true);
+        expect(set.has("order:read")).toBe(true);
+        expect(set.has("order:create")).toBe(false);
+    });
+
+    it.each(parts)("%s alone implies order:read and nothing else", (part) => {
+        const set = resolveCapabilities("custom", [part]);
+        expect([...set].sort()).toEqual([part, "order:read"].sort());
+    });
+
+    it("order:stage does not imply order:read yet (F18)", () => {
+        const set = resolveCapabilities("kitchen", ["order:stage"]);
+        expect(set.has("order:read")).toBe(false);
+    });
+
+    it("Owner and Admin hold every part; Member and Reviewer hold none", () => {
+        for (const part of parts) {
+            expect(resolveCapabilities("OWNER").has(part)).toBe(true);
+            expect(resolveCapabilities("ADMIN").has(part)).toBe(true);
+            expect(resolveCapabilities("MEMBER").has(part)).toBe(false);
+            expect(resolveCapabilities("REVIEWER").has(part)).toBe(false);
+        }
+        // The Member bundle is unchanged here; F18 decides it.
+        expect(resolveCapabilities("MEMBER").has("order:stage")).toBe(true);
+        expect(resolveCapabilities("MEMBER").has("order:read")).toBe(false);
+    });
+
+    it("a role with order:create alone may take an order, but not edit or refund one", () => {
+        const actor = ctx({
+            roleKey: "counter",
+            actions: resolveCapabilities("counter", ["order:create"]),
+        });
+        expect(allows(actor, "order:create")).toBe(true);
+        expect(allows(actor, "order:read")).toBe(true);
+        expect(() => authorize(actor, "order:edit")).toThrow(/may not perform/);
+        expect(() => authorize(actor, "order:refund")).toThrow(
+            /may not perform/,
+        );
+        expect(() => authorize(actor, "order:export")).toThrow(
+            /may not perform/,
+        );
     });
 });
 
