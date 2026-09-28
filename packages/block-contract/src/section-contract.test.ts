@@ -393,7 +393,6 @@ describe("per-section padding override (#189)", () => {
         journal: {},
         plans: {},
         productGrid: {},
-        packs: {},
     };
 
     it("is accepted on every section type", () => {

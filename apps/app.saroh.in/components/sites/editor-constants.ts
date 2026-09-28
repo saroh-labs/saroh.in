@@ -25,7 +25,6 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     visitUs: "Visit us",
     journal: "Journal",
     plans: "Plans",
-    packs: "Class packs",
     productGrid: "Product grid",
 };
 
@@ -53,7 +52,6 @@ export const SECTION_HINTS: Record<SectionType, string> = {
         "Your shop's address, hours and Open now, with directions, always up to date.",
     journal: "Your latest posts, newest first. A new post shows up on its own.",
     plans: "Your plans on sale, with price and how often. A new plan shows up on its own.",
-    packs: "Your class packs on sale, with the price per class. A new pack shows up on its own.",
     productGrid: "Reads the catalogue. Stays current on its own.",
 };
 
@@ -122,7 +120,6 @@ export const SECTION_ORDER: SectionType[] = [
     "visitUs",
     "journal",
     "plans",
-    "packs",
     "productGrid",
 ];
 

@@ -9,7 +9,6 @@ import {
     getPreviewByToken,
     getPreviewJournalFeed,
 } from "@/lib/publication";
-import { getPreviewPacksFeed } from "@/lib/site-packs";
 import { getPreviewPlansFeed } from "@/lib/site-plans";
 import { getPreviewProductGridFeeds } from "@/lib/site-product-grids";
 
@@ -36,18 +35,11 @@ export default async function PreviewHomePage({
     if (!home) notFound();
 
     // The draft's posts (G10), as the preview's own index shows them, and
-    // the plans (G9) and class packs (G20) on sale now and each Product
-    // grid's products (G12): a draft plan, pack or product never shows, even
-    // here. A preview joins and buys nothing: its blocks ask instead.
-    const [journal, plans, packs, productGrids] = await Promise.all([
+    // the plans on sale now (G9) and each Product grid's products (G12): a
+    // draft plan or product never shows, even here.
+    const [journal, plans, productGrids] = await Promise.all([
         getPreviewJournalFeed(home.sections, preview.snapshot, token),
         getPreviewPlansFeed(
-            home.sections,
-            preview.snapshot,
-            preview.siteId,
-            token,
-        ),
-        getPreviewPacksFeed(
             home.sections,
             preview.snapshot,
             preview.siteId,
@@ -63,7 +55,6 @@ export default async function PreviewHomePage({
             siteId={preview.siteId}
             journal={journal}
             plans={plans}
-            packs={packs}
             productGrids={productGrids}
         />
     );

@@ -78,19 +78,6 @@ export function moduleOff(
 }
 
 /**
- * Where the account's "See plans" goes (G20): the site's published Prices
- * page, while its module is on. Null when the site has none, or it shows
- * "This isn't available right now".
- */
-export function pricesPageHref(
-    pages: readonly KindedPage[],
-    modules: ModulePageStates | null | undefined,
-): string | null {
-    const page = findModulePage(pages, "PRICES");
-    return page && !moduleOff(page, modules) ? page.path : null;
-}
-
-/**
  * What a module's own route draws (`/book`, `/shop`):
  * - `unavailable`: the site has that module page and its module is off;
  * - `page`: it has the page, the module is on, and the visit isn't a deep

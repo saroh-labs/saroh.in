@@ -3,12 +3,9 @@
 import type {
     AccountPackAttempt,
     AccountPackCheckout,
-    JoinResult,
     PackResult,
     PayNowResult,
     PlanChangeResult,
-    PlanJoinAttempt,
-    PlanJoinStarted,
 } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
@@ -19,7 +16,6 @@ import {
 import { payNowAnswer, planChangeAnswer } from "@/lib/account-shape";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
-import { joinStandingAnswer, joinStartAnswer } from "@/lib/plan-join-shape";
 
 /**
  * What a member does to their own plan from the account's Plan tab (round-2
@@ -141,64 +137,6 @@ export async function packPayment(
     const call = await accountFetch(`me/packs/payments/${ref}`);
     if (!call?.ok) return { ok: false, message: OFFLINE };
     return packAttemptAnswer(
-        call.res.status,
-        await call.res.json().catch(() => null),
-    );
-}
-
-// ---- Joining a plan from the site's Prices page (G20) ---------------------
-
-const OFFLINE_JOIN: JoinResult<never> = {
-    ok: false,
-    reason: "error",
-    message: OFFLINE,
-};
-
-const SIGNED_OUT: JoinResult<never> = {
-    ok: false,
-    reason: "signed-out",
-    message: "Sign in again to join.",
-};
-
-/**
- * Start paying to join a plan: the API makes the payment from the plan's
- * own price, and answers with the provider's handoff. Only the plan's ref
- * and the page's idempotency key travel on — never an amount, and no way
- * to pay (DEC-059; autopay is D12's).
- */
-export async function joinPlan(
-    ref: string,
-    idempotencyKey: string,
-): Promise<JoinResult<PlanJoinStarted>> {
-    if (!(await siteOrigin())) return OFFLINE_JOIN;
-    if (!accountAreaOn()) return OFFLINE_JOIN;
-    if (typeof ref !== "string" || !REF.test(ref)) return OFFLINE_JOIN;
-    if (typeof idempotencyKey !== "string" || !KEY.test(idempotencyKey)) {
-        return OFFLINE_JOIN;
-    }
-    const call = await accountFetch(`me/plans/${ref}/join`, {
-        method: "POST",
-        body: { idempotencyKey },
-    });
-    if (call === null) return SIGNED_OUT;
-    if (!call.ok) return OFFLINE_JOIN;
-    return joinStartAnswer(
-        call.res.status,
-        await call.res.json().catch(() => null),
-    );
-}
-
-/** How a started join stands: paying, joined or closed. */
-export async function planJoinStanding(
-    ref: string,
-): Promise<JoinResult<PlanJoinAttempt>> {
-    if (!(await siteOrigin())) return OFFLINE_JOIN;
-    if (!accountAreaOn()) return OFFLINE_JOIN;
-    if (typeof ref !== "string" || !REF.test(ref)) return OFFLINE_JOIN;
-    const call = await accountFetch(`me/plans/joins/${ref}`);
-    if (call === null) return SIGNED_OUT;
-    if (!call.ok) return OFFLINE_JOIN;
-    return joinStandingAnswer(
         call.res.status,
         await call.res.json().catch(() => null),
     );

@@ -14,9 +14,7 @@ const PLAN = {
 
 describe("the Plans block's plans on a served page (G9)", () => {
     it("reads nothing for a page without a Plans block", async () => {
-        const read = vi.fn(() =>
-            Promise.resolve({ plans: [PLAN], payOnline: true }),
-        );
+        const read = vi.fn(() => Promise.resolve([PLAN]));
         const feed = await plansFeed(
             [{ type: "hero" }, { type: "journal" }],
             "/contact",
@@ -27,27 +25,21 @@ describe("the Plans block's plans on a served page (G9)", () => {
     });
 
     it("reads once for a page with one, with where its button goes", async () => {
-        const read = vi.fn(() =>
-            Promise.resolve({ plans: [PLAN], payOnline: true }),
-        );
+        const read = vi.fn(() => Promise.resolve([PLAN]));
         const feed = await plansFeed(
             [{ type: "plans" }, { type: "plans" }],
             "/contact",
             read,
         );
         expect(read).toHaveBeenCalledTimes(1);
-        expect(feed).toEqual({
-            plans: [PLAN],
-            joinHref: "/contact",
-            payOnline: true,
-        });
+        expect(feed).toEqual({ plans: [PLAN], joinHref: "/contact" });
     });
 
     it("hands in an empty list when nothing is on sale, so the block draws nothing", async () => {
         const feed = await plansFeed([{ type: "plans" }], null, () =>
-            Promise.resolve({ plans: [], payOnline: false }),
+            Promise.resolve([]),
         );
-        expect(feed).toEqual({ plans: [], joinHref: null, payOnline: false });
+        expect(feed).toEqual({ plans: [], joinHref: null });
     });
 
     it("knows a Plans block when it sees one", () => {

@@ -13,8 +13,6 @@ import {
 } from "./class-packs.controller";
 import { ClassPacksService } from "./class-packs.service";
 import { PublicPackPurchaseService } from "./public-pack-purchase.service";
-import { PublicPacksController } from "./public-packs.controller";
-import { PublicPacksService } from "./public-packs.service";
 
 /** Class packs: the packs, the people holding them, and spending them (ADR-007). */
 @Module({
@@ -31,14 +29,11 @@ import { PublicPacksService } from "./public-packs.service";
         ClassPacksController,
         BookingClassPackController,
         AccountPacksController,
-        // G20: the Prices page's Class packs section.
-        PublicPacksController,
     ],
     providers: [
         ClassPacksService,
         OrganizationGuard,
         PublicPackPurchaseService,
-        PublicPacksService,
     ],
     exports: [ClassPacksService],
 })

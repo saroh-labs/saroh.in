@@ -8,7 +8,6 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedJournal,
-    RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
     RenderedRichText,
@@ -27,8 +26,6 @@ import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
-import type { PacksFeed } from "./blocks/packs";
-import PacksSection from "./blocks/packs";
 import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import type { ProductGridFeed } from "./blocks/product-grid";
@@ -37,7 +34,6 @@ import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import VisitUsSection from "./blocks/visit-us";
-import type { PricesActions } from "./prices/api";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -73,8 +69,6 @@ export default function SectionRenderer({
     siteId,
     journal,
     plans,
-    packs,
-    prices,
     productGrid,
 }: {
     section: Section;
@@ -104,17 +98,6 @@ export default function SectionRenderer({
      * block reads them itself and says why when there are none.
      */
     plans?: PlansFeed;
-    /**
-     * The business's class packs on sale, read by the page that serves the
-     * site (G20), for the Class packs block. Undefined on the editor's
-     * canvas, where the block reads them itself.
-     */
-    packs?: PacksFeed;
-    /**
-     * Join and Buy's actions (G20), handed in by the live site when the
-     * account area is on. Absent: Plans and Class packs offer "Ask about…".
-     */
-    prices?: PricesActions | null;
     /**
      * This section's products, read by the page that serves the site (G12),
      * for a Product grid. Undefined on the editor's canvas, where the block
@@ -201,17 +184,6 @@ export default function SectionRenderer({
                 <PlansSection
                     content={section.content as RenderedPlans}
                     feed={plans}
-                    prices={prices}
-                    apiUrl={apiUrl}
-                    siteId={siteId}
-                />
-            );
-        case "packs":
-            return (
-                <PacksSection
-                    content={section.content as RenderedPacks}
-                    feed={packs}
-                    prices={prices}
                     apiUrl={apiUrl}
                     siteId={siteId}
                 />
@@ -274,8 +246,6 @@ export function PageSections({
     siteId,
     journal,
     plans,
-    packs,
-    prices,
     productGrids,
 }: {
     sections: Section[];
@@ -289,10 +259,6 @@ export function PageSections({
     journal?: JournalFeed;
     /** The business's plans on sale, for the Plans block (G9). */
     plans?: PlansFeed;
-    /** The business's class packs on sale, for the Class packs block (G20). */
-    packs?: PacksFeed;
-    /** Join and Buy's actions on a live site (G20). */
-    prices?: PricesActions | null;
     /**
      * Each Product grid's products (G12), by the section's index in
      * `sections`: every grid asks for its own.
@@ -311,8 +277,6 @@ export function PageSections({
                         siteId={siteId}
                         journal={journal}
                         plans={plans}
-                        packs={packs}
-                        prices={prices}
                         productGrid={productGrids?.[i]}
                     />
                 );

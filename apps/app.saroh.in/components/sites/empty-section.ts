@@ -127,14 +127,6 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { title: "Our products" },
             };
-        case "packs":
-            // Nothing to choose: the packs on sale, read live.
-            return {
-                key: newKey(),
-                type,
-                contractVersion: 1,
-                content: { title: "Class packs" },
-            };
         case "plans":
             // Nothing to choose: the plans on sale, read live.
             return {

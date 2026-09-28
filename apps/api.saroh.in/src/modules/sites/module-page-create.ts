@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { defaultModuleSections } from "./module-page-sections";
-import { modulePageState, pricesOffer } from "./module-pages";
+import { modulePageState } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import { assertPathIsFree } from "./site-access";
@@ -118,10 +118,6 @@ export async function createModulePage(
         });
     }
 
-    // A Prices page starts with what the business offers now (G20).
-    const prices =
-        kind === "PRICES" ? await pricesOffer(ctx.organizationId) : undefined;
-
     try {
         return await prisma.$transaction(async (tx) => {
             const sections = await defaultModuleSections(tx, {
@@ -129,7 +125,6 @@ export async function createModulePage(
                 siteId: site.id,
                 siteName: site.name,
                 kind,
-                prices,
             });
             return tx.page.create({
                 data: {

@@ -7,7 +7,6 @@ import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { classPacksOn } from "../class-packs/class-packs-on";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { paymentsOn } from "../invoices/payments-on";
-import type { PricesOffer } from "./module-page-sections";
 import type { ModulePageKind } from "./page-kinds";
 import { MODULE_PAGE_KINDS } from "./page-kinds";
 import { commerceOpen, shopRolloutOn } from "./sells-from";
@@ -107,28 +106,6 @@ export async function modulePageState(
         case "CONTACT":
             return { state: "on" };
     }
-}
-
-/**
- * What a new Prices page can offer (G20), each asked as the page's own gate
- * asks it: single visits with Appointments rolled out and on, plans with
- * Payments, packs with Class packs. Its default sections follow, so none
- * names a module that is off or not rolled out (DEC-057).
- */
-export async function pricesOffer(
-    organizationId: string,
-    db: ModuleDb = prisma,
-): Promise<PricesOffer> {
-    const [book, payments, packs] = await Promise.all([
-        modulePageState("BOOK", organizationId, db),
-        rolledOut("PAYMENTS", organizationId),
-        rolledOut("CLASS_PACKS", organizationId),
-    ]);
-    const [plansOn, packsOn] = await Promise.all([
-        payments ? paymentsOn(db, organizationId) : false,
-        packs ? classPacksOn(db, organizationId) : false,
-    ]);
-    return { once: book.state === "on", plans: plansOn, packs: packsOn };
 }
 
 /** The kinds a site could add now: on, and not on the site yet. */

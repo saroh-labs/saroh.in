@@ -228,72 +228,6 @@ describe("module pages (G14, real database)", () => {
         expect(checkRenderability(snapshot).renderable).toBe(true);
     });
 
-    it("starts a Prices page with Try it once, Memberships and Class packs (G20)", async () => {
-        const b = await business();
-        const org = b.ctx.organizationId;
-        const priced = async (name: string, priceCents: number, shown = true) =>
-            prisma.service.update({
-                where: { id: (await service(org, name, shown)).id },
-                data: { priceCents, currency: "INR" },
-                select: { id: true },
-            });
-        const pt = await priced("Personal training", 150_000);
-        const trial = await priced("Trial class", 40_000);
-        await priced("Hidden class", 10_000, false);
-        await service(org, "Free intro");
-        await priced("Yoga", 60_000);
-
-        const prices = await sites.createPage(b.ctx, b.siteId, {
-            kind: "PRICES",
-        });
-        const sections = await draftSections(prices.id);
-        expect(sections.map((s) => s.type)).toEqual([
-            "richText",
-            "servicesList",
-            "plans",
-            "packs",
-        ]);
-        expect(sections[0]?.content).toMatchObject({
-            value: "<p>Try one class, buy a pack, or join. Price per class is shown so you can compare.</p>",
-        });
-        // The cheapest two shown on the booking page with a price.
-        expect(sections[1]?.content).toMatchObject({
-            heading: "Try it once",
-            serviceIds: [trial.id, expect.any(String)],
-            showPrices: true,
-        });
-        expect(
-            (sections[1]?.content as { serviceIds: string[] }).serviceIds,
-        ).not.toContain(pt.id);
-        expect(sections[2]?.content).toMatchObject({ title: "Memberships" });
-        expect(sections[3]?.content).toMatchObject({ title: "Class packs" });
-    });
-
-    it("leaves off a Prices section whose module is off or not rolled out (DEC-057)", async () => {
-        const noPacks = await business({
-            notRolledOut: ["MODULE_CLASS_PACKS"],
-        });
-        const a = await sites.createPage(noPacks.ctx, noPacks.siteId, {
-            kind: "PRICES",
-        });
-        expect((await draftSections(a.id)).map((s) => s.type)).toEqual([
-            "richText",
-            "plans",
-        ]);
-        expect((await draftSections(a.id))[0]?.content).toMatchObject({
-            value: "<p>Join.</p>",
-        });
-
-        const packsOnly = await business({ switchedOff: ["PAYMENTS"] });
-        const b = await sites.createPage(packsOnly.ctx, packsOnly.siteId, {
-            kind: "PRICES",
-        });
-        expect((await draftSections(b.id)).map((s) => s.type)).toEqual([
-            "richText",
-            "packs",
-        ]);
-    });
-
     it("starts a Book page with the intro alone while no service is shown", async () => {
         const b = await business();
         const page = await sites.createPage(b.ctx, b.siteId, { kind: "BOOK" });
@@ -501,11 +435,8 @@ describe("module pages (G14, real database)", () => {
             "/journal",
             "/contact",
         ]);
-        // With nothing priced to book, no "Try it once" (G20).
         expect((await draftSections(prices.id)).map((s) => s.type)).toEqual([
-            "richText",
             "plans",
-            "packs",
         ]);
         expect((await draftSections(journal.id)).map((s) => s.type)).toEqual([
             "journal",

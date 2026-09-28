@@ -15,10 +15,7 @@ import type { ModulePageKind } from "./page-kinds";
  *   booking page (E1), in its order — each opening the flow at itself. With
  *   no such service yet, the intro alone: a list needs one, and the editor
  *   adds it when there is.
- * - Prices (G20): "Try it once" — the cheapest priced services shown on the
- *   booking page, each opening the flow at itself — then the plans and the
- *   class packs on sale, each only when its module is rolled out and on
- *   (DEC-057), with a line saying what the page offers.
+ * - Prices: the plans on sale (G20 adds the packs).
  * - Journal: the latest posts.
  * - Contact: Visit us (the business's only shop, when it has exactly one;
  *   otherwise the editor asks which) and an enquiry form, whose Form is made
@@ -44,47 +41,6 @@ export const CONTACT_ENQUIRY_FIELDS = [
 
 /** A services list holds at most this many (its contract). */
 const SERVICES_LIST_MAX = 24;
-
-/** "Try it once" lists this many services, cheapest first (the design's). */
-export const TRY_IT_ONCE_MAX = 2;
-
-/** What a Prices page can offer, as its default sections are chosen. */
-export interface PricesOffer {
-    /** Appointments is open: single visits can be booked. */
-    once: boolean;
-    /** Payments is rolled out and on: plans can show. */
-    plans: boolean;
-    /** Class packs is rolled out and on: packs can show. */
-    packs: boolean;
-}
-
-/**
- * The Prices page's opening line, naming only what it offers: "Try one
- * class, buy a pack, or join." With packs, the design's comparison note.
- */
-export function pricesIntro(offer: {
-    once: boolean;
-    plans: boolean;
-    packs: boolean;
-}): string | null {
-    const parts = [
-        ...(offer.once ? ["try one class"] : []),
-        ...(offer.packs ? ["buy a pack"] : []),
-        ...(offer.plans ? ["join"] : []),
-    ];
-    if (parts.length === 0) return null;
-    const last = parts[parts.length - 1];
-    const list =
-        parts.length === 1
-            ? last
-            : parts.length === 2
-              ? `${parts[0]} or ${last}`
-              : `${parts.slice(0, -1).join(", ")}, or ${last}`;
-    const line = `${list.charAt(0).toUpperCase()}${list.slice(1)}.`;
-    return offer.packs && parts.length > 1
-        ? `${line} Price per class is shown so you can compare.`
-        : line;
-}
 
 type Tx = Pick<Prisma.TransactionClient, "service" | "store" | "form">;
 
@@ -114,8 +70,6 @@ export async function defaultModuleSections(
         siteId: string;
         siteName: string;
         kind: ModulePageKind;
-        /** What a Prices page offers; the caller asks the modules. */
-        prices?: PricesOffer;
     },
 ): Promise<DefaultSection[]> {
     const { organizationId, siteId, kind } = input;
@@ -162,12 +116,13 @@ export async function defaultModuleSections(
             ];
         }
         case "PRICES":
-            return pricesSections(
-                tx,
-                organizationId,
-                siteId,
-                input.prices ?? { once: false, plans: true, packs: false },
-            );
+            return [
+                checked({
+                    type: "plans",
+                    contractVersion: 1,
+                    content: { title: "Memberships" },
+                }),
+            ];
         case "JOURNAL":
             return [
                 checked({
@@ -221,77 +176,4 @@ export async function defaultModuleSections(
             ];
         }
     }
-}
-
-/**
- * A Prices page's sections (G20): its line, "Try it once", Memberships and
- * Class packs — each only when there is something to offer, so no section
- * names a module that is off. With nothing at all, Memberships alone, as
- * before G20: it draws nothing until Payments is on and a plan published.
- */
-async function pricesSections(
-    tx: Tx,
-    organizationId: string,
-    siteId: string,
-    offer: PricesOffer,
-): Promise<DefaultSection[]> {
-    const once = offer.once
-        ? await tx.service.findMany({
-              where: {
-                  ...offeredOnSite(organizationId, siteId),
-                  priceCents: { gt: 0 },
-              },
-              orderBy: [{ priceCents: "asc" }, { createdAt: "asc" }],
-              take: TRY_IT_ONCE_MAX,
-              select: { id: true },
-          })
-        : [];
-    const shown = {
-        once: once.length > 0,
-        plans: offer.plans,
-        packs: offer.packs,
-    };
-    const intro = pricesIntro(shown);
-    const sections: DefaultSection[] = [];
-    if (intro) {
-        sections.push(
-            checked({
-                type: "richText",
-                contractVersion: 1,
-                content: { format: "html", value: `<p>${intro}</p>` },
-            }),
-        );
-    }
-    if (shown.once) {
-        sections.push(
-            checked({
-                type: "servicesList",
-                contractVersion: 1,
-                content: {
-                    heading: "Try it once",
-                    serviceIds: once.map((s) => s.id),
-                    showPrices: true,
-                },
-            }),
-        );
-    }
-    if (shown.plans || !shown.packs) {
-        sections.push(
-            checked({
-                type: "plans",
-                contractVersion: 1,
-                content: { title: "Memberships" },
-            }),
-        );
-    }
-    if (shown.packs) {
-        sections.push(
-            checked({
-                type: "packs",
-                contractVersion: 1,
-                content: { title: "Class packs" },
-            }),
-        );
-    }
-    return sections;
 }

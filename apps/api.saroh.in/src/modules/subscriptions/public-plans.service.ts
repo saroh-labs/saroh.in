@@ -7,7 +7,6 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
-import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -30,9 +29,6 @@ import { PLANS_ON_SALE } from "./plan-on-sale";
  *   module rolled out for the business AND switched on. Otherwise a 404, the
  *   same as a site with no plans at all, so a rollout flag never leaks
  *   (DEC-057).
- * - **Whether Join works** (G20): `payOnline`, the booking page's own
- *   question (a connected provider that opens a checkout). It never says
- *   how — the site names no payment method (DEC-059).
  * - **An explicit allow-list.** Name, description, price, currency and how
  *   often — no counts, no ids of anything else. Nothing about how to pay:
  *   the site names no payment method (DEC-059).
@@ -65,13 +61,6 @@ export interface PublicPlan {
 
 export interface PublicPlans {
     plans: PublicPlan[];
-    /**
-     * Whether a signed-in customer can join online now (G20): Payments on
-     * and a provider that opens a checkout. False: the site offers "Ask
-     * about joining" instead. Added beside `plans`, so an older site that
-     * never reads it keeps working.
-     */
-    payOnline: boolean;
 }
 
 function notFound(): never {
@@ -166,42 +155,31 @@ export class PublicPlansService {
         if (!site) notFound();
         const { organizationId } = site;
 
-        const [rows, payOnline] = await runInOrgContext(
-            organizationId,
-            async () => {
-                if (!(await paymentsOffered(organizationId))) notFound();
-                return Promise.all([
-                    prisma.subscriptionPlan.findMany({
-                        where: { organizationId, ...PLANS_ON_SALE },
-                        take: MAX_PLANS,
-                        orderBy: [
-                            { price: "asc" },
-                            { name: "asc" },
-                            { id: "asc" },
-                        ],
-                        // The published columns only: never `pendingChanges`.
+        const rows = await runInOrgContext(organizationId, async () => {
+            if (!(await paymentsOffered(organizationId))) notFound();
+            return prisma.subscriptionPlan.findMany({
+                where: { organizationId, ...PLANS_ON_SALE },
+                take: MAX_PLANS,
+                orderBy: [{ price: "asc" }, { name: "asc" }, { id: "asc" }],
+                // The published columns only: never `pendingChanges`.
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    price: true,
+                    currency: true,
+                    interval: true,
+                    _count: {
                         select: {
-                            id: true,
-                            name: true,
-                            description: true,
-                            price: true,
-                            currency: true,
-                            interval: true,
-                            _count: {
-                                select: {
-                                    subscriptions: {
-                                        where: { status: { not: "CANCELLED" } },
-                                    },
-                                },
+                            subscriptions: {
+                                where: { status: { not: "CANCELLED" } },
                             },
                         },
-                    }),
-                    takesOnlinePayment(organizationId),
-                ]);
-            },
-        );
+                    },
+                },
+            });
+        });
         return {
-            payOnline,
             plans: orderPlans(
                 rows.map(({ _count, ...row }) => ({
                     ...row,

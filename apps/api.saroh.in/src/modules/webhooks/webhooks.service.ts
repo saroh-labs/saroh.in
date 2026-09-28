@@ -36,7 +36,6 @@ import {
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
-import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { applyOnlineOrderSuccess } from "./online-order-payment";
 import type {
     NormalizedWebhookEvent,
@@ -1102,19 +1101,6 @@ export class WebhooksService {
                       payment,
                   })
                 : null;
-        // A plan joined online (G20): the subscription is started from the
-        // draft's snapshot and the invoice numbered and paid — unless the
-        // draft was discarded, or its member removed or put on the plan by
-        // the desk meanwhile, and then the money is owed back, below.
-        const joined =
-            invoice?.status === "DRAFT" && invoice.source === "SUBSCRIPTION"
-                ? await completePlanJoinInTx(tx, {
-                      invoiceId,
-                      organizationId: intent.organizationId,
-                      now: new Date(),
-                      payment,
-                  })
-                : null;
         // A booking's pay link (E4) paid after the booking was cancelled:
         // cancelling retires the link, but a checkout already open can still
         // take the money. The place is gone, so it is owed back, not a
@@ -1130,8 +1116,7 @@ export class WebhooksService {
         if (
             (invoice?.status === "ISSUED" && !cancelledBooking) ||
             held === "confirmed" ||
-            bought === "bought" ||
-            joined === "joined"
+            bought === "bought"
         ) {
             if (invoice?.status === "ISSUED") {
                 await tx.invoice.update({
@@ -1163,11 +1148,9 @@ export class WebhooksService {
                 ? "RELEASED_HOLD"
                 : bought === "gone"
                   ? "PACK_NOT_BOUGHT"
-                  : joined === "gone"
-                    ? "PLAN_NOT_JOINED"
-                    : cancelledBooking
-                      ? "CANCELLED_BOOKING"
-                      : (invoice?.status ?? "MISSING");
+                  : cancelledBooking
+                    ? "CANCELLED_BOOKING"
+                    : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,

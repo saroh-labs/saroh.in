@@ -8,7 +8,6 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedJournal,
-    RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
     RenderedRichText,
@@ -21,7 +20,6 @@ import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
-    SAMPLE_PACKS,
     SAMPLE_PLANS,
     SAMPLE_POSTS,
     SAMPLE_PRODUCTS,
@@ -36,7 +34,6 @@ import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import JournalSection from "./blocks/journal";
-import PacksSection from "./blocks/packs";
 import PlansSection from "./blocks/plans";
 import ProductGridSection from "./blocks/product-grid";
 import RichTextSection from "./blocks/rich-text";
@@ -451,41 +448,6 @@ describe("block rendering", () => {
         );
         expect(screen.queryByText("Most chosen")).toBeNull();
         expect(screen.getAllByText("Ask to join")).toHaveLength(3);
-        expect(container.innerHTML).toMatchSnapshot();
-    });
-
-    // Sample packs rather than a fetch: the page serving the site reads them
-    // and hands them in (G20).
-    it("packs", () => {
-        const { container } = render(
-            <PacksSection
-                content={BLOCK_META.packs.fixtures.default as RenderedPacks}
-                feed={{
-                    packs: SAMPLE_PACKS,
-                    payOnline: false,
-                    askHref: "/contact#enquiry",
-                }}
-            />,
-        );
-        expect(screen.getAllByRole("listitem")).toHaveLength(2);
-        expect(container.innerHTML).toMatchSnapshot();
-    });
-
-    it("packs, no descriptions, the merchant's button", () => {
-        const { container } = render(
-            <PacksSection
-                content={BLOCK_META.packs.cases.plain as RenderedPacks}
-                feed={{
-                    packs: SAMPLE_PACKS,
-                    payOnline: false,
-                    askHref: "/",
-                }}
-            />,
-        );
-        expect(
-            screen.queryByText("Any group class, mat or reformer."),
-        ).toBeNull();
-        expect(screen.getAllByText("Get this pack")).toHaveLength(2);
         expect(container.innerHTML).toMatchSnapshot();
     });
 

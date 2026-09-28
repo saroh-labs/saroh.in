@@ -54,12 +54,6 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: "/billing/subscriptions?tab=plans",
         linkLabel: "Open Plans",
     },
-    packs: {
-        reads: "Reads your class packs on sale live, so a price or a newly published pack shows here without publishing the site again.",
-        notice: "Packs live in Class packs. Only published packs show; a draft or an unpublished change never does.",
-        href: "/class-packs",
-        linkLabel: "Open Class packs",
-    },
     productGrid: {
         reads: "Reads the catalogue. Stays current on its own.",
         notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products sold where the site sells from show.",

@@ -341,10 +341,6 @@ describe("the Plans block's words (G9)", () => {
             "I'd like to join Gold plan. ",
         );
         expect(askedFromSearch("?about=Rye")).toBe("I'd like to order Rye. ");
-        // G20: "Ask about this pack" names the pack.
-        expect(askedFromSearch("?pack=10%20classes")).toBe(
-            "I'd like to buy 10 classes. ",
-        );
         expect(askedFromSearch("?join=%20")).toBeNull();
         expect(askedFromSearch("")).toBeNull();
     });

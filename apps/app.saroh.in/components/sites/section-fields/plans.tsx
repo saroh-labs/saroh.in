@@ -1,6 +1,6 @@
 "use client";
 
-import { PLANS_BUTTON, PLANS_JOIN } from "@saroh/site-blocks";
+import { PLANS_BUTTON } from "@saroh/site-blocks";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
@@ -71,14 +71,12 @@ export function PlansFields({
                     onChange={(e) =>
                         patch({ buttonLabel: e.target.value || undefined })
                     }
-                    placeholder={PLANS_JOIN}
+                    placeholder={PLANS_BUTTON}
                 />
             </Field>
             <p className="-mt-1.5 text-xs text-muted-foreground">
-                Customers sign in and join, paying you online. Where you
-                can&apos;t take the payment online, it says &ldquo;
-                {PLANS_BUTTON}&rdquo; and opens your site&apos;s enquiry form
-                with the plan named.
+                Opens your site&apos;s enquiry form with the plan named. With no
+                enquiry form on the site, no button shows.
             </p>
 
             <div className="flex items-center justify-between gap-3">

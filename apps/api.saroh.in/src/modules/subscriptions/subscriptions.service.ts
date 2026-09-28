@@ -55,7 +55,7 @@ import {
     resumeWhenDue,
 } from "./pause-until";
 import type { Interval, Period } from "./periods";
-import { periodContaining, periodLabel } from "./periods";
+import { periodContaining } from "./periods";
 import type { PlanEditorView } from "./plan-draft-view";
 import { readPlanEditor } from "./plan-draft-view";
 import {
@@ -2172,6 +2172,16 @@ function planRef(p: {
         currency: p.currency,
         interval: p.interval,
     };
+}
+
+/** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */
+export function periodLabel(period: Period, timezone: string): string {
+    const start = DateTime.fromJSDate(period.start, { zone: timezone });
+    const last = DateTime.fromJSDate(period.end, { zone: timezone }).minus({
+        days: 1,
+    });
+    const sameYear = start.year === last.year;
+    return `${start.toFormat(sameYear ? "d LLL" : "d LLL yyyy")} – ${last.toFormat("d LLL yyyy")}`;
 }
 
 /**

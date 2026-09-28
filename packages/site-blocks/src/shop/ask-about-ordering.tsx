@@ -19,13 +19,12 @@ import { actionButton } from "./add-to-bag";
 /**
  * Where the enquiry form is, with the product named for its message. `key`
  * says what the visitor is asking: `about` (ordering a product, G13) or
- * `join` (joining a plan, G9) or `pack` (buying a class pack, G20); the
- * form words its message to match.
+ * `join` (joining a plan, G9); the form words its message to match.
  */
 export function askAboutHref(
     enquiryHref: string,
     about: string,
-    key: "about" | "join" | "pack" = "about",
+    key: "about" | "join" = "about",
 ): string {
     const at = enquiryHref.indexOf("#");
     const path = at >= 0 ? enquiryHref.slice(0, at) : enquiryHref;
