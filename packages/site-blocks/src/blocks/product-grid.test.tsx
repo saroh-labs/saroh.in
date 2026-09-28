@@ -119,7 +119,7 @@ describe("the Product grid on a served page (G12)", () => {
         expect(screen.queryByText("From ₹250")).toBeNull();
     });
 
-    it("shows four when the count isn't set, and 'Shop' when the title isn't", () => {
+    it("shows four when the count isn't set, and 'Our products' when the title isn't", () => {
         render(
             <ProductGridSection
                 content={{}}
@@ -128,7 +128,7 @@ describe("the Product grid on a served page (G12)", () => {
         );
         expect(cards()).toHaveLength(4);
         expect(
-            screen.getByRole("heading", { level: 2, name: "Shop" }),
+            screen.getByRole("heading", { level: 2, name: "Our products" }),
         ).toBeTruthy();
     });
 

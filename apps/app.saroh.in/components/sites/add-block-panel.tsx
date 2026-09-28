@@ -11,7 +11,7 @@ import { addBlockGroups } from "@/components/sites/block-kinds";
 import {
     SECTION_HINTS,
     SECTION_LABELS,
-    SECTION_ORDER,
+    addableSections,
 } from "@/components/sites/editor-constants";
 import type { SectionType } from "@/lib/sites/service";
 
@@ -30,6 +30,7 @@ import type { SectionType } from "@/lib/sites/service";
 export function AddBlockPanel({
     onPick,
     onBrowse,
+    shopOpen = false,
 }: {
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
@@ -38,8 +39,10 @@ export function AddBlockPanel({
      * site's colours — what "+ Add section" showed before the tab (#267).
      */
     onBrowse: () => void;
+    /** The shop is open for the business: the Product grid is offered (G12). */
+    shopOpen?: boolean;
 }) {
-    const { structure, business } = addBlockGroups(SECTION_ORDER);
+    const { structure, business } = addBlockGroups(addableSections(shopOpen));
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">

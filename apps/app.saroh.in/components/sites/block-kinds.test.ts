@@ -25,6 +25,7 @@ describe("the Add block groups", () => {
             "visitUs",
             "journal",
             "plans",
+            "productGrid",
         ]);
     });
 });

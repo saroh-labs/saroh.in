@@ -40,6 +40,7 @@ const TYPE_LABEL: Record<FlagType, string> = {
     storefrontUnchosen: "No storefront to sell from",
     reservedAddress: "Change address",
     shopCantTakeOrders: "Can't take orders online",
+    productsNotOnSale: "Products not on sale",
 };
 
 /**

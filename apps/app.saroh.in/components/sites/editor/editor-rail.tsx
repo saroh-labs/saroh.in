@@ -59,6 +59,7 @@ export function EditorRail({
     heldBackAt,
     flagsBySection,
     notedKeys,
+    shopOpen = false,
 }: {
     rail: EditorRailTab;
     setRail: (next: EditorRailTab) => void;
@@ -85,6 +86,8 @@ export function EditorRail({
     heldBackAt: (index: number) => HeldBackSection | undefined;
     flagsBySection: Map<number, Flag[]>;
     notedKeys: Set<string>;
+    /** The shop is open for the business: the Product grid is offered (G12). */
+    shopOpen?: boolean;
 }) {
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
@@ -119,6 +122,7 @@ export function EditorRail({
                 <>
                     {adding ? (
                         <AddBlockPanel
+                            shopOpen={shopOpen}
                             onBrowse={() => setBrowsing(true)}
                             onPick={(type, looks) => {
                                 if (looks > 1) setLookFor(type);

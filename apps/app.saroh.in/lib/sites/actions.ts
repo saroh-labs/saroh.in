@@ -3,6 +3,8 @@
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { listVisitPlaces } from "@/lib/stores/storefronts";
 
+import type { GridCatalogueRead } from "./grid-catalogue";
+import { readGridCatalogue } from "./grid-catalogue";
 import type {
     CreateSiteInput,
     PreviewLinkDays,
@@ -173,4 +175,13 @@ export async function revokePreviewLink(siteId: string, linkId: string) {
  */
 export async function listVisitPlacesForPicker(): Promise<VisitPlacesRead> {
     return listVisitPlaces();
+}
+
+/**
+ * The products and collections a Product grid can pick from (G12). A read,
+ * but the editor is a client component and reaches the API only through an
+ * action.
+ */
+export async function listGridCatalogue(): Promise<GridCatalogueRead> {
+    return readGridCatalogue();
 }

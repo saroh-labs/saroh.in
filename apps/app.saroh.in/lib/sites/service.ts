@@ -202,6 +202,21 @@ export interface PlansContent {
     showDescriptions?: boolean;
 }
 
+/**
+ * `productGrid` — which products from the catalogue show (G12): the newest,
+ * a collection's or picked by hand, by id. The products themselves are read
+ * live by the site, never stored here. `source` absent means `newest`,
+ * `count` absent four, `showPrices` absent shown.
+ */
+export interface ProductGridContent {
+    title?: string;
+    source?: "newest" | "collection" | "picked";
+    collectionId?: string;
+    productIds?: string[];
+    count?: number;
+    showPrices?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -263,6 +278,7 @@ export interface SectionContentByType {
     visitUs: VisitUsContent;
     journal: JournalContent;
     plans: PlansContent;
+    productGrid: ProductGridContent;
 }
 
 /**
@@ -1153,7 +1169,9 @@ export type FlagType =
     | "storefrontUnchosen"
     | "reservedAddress"
     // The checkout (G13): the shop can't take an online order now.
-    | "shopCantTakeOrders";
+    | "shopCantTakeOrders"
+    // A Product grid (G12) naming products that aren't on sale there.
+    | "productsNotOnSale";
 
 export interface Flag {
     type: FlagType;

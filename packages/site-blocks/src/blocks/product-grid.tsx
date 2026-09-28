@@ -47,7 +47,7 @@ export interface ProductGridFeed {
 }
 
 /** What the section is called when the merchant left the title empty. */
-export const PRODUCT_GRID_TITLE = "Shop";
+export const PRODUCT_GRID_TITLE = "Our products";
 
 /**
  * The public read's query for this grid, or null when it can show nothing
