@@ -528,6 +528,10 @@ test.describe("orders quick view and row menu (B5)", () => {
         });
         await openerOf(page, top.orderId).click();
         await expect(quickView(page).getByRole("alert")).toBeVisible();
+        // Behind the modal the list is hidden from the accessibility tree;
+        // closing the panel shows it is still there, not replaced by an error.
+        await page.keyboard.press("Escape");
+        await expect(quickView(page)).toHaveCount(0);
         await expect(grid(page)).toBeVisible();
     });
 
