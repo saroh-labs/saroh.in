@@ -22,6 +22,7 @@ import {
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import { PaymentsService } from "../payments/payments.service";
+import { OPENS_CHECKOUT } from "../payments/public-key";
 import { isValidSlotStart } from "./availability";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
@@ -1381,8 +1382,15 @@ export class BookingsService {
         authorize(ctx, "booking:write");
         authorize(ctx, "invoice:write");
         await this.requireOwnedBooking(ctx, bookingId);
+        // Only a connection that can open the checkout window counts: a
+        // Razorpay one still missing its public key id would make a link
+        // the customer can't pay (DEC-054).
         const connected = await prisma.merchantPaymentProvider.count({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+            where: {
+                organizationId: ctx.organizationId,
+                status: "CONNECTED",
+                ...OPENS_CHECKOUT,
+            },
         });
         if (connected === 0) {
             throw new ConflictException(

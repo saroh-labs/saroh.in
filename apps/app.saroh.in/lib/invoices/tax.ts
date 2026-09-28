@@ -1,6 +1,8 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
 import { printedAddress } from "@/lib/organizations/registered-address";
 import type { RegisteredAddress } from "@/lib/organizations/settings-service";
+import type { ProviderConnection } from "@/lib/payments/providers";
+import { opensCheckout } from "@/lib/payments/providers";
 
 /**
  * The business's GST standing and what its paper prints at the top: logo,
@@ -62,15 +64,18 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
 }
 
 /**
- * Whether a payment provider is connected, so issuing can make a pay link.
- * False when it could not be found out: the form then offers "Issue it",
- * and the invoice's own page says whether a link can be made.
+ * Whether a payment provider is connected that can open the checkout
+ * window, so issuing can make a pay link. A Razorpay connection still
+ * missing its public key id can't (DEC-054), so it doesn't count: a link it
+ * would take could only fail on the customer's phone. False when it could
+ * not be found out: the form then offers "Issue it", and the invoice's own
+ * page says whether a link can be made.
  */
 export async function hasPaymentProvider(): Promise<boolean> {
     const base = await orgBase();
     if (!base) return false;
     const res = await apiFetch(`${base}/payment-providers`);
     if (!res.ok) return false;
-    const rows = (await res.json()) as { status: string }[];
-    return rows.some((r) => r.status === "CONNECTED");
+    const rows = (await res.json()) as ProviderConnection[];
+    return rows.some(opensCheckout);
 }
