@@ -136,12 +136,15 @@ each with why it stops there:
   to `month-step.tsx` to make room for the team filter, whose select is
   `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
   which needed nothing new from the API.
-- `organizations/organization-settings-form.tsx` (1,246) — one form holds
+- `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
+  F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
   to `time-zone-select.tsx`, and the Hours card, which saves to the
-  storefronts, to `business-hours-section.tsx`. Less
+  storefronts, to `business-hours-section.tsx`. F12's Undo on a save kept
+  its rules out (`lib/organizations/settings-undo.ts`, and the hold and
+  toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
 - `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
   member drawer and the invite dialog share the screen's roster and role

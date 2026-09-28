@@ -8,9 +8,10 @@ import type { ReadyChecklist as Checklist } from "@/lib/settings/ready";
  * "Ready to take payments" ("Saroh Settings" design): a card at the top of
  * Business listing what is left, a bar for how far along the business is,
  * and a button per step to the place that does it. Nothing renders once
- * nothing is left — the page already says the rest. The steps and the count
- * come from `readyChecklist`, the same list as Home's "Get ready to take
- * money" (F8), so the two always agree.
+ * nothing is left — the page already says the rest. The steps are Home's
+ * "Get ready to take money" (`readyChecklist`, F8), followed by what
+ * Settings also asks for — email, business type, logo, a pipeline
+ * (`settingsChecklist`, DEC-056).
  */
 export function ReadyChecklist({ list }: { list: Checklist }) {
     if (list.left.length === 0 || list.total === 0) return null;
@@ -60,7 +61,12 @@ export function ReadyChecklist({ list }: { list: Checklist }) {
                                 {item.why}
                             </span>
                         </span>
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="wk-press"
+                        >
                             <Link href={item.href}>{item.cta}</Link>
                         </Button>
                     </li>

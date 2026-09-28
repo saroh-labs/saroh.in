@@ -13,8 +13,9 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +25,7 @@ import {
     BusinessSection,
     ComingSoon,
 } from "@/components/organizations/business-section";
+import type { OfferUndo } from "@/components/organizations/use-settings-undo";
 import type { WeekText } from "@/lib/organizations/opening-hours";
 import {
     dayProblem,
@@ -33,6 +35,8 @@ import {
     weekFromText,
     weekText,
 } from "@/lib/organizations/opening-hours";
+import { undoStorefrontHours } from "@/lib/organizations/settings-actions";
+import { hoursUndo } from "@/lib/organizations/settings-undo";
 import { newStorefrontHref } from "@/lib/stores/links";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
@@ -101,6 +105,7 @@ export function BusinessHoursSection({
     onDone,
     onDirty,
     hidden,
+    offerUndo,
 }: {
     hours: StorefrontHoursRead;
     editing: boolean;
@@ -115,7 +120,10 @@ export function BusinessHoursSection({
      * survives a look at another tab, as the Business form's cards do.
      */
     hidden: boolean;
+    /** Says the save landed, with Undo while the week can be put back (F12). */
+    offerUndo: OfferUndo;
 }) {
+    const router = useRouter();
     // What the API last said, so the card reads a save at once.
     const [stores, setStores] = useState<StorefrontHours[]>(
         hours.state === "ok" ? hours.storefronts : [],
@@ -172,10 +180,35 @@ export function BusinessHoursSection({
             );
             return;
         }
-        showSuccess(
+        const back = hoursUndo(
+            results.map(({ store, result }) => ({
+                id: store.id,
+                before: store.openingHours,
+                after: result.ok ? result.data.openingHours : null,
+            })),
+        );
+        offerUndo(
             stores.length === 1
                 ? "Hours saved"
                 : `Hours saved for all ${stores.length} storefronts`,
+            back &&
+                (async () => {
+                    const undone = await undoStorefrontHours(back);
+                    if (!undone.ok) return undone;
+                    const weeks = new Map(
+                        undone.data.map((s) => [s.id, s.openingHours]),
+                    );
+                    setStores((now) =>
+                        now.map((s) => ({
+                            ...s,
+                            openingHours: weeks.get(s.id) ?? s.openingHours,
+                        })),
+                    );
+                    form.reset(
+                        weekText(undone.data.at(0)?.openingHours ?? null),
+                    );
+                    return { ok: true };
+                }),
         );
         // As the fields will read it back: "7:00 - 9:30" is "07:00–09:30".
         form.reset(weekText(weekFromText(values, null)));
@@ -211,7 +244,17 @@ export function BusinessHoursSection({
         ) : hours.state === "unavailable" ? (
             <Notice>
                 Your storefronts&apos; hours couldn&apos;t be read, so they
-                can&apos;t be changed here right now.
+                can&apos;t be changed here right now.{" "}
+                <button
+                    type="button"
+                    onClick={() => router.refresh()}
+                    className={cn(
+                        LINK,
+                        "cursor-pointer rounded-sm hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70",
+                    )}
+                >
+                    Try again
+                </button>
             </Notice>
         ) : !first ? (
             <Notice>

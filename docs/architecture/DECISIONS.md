@@ -592,3 +592,12 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **Saroh doesn't choose or restrict payment methods.** The provider's window shows the methods the business has switched on in its Razorpay or Cashfree account. Saroh's copy names no methods it can't vouch for: at most, it shows methods the provider reports as switched on for that account.
 - Consequences: Razorpay's UPI-and-card-only display block is removed. "UPI or card" becomes neutral copy, such as "Pay online in the ‹Razorpay› window", unless the provider reports the account's methods.
 - Migration: none.
+
+## DEC-060 Three small calls on customers and orders (2026-09-28)
+
+**Status: Accepted — 2026-09-28** · round-2 plans B (B15, B13) and F (F10, F12)
+
+- **A Member sees a customer's email on an order.** On the order read and the quick view, `contact:read` alone shows the customer's own phone and email, the same as on the list's rows. Without it, neither is shown, as review #19 set; the delivery phone is always shown.
+- **Onboarding's "Registered" saves no business type.** It used to save `company`, which Settings reads as Private limited, so an LLP or partnership was mislabelled. The business picks its real type in Settings. F12's go-live checklist nudges for it until one is set.
+- **A walk-in who gives a phone is a customer.** A name-only walk-in stays a walk-in, with no customer and no contact. With a phone, the order is made for a customer found by that phone, or one created and linked (DEC-045 is amended). This lets their history, duplicate matching and a privacy removal reach them.
+- Migration: none.

@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { showSuccess } from "@saroh/ui/toast";
 import { useRef, useState } from "react";
 
 import { useImageUpload } from "@/components/sites/media-picker";
@@ -31,7 +30,8 @@ export function BusinessLogoRow({
     /** The business name, for the initial when there is no logo. */
     name: string;
     canEdit: boolean;
-    onSaved: (settings: OrganizationSettings) => void;
+    /** Saved: the settings now, and what to say (the screen offers Undo). */
+    onSaved: (settings: OrganizationSettings, said: string) => void;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const {
@@ -65,8 +65,10 @@ export function BusinessLogoRow({
             setError(result.error);
             return;
         }
-        onSaved(result.data);
-        showSuccess("Logo saved — it prints on your invoices and receipts");
+        onSaved(
+            result.data,
+            "Logo saved — it prints on your invoices and receipts",
+        );
     }
 
     async function remove() {
@@ -78,8 +80,7 @@ export function BusinessLogoRow({
             setError(result.error);
             return;
         }
-        onSaved(result.data);
-        showSuccess("Logo removed");
+        onSaved(result.data, "Logo removed");
     }
 
     const pickLabel = busy ? "Uploading…" : logoUrl ? "Replace" : "Upload logo";
