@@ -34,6 +34,7 @@ import type {
     BookingPageData,
     BookingStart,
     BookingWhere,
+    BookPay,
     BookResult,
     HoldView,
 } from "./model";
@@ -41,7 +42,10 @@ import {
     asksWhere,
     dateIn,
     dateText,
+    depositUnpayable,
     formatMoney,
+    payChoices,
+    restAfterDeposit,
     rulesText,
     timeIn,
     whereText,
@@ -161,7 +165,7 @@ export default function BookingFlow({
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
     const [note, setNote] = useState("");
     const [touched, setTouched] = useState(false);
-    const [payChoice, setPayChoice] = useState<"NOW" | "DESK" | null>(null);
+    const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -263,7 +267,7 @@ export default function BookingFlow({
         }
         setStart(next);
     };
-    const pickPay = (next: "NOW" | "DESK") => {
+    const pickPay = (next: BookPay) => {
         if (next !== pay) attemptKey.current = null;
         setPayChoice(next);
     };
@@ -298,16 +302,20 @@ export default function BookingFlow({
     const price = service
         ? formatMoney(service.priceCents, service.currency)
         : null;
-    const canPayNow =
-        page.payOnline && !!service?.priceCents && service.priceCents > 0;
-    const pay: "NOW" | "DESK" =
-        payChoice === "NOW" && canPayNow
-            ? "NOW"
-            : payChoice === "DESK"
-              ? "DESK"
-              : canPayNow
-                ? "NOW"
-                : "DESK";
+    // The ways this service may be paid (E8): the one chosen, else the
+    // first — and a service that takes a deposit is never at the desk.
+    const choices = service
+        ? payChoices(service, page.payOnline, page.businessName)
+        : [];
+    const chosenPay =
+        choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
+    const pay: BookPay = chosenPay?.pay ?? "DESK";
+    const takesDeposit = (service?.depositCents ?? 0) > 0;
+    /** What leaves their account at booking: the deposit or the price. */
+    const payingNow = chosenPay?.amount ?? price ?? "";
+    /** What is left for the visit once the deposit is paid. */
+    const rest =
+        pay === "DEPOSIT" && service ? restAfterDeposit(service) : null;
 
     const asks = asksWhere(service);
     /** What the booking page asks beyond the time, as the API takes it. */
@@ -324,11 +332,13 @@ export default function BookingFlow({
 
     const block = !service
         ? "Pick what you'd like to book."
-        : !chosenStart
-          ? "Pick a time."
-          : !whoOk
-            ? "Add your name."
-            : "";
+        : depositUnpayable(service, page.payOnline)
+          ? `${page.businessName} can't take the deposit online right now. Get in touch with them to book.`
+          : !chosenStart
+            ? "Pick a time."
+            : !whoOk
+              ? "Add your name."
+              : "";
 
     const whenText = chosenStart
         ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeIn(chosenStart.startAt, zone)}${
@@ -337,20 +347,32 @@ export default function BookingFlow({
         : "";
 
     const dueLabel =
-        pay === "NOW" ? "To pay now" : price ? "Pay at the desk" : "To pay";
-    const due = price ?? formatMoney(0, service?.currency ?? "INR") ?? "₹0";
+        pay === "DEPOSIT"
+            ? "Deposit now"
+            : pay === "NOW"
+              ? "To pay now"
+              : price
+                ? "Pay at the desk"
+                : "To pay";
+    const due =
+        chosenPay?.amount ??
+        price ??
+        formatMoney(0, service?.currency ?? "INR") ??
+        "₹0";
     // Not signed in yet, the last step is signing in (A9, the Customer Site
     // design's "Continue to sign in"); the booking follows the code.
     const confirmLabel = !customer
         ? "Continue to sign in"
-        : pay === "NOW"
-          ? `Pay ${price ?? ""} and book`
-          : price
-            ? "Book — pay at the desk"
-            : "Book";
+        : pay === "DEPOSIT"
+          ? `Pay ${payingNow} deposit and book`
+          : pay === "NOW"
+            ? `Pay ${price ?? ""} and book`
+            : price
+              ? "Book — pay at the desk"
+              : "Book";
     const barLabel = !customer
         ? "Continue to sign in"
-        : pay === "NOW"
+        : pay === "NOW" || pay === "DEPOSIT"
           ? "Pay and book"
           : "Book";
     const rules = rulesText(page.rules);
@@ -402,6 +424,7 @@ export default function BookingFlow({
                                 : p.booking,
                             paid: true,
                             price: p.price,
+                            rest: p.rest ?? null,
                             when: p.when,
                             first: bookerFirst,
                         };
@@ -546,7 +569,8 @@ export default function BookingFlow({
                 handoff: null,
                 payError: null,
                 when: whenText,
-                price: price ?? "",
+                price: payingNow,
+                rest,
             });
             const started = await startPayment(apiUrl, token, newKey());
             setPhase((p) =>
@@ -570,6 +594,7 @@ export default function BookingFlow({
             booking,
             paid: false,
             price,
+            rest: null,
             when: whenText,
             first: firstName,
         });
@@ -600,6 +625,7 @@ export default function BookingFlow({
                         : held.booking,
                     paid: true,
                     price: held.price,
+                    rest: held.rest ?? null,
                     when: held.when,
                     first: bookerFirst,
                 });
@@ -649,6 +675,7 @@ export default function BookingFlow({
                     booking: result.value,
                     paid: false,
                     price,
+                    rest: null,
                     when: held.when,
                     first: bookerFirst,
                 });
@@ -773,7 +800,12 @@ export default function BookingFlow({
                                 email: customer?.email ?? "",
                             }}
                             busy={leaving}
-                            onDesk={() => void leaveHold("desk")}
+                            // A deposit is never paid at the desk (E8).
+                            onDesk={
+                                takesDeposit
+                                    ? undefined
+                                    : () => void leaveHold("desk")
+                            }
                             onBack={() => void leaveHold("choose")}
                             onPaid={() =>
                                 setPhase((p) =>
@@ -850,12 +882,10 @@ export default function BookingFlow({
                                 />
                             ) : null}
 
-                            {chosenStart && whoOk && price ? (
+                            {chosenStart && whoOk && choices.length > 0 ? (
                                 <PayStep
-                                    canPayNow={canPayNow}
+                                    choices={choices}
                                     pay={pay}
-                                    price={price}
-                                    isClass={isClass}
                                     onPick={pickPay}
                                 />
                             ) : null}

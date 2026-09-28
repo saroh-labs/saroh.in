@@ -18,7 +18,10 @@ export type Phase =
           handoff: PaymentHandoff | null;
           payError: string | null;
           when: string;
+          /** What is being paid now: the price, or only the deposit (E8). */
           price: string;
+          /** What is left for the visit when only the deposit is paid. */
+          rest?: string | null;
           /**
            * The provider's window closed on a payment (E11). Only a hint:
            * the webhook confirms the booking. If the hold runs out anyway,
@@ -32,6 +35,8 @@ export type Phase =
           booking: BookResult;
           paid: boolean;
           price: string | null;
+          /** Paid a deposit: what is left for the visit (E8). */
+          rest?: string | null;
           when: string;
           first: string;
       };

@@ -20,6 +20,12 @@ export interface BookingService {
     capacity: number;
     priceCents: number | null;
     currency: string | null;
+    /**
+     * What paying the deposit takes at booking (E8), worked out by the
+     * server, or null when the service takes none. Absent from an API
+     * older than the page: no deposit.
+     */
+    depositCents?: number | null;
     /** Online only. */
     online: boolean;
     /**
@@ -123,6 +129,7 @@ function isService(v: unknown): v is BookingService {
         isNum(v.capacity) &&
         numOrNull(v.priceCents) &&
         strOrNull(v.currency) &&
+        (v.depositCents === undefined || numOrNull(v.depositCents)) &&
         typeof v.online === "boolean" &&
         (v.where === undefined ||
             v.where === "IN_PERSON" ||
@@ -241,6 +248,97 @@ export function whereText(
         return whereLabel("ONLINE", business);
     }
     return whereLabel("IN_PERSON", business);
+}
+
+// ── Paying at booking (U19, E8) ──────────────────────────────────────────
+
+/** How the booker pays: it all now, the deposit now, or at the desk. */
+export type BookPay = "NOW" | "DEPOSIT" | "DESK";
+
+/** One way to pay, as the pay step offers it. */
+export interface PayChoice {
+    pay: BookPay;
+    label: string;
+    sub: string;
+    /** What it takes at booking, in words: "₹400". */
+    amount: string;
+}
+
+/**
+ * The ways a service can be paid for, in the order the pay step lists
+ * them (the Kavi Dental and Pulse Fitness designs). A service with a
+ * deposit is paid online — its deposit, or the whole price — and never at
+ * the desk; one whose deposit is the full price is simply paid now.
+ * Without a deposit: now, when the business takes money online, or at the
+ * desk. None when a deposit is asked for and the business can't take it
+ * online, and none for a service with no price.
+ */
+export function payChoices(
+    service: BookingService,
+    payOnline: boolean,
+    business: string,
+): PayChoice[] {
+    const price = formatMoney(service.priceCents, service.currency);
+    if (!price || !service.priceCents || service.priceCents <= 0) return [];
+    const isClass = service.kind === "class";
+    const place = isClass ? "place" : "appointment";
+    const payNow: PayChoice = {
+        pay: "NOW",
+        label: isClass ? `Pay ${price} for this class` : `Pay ${price} now`,
+        sub: `UPI or card — your ${place} is confirmed straight away`,
+        amount: price,
+    };
+    const deposit = service.depositCents ?? null;
+    if (deposit !== null && deposit > 0) {
+        if (!payOnline) return [];
+        if (deposit >= service.priceCents) return [payNow];
+        const part = formatMoney(deposit, service.currency) ?? "";
+        const rest = restAfterDeposit(service) ?? "";
+        return [
+            {
+                pay: "DEPOSIT",
+                label: `Pay ${part} deposit now`,
+                sub: `The rest (${rest}) at ${business}. Refunded if you cancel in time.`,
+                amount: part,
+            },
+            {
+                ...payNow,
+                label: `Pay the full ${price} now`,
+                sub: "UPI or card",
+            },
+        ];
+    }
+    const desk: PayChoice = {
+        pay: "DESK",
+        label: "Pay at the desk",
+        sub: "Held for you; pay when you arrive",
+        amount: price,
+    };
+    return payOnline ? [payNow, desk] : [desk];
+}
+
+/** A deposit is asked for, and there is no way to pay it here (E8). */
+export function depositUnpayable(
+    service: BookingService | null,
+    payOnline: boolean,
+): boolean {
+    return (
+        !!service &&
+        !payOnline &&
+        (service.depositCents ?? null) !== null &&
+        (service.depositCents ?? 0) > 0
+    );
+}
+
+/**
+ * What is left to pay at the visit after the deposit (E8): "₹400", or null
+ * when nothing is.
+ */
+export function restAfterDeposit(service: BookingService): string | null {
+    const deposit = service.depositCents ?? null;
+    if (deposit === null || !service.priceCents) return null;
+    if (deposit >= service.priceCents) return null;
+    return formatMoney(service.priceCents - deposit, service.currency);
 }
 
 // ── Words and numbers ────────────────────────────────────────────────────

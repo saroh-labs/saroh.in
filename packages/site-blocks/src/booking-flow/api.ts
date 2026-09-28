@@ -1,4 +1,10 @@
-import type { BookingDays, BookingWhere, BookResult, HoldView } from "./model";
+import type {
+    BookingDays,
+    BookingWhere,
+    BookPay,
+    BookResult,
+    HoldView,
+} from "./model";
 import { isBookingDays, isHoldView } from "./model";
 
 /**
@@ -142,7 +148,8 @@ export interface SignedInBookRequest {
     bookerName?: string;
     idempotencyKey: string;
     staffId?: string;
-    pay: "NOW" | "DESK";
+    /** Pay it all now, only the deposit now (E8), or at the desk. */
+    pay: BookPay;
     /** The answer to Where, for a service offered either way (E7). */
     locationType?: BookingWhere;
     /** "Anything we should know?" (E7), when they wrote something. */

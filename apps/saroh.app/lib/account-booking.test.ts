@@ -45,6 +45,12 @@ describe("accountBookingBody", () => {
         expect(body).toEqual(REQUEST);
     });
 
+    it("forwards paying a deposit (E8), never an amount", () => {
+        expect(
+            accountBookingBody({ ...REQUEST, pay: "DEPOSIT", amount: 400 }),
+        ).toEqual({ ...REQUEST, pay: "DEPOSIT" });
+    });
+
     it("refuses a request that isn't one", () => {
         expect(accountBookingBody(null)).toBeNull();
         expect(accountBookingBody("book")).toBeNull();

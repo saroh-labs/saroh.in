@@ -1808,3 +1808,180 @@ describe("sign-in at the last step (A9)", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("a deposit at booking (E8)", () => {
+    /** Personal training taking a 50% deposit: ₹600 of ₹1,200. */
+    const DEPOSIT_PAGE: BookingPageData = {
+        ...PAGE,
+        services: [{ ...PAGE.services[0], depositCents: 60_000 }],
+    };
+
+    function serveDeposit(intent: () => Response) {
+        const hold = { state: "HELD" };
+        serve((url) => {
+            if (url.endsWith("/days")) return json(ONE_DAYS);
+            if (url.endsWith("/book")) {
+                return json(
+                    booked({
+                        state: "HELD",
+                        holdExpiresAt: "2026-09-18T04:15:00.000Z",
+                        payToken: "tok_1",
+                    }),
+                    201,
+                );
+            }
+            if (url.endsWith("/payment-intent")) return intent();
+            return json({ state: hold.state, holdExpiresAt: null });
+        });
+        return hold;
+    }
+
+    it("offers the deposit or the full price, never the desk, and says what is due now", async () => {
+        serveDeposit(() => json({}, 500));
+        render(
+            <BookingFlow
+                page={DEPOSIT_PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay ₹600 deposit now The rest (₹600) at Pulse Fitness. Refunded if you cancel in time.",
+            }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay the full ₹1,200 now UPI or card",
+            }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: /at the desk/ })).toBeNull();
+        expect(screen.getByText("Deposit now")).toBeInTheDocument();
+        expect(screen.getByText("₹600")).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("radio", {
+                name: "Pay the full ₹1,200 now UPI or card",
+            }),
+        );
+        expect(
+            screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
+        ).toBeInTheDocument();
+    });
+
+    it("pays the deposit: sends DEPOSIT and no amount, and confirms with the rest due", async () => {
+        const hold = serveDeposit(() =>
+            json({
+                paymentIntentId: "pi_1",
+                provider: "RAZORPAY",
+                providerIntentId: "order_1",
+                amountCents: 60_000,
+                currency: "INR",
+                publicKey: null,
+                clientParams: {},
+            }),
+        );
+        render(
+            <BookingFlow
+                page={DEPOSIT_PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹600 deposit and book" }),
+        );
+        expect(
+            await screen.findByRole("heading", {
+                name: "Pay ₹600 to confirm your place",
+            }),
+        ).toBeInTheDocument();
+        const sent = JSON.parse(
+            calls.find((c) => c.url.endsWith("/book"))?.init?.body as string,
+        ) as Record<string, unknown>;
+        expect(sent.pay).toBe("DEPOSIT");
+        expect(sent).not.toHaveProperty("amount");
+
+        hold.state = "CONFIRMED";
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(4_500);
+        });
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "You're booked, Asha." }),
+            ).toBeInTheDocument(),
+        );
+        expect(
+            screen.getByText(
+                "Paid a ₹600 deposit. The rest (₹600) is paid at Pulse Fitness.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("a payment that can't start offers no desk booking for a deposit", async () => {
+        serveDeposit(() => json({}, 500));
+        render(
+            <BookingFlow
+                page={DEPOSIT_PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Pay ₹600 deposit and book" }),
+        );
+        expect(
+            await screen.findByRole("button", { name: "Pick another time" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", {
+                name: "Book it to pay at the desk",
+            }),
+        ).toBeNull();
+    });
+
+    it("a full-price deposit is paying now, with no other way", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={{
+                    ...PAGE,
+                    services: [{ ...PAGE.services[0], depositCents: 120_000 }],
+                }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const group = screen.getByRole("radiogroup", { name: "Paying" });
+        expect(within(group).getAllByRole("radio")).toHaveLength(1);
+        expect(
+            within(group).getByRole("radio", { name: /^Pay ₹1,200 now/ }),
+        ).toBeInTheDocument();
+    });
+
+    it("a business that can't take the deposit online says so, and books nothing", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={{ ...DEPOSIT_PAGE, payOnline: false }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        );
+        expect(
+            await screen.findByText(
+                "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
+        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
+    });
+});

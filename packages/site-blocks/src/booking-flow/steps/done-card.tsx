@@ -44,7 +44,9 @@ export function DoneCard({
         URL.revokeObjectURL(url);
     };
     const payText = phase.paid
-        ? `Paid ${phase.price ?? ""} online.`
+        ? phase.rest
+            ? `Paid a ${phase.price ?? ""} deposit. The rest (${phase.rest}) is paid at ${business}.`
+            : `Paid ${phase.price ?? ""} online.`
         : phase.price
           ? `Pay ${phase.price} at the front desk when you arrive.`
           : "Nothing to pay in advance.";

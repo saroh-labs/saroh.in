@@ -1,48 +1,37 @@
+import type { BookPay, PayChoice } from "../model";
 import { card } from "../styles";
 import { PayOption } from "./pay-option";
 import { StepHead } from "./step-head";
 
 /**
  * Step 4: how they pay — now, through the business's own provider (UPI or
- * card, E11), or at the desk. Pay now is offered only when the business has
- * a provider connected. The words are the designs': a class is "for this
- * class", an appointment is paid "now" (Pulse Fitness, Kavi Dental).
+ * card, E11), the deposit now and the rest at the visit (E8), or at the
+ * desk. The choices and their words come from `payChoices`: a class is
+ * "for this class", an appointment is paid "now", and a service that takes
+ * a deposit is never paid at the desk (Pulse Fitness, Kavi Dental).
  */
 export function PayStep({
-    canPayNow,
+    choices,
     pay,
-    price,
-    isClass,
     onPick,
 }: {
-    canPayNow: boolean;
-    pay: "NOW" | "DESK";
-    price: string;
-    isClass: boolean;
-    onPick: (pay: "NOW" | "DESK") => void;
+    choices: PayChoice[];
+    pay: BookPay;
+    onPick: (pay: BookPay) => void;
 }) {
     return (
         <div className={card}>
             <StepHead n={4} title="Paying" />
             <div role="radiogroup" aria-label="Paying" className="grid gap-2">
-                {canPayNow ? (
+                {choices.map((choice) => (
                     <PayOption
-                        on={pay === "NOW"}
-                        label={
-                            isClass
-                                ? `Pay ${price} for this class`
-                                : `Pay ${price} now`
-                        }
-                        sub={`UPI or card — your ${isClass ? "place" : "appointment"} is confirmed straight away`}
-                        onPick={() => onPick("NOW")}
+                        key={choice.pay}
+                        on={pay === choice.pay}
+                        label={choice.label}
+                        sub={choice.sub}
+                        onPick={() => onPick(choice.pay)}
                     />
-                ) : null}
-                <PayOption
-                    on={pay === "DESK"}
-                    label="Pay at the desk"
-                    sub="Held for you; pay when you arrive"
-                    onPick={() => onPick("DESK")}
-                />
+                ))}
             </div>
         </div>
     );
