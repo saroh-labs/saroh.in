@@ -16,7 +16,10 @@ type CardService = Pick<
     | "bufferAfterMinutes"
     | "capacity"
     | "locationType"
->;
+> & {
+    /** Visits one booking of it is (E10); absent reads as one. */
+    visits?: number;
+};
 
 /**
  * Beside the heading: how many the booking page offers and how many are
@@ -38,10 +41,16 @@ export function servicesSummary(
     return paused ? `${head} · ${paused} paused` : head;
 }
 
-/** "60 min · 15 min gap after · Online · 12 places". */
+/**
+ * "60 min · 15 min gap after · Online · 12 places"; a treatment (E10)
+ * "3 visits of 60 min · …".
+ */
 export function lengthLine(service: CardService): string {
+    const visits = service.visits ?? 1;
     const parts = [
-        `${service.durationMinutes} min`,
+        visits > 1
+            ? `${visits} visits of ${service.durationMinutes} min`
+            : `${service.durationMinutes} min`,
         service.bufferAfterMinutes
             ? `${service.bufferAfterMinutes} min gap after`
             : "no gap after",

@@ -1,3 +1,4 @@
+import { apiFetch, orgBase } from "@/lib/api/http";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
 import type { StaffList } from "@/lib/staff/service";
@@ -35,6 +36,26 @@ export async function readHasBookingPage(): Promise<boolean | null> {
     }
 }
 
+/**
+ * Whether the business has a storefront to sell a treatment from (E10,
+ * DEC-050). Null when it couldn't be told — Sell switched off, a role
+ * that can't read storefronts, or the API down — which leaves the refusal
+ * to the API. Read with a bare fetch: a 403 here is "couldn't tell", never
+ * the page's own forbidden.
+ */
+export async function readHasStorefront(): Promise<boolean | null> {
+    try {
+        const base = await orgBase();
+        if (!base) return null;
+        const res = await apiFetch(`${base}/storefronts`);
+        if (!res.ok) return null;
+        const list: unknown = await res.json();
+        return Array.isArray(list) ? list.length > 0 : null;
+    } catch {
+        return null;
+    }
+}
+
 /** Whether this person may change services (`service:write`). */
 export async function readCanEditServices(): Promise<boolean> {
     const organization = await resolveActiveOrganization();
@@ -52,6 +73,8 @@ export interface EditorContext {
     services: Service[];
     staff: StaffList | null;
     hasPage: boolean | null;
+    /** A storefront to sell treatments from (E10); null when unknown. */
+    hasStorefront: boolean | null;
     canEdit: boolean;
     /** The business's zone: the diary's, else its services', else India. */
     timezone: string;
@@ -62,11 +85,12 @@ export interface EditorContext {
 export async function loadEditorContext(): Promise<
     { ok: true; context: EditorContext } | { ok: false; forbidden: boolean }
 > {
-    const [read, staff, hasPage, canEdit] = await Promise.all([
+    const [read, staff, hasPage, canEdit, hasStorefront] = await Promise.all([
         readServices(),
         readStaffOrNull(),
         readHasBookingPage(),
         readCanEditServices(),
+        readHasStorefront(),
     ]);
     if (!read.ok) return read;
     return {
@@ -75,6 +99,7 @@ export async function loadEditorContext(): Promise<
             services: read.services,
             staff,
             hasPage,
+            hasStorefront,
             canEdit,
             timezone:
                 staff?.timezone ??

@@ -4,9 +4,9 @@
  * the words around it. Pure and client-safe, so the editor and its tests
  * agree.
  *
- * Visits are not here yet: the editor offers them from E10, when the
- * booking page honours them, and saving never sends them, so a service
- * keeps whatever the API holds. "At booking, they pay" arrived with E8.
+ * Visits arrived with E10, when the booking page honours them: a
+ * one-to-one service of more than one visit is a treatment, sold as one
+ * order. "At booking, they pay" arrived with E8.
  */
 
 import { formatMoney } from "@/lib/format/money";
@@ -22,6 +22,10 @@ import type {
 import type { ServiceUsage } from "./usage";
 
 export type ServiceKind = "one" | "class";
+
+/** The API's refusal of a treatment with no storefront (E10, DEC-050). */
+export const TREATMENT_NEEDS_STOREFRONT =
+    "Treatments are sold as orders — add a storefront first.";
 
 /**
  * Whether a service needs its meeting link: when it happens online, or the
@@ -40,6 +44,8 @@ export interface ServiceDraft {
     // Time, and where
     minutes: string;
     gap: string;
+    /** Visits one booking of it is, 1 to 12 (E10); one-to-one only. */
+    visits: string;
     places: string;
     where: LocationType;
     meetingUrl: string;
@@ -120,6 +126,7 @@ export function draftOf(
             kind: "one",
             minutes: "30",
             gap: "10",
+            visits: "1",
             places: "",
             where: "IN_PERSON",
             meetingUrl: "",
@@ -141,6 +148,7 @@ export function draftOf(
         kind: isClass ? "class" : "one",
         minutes: String(service.durationMinutes),
         gap: String(service.bufferAfterMinutes),
+        visits: String(isClass ? 1 : Math.max(1, service.visits)),
         places: isClass ? String(service.capacity) : "",
         where: service.locationType,
         meetingUrl: service.meetingUrl ?? "",
@@ -172,6 +180,8 @@ function isHttps(link: string): boolean {
 export function serviceProblems(
     draft: ServiceDraft,
     hasStaff: boolean,
+    /** No storefront to sell a treatment from (E10). */
+    noStorefront = false,
 ): string[] {
     const problems: string[] = [];
     if (!draft.name.trim()) problems.push("Add a name.");
@@ -183,6 +193,14 @@ export function serviceProblems(
     }
     if (!(strictWhole(draft.gap) <= 1440)) {
         problems.push("The gap after has to be a number of minutes.");
+    }
+    if (draft.kind === "one") {
+        const visits = strictWhole(draft.visits);
+        if (!(visits >= 1 && visits <= 12)) {
+            problems.push("Visits has to be between 1 and 12.");
+        } else if (visits > 1 && noStorefront) {
+            problems.push(TREATMENT_NEEDS_STOREFRONT);
+        }
     }
     if (draft.kind === "class" && !(strictWhole(draft.places) >= 2)) {
         problems.push("A class needs at least 2 places.");
@@ -219,10 +237,16 @@ export function serviceProblems(
     return problems;
 }
 
+/** How many visits the draft is: one for a class, else as typed (1–12). */
+export function draftVisits(draft: Pick<ServiceDraft, "kind" | "visits">) {
+    if (draft.kind === "class") return 1;
+    return Math.min(12, Math.max(1, wholeNumber(draft.visits) || 1));
+}
+
 /**
- * What saving sends. Never visits (E10 adds them), and the link only for a
- * service that can happen online. The deposit is its mode; the amount is
- * always the server's (E8).
+ * What saving sends: the visits (E10; a class is always one), and the link
+ * only for a service that can happen online. The deposit is its mode; the
+ * amount is always the server's (E8).
  */
 export function serviceInput(
     draft: ServiceDraft,
@@ -246,6 +270,7 @@ export function serviceInput(
         meetingUrl: online ? draft.meetingUrl.trim() : null,
         showOnBookingPage: draft.showOnBookingPage,
         depositMode: draft.deposit,
+        visits: draftVisits(draft),
     };
 }
 
@@ -263,7 +288,7 @@ export function serviceUpdate(
 /** The editor's sections, as the leave dialog names them. */
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
-    ["Time", ["minutes", "gap", "places", "where", "meetingUrl"]],
+    ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
     ["Price", ["price", "deposit"]],
     ["Who takes it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
@@ -354,9 +379,17 @@ export function savedMessage({
 }
 
 /** The note under Time. */
-export function timeNote(kind: ServiceKind, hasStaff: boolean): string {
+export function timeNote(
+    kind: ServiceKind,
+    hasStaff: boolean,
+    visits = 1,
+    minutes = 0,
+): string {
     if (kind === "class")
         return "A class runs at set times; people book a place.";
+    if (visits > 1) {
+        return `${visits} visits of ${minutes || "?"} min, booked one at a time. The order is fulfilled after the last visit.`;
+    }
     return hasStaff
         ? "Fills the free time of whoever takes it, with the gap kept free after."
         : "Books in its own weekly hours, set under More settings, with the gap kept free after.";
@@ -379,6 +412,7 @@ export function depositNote(
     deposit: DepositMode,
     price: string,
     currency: string,
+    visits = 1,
 ): string {
     if (deposit === "NONE") {
         return "No card needed to book. No-shows cost you the slot.";
@@ -390,7 +424,7 @@ export function depositNote(
     const split =
         deposit === "FULL"
             ? `They pay ${money(now)} when booking.`
-            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) at the visit.`;
+            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${visits > 1 ? "over the visits" : "at the visit"}.`;
     return `${split} Refunded if they cancel in time.`;
 }
 
@@ -446,6 +480,26 @@ export function glance(
               : (formatMoney(price, currency) ?? "—");
     const counted = (n: number | undefined) =>
         usage ? String(n ?? 0) : "Couldn't count";
+    // A treatment (E10): its price is for every visit, and so is its time.
+    const visits = draftVisits(draft);
+    if (visits > 1) {
+        const whole = price !== null && !Number.isNaN(price) && price > 0;
+        return [
+            ["Price", whole ? `${priceText} for ${visits} visits` : priceText],
+            ...(whole
+                ? [
+                      [
+                          "Per visit",
+                          formatMoney(Math.round(price / visits), currency) ??
+                              "—",
+                      ] as [string, string],
+                  ]
+                : []),
+            ["Time needed", `${visits} × ${minutes} min`],
+            ["Booked this week", counted(usage?.thisWeek)],
+            ["Still to come", counted(usage?.comingUp)],
+        ];
+    }
     return [
         ["Price", priceText],
         ["Time needed", `${minutes} min + ${gap} min gap`],
