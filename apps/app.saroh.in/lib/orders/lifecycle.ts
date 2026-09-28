@@ -1,7 +1,6 @@
 import type {
     AllergenRef,
     AllergyNote,
-    Fulfilment,
     FulfilmentStep,
     FulfilmentType,
     KitchenStage,
@@ -109,22 +108,9 @@ export const STEP_LABEL: Record<KitchenStage, string> = {
 /**
  * The steps an order passes through, in the words of its type — as the API
  * sends them (`steps`, DEC-045). The app keeps no table of its own.
- *
- * Only an API rolled back to before B2a sends no steps; the order then
- * walks one of the two flows that API knew. Goes with the legacy
- * `fulfilment` word in the contract release (B2d).
  */
-export function stepsOf(
-    order: Pick<OrderRead, "fulfilment"> & {
-        steps?: OrderRead["steps"];
-    },
-): FulfilmentStep[] {
-    if (order.steps?.length) return order.steps;
-    const legacy: KitchenStage[] =
-        order.fulfilment === "DELIVERY"
-            ? ["NEW", "PREPARING", "READY", "HANDED_TO_COURIER", "DELIVERED"]
-            : ["NEW", "PREPARING", "READY", "COLLECTED"];
-    return legacy.map((stage) => ({ stage, label: STAGE_LABEL[stage] }));
+export function stepsOf(order: Pick<OrderRead, "steps">): FulfilmentStep[] {
+    return order.steps;
 }
 
 /** Every stage an order passes through, in order. */
@@ -135,16 +121,15 @@ export function flowOf(order: Parameters<typeof stepsOf>[0]): KitchenStage[] {
 /**
  * Whether the order goes to the customer's address — a local delivery or a
  * shipment — so it has a delivery address and a delivery charge. Read from
- * the type; falls back to the legacy word from an API before B2a.
+ * the type (DEC-045).
  */
 export function goesToAddress(order: {
-    fulfilment: string;
-    fulfilmentType?: FulfilmentType;
+    fulfilmentType: FulfilmentType;
 }): boolean {
-    return order.fulfilmentType
-        ? order.fulfilmentType === "LOCAL_DELIVERY" ||
-              order.fulfilmentType === "SHIPPING"
-        : order.fulfilment === "DELIVERY";
+    return (
+        order.fulfilmentType === "LOCAL_DELIVERY" ||
+        order.fulfilmentType === "SHIPPING"
+    );
 }
 
 /**
@@ -164,8 +149,7 @@ export function kitchenStanding(order: {
 export function isOpen(order: {
     status: OrderStatus;
     stage: KitchenStage;
-    fulfilment: Fulfilment;
-    steps?: OrderRead["steps"];
+    steps: OrderRead["steps"];
     refundStanding: OrderRead["refundStanding"];
 }): boolean {
     if (order.status === "CANCELLED" || order.refundStanding === "REFUNDED") {

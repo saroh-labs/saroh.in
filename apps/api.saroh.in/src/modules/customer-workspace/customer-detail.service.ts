@@ -25,7 +25,7 @@ import {
     OWED_WHERE,
 } from "../invoices/invoice-state";
 import type { FulfilmentType } from "../orders/fulfilment";
-import { legacyWord, shipsToAddress, typeOf } from "../orders/fulfilment";
+import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
@@ -144,9 +144,7 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
-    /** COLLECT or DELIVERY (U6; the legacy word until B2d), and where the kitchen has it. */
-    fulfilment: string;
-    /** How it leaves (DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING… */
+    /** How it leaves (DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING…, and where the kitchen has it. */
     fulfilmentType: FulfilmentType;
     stage: string;
     /** Where a delivery went; null for a collection. */
@@ -933,7 +931,6 @@ export class CustomerDetailService {
                     variant: i.variant?.title ?? null,
                     quantity: i.quantity,
                 })),
-                fulfilment: legacyWord(typeOf(o.fulfilment)),
                 fulfilmentType: typeOf(o.fulfilment),
                 stage: o.stage,
                 delivery: shipsToAddress(typeOf(o.fulfilment))

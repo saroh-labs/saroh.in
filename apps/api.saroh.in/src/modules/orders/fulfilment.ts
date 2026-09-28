@@ -2,12 +2,11 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import type {
     FulfilmentType,
-    LegacyFulfilment,
     OrderFulfilment,
     OrderStage,
     OrderStatus,
 } from "./dto";
-import { FULFILMENT_TYPES, ORDER_FULFILMENTS } from "./dto";
+import { FULFILMENT_TYPES } from "./dto";
 
 /**
  * How an order leaves, and the steps it takes to get there (DEC-045).
@@ -18,32 +17,22 @@ import { FULFILMENT_TYPES, ORDER_FULFILMENTS } from "./dto";
  * already exist (ADR-008's "status values stay"). A step word changes here
  * and nowhere else: the app draws what the API sends, and keeps no copy.
  *
- * The column can still hold the legacy words COLLECT and DELIVERY (an order
- * release 1 wrote while release 2 rolled out, until B2d converts it), so
- * every reader goes through {@link typeOf}; nothing compares the raw enum. The
- * types come in by expand and contract over three releases
+ * Every reader goes through {@link typeOf}; nothing compares the raw enum.
+ * The types came in by expand and contract over three releases
  * (`docs/architecture/ORDER_FULFILMENT_ROLLOUT.md`):
  *
- *   1 · expand (B2a)   values added; writes only COLLECT, DELIVERY and
- *                      today's stages; reads both vocabularies
- *   2 · switch (B2c)   rows backfilled; {@link WRITES_NEW_FULFILMENT_VALUES}
- *                      on; the new types and stages open
+ *   1 · expand (B2a)   values added beside the legacy COLLECT and DELIVERY
+ *   2 · switch (B2c)   rows backfilled; writes and the new types open
  *   3 · contract (B2d) COLLECT and DELIVERY dropped
+ *                      (`20261013100000_order_fulfilment_contract`)
+ *
+ * What stays of the old way is a stage, not a value: a local delivery
+ * handed to a courier before the switch keeps HANDED_TO_COURIER and moves
+ * on from it (the legacy move below).
  */
 
 export { FULFILMENT_TYPES } from "./dto";
-export type { FulfilmentType, LegacyFulfilment } from "./dto";
-
-/**
- * The write switch. Off in release 1: create, edit and the kitchen stored
- * only the values the image before it could read. On from release 2 (B2c),
- * whose migration (`20261011160000_order_fulfilment_switch`) rewrites every
- * row first: every write is a type's own name, a local delivery goes out for
- * delivery, and Shipping and Digital can be created. Rolling back is
- * deploying release 1's tag, which reads all of it. A constant, not an
- * environment flag: it must follow the migration, not the environment.
- */
-export const WRITES_NEW_FULFILMENT_VALUES = true;
+export type { FulfilmentType } from "./dto";
 
 /** The ways a storefront itself offers; the rest follow the product. */
 export const STOREFRONT_FULFILMENT_TYPES = [
@@ -177,9 +166,9 @@ export const FULFILMENT_RULES: Readonly<Record<FulfilmentType, TypeRule>> = {
                 fromStatus: "SHIPPED",
                 toStatus: "DELIVERED",
             },
-            // Legacy: a delivery already with a courier on switch day moves
-            // on from where it is. Never offered from READY once the switch
-            // is on, and kept after B2d — old orders keep their stage.
+            // Legacy: a delivery already with a courier on switch day (B2c)
+            // moves on from where it is. Never offered from READY, and kept
+            // for good (B2d too) — old orders keep their stage.
             {
                 from: "HANDED_TO_COURIER",
                 to: "DELIVERED",
@@ -271,31 +260,17 @@ export const FULFILMENT_RULES: Readonly<Record<FulfilmentType, TypeRule>> = {
     },
 };
 
-const LEGACY_TYPE: Readonly<Record<LegacyFulfilment, FulfilmentType>> = {
-    COLLECT: "PICKUP",
-    DELIVERY: "LOCAL_DELIVERY",
-};
-
 const isType = (v: string): v is FulfilmentType =>
     (FULFILMENT_TYPES as readonly string[]).includes(v);
 
 /**
- * The type a stored (or sent) value means: COLLECT → PICKUP, DELIVERY →
- * LOCAL_DELIVERY, a type as itself. Anything else is a bug, not a guess.
+ * The type a stored (or sent) value is. Since the contract release (B2d)
+ * the column holds only the six types, so the legacy words COLLECT and
+ * DELIVERY are unknown here like anything else: a bug, not a guess.
  */
 export function typeOf(stored: string): FulfilmentType {
-    if (stored in LEGACY_TYPE) return LEGACY_TYPE[stored as LegacyFulfilment];
     if (isType(stored)) return stored;
     throw new Error(`Unknown order fulfilment: ${stored}`);
-}
-
-/**
- * The legacy word for a type, for the `fulfilment` field an app built
- * before B2a reads: whatever goes to an address is DELIVERY, the rest
- * COLLECT. Sent beside `fulfilmentType` until the contract release.
- */
-export function legacyWord(type: FulfilmentType): LegacyFulfilment {
-    return shipsToAddress(type) ? "DELIVERY" : "COLLECT";
 }
 
 /**
@@ -307,65 +282,39 @@ export function shipsToAddress(type: FulfilmentType): boolean {
 }
 
 /**
- * What a create or an edit stores for a type. With the switch on, the type
- * itself, except an appointment: it is made by booking it and finished by
- * its visits (E9 writes it), never typed into an order. With the switch
- * off, only the two types a legacy word names can be written, and they are
- * written in that word; the rest are refused.
+ * What a create or an edit stores for a type: the type itself, except an
+ * appointment, which is made by booking it and finished by its visits (E9
+ * writes it), never typed into an order.
  */
-export function storedValueFor(
-    type: FulfilmentType,
-    writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
-): OrderFulfilment {
-    if (writesNew && FULFILMENT_RULES[type].visits) {
+export function storedValueFor(type: FulfilmentType): OrderFulfilment {
+    if (FULFILMENT_RULES[type].visits) {
         throw new BadRequestException({
             message:
                 "An appointment is made by booking it, not by adding an order.",
             field: "fulfilment",
         });
     }
-    if (writesNew) return type;
-    if (type === "PICKUP" || type === "LOCAL_DELIVERY") return legacyWord(type);
-    throw new BadRequestException({
-        message: `${FULFILMENT_RULES[type].label} isn't available yet.`,
-        field: "fulfilment",
-    });
+    return type;
 }
 
-/**
- * The moves a type makes now. With the switch off a local delivery is still
- * handed over as today (READY → HANDED_TO_COURIER); moves OUT of the new
- * stages stay, so an order written by the switch release still moves on.
- */
-export function movesFor(
-    type: FulfilmentType,
-    writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
-): readonly StageMove[] {
-    const moves = FULFILMENT_RULES[type].moves;
-    if (writesNew || type !== "LOCAL_DELIVERY") return moves;
-    return moves.map((m) =>
-        m.from === "READY" && m.to === "OUT_FOR_DELIVERY"
-            ? { ...m, to: "HANDED_TO_COURIER" as const }
-            : m,
-    );
+/** The moves a type makes. */
+export function movesFor(type: FulfilmentType): readonly StageMove[] {
+    return FULFILMENT_RULES[type].moves;
 }
 
 /**
  * The steps an order of this type shows, at this stage. A local delivery
- * handed to a courier the old way (or, before the switch, about to be)
- * shows "Handed to courier" where "Out for delivery" would be, so the step
- * it is at, or is offered next, is on the list.
+ * handed to a courier the old way (before the switch release) shows
+ * "Handed to courier" where "Out for delivery" would be, so the step it is
+ * at is on the list.
  */
 export function stepsFor(
     type: FulfilmentType,
     stage: OrderStage,
-    writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
 ): FulfilmentStep[] {
     const steps = [...FULFILMENT_RULES[type].steps];
     const legacyHandover =
-        type === "LOCAL_DELIVERY" &&
-        (stage === "HANDED_TO_COURIER" ||
-            (!writesNew && stage !== "OUT_FOR_DELIVERY"));
+        type === "LOCAL_DELIVERY" && stage === "HANDED_TO_COURIER";
     return legacyHandover
         ? steps.map((s): FulfilmentStep =>
               s.stage === "OUT_FOR_DELIVERY"
@@ -398,8 +347,8 @@ export function isHandedOver(type: FulfilmentType, stage: OrderStage): boolean {
 
 /**
  * Whether the order goes by courier, at the stage it is at: its steps have a
- * "Handed to courier". A shipment does; so does a local delivery before the
- * switch release, or one handed over the old way after it. A pick-up, a
+ * "Handed to courier". A shipment does; so does a local delivery handed
+ * over the old way, before the switch release. A pick-up, a
  * digital order and an appointment never do. Its courier's name and tracking
  * number belong to that step (DEC-045).
  */
@@ -411,8 +360,6 @@ export function goesByCourier(stored: string, stage: OrderStage): boolean {
 
 /** What every order read answers about how it leaves. */
 export interface FulfilmentView {
-    /** The legacy word (COLLECT or DELIVERY), until B2d. */
-    fulfilment: LegacyFulfilment;
     fulfilmentType: FulfilmentType;
     /** "Pick-up", "Local delivery"… */
     fulfilmentLabel: string;
@@ -430,7 +377,6 @@ export function fulfilmentView(
     const type = typeOf(stored);
     const steps = stepsFor(type, stage);
     return {
-        fulfilment: legacyWord(type),
         fulfilmentType: type,
         fulfilmentLabel: FULFILMENT_RULES[type].label,
         steps,
@@ -440,9 +386,8 @@ export function fulfilmentView(
 }
 
 /**
- * A stored list read as the storefront's ways, in table order: a legacy
- * word is read as its type, and anything that isn't a storefront's own way
- * is left out.
+ * A stored list read as the storefront's ways, in table order: anything
+ * that isn't a storefront's own way is left out.
  *
  * Given the row's two toggles, an empty list is read from them instead
  * (O-3): the image before B2a, still serving while the migration deploys,
@@ -503,10 +448,9 @@ const isProductType = (t: FulfilmentType): t is ProductFulfilmentType =>
     (PRODUCT_FULFILMENT_TYPES as readonly string[]).includes(t);
 
 /**
- * A product's stored list, as its ways in table order: a legacy word is
- * read as its type (the column never holds one, but a reader never
- * compares the raw enum), and anything a product can't be set to is left
- * out. Empty stays empty: every way its storefronts offer.
+ * A product's stored list, as its ways in table order: anything a product
+ * can't be set to is left out. Empty stays empty: every way its storefronts
+ * offer.
  */
 export function productTypesOf(
     stored: readonly string[],
@@ -583,13 +527,12 @@ export function assertItemsAllow(
 }
 
 /**
- * The stored values a filter by type matches: each type, and its legacy
- * word until the contract release drops it, so Pick-up finds COLLECT
- * orders. Accepts either vocabulary.
+ * The stored values a filter by type matches: each type once, in table
+ * order. Since the contract release (B2d) a type is stored as itself.
  */
 export function storedValuesOf(values: readonly string[]): OrderFulfilment[] {
     const types = new Set(values.map(typeOf));
-    return ORDER_FULFILMENTS.filter((v) => types.has(typeOf(v)));
+    return FULFILMENT_TYPES.filter((v) => types.has(v));
 }
 
 /**
@@ -644,7 +587,7 @@ export interface LateView {
 
 /** The facts the late rule reads from an order. */
 export interface LateFacts {
-    /** The stored fulfilment value, in either vocabulary. */
+    /** The stored fulfilment value. */
     fulfilment: string;
     stage: string;
     status: string;
@@ -693,14 +636,14 @@ export function lateOf(
 
 /**
  * The stored values that are ever late, each with the storefront type whose
- * threshold it reads, under both vocabularies — for a query that judges late
- * in SQL (the Orders list). Digital and appointments are never here.
+ * threshold it reads — for a query that judges late in SQL (the Orders
+ * list). Digital and appointments are never here.
  */
 export function lateStoredValues(): [
     OrderFulfilment,
     StorefrontFulfilmentType,
 ][] {
-    return ORDER_FULFILMENTS.flatMap(
+    return FULFILMENT_TYPES.flatMap(
         (v): [OrderFulfilment, StorefrontFulfilmentType][] => {
             const type = typeOf(v);
             return FULFILMENT_RULES[type].lateAfterMinutes === null

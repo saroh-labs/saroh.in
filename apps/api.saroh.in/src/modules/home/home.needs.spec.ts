@@ -310,7 +310,7 @@ describe("openOrderWords", () => {
         status: "PENDING",
         paymentStatus: "PAID",
         stage: "NEW",
-        fulfilment: "DELIVERY",
+        fulfilment: "LOCAL_DELIVERY",
         ...over,
     });
 
@@ -322,7 +322,7 @@ describe("openOrderWords", () => {
             tone: "bad",
         });
         const collect = order({
-            fulfilment: "COLLECT",
+            fulfilment: "PICKUP",
             createdAt: ago(3 * HOUR),
         });
         expect(openOrderWords(collect, "Anika Rao", NOW, ZONE).tag).toBe(
@@ -339,7 +339,7 @@ describe("openOrderWords", () => {
             tone: "due",
             detail: "Placed today at 08:30",
         });
-        const pickup = order({ fulfilment: "COLLECT", createdAt: ago(HOUR) });
+        const pickup = order({ fulfilment: "PICKUP", createdAt: ago(HOUR) });
         expect(openOrderWords(pickup, "Dev", NOW, ZONE)).toMatchObject({
             headline: "Get order #1042 ready for Dev",
             tag: "Due today",
@@ -388,7 +388,7 @@ describe("openOrderWords", () => {
     });
 
     it("asks for the hand-over once a pick-up is ready", () => {
-        const ready = order({ fulfilment: "COLLECT", stage: "READY" });
+        const ready = order({ fulfilment: "PICKUP", stage: "READY" });
         expect(openOrderWords(ready, "Dev", NOW, ZONE).headline).toBe(
             "Hand over order #1042 to Dev",
         );
@@ -506,7 +506,7 @@ describe("HomeService needs", () => {
         status: "PENDING",
         paymentStatus: "PAID",
         stage: "NEW",
-        fulfilment: "DELIVERY",
+        fulfilment: "LOCAL_DELIVERY",
         store: { settings: null },
         customer: { firstName: "Anika", lastName: "Rao", email: "a@x.in" },
     };

@@ -102,8 +102,8 @@ const DELIVERY = "Delivery";
 
 /** The order's customer and, for a delivery, where it goes. */
 export function orderBillTo(order: OrderForInvoice): BillTo {
-    // A local delivery or a shipment goes to an address (DEC-045); read
-    // through the type, so COLLECT/DELIVERY and the new names agree.
+    // A local delivery or a shipment goes to an address (DEC-045), read
+    // through the type.
     const delivered =
         shipsToAddress(typeOf(order.fulfilment)) && order.deliveryLine1;
     const address = delivered

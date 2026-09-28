@@ -46,9 +46,10 @@ is in production.
 **Why each rollback is safe.** Rolling back release 1 lands on the image
 before it, and release 1 wrote nothing that image can't read. Rolling back
 release 2 lands on release 1, which reads every new value and stage. Rolling
-back release 3 lands on release 2, which writes only values that still exist.
-No release needs the snapshot to roll back; each still takes the usual backup
-before it migrates.
+back release 3 lands on release 2, which writes only values that still exist
+(two of its reads still name COLLECT, so that rollback also gives the type
+its two old values back: see release 3's Rollback). No release needs the
+snapshot to roll back; each still takes the usual backup before it migrates.
 
 ---
 
@@ -391,12 +392,199 @@ before release 3 (the phase-2 waves plan puts B12 ahead of B2d).
 
 ## Release 3 · contract (B2d)
 
-To be filled in by B2d: the contract migration re-runs the backfill for
-stragglers, fails loudly if any COLLECT or DELIVERY remains, builds the new
-type without them, casts `Order.fulfilment`, `StoreSettings.fulfilmentTypes`
-and `Product.fulfilmentTypes` (B12, which ships first) to it, and swaps the
-names. The cast rewrites `Order` under an ACCESS EXCLUSIVE lock: measure how
-long on a production-sized copy and record it here before choosing the
-window.
+**Release 2 (B2c) must be live in production, API and app, for at least one
+release before this one deploys, and B12 must be live too.** B2d ships
+alone, in a PR of its own (CP-B2d in the phase-2 waves plan). Check before
+you start:
 
-- Rollback: deploy the release-2 tag; it writes only values that remain.
+- the API that production serves is release 2 or later: an order created
+  as `LOCAL_DELIVERY` is stored as `LOCAL_DELIVERY`, and a ready one is
+  offered `OUT_FOR_DELIVERY`;
+- release 2's migration and B12's are applied:
+
+    ```sql
+    SELECT migration_name, finished_at FROM "_prisma_migrations"
+    WHERE migration_name IN ('20261011160000_order_fulfilment_switch',
+                             '20261012110000_product_fulfilment_types');
+    -- two rows, both finished
+    ```
+
+- the app in production was built from release 2 or later: it asks the
+  Orders list for `v=2` (B1) and reads `fulfilmentType` and `steps`. No
+  caller of the Orders list reads the bare array, and nothing reads the
+  legacy `fulfilment` word (the release-2 app only fell back to it when an
+  API sent no `steps`).
+- how many stragglers the migration will convert (read-only; expect 0 or a
+  handful):
+
+    ```sql
+    SELECT fulfilment, count(*) FROM "Order"
+    WHERE fulfilment IN ('COLLECT', 'DELIVERY') GROUP BY 1;
+    SELECT count(*) FROM "StoreSettings"
+    WHERE "fulfilmentTypes" && ARRAY['COLLECT', 'DELIVERY']::"OrderFulfilment"[];
+    SELECT count(*) FROM "Product"
+    WHERE "fulfilmentTypes" && ARRAY['COLLECT', 'DELIVERY']::"OrderFulfilment"[];
+    SELECT count(*) FROM "Order";  -- for the timing below
+    ```
+
+### The migration and its locks
+
+`20261013100000_order_fulfilment_contract` is one transaction (`BEGIN` …
+`COMMIT` in the file), so it either all happens or nothing does:
+
+1. `LOCK TABLE "Order", "StoreSettings", "Product" IN ACCESS EXCLUSIVE MODE`
+   — first, so nothing can write a legacy word between the backfill and the
+   cast.
+2. Release 2's backfill again, for stragglers: an order the release-1 image
+   wrote or edited while B2c deployed, or after a rollback to release 1.
+   The two arrays get the same treatment (each value once, in table order),
+   although only the new names were ever stored in them.
+3. A guard that raises, and so rolls everything back, if any COLLECT or
+   DELIVERY survives: "An order, storefront or product still holds COLLECT
+   or DELIVERY after the backfill. Nothing was changed."
+4. Builds `OrderFulfilment_new` without the two, casts `Product`, `Order`
+   and `StoreSettings` to it, renames it over the old type and drops the old
+   one, restoring each column's default (`'PICKUP'`, `'{}'`) — what
+   `prisma migrate diff` writes for a dropped enum value.
+
+| Migration                                  | Locks held until it commits                                                                                                                                                                                                                                                                                            | Time                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261013100000_order_fulfilment_contract` | **ACCESS EXCLUSIVE on `Order`, `StoreSettings` and `Product`** from its first statement: every read and write of an order, a storefront's settings or a product waits — the Orders list, Order Detail, the kitchen, checkout, the product pages. The cast rewrites `Order` and its indexes (and the two small tables). | Measured locally (Postgres 17, `Order` with its 5 indexes). The showcase seed (`db:seed:showcase`, 667 orders, 651 of them put back in the legacy words as stragglers): **70 ms** in all, the `Order` cast 10 ms. The same orders copied to **200,100 (69 MB), 1,000 of them stragglers: 2.44 s** in all, of which the `Order` cast is **2.34 s** and the backfill 52 ms; `migrate deploy` end to end 3.4 s. Linear in the number of orders (about 12 µs a row). |
+
+At today's production size this is milliseconds, and a normal window is
+enough. If production holds more than about 50,000 orders when this ships
+(over half a second with every order read waiting), re-time it on a
+restored copy (as `PRODUCTS_STOCK_ROLLOUT.md` does) and pick a quiet hour:
+checkout and the kitchen stop for the whole cast.
+
+### The deploy window
+
+Between the migration's commit and the new image passing `/health/ready`,
+the release-2 image still serves against the contracted type. Everything it
+writes is a value that remains, and it reads every order, but two of its
+reads still **name** COLLECT beside PICKUP in a Prisma `in` filter
+(`storedValuesOf(["PICKUP"])`), and Postgres refuses a value its type no
+longer has (`invalid input value for enum "OrderFulfilment": "COLLECT"`):
+
+- Home's Today column (pick-ups due today): Home reports "Today"
+  unavailable and shows the rest;
+- `GET …/storefronts/late-rule-notices` answers 500: Orders shows without
+  B17's one-time notice.
+
+Both degrade as designed and heal the moment the new image serves (it names
+only the six types). Checked by running release 2's generated Prisma client
+against a contracted copy. Nothing else in release 2 names a legacy word
+where Postgres reads it as the enum: the Orders list compares
+`fulfilment::text`.
+
+### Checklist
+
+This release **can** go through the automatic push-to-deploy (backup,
+migrate, deploy), once the checks above hold, accepting the window above
+(seconds). Run the checks by hand first, then merge.
+
+1. **Back up** (the host's rollout does it before it migrates).
+2. **Migrate** with the new image: `db:migrate:deploy` applies
+   `20261013100000_order_fulfilment_contract`. If it stops on the guard,
+   nothing changed and the old image keeps serving: find the row with the
+   queries above (a trigger or a write the backfill can't reach), fix it,
+   mark the migration rolled back
+   (`prisma migrate resolve --rolled-back 20261013100000_order_fulfilment_contract`)
+   and deploy again.
+3. **Deploy** the new API image and wait for `/health/ready`.
+4. **Verify** (read-only). Every query must return no rows:
+
+    ```sql
+    -- The type holds the six ways only.
+    SELECT v FROM unnest(enum_range(NULL::"OrderFulfilment")) AS v
+    WHERE v::text NOT IN ('PICKUP', 'LOCAL_DELIVERY', 'SHIPPING', 'DIGITAL',
+                          'APPOINTMENT_IN_PERSON', 'APPOINTMENT_ONLINE');
+
+    -- No old type left behind.
+    SELECT typname FROM pg_type WHERE typname = 'OrderFulfilment_old';
+
+    -- Each column kept its default.
+    SELECT table_name, column_default FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND ((table_name = 'Order' AND column_name = 'fulfilment'
+            AND column_default <> '''PICKUP''::"OrderFulfilment"')
+        OR (table_name IN ('StoreSettings', 'Product')
+            AND column_name = 'fulfilmentTypes'
+            AND column_default <> 'ARRAY[]::"OrderFulfilment"[]'));
+
+    -- As release 2: each new stage only on its own type, and only a
+    -- storefront's own ways on it.
+    SELECT id, fulfilment, stage FROM "Order"
+    WHERE (stage = 'OUT_FOR_DELIVERY' AND fulfilment <> 'LOCAL_DELIVERY')
+       OR (stage = 'SENT' AND fulfilment <> 'DIGITAL');
+    SELECT "storeId" FROM "StoreSettings"
+    WHERE NOT ("fulfilmentTypes" <@ ARRAY['PICKUP', 'LOCAL_DELIVERY', 'SHIPPING']::"OrderFulfilment"[]);
+    SELECT id FROM "Product"
+    WHERE NOT ("fulfilmentTypes" <@ ARRAY['PICKUP', 'LOCAL_DELIVERY', 'SHIPPING', 'DIGITAL']::"OrderFulfilment"[]);
+    ```
+
+    The local deliveries handed to a courier before B2c are still there,
+    and still move on by the legacy step (it is a stage, not a value, and
+    stays for good):
+
+    ```sql
+    SELECT id, stage FROM "Order"
+    WHERE fulfilment = 'LOCAL_DELIVERY' AND stage = 'HANDED_TO_COURIER';
+    ```
+
+5. **Deploy the app** (Vercel) after the API, as always. The release-2 app
+   works against this API (it reads `fulfilmentType` and `steps`, and asks
+   for `v=2`); the new build only drops its fallbacks for an API before B1
+   and B2a.
+
+### What changes for callers
+
+- **The legacy words are refused.** Create and edit
+  (`POST stores/:storeId/orders`, `PATCH organizations/:org/orders/:orderId`)
+  answer 400 "Unknown way to fulfil an order" for COLLECT or DELIVERY; the
+  Orders list answers 400 for `fulfilment=COLLECT` or `DELIVERY`. Only the
+  six types are accepted, and an appointment type is still refused on an
+  order ("An appointment is made by booking it…").
+- **The legacy `fulfilment` field is gone** from the order read (Order
+  Detail), the Orders list rows and the customer page's orders.
+  `fulfilmentType` is the one name.
+- **The Orders list has one shape.** `GET organizations/:org/orders`
+  answers `{ rows, counts, nextCursor }` with or without `v=2`; the bare
+  array for an app before B1 is gone. `v=2` is still accepted (the app
+  sends it); `v=1` is refused with 400.
+- A local delivery handed to a courier before B2c keeps
+  `HANDED_TO_COURIER` and its "Handed to courier" step, and moves on to
+  DELIVERED by the legacy move.
+
+### Rollback
+
+Deploy the release-2 tag. It writes only values that remain and reads every
+order. The two reads in "The deploy window" above keep failing against the
+contracted type, so give the type its two old values back — instant, a
+catalogue change that rewrites nothing:
+
+```sql
+ALTER TYPE "OrderFulfilment" ADD VALUE IF NOT EXISTS 'COLLECT';
+ALTER TYPE "OrderFulfilment" ADD VALUE IF NOT EXISTS 'DELIVERY';
+```
+
+(Checked the same way: release 2's client reads Home's Today and the
+notices again.) The app needs nothing: the release-3 app works against the
+release-2 API. Release 2 never writes either value, so nothing new needs
+converting. To release B2d again afterwards, the migration must run again
+(`migrate deploy` already counts it applied): delete its row from
+`_prisma_migrations` (`WHERE migration_name =
+'20261013100000_order_fulfilment_contract'`), then deploy; it converts
+nothing and drops the two values again.
+
+### Rehearsal (to do before production)
+
+On the development environment: start the release-2 tag against a database
+migrated by this release, and check that Orders, Order Detail and a kitchen
+move work (Home's Today column and the late-rule notice fail, as above).
+Then add the two values back as in Rollback and check that they read again.
+The timings above came from B2d's local run (`saroh-test-r2-b2d-timing`,
+the showcase grown by copying its orders); the migration itself is tested in
+`apps/api.saroh.in/src/modules/orders/order-fulfilment-contract.db.spec.ts`
+(stragglers converted, defaults kept, and the guard aborting with nothing
+changed).

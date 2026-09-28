@@ -32,16 +32,14 @@ const MIN = 60_000;
 const kitchen = new OrderKitchenService();
 const storefronts = new StorefrontsService();
 const availability = {
-    listViews: jest
-        .fn()
-        .mockResolvedValue([
-            {
-                key: "COMMERCE",
-                label: "Sell",
-                readiness: "ACTIVE",
-                blockers: [],
-            },
-        ]),
+    listViews: jest.fn().mockResolvedValue([
+        {
+            key: "COMMERCE",
+            label: "Sell",
+            readiness: "ACTIVE",
+            blockers: [],
+        },
+    ]),
 } as unknown as ModuleAvailabilityService;
 const home = new HomeService(availability, prisma);
 
@@ -58,7 +56,7 @@ const ids: Record<string, string> = {};
 
 async function order(
     storeId: string,
-    fulfilment: "PICKUP" | "COLLECT" | "SHIPPING",
+    fulfilment: "PICKUP" | "SHIPPING",
     minutesAgo: number,
 ): Promise<string> {
     seq += 1;
@@ -121,7 +119,7 @@ beforeAll(async () => {
 
     // Five open orders: Home's Needs you shows up to five, oldest first.
     ids.counterPickup25 = await order(counter, "PICKUP", 25);
-    ids.bakeryPickup25 = await order(bakery, "COLLECT", 25);
+    ids.bakeryPickup25 = await order(bakery, "PICKUP", 25);
     ids.bakeryPickup150 = await order(bakery, "PICKUP", 150);
     ids.counterShipping50h = await order(counter, "SHIPPING", 50 * 60);
     ids.bakeryShipping50h = await order(bakery, "SHIPPING", 50 * 60);

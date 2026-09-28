@@ -449,7 +449,7 @@ function reset(over: Record<string, unknown> = {}) {
         status: "PENDING",
         paymentStatus: "PAID",
         stage: "NEW",
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         currency: "INR",
         subtotal: "360.00",
         tax: "0.00",
@@ -783,7 +783,7 @@ describe("editing before preparing", () => {
 
     it("a delivery needs an address", async () => {
         await expect(
-            kitchen.edit(OWNER, "order_1", { fulfilment: "DELIVERY" }),
+            kitchen.edit(OWNER, "order_1", { fulfilment: "LOCAL_DELIVERY" }),
         ).rejects.toThrow(/needs an address/);
     });
 
@@ -846,7 +846,7 @@ describe("editing before preparing", () => {
 describe("the courier and tracking number (B2b, DEC-045)", () => {
     const withCourier = () =>
         reset({
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             stage: "HANDED_TO_COURIER",
             status: "SHIPPED",
             deliveryLine1: "12 MG Road",
@@ -984,7 +984,7 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
         for (const dto of [
             { notes: "Leave at the gate" },
             { lines: [{ itemId: "li_1", quantity: 4 }] },
-            { fulfilment: "COLLECT" as const },
+            { fulfilment: "PICKUP" as const },
             { address: null },
         ]) {
             await expect(kitchen.edit(OWNER, "order_1", dto)).rejects.toThrow(
@@ -1007,7 +1007,7 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
     });
 
     it("a local delivery goes out for delivery (B2c): no courier, before or after", async () => {
-        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"] as const) {
+        for (const stored of ["LOCAL_DELIVERY"] as const) {
             reset({
                 fulfilment: stored,
                 stage: "READY",

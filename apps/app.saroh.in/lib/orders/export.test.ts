@@ -18,7 +18,6 @@ const order: OrderRow = {
     status: "PENDING",
     paymentStatus: "PAID",
     stage: "NEW",
-    fulfilment: "COLLECT",
     fulfilmentType: "PICKUP",
     fulfilmentLabel: "Pick-up",
     steps: [

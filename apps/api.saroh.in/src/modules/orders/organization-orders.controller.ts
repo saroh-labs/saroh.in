@@ -72,28 +72,19 @@ export class OrganizationOrdersController {
         const full = allows(ctx, "order:read");
         if (!full && !allows(ctx, "order:stage")) authorize(ctx, "order:read");
 
-        // v2 (plan B, B1): rows, tab counts and a cursor. Money needs
-        // `order:read`; a customer's phone and email need `contact:read`.
-        if (query.v === "2") {
-            const { v: _v, late, since, ...filter } = query;
-            return this.orders.listRows(
-                ctx.organizationId,
-                {
-                    ...filter,
-                    late: late === undefined ? undefined : late === "true",
-                    since: since ? new Date(since) : undefined,
-                },
-                { money: full, contact: allows(ctx, "contact:read") },
-            );
-        }
-
-        // Without `v=2`, today's bare array for one release, so an app built
-        // before this API keeps working (B2d removes it). `storeId` narrows
-        // within the organization; it cannot widen past it.
-        return this.orders.listForOrganization(
+        // Rows, tab counts and a cursor (plan B, B1), with or without `v=2`:
+        // the bare array an app before B1 read went in the contract release
+        // (B2d). Money needs `order:read`; a customer's phone and email need
+        // `contact:read`. Every filter narrows within the organization.
+        const { v: _v, late, since, ...filter } = query;
+        return this.orders.listRows(
             ctx.organizationId,
-            { storeId: query.storeId },
-            { kitchenOnly: !full },
+            {
+                ...filter,
+                late: late === undefined ? undefined : late === "true",
+                since: since ? new Date(since) : undefined,
+            },
+            { money: full, contact: allows(ctx, "contact:read") },
         );
     }
 

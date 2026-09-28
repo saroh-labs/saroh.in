@@ -395,8 +395,8 @@ export function serializeOrderRead(
             refundedCents,
         ),
         stage: order.stage,
-        // The legacy word and the type, their steps and where it stands
-        // (fulfilment.ts); the app draws these and keeps no copy.
+        // The type, its steps and where it stands (fulfilment.ts); the
+        // app draws these and keeps no copy.
         ...fulfilmentView(order.fulfilment, stage),
         // Late by the threshold its storefront sets for its type (B17): the
         // rule the Orders list's Late filter runs, so the two never disagree.

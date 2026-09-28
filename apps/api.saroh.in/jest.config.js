@@ -189,8 +189,9 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
         // The order screen reads when an order last changed (#374).
         "<rootDir>/src/modules/orders/serialize.spec.ts",
-        "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
+        // B2d: the legacy fulfilment words are refused.
+        "<rootDir>/src/modules/orders/dto.spec.ts",
         // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",

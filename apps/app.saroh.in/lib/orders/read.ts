@@ -21,10 +21,7 @@ export type KitchenStage =
     | "OUT_FOR_DELIVERY"
     | "SENT";
 
-/** The legacy word the API sends as `fulfilment` until B2d. */
-export type Fulfilment = "COLLECT" | "DELIVERY";
-
-/** The six ways an order leaves (DEC-045); COLLECT reads as PICKUP. */
+/** The six ways an order leaves (DEC-045). */
 export type FulfilmentType =
     | "PICKUP"
     | "LOCAL_DELIVERY"
@@ -45,8 +42,6 @@ export interface FulfilmentStep {
 
 /** How an order leaves, as every order read and row answers it. */
 export interface FulfilmentFields {
-    /** The legacy word, until the contract release (B2d). */
-    fulfilment: Fulfilment;
     fulfilmentType: FulfilmentType;
     /** "Pick-up", "Local delivery"… */
     fulfilmentLabel: string;

@@ -47,7 +47,7 @@ function order(over: Partial<TodayOrderRow> = {}): TodayOrderRow {
         storeId: "st_1",
         createdAt: at("08:15"),
         stage: "PREPARING",
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         paymentStatus: "PAID",
         customer: { firstName: "Anika", lastName: "Rao", email: "a@x.in" },
         ...over,
@@ -211,17 +211,17 @@ describe("pickUpItems", () => {
         });
     });
 
-    it("reads both fulfilment vocabularies as pick-up, and not delivery", () => {
+    it("reads a pick-up as one, and not a delivery", () => {
         const items = pickUpItems(
             [
-                order({ id: "old", fulfilment: "COLLECT" }),
-                order({ id: "new", fulfilment: "PICKUP" }),
-                order({ id: "del", fulfilment: "DELIVERY" }),
+                order({ id: "a", fulfilment: "PICKUP" }),
+                order({ id: "b", fulfilment: "PICKUP" }),
+                order({ id: "del", fulfilment: "LOCAL_DELIVERY" }),
             ],
             day,
             ZONE,
         );
-        expect(items.map((i) => i.id)).toEqual(["old", "new"]);
+        expect(items.map((i) => i.id)).toEqual(["a", "b"]);
     });
 
     it("leaves out one due another day, and one refunded", () => {
@@ -358,7 +358,7 @@ describe("readToday", () => {
         expect(where.createdAt.gte).toEqual(
             new Date("2026-09-16T18:30:00.000Z"),
         );
-        expect(where.fulfilment.in.sort()).toEqual(["COLLECT", "PICKUP"]);
+        expect(where.fulfilment.in).toEqual(["PICKUP"]);
     });
 
     it("puts bookings and pick-ups in one time order", async () => {

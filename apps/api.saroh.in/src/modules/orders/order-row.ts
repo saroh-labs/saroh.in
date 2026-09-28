@@ -15,8 +15,8 @@ import { orderStanding } from "./order-standing";
  * hide (DEC-024): money (`total`, `unpaidAmount`) only with `order:read`, and
  * a customer's phone and email only with `contact:read`.
  *
- * B2a adds how it leaves: the legacy word and the type, its `steps` and
- * `stepIndex` (`fulfilment.ts`). B2b adds whether it is late (`late`,
+ * B2a adds how it leaves: the type, its `steps` and `stepIndex`
+ * (`fulfilment.ts`). B2b adds whether it is late (`late`,
  * `lateBy`, `lateAfterMinutes`, by the rule in `fulfilment.ts`, the same one
  * the Late filter runs in SQL) and the courier. B15 adds `attention`, with no
  * stand-in here.
@@ -162,8 +162,7 @@ export function serializeOrderRow(
         status: order.status,
         paymentStatus: order.paymentStatus,
         stage: order.stage,
-        // The legacy word (COLLECT or DELIVERY until B2d), the type, and
-        // the type's steps with where the order stands on them.
+        // The type, and its steps with where the order stands on them.
         ...fulfilmentView(order.fulfilment, order.stage as OrderStage),
         // Late by the threshold its storefront sets for its type (B17), on
         // the same clock as the page's Late filter.

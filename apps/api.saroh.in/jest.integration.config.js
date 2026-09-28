@@ -24,6 +24,7 @@ const OWNER_DDL_SPECS = rlsMode
     ? [
           "<rootDir>/src/modules/products/listings-stock-levels.backfill.db.spec.ts",
           "<rootDir>/src/modules/catalogue/catalogue-settings.backfill.db.spec.ts",
+          "<rootDir>/src/modules/orders/order-fulfilment-contract.db.spec.ts",
       ]
     : [];
 

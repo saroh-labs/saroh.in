@@ -33,7 +33,7 @@ async function store(organizationId: string, name: string): Promise<string> {
 async function order(
     organizationId: string,
     storeId: string,
-    fulfilment: "COLLECT" | "PICKUP" | "SHIPPING",
+    fulfilment: "PICKUP" | "SHIPPING",
     daysAgo: number,
 ) {
     seq += 1;
@@ -90,10 +90,10 @@ describe("the late rule notice", () => {
         // Recent pick-ups, no settings saved yet: on the default.
         counter = await store(orgId, "Counter");
         await order(orgId, counter, "PICKUP", 2);
-        // Recent pick-ups under the legacy word, settings saved.
+        // Recent pick-ups, settings saved.
         legacy = await store(orgId, "Legacy");
         await prisma.storeSettings.create({ data: { storeId: legacy } });
-        await order(orgId, legacy, "COLLECT", 29);
+        await order(orgId, legacy, "PICKUP", 29);
         // Only shipping orders.
         shipsOnly = await store(orgId, "Ships");
         await order(orgId, shipsOnly, "SHIPPING", 1);

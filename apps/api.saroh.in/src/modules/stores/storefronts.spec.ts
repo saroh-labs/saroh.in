@@ -310,9 +310,9 @@ describe("StorefrontsService", () => {
         ]);
     });
 
-    it("reads a legacy word stored in the list as its type (B2a)", async () => {
+    it("reads a stored list in table order", async () => {
         db.storeSettings.findUnique!.mockResolvedValue({
-            fulfilmentTypes: ["SHIPPING", "COLLECT"],
+            fulfilmentTypes: ["SHIPPING", "PICKUP"],
             taxRate: "0",
         });
         expect((await service.get("org_1", "st_1")).fulfilmentTypes).toEqual([

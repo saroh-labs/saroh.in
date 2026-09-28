@@ -28,7 +28,7 @@ const base: RawOrderRead = {
     status: "PROCESSING",
     paymentStatus: "PAID",
     stage: "PREPARING",
-    fulfilment: "DELIVERY",
+    fulfilment: "LOCAL_DELIVERY",
     currency: "INR",
     subtotal: "360.00",
     tax: "0.00",
@@ -157,16 +157,16 @@ describe("serializeOrderRead", () => {
         ).toEqual(paper);
     });
 
-    it("answers the legacy word and the type, with its steps (B2a, switched by B2c)", () => {
+    it("answers the type with its steps, and no legacy word (B2a, contracted by B2d)", () => {
         const read = serializeOrderRead(base, opts(false));
+        expect(read).not.toHaveProperty("fulfilment");
         expect(read).toMatchObject({
-            fulfilment: "DELIVERY",
             fulfilmentType: "LOCAL_DELIVERY",
             fulfilmentLabel: "Local delivery",
             stepIndex: 1,
             ticketName: "Packing slip",
         });
-        // From the switch on, a local delivery goes out for delivery.
+        // A local delivery goes out for delivery.
         expect(read.steps.map((s) => s.stage)).toEqual([
             "NEW",
             "PREPARING",
@@ -174,13 +174,6 @@ describe("serializeOrderRead", () => {
             "OUT_FOR_DELIVERY",
             "DELIVERED",
         ]);
-        // A row already in the new names reads the same.
-        const renamed = serializeOrderRead(
-            { ...base, fulfilment: "LOCAL_DELIVERY" },
-            opts(false),
-        );
-        expect(renamed.fulfilment).toBe("DELIVERY");
-        expect(renamed.steps).toEqual(read.steps);
         expect(
             serializeOrderRead(
                 {
@@ -192,7 +185,6 @@ describe("serializeOrderRead", () => {
                 opts(false),
             ),
         ).toMatchObject({
-            fulfilment: "DELIVERY",
             fulfilmentType: "SHIPPING",
             stepIndex: 2,
             next: { stages: ["HANDED_TO_COURIER"] },
@@ -231,7 +223,7 @@ describe("serializeOrderRead", () => {
             lateBy: 120,
         });
         // A pick-up two hours; once collected it is never late.
-        const pickup = { ...base, fulfilment: "COLLECT" };
+        const pickup = { ...base, fulfilment: "PICKUP" };
         expect(serializeOrderRead(pickup, hours(3))).toMatchObject({
             lateAfterMinutes: 120,
             late: true,
