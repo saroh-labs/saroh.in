@@ -1,5 +1,5 @@
 // The class-pack routes: guarded like every organization route, under the
-// Appointments module, and each hands the caller's own context and ids to
+// Class packs module (E12; Appointments before it), and each hands the caller's own context and ids to
 // the service — which is where who-may is decided (class-packs.service.spec).
 jest.mock("../../common/guards/better-auth.guard", () => ({
     BetterAuthGuard: class BetterAuthGuard {},
@@ -53,7 +53,7 @@ describe.each([
     ["ClassPacksController", ClassPacksController],
     ["BookingClassPackController", BookingClassPackController],
 ])("%s", (_name, controller) => {
-    it("runs sign-in, organization and module guards, under Appointments", () => {
+    it("runs sign-in, organization and module guards, under Class packs", () => {
         const guards = (
             Reflect.getMetadata(GUARDS_METADATA, controller) as {
                 name: string;
@@ -65,7 +65,7 @@ describe.each([
             "ModuleEnforcementGuard",
         ]);
         expect(Reflect.getMetadata(REQUIRE_MODULE_KEY, controller)).toBe(
-            "APPOINTMENTS",
+            "CLASS_PACKS",
         );
         expect(Reflect.getMetadata(PATH_METADATA, controller)).toMatch(
             /^organizations\/:organizationId\//,

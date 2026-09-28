@@ -1,5 +1,18 @@
 // Invoices: the lifecycle, who may do what, and whose ids are trusted. The
 // database is mocked; the arithmetic has its own spec (totals.spec.ts).
+// A contact resolves to itself: no merges here (C9's resolve-contact.db.spec
+// covers following a tombstone).
+jest.mock("../customer-workspace/resolve-contact", () => ({
+    resolveContact: jest.fn(
+        (_tx: unknown, id: string, organizationId?: string) =>
+            Promise.resolve({
+                id,
+                organizationId: organizationId ?? "org_1",
+                mergedFrom: null,
+                removed: false,
+            }),
+    ),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {

@@ -28,6 +28,7 @@ import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
 import { readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
+import { readReviews } from "./home-reviewer";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { readToday, todayScope } from "./home-today";
 
@@ -41,12 +42,15 @@ export type {
     HomeModel,
     HomeNeed,
     HomeNumber,
+    HomeReviewPage,
+    HomeReviewSite,
     HomeSeverity,
     HomeSinceItem,
     HomeToday,
     HomeTodayItem,
     HomeTone,
     HomeUnavailable,
+    HomeView,
 } from "./home-model";
 
 const SEVERITY_RANK: Record<HomeSeverity, number> = {
@@ -136,6 +140,12 @@ export class HomeService {
     }
 
     async build(input: HomeInput): Promise<HomeModel> {
+        // A Reviewer's Home is its own view (F9): read before anything
+        // else, so no other source is ever asked on their behalf.
+        if (input.organizationRole === "REVIEWER") {
+            return this.buildReviewer(input);
+        }
+
         // NOT guarded. Availability decides what Home is even allowed to show;
         // without it there is no page to degrade, and guessing would risk
         // emitting an action for a module the actor cannot see.
@@ -378,12 +388,9 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
-            // Websites that aren't live (F1). Not for a Reviewer: they are
-            // asked to look at named sites, and their Home is its own view
-            // (F9).
-            available.has("WEBSITE") &&
-            holds(input, "site:read") &&
-            input.organizationRole !== "REVIEWER"
+            // Websites that aren't live (F1). Never a Reviewer's: their Home
+            // is its own view (F9) and returned before any of this.
+            available.has("WEBSITE") && holds(input, "site:read")
                 ? guard(
                       { moduleKey: "WEBSITE", label: "Website" },
                       () => sitesNotLive(this.db, input.organizationId),
@@ -503,6 +510,7 @@ export class HomeService {
         );
 
         return {
+            view: "business",
             actions,
             primaryAction: actions[0] ?? null,
             hasAnyModule: views.some((v) => v.readiness !== "DISABLED"),
@@ -512,6 +520,43 @@ export class HomeService {
             ...flattenNeeds(actions, zone),
             today,
             lastDay,
+        };
+    }
+
+    /**
+     * A Reviewer's Home (F9): the greeting, and the sites they were asked
+     * to review with their pages and open notes. No module readiness, no
+     * numbers, no other source: every business-shaped field is sent empty,
+     * so an app from before F9 still renders it. Without a viewer to scope
+     * the grants to, there is nothing to read.
+     */
+    private async buildReviewer(input: HomeInput): Promise<HomeModel> {
+        const now = new Date();
+        const zone = await this.businessZone(input.organizationId);
+        const unavailable: HomeUnavailable[] = [];
+        const userId = input.userId;
+        const reviews = userId
+            ? await this.attempt(
+                  { moduleKey: "WEBSITE", label: "Sites to review" },
+                  () => readReviews(this.db, input.organizationId, userId),
+                  [],
+                  unavailable,
+              )
+            : [];
+        return {
+            view: "reviewer",
+            reviews,
+            actions: [],
+            primaryAction: null,
+            // Not the first-run question: a Reviewer has their sites.
+            hasAnyModule: true,
+            upcoming: [],
+            numbers: [],
+            unavailable,
+            needs: [],
+            needsTotal: 0,
+            today: null,
+            lastDay: lastDayHeader(now, zone),
         };
     }
 

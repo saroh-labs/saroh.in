@@ -497,11 +497,12 @@ export const NAV_GROUPS: NavGroup[] = [
                         moduleKey: "COURSES",
                         action: "course:read",
                     },
-                    // Booked time sold ahead (ADR-007).
+                    // Booked time sold ahead (ADR-007): its own module, which
+                    // needs Appointments (E12).
                     {
                         href: "/class-packs",
                         label: "Class packs",
-                        moduleKey: "APPOINTMENTS",
+                        moduleKey: "CLASS_PACKS",
                         action: "pack:read",
                     },
                 ],

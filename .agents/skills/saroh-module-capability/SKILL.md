@@ -7,7 +7,7 @@ description: Use when adding or changing a capability module, a capability-gated
 
 ## Overview
 
-Nine customer-owned capability modules (ADR-003 / DEC-016; Courses joined in ADR-007), selected per
+Ten customer-owned capability modules (ADR-003 / DEC-016; Courses joined in ADR-007, Class packs in round 2's E12), selected per
 Organization and optionally per Project. **Separate from feature flags and
 entitlements**: a flag is ours, an entitlement is billing, a module is the
 merchant's answer to "what does your business need to do?".
@@ -53,6 +53,15 @@ sidebar still linked to them — the workspace contradicting itself.
 Modules ship behind `MODULE_*` rollout flags that default off, with
 `MODULE_ENFORCEMENT` unset. To see them in a dev database you must insert the
 `FeatureFlag` rows yourself; nothing seeds them.
+
+**Splitting a module out of one that exists** (Class packs out of
+Appointments, E12) needs more than a descriptor: production resolves an
+unregistered flag to off, so everyone who used the feature loses it on the
+release. Ship a backfill that registers the new flag with the old module's
+value and overrides, and writes each business's row from evidence (never
+over a row that is there). Run it before the API that gates on the new key
+(`packages/database/src/backfill/class-packs-module.ts`,
+`runbooks/MODULE_ROLLOUT.md`).
 
 ## Gating an endpoint
 

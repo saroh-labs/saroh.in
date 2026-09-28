@@ -26,6 +26,8 @@ import {
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CalendarService } from "../calendar/calendar.service";
@@ -125,8 +127,8 @@ beforeAll(async () => {
     pastry = await product("Croissant", "120.00", 200);
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
-        publicKey: "rzp_public",
-        keyId: "rzp_key",
+        publicKey: "rzp_test_Public1",
+        keyId: "rzp_test_Public1",
         keySecret: "rzp_secret",
         webhookSecret: WEBHOOK_SECRET,
     });
@@ -527,7 +529,7 @@ describe("editing before preparing (real database)", () => {
  * every write is still today's. These pin today's delivery flow and prove
  * this release already serves the rows the switch release (B2c) writes.
  */
-describe("fulfilment types, release 1 (real database)", () => {
+describe("fulfilment types, release 2: the switch (real database)", () => {
     const ADDRESS = {
         line1: "12 Church Street",
         city: "Bengaluru",
@@ -535,16 +537,24 @@ describe("fulfilment types, release 1 (real database)", () => {
         postalCode: "560001",
     };
 
+    type Stored =
+        | "COLLECT"
+        | "DELIVERY"
+        | "PICKUP"
+        | "LOCAL_DELIVERY"
+        | "SHIPPING"
+        | "DIGITAL";
+
     /** A paid order stored in `fulfilment`, standing at `stage`/`status`. */
     async function storedAs(
-        fulfilment:
-            "COLLECT" | "DELIVERY" | "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING",
+        fulfilment: Stored,
         at: {
             stage?: "NEW" | "READY" | "OUT_FOR_DELIVERY" | "HANDED_TO_COURIER";
             status?: "PENDING" | "PROCESSING" | "SHIPPED";
+            paid?: boolean;
         } = {},
     ) {
-        const order = await paidOrder();
+        const order = await paidOrder({ paid: at.paid });
         await prisma.order.update({
             where: { id: order.id },
             data: {
@@ -560,133 +570,319 @@ describe("fulfilment types, release 1 (real database)", () => {
         return order;
     }
 
-    it("a DELIVERY order walks New → Handed to courier → Delivered as today: events, statuses, stock", async () => {
-        const order = await storedAs("DELIVERY");
-        const before = await stock(pastry);
-        for (const to of [
+    /**
+     * Runs the switch migration's own backfill, verbatim, over this file's
+     * storefront only (other files share the database).
+     */
+    async function runSwitchBackfill(): Promise<number> {
+        const sql = readFileSync(
+            join(
+                __dirname,
+                "../../../../../packages/database/prisma/migrations/20261011160000_order_fulfilment_switch/migration.sql",
+            ),
+            "utf8",
+        );
+        const update = sql.slice(
+            sql.indexOf('UPDATE "Order"'),
+            sql.indexOf(";", sql.indexOf('UPDATE "Order"')),
+        );
+        expect(update).toContain(
+            `WHERE "fulfilment" IN ('COLLECT', 'DELIVERY')`,
+        );
+        return prisma.$executeRawUnsafe(
+            `${update} AND "storeId" = $1`,
+            storeId,
+        );
+    }
+
+    /** Walks `order` through `stages`, and reads back its row and events. */
+    async function walk(orderId: string, stages: string[]) {
+        for (const to of stages) {
+            await kitchen.moveStage(member, orderId, {
+                to: to as "PREPARING",
+            });
+        }
+        return prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+            include: { events: { orderBy: { createdAt: "asc" } } },
+        });
+    }
+
+    it.each<[Stored, string[], string[]]>([
+        [
+            "PICKUP",
+            ["PREPARING", "READY", "COLLECTED"],
+            ["PROCESSING", "PROCESSING", "DELIVERED"],
+        ],
+        [
+            "LOCAL_DELIVERY",
+            ["PREPARING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"],
+            ["PROCESSING", "PROCESSING", "SHIPPED", "DELIVERED"],
+        ],
+        [
+            "SHIPPING",
+            ["PREPARING", "READY", "HANDED_TO_COURIER", "DELIVERED"],
+            ["PROCESSING", "PROCESSING", "SHIPPED", "DELIVERED"],
+        ],
+        ["DIGITAL", ["SENT"], ["DELIVERED"]],
+    ])(
+        "a %s order walks its steps: an event and the mapped status each, the stock committed at the end",
+        async (fulfilment, stages, statuses) => {
+            const order = await storedAs(fulfilment);
+            const before = await stock(pastry);
+            const read = await kitchen.read(member, order.id);
+            expect(read.next.stages).toEqual([stages[0]]);
+            const row = await walk(order.id, stages);
+            expect(row).toMatchObject({
+                stage: stages.at(-1),
+                status: "DELIVERED",
+                fulfilment,
+            });
+            expect(row.events.map((e) => [e.toStage, e.toStatus])).toEqual(
+                stages.map((s, i) => [s, statuses[i]]),
+            );
+            expect(await stock(pastry)).toEqual({
+                quantity: before.quantity - 3,
+                reserved: before.reserved - 3,
+            });
+            expect((await kitchen.read(member, order.id)).next.stages).toEqual(
+                [],
+            );
+        },
+    );
+
+    it("an order created with no type is stored as PICKUP (the column's new default)", async () => {
+        const order = await paidOrder();
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .fulfilment,
+        ).toBe("PICKUP");
+    });
+
+    it("the backfill renames COLLECT and DELIVERY, and nothing else about an order", async () => {
+        const collect = await storedAs("COLLECT", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        const delivery = await storedAs("DELIVERY");
+        const shipping = await storedAs("SHIPPING");
+        const before = await prisma.order.findMany({
+            where: { id: { in: [collect.id, delivery.id, shipping.id] } },
+            orderBy: { id: "asc" },
+        });
+
+        expect(await runSwitchBackfill()).toBeGreaterThanOrEqual(2);
+        // A second run finds nothing left to rename.
+        expect(await runSwitchBackfill()).toBe(0);
+
+        const after = await prisma.order.findMany({
+            where: { id: { in: [collect.id, delivery.id, shipping.id] } },
+            orderBy: { id: "asc" },
+        });
+        const renamed: Record<string, string> = {
+            [collect.id]: "PICKUP",
+            [delivery.id]: "LOCAL_DELIVERY",
+            [shipping.id]: "SHIPPING",
+        };
+        for (const [i, row] of after.entries()) {
+            expect(row).toEqual({
+                ...before[i],
+                fulfilment: renamed[row.id],
+            });
+        }
+        expect(
+            await prisma.order.count({
+                where: { storeId, fulfilment: { in: ["COLLECT", "DELIVERY"] } },
+            }),
+        ).toBe(0);
+    });
+
+    it("an existing COLLECT order reads as PICKUP after the backfill, with identical steps and history", async () => {
+        const order = await storedAs("COLLECT");
+        await kitchen.moveStage(member, order.id, { to: "PREPARING" });
+        await kitchen.moveStage(member, order.id, { to: "READY" });
+        const before = await kitchen.read(owner, order.id);
+
+        await runSwitchBackfill();
+
+        const after = await kitchen.read(owner, order.id);
+        expect(after).toEqual(before);
+        expect(after).toMatchObject({
+            fulfilment: "COLLECT",
+            fulfilmentType: "PICKUP",
+            stepIndex: 2,
+            next: { stages: ["COLLECTED"] },
+        });
+        expect(after.events.map((e) => e.toStage)).toEqual([
             "PREPARING",
             "READY",
-            "HANDED_TO_COURIER",
-            "DELIVERED",
-        ] as const) {
-            await kitchen.moveStage(member, order.id, { to });
-        }
+        ]);
+    });
+
+    /**
+     * A DELIVERY order release 1 handed to a courier the old way: READY →
+     * HANDED_TO_COURIER (SHIPPED, stock committed, its event, the courier
+     * named). Release 1's delivery handover is the move a shipment makes
+     * now, so a shipment is walked there and stored back as DELIVERY.
+     */
+    async function handedOverByRelease1() {
+        const order = await storedAs("SHIPPING", {
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        const held = await stock(pastry);
+        const handover = await kitchen.moveStage(member, order.id, {
+            to: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+        });
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { fulfilment: "DELIVERY" },
+        });
+        return { order, handoverId: handover.eventId, held };
+    }
+
+    it("a DELIVERY order handed to a courier before the switch is delivered after it: stock, history and undo intact", async () => {
+        const { order, held } = await handedOverByRelease1();
+        const committed = {
+            quantity: held.quantity - 3,
+            reserved: held.reserved - 3,
+        };
+        expect(await stock(pastry)).toEqual(committed);
+
+        await runSwitchBackfill();
+
+        const read = await kitchen.read(owner, order.id);
+        expect(read).toMatchObject({
+            fulfilment: "DELIVERY",
+            fulfilmentType: "LOCAL_DELIVERY",
+            stage: "HANDED_TO_COURIER",
+            courierName: "Delhivery",
+            next: { stages: ["DELIVERED"] },
+        });
+        // It keeps its step: "Handed to courier" where "Out for delivery"
+        // would be.
+        expect(read.steps[read.stepIndex]).toEqual({
+            stage: "HANDED_TO_COURIER",
+            label: "Handed to courier",
+        });
+
+        const delivered = await kitchen.moveStage(member, order.id, {
+            to: "DELIVERED",
+        });
+        // Sold at the handover; delivering it leaves the stock as it is.
+        expect(await stock(pastry)).toEqual(committed);
         const row = await prisma.order.findUniqueOrThrow({
             where: { id: order.id },
             include: { events: { orderBy: { createdAt: "asc" } } },
         });
         expect(row).toMatchObject({
+            fulfilment: "LOCAL_DELIVERY",
             stage: "DELIVERED",
             status: "DELIVERED",
-            fulfilment: "DELIVERY",
         });
-        expect(row.events.map((e) => [e.toStage, e.toStatus])).toEqual([
-            ["PREPARING", "PROCESSING"],
-            ["READY", "PROCESSING"],
-            ["HANDED_TO_COURIER", "SHIPPED"],
-            ["DELIVERED", "DELIVERED"],
+        expect(
+            row.events.map((e) => [e.fromStage, e.toStage, e.toStatus]),
+        ).toEqual([
+            ["READY", "HANDED_TO_COURIER", "SHIPPED"],
+            ["HANDED_TO_COURIER", "DELIVERED", "DELIVERED"],
         ]);
-        expect(await stock(pastry)).toEqual({
-            quantity: before.quantity - 3,
-            reserved: before.reserved - 3,
-        });
-    });
 
-    it("the read answers the legacy word and the type, with the type's steps", async () => {
-        const order = await storedAs("COLLECT", {
-            stage: "READY",
-            status: "PROCESSING",
-        });
-        const read = await kitchen.read(member, order.id);
-        expect(read).toMatchObject({
-            fulfilment: "COLLECT",
-            fulfilmentType: "PICKUP",
-            fulfilmentLabel: "Pick-up",
-            stepIndex: 2,
-            ticketName: "Order ticket",
-            next: { stages: ["COLLECTED"] },
-        });
-        expect(read.steps.map((s) => s.label)).toEqual([
-            "New",
-            "Preparing",
-            "Ready",
-            "Collected",
-        ]);
-    });
-
-    it("a row stored as LOCAL_DELIVERY (the switch release's) reads and moves; nothing new is written", async () => {
-        const order = await storedAs("LOCAL_DELIVERY", {
-            stage: "READY",
-            status: "PROCESSING",
-        });
-        const read = await kitchen.read(owner, order.id);
-        expect(read).toMatchObject({
-            fulfilment: "DELIVERY",
-            fulfilmentType: "LOCAL_DELIVERY",
-            next: { stages: ["HANDED_TO_COURIER"] },
-        });
-        await kitchen.moveStage(owner, order.id, { to: "HANDED_TO_COURIER" });
-        const moved = await kitchen.moveStage(owner, order.id, {
-            to: "DELIVERED",
-        });
-        await kitchen.undoStage(owner, order.id, moved.eventId);
-        const row = await prisma.order.findUniqueOrThrow({
-            where: { id: order.id },
-        });
-        expect(row).toMatchObject({
+        // Undone within the window, it is back with the courier.
+        await kitchen.undoStage(owner, order.id, delivered.eventId);
+        expect(await stock(pastry)).toEqual(committed);
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({
+            fulfilment: "LOCAL_DELIVERY",
             stage: "HANDED_TO_COURIER",
             status: "SHIPPED",
-            fulfilment: "LOCAL_DELIVERY",
         });
     });
 
-    it("an order Out for delivery (written by the switch release) is delivered, and undone, here", async () => {
-        const order = await storedAs("LOCAL_DELIVERY", {
-            stage: "OUT_FOR_DELIVERY",
-            status: "SHIPPED",
-        });
+    it("a handover release 1 made can still be undone after the switch; the order then goes out for delivery", async () => {
+        const { order, handoverId, held } = await handedOverByRelease1();
+
+        await runSwitchBackfill();
+
+        await kitchen.undoStage(owner, order.id, handoverId);
+        expect(await stock(pastry)).toEqual(held);
         const read = await kitchen.read(owner, order.id);
-        expect(read.next.stages).toEqual(["DELIVERED"]);
-        expect(read.steps[read.stepIndex].label).toBe("Out for delivery");
-        const moved = await kitchen.moveStage(owner, order.id, {
-            to: "DELIVERED",
+        expect(read).toMatchObject({
+            fulfilmentType: "LOCAL_DELIVERY",
+            stage: "READY",
+            status: "PROCESSING",
+            next: { stages: ["OUT_FOR_DELIVERY"] },
         });
-        await kitchen.undoStage(owner, order.id, moved.eventId);
+        await kitchen.moveStage(member, order.id, { to: "OUT_FOR_DELIVERY" });
         expect(
             await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
         ).toMatchObject({ stage: "OUT_FOR_DELIVERY", status: "SHIPPED" });
     });
 
-    it("a local delivery can't be sent Out for delivery before the switch", async () => {
-        const order = await storedAs("DELIVERY", {
+    it("a ready local delivery goes out for delivery, never to a courier (400 in step words)", async () => {
+        const order = await storedAs("LOCAL_DELIVERY", {
             stage: "READY",
             status: "PROCESSING",
         });
         await expect(
-            kitchen.moveStage(owner, order.id, { to: "OUT_FOR_DELIVERY" }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+            kitchen.moveStage(owner, order.id, { to: "HANDED_TO_COURIER" }),
+        ).rejects.toThrow(
+            "This order is a local delivery, so it goes out for delivery, not to a courier.",
+        );
+        await expect(
+            kitchen.moveStage(owner, order.id, { to: "SENT" }),
+        ).rejects.toThrow("An order that is ready cannot become sent.");
+        const out = await kitchen.moveStage(owner, order.id, {
+            to: "OUT_FOR_DELIVERY",
+        });
+        await kitchen.undoStage(owner, order.id, out.eventId);
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        ).toMatchObject({ stage: "READY", status: "PROCESSING" });
     });
 
-    it("an edit to LOCAL_DELIVERY is stored as DELIVERY; to SHIPPING is refused and writes nothing", async () => {
+    it("digital skips Preparing, and an unpaid digital order can't be sent", async () => {
+        const unpaid = await storedAs("DIGITAL", { paid: false });
+        expect((await kitchen.read(owner, unpaid.id)).next.stages).toEqual([]);
+        await expect(
+            kitchen.moveStage(owner, unpaid.id, { to: "SENT" }),
+        ).rejects.toThrow(/not paid yet, so it cannot be sent/);
+        const paid = await storedAs("DIGITAL");
+        await expect(
+            kitchen.moveStage(owner, paid.id, { to: "PREPARING" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(
+            await prisma.order.findUniqueOrThrow({ where: { id: paid.id } }),
+        ).toMatchObject({ stage: "NEW", status: "PENDING" });
+    });
+
+    it("an edit stores the type in its own name: Local delivery, Shipping, Digital; an appointment is refused", async () => {
         const order = await storedAs("COLLECT");
+        const stored = async () =>
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .fulfilment;
         await kitchen.edit(owner, order.id, {
-            fulfilment: "LOCAL_DELIVERY",
+            fulfilment: "DELIVERY",
             address: ADDRESS,
         });
-        expect(
-            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
-                .fulfilment,
-        ).toBe("DELIVERY");
+        expect(await stored()).toBe("LOCAL_DELIVERY");
+        await kitchen.edit(owner, order.id, { fulfilment: "SHIPPING" });
+        expect(await stored()).toBe("SHIPPING");
+        await kitchen.edit(owner, order.id, { fulfilment: "DIGITAL" });
+        expect(await stored()).toBe("DIGITAL");
 
         const events = await prisma.orderEvent.count({
             where: { orderId: order.id },
         });
         await expect(
-            kitchen.edit(owner, order.id, { fulfilment: "SHIPPING" }),
-        ).rejects.toThrow("Shipping isn't available yet.");
-        expect(
-            await prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
-        ).toMatchObject({ fulfilment: "DELIVERY" });
+            kitchen.edit(owner, order.id, {
+                fulfilment: "APPOINTMENT_IN_PERSON",
+            }),
+        ).rejects.toThrow(
+            "An appointment is made by booking it, not by adding an order.",
+        );
+        expect(await stored()).toBe("DIGITAL");
         expect(
             await prisma.orderEvent.count({ where: { orderId: order.id } }),
         ).toBe(events);
@@ -702,6 +898,10 @@ describe("fulfilment types, release 1 (real database)", () => {
             where: { id: edit.eventId ?? "" },
         });
         expect(event.note).toBe("notes changed");
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+                .fulfilment,
+        ).toBe("DELIVERY");
     });
 
     it("a Shipping order handed over with Delhivery and a number; the number added later by PATCH", async () => {
@@ -730,6 +930,12 @@ describe("fulfilment types, release 1 (real database)", () => {
             kind: "EDIT",
             note: "tracking number AWB 1234 5678",
         });
+        // The handover's own step names the courier it went with (B10).
+        expect(read.events.at(-2)).toMatchObject({
+            kind: "STAGE",
+            toStage: "HANDED_TO_COURIER",
+            note: "Delhivery",
+        });
 
         // Still editable once delivered; null clears one.
         await kitchen.moveStage(member, order.id, { to: "DELIVERED" });
@@ -743,7 +949,7 @@ describe("fulfilment types, release 1 (real database)", () => {
     });
 
     it("after handover a PATCH of any other field is 409, and nothing is written", async () => {
-        const order = await storedAs("DELIVERY", {
+        const order = await storedAs("SHIPPING", {
             stage: "HANDED_TO_COURIER",
             status: "SHIPPED",
         });
@@ -765,7 +971,7 @@ describe("fulfilment types, release 1 (real database)", () => {
         ).toMatchObject({
             notes: null,
             trackingNumber: null,
-            fulfilment: "DELIVERY",
+            fulfilment: "SHIPPING",
         });
         expect(
             await prisma.orderEvent.count({ where: { orderId: order.id } }),

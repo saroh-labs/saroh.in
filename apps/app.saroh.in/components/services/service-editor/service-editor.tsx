@@ -56,9 +56,9 @@ const SERVICES_HREF = "/services";
  * At a glance; everything else the old forms had is under More settings.
  * One Save, in the header, applies to bookings made after it.
  *
- * Visits (E10) and "At booking, they pay" (E8) are not offered until the
- * booking page honours them; the Time and Price sections leave room for
- * them.
+ * "At booking, they pay" sits under Price (E8). Visits (E10) are not
+ * offered until the booking page honours them; the Time section leaves
+ * room for them.
  */
 export function ServiceEditor({
     service,

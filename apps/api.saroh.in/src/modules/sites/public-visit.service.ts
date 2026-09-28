@@ -9,6 +9,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { closedDates, closuresAhead } from "../bookings/closed-dates";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { businessTimezone } from "../bookings/staff-availability";
+import { businessPublicPhoneOf } from "../organizations/business-phone";
 
 /**
  * The public read of a business's place (G8): what a site's Visit us block
@@ -26,10 +27,11 @@ export interface PublicVisit {
     name: string;
     address: string | null;
     /**
-     * The business's public phone. Always null today: no business record
-     * keeps a public phone yet, and a number taken from anywhere else (a
-     * contact email's owner, a member) would publish something the merchant
-     * never offered. The Call button stays hidden until one exists.
+     * The business's public phone (DEC-053), E.164, for a shop and the
+     * profile fallback alike; null when Settings › Business has none, and
+     * the Call button is then hidden. Never a number taken from anywhere
+     * else (a contact email's owner, a member): that would publish something
+     * the merchant never offered.
      */
     phone: string | null;
     hours: PublicOpeningDay[] | null;
@@ -192,6 +194,7 @@ export class PublicVisitService {
 
         return runInOrgContext(organizationId, async () => {
             const timezone = await businessTimezone(prisma, organizationId);
+            const phone = await businessPublicPhoneOf(organizationId);
             const closures = await closuresAhead(
                 prisma,
                 organizationId,
@@ -220,7 +223,7 @@ export class PublicVisitService {
                     storeId: shop.id,
                     name: shop.name,
                     address: said(shop.settings?.address),
-                    phone: null,
+                    phone,
                     hours,
                     timezone,
                     closedDates: closedDates(hours, closures, timezone, now),
@@ -233,6 +236,7 @@ export class PublicVisitService {
                 organizationId,
                 site.organization.name,
                 timezone,
+                phone,
             );
             return {
                 ...fallback,
@@ -256,6 +260,7 @@ export class PublicVisitService {
         organizationId: string,
         name: string,
         timezone: string,
+        phone: string | null,
     ): Promise<Omit<PublicVisit, "closedDates">> {
         const [profile, first] = await Promise.all([
             prisma.businessProfile.findUnique({
@@ -278,7 +283,7 @@ export class PublicVisitService {
             storeId: null,
             name,
             address: profile ? registeredAddress(profile) : null,
-            phone: null,
+            phone,
             hours: publicWeek(first?.settings?.openingHours),
             timezone,
         };

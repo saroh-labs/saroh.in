@@ -1,7 +1,9 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import type { FulfilmentType } from "./fulfilment";
 import {
+    allowedTypes,
+    assertItemsAllow,
     DEFAULT_LATE_THRESHOLDS,
     FULFILMENT_RULES,
     FULFILMENT_TYPES,
@@ -15,6 +17,8 @@ import {
     lateStoredValues,
     legacyWord,
     movesFor,
+    PRODUCT_FULFILMENT_TYPES,
+    productTypesOf,
     shipsToAddress,
     stepIndexOf,
     stepsFor,
@@ -30,8 +34,8 @@ const words = (type: FulfilmentType, stage = "NEW" as const) =>
     stepsFor(type, stage, true).map((s) => s.label);
 
 describe("the fulfilment rule table (DEC-045)", () => {
-    it("is release 1: the write switch is off", () => {
-        expect(WRITES_NEW_FULFILMENT_VALUES).toBe(false);
+    it("is release 2: the write switch is on (B2c)", () => {
+        expect(WRITES_NEW_FULFILMENT_VALUES).toBe(true);
     });
 
     it("gives each type the designs' steps, late default, ticket and done word", () => {
@@ -152,25 +156,48 @@ describe("the normaliser", () => {
 });
 
 describe("the write switch", () => {
-    it("off: stores the legacy word, and refuses the types today's image can't read", () => {
-        expect(storedValueFor("PICKUP")).toBe("COLLECT");
-        expect(storedValueFor("LOCAL_DELIVERY")).toBe("DELIVERY");
+    it("off (release 1): stores the legacy word, and refuses the types that image's predecessor can't read", () => {
+        expect(storedValueFor("PICKUP", false)).toBe("COLLECT");
+        expect(storedValueFor("LOCAL_DELIVERY", false)).toBe("DELIVERY");
         for (const t of [
             "SHIPPING",
             "DIGITAL",
             "APPOINTMENT_IN_PERSON",
             "APPOINTMENT_ONLINE",
         ] as const) {
-            expect(() => storedValueFor(t)).toThrow(BadRequestException);
+            expect(() => storedValueFor(t, false)).toThrow(BadRequestException);
         }
-        expect(() => storedValueFor("SHIPPING")).toThrow(
+        expect(() => storedValueFor("SHIPPING", false)).toThrow(
             "Shipping isn't available yet.",
         );
     });
 
-    it("on (B2c): stores the type itself", () => {
+    it("on (B2c, the default now): stores each physical type and Digital as itself", () => {
+        for (const t of [
+            "PICKUP",
+            "LOCAL_DELIVERY",
+            "SHIPPING",
+            "DIGITAL",
+        ] as const) {
+            expect(storedValueFor(t)).toBe(t);
+        }
+    });
+
+    it("on: an appointment is never typed into an order; it is booked (E9)", () => {
+        for (const t of [
+            "APPOINTMENT_IN_PERSON",
+            "APPOINTMENT_ONLINE",
+        ] as const) {
+            expect(() => storedValueFor(t)).toThrow(BadRequestException);
+            expect(() => storedValueFor(t)).toThrow(
+                "An appointment is made by booking it, not by adding an order.",
+            );
+        }
+    });
+
+    it("on: the default moves are the final table", () => {
         for (const t of FULFILMENT_TYPES) {
-            expect(storedValueFor(t, true)).toBe(t);
+            expect(movesFor(t)).toEqual(FULFILMENT_RULES[t].moves);
         }
     });
 
@@ -215,6 +242,42 @@ describe("steps and where an order stands", () => {
         expect(fourth("HANDED_TO_COURIER", true).stage).toBe(
             "HANDED_TO_COURIER",
         );
+    });
+
+    it("after the switch, a backfilled order reads exactly as its legacy word did", () => {
+        // COLLECT → PICKUP and DELIVERY → LOCAL_DELIVERY by the migration:
+        // the same type, steps, step index, label and ticket either way.
+        for (const stage of [
+            "NEW",
+            "PREPARING",
+            "READY",
+            "COLLECTED",
+        ] as const) {
+            expect(fulfilmentView("PICKUP", stage)).toEqual(
+                fulfilmentView("COLLECT", stage),
+            );
+        }
+        for (const stage of [
+            "NEW",
+            "READY",
+            "OUT_FOR_DELIVERY",
+            "HANDED_TO_COURIER",
+            "DELIVERED",
+        ] as const) {
+            expect(fulfilmentView("LOCAL_DELIVERY", stage)).toEqual(
+                fulfilmentView("DELIVERY", stage),
+            );
+        }
+        // A ready local delivery is now offered Out for delivery next.
+        expect(
+            fulfilmentView("LOCAL_DELIVERY", "READY").steps.map((s) => s.label),
+        ).toEqual([
+            "New",
+            "Preparing",
+            "Ready",
+            "Out for delivery",
+            "Delivered",
+        ]);
     });
 
     it("finds the step; a stage the type lacks reads as done if it ends an order", () => {
@@ -489,11 +552,15 @@ describe("the late rule (DEC-045, default 16)", () => {
 });
 
 describe("going by courier", () => {
-    it("a shipment and (before the switch) a local delivery do; the rest never", () => {
+    it("a shipment does, and a local delivery only if handed over the old way; the rest never", () => {
         expect(goesByCourier("SHIPPING", "READY")).toBe(true);
         expect(goesByCourier("DELIVERY", "HANDED_TO_COURIER")).toBe(true);
-        expect(goesByCourier("LOCAL_DELIVERY", "READY")).toBe(true);
-        expect(goesByCourier("LOCAL_DELIVERY", "OUT_FOR_DELIVERY")).toBe(false);
+        expect(goesByCourier("LOCAL_DELIVERY", "HANDED_TO_COURIER")).toBe(true);
+        // With the switch on a local delivery goes out for delivery.
+        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"]) {
+            expect(goesByCourier(stored, "READY")).toBe(false);
+            expect(goesByCourier(stored, "OUT_FOR_DELIVERY")).toBe(false);
+        }
         for (const stored of [
             "COLLECT",
             "PICKUP",
@@ -503,5 +570,103 @@ describe("going by courier", () => {
         ]) {
             expect(goesByCourier(stored, "NEW")).toBe(false);
         }
+    });
+});
+
+describe("product fulfilment types (B12)", () => {
+    const cake = {
+        name: "Chocolate cake",
+        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+    };
+    const jar = { name: "Honey jar", fulfilmentTypes: ["SHIPPING"] };
+    const anyWay = { name: "Candle", fulfilmentTypes: [] as string[] };
+    const all = ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"] as const;
+
+    it("a product is set to a storefront's ways or Digital, never an appointment", () => {
+        expect(PRODUCT_FULFILMENT_TYPES).toEqual([
+            "PICKUP",
+            "LOCAL_DELIVERY",
+            "SHIPPING",
+            "DIGITAL",
+        ]);
+    });
+
+    it("reads a stored list in table order, as types, without duplicates", () => {
+        expect(productTypesOf(["SHIPPING", "PICKUP", "SHIPPING"])).toEqual([
+            "PICKUP",
+            "SHIPPING",
+        ]);
+        // A legacy word reads as its type; an appointment is left out.
+        expect(
+            productTypesOf(["DELIVERY", "COLLECT", "APPOINTMENT_ONLINE"]),
+        ).toEqual(["PICKUP", "LOCAL_DELIVERY"]);
+        expect(productTypesOf([])).toEqual([]);
+        expect(() => productTypesOf(["TELEPORT"])).toThrow();
+    });
+
+    it("offers only what every item allows: a cake and a shipped jar share nothing", () => {
+        expect(allowedTypes([cake], all)).toEqual(["PICKUP", "LOCAL_DELIVERY"]);
+        expect(allowedTypes([cake, jar], all)).toEqual([]);
+        // The jar allows Pick-up and Local delivery too: both are offered.
+        const jarToo = {
+            ...jar,
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        };
+        expect(allowedTypes([cake, jarToo], all)).toEqual([
+            "PICKUP",
+            "LOCAL_DELIVERY",
+        ]);
+    });
+
+    it("an empty list is every way the storefront offers, and never Digital", () => {
+        expect(allowedTypes([anyWay], all)).toEqual([...all]);
+        expect(allowedTypes([anyWay], ["PICKUP"])).toEqual(["PICKUP"]);
+        expect(allowedTypes([anyWay, cake], ["PICKUP", "SHIPPING"])).toEqual([
+            "PICKUP",
+        ]);
+        // No items yet: what the storefront offers.
+        expect(allowedTypes([], ["SHIPPING"])).toEqual(["SHIPPING"]);
+        expect(allowedTypes([], [])).toEqual([]);
+    });
+
+    it("the storefront narrows its own ways, but Digital follows the products", () => {
+        const ebook = { name: "Recipe ebook", fulfilmentTypes: ["DIGITAL"] };
+        expect(allowedTypes([ebook], [])).toEqual(["DIGITAL"]);
+        expect(allowedTypes([ebook, ebook], all)).toEqual(["DIGITAL"]);
+        expect(allowedTypes([ebook, anyWay], all)).toEqual([]);
+        const giftCard = {
+            name: "Gift card",
+            fulfilmentTypes: ["DIGITAL", "SHIPPING"],
+        };
+        expect(allowedTypes([giftCard], ["PICKUP"])).toEqual(["DIGITAL"]);
+        expect(allowedTypes([giftCard], all)).toEqual(["SHIPPING", "DIGITAL"]);
+    });
+
+    it("refuses a type an item's own list leaves out, naming the item (409)", () => {
+        expect(() => assertItemsAllow([anyWay, cake], "SHIPPING")).toThrow(
+            ConflictException,
+        );
+        try {
+            assertItemsAllow([anyWay, cake], "SHIPPING");
+        } catch (error) {
+            expect((error as ConflictException).getResponse()).toEqual({
+                message:
+                    "Chocolate cake isn't sold for Shipping. It allows Pick-up and Local delivery only.",
+                field: "fulfilment",
+            });
+        }
+        expect(() => assertItemsAllow([jar], "PICKUP")).toThrow(
+            "Honey jar isn't sold for Pick-up. It allows Shipping only.",
+        );
+    });
+
+    it("lets through a type every list allows, and any type when no item has a list", () => {
+        expect(() => assertItemsAllow([cake], "PICKUP")).not.toThrow();
+        expect(() => assertItemsAllow([cake], "LOCAL_DELIVERY")).not.toThrow();
+        // An empty list behaves as before B12, whatever the type.
+        for (const type of FULFILMENT_TYPES) {
+            expect(() => assertItemsAllow([anyWay], type)).not.toThrow();
+        }
+        expect(() => assertItemsAllow([], "SHIPPING")).not.toThrow();
     });
 });

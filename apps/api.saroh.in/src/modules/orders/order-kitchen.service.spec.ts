@@ -60,7 +60,11 @@ jest.mock("@saroh/database", () => {
             ...o,
             items: mockDb.items.map((i) => ({
                 ...i,
-                product: { name: i.name },
+                product: {
+                    name: i.name,
+                    // How it may leave (B12); none of its own by default.
+                    fulfilmentTypes: i.fulfilmentTypes ?? [],
+                },
                 variant: null,
                 refundLines: [],
             })),
@@ -783,6 +787,41 @@ describe("editing before preparing", () => {
         ).rejects.toThrow(/needs an address/);
     });
 
+    it("refuses a way a line's product doesn't allow, naming it (B12)", async () => {
+        mockDb.items[0]!.fulfilmentTypes = ["PICKUP"];
+        const refused = await kitchen
+            .edit(OWNER, "order_1", {
+                fulfilment: "SHIPPING",
+                address: {
+                    line1: "12 MG Road",
+                    city: "Pune",
+                    state: "Maharashtra",
+                    postalCode: "411001",
+                },
+            })
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(ConflictException);
+        expect((refused as ConflictException).getResponse()).toEqual({
+            message:
+                "Croissant isn't sold for Shipping. It allows Pick-up only.",
+            field: "fulfilment",
+        });
+        expect(mockDb.order.fulfilment).not.toBe("SHIPPING");
+    });
+
+    it("a line with no list of its own leaves any way open (B12)", async () => {
+        await kitchen.edit(OWNER, "order_1", {
+            fulfilment: "SHIPPING",
+            address: {
+                line1: "12 MG Road",
+                city: "Pune",
+                state: "Maharashtra",
+                postalCode: "411001",
+            },
+        });
+        expect(mockDb.order.fulfilment).toBe("SHIPPING");
+    });
+
     it("a repeated itemId in lines is refused, not double-counted", async () => {
         const refused = await kitchen
             .edit(OWNER, "order_1", {
@@ -844,9 +883,9 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
         ).toEqual(["trackingNumber", "trackingUrl"]);
     });
 
-    it("go with the handover: a Member hands over with them", async () => {
+    it("go with the handover: a Member hands a shipment over with them", async () => {
         reset({
-            fulfilment: "DELIVERY",
+            fulfilment: "SHIPPING",
             stage: "READY",
             status: "PROCESSING",
         });
@@ -860,6 +899,39 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
             courierName: "Delhivery",
             trackingNumber: "AWB4411",
         });
+        // The step on the timeline names them as they were at the handover.
+        expect(mockDb.events.at(-1)).toMatchObject({
+            kind: "STAGE",
+            toStage: "HANDED_TO_COURIER",
+            note: "Delhivery · AWB4411",
+        });
+    });
+
+    it("a handover with neither leaves its step unnamed, and a courier alone names it", async () => {
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+        });
+        expect(mockDb.events.at(-1)).toMatchObject({
+            toStage: "HANDED_TO_COURIER",
+            note: null,
+        });
+
+        reset({
+            fulfilment: "SHIPPING",
+            stage: "READY",
+            status: "PROCESSING",
+        });
+        await kitchen.moveStage(MEMBER, "order_1", {
+            to: "HANDED_TO_COURIER",
+            courierName: "Blue Dart",
+            trackingNumber: null,
+        });
+        expect(mockDb.events.at(-1)).toMatchObject({ note: "Blue Dart" });
     });
 
     it("are refused on any other step, and nothing moves", async () => {
@@ -927,11 +999,49 @@ describe("the courier and tracking number (B2b, DEC-045)", () => {
         await expect(
             kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
         ).rejects.toThrow("A pick-up order isn't handed to a courier.");
-        reset({ fulfilment: "DELIVERY", stage: "READY", status: "PROCESSING" });
+        reset({ fulfilment: "SHIPPING", stage: "READY", status: "PROCESSING" });
         await expect(
             kitchen.edit(OWNER, "order_1", { courierName: "Delhivery" }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(mockDb.order.courierName).toBeNull();
+    });
+
+    it("a local delivery goes out for delivery (B2c): no courier, before or after", async () => {
+        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"] as const) {
+            reset({
+                fulfilment: stored,
+                stage: "READY",
+                status: "PROCESSING",
+            });
+            await expect(
+                kitchen.moveStage(MEMBER, "order_1", {
+                    to: "HANDED_TO_COURIER",
+                    courierName: "Delhivery",
+                }),
+            ).rejects.toThrow(
+                "This order is a local delivery, so it goes out for delivery, not to a courier.",
+            );
+            await expect(
+                kitchen.moveStage(MEMBER, "order_1", {
+                    to: "OUT_FOR_DELIVERY",
+                    courierName: "Delhivery",
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(mockDb.order).toMatchObject({
+                stage: "READY",
+                courierName: null,
+            });
+            await kitchen.moveStage(MEMBER, "order_1", {
+                to: "OUT_FOR_DELIVERY",
+            });
+            expect(mockDb.order).toMatchObject({
+                stage: "OUT_FOR_DELIVERY",
+                status: "SHIPPED",
+            });
+            await expect(
+                kitchen.edit(OWNER, "order_1", { trackingNumber: "AWB4411" }),
+            ).rejects.toThrow("A local delivery isn't handed to a courier.");
+        }
     });
 });
 

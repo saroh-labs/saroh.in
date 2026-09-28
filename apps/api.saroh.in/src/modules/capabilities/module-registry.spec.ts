@@ -33,12 +33,13 @@ describe("module registry", () => {
         expect(MODULES.some((m) => (m.key as string) === "AI")).toBe(false);
     });
 
-    it("exposes exactly the nine keys", () => {
+    it("exposes exactly the ten keys", () => {
         expect([...MODULE_KEYS]).toEqual([
             "WEBSITE",
             "CRM",
             "APPOINTMENTS",
             "COURSES",
+            "CLASS_PACKS",
             "COMMERCE",
             "PAYMENTS",
             "COMMUNICATIONS",
@@ -164,6 +165,19 @@ describe("Courses (ADR-007)", () => {
             rootRoutes: ["/courses"],
             requiredAction: "course:read",
             dependencies: ["APPOINTMENTS"],
+        });
+    });
+});
+
+describe("Class packs (E12, default 44)", () => {
+    it("is its own module, reached by pack:read, riding on Appointments", () => {
+        const packs = MODULES.find((m) => m.key === "CLASS_PACKS");
+        expect(packs).toMatchObject({
+            label: "Class packs",
+            rootRoutes: ["/class-packs"],
+            requiredAction: "pack:read",
+            dependencies: ["APPOINTMENTS"],
+            rolloutFlag: "MODULE_CLASS_PACKS",
         });
     });
 });

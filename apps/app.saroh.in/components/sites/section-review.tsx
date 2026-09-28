@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { env } from "@/env";
 import { createComment } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
@@ -202,6 +203,10 @@ function SectionSlot({
                     sections={[
                         { type: section.type, content: section.content },
                     ]}
+                    // The site, so Visit us shows its real place here as it
+                    // does on the editor's canvas, read from the same API.
+                    siteId={siteId}
+                    apiUrl={env.NEXT_PUBLIC_API_URL}
                 />
             </div>
 

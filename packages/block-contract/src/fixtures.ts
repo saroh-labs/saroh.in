@@ -40,6 +40,14 @@ export interface BlockMeta<T extends SectionType> {
     variants: readonly [BlockVariant, ...BlockVariant[]];
     /** One example per variant id. Keys must cover `variants`; G4 checks it. */
     fixtures: Record<string, RenderedContent<T>>;
+    /**
+     * Further examples of a look, for an optional part a block may carry that
+     * is not a look of its own — the text block's photo (G7). Keyed by what
+     * the case shows; each names one of the block's variants, and G4 parses
+     * them exactly as it parses `fixtures`. The catalog's one example per look
+     * stays in `fixtures`, so adding a case never moves a published snapshot.
+     */
+    cases?: Record<string, RenderedContent<T>>;
 }
 
 /**
@@ -149,6 +157,22 @@ export const BLOCK_META = {
                 variant: "default",
                 format: "html",
                 value: "<h2>About the bakery</h2><p>We have been on the same corner since 1998.</p>",
+            },
+        },
+        cases: {
+            // The text beside one photo (G7), on the left to show the side
+            // that is not the default.
+            photo: {
+                variant: "default",
+                format: "html",
+                value: "<h2>About the bakery</h2><p>We have been on the same corner since 1998.</p>",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23d9cbb5'/%3E%3Crect x='80' y='330' width='640' height='150' fill='%23a8794c'/%3E%3Ccircle cx='250' cy='250' r='70' fill='%23c9a878'/%3E%3C/svg%3E",
+                    alt: "The bakery counter at opening time",
+                    width: 800,
+                    height: 600,
+                },
+                imageSide: "left",
             },
         },
     },

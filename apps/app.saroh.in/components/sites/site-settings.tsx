@@ -2,7 +2,6 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Card, CardContent } from "@saroh/ui/card";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
@@ -13,6 +12,8 @@ import { useRef, useState, useTransition } from "react";
 
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
+import { SellsFromRow } from "@/components/sites/sells-from-row";
+import { Row, Section } from "@/components/sites/settings-rows";
 import { ShareCards, webImageUrl } from "@/components/sites/share-cards";
 import dynamic from "next/dynamic";
 
@@ -60,59 +61,6 @@ import type {
 /** Search engines truncate around here. Guidance, never enforcement. */
 const TITLE_GUIDE = 60;
 const DESCRIPTION_GUIDE = 155;
-
-function Section({
-    title,
-    description,
-    badge,
-    children,
-}: {
-    title: string;
-    description: string;
-    badge?: React.ReactNode;
-    children: React.ReactNode;
-}) {
-    return (
-        <section className="space-y-3">
-            <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold">{title}</h2>
-                    {badge}
-                </div>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </div>
-            <Card className="wk-surface">
-                <CardContent className="divide-y divide-border p-0">
-                    {children}
-                </CardContent>
-            </Card>
-        </section>
-    );
-}
-
-function Row({
-    label,
-    children,
-    action,
-}: {
-    label: string;
-    children: React.ReactNode;
-    action?: React.ReactNode;
-}) {
-    return (
-        <div className="grid items-center gap-x-4 gap-y-2 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-            <div className="text-sm text-muted-foreground">{label}</div>
-            <div className="min-w-0 text-sm">{children}</div>
-            {action ? (
-                <div className="justify-self-start sm:justify-self-end">
-                    {action}
-                </div>
-            ) : (
-                <div />
-            )}
-        </div>
-    );
-}
 
 const Missing = () => (
     <span className="text-muted-foreground">Nothing set yet</span>
@@ -350,6 +298,15 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
             >
                 <CustomDomain siteId={site.id} />
             </Section>
+
+            {/* Where the shop sells from (G11): only while it is open. */}
+            {site.sellsFrom ? (
+                <SellsFromRow
+                    siteId={site.id}
+                    sellsFrom={site.sellsFrom}
+                    canChange={site.can.manageSettings}
+                />
+            ) : null}
 
             <Section
                 title="Writing"

@@ -27,14 +27,16 @@ import {
 } from "./dto";
 
 /**
- * Schedule → Class packs (ADR-007). Booked time sold ahead, so it sits under
- * Appointments with bookings. Selling one invoices it when Payments is on,
- * which the service decides — Payments is not required to sell a pack.
- * Authorization is in the service.
+ * Bookings › Class packs (ADR-007). Booked time sold ahead: its own module,
+ * CLASS_PACKS, which needs Appointments (E12, default 44). Selling one
+ * invoices it when Payments is on, which the service decides — Payments is
+ * not required to sell a pack. Authorization is in the service, and so is
+ * the refusal to sell once the business switched Class packs off, which
+ * holds whether or not enforcement is on.
  */
 @Controller("organizations/:organizationId/class-packs")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("APPOINTMENTS")
+@RequireModule("CLASS_PACKS")
 export class ClassPacksController {
     constructor(private readonly packs: ClassPacksService) {}
 
@@ -122,10 +124,15 @@ export class ClassPacksController {
     }
 }
 
-/** "Use a class pack" on a booking already made, and taking it back off. */
+/**
+ * "Use a class pack" on a booking already made, and taking it back off. Part
+ * of Class packs: with it off, a booking already paid with a pack keeps
+ * saying so (the booking read), and cancelling it in time still gives the class back
+ * (the bookings controller).
+ */
 @Controller("organizations/:organizationId/bookings/:bookingId/class-pack")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("APPOINTMENTS")
+@RequireModule("CLASS_PACKS")
 export class BookingClassPackController {
     constructor(private readonly packs: ClassPacksService) {}
 

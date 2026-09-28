@@ -15,12 +15,12 @@ import type {
  */
 
 /** A layer fill, one of the `--layer-*` tokens (globals.css). */
-export type LayerTone = 1 | 2 | 3 | 4 | 5 | 6;
+export type LayerTone = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface LayerStyle {
     key: LayerKey;
     label: string;
-    /** What one chip counts: "1 order", "2 pickups". */
+    /** What one chip counts: "1 order", "2 pick-ups". */
     one: string;
     many: string;
     tone: LayerTone;
@@ -42,10 +42,11 @@ const ORDER: LayerKey[] = [
 
 /**
  * Colours as the design gives them per business. A shop: Orders umber,
- * Collections green, Subscriptions slate, Invoices clay. A business that
+ * Pick-ups green, Subscriptions slate, Invoices stone. A business that
  * takes bookings and sells no orders: Bookings umber, Classes slate, its
- * memberships green, Invoices clay. Both kinds at once keep the shop's and
- * give the diary the two fills left, so no two layers share one.
+ * memberships green, Invoices stone. Both kinds at once keep the shop's and
+ * give the diary the two fills left, so no two layers share one. Invoices
+ * keep a tone of their own, the one grey among the browns (E21).
  */
 function toneOf(key: LayerKey, shop: boolean): LayerTone {
     switch (key) {
@@ -56,7 +57,7 @@ function toneOf(key: LayerKey, shop: boolean): LayerTone {
         case "subscriptions":
             return shop ? 3 : 2;
         case "invoices":
-            return 4;
+            return 7;
         case "bookings":
             return shop ? 5 : 1;
         case "classes":
@@ -91,10 +92,11 @@ const LABELS: Record<
     (shop: boolean) => Pick<LayerStyle, "label" | "one" | "many">
 > = {
     orders: () => ({ label: "Orders", one: "order", many: "orders" }),
+    // The design's word for a weekly collection: what the customer does.
     collections: () => ({
-        label: "Collections",
-        one: "pickup",
-        many: "pickups",
+        label: "Pick-ups",
+        one: "pick-up",
+        many: "pick-ups",
     }),
     // A gym sells memberships; a bakery, subscriptions. Same records.
     subscriptions: (shop) => ({

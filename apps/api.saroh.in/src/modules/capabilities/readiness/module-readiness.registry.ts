@@ -80,6 +80,7 @@ export class ModuleReadinessRegistry {
             this.crm(),
             this.appointments(),
             this.courses(),
+            this.classPacks(),
             this.commerce(),
             this.payments(),
             this.communications(),
@@ -203,6 +204,36 @@ export class ModuleReadinessRegistry {
             },
             // Turning Courses off keeps every course, enrolment and booked
             // session; it only stops new enrolments.
+            deactivationBlockers: () => Promise.resolve([]),
+        };
+    }
+
+    private classPacks(): ModuleReadinessAdapter {
+        return {
+            key: "CLASS_PACKS",
+            evaluate: async ({ organizationId }) => {
+                const [all, onSale] = await Promise.all([
+                    this.db.classPack.count({ where: { organizationId } }),
+                    this.db.classPack.count({
+                        where: { organizationId, status: "ACTIVE" },
+                    }),
+                ]);
+                if (all === 0)
+                    return setup(
+                        "CLASS_PACKS_NO_PACK",
+                        "Make a pack to start selling them.",
+                        "/class-packs/new",
+                    );
+                if (onSale === 0)
+                    return setup(
+                        "CLASS_PACKS_NONE_ON_SALE",
+                        "Every pack is archived. Restore one or make a new one to sell.",
+                        "/class-packs",
+                    );
+                return active();
+            },
+            // Turning Class packs off keeps every pack, purchase and class
+            // already spent (DEC-016); it only stops new sales.
             deactivationBlockers: () => Promise.resolve([]),
         };
     }

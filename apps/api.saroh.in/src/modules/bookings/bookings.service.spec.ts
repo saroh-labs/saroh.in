@@ -32,6 +32,12 @@ jest.mock("@saroh/database", () => {
         contact: { upsert: jest.fn(), findUnique: jest.fn() },
         customerSubscription: { findFirst: jest.fn() },
         invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        // Money paid online for a booking (E8): none unless a test says so.
+        paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
+        paymentRefund: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn(),
+        },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
         site: { findUnique: jest.fn() },
@@ -79,6 +85,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
+import type { PaymentsService } from "../payments/payments.service";
 import { BookingsService } from "./bookings.service";
 import { CreateServiceDto, UpdateServiceDto } from "./dto";
 import { PublicBookingsService } from "./public-bookings.service";
@@ -262,7 +269,12 @@ describe("BookingsService — bookings management", () => {
         expect(arg.where).toEqual({ id: "bk_1" });
         expect(arg.data.status).toBe("CANCELLED");
         expect(arg.data.cancelledAt).toBeInstanceOf(Date);
-        expect(res).toEqual({ id: "bk_1", status: "CANCELLED" });
+        // Nothing was paid online for it, so nothing is refunded or kept.
+        expect(res).toEqual({
+            id: "bk_1",
+            status: "CANCELLED",
+            money: { refund: null, kept: null },
+        });
     });
 
     it("cancelBooking is idempotent for an already-cancelled booking", async () => {
@@ -342,12 +354,16 @@ describe("BookingsService — bookings management", () => {
             type: "CANCELLED",
             actorUserId: "user_1",
         });
-        // Every lock taken invoice first, the webhook's order: the Booking
-        // row is never locked before its invoice.
+        // Every lock taken in the webhook's order — the payment, then the
+        // invoice, then the booking (#508, E8): the Booking row is never
+        // locked before its invoice, nor the invoice before its payment.
         const tables = (queryRaw.mock.calls as [TemplateStringsArray][]).map(
             ([sql]) => /FROM "(\w+)"/.exec(sql.join("?"))?.[1],
         );
-        expect(tables[0]).toBe("Invoice");
+        expect(tables[0]).toBe("PaymentIntent");
+        expect(tables.indexOf("Invoice")).toBeGreaterThan(
+            tables.indexOf("PaymentIntent"),
+        );
         expect(tables.indexOf("Booking")).toBeGreaterThan(
             tables.indexOf("Invoice"),
         );
@@ -2074,6 +2090,218 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
             },
             data: { payTokenHash: null },
         });
+    });
+});
+
+describe("money paid online when a booking is cancelled (E8, DEC-051)", () => {
+    const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+    const START_AT = new Date("2026-07-20T09:00:00Z");
+    /** Fixed when it was booked: 24 hours before its first start. */
+    const DEADLINE = new Date("2026-07-19T09:00:00Z");
+    const IN_TIME = new Date("2026-07-19T08:00:00Z");
+    const LATE = new Date("2026-07-20T01:00:00Z");
+    const sendAutomaticRefund = jest.fn();
+    const payments = { sendAutomaticRefund } as unknown as PaymentsService;
+    const booking = {
+        id: "bk_1",
+        organizationId: "org_SVC",
+        status: "CONFIRMED",
+        startAt: START_AT,
+        freeCancelUntil: DEADLINE,
+    };
+    /** A member of staff who may change bookings but not refund money. */
+    const desk = ctx({
+        role: "MEMBER",
+        actions: new Set(["booking:read", "booking:write"]),
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        bookingFindUnique.mockResolvedValue(booking);
+        bookingUpdate.mockResolvedValue({ ...booking, status: "CANCELLED" });
+        // Rules today: none. The deadline fixed at booking decides.
+        db.bookingRules!.findUnique!.mockResolvedValue(null);
+        // A ₹400 deposit paid online through the provider.
+        db.paymentIntent!.findMany!.mockResolvedValue([
+            { id: "pi_1", amountCents: 40_000, currency: "INR", refunds: [] },
+        ]);
+        db.paymentRefund!.findFirst!.mockResolvedValue(null);
+        db.paymentRefund!.create!.mockResolvedValue({ id: "rf_1" });
+        sendAutomaticRefund.mockResolvedValue({
+            status: "PENDING",
+            beingConfirmed: false,
+        });
+    });
+    afterEach(() => {
+        db.paymentIntent!.findMany!.mockResolvedValue([]);
+    });
+
+    it("in time: one PENDING refund keyed on the booking, written with the cancel, sent after it", async () => {
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            status: "CANCELLED",
+            cancelledLate: false,
+        });
+        expect(db.paymentRefund!.create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_SVC",
+                paymentIntentId: "pi_1",
+                amountCents: 40_000,
+                currency: "INR",
+                status: "PENDING",
+                reason: "Booking cancelled in time",
+                idempotencyKey: "deposit-refund:bk_1",
+            },
+            select: { id: true },
+        });
+        // The provider is called once the transaction has returned.
+        expect(sendAutomaticRefund).toHaveBeenCalledWith("org_SVC", "rf_1");
+        expect(sendAutomaticRefund.mock.invocationCallOrder[0]).toBeGreaterThan(
+            transaction.mock.invocationCallOrder[0],
+        );
+        expect(out.money).toEqual({
+            refund: { amountCents: 40_000, currency: "INR", status: "SENT" },
+            kept: null,
+        });
+    });
+
+    it("late by the deadline fixed at booking: the deposit is kept, and nothing is sent", async () => {
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", LATE);
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            cancelledLate: true,
+        });
+        expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+        expect(sendAutomaticRefund).not.toHaveBeenCalled();
+        expect(out.money).toEqual({
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        });
+    });
+
+    it("a booking moved a week out keeps its first deadline: cancelled after it, it is late", async () => {
+        bookingFindUnique.mockResolvedValue({
+            ...booking,
+            startAt: new Date("2026-07-27T09:00:00Z"),
+        });
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", LATE);
+        expect(out.money.kept).toEqual({
+            amountCents: 40_000,
+            currency: "INR",
+        });
+        expect(sendAutomaticRefund).not.toHaveBeenCalled();
+    });
+
+    it("the business calling it off late refunds it only for someone who may refund", async () => {
+        const owner = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", LATE, { returnCredit: true });
+        expect(owner.money.refund).toMatchObject({ amountCents: 40_000 });
+        expect(db.paymentRefund!.create.mock.calls[0][0].data.reason).toBe(
+            "Booking cancelled by the business",
+        );
+
+        jest.clearAllMocks();
+        const byDesk = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(desk, "bk_1", LATE, { returnCredit: true });
+        // Cancelled, the class back — but the deposit is kept, and said so.
+        expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+            cancelledLate: false,
+        });
+        expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+        expect(byDesk.money).toEqual({
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        });
+    });
+
+    it("a cancel in time needs no payment:manage: the rule refunds it", async () => {
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(desk, "bk_1", IN_TIME);
+        expect(out.money.refund).toMatchObject({ amountCents: 40_000 });
+    });
+
+    it("says where the refund stands: refused, or still being confirmed", async () => {
+        sendAutomaticRefund.mockResolvedValueOnce({
+            status: "FAILED",
+            beingConfirmed: false,
+        });
+        const refused = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(refused.money.refund?.status).toBe("REFUSED");
+
+        sendAutomaticRefund.mockResolvedValueOnce({
+            status: "PENDING",
+            beingConfirmed: true,
+        });
+        const unsure = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(unsure.money.refund?.status).toBe("CONFIRMING");
+
+        // The provider call itself throwing never undoes the cancel.
+        sendAutomaticRefund.mockRejectedValueOnce(new Error("boom"));
+        const thrown = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(thrown.status).toBe("CANCELLED");
+        expect(thrown.money.refund?.status).toBe("CONFIRMING");
+    });
+
+    it("a refund already reserved for the booking is never made or sent again", async () => {
+        db.paymentRefund!.findFirst!.mockResolvedValue({
+            id: "rf_1",
+            amountCents: 40_000,
+            currency: "INR",
+        });
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+        expect(sendAutomaticRefund).not.toHaveBeenCalled();
+        expect(out.money.refund).toMatchObject({ status: "CONFIRMING" });
+    });
+
+    it("a cancel that lost the race refunds nothing", async () => {
+        bookingFindUnique
+            .mockResolvedValueOnce(booking)
+            .mockResolvedValueOnce({ ...booking, status: "CANCELLED" });
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(bookingUpdate).not.toHaveBeenCalled();
+        expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+        expect(sendAutomaticRefund).not.toHaveBeenCalled();
+        expect(out.money).toEqual({ refund: null, kept: null });
+    });
+
+    it("a booking paid at the desk has nothing to refund or keep", async () => {
+        db.paymentIntent!.findMany!.mockResolvedValue([]);
+        const out = await new BookingsService(
+            undefined,
+            payments,
+        ).cancelBooking(ctx(), "bk_1", IN_TIME);
+        expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+        expect(out.money).toEqual({ refund: null, kept: null });
     });
 });
 

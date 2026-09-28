@@ -10,11 +10,13 @@ import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import { assertClassPacksOn } from "./class-packs-on";
 import type {
     ListPacksQueryDto,
     ListPurchasesQueryDto,
@@ -290,6 +292,8 @@ export class ClassPacksService {
     ): Promise<PurchaseView> {
         authorize(ctx, "pack:write");
         const organizationId = ctx.organizationId;
+        // Switched off: no new sales, whatever enforcement says (E12).
+        await assertClassPacksOn(prisma, organizationId);
         const [pack, contact] = await Promise.all([
             prisma.classPack.findFirst({
                 where: { id: packId, organizationId },
@@ -309,11 +313,14 @@ export class ClassPacksService {
 
         const price = toMoneyString(pack.price);
         const id = await prisma.$transaction(async (tx) => {
+            // Merged since the page loaded (C9)? Sell to the survivor.
+            const buyer = await resolveContact(tx, contact.id, organizationId);
+            if (!buyer || buyer.removed) notFound("Contact", "contactId");
             const purchase = await tx.packPurchase.create({
                 data: {
                     organizationId,
                     packId: pack.id,
-                    contactId: contact.id,
+                    contactId: buyer.id,
                     credits: pack.credits,
                     price,
                     currency: pack.currency,
@@ -326,7 +333,7 @@ export class ClassPacksService {
             });
             if (await paymentsOn(tx, organizationId)) {
                 await this.invoices.issueInTx(tx, organizationId, {
-                    contactId: contact.id,
+                    contactId: buyer.id,
                     currency: pack.currency,
                     lines: [
                         {

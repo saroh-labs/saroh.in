@@ -88,6 +88,10 @@ export interface HeroContent {
 export interface RichTextContent {
     format: "html" | "markdown";
     value: string;
+    /** One photo beside the text (G7). */
+    image?: ImageValue;
+    /** Which side the photo sits on; absent is the right. */
+    imageSide?: "left" | "right";
 }
 
 export type CtaContent = CtaValue;
@@ -427,6 +431,20 @@ export interface SiteDetail extends SiteSummary {
     /** The site's look — always complete; absent choices come back filled. */
     style: SiteStyle;
     styleOptions: SiteStyleOptions;
+    /**
+     * Where the site's shop sells from (G11), and the storefronts it could.
+     * Null while the shop isn't open for this business — the API's
+     * `SITE_SHOP` flag, off until checkout (G13) ships — and absent from an
+     * API older than G11: either way the settings show no row.
+     */
+    sellsFrom?: SellsFrom | null;
+}
+
+/** The storefront a site sells from, and the open ones with products. */
+export interface SellsFrom {
+    /** Null: not answered yet, so the shop shows nothing live. */
+    storefront: { id: string; name: string } | null;
+    choices: { id: string; name: string; products: number }[];
 }
 
 /**
@@ -449,6 +467,8 @@ export interface SiteSettingsInput {
     socialImageBytes?: number | null;
     /** Null restores the default (#232). */
     postsPrefix?: string | null;
+    /** The storefront the shop sells from (G11); null clears it. */
+    storefrontId?: string | null;
 }
 
 export interface PageDraft {
@@ -1102,7 +1122,10 @@ export type FlagType =
     | "unpublishedChanges"
     | "missingSeoDescription"
     | "brokenLink"
-    | "phoneWidth";
+    | "phoneWidth"
+    // The shop (G11): raised only while it is open for the business.
+    | "storefrontUnchosen"
+    | "reservedAddress";
 
 export interface Flag {
     type: FlagType;

@@ -1,5 +1,6 @@
 import { Card } from "@saroh/ui/card";
 
+import { fulfilmentLine } from "@/lib/products/fulfilment-types";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { customFieldText, onTheShop } from "@/lib/products/overview-rules";
 import { detailTag, NOT_FILLED_IN } from "@/lib/products/overview-words";
@@ -10,8 +11,8 @@ import { SheetButton } from "./sheet-button";
 
 /**
  * Details (#522), in two groups as the design has them: "How it's sold" —
- * visibility, where, its category, its address and whether stock is
- * counted — and "On the product page", each with a tag saying whether
+ * visibility, where, how it's fulfilled (B12), its category, its address
+ * and whether stock is counted — and "On the product page", each with a tag saying whether
  * customers see it. One the shop would show but that is empty reads "Not
  * filled in · Hidden until filled in".
  */
@@ -60,6 +61,9 @@ export function ProductDetailsCard({
                     </DetailRow>
                     <DetailRow label="Sold at" muted={places.length === 0}>
                         {places.length ? places.join(", ") : "Nowhere yet"}
+                    </DetailRow>
+                    <DetailRow label="Fulfilled by">
+                        {fulfilmentLine(product.fulfilmentTypes)}
                     </DetailRow>
                     <DetailRow label="Category">
                         {product.category?.name ?? "Uncategorized"}

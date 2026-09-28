@@ -16,6 +16,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { formatTimeRange } from "@/lib/format/datetime";
 import { listAvailability, rescheduleBooking } from "@/lib/services/actions";
+import { deadlineText } from "@/lib/services/booking-money";
 import type { Slot } from "@/lib/services/service";
 
 /**
@@ -41,12 +42,15 @@ export function RescheduleBooking({
     timezone,
     currentStartAt,
     currentEndAt,
+    freeCancelUntil = null,
 }: {
     bookingId: string;
     serviceId: string;
     timezone: string;
     currentStartAt: string;
     currentEndAt: string;
+    /** The free-cancel deadline fixed at booking (E8); a move keeps it. */
+    freeCancelUntil?: string | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -121,6 +125,9 @@ export function RescheduleBooking({
                         )}
                         , {timezone}. Only times this service is open and nobody
                         else has taken are shown.
+                        {freeCancelUntil
+                            ? ` Moving it keeps its free-cancel time: ${deadlineText(freeCancelUntil, timezone)}.`
+                            : ""}
                     </DialogDescription>
                 </DialogHeader>
 

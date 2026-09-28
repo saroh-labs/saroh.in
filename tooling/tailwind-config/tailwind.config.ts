@@ -250,6 +250,7 @@ const config = {
                     4: "hsl(var(--layer-4))",
                     5: "hsl(var(--layer-5))",
                     6: "hsl(var(--layer-6))",
+                    7: "hsl(var(--layer-7))",
                     foreground: "hsl(var(--layer-foreground))",
                 },
             },

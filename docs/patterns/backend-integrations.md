@@ -52,12 +52,21 @@ a note saying so.
   amount sent anyway is ignored rather than refused (ADR-007).
 - **Current** (E11) — **The booking page opens the provider's own window**
   (`packages/site-blocks/src/booking-flow/checkout.ts`): Razorpay Checkout on
-  the handoff's order with the business's _public key_ (the key id stays
-  sealed, so a Razorpay connection without a public key can't take pay-now),
-  or Cashfree's drop-in on its payment session. Razorpay's is set to UPI and
+  the handoff's order with the business's _public key_, or Cashfree's drop-in
+  on its payment session. Razorpay's is set to UPI and
   card only; Cashfree's shows what the account has on. What the
   window says is a hint ("Paying…"); only the webhook confirms the booking.
   The invoice pay page still shows the handoff, not the window.
+- **Current** (D22, DEC-054) — **Razorpay's key id is its public key.**
+  Setup checks the key id (`rzp_live_…` / `rzp_test_…`) and the secret, and
+  stores the key id as the connection's `publicKey` beside the sealed pair
+  (`payments/public-key.ts`); a public key sent that names another key is
+  refused. A Razorpay connection without one gets no provider order (409),
+  the booking page doesn't offer Pay now for it (`OPENS_CHECKOUT`), and
+  Providers shows it as Needs attention. The key id is never read out of
+  the sealed blob on a serving path: connections made before D22 were
+  filled by the `razorpay-public-keys` backfill
+  (`ROUND_2_PHASE_2_ROLLOUT.md`). Cashfree's public key stays optional.
 - **Current** — **Money that arrives for something already settled is kept,
   not lost.** A webhook success on a paid or void invoice marks the intent
   SUCCEEDED and records a `CAPTURED_NEEDS_REFUND` attempt, which Home raises

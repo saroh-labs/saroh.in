@@ -12,6 +12,7 @@ export const TONE_FILL: Record<LayerTone, string> = {
     4: "bg-layer-4",
     5: "bg-layer-5",
     6: "bg-layer-6",
+    7: "bg-layer-7",
 };
 
 export const TONE_BORDER: Record<LayerTone, string> = {
@@ -21,4 +22,5 @@ export const TONE_BORDER: Record<LayerTone, string> = {
     4: "border-layer-4",
     5: "border-layer-5",
     6: "border-layer-6",
+    7: "border-layer-7",
 };

@@ -171,8 +171,8 @@ beforeAll(async () => {
     ).id;
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
-        publicKey: "rzp_public",
-        keyId: "rzp_key",
+        publicKey: "rzp_test_Public1",
+        keyId: "rzp_test_Public1",
         keySecret: "rzp_secret",
         webhookSecret: WEBHOOK_SECRET,
     });
@@ -211,7 +211,10 @@ describe("the booking page (real database)", () => {
         ]);
         expect(page.services[0]!.staff).toEqual(["Karan Mehta"]);
 
-        const days = await publicBookings.publicDays(oneToOne);
+        // Read from next Monday, so the Monday he is off (two weeks out)
+        // is inside the 14-day window every day of the week. Read from
+        // today, on a Monday it falls 14 days ahead, one past the window.
+        const days = await publicBookings.publicDays(oneToOne, nextMonday(0));
         expect(JSON.stringify(days)).not.toMatch(/Wedding|timeOff|reason/);
         // The Monday he is off reads open and Full.
         const off = nextMonday(0, 2).toISOString().slice(0, 10);

@@ -339,6 +339,9 @@ describe("Customers list (DB)", () => {
                 email: reservedMergedEmail(t),
                 firstName: null,
                 phone: null,
+                // What C9's merge writes: the pointer is what marks it.
+                mergedIntoId: crmOnly,
+                mergedAt: new Date(),
             },
         });
         tombstone = t;

@@ -18,6 +18,7 @@ import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
 import { logoProblem } from "./business-logo";
+import { phoneWrite } from "./business-phone";
 import type {
     RegisteredAddressView,
     TaxSettingsView,
@@ -50,6 +51,11 @@ export interface OrganizationSettings {
          * until set, when invoice numbers and the calendar read India's.
          */
         timezone: string | null;
+        /**
+         * The business's public phone (DEC-053), E.164; null when none is
+         * set, and then the site shows no Call button.
+         */
+        phone: string | null;
     } | null;
     /**
      * When the business first sold something: the earliest order on record,
@@ -98,6 +104,7 @@ const PROFILE_SELECT = {
     contactEmail: true,
     website: true,
     timezone: true,
+    phone: true,
     gstRegistered: true,
     gstState: true,
     invoicePrefix: true,
@@ -120,6 +127,7 @@ interface ProfileRow {
     contactEmail: string | null;
     website: string | null;
     timezone: string | null;
+    phone: string | null;
     gstRegistered: boolean;
     gstState: string | null;
     invoicePrefix: string | null;
@@ -264,6 +272,8 @@ export class OrganizationSettingsService {
 
         const profileData = reduceProfile(dto.profile);
         const timezone = zoneWrite(profileData.timezone);
+        // Checked and made E.164 before anything is written; "" clears it.
+        const phone = phoneWrite(dto.profile?.phone);
         const taxSent = {
             tax: dto.tax,
             taxId: profileData.taxId,
@@ -282,6 +292,7 @@ export class OrganizationSettingsService {
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...Object.keys(profileData),
+            ...Object.keys(phone),
             ...Object.keys(taxData),
         ];
 
@@ -311,7 +322,12 @@ export class OrganizationSettingsService {
                 });
             }
 
-            const written = { ...profileData, ...timezone, ...taxData };
+            const written = {
+                ...profileData,
+                ...timezone,
+                ...phone,
+                ...taxData,
+            };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({
                     where: { organizationId: ctx.organizationId },
@@ -332,8 +348,8 @@ export class OrganizationSettingsService {
 
         // Every field by name, as older readers expect; the business details
         // also as they were and became. What may carry a value is decided in
-        // one place (`audit/audit-changes.ts`): never the contact email or
-        // the website, which stay names only (S1-009).
+        // one place (`audit/audit-changes.ts`): never the contact email, the
+        // phone or the website, which stay names only (S1-009).
         const now = new Date();
         await this.audit.record({
             action: AuditAction.ProfileUpdate,

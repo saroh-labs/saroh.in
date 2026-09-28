@@ -37,6 +37,8 @@ const TYPE_LABEL: Record<FlagType, string> = {
     missingSeoDescription: "No search description",
     brokenLink: "Link goes nowhere",
     phoneWidth: "Breaks at phone width",
+    storefrontUnchosen: "No storefront to sell from",
+    reservedAddress: "Change address",
 };
 
 /**

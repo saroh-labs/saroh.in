@@ -23,6 +23,7 @@ export class HomeController {
     ) {
         return this.home.build({
             organizationId: ctx.organizationId,
+            userId: ctx.userId,
             organizationRole: ctx.role,
             organizationActions: ctx.actions,
             projectId,

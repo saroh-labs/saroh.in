@@ -47,9 +47,10 @@ export const CURRENCY = "INR";
  * when the rules change.
  *
  * The consequence, now that the fixture also carries sites, analytics and live
- * providers: every ENABLED module below evaluates to ACTIVE, except COURSES:
- * Northwind runs no course, so it asks for one (the showcase's Pulse Fitness
- * and Prana Yoga are where courses are seeded — ADR-007). AUTOMATIONS is the
+ * providers: every ENABLED module below evaluates to ACTIVE, except COURSES
+ * and CLASS_PACKS: Northwind runs no course and sells no pack, so each asks
+ * for one (the showcase's Pulse Fitness and Prana Yoga are where courses and
+ * packs are seeded — ADR-007). AUTOMATIONS is the
  * one capability left genuinely absent, and it short-circuits at the
  * "configured" gate rather than on readiness — so `SETUP_REQUIRED` and
  * `ATTENTION_REQUIRED` are no longer reachable from this fixture. Reaching them
@@ -74,6 +75,11 @@ export const MODULE_STATES: readonly {
         key: "COURSES",
         status: "ENABLED",
         why: "switched on but no course yet, so it reads SETUP_REQUIRED; the showcase's Pulse and Prana run courses",
+    },
+    {
+        key: "CLASS_PACKS",
+        status: "ENABLED",
+        why: "switched on but no pack yet, so it reads SETUP_REQUIRED and packs can be tried here; the showcase's Pulse and Prana sell them (E12)",
     },
     {
         key: "PAYMENTS",
@@ -506,12 +512,30 @@ export const ONLINE_STOCK: Readonly<Record<string, number>> = {
  * Orders across every status the UI renders. The PENDING and PROCESSING ones
  * are what Home counts as open work — without them the OVERDUE branch of the
  * ranking is unreachable and cannot be reviewed.
+ *
+ * Each stands at the kitchen step its status means, in its type's own name
+ * (B2c, DEC-045): every physical type, one of them out for delivery and one
+ * with its courier, and one Digital order. Northwind sells no digital
+ * product yet (B12 marks which ones are), so that order's line is a
+ * physical one standing in.
  */
 export const ORDERS: readonly {
     customer: number;
     dayOffset: number;
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
     paymentStatus: "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
+    fulfilment: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING" | "DIGITAL";
+    stage:
+        | "NEW"
+        | "PREPARING"
+        | "READY"
+        | "COLLECTED"
+        | "OUT_FOR_DELIVERY"
+        | "HANDED_TO_COURIER"
+        | "DELIVERED"
+        | "SENT";
+    /** Who took a shipment and its number (B2b). */
+    courier?: { name: string; number: string };
     lines: readonly { product: number; quantity: number }[];
 }[] = [
     {
@@ -519,6 +543,8 @@ export const ORDERS: readonly {
         dayOffset: -1,
         status: "PENDING",
         paymentStatus: "PAID",
+        fulfilment: "PICKUP",
+        stage: "NEW",
         lines: [
             { product: 0, quantity: 50 },
             { product: 2, quantity: 10 },
@@ -529,6 +555,8 @@ export const ORDERS: readonly {
         dayOffset: -2,
         status: "PENDING",
         paymentStatus: "UNPAID",
+        fulfilment: "LOCAL_DELIVERY",
+        stage: "NEW",
         lines: [{ product: 5, quantity: 2 }],
     },
     {
@@ -536,6 +564,8 @@ export const ORDERS: readonly {
         dayOffset: -3,
         status: "PROCESSING",
         paymentStatus: "PAID",
+        fulfilment: "SHIPPING",
+        stage: "PREPARING",
         lines: [
             { product: 3, quantity: 20 },
             { product: 4, quantity: 5 },
@@ -546,6 +576,8 @@ export const ORDERS: readonly {
         dayOffset: -5,
         status: "PROCESSING",
         paymentStatus: "PAID",
+        fulfilment: "PICKUP",
+        stage: "READY",
         lines: [
             { product: 9, quantity: 1 },
             { product: 10, quantity: 12 },
@@ -556,6 +588,8 @@ export const ORDERS: readonly {
         dayOffset: -8,
         status: "SHIPPED",
         paymentStatus: "PAID",
+        fulfilment: "LOCAL_DELIVERY",
+        stage: "OUT_FOR_DELIVERY",
         lines: [{ product: 6, quantity: 40 }],
     },
     {
@@ -563,6 +597,9 @@ export const ORDERS: readonly {
         dayOffset: -12,
         status: "DELIVERED",
         paymentStatus: "PAID",
+        fulfilment: "SHIPPING",
+        stage: "DELIVERED",
+        courier: { name: "Blue Dart", number: "BD7730419265" },
         lines: [
             { product: 1, quantity: 6 },
             { product: 7, quantity: 25 },
@@ -573,6 +610,8 @@ export const ORDERS: readonly {
         dayOffset: -18,
         status: "DELIVERED",
         paymentStatus: "PAID",
+        fulfilment: "DIGITAL",
+        stage: "SENT",
         lines: [{ product: 8, quantity: 3 }],
     },
     {
@@ -580,6 +619,8 @@ export const ORDERS: readonly {
         dayOffset: -21,
         status: "CANCELLED",
         paymentStatus: "REFUNDED",
+        fulfilment: "PICKUP",
+        stage: "NEW",
         lines: [{ product: 11, quantity: 1 }],
     },
     {
@@ -587,6 +628,8 @@ export const ORDERS: readonly {
         dayOffset: -25,
         status: "DELIVERED",
         paymentStatus: "PAID",
+        fulfilment: "PICKUP",
+        stage: "COLLECTED",
         lines: [{ product: 0, quantity: 120 }],
     },
     {
@@ -594,6 +637,8 @@ export const ORDERS: readonly {
         dayOffset: -30,
         status: "DELIVERED",
         paymentStatus: "FAILED",
+        fulfilment: "LOCAL_DELIVERY",
+        stage: "DELIVERED",
         lines: [{ product: 4, quantity: 3 }],
     },
 ];

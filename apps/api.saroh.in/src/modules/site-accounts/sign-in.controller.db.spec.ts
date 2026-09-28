@@ -726,14 +726,30 @@ describe("site sign-in: when the code can't be sent", () => {
         ).resolves.toHaveProperty("token");
     });
 
-    it("has no public phone to give yet, so the sheet shows the try-again line alone", async () => {
+    it("has no public phone to give when the business set none, so the sheet shows the try-again line alone", async () => {
         const t = build();
         // A phone in the site's Contact block is not the business's public
-        // phone field, which doesn't exist yet (businessPublicPhone).
+        // phone (DEC-053), and is never offered in its place.
         const site = await business({ phone: "+91 98200 12345" });
         await expect(t.api.options(relay(site.host))).resolves.toEqual({
             businessName: "Kavi Dental",
             phone: null,
+            challenge: { required: false, siteKey: "site-key" },
+        });
+    });
+
+    it("gives the business's public phone once it is set (DEC-053)", async () => {
+        const t = build();
+        const site = await business();
+        await prisma.businessProfile.create({
+            data: {
+                organizationId: site.organizationId,
+                phone: "+918040001234",
+            },
+        });
+        await expect(t.api.options(relay(site.host))).resolves.toEqual({
+            businessName: "Kavi Dental",
+            phone: "+918040001234",
             challenge: { required: false, siteKey: "site-key" },
         });
     });

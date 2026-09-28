@@ -93,6 +93,8 @@ beforeEach(() => {
         price: "20.00",
         currency: "INR",
         categoryId: null,
+        // No list of its own (B12): any way.
+        fulfilmentTypes: [],
         variants: [],
     });
     inventoryFindUnique.mockResolvedValue(null); // untracked — no stock plumbing

@@ -8,6 +8,7 @@ import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
+import { shipmentOf } from "@/lib/orders/courier";
 import {
     allergenWords,
     allergyCheck,
@@ -137,6 +138,7 @@ export function OrderDetail({
     };
 
     const print = () => window.print();
+    const shipment = shipmentOf(order, can.stage);
 
     const heading = (
         <OrderHeading
@@ -145,14 +147,16 @@ export function OrderDetail({
             standing={standing}
             age={age}
         >
-            <Button
-                type="button"
-                variant="outline"
-                className={actionClass("ghost")}
-                onClick={print}
-            >
-                {delivery ? "Packing slip" : "Print ticket"}
-            </Button>
+            {order.ticketName ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className={actionClass("ghost")}
+                    onClick={print}
+                >
+                    Print {order.ticketName.toLowerCase()}
+                </Button>
+            ) : null}
             {can.write ? (
                 <OrderActions
                     storeId={order.store.id}
@@ -231,9 +235,7 @@ export function OrderDetail({
               .filter(Boolean)
               .join("\n")
         : null;
-    const handover = [...order.events]
-        .reverse()
-        .find((e) => e.kind === "STAGE" && e.toStage === "HANDED_TO_COURIER");
+    const to = addressText?.replace(/\n/g, ", ") ?? first;
 
     return (
         <main className="w-full">
@@ -305,20 +307,26 @@ export function OrderDetail({
                         />
                         {panel === "courier" ? (
                             <CourierPanel
-                                to={addressText?.replace(/\n/g, ", ") ?? first}
+                                mode="handover"
+                                to={to}
                                 first={first}
                                 busy={busy}
                                 onPrint={print}
                                 onCancel={() => setPanel(null)}
-                                onHandOver={({ courier, trackingUrl }) =>
-                                    void kitchen.move(
-                                        "HANDED_TO_COURIER",
-                                        { note: courier, trackingUrl },
-                                        courier === "Our own driver"
-                                            ? "Out with your own driver."
-                                            : `Handed to ${courier}.${trackingUrl ? " The tracking link is on the order." : ""}`,
-                                    )
+                                onSave={(fields) =>
+                                    void kitchen.handOver(fields)
                                 }
+                            />
+                        ) : null}
+                        {panel === "tracking" && shipment ? (
+                            <CourierPanel
+                                mode="change"
+                                to={to}
+                                first={first}
+                                busy={busy}
+                                before={shipment}
+                                onCancel={() => setPanel(null)}
+                                onSave={kitchen.saveCourier}
                             />
                         ) : null}
                         {panel === "edit" ? (
@@ -370,14 +378,8 @@ export function OrderDetail({
                                     notes === "unavailable" ? null : noteList
                                 }
                                 address={delivery ? addressText : null}
-                                tracking={
-                                    order.trackingUrl
-                                        ? {
-                                              url: order.trackingUrl,
-                                              courier: handover?.note ?? null,
-                                          }
-                                        : null
-                                }
+                                shipment={shipment}
+                                onChangeTracking={() => setPanel("tracking")}
                                 orderNote={order.notes}
                             />
                         ) : (

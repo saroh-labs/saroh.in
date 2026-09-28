@@ -134,8 +134,8 @@ beforeAll(async () => {
     pastry = await product("Croissant", "118.00", "18");
     await payments.connectProvider(rye, {
         provider: "RAZORPAY",
-        publicKey: "rzp_public",
-        keyId: "rzp_key",
+        publicKey: "rzp_test_Public1",
+        keyId: "rzp_test_Public1",
         keySecret: "rzp_secret",
         webhookSecret: WEBHOOK_SECRET,
     });

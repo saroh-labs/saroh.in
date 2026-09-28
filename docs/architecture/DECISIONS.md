@@ -528,3 +528,67 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **a service of 30 minutes or more offers a start every half hour** from each availability window's start; **a shorter service keeps stepping by its own length.** No service loses a start it offers today, and the clock is never forced (a window from 09:15 steps 09:15, 09:45).
 - Consequences: staff New booking and the site's "On today" read the same starts as the booking page. Capacity and overlap checks count buffers explicitly, since the step no longer carries them.
 - Migration: none.
+
+## DEC-053 A business can show a public phone number on its site
+
+**Status: Accepted — 2026-09-28** · round-2 phase 2 (plan G, G8; plan E, E6; plan A, A2/A9)
+
+- Context: the site's Call button, the booking page header and "We couldn't send your code, call ‹Business›" all need the business's phone number, but the schema has no public phone, and `businessPublicPhone(site)` in `site-host.ts` returns null.
+- Decision: **each business may set one optional public phone number in Settings → Business.** It is the merchant's own number, shown only on that business's site. Saroh's number never appears there.
+- Consequences: with no number set, the Call button and the "call us" line are hidden, and never shown empty or with a placeholder.
+- Migration: a nullable phone field on the business profile; additive.
+
+## DEC-054 Razorpay setup asks for the public key
+
+**Status: Accepted — 2026-09-28** · round-2 phase 2 (plan A, A10/A11; plan D, D19; plan E, E11 follow-up)
+
+- Context: Razorpay's checkout window opens with the business's public key id, and the provider setup saved only the secret. A connection without the public key answers "couldn't open the payment window".
+- Decision: **the Razorpay provider setup asks for the public key id alongside the secret**, and checks both before it calls the connection ready.
+- Consequences: an existing connection with no public key reads as needing attention in Providers, with a way to add it. Online pay stays off for that business until it is added.
+- Migration: none beyond storing the key with the connection.
+
+## DEC-055 Each storefront chooses how a same-email customer is linked
+
+**Status: Accepted — 2026-09-28** — builds on [DEC-042](#dec-042-duplicate-customers-are-merged-and-a-customers-details-can-be-removed) and [DEC-049](#dec-049-a-site-account-links-to-an-existing-contact-only-when-that-contacts-email-is-verified) · round-2 plan C (C2, C9, C10)
+
+- Context: when a contact made for one storefront's customer already holds an email, another storefront's customer with the same email waits for staff (5 of 76 in the showcase).
+- Decision: **a per-storefront setting, shown to the merchant, chooses between linking such a customer automatically and leaving the pair for staff to confirm.** The default leaves it for staff, which is today's behaviour. Automatic linking applies only when the holding contact was itself made from a store customer.
+- Consequences: the setting's copy says plainly what automatic linking does.
+- Migration: a storefront setting with a default; additive.
+
+## DEC-056 Smaller calls for round 2, phase 2
+
+**Status: Accepted — 2026-09-28** · round-2 plans B, C and F
+
+- **"Add customer" creates a contact only**, never a store customer.
+- **The Settings ready checklist brings back the email, logo and pipeline nudges** that F8 dropped.
+- **A Reviewer on Orders sees the Orders locked card**, not the generic module card (B7, F9).
+- **"Returning" counts only what the viewer can read.** Without `invoice:read` it is judged from orders alone (C3).
+- **The bot check (Cloudflare Turnstile, free) is deferred.** Code sign-in runs without a challenge until abuse shows up. The API logs `site_codes_challenge_unconfigured` meanwhile, and the check is switched on by setting the two keys.
+
+## DEC-057 A module Saroh has switched off is never shown to the business
+
+**Status: Accepted — 2026-09-28** · applies to every surface that lists or gates modules
+
+- Context: on a fresh production database every module's rollout flag was unset, so Settings › Modules listed Website, Contacts, Appointments and Sell with their switches on and a raw `ROLLOUT_DISABLED` line under each.
+- Decision: **a module whose rollout flag is off (`ROLLOUT_DISABLED`) is not shown to the business anywhere**: not in Settings › Modules, the rail, the command menu, "Also sell", onboarding's module choices, setup checklists or any upsell. Only modules Saroh has rolled out appear, and the business turns those on or off. A raw blocker code is never shown to a merchant.
+- Consequences: the module list the app renders is the set that has passed the rollout gate. Turning a rollout flag off in the admin console hides the module; the business's own setting and its data are kept.
+- Migration: none.
+
+## DEC-058 A cancelled booking is refunded by the business's own policy, never beyond what was received
+
+**Status: Accepted — 2026-09-28** — amends [DEC-051](#dec-051-a-bookings-deposit-is-refunded-once-against-a-free-cancel-deadline-fixed-at-booking) · round-2 plan E (E8, E30)
+
+- Context: E8 refunded any money paid online when a booking was cancelled in time. Which cancellations are refunded is the business's refund policy, and Saroh doesn't set it.
+- Decision: **each business sets its own policy for cancellations made in time**, in its booking settings: refund what the customer paid online automatically, or don't. Saroh follows that setting. **A refund is never more than the money actually received** for that booking, and a late cancel is never refunded automatically. Staff with `payment:manage` can still refund by hand, within what was received. DEC-051's mechanics stay as they are: the fixed free-cancel deadline, one refund under the booking's lock, and the provider called after commit.
+- Consequences: the booking page and the cancel dialog state the business's policy as it is set. A business that never set it gets the default, automatic refund of what was paid online, which is what E8 shipped. The setting's copy makes plain that the business can change it.
+- Migration: one booking-policy setting per business, with a default; additive.
+
+## DEC-059 The payment window shows the methods the business's account has switched on
+
+**Status: Accepted — 2026-09-28** · round-2 plan E (E11, D23), plan D
+
+- Context: the booking page promised "UPI or card", and Razorpay's window was limited to UPI and card by Saroh, while Cashfree's showed whatever the account had switched on.
+- Decision: **Saroh doesn't choose or restrict payment methods.** The provider's window shows the methods the business has switched on in its Razorpay or Cashfree account. Saroh's copy names no methods it can't vouch for: at most, it shows methods the provider reports as switched on for that account.
+- Consequences: Razorpay's UPI-and-card-only display block is removed. "UPI or card" becomes neutral copy, such as "Pay online in the ‹Razorpay› window", unless the provider reports the account's methods.
+- Migration: none.

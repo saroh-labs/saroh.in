@@ -16,6 +16,7 @@ import {
 } from "@/lib/services/service-editor";
 import type { StaffView } from "@/lib/staff/types";
 
+import { DepositField } from "./deposit-field";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
 import { WhereField } from "./where-field";
 
@@ -150,7 +151,12 @@ export function PriceSection({
                 onChange={(e) => set({ price: e.target.value })}
                 className={cn(FIELD, "w-[160px] max-w-full")}
             />
-            {/* E8's "At booking, they pay" goes here. */}
+            <DepositField
+                deposit={draft.deposit}
+                price={draft.price}
+                currency={currency}
+                onChange={(deposit) => set({ deposit })}
+            />
         </Section>
     );
 }

@@ -130,6 +130,8 @@ export async function duplicateProduct(
             seoTitle: source.seoTitle,
             seoDescription: source.seoDescription,
             optionId: source.optionId,
+            // Fulfilled the ways the original is (B12).
+            fulfilmentTypes: source.fulfilmentTypes,
             // Tracks stock as the original does (#515), from 0.
             stockTracked: source.stockTracked,
             stockTrackedAt: source.stockTracked ? new Date() : null,

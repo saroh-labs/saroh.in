@@ -96,6 +96,32 @@ for (const role of ["MEMBER", "REVIEWER"]) {
     });
 }
 
+test("REVIEWER's Home is what was sent to them for review, and nothing about the business", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "REVIEWER");
+    await page.goto("/");
+    await expect(
+        page.getByRole("heading", { name: "Sent to you for review" }),
+    ).toBeVisible();
+    // A row per page waiting, opening the Review tab on that page.
+    const row = page.getByRole("link", { name: /Home.*From Priya Raman/ });
+    await expect(row).toHaveAttribute(
+        "href",
+        "/sites/site_1/review?page=page_1",
+    );
+    await expect(row).toContainText("2 notes open");
+    // None of the business's bands.
+    for (const band of ["Needs you", "Today", "This week"]) {
+        await expect(
+            page.getByRole("heading", { name: band, exact: true }),
+        ).toHaveCount(0);
+    }
+    await row.click();
+    await expect(page).toHaveURL(/\/sites\/site_1\/review\?page=page_1$/);
+});
+
 test("production 403 uses the editor permission boundary", async ({
     page,
     context,
@@ -282,6 +308,59 @@ test("a failed Orders read says so, and is never an empty list", async ({
     await expect(page.getByText("No orders yet")).toHaveCount(0);
     // No tabs or counts around the message: none of them would be true.
     await expect(page.getByRole("navigation", { name: "Orders" })).toHaveCount(
+        0,
+    );
+});
+
+test("a Manager who edits roles can give only what they hold (F19)", async ({
+    page,
+    context,
+}) => {
+    // Holds `member:role:update` and storefronts, but no money.
+    await scenario(context, "MANAGER");
+    await page.goto("/settings/people?view=roles");
+
+    // Counter is within reach: what the Manager holds can be ticked, and
+    // what they don't is locked with the reason beside it.
+    await expect(
+        page.getByRole("heading", { name: "Counter", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "Change storefronts, not allowed" }),
+    ).toBeEnabled();
+    await expect(
+        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+    ).toBeDisabled();
+    await expect(
+        page.getByText("You don't have this yourself, so you can't give it.", {
+            exact: true,
+        }),
+    ).toHaveCount(1);
+
+    // Their own role follows the same rule: nothing they lack can be added.
+    await page.getByRole("button", { name: /^Manager/ }).click();
+    await expect(
+        page.getByRole("heading", { name: "Manager", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+    ).toBeDisabled();
+
+    // Senior holds payments, so it is above them: read-only, and it says why.
+    await page.getByRole("button", { name: /^Senior/ }).click();
+    await expect(
+        page.getByRole("heading", { name: "Senior", exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "This role can do things you can't (Manage payments), so only someone who can do all of them may change it.",
+        ),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("switch", { name: "See orders, allowed" }),
+    ).toBeDisabled();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove role" })).toHaveCount(
         0,
     );
 });

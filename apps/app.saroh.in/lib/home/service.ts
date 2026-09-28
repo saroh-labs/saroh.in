@@ -174,7 +174,44 @@ export interface HomeLastDay {
     items: HomeSinceItem[];
 }
 
+/** Whose Home this is (F9): the business's, or a Reviewer's. */
+export type HomeView = "business" | "reviewer";
+
+/** A page of a site a Reviewer was asked to review (F9). */
+export interface HomeReviewPage {
+    id: string;
+    title: string;
+    path: string;
+    openNotes: number;
+    /** The Review tab, opened on this page. */
+    href: string;
+}
+
+/**
+ * A site a Reviewer was granted (F9): its pages, who asked for the review
+ * and when while it waits on them, and the notes still open. The API sends
+ * only the sites they were granted. See `lib/home/reviews.ts`.
+ */
+export interface HomeReviewSite {
+    id: string;
+    name: string;
+    href: string;
+    /** Who asked, while nobody has answered; else null. */
+    requestedBy: string | null;
+    requestedAt: string | null;
+    openNotes: number;
+    /** Up to five visible pages, home first. */
+    pages: HomeReviewPage[];
+    pageCount: number;
+    subdomain: string | null;
+    live: boolean;
+}
+
 export interface HomeModel {
+    /** Absent from an API before F9, which is the business's Home. */
+    view: HomeView;
+    /** A Reviewer's sites (F9); only on `view: "reviewer"`. */
+    reviews?: HomeReviewSite[];
     actions: HomeAction[];
     primaryAction: HomeAction | null;
     hasAnyModule: boolean;
@@ -193,6 +230,7 @@ export interface HomeModel {
 }
 
 const EMPTY: HomeModel = {
+    view: "business",
     actions: [],
     primaryAction: null,
     hasAnyModule: false,
@@ -224,8 +262,10 @@ async function readHome(projectId?: string): Promise<HomeModel> {
     const read = (await res.json()) as HomeModel;
     // An API from before F5 sends no `today`: no column, not an empty day.
     // One from before F6 sends no `lastDay`: a plain greeting, no strip.
+    // One from before F9 sends no `view`: it is the business's Home.
     const model: HomeModel = {
         ...read,
+        view: read.view === "reviewer" ? "reviewer" : "business",
         today: read.today ?? null,
         lastDay: read.lastDay ?? null,
     };

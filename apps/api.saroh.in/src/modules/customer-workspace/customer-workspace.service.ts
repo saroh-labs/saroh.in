@@ -3,6 +3,7 @@ import type { CustomerLinkReason } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditAction } from "../audit/audit.service";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { MatchedOn } from "./duplicates";
@@ -49,7 +50,7 @@ export interface ContactDuplicateSuggestion {
 export type Suggestion = IdentitySuggestion | ContactDuplicateSuggestion;
 
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -308,6 +309,26 @@ export class CustomerWorkspaceService {
                     moduleKey: "COMMUNICATIONS",
                 });
         }
+
+        // A merge into this person (C9): the audit row names them as the
+        // target. It is about the person, not a module, so it always shows.
+        const merges = await this.db.auditEvent.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                action: AuditAction.CustomerMerged,
+                targetType: "contact",
+                targetId: contactId,
+            },
+            select: { createdAt: true },
+            take: 50,
+        });
+        for (const merge of merges)
+            events.push({
+                type: "MERGE",
+                at: merge.createdAt.toISOString(),
+                title: "Merged with a duplicate",
+                moduleKey: "CRM",
+            });
 
         events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
         return { events };

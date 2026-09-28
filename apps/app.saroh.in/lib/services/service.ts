@@ -22,8 +22,8 @@ export type ServiceStatus = "ACTIVE" | "ARCHIVED";
 export type LocationType = "IN_PERSON" | "ONLINE" | "EITHER";
 
 /**
- * What is paid at booking (E1), as a share of the price. The API stores it
- * now and takes it from E8; nothing in the workspace sets it before then.
+ * What is paid at booking (E1), as a share of the price: the Service
+ * Editor sets it and the booking page takes it (E8).
  */
 export type DepositMode = "NONE" | "PERCENT_25" | "PERCENT_50" | "FULL";
 
@@ -75,7 +75,11 @@ export interface AvailabilityRule {
 // which imports nothing — the bookings TABLE is a client component and this
 // module reaches next/headers through the CRM HTTP plumbing. Imported for use
 // below AND re-exported, so server callers still have one place to look.
+import type { BookingMoney, CancelMoney } from "./booking-money";
 import type { BookingOutcome, BookingStatus } from "./booking-state";
+
+/** A cancelled booking, and what the cancel did with its money (E8). */
+export type CancelledBooking = Booking & { money?: CancelMoney };
 
 export type { BookingOutcome, BookingStatus };
 
@@ -96,6 +100,12 @@ export interface Booking {
     bookerPhone: string | null;
     createdAt: string;
     cancelledAt: string | null;
+    /**
+     * The free-cancel deadline fixed when it was booked (E8, DEC-051); a
+     * move never changes it. Null with no rule then, and absent from an
+     * API older than it.
+     */
+    freeCancelUntil?: string | null;
     /**
      * The CRM contact this booking belongs to, when one is linked.
      *
@@ -143,6 +153,8 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
         reversedAt: string | null;
         purchase: { id: string; pack: { name: string } };
     } | null;
+    /** Paid online, due at the visit and any refund (E8); the API's sums. */
+    money?: BookingMoney;
 }
 
 /** One open slot on a service, as the api's availability preview returns it. */
@@ -579,11 +591,12 @@ export function rescheduleBooking(
 export function cancelBooking(
     bookingId: string,
     options: { returnCredit?: boolean } = {},
-): Promise<CrmResult<Booking>> {
+): Promise<CrmResult<CancelledBooking>> {
     // The business calling a class off gives a pack's class back even inside
-    // the free-cancellation window (U15).
+    // the free-cancellation window (U15), and — for someone who may refund —
+    // money a late cancel would keep (E8).
     const query = options.returnCredit ? "?returnCredit=true" : "";
-    return send<Booking>(
+    return send<CancelledBooking>(
         `/bookings/${bookingId}${query}`,
         "DELETE",
         undefined,

@@ -27,6 +27,7 @@ import { PaymentsService } from "../payments/payments.service";
 import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
 import {
+    assertItemsAllow,
     FULFILMENT_RULES,
     goesByCourier,
     isHandedOver,
@@ -196,7 +197,14 @@ export class OrderKitchenService {
                     toStage: move.to,
                     fromStatus: move.fromStatus,
                     toStatus: move.toStatus,
-                    note: dto.note ?? null,
+                    // The handover's step says who took it and their number
+                    // ("Delhivery · AWB4411"), as they were at the handover:
+                    // the order's own fields may be corrected later.
+                    note:
+                        dto.note ??
+                        (move.to === "HANDED_TO_COURIER"
+                            ? handoverNote(dto)
+                            : null),
                 },
                 select: { id: true },
             });
@@ -569,6 +577,25 @@ export class OrderKitchenService {
                     field: "address",
                 });
             }
+            // A product that lists how it may leave refuses any other way
+            // (B12): checked when the way changes or a line comes in, over
+            // every line the order keeps.
+            if (newStored || added.length > 0) {
+                const removed = new Set(
+                    (dto.lines ?? [])
+                        .filter((c) => c.quantity === 0)
+                        .map((c) => c.itemId),
+                );
+                assertItemsAllow(
+                    [
+                        ...order.items
+                            .filter((i) => !removed.has(i.id))
+                            .map((i) => i.product),
+                        ...added,
+                    ],
+                    type,
+                );
+            }
             if (newStored) {
                 changes.push(
                     type === "LOCAL_DELIVERY"
@@ -776,6 +803,14 @@ const COURIER_FIELD_WORDS: Record<CourierField, string> = {
     trackingUrl: "A tracking link",
 };
 
+/** The handover step's words: the courier and number given with it, if any. */
+function handoverNote(dto: MoveStageDto): string | null {
+    const words = [dto.courierName, dto.trackingNumber].filter(
+        (w): w is string => typeof w === "string" && w !== "",
+    );
+    return words.length > 0 ? words.join(" · ") : null;
+}
+
 /**
  * Record the courier's name, number or link on an order handed to a courier
  * (DEC-045), under the lock the edit took. A pick-up, a digital order or an
@@ -975,7 +1010,13 @@ async function lockOrder(
             items: {
                 orderBy: { id: "asc" },
                 include: {
-                    product: { select: { name: true, status: true } },
+                    product: {
+                        select: {
+                            name: true,
+                            status: true,
+                            fulfilmentTypes: true,
+                        },
+                    },
                     refundLines: {
                         where: {
                             paymentRefund: { status: { not: "FAILED" } },

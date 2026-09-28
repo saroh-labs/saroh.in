@@ -25,6 +25,7 @@
  *   Contact/Lead/Pipeline/Stage/Activity ............ CRM
  *   Service/AvailabilityRule/Booking ................ APPOINTMENTS
  *   Course ........................................... COURSES
+ *   ClassPack/PackPurchase ........................... CLASS_PACKS
  *   Store/Product/StockLevel/Cart/Order/Customer .... COMMERCE
  *   MerchantPaymentProvider/PaymentIntent/
  *     PaymentAttempt/WebhookEvent ................... PAYMENTS
@@ -107,6 +108,15 @@ export async function deriveModuleEvidence(
 
     if (await anyExists(client.course.count({ where }))) {
         evidence.add("COURSES");
+    }
+
+    if (
+        await anyExists(
+            client.classPack.count({ where }),
+            client.packPurchase.count({ where }),
+        )
+    ) {
+        evidence.add("CLASS_PACKS");
     }
 
     if (

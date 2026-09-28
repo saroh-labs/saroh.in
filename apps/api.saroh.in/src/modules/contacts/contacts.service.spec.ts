@@ -106,7 +106,7 @@ describe("ContactsService.list", () => {
         await service.list(ctx());
 
         expect(findMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1" },
+            where: { organizationId: "org_1", mergedIntoId: null },
             orderBy: { createdAt: "desc" },
         });
     });

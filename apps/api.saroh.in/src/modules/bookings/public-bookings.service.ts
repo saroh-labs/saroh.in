@@ -23,6 +23,7 @@ import {
     renewHoldTokenInTx,
 } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
+import { paidADeposit } from "./booking-money";
 import {
     bookingWindowRefusal,
     loadBookingRules,
@@ -37,6 +38,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import type { BookPay } from "./dto";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -60,6 +62,7 @@ import {
     ownHoldOn,
     reserve,
 } from "./reservation";
+import { depositCents } from "./service-fields";
 import { serviceStaff } from "./staff-availability";
 
 /**
@@ -319,9 +322,15 @@ export class PublicBookingsService {
         // The booker is the account's, never the page's (A9): its verified
         // email, and its contact's name and phone. A name typed on the page
         // is used only when the contact has none yet.
-        const input = signedIn
+        const asked = signedIn
             ? await this.signedInBooker(signedIn, given)
             : given;
+        // How they pay, as the service allows it (E8): a deposit service is
+        // paid online, in part or in full; any other never takes a deposit.
+        const input: BookInput = {
+            ...asked,
+            pay: payAtBooking(service, asked.pay),
+        };
         // Where and the note are checked before anything is held (E7): an
         // answer to Where the service can't give, or a note past its length.
         const place = bookingLocation(service.locationType, input.locationType);
@@ -359,9 +368,12 @@ export class PublicBookingsService {
             startAt.getTime() + service.durationMinutes * 60_000,
         );
         // Pay now is refused before anything is held: no price, or no way
-        // for this business to take the money online.
+        // for this business to take the money online. A deposit is its
+        // share of the price, worked out here — never the client's (E8).
         const price =
-            input.pay === "NOW" ? await this.onlinePrice(service) : null;
+            input.pay === "NOW" || input.pay === "DEPOSIT"
+                ? await this.onlinePrice(service, input.pay)
+                : null;
 
         // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
         //    the replay too, so replays cannot be used to probe for keys.
@@ -457,7 +469,10 @@ export class PublicBookingsService {
                     billToName: booking.bookerName,
                     billToEmail: booking.bookerEmail ?? "",
                     service: {
-                        name: service.name,
+                        name:
+                            input.pay === "DEPOSIT"
+                                ? `Deposit for ${service.name}`
+                                : service.name,
                         priceCents: price.cents,
                         currency: price.currency,
                         timezone: service.timezone,
@@ -574,7 +589,9 @@ export class PublicBookingsService {
             existing.paidWith === "DESK"
                 ? "DESK"
                 : existing.paidWith === "PAID" || existing.holdExpiresAt
-                  ? "NOW"
+                  ? paidADeposit(existing.snapshot)
+                      ? "DEPOSIT"
+                      : "NOW"
                   : undefined;
         if (
             (existing.bookerEmail ?? "").toLowerCase() !==
@@ -600,11 +617,13 @@ export class PublicBookingsService {
     }
 
     /**
-     * What pay now charges for a service: its price, when it has one and the
-     * business can take money online (Payments on, a provider connected).
+     * What pay now charges for a service: its price — or, paying a deposit,
+     * the deposit worked out from it (E8) — when it has one and the business
+     * can take money online (Payments on, a provider connected).
      */
     private async onlinePrice(
         service: Service,
+        pay: "NOW" | "DEPOSIT",
     ): Promise<{ cents: number; currency: string }> {
         if (
             !service.priceCents ||
@@ -617,13 +636,55 @@ export class PublicBookingsService {
                 field: "pay",
             });
         }
+        const deposit = depositCents(service.priceCents, service.depositMode);
         if (!(await takesOnlinePayment(service.organizationId))) {
             throw new ConflictException({
                 message:
-                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+                    deposit === null
+                        ? "This business isn't taking payment online right now. Book it to pay at the desk."
+                        : "This business can't take the deposit online right now. Get in touch with them to book.",
                 field: "pay",
             });
         }
-        return { cents: service.priceCents, currency: service.currency };
+        return {
+            cents:
+                pay === "DEPOSIT" && deposit !== null
+                    ? deposit
+                    : service.priceCents,
+            currency: service.currency,
+        };
     }
+}
+
+/**
+ * How a booking is paid, as its service allows (E8, default 39). A service
+ * that takes a deposit is paid online: its deposit, or the whole price, and
+ * never at the desk — a full-price deposit is simply paying now. A service
+ * that takes none is paid now or at the desk, and a deposit is refused.
+ */
+export function payAtBooking(
+    service: Pick<Service, "priceCents" | "depositMode">,
+    pay: BookPay | undefined,
+): BookPay | undefined {
+    const deposit = depositCents(service.priceCents, service.depositMode);
+    if (deposit === null) {
+        if (pay === "DEPOSIT") {
+            throw new BadRequestException({
+                message:
+                    "This takes no deposit. Pay now or pay at the desk instead.",
+                field: "pay",
+            });
+        }
+        return pay;
+    }
+    if (pay === "NOW" || pay === "DEPOSIT") {
+        return service.depositMode === "FULL" ? "NOW" : pay;
+    }
+    throw new BadRequestException({
+        message:
+            service.depositMode === "FULL"
+                ? "This is paid online when you book."
+                : "This takes a deposit when you book. Pay the deposit or the full price online.",
+        field: "pay",
+    });
 }

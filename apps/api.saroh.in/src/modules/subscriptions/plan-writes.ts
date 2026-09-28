@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { fromCents, toCents } from "../invoices/totals";
@@ -12,6 +16,7 @@ import {
     recordPlanEdit,
     recordPlanEvent,
 } from "./plan-events";
+import { PLAN_DRAFT, PLAN_NOT_PUBLISHED } from "./plan-on-sale";
 import { assertPlanNameFree, lockPlan, lockPlanNames } from "./plans";
 
 /**
@@ -139,6 +144,15 @@ export async function setPlanStatusRow(
             select: { name: true, status: true },
         });
         if (!plan) planNotFound();
+        // A draft is sold only by publishing it (D5). "Sell again" would put
+        // it on sale unchecked, and archiving it would let "Sell again" do so
+        // next; both are refused, whichever the draft (D21).
+        if (plan.status === PLAN_DRAFT) {
+            throw new ConflictException({
+                message: PLAN_NOT_PUBLISHED,
+                details: { field: "status" },
+            });
+        }
         if (status === "ACTIVE" && plan.status === "ARCHIVED") {
             await assertPlanNameFree(tx, organizationId, plan.name, id);
         }

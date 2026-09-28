@@ -51,7 +51,8 @@ export function PayingCard({
     booker: CheckoutRequest["booker"];
     /** Letting the hold go, or booking it at the desk, is under way. */
     busy: boolean;
-    onDesk: () => void;
+    /** Book it to pay at the desk instead; absent for a deposit (E8). */
+    onDesk?: () => void;
     onBack: () => void;
     /** The provider's window closed on a payment. */
     onPaid: () => void;
@@ -123,22 +124,29 @@ export function PayingCard({
                                 Try again
                             </button>
                         ) : null}
-                        <button
-                            type="button"
-                            onClick={onDesk}
-                            aria-disabled={busy}
-                            className={cn(
-                                refused ? quiet : primary,
-                                busy && idle,
-                            )}
-                        >
-                            {busy ? "Booking…" : "Book it to pay at the desk"}
-                        </button>
+                        {onDesk ? (
+                            <button
+                                type="button"
+                                onClick={onDesk}
+                                aria-disabled={busy}
+                                className={cn(
+                                    refused ? quiet : primary,
+                                    busy && idle,
+                                )}
+                            >
+                                {busy
+                                    ? "Booking…"
+                                    : "Book it to pay at the desk"}
+                            </button>
+                        ) : null}
                         <button
                             type="button"
                             onClick={onBack}
                             aria-disabled={busy}
-                            className={cn(quiet, busy && idle)}
+                            className={cn(
+                                refused || onDesk ? quiet : primary,
+                                busy && idle,
+                            )}
                         >
                             Pick another time
                         </button>

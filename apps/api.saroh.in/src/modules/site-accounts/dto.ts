@@ -9,8 +9,9 @@ import {
     MaxLength,
 } from "class-validator";
 
-import type { BookingLocationType } from "../bookings/dto";
+import type { BookingLocationType, BookPay } from "../bookings/dto";
 import {
+    BOOK_PAY,
     BOOKING_LOCATION_TYPES,
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
@@ -87,9 +88,10 @@ export class AccountBookDto {
     @MaxLength(64)
     staffId?: string;
 
+    /** NOW, DEPOSIT (E8) or DESK; the amount is always the server's. */
     @IsOptional()
-    @IsIn(["NOW", "DESK"])
-    pay?: "NOW" | "DESK";
+    @IsIn(BOOK_PAY)
+    pay?: BookPay;
 
     @IsOptional()
     @IsIn(BOOKING_LOCATION_TYPES, {

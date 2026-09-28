@@ -231,8 +231,11 @@ as they are.
 - **Order fulfilment, release 2 (B2c)** is a separate release, after this one
   has been live (API and frontends) in production. Its checklist is
   `ORDER_FULFILMENT_ROLLOUT.md`, release 2.
-- **The anonymous booking route closes in the next release.** This release
-  keeps `POST public/services/:serviceId/book` serving so a page loaded
-  before the deploy still books. The next release makes it answer 410 "Sign
-  in to book" (customer accounts plan, A9); from then on, rolling back
-  saroh.app past this release breaks booking.
+- **The anonymous booking route is closed (round 2, phase 2, E8).** This
+  release kept `POST public/services/:serviceId/book` serving so a page
+  loaded before the deploy still booked. A9 is in production, so phase 2's
+  first release (CP-1) makes it answer 410 "Sign in to book" (customer
+  accounts plan, A9): it reads no body and books nothing. From then on,
+  rolling back saroh.app past this release breaks booking. Before CP-1,
+  check that the production renderer includes A9 (it has since #537), so no
+  cached page still posts to it.

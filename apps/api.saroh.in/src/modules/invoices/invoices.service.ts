@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { authorize } from "../organizations/organization-policy";
 import type {
     CreditInvoiceDto,
@@ -702,7 +703,18 @@ export class InvoicesService {
             { billToGstin: null, billToState: null, billToAddress: null },
             input.tax ?? "0",
         );
-        const billTo = await this.billTo(tx, organizationId, input.contactId);
+        // The renewal job and a sale name a contact read before this
+        // transaction: a merge since then points it at the survivor (C9).
+        const resolved = await resolveContact(
+            tx,
+            input.contactId,
+            organizationId,
+        );
+        if (!resolved || resolved.removed) {
+            fieldError("That contact was not found", "contactId");
+        }
+        const contactId = resolved.id;
+        const billTo = await this.billTo(tx, organizationId, contactId);
         const issuedAt = input.issuedAt ?? new Date();
         const number = await numberFor(
             tx,
@@ -716,7 +728,7 @@ export class InvoicesService {
                 organizationId,
                 status: "ISSUED",
                 number,
-                contactId: input.contactId,
+                contactId,
                 ...billTo,
                 currency: input.currency,
                 ...documentColumns(doc),

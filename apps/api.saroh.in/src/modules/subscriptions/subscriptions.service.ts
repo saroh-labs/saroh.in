@@ -10,6 +10,7 @@ import { DateTime, IANAZone } from "luxon";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
@@ -51,6 +52,7 @@ import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
 import type { PlanEventsPage } from "./plan-events";
 import { listPlanEvents, planActor } from "./plan-events";
+import { assertPlanOnSale } from "./plan-on-sale";
 import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
@@ -434,12 +436,8 @@ export class SubscriptionsService {
         ]);
         if (!contact) notFound("Contact", "contactId");
         if (!plan) notFound("Plan", "planId");
-        if (plan.status !== "ACTIVE") {
-            fieldError(
-                "That plan is archived and takes no new sign-ups",
-                "planId",
-            );
-        }
+        // A draft isn't published yet; an archived plan takes no one new.
+        assertPlanOnSale(plan);
 
         // A cleared business timezone is stored as "", which is no zone.
         const timezone =
@@ -476,11 +474,18 @@ export class SubscriptionsService {
         const id = await prisma
             .$transaction(async (tx) => {
                 await assertPaymentsOn(tx, organizationId, "subscribe people");
+                // Merged since the page loaded (C9)? Subscribe the survivor.
+                const person = await resolveContact(
+                    tx,
+                    contact.id,
+                    organizationId,
+                );
+                if (!person || person.removed) notFound("Contact", "contactId");
                 const created = await tx.customerSubscription.create({
                     data: {
                         organizationId,
                         planId: plan.id,
-                        contactId: contact.id,
+                        contactId: person.id,
                         status: "ACTIVE",
                         price,
                         currency: plan.currency,
@@ -500,7 +505,7 @@ export class SubscriptionsService {
                     invoiceId = await this.invoicePeriod(tx, {
                         organizationId,
                         subscriptionId: created.id,
-                        contactId: contact.id,
+                        contactId: person.id,
                         planName: plan.name,
                         price,
                         currency: plan.currency,
@@ -1013,12 +1018,8 @@ export class SubscriptionsService {
                 },
             });
             if (!plan) notFound("Plan", "planId");
-            if (plan.status !== "ACTIVE") {
-                fieldError(
-                    "That plan is archived and takes no new sign-ups",
-                    "planId",
-                );
-            }
+            // Switching onto a plan sells it: never a draft or an archived one.
+            assertPlanOnSale(plan);
             if (plan.id === sub.planId) {
                 fieldError(`They are already on ${plan.name}`, "planId");
             }

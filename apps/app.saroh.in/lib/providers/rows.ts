@@ -24,12 +24,19 @@ import type {
  */
 
 /**
- * CONNECTED — working. DISCONNECTED — someone disconnected it, so nothing
- * is being sent or taken through it. NOT_CONNECTED — never set up.
- * PENDING / FAILED — a domain's DNS check, waiting or failed.
+ * CONNECTED — working. ATTENTION — connected, but missing something it
+ * needs to work (a Razorpay connection without its public key id).
+ * DISCONNECTED — someone disconnected it, so nothing is being sent or taken
+ * through it. NOT_CONNECTED — never set up. PENDING / FAILED — a domain's
+ * DNS check, waiting or failed.
  */
 export type ProviderRowState =
-    "CONNECTED" | "DISCONNECTED" | "NOT_CONNECTED" | "PENDING" | "FAILED";
+    | "CONNECTED"
+    | "ATTENTION"
+    | "DISCONNECTED"
+    | "NOT_CONNECTED"
+    | "PENDING"
+    | "FAILED";
 
 /** What to call a connection's own account, so it can be found there. */
 export interface ProviderRef {
@@ -56,7 +63,7 @@ export interface ProviderEntry {
     key: string;
     name: string;
     type: ProviderType;
-    state: "CONNECTED" | "DISCONNECTED" | "NOT_CONNECTED";
+    state: "CONNECTED" | "ATTENTION" | "DISCONNECTED" | "NOT_CONNECTED";
     /** What it does for the business; empty for one not connected. */
     note: string;
     refs: ProviderRef[];
@@ -177,6 +184,27 @@ export interface ProviderRowsInput {
     checkout: { name: string; provider: string | null }[];
 }
 
+/**
+ * A Razorpay key id, test or live — the same check the API makes
+ * (`payments/public-key.ts`), so setup can say what's wrong before saving.
+ */
+export const RAZORPAY_KEY_ID = /^rzp_(test|live)_[A-Za-z0-9]+$/;
+
+/**
+ * A connected Razorpay account without its public key id (DEC-054): its
+ * checkout window can't open, so the API takes no online payment through
+ * it. Setup stores the key id as the public key since D22, and a backfill
+ * filled every older connection it could read; one left over needs its keys
+ * entered again.
+ */
+export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
+    return (
+        p.provider === "RAZORPAY" &&
+        p.status === "CONNECTED" &&
+        !p.publicKey?.trim()
+    );
+}
+
 const PAYMENTS_CONSEQUENCE =
     "Checkout stops taking card and UPI payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back.";
 
@@ -235,6 +263,7 @@ function paymentEntry(
     input: ProviderRowsInput,
 ): ProviderEntry {
     const live = p.status === "CONNECTED";
+    const attention = needsPublicKey(p);
     // The storefronts whose checkout really charges through it.
     const stores = input.checkout
         .filter((s) => s.provider === p.provider)
@@ -243,15 +272,17 @@ function paymentEntry(
         key: `payments:${p.provider}`,
         name: providerName(p.provider),
         type: "Payments",
-        state: live ? "CONNECTED" : "DISCONNECTED",
+        state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
             ? "Disconnected — checkout can't take card or UPI payments through it until it is connected again."
-            : stores.length > 0
-              ? sentence(`Takes card and UPI payments at ${words(stores)}`)
-              : "Ready to take card and UPI payments — no storefront's checkout uses it yet.",
+            : attention
+              ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+              : stores.length > 0
+                ? sentence(`Takes card and UPI payments at ${words(stores)}`)
+                : "Ready to take card and UPI payments — no storefront's checkout uses it yet.",
         refs:
-            live && p.publicKey
-                ? [{ label: "Public key", code: p.publicKey }]
+            live && p.publicKey?.trim()
+                ? [{ label: "Public key", code: p.publicKey.trim() }]
                 : [],
         manageHref: live ? dashboardFor(p.provider) : null,
         target: live ? { kind: "payments", provider: p.provider } : null,

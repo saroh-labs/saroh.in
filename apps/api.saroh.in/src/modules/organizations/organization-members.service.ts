@@ -28,6 +28,7 @@ import {
     authorize,
     isBuiltInRole,
     resolveCapabilities,
+    withinReach,
 } from "./organization-policy";
 
 /** A week. Long enough to survive a holiday, short enough to expire. */
@@ -721,8 +722,8 @@ export class OrganizationMembersService {
      * can be granted to a role like "Stock clerk"; without this, whoever holds
      * it could give themselves Owner, or demote the Owner, and the owner who
      * granted it would have handed over the business by ticking one box. The
-     * catalogue WARNS about that permission; this is what makes the warning
-     * true rather than merely honest.
+     * role editor asks the same question of what a role may be given (F19);
+     * both go through `withinReach` in the policy.
      *
      * It also changes one thing for the built-ins, deliberately: an Admin can
      * no longer make someone an Owner, because Owner can close the business
@@ -743,8 +744,7 @@ export class OrganizationMembersService {
             roleKey,
             mustExist,
         );
-        const beyond = [...theirs].filter((a) => !allows(ctx, a));
-        if (beyond.length > 0) {
+        if (!withinReach(ctx, theirs)) {
             throw new ForbiddenException(
                 `You cannot ${verb} a role that can do more than you can.`,
             );
