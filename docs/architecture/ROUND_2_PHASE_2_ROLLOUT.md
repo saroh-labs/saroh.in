@@ -298,3 +298,37 @@ the drafts first:
 ```sql
 SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
 ```
+
+## E20: the calendar reads a range (wave 3)
+
+`GET organizations/:org/calendar` takes `from`/`to` (local dates, both
+inclusive, at most 62 days) as well as `month` (`calendar/range.ts`). No
+migration.
+
+- **API before app.** The new workspace asks for `from`/`to`, which the old
+  API refuses (400), so deploy the API first. The old workspace sends
+  `month`, which the new API still answers, and ignores the new fields
+  (`staffId`, `durationMinutes`, `flags`, `daysOff`, `hasStaff`, `staff`)
+  and the new `payments` layer.
+- **`month` is an alias for one release.** It is not held to the range:
+  the old workspace reads `joinedAt` from the answer and pulls the address
+  back itself. Follow-up Z3 removes it once no old workspace is live.
+- **What the new API refuses:** a range wholly before the month the
+  business joined (`details.reason: "before_joined"`, `earliestMonth`), or
+  wholly past three months ahead (`too_far_ahead`, `latestMonth`). The new
+  workspace opens that month instead. A role that reads none of orders,
+  bookings, subscriptions, invoices or payments gets 403, which the
+  workspace shows as its locked card.
+
+### Verify
+
+1. `/calendar` opens this month; `/calendar?month=<a month before the
+business joined>` opens the joined month, with no error page.
+2. `/calendar?month=<four months ahead>` opens the third month ahead.
+3. Kavi Dental (no orders): the Payments layer lists its paid booking
+   invoices.
+
+### Rollback
+
+Roll the workspace back first (it asks for `from`/`to`), then the API.
+Nothing is stored.

@@ -10,7 +10,9 @@ export type LayerKey =
     | "subscriptions"
     | "invoices"
     | "bookings"
-    | "classes";
+    | "classes"
+    /** Paid invoices, for a business with no orders (E20: the clinic). */
+    | "payments";
 
 export type LinkType =
     "order" | "subscription" | "invoice" | "booking" | "service";
@@ -39,6 +41,27 @@ export interface CalendarItem {
     amount?: string;
     currency?: string;
     link: CalendarLink;
+    /** Bookings and classes (E20): who it is with; null when nobody. */
+    staffId?: string | null;
+    /** Bookings and classes (E20): how long it takes. */
+    durationMinutes?: number;
+    /** What is wrong with it or became of it (E20). */
+    flags?: ("late" | "no_show" | "cancelled" | "failed")[];
+}
+
+/** A closure or someone's time off, over the days read (E20). */
+export interface DayOff {
+    kind: "closure" | "time_off";
+    startAt: string;
+    /** Exclusive. */
+    endAt: string;
+    allDay: boolean;
+    /** The days read it touches, "YYYY-MM-DD" in the business's zone. */
+    dates: string[];
+    /** Time off, for someone who reads bookings: whose. */
+    staffId?: string;
+    name?: string;
+    reason?: string | null;
 }
 
 export interface LayerDay {
@@ -58,7 +81,7 @@ export interface CalendarDay {
 }
 
 export interface CalendarUnavailable {
-    source: LayerKey | "takings";
+    source: LayerKey | "takings" | "money" | "days_off";
     label: string;
 }
 
@@ -91,4 +114,10 @@ export interface CalendarMonth {
      * could not be read: no back edge then.
      */
     joinedAt?: string | null;
+    /** Closures and time off (E20); null when they could not be read. */
+    daysOff?: DayOff[] | null;
+    /** Whether the business has a team (E20); null when unread. */
+    hasStaff?: boolean | null;
+    /** The team, for someone who reads bookings (E20). */
+    staff?: { id: string; name: string; title: string | null }[];
 }
