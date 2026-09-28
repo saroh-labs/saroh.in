@@ -42,6 +42,9 @@ import { PLAN_OFFLINE } from "./plan-api";
  * With packs on sale (A11, `packs`), the Class packs card shows even with
  * none held, and "Buy a pack" opens the sheet that buys one online — or
  * says to buy at the desk when the business takes no payment online.
+ *
+ * With no plan, "See plans" goes to the site's Prices page (G20), where the
+ * member can join one — when the site has one to show.
  */
 
 export type { PayNowResult, PlanApi, PlanChangeResult } from "./plan-api";
@@ -52,6 +55,11 @@ export interface PlanTabProps {
     api: PlanApi;
     /** Packs on sale online and the actions that buy one (A11). */
     packs?: PlanPacksShop | null;
+    /**
+     * The site's Prices page, where plans are joined (G20), or null when
+     * the site shows none (no "See plans").
+     */
+    plansHref?: string | null;
 }
 
 /** What is being done, to which plan: one thing at a time. */
@@ -68,6 +76,7 @@ export function PlanTab({
     tab: initial,
     api,
     packs: shop = null,
+    plansHref = null,
 }: PlanTabProps) {
     const router = useRouter();
     const [tab, setTab] = useState(initial);
@@ -155,6 +164,13 @@ export function PlanTab({
                     labelledBy="plan-membership"
                     title="No plan yet"
                     lead={`You're not on a plan with ${account.businessName}.`}
+                    actions={
+                        plansHref ? (
+                            <a href={plansHref} className={buttonClasses(true)}>
+                                See plans
+                            </a>
+                        ) : undefined
+                    }
                 />
             ) : (
                 plans.value.map((plan, i) => (

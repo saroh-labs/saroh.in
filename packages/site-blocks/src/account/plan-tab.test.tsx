@@ -321,6 +321,21 @@ describe("PlanTab", () => {
         ).toBe(false);
     });
 
+    it("with no plan, See plans goes to the site's Prices page (G20)", () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([])}
+                api={api()}
+                plansHref="/prices"
+            />,
+        );
+        expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
+            "href",
+            "/prices",
+        );
+    });
+
     it("lists packs, a used-up one as such, and says when a part couldn't be read", () => {
         const { unmount } = render(
             <PlanTab
@@ -338,6 +353,8 @@ describe("PlanTab", () => {
         expect(
             screen.getByText("You're not on a plan with Pulse Fitness."),
         ).toBeTruthy();
+        // No Prices page on the site: nowhere to send them.
+        expect(screen.queryByRole("link", { name: "See plans" })).toBeNull();
         expect(screen.getByText("Active")).toBeTruthy();
         expect(screen.getByText("Used up")).toBeTruthy();
         unmount();

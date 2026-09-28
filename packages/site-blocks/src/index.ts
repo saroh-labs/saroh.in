@@ -45,12 +45,24 @@ export {
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
 export {
+    PACKS_ASK,
+    PACKS_BUY,
+    PACKS_TITLE,
+    default as PacksSection,
+    packEyebrow,
+    packPerClass,
+    packsOf,
+} from "./blocks/packs";
+export type { PacksFeed, PublicPack } from "./blocks/packs";
+export {
     PLANS_BUTTON,
+    PLANS_JOIN,
     default as PlansSection,
     joinHref,
     planEvery,
     planPrice,
     plansOf,
+    plansPayOnline,
 } from "./blocks/plans";
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export {
@@ -268,8 +280,20 @@ export type {
     PacksApi,
     PlanPacksShop,
 } from "./account/packs-api";
+// G20: joining a plan and buying a pack from the site's Prices page.
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
 export type { TrackLookup } from "./account/track-sheet";
+export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
+export type {
+    JoinApi,
+    JoinProblem,
+    JoinResult,
+    PlanJoinAttempt,
+    PlanJoinStarted,
+    PricesActions,
+} from "./prices/api";
+export { JoinSheet } from "./prices/join-sheet";
+export type { JoinSheetProps, JoinablePlan } from "./prices/join-sheet";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
