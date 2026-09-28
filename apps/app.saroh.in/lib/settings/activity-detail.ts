@@ -1,3 +1,9 @@
+import {
+    ALERT_CHANNEL_LABELS,
+    ALERT_CHANNELS,
+    ALERTS,
+} from "@/lib/notifications/preferences";
+
 import type { AuditEventRow, RoleLabels } from "./activity";
 import { personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
@@ -209,6 +215,25 @@ function detailRows(
                 rows: changes.map((c) =>
                     row(
                         where ? `${label}, ${where}` : label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    ),
+                ),
+                withoutValues: false,
+            };
+        }
+        case "member.alerts.update": {
+            // One of their own alerts (F14): "New order by Email", On or Off.
+            const alert = ALERTS.find((a) => a.key === meta.alert)?.label;
+            const channel = ALERT_CHANNELS.find((c) => c === meta.channel);
+            const label =
+                alert && channel
+                    ? `${alert} by ${ALERT_CHANNEL_LABELS[channel]}`
+                    : "An alert";
+            return {
+                rows: (recordedChanges(meta) ?? []).map((c) =>
+                    row(
+                        label,
                         shown(c.field, c.before),
                         shown(c.field, c.after),
                     ),
