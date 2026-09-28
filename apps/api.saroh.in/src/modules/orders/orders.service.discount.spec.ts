@@ -191,8 +191,9 @@ describe("OrdersService.create — delivery", () => {
                 postalCode: "560001",
             },
         });
+        // Stored in its type's own name from the switch release (B2c).
         expect(createData()).toMatchObject({
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             deliveryLine1: "12 Church Street",
         });
         await makeService().create("st_1", "u_1", {
@@ -203,8 +204,9 @@ describe("OrdersService.create — delivery", () => {
     });
 });
 
-// B2a, the expand release: either vocabulary in, only today's values stored.
-describe("OrdersService.create — fulfilment types (DEC-045, release 1)", () => {
+// B2c, the switch release: either vocabulary in, each type stored in its
+// own name; Shipping and Digital open, appointments are booked (E9).
+describe("OrdersService.create — fulfilment types (DEC-045, release 2)", () => {
     const ADDRESS = {
         line1: "12 Church Street",
         city: "Bengaluru",
@@ -212,41 +214,65 @@ describe("OrdersService.create — fulfilment types (DEC-045, release 1)", () =>
         postalCode: "560001",
     };
 
-    it("stores a PICKUP order as COLLECT, and an order with no type as COLLECT", async () => {
-        await makeService().create("st_1", "u_1", {
-            ...DTO,
-            fulfilment: "PICKUP",
-        });
-        expect(createData()).toMatchObject({ fulfilment: "COLLECT" });
-        await makeService().create("st_1", "u_1", DTO);
-        expect(db.order!.create!.mock.calls[1][0].data).toMatchObject({
-            fulfilment: "COLLECT",
-        });
+    it("stores PICKUP, the old app's COLLECT and an order with no type as PICKUP", async () => {
+        for (const fulfilment of ["PICKUP", "COLLECT", undefined] as const) {
+            await makeService().create("st_1", "u_1", { ...DTO, fulfilment });
+        }
+        for (const call of db.order!.create!.mock.calls) {
+            expect(call[0].data).toMatchObject({ fulfilment: "PICKUP" });
+        }
+        expect(db.order!.create).toHaveBeenCalledTimes(3);
     });
 
-    it("stores a LOCAL_DELIVERY order as DELIVERY, with the address rule", async () => {
+    it("stores LOCAL_DELIVERY and the old app's DELIVERY as LOCAL_DELIVERY, with the address rule", async () => {
         const err = await makeService()
             .create("st_1", "u_1", { ...DTO, fulfilment: "LOCAL_DELIVERY" })
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(BadRequestException);
+        for (const fulfilment of ["LOCAL_DELIVERY", "DELIVERY"] as const) {
+            await makeService().create("st_1", "u_1", {
+                ...DTO,
+                fulfilment,
+                address: ADDRESS,
+            });
+            expect(createData()).toMatchObject({
+                fulfilment: "LOCAL_DELIVERY",
+                deliveryState: "Karnataka",
+            });
+        }
+    });
+
+    it("takes a Shipping order, which needs an address like a delivery", async () => {
+        const err = await makeService()
+            .create("st_1", "u_1", { ...DTO, fulfilment: "SHIPPING" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toMatchObject({
+            message: "A delivery needs an address.",
+            field: "address",
+        });
+        expect(db.order!.create).not.toHaveBeenCalled();
         await makeService().create("st_1", "u_1", {
             ...DTO,
-            fulfilment: "LOCAL_DELIVERY",
+            fulfilment: "SHIPPING",
             address: ADDRESS,
         });
         expect(createData()).toMatchObject({
-            fulfilment: "DELIVERY",
+            fulfilment: "SHIPPING",
             deliveryState: "Karnataka",
         });
     });
 
-    it.each([
-        "SHIPPING",
-        "DIGITAL",
-        "APPOINTMENT_IN_PERSON",
-        "APPOINTMENT_ONLINE",
-    ] as const)(
-        "refuses %s until the switch release (400), creating nothing",
+    it("takes a Digital order, with no address", async () => {
+        await makeService().create("st_1", "u_1", {
+            ...DTO,
+            fulfilment: "DIGITAL",
+        });
+        expect(createData()).toMatchObject({ fulfilment: "DIGITAL" });
+    });
+
+    it.each(["APPOINTMENT_IN_PERSON", "APPOINTMENT_ONLINE"] as const)(
+        "refuses %s (400): an appointment is booked, creating nothing",
         async (fulfilment) => {
             const err = await makeService()
                 .create("st_1", "u_1", {
@@ -257,7 +283,8 @@ describe("OrdersService.create — fulfilment types (DEC-045, release 1)", () =>
                 .catch((e: unknown) => e);
             expect(err).toBeInstanceOf(BadRequestException);
             expect((err as BadRequestException).getResponse()).toMatchObject({
-                message: expect.stringMatching(/isn't available yet\.$/),
+                message:
+                    "An appointment is made by booking it, not by adding an order.",
                 field: "fulfilment",
             });
             expect(db.order!.create).not.toHaveBeenCalled();

@@ -36,11 +36,11 @@ describe("the kitchen flow (order-stage)", () => {
         expect(nextStages(o)).toEqual([]);
     });
 
-    it("a delivery: Ready → Handed to courier (SHIPPED) → Delivered", () => {
+    it("a delivery (B2c): Ready → Out for delivery (SHIPPED) → Delivered", () => {
         let o = order({ fulfilment: "DELIVERY" });
         o = step(step(o, "PREPARING"), "READY");
-        expect(nextStages(o)).toEqual(["HANDED_TO_COURIER"]);
-        o = step(o, "HANDED_TO_COURIER");
+        expect(nextStages(o)).toEqual(["OUT_FOR_DELIVERY"]);
+        o = step(o, "OUT_FOR_DELIVERY");
         expect(o.status).toBe("SHIPPED");
         o = step(o, "DELIVERED");
         expect(o).toMatchObject({ stage: "DELIVERED", status: "DELIVERED" });
@@ -213,7 +213,7 @@ describe("editing and the legacy status PATCH", () => {
             fulfilment: "DELIVERY" as const,
         };
         expect(stageForStatus("SHIPPED", courier)).toEqual({
-            stage: "HANDED_TO_COURIER",
+            stage: "OUT_FOR_DELIVERY",
         });
         expect(
             stageForStatus("DELIVERED", {
@@ -259,21 +259,21 @@ describe("editing and the legacy status PATCH", () => {
         expect(stageForStatus("SHIPPED", at("SHIPPING")).stage).toBe(
             "HANDED_TO_COURIER",
         );
-        // Release 1 writes today's handover for a local delivery…
+        // Release 1 wrote today's handover for a local delivery…
+        expect(
+            stageForStatus("SHIPPED", at("LOCAL_DELIVERY"), false).stage,
+        ).toBe("HANDED_TO_COURIER");
+        // …and the switch release (now) its own, except for one already
+        // with a courier the old way.
         expect(stageForStatus("SHIPPED", at("LOCAL_DELIVERY")).stage).toBe(
-            "HANDED_TO_COURIER",
+            "OUT_FOR_DELIVERY",
         );
-        // …and the switch release its own, except for one already with a
-        // courier the old way.
+        expect(stageForStatus("SHIPPED", at("DELIVERY")).stage).toBe(
+            "OUT_FOR_DELIVERY",
+        );
         expect(
-            stageForStatus("SHIPPED", at("LOCAL_DELIVERY"), true).stage,
-        ).toBe("OUT_FOR_DELIVERY");
-        expect(
-            stageForStatus(
-                "SHIPPED",
-                at("LOCAL_DELIVERY", "HANDED_TO_COURIER"),
-                true,
-            ).stage,
+            stageForStatus("SHIPPED", at("LOCAL_DELIVERY", "HANDED_TO_COURIER"))
+                .stage,
         ).toBe("HANDED_TO_COURIER");
         expect(stageForStatus("DELIVERED", at("PICKUP")).stage).toBe(
             "COLLECTED",
@@ -312,7 +312,7 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
         const local: OrderStage[] = [
             "PREPARING",
             "READY",
-            "HANDED_TO_COURIER",
+            "OUT_FOR_DELIVERY",
             "DELIVERED",
         ];
         expect(walk("LOCAL_DELIVERY", local)).toEqual(walk("DELIVERY", local));
@@ -324,15 +324,52 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
         ]);
     });
 
-    it("a local delivery is not sent Out for delivery until the switch release", () => {
-        const ready = paid("LOCAL_DELIVERY", {
-            stage: "READY",
-            status: "PROCESSING",
-        });
-        expect(nextStages(ready)).toEqual(["HANDED_TO_COURIER"]);
-        expect(() => planStageMove(ready, "OUT_FOR_DELIVERY")).toThrow(
-            BadRequestException,
+    it("from the switch release a ready local delivery goes out for delivery, never to a courier", () => {
+        for (const fulfilment of ["LOCAL_DELIVERY", "DELIVERY"] as const) {
+            const ready = paid(fulfilment, {
+                stage: "READY",
+                status: "PROCESSING",
+            });
+            expect(nextStages(ready)).toEqual(["OUT_FOR_DELIVERY"]);
+            const run = () => planStageMove(ready, "HANDED_TO_COURIER");
+            expect(run).toThrow(BadRequestException);
+            expect(run).toThrow(
+                "This order is a local delivery, so it goes out for delivery, not to a courier.",
+            );
+            expect(() => planStageMove(ready, "COLLECTED")).toThrow(
+                "This order is a local delivery, so it goes out for delivery, not collected.",
+            );
+        }
+    });
+
+    it("a shipment is handed to a courier, never sent out for delivery", () => {
+        expect(() =>
+            planStageMove(
+                paid("SHIPPING", { stage: "READY", status: "PROCESSING" }),
+                "OUT_FOR_DELIVERY",
+            ),
+        ).toThrow(
+            "This order is a shipment, so it is handed to a courier, not sent out for delivery.",
         );
+    });
+
+    it("a local delivery handed to a courier before the switch reaches Delivered after it", () => {
+        // The migration renames DELIVERY to LOCAL_DELIVERY and leaves the
+        // stage: the legacy move takes it on, under either name.
+        for (const fulfilment of ["DELIVERY", "LOCAL_DELIVERY"] as const) {
+            const o = paid(fulfilment, {
+                stage: "HANDED_TO_COURIER",
+                status: "SHIPPED",
+            });
+            expect(nextStages(o)).toEqual(["DELIVERED"]);
+            expect(step(o, "DELIVERED")).toMatchObject({
+                stage: "DELIVERED",
+                status: "DELIVERED",
+            });
+            expect(() => planStageMove(o, "OUT_FOR_DELIVERY")).toThrow(
+                BadRequestException,
+            );
+        }
     });
 
     it("release 1 serves release 2's rows: Out for delivery → Delivered, and the legacy courier move", () => {

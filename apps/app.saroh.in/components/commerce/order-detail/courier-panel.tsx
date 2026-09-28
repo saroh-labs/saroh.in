@@ -2,58 +2,94 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+
+import type { CourierFields, Shipment } from "@/lib/orders/courier";
+import {
+    COURIER_FIELD_MAX,
+    courierChoices,
+    courierFields,
+    COURIERS,
+    isTrackingLink,
+    OWN_DRIVER,
+} from "@/lib/orders/courier";
 
 import { actionClass, FOCUS, PanelTitle, WorkPanel } from "./parts";
 
-const COURIERS = ["Delhivery", "Blue Dart", "Our own driver"] as const;
-
-const isLink = (v: string) => /^https?:\/\/\S+\.\S+/.test(v);
+const FIELD =
+    "mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11";
 
 /**
- * "Hand to courier": who takes it and, for a courier, the tracking link they
- * gave you. Saroh books no pickups and sends no email (scope: a tracking link
- * is typed) — the link is kept on the order, where the team can open it.
+ * The courier's details (B10, DEC-045): who took it, their tracking number
+ * and, if they gave one, the tracking link — every one optional, since the
+ * number often comes after the parcel goes. Saroh books no pickup and sends
+ * no message: what is typed stays on the order, where the team can see it.
+ *
+ * `handover` is the "Hand to courier" step itself (the design's panel);
+ * `change` fills them in or corrects them afterwards — "No tracking number
+ * yet · Add" on the customer card opens it.
  */
 export function CourierPanel({
+    mode,
     to,
     first,
     busy,
+    before,
     onPrint,
     onCancel,
-    onHandOver,
+    onSave,
 }: {
+    mode: "handover" | "change";
     /** Where it is going, one line. */
     to: string;
     first: string;
     busy: boolean;
-    onPrint: () => void;
+    /** What the order already has — `change` only. */
+    before?: Pick<Shipment, "courier" | "number" | "url">;
+    /** The packing slip — `handover` only. */
+    onPrint?: () => void;
     onCancel: () => void;
-    onHandOver: (input: { courier: string; trackingUrl?: string }) => void;
+    onSave: (fields: CourierFields) => void;
 }) {
-    const [courier, setCourier] = useState<string>(COURIERS[0]);
-    const [link, setLink] = useState("");
-    const own = courier === "Our own driver";
-    const bad = !own && link.trim() !== "" && !isLink(link.trim());
+    const ids = useId();
+    const choices = courierChoices(before?.courier ?? null);
+    const [courier, setCourier] = useState<string>(
+        before?.courier ?? COURIERS[0],
+    );
+    const [number, setNumber] = useState(before?.number ?? "");
+    const [link, setLink] = useState(before?.url ?? "");
+    const numberRef = useRef<HTMLInputElement>(null);
+    const own = courier === OWN_DRIVER;
+    const bad = !own && link.trim() !== "" && !isTrackingLink(link.trim());
+    const handover = mode === "handover";
+
+    // Opened from the card to add the number: start there.
+    useEffect(() => {
+        if (!handover) numberRef.current?.focus();
+    }, [handover]);
+
+    const title = handover ? "Hand to courier" : "Tracking";
 
     return (
-        <WorkPanel label="Hand to courier">
-            <PanelTitle>Hand to courier</PanelTitle>
+        <WorkPanel label={title}>
+            <PanelTitle>{title}</PanelTitle>
             <p className="mt-[3px] text-[12px] text-muted-foreground">
-                To {to}
+                {handover
+                    ? `To ${to}`
+                    : `Add or correct what the courier gave you. It stays on the order; nothing is sent to ${first}.`}
             </p>
             <div
                 className="mb-1.5 mt-3 text-[12px] font-medium"
-                id="od-courier"
+                id={`${ids}-courier`}
             >
                 Courier
             </div>
             <div
                 role="radiogroup"
-                aria-labelledby="od-courier"
+                aria-labelledby={`${ids}-courier`}
                 className="flex flex-wrap gap-1.5"
             >
-                {COURIERS.map((c) => {
+                {choices.map((c) => {
                     const on = c === courier;
                     return (
                         <button
@@ -76,44 +112,69 @@ export function CourierPanel({
                 })}
             </div>
             {!own ? (
-                <label className="mt-3 block text-[12px] font-medium">
-                    Tracking link
-                    <input
-                        type="url"
-                        inputMode="url"
-                        value={link}
-                        onChange={(e) => setLink(e.target.value)}
-                        placeholder="https://"
-                        aria-invalid={bad || undefined}
-                        aria-describedby="od-track-help"
-                        className="mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11"
-                    />
-                </label>
-            ) : null}
-            {!own ? (
-                <p
-                    id="od-track-help"
-                    className={cn(
-                        "mt-[5px] text-[11.5px]",
-                        bad
-                            ? "text-destructive-subtle-foreground"
-                            : "text-muted-foreground",
-                    )}
-                >
-                    {bad
-                        ? "That isn't a web address — paste the whole link, starting https://."
-                        : `Paste the link ${courier} gave you, or leave it empty. It stays on the order; nothing is sent to ${first}.`}
-                </p>
+                <>
+                    <label className="mt-3 block text-[12px] font-medium">
+                        Tracking number
+                        <input
+                            ref={numberRef}
+                            type="text"
+                            value={number}
+                            maxLength={COURIER_FIELD_MAX}
+                            autoComplete="off"
+                            spellCheck={false}
+                            onChange={(e) => setNumber(e.target.value)}
+                            placeholder="Leave empty if you don't have it yet"
+                            aria-describedby={`${ids}-number-help`}
+                            className={FIELD}
+                        />
+                    </label>
+                    <p
+                        id={`${ids}-number-help`}
+                        className="mt-[5px] text-[11.5px] text-muted-foreground"
+                    >
+                        {handover
+                            ? "You can add it later, once the courier sends it."
+                            : `As ${courier} gave it to you.`}
+                    </p>
+                    <label className="mt-3 block text-[12px] font-medium">
+                        Tracking link
+                        <input
+                            type="url"
+                            inputMode="url"
+                            value={link}
+                            onChange={(e) => setLink(e.target.value)}
+                            placeholder="https://"
+                            aria-invalid={bad || undefined}
+                            aria-describedby={`${ids}-link-help`}
+                            className={FIELD}
+                        />
+                    </label>
+                    <p
+                        id={`${ids}-link-help`}
+                        className={cn(
+                            "mt-[5px] text-[11.5px]",
+                            bad
+                                ? "text-destructive-subtle-foreground"
+                                : "text-muted-foreground",
+                        )}
+                    >
+                        {bad
+                            ? "That isn't a web address — paste the whole link, starting https://."
+                            : `Optional. Paste the link ${courier} gave you. It stays on the order; nothing is sent to ${first}.`}
+                    </p>
+                </>
             ) : null}
             <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={onPrint}
-                >
-                    Packing slip
-                </Button>
+                {handover && onPrint ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={actionClass("ghost")}
+                        onClick={onPrint}
+                    >
+                        Packing slip
+                    </Button>
+                ) : null}
                 <Button
                     type="button"
                     variant="outline"
@@ -127,15 +188,15 @@ export function CourierPanel({
                     className={actionClass("primary")}
                     disabled={bad || busy}
                     onClick={() =>
-                        onHandOver({
-                            courier,
-                            ...(!own && link.trim()
-                                ? { trackingUrl: link.trim() }
-                                : {}),
-                        })
+                        onSave(
+                            courierFields(
+                                { courier, number, link },
+                                handover ? undefined : before,
+                            ),
+                        )
                     }
                 >
-                    Handed over
+                    {handover ? "Handed over" : "Save"}
                 </Button>
             </div>
         </WorkPanel>
