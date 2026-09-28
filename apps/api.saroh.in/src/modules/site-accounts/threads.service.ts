@@ -13,10 +13,15 @@ import {
     resolveContact,
 } from "../customer-workspace/resolve-contact";
 import { allows, authorize } from "../organizations/organization-policy";
+import { accountAreaOn } from "./account-area";
 import type { CustomerContext } from "./customer-context.decorator";
 import type { AccountMessage, AccountThread } from "./customer-view";
 import { messageView } from "./customer-view";
 import { appendMessage, markRead, unreadCount } from "./thread-store";
+import type { WaitingThreads } from "./threads-waiting";
+import { NOBODY_WAITING, readWaitingOnTeam } from "./threads-waiting";
+
+export type { WaitingThread, WaitingThreads } from "./threads-waiting";
 
 /**
  * The customer's message thread with the business (round-2 A13, R14; ADR-011
@@ -270,6 +275,26 @@ export class ThreadsService {
                 invoiceId: null,
             };
         });
+    }
+
+    /**
+     * Customers waiting on the team (Home's Needs you, round-2 F2): a
+     * thread whose customer wrote after the team last did, and whose first
+     * such message is older than `olderThanMs`. Saroh's own posts (an
+     * invoice sent) answer nobody, so only a STAFF message ends the wait.
+     * The longest wait first.
+     *
+     * `message:read`, as the thread itself. Nothing while the account area
+     * is off: no customer can write, and the team is never shown a thread
+     * it can't open.
+     */
+    async waitingOnTeam(
+        ctx: OrganizationContext,
+        view: { now: Date; olderThanMs: number; limit: number },
+    ): Promise<WaitingThreads> {
+        authorize(ctx, "message:read");
+        if (!accountAreaOn()) return NOBODY_WAITING;
+        return readWaitingOnTeam(prisma, ctx.organizationId, view);
     }
 
     // ---- Reads ----------------------------------------------------------
