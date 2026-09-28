@@ -21,9 +21,9 @@ import type {
     ShopResult,
     StartCheckout,
 } from "./api";
-import { AskAboutOrdering, askAboutHref } from "./ask-about-ordering";
+import { askAboutHref, AskAboutOrdering } from "./ask-about-ordering";
 import { ShopBag } from "./bag";
-import { addToBag, readBag } from "./bag-store";
+import { addToBag, MAX_BAG_ITEMS, readBag } from "./bag-store";
 
 /**
  * The bag and checkout on a merchant's site (G13): the product page's
@@ -101,6 +101,29 @@ describe("Add to bag on the product page", () => {
         expect(
             screen.getByRole("button", { name: "View bag" }),
         ).toBeInTheDocument();
+    });
+
+    it("says the bag is full, not added, when it holds its most lines", () => {
+        for (let i = 0; i < MAX_BAG_ITEMS; i++) {
+            addToBag(SITE, {
+                listingId: `l-${i}`,
+                variantId: null,
+                quantity: 1,
+            });
+        }
+        render(
+            <ProductPage
+                product={bread}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        expect(readBag(SITE)).toHaveLength(MAX_BAG_ITEMS);
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Your bag is full. Take something out to add this.",
+        );
+        expect(screen.queryByText(/added to your bag/)).toBeNull();
     });
 
     it("is off, reading Sold out, for an option that can't be sold", () => {
@@ -518,6 +541,99 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeEnabled();
+    });
+
+    it("keeps the way, the address and the key when the customer goes back to the bag", async () => {
+        const { start } = setup({
+            signedIn: true,
+            outcome: "closed",
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        { type: "PICKUP", label: "Pick-up", fee: null },
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
+        for (const [label, value] of [
+            ["Address", "12 Hill Road"],
+            ["Town or city", "Mumbai"],
+            ["PIN code", "400050"],
+            ["State", "Maharashtra"],
+        ] as const) {
+            fireEvent.change(
+                await screen.findByLabelText(new RegExp(`^${label}`)),
+                { target: { value } },
+            );
+        }
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Back to your bag" }),
+        );
+
+        await screen.findByText("Sourdough");
+        expect(
+            screen.getByRole("radio", { name: /Local delivery/ }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(screen.getByLabelText(/^Address/)).toHaveValue("12 Hill Road");
+        fireEvent.click(
+            await screen.findByRole("button", { name: /^Place order/ }),
+        );
+        await screen.findByRole("button", { name: "Back to your bag" });
+        expect(start).toHaveBeenCalledTimes(2);
+        expect(start.mock.calls[1][0].key).toBe(start.mock.calls[0][0].key);
+        expect(start.mock.calls[1][0].address).toMatchObject({
+            line1: "12 Hill Road",
+        });
+    });
+
+    it("keeps asking about a payment closed while it was being confirmed, and empties the bag once placed", async () => {
+        const standingOf = (state: CheckoutStanding["state"]) => ({
+            ok: true as const,
+            data: {
+                orderNumber: "ORD-007",
+                state,
+                total: "500.00",
+                currency: "INR",
+                message: null,
+            },
+        });
+        const { standing } = setup({ signedIn: true });
+        standing
+            .mockResolvedValueOnce(standingOf("paying"))
+            .mockResolvedValue(standingOf("placed"));
+        await openTheBag();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await screen.findByRole("heading", {
+            name: "Confirming your payment",
+        });
+        expect(window.localStorage.getItem(`saroh.checkout.${SITE}`)).toBe(
+            "o-1",
+        );
+        await waitFor(() => expect(standing).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+        await waitFor(() => expect(readBag(SITE)).toEqual([]));
+        expect(standing).toHaveBeenLastCalledWith("o-1");
+        expect(
+            window.localStorage.getItem(`saroh.checkout.${SITE}`),
+        ).toBeNull();
+    });
+
+    it("asks again, on a later page, about a payment still being confirmed", async () => {
+        window.localStorage.setItem(`saroh.checkout.${SITE}`, "o-1");
+        const { standing } = setup({ signedIn: true });
+        await waitFor(() => expect(standing).toHaveBeenCalledWith("o-1"));
+        await waitFor(() => expect(readBag(SITE)).toEqual([]));
     });
 
     it("draws nothing in the header while the bag is empty", () => {

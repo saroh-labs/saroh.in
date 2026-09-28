@@ -39,6 +39,8 @@ export function CheckoutPay({
     businessName,
     customer,
     onPlaced,
+    onConfirming,
+    onSettled,
     onBack,
     onClose,
     openCheckout = openProviderCheckout,
@@ -49,6 +51,13 @@ export function CheckoutPay({
     customer: SignedInCustomer;
     /** The order is placed: empty the bag. */
     onPlaced: () => void;
+    /**
+     * Paid in the window, and being confirmed: the bag keeps asking about
+     * this order if the sheet is closed before the answer comes.
+     */
+    onConfirming?: (orderId: string) => void;
+    /** The server answered how it stands (placed, refunded or closed). */
+    onSettled?: () => void;
     /** Back to the bag, to change it. */
     onBack: () => void;
     onClose: () => void;
@@ -73,6 +82,7 @@ export function CheckoutPay({
         session.current = opened;
         void opened.outcome.then((outcome) => {
             if (session.current !== opened) return;
+            if (outcome === "paid") onConfirming?.(started.orderId);
             setPhase(
                 outcome === "paid"
                     ? { kind: "confirming", tries: 0 }
@@ -109,6 +119,7 @@ export function CheckoutPay({
                     .then((result) => {
                         if (result?.ok && result.data.state !== "paying") {
                             if (result.data.state === "placed") onPlaced();
+                            onSettled?.();
                             setPhase({ kind: "done", standing: result.data });
                             return;
                         }
@@ -118,7 +129,7 @@ export function CheckoutPay({
             confirming === 0 ? 0 : STANDING_POLL_MS,
         );
         return () => clearTimeout(timer);
-    }, [confirming, api, started.orderId, onPlaced]);
+    }, [confirming, api, started.orderId, onPlaced, onSettled]);
 
     if (phase.kind === "done") {
         const s = phase.standing;

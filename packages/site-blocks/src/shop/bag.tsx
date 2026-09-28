@@ -18,9 +18,15 @@ import type {
     StartCheckout,
 } from "./api";
 import { SHOP_OFFLINE } from "./api";
-import { BagSheet } from "./bag-sheet";
+import type { BagDraft } from "./bag-sheet";
+import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
 import { bagCount, clearBag, onOpenBag, useBag } from "./bag-store";
-import { CheckoutPay } from "./checkout-sheet";
+import {
+    CheckoutPay,
+    STANDING_POLL_MS,
+    STANDING_POLL_TRIES,
+} from "./checkout-sheet";
+import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
 
 /**
  * The bag in the site's header (round-2 G13), and the sheets it opens: the
@@ -33,6 +39,13 @@ import { CheckoutPay } from "./checkout-sheet";
  * sheet ("Last step: confirm it's you"), and placing the order goes on by
  * itself once the code checks. When the code can't be sent, the sheet says
  * so with the business's phone, and the bag is kept.
+ *
+ * The way, the address and the checkout's key live here, not in the bag
+ * sheet, which closes whenever the checkout moves on: coming back to the
+ * bag finds them as they were, and the same bag placed again is the same
+ * order. A payment made but not yet confirmed when its sheet closes is
+ * remembered (`pending-checkout.ts`) and asked about until the server
+ * answers; the bag empties once the order is placed.
  */
 
 type Step =
@@ -67,6 +80,12 @@ export function ShopBag({
     const [step, setStep] = useState<Step>({ kind: "closed" });
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
+    const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
+    // One left from an earlier page is asked about again. It is never
+    // drawn, so the server's null and the browser's id can differ.
+    const [pending, setPending] = useState<string | null>(() =>
+        typeof window === "undefined" ? null : readPendingCheckout(site),
+    );
     const [problem, setProblem] = useState<{
         reason: ShopProblem;
         message: string;
@@ -78,7 +97,63 @@ export function ShopBag({
         setStep({ kind: "closed" });
         setProblem(null);
     }, []);
-    const placed = useCallback(() => clearBag(site), [site]);
+    const placed = useCallback(() => {
+        clearBag(site);
+        setDraft(EMPTY_DRAFT);
+    }, [site]);
+
+    // A payment being confirmed: remembered until the server answers.
+    const confirming = useCallback(
+        (orderId: string) => {
+            writePendingCheckout(site, orderId);
+            setPending(orderId);
+        },
+        [site],
+    );
+    const settled = useCallback(() => {
+        writePendingCheckout(site, null);
+        setPending(null);
+    }, [site]);
+
+    // While the pay sheet is closed, keep asking how the remembered one
+    // stands, as the sheet would: placed empties the bag; any other answer
+    // ends the wait. Signed out, it waits for the next signed-in page.
+    const paying = step.kind === "pay";
+    useEffect(() => {
+        if (!pending || paying || !customer) return;
+        let live = true;
+        let tries = 0;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ask = () => {
+            void api
+                .standing(pending)
+                .catch(() => null)
+                .then((result) => {
+                    if (!live) return;
+                    if (result?.ok && result.data.state !== "paying") {
+                        if (result.data.state === "placed") placed();
+                        settled();
+                        return;
+                    }
+                    if (
+                        result &&
+                        !result.ok &&
+                        result.reason === "signed-out"
+                    ) {
+                        return;
+                    }
+                    tries += 1;
+                    if (tries < STANDING_POLL_TRIES) {
+                        timer = setTimeout(ask, STANDING_POLL_MS);
+                    }
+                });
+        };
+        ask();
+        return () => {
+            live = false;
+            clearTimeout(timer);
+        };
+    }, [pending, paying, customer, api, placed, settled]);
 
     async function start(request: StartCheckout, who: SignedInCustomer) {
         setBusy(true);
@@ -156,6 +231,8 @@ export function ShopBag({
                     signedIn={customer !== null}
                     busy={busy}
                     problem={problem}
+                    draft={draft}
+                    onDraft={setDraft}
                     onPlace={place}
                     onClose={close}
                 />
@@ -180,6 +257,8 @@ export function ShopBag({
                     businessName={businessName}
                     customer={customer}
                     onPlaced={placed}
+                    onConfirming={confirming}
+                    onSettled={settled}
                     onBack={() => setStep({ kind: "bag" })}
                     onClose={close}
                     openCheckout={openCheckout}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { focusRing, inputFill, optionClasses } from "../booking-flow/styles";
@@ -95,6 +95,26 @@ const stepper = cn(
     focusRing,
 );
 
+/**
+ * What the customer chose in the bag, kept by the header's bag (`ShopBag`)
+ * rather than the sheet: the sheet closes whenever the checkout moves on —
+ * to signing in, or to paying — and "Back to your bag", a sign-in closed or
+ * a refused start must find the way and the address as they were, and
+ * place the same bag under the same key (one order, not a second).
+ */
+export interface BagDraft {
+    way: ShopWay | null;
+    address: DeliveryAddress;
+    /** One key per request: the same bag placed again is the same order. */
+    checkout: { print: string; key: string } | null;
+}
+
+export const EMPTY_DRAFT: BagDraft = {
+    way: null,
+    address: EMPTY_ADDRESS,
+    checkout: null,
+};
+
 export function BagSheet({
     site,
     items,
@@ -102,6 +122,8 @@ export function BagSheet({
     signedIn,
     busy,
     problem,
+    draft,
+    onDraft,
     onPlace,
     onClose,
 }: {
@@ -113,17 +135,19 @@ export function BagSheet({
     busy: boolean;
     /** Why the last start didn't go, in the page's words. */
     problem: { reason: ShopProblem; message: string } | null;
+    /** The way, the address and the checkout key, kept above the sheet. */
+    draft: BagDraft;
+    onDraft: (change: (draft: BagDraft) => BagDraft) => void;
     /** Place it: the request, with its key. */
     onPlace: (request: StartCheckout) => void;
     onClose: () => void;
 }) {
-    const [way, setWay] = useState<ShopWay | null>(null);
-    const [address, setAddress] = useState<DeliveryAddress>(EMPTY_ADDRESS);
+    const { way, address } = draft;
+    const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
+    const setAddress = (change: (a: DeliveryAddress) => DeliveryAddress) =>
+        onDraft((d) => ({ ...d, address: change(d.address) }));
     const [load, setLoad] = useState<Load>({ kind: "loading" });
     const [round, setRound] = useState(0);
-    // One key per request: the same bag placed twice is one order, and a
-    // changed bag is a new one.
-    const key = useRef<{ print: string; key: string } | null>(null);
 
     // The quote, again whenever the bag or the way changes.
     const bagPrint = JSON.stringify(items);
@@ -193,10 +217,14 @@ export function BagSheet({
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
         };
         const print = JSON.stringify(body);
-        if (key.current?.print !== print) {
-            key.current = { print, key: checkoutKey() };
+        const checkout =
+            draft.checkout?.print === print
+                ? draft.checkout
+                : { print, key: checkoutKey() };
+        if (checkout !== draft.checkout) {
+            onDraft((d) => ({ ...d, checkout }));
         }
-        onPlace({ ...body, key: key.current.key });
+        onPlace({ ...body, key: checkout.key });
     }
 
     const setField = (name: keyof DeliveryAddress) => (value: string) =>
