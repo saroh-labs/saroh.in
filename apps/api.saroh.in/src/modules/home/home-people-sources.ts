@@ -12,6 +12,7 @@ import type {
     HomeTone,
 } from "./home-model";
 import { EVIDENCE_LIMIT, personName } from "./home-model";
+import { storeWhere } from "./home-staff";
 
 /**
  * Home's sources about people (round 2, F2): the customers waiting on the
@@ -106,14 +107,17 @@ export function viewerOf(input: HomeInput): OrganizationContext {
  * Published reviews at {@link LOW_STAR_MAX} stars or fewer with no reply,
  * newest first: the newest is the one a reply still reaches in time. A
  * hidden review isn't on the site, so there is nobody to answer in public.
- * The caller has checked `product-review:read`.
+ * The caller has checked `product-review:read`. A staff member's Home reads
+ * only their storefronts' reviews (F11, `storeIds`).
  */
 export async function lowStarReviews(
     db: Db,
     organizationId: string,
+    storeIds?: readonly string[] | null,
 ): Promise<HomeAction | null> {
     const where = {
         organizationId,
+        ...storeWhere(storeIds),
         status: "PUBLISHED",
         rating: { lte: LOW_STAR_MAX },
         reply: null,

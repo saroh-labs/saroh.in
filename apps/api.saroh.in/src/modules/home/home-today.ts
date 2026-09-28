@@ -18,6 +18,8 @@ import { openOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeToday, HomeTodayItem } from "./home-model";
 import { holds, personName } from "./home-model";
 import { orderNumber } from "./home-order-rows";
+import type { HomeNarrow } from "./home-staff";
+import { diaryWhere, storeWhere, WHOLE_BUSINESS } from "./home-staff";
 
 /**
  * Home's Today column (round 2, F5): the business's day — its bookings, its
@@ -341,6 +343,7 @@ async function pickUpRows(
     db: typeof prisma,
     organizationId: string,
     day: { start: Date; end: Date },
+    storeIds: readonly string[] | null,
 ): Promise<TodayOrderRow[]> {
     const longest = await db.storeSettings.aggregate({
         where: { store: { organizationId } },
@@ -355,6 +358,8 @@ async function pickUpRows(
             // Open as the Orders list's Open tab reads it: never refunded,
             // never an abandoned online checkout.
             ...openOrderWhere(organizationId),
+            // A staff member's storefronts only (F11).
+            ...storeWhere(storeIds),
             stage: { in: ["NEW", "PREPARING", "READY"] },
             fulfilment: { in: storedValuesOf(["PICKUP"]) },
             createdAt: {
@@ -382,12 +387,17 @@ async function pickUpRows(
     });
 }
 
-/** Read today for one business. Throws on a failed read; Home names it. */
+/**
+ * Read today for one business. Throws on a failed read; Home names it. A
+ * staff member's day (F11) is their own diary and their storefronts'
+ * pick-ups (`narrow`).
+ */
 export async function readToday(
     db: typeof prisma,
     input: HomeInput,
     scope: TodayScope,
     at: { now: Date; zone: string },
+    narrow: HomeNarrow = WHOLE_BUSINESS,
 ): Promise<HomeToday> {
     const day = businessDay(at.now, at.zone);
     const [bookingRows, orderRows] = await Promise.all([
@@ -395,6 +405,7 @@ export async function readToday(
             ? (db.booking.findMany({
                   where: {
                       organizationId: input.organizationId,
+                      ...diaryWhere(narrow.staff),
                       // Standing bookings only: a cancelled one isn't coming,
                       // and an unpaid hold isn't a booking yet.
                       status: "CONFIRMED",
@@ -437,7 +448,7 @@ export async function readToday(
               }) as Promise<TodayBookingRow[]>)
             : Promise.resolve([] as TodayBookingRow[]),
         scope.pickUps
-            ? pickUpRows(db, input.organizationId, day)
+            ? pickUpRows(db, input.organizationId, day, narrow.storeIds)
             : Promise.resolve([] as TodayOrderRow[]),
     ]);
 
