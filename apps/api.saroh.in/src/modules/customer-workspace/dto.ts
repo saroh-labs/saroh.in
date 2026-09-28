@@ -101,6 +101,35 @@ export class CreateAttentionDto {
     allergenId?: string | null;
 }
 
+/**
+ * "Add to Needs attention" on a suggestion (C12): what the confirm card
+ * settled on. Fields left out keep what the suggestion has, so a confirm
+ * with no body adds it as it stands, as it did before C12. An Allergy names
+ * an allergen from the business's list when it has one, as on create.
+ */
+export class ConfirmAttentionDto {
+    @IsOptional()
+    @IsIn(ATTENTION_KINDS, { message: KIND_MESSAGE })
+    kind?: AttentionKind;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(ATTENTION_LABEL_MAX, {
+        message: `Keep it under ${ATTENTION_LABEL_MAX} characters; add the rest as detail.`,
+    })
+    label?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    sensitive?: boolean;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsString()
+    allergenId?: string | null;
+}
+
 /** Fields given replace what the entry had; fields left out are kept. */
 export class UpdateAttentionDto {
     @IsOptional()

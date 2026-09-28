@@ -3,7 +3,11 @@ import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
-import type { AttentionEntry, AttentionInput } from "./attention";
+import type {
+    AttentionEntry,
+    AttentionInput,
+    SuggestionInput,
+} from "./attention";
 import type { UnlinkPreview } from "./site-account";
 
 /**
@@ -170,6 +174,26 @@ export function updateAttention(
     input: AttentionInput,
 ) {
     return writeAttention(attentionPath(contactId, entryId), "PATCH", input);
+}
+
+/**
+ * "Add to Needs attention" on a booking-page note (C12), with the kind,
+ * label and sensitive tick staff settled on. A refusal keeps its field.
+ */
+export async function confirmAttention(
+    contactId: string,
+    entryId: string,
+    input: SuggestionInput,
+): Promise<ApiResult<AttentionEntry>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}${attentionPath(contactId, entryId)}/confirm`,
+        { method: "POST", body: JSON.stringify(input) },
+    );
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: body as AttentionEntry };
+    return toFailure(body, "Could not add that to Needs attention.");
 }
 
 /** Take an entry off the list; the API keeps the row, stamped removed. */

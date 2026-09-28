@@ -25,6 +25,7 @@ import {
 } from "./attention-read";
 import type {
     AttentionKind,
+    ConfirmAttentionDto,
     CreateAttentionDto,
     UpdateAttentionDto,
 } from "./dto";
@@ -211,14 +212,17 @@ export class ContactAttentionService {
     }
 
     /**
-     * "Add to Needs attention": a suggestion goes on the record. Confirming
-     * one already on it answers with the entry as it is, so a second tap is
-     * harmless.
+     * "Add to Needs attention": a suggestion goes on the record, with the
+     * kind, label and sensitive tick staff settled on (C12). What they left
+     * out stays as suggested, and the detail (the booker's words) is kept.
+     * Confirming one already on it answers with the entry as it is, so a
+     * second tap is harmless.
      */
     async confirm(
         ctx: OrganizationContext,
         contactId: string,
         entryId: string,
+        dto: ConfirmAttentionDto = {},
     ): Promise<AttentionEntryView> {
         authorize(ctx, "contact:write");
         const current = await this.find(ctx, contactId, entryId);
@@ -226,27 +230,49 @@ export class ContactAttentionService {
         if (current.status === "ACTIVE") {
             return this.view(ctx, contactId, entryId);
         }
+        const kind = dto.kind ?? current.kind;
+        const { fields, allergenName } = await this.settle(ctx, {
+            kind,
+            label: dto.label ?? current.label,
+            detail: current.detail,
+            sensitive: dto.sensitive ?? current.sensitive,
+            allergenId:
+                dto.allergenId !== undefined
+                    ? dto.allergenId
+                    : kind === "ALLERGY"
+                      ? (current.allergen?.id ?? null)
+                      : null,
+        });
+        this.requireSensitiveReader(ctx, fields.sensitive);
         await this.refuseSecondAllergy(
             ctx,
             contactId,
-            {
-                kind: current.kind,
-                label: current.label,
-                detail: current.detail,
-                sensitive: current.sensitive,
-                allergenId: current.allergen?.id ?? null,
-            },
+            fields,
             entryId,
-            current.allergen?.name ?? null,
+            allergenName,
         );
         await this.db.$transaction(async (tx) => {
-            await tx.contactAttention.update({
-                where: { id: entryId },
-                data: { status: "ACTIVE", confirmedByUserId: ctx.userId },
+            // Only a suggestion still waiting is added: a teammate's "Nothing
+            // to add" or Add a moment ago stands, and the answer below is the
+            // entry as it now is (or a 404, once set aside).
+            const { count } = await tx.contactAttention.updateMany({
+                where: {
+                    id: entryId,
+                    organizationId: ctx.organizationId,
+                    status: "SUGGESTED",
+                    removedAt: null,
+                },
+                data: {
+                    ...fields,
+                    status: "ACTIVE",
+                    confirmedByUserId: ctx.userId,
+                },
             });
+            if (count === 0) return;
             await this.audit(tx, ctx, "contact.attention.confirmed", entryId, {
                 contactId,
-                kind: current.kind,
+                kind: fields.kind,
+                sensitive: fields.sensitive ? "yes" : "no",
             });
         });
         return this.view(ctx, contactId, entryId);

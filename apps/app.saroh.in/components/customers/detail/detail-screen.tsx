@@ -40,6 +40,7 @@ import {
     HeaderAttention,
     useAttention,
 } from "./attention";
+import { AttentionSuggestions } from "./attention-suggestions";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { EditSheet } from "./edit-sheet";
@@ -290,6 +291,16 @@ export function CustomerDetailScreen({
                     onEdit={() => setEditing((n) => n + 1)}
                     menu={menu}
                 />
+                {canWrite && d.attention?.suggestions?.length ? (
+                    <AttentionSuggestions
+                        contactId={d.contact.id}
+                        suggestions={d.attention.suggestions}
+                        choices={d.notes?.allergenChoices ?? []}
+                        firstName={first}
+                        timeZone={d.timezone}
+                        now={now}
+                    />
+                ) : null}
                 <Tabs tabs={tabs} value={tab} onChange={go} />
             </div>
             <div
