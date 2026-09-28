@@ -24,7 +24,8 @@ export type Panel<T> =
 export interface OverviewOrder {
     id: string;
     orderNumber: string;
-    customerId: string;
+    /** Null for a walk-in (B13): named, with nothing to link to. */
+    customerId: string | null;
     customer: string;
     status: string;
     open: boolean;

@@ -13,7 +13,6 @@ import type {
     OrderFilterOptions,
     OrderListPage,
 } from "@/lib/orders/business-service";
-import { newOrderHref } from "@/lib/orders/links";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import {
     nextPageHref,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/orders/list-query";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 
+import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { OrderExport } from "./order-export";
 import { OrderFilters } from "./order-filters";
 import { OrderQuickView } from "./order-quick-view";
@@ -61,6 +61,7 @@ export function OrdersScreen({
     filterOptions = null,
     shareUrl = null,
     can = NO_ABILITIES,
+    newOrder = null,
 }: {
     query: OrdersQuery;
     /** The page on screen, read on the server. */
@@ -94,6 +95,17 @@ export function OrdersScreen({
      * only what they can use. The API decides again on every write.
      */
     can?: OrderAbilities;
+    /**
+     * New order (B13): whether the sheet opens on arrival (`?new=1`, where
+     * the old New order page and the calendar send people) and what the
+     * viewer may do in it. Null when the business sells nothing a counter
+     * takes — its appointments are booked in Bookings.
+     */
+    newOrder?: {
+        openOnArrival: boolean;
+        /** `contact:read`: search customers, and read their notes. */
+        canSearch: boolean;
+    } | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -103,6 +115,9 @@ export function OrdersScreen({
     const money = !kitchen && rows.some((r) => r.total !== undefined);
     // The row whose quick view is open (B5).
     const [peekId, setPeekId] = useState<string | null>(null);
+    const [newOpen, setNewOpen] = useState(
+        newOrder?.openOnArrival === true && stores.length > 0 && !kitchen,
+    );
     const peek = rows.find((r) => r.id === peekId) ?? null;
 
     const go = useCallback(
@@ -132,18 +147,16 @@ export function OrdersScreen({
                 actions={
                     stores.length > 0 && !kitchen ? (
                         <>
-                            <Button asChild>
-                                {/* Into the storefront in view, or — with several
-                                and none chosen — a page that asks which. */}
-                                <Link
-                                    href={newOrderHref(
-                                        store?.id ?? firstStore?.id,
-                                    )}
+                            {newOrder ? (
+                                <Button
+                                    type="button"
+                                    onClick={() => setNewOpen(true)}
+                                    className="cursor-pointer active:scale-[0.98]"
                                 >
                                     <Plus className="mr-1.5 size-4" />
                                     New order
-                                </Link>
-                            </Button>
+                                </Button>
+                            ) : null}
                             <OrderExport
                                 query={query}
                                 total={page.counts[query.tab]}
@@ -258,6 +271,27 @@ export function OrdersScreen({
                     if (!open) setPeekId(null);
                 }}
             />
+
+            {newOrder && stores.length > 0 && !kitchen ? (
+                <NewOrderSheet
+                    open={newOpen}
+                    onOpenChange={(open) => {
+                        setNewOpen(open);
+                        // Opened by ?new=1: closing it leaves the list's
+                        // own address, so a reload doesn't open it again.
+                        if (!open && newOrder.openOnArrival) {
+                            router.replace(ordersHref(query, {}), {
+                                scroll: false,
+                            });
+                        }
+                    }}
+                    stores={stores}
+                    // The storefront in view, else the first.
+                    initialStoreId={store?.id ?? stores[0].id}
+                    canLink={can.write}
+                    canSearch={newOrder.canSearch}
+                />
+            ) : null}
 
             {previous || next ? (
                 <nav

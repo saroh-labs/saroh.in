@@ -184,7 +184,7 @@ export class OrderKitchenService {
     /** How the order's notices reach its customer (A14); null if unknown. */
     private async noticeOf(
         ctx: OrganizationContext,
-        order: { customerId: string; customerAccountId: string | null },
+        order: { customerId: string | null; customerAccountId: string | null },
     ): Promise<NoticeReach | null> {
         try {
             const contactId = await orderContactId(

@@ -6,13 +6,8 @@ import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 import { demoUser, urls } from "../playwright.config";
 
 /**
- * New order, by hand, at a GST-registered business (#508 U8, ADR-008): its
- * prices include GST, so the form offers no add-on tax and its total is
- * subtotal + shipping − discount — the sum `orders.service.ts` saves (pinned
- * there by `orders.service.discount.spec.ts`).
- *
- * Rye & Co. is the only registered seed business and is the film set, so
- * this reads the form and never places the order.
+ * New order v2 (plan B, B13): the sheet on the Orders list, at the counter
+ * or on the phone. The old New order page's address opens it.
  */
 
 const RYE = "seed_sc_rc_org";
@@ -28,126 +23,142 @@ async function signIn(page: Page) {
     });
 }
 
+/**
+ * At a GST-registered business (#508 U8, ADR-008) prices include GST, so
+ * the sheet adds no tax: the total is what `orders.service.ts` saves.
+ * Rye & Co. is the film set: this reads the sheet and never places the
+ * order.
+ */
 test.describe("new order at a GST-registered business", () => {
     test("adds no tax: prices include GST and the total is what is saved", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto(`/open/${RYE}`);
+        // The old page's address opens the sheet on the Orders list.
         await page.goto(`/commerce/orders/new?storefront=${RYE_STORE}`);
-        await expect(
-            page.getByRole("heading", { name: "New order" }),
-        ).toBeVisible();
+        const sheet = page.getByRole("dialog", { name: "New order" });
+        await expect(sheet).toBeVisible();
+        await expect(page).toHaveURL(/\/commerce\/orders\?/);
 
-        await page.getByRole("combobox", { name: "Product" }).click();
+        await sheet.getByLabel("Add a product").fill("Sourdough");
         // Sourdough has sizes since the showcase grew (#526); 800g is ₹480.
-        await page
-            .getByRole("option", { name: /^Sourdough loaf · 800g —/ })
-            .click();
-        await page.getByLabel("Quantity").fill("2");
+        const eight = sheet
+            .getByRole("group", { name: /^Add Sourdough/ })
+            .getByRole("button", { name: /^800g · ₹480/ });
+        await eight.click();
+        await eight.click();
 
-        await expect(page.getByLabel(/^Tax/)).toHaveCount(0);
-        await expect(page.getByText("prices include GST")).toBeVisible();
-        await expect(page.getByText("Includes GST")).toBeVisible();
-        // 2 × ₹480, GST inside; nothing added on top. Exact: the summary's
-        // "Subtotal ₹960 · …" line also contains "total ₹960".
-        await expect(
-            page.getByText("Total ₹960", { exact: true }),
-        ).toBeVisible();
+        // 2 × ₹480, GST inside; nothing added on top.
+        const footer = sheet.getByRole("button", { name: /· create$|^Create/ });
+        await expect(sheet.getByText("₹960", { exact: true })).toBeVisible();
+        await expect(sheet.getByText(/ tax( ·|$)/)).toHaveCount(0);
+        await expect(footer).toBeVisible();
 
-        await page.getByLabel("Discount", { exact: true }).fill("60");
-        await expect(
-            page.getByText("Total ₹900", { exact: true }),
-        ).toBeVisible();
+        await sheet.getByRole("button", { name: "+ Add a discount" }).click();
+        await sheet.getByLabel("Discount").fill("60");
+        await expect(sheet.getByText("₹900", { exact: true })).toBeVisible();
     });
 });
 
 /**
- * The API's refusal of a line ("… — Only 1 left at …") is about the lines as
- * they were sent (e80f2211): changing a quantity, adding a line, removing
- * one or picking another product clears it until the next save. Each of the
- * four is wired by hand, so each is checked.
- *
- * Runs on Northwind Supply (writes and error paths go there, never on the
- * film sets). It uses a product of its own counted at 1 and never places an
- * order. Counted, the product has a stock history (DEC-032), so afterwards
- * it is set to Not sold under one fixed name, and the next run brings that
- * same one back (`fixtures/throwaway-products.ts`).
+ * The happy path, on Northwind Supply (writes go there, never on the film
+ * sets): a walk-in, two lines, cash ₹500 for ₹430 → ₹70 change; the order
+ * is paid, and its paper is billed to "‹name› (walk-in)". Two products of
+ * its own, set aside afterwards (`fixtures/throwaway-products.ts`).
  */
 const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 
-test.describe("a line the API refused", () => {
-    test("its error clears when the lines change: quantity, add, remove, product", async ({
+test.describe("a walk-in paid in cash", () => {
+    test("₹500 for ₹430 gives ₹70 change, and the order reads Walk-in", async ({
         page,
     }, testInfo) => {
         test.setTimeout(120_000);
-        const name = `E2E Last Jar ${testInfo.project.name}`;
+        const bread = `E2E Counter Bread ${testInfo.project.name}`;
+        const cake = `E2E Counter Cake ${testInfo.project.name}`;
+        const walkIn = `Asha ${testInfo.project.name}`;
         await signIn(page);
         await page.goto(`/open/${NW.organizationId}`);
-
         try {
-            const id = await takeProduct(page.request, NW, name, {
-                price: "100.00",
+            await takeProduct(page.request, NW, bread, {
+                price: "180.00",
                 status: "PUBLISHED",
             });
-            const counted = await page.request.put(
-                `${urls.API_URL}/stores/${NW.storeId}/products/${id}/inventory`,
-                {
-                    headers: {
-                        "x-organization-id": NW.organizationId,
-                        origin: urls.APP_URL,
-                    },
-                    data: { quantity: 1 },
-                },
-            );
-            expect(counted.ok()).toBe(true);
-
-            await page.goto(`/commerce/orders/new?storefront=${NW.storeId}`);
-            await page.getByLabel("Customer").click();
-            await page.getByRole("option").first().click();
-
-            const product = page.getByRole("combobox", { name: "Product" });
-            const quantity = page.getByLabel("Quantity");
-            const refused = page.getByRole("alert").filter({
-                hasText: `${name} — Only 1 left at`,
+            await takeProduct(page.request, NW, cake, {
+                price: "250.00",
+                status: "PUBLISHED",
             });
-            const create = page.getByRole("button", { name: "Create order" });
 
-            await product.first().click();
-            await page
-                .getByRole("option", { name: new RegExp(`^${name} —`) })
-                .click();
-            const refuse = async () => {
-                await quantity.first().fill("2");
-                await create.click();
-                await expect(refused).toBeVisible();
-            };
+            await page.goto(`/commerce/orders?storefront=${NW.storeId}`);
+            await page.getByRole("button", { name: "New order" }).click();
+            const sheet = page.getByRole("dialog", { name: "New order" });
 
-            // 1. The quantity changes.
-            await refuse();
-            await quantity.first().fill("1");
-            await expect(refused).toHaveCount(0);
+            // Who: a walk-in, a name and a phone, no record.
+            await sheet.getByRole("radio", { name: "Walk-in" }).click();
+            await sheet.getByLabel("Name").fill(walkIn);
+            await sheet
+                .getByLabel("Phone (if they give one)")
+                .fill("+91 90000 11111");
+            await sheet.getByRole("button", { name: "Use walk-in" }).click();
+            await expect(
+                sheet.getByText("Walk-in · +91 90000 11111"),
+            ).toBeVisible();
 
-            // 2. A line is added.
-            await refuse();
-            await page.getByRole("button", { name: "Add item" }).click();
-            await expect(refused).toHaveCount(0);
+            // Two lines.
+            for (const name of [bread, cake]) {
+                await sheet.getByLabel("Add a product").fill(name);
+                await sheet
+                    .getByRole("group", { name: `Add ${name}` })
+                    .getByRole("button")
+                    .first()
+                    .click();
+            }
+            await expect(sheet.getByText("2 items")).toBeVisible();
 
-            // 3. A line is removed (the one just added).
-            await refuse();
-            await page.getByRole("button", { name: "✕" }).nth(1).click();
-            await expect(refused).toHaveCount(0);
+            // Pick-up where the storefront offers it; else its first way,
+            // with the address a delivery needs.
+            const pickUp = sheet.getByRole("radio", { name: "Pick-up" });
+            if (await pickUp.count()) {
+                await pickUp.click();
+            } else {
+                await sheet
+                    .getByLabel("Delivery address")
+                    .last()
+                    .fill("12 Church St");
+                await sheet.getByLabel("Town or city").fill("Bengaluru");
+                await sheet.getByLabel("State").fill("Karnataka");
+                await sheet.getByLabel("PIN code").fill("560001");
+            }
 
-            // 4. Another product is picked.
-            await refuse();
-            await product.first().click();
-            await page
-                .getByRole("option", { name: new RegExp(`^(?!${name}).+ — `) })
-                .first()
-                .click();
-            await expect(refused).toHaveCount(0);
+            // Cash: what was handed over, and the change.
+            await sheet.getByRole("radio", { name: "Cash" }).click();
+            const ways = await sheet
+                .getByRole("radiogroup", { name: "How it leaves" })
+                .getByRole("radio", { checked: true })
+                .textContent();
+            const delivered = !ways?.startsWith("Pick-up");
+            if (!delivered) {
+                await sheet.getByLabel("Cash given").fill("500");
+                await expect(sheet.getByText("Change ₹70")).toBeVisible();
+                await sheet
+                    .getByRole("button", { name: "Take ₹430 cash · create" })
+                    .click();
+                await expect(
+                    page.getByText("Order created — give ₹70 change."),
+                ).toBeVisible();
+            } else {
+                await sheet
+                    .getByRole("button", { name: /cash · create$/ })
+                    .click();
+                await expect(page.getByText(/^Order created/)).toBeVisible();
+            }
+
+            // It is on the list, found by the walk-in's name (B13's search).
+            await page.getByLabel("Search orders").fill(walkIn);
+            await expect(page.getByText(walkIn).first()).toBeVisible();
         } finally {
-            await removeProducts(page.request, NW, name);
+            await removeProducts(page.request, NW, bread);
+            await removeProducts(page.request, NW, cake);
         }
     });
 });

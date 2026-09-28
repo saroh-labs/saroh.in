@@ -44,7 +44,8 @@ const ITEM =
     "cursor-pointer items-start active:bg-secondary-hover data-[disabled]:cursor-default";
 
 const firstName = (row: OrderRow) =>
-    (row.customer?.name ?? "").trim().split(/\s+/)[0] || "the customer";
+    (row.customer?.name ?? row.walkIn?.name ?? "").trim().split(/\s+/)[0] ||
+    "the customer";
 
 /**
  * A row's "More actions" menu on the Orders list (plan B, B5), after the

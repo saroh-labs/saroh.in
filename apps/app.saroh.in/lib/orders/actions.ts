@@ -17,24 +17,13 @@ import {
     saveOrderCourier,
     undoOrderStage,
 } from "./kitchen-service";
-import type {
-    CreateOrderInput,
-    OrderResult,
-    UpdateOrderInput,
-} from "./service";
-import {
-    createOrder as createOrderApi,
-    updateOrder as updateOrderApi,
-} from "./service";
+import type { OrderResult, UpdateOrderInput } from "./service";
+import { updateOrder as updateOrderApi } from "./service";
 
-/** Server Actions for orders — forward the cookie to api (write = owner/EDITOR+). */
-
-export async function createOrder(
-    storeId: string,
-    input: CreateOrderInput,
-): Promise<OrderResult> {
-    return createOrderApi(storeId, input);
-}
+/**
+ * Server Actions for orders — forward the cookie to api (write =
+ * owner/EDITOR+). Taking an order is New order's (`new-order-actions.ts`).
+ */
 
 export async function updateOrder(
     storeId: string,

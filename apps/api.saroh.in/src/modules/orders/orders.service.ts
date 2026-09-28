@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -11,12 +12,14 @@ import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     creditRestOfOrder,
     ensureOrderInvoice,
     loadTaxProfile,
 } from "../invoices/order-invoicing";
+import { assertPaymentsOn } from "../invoices/payments-on";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -31,11 +34,22 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import {
+    assertOneParty,
+    assertStorefrontOffers,
+    cashReceivedCents,
+    isCounterPayment,
+    newOrderLines,
+    orderPartyInTx,
+    storefrontOffers,
+    takeCounterPaymentInTx,
+} from "./new-order";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import type { OrderListCaller, OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
 import { orderFilterOptions, searchOrderProducts } from "./order-list-options";
 import { retireOrderPayLinkInTx } from "./order-pay-link";
+import { issueOrderPayLinkInTx } from "./order-pay-link.service";
 import {
     fromCents,
     priceOrderLines,
@@ -147,17 +161,10 @@ export class OrdersService {
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
         const organizationId = await this.requireWrite(storeId, userId);
-
-        const customer = await prisma.customer.findFirst({
-            where: { id: dto.customerId, storeId },
-            select: { id: true },
-        });
-        if (!customer) {
-            throw new BadRequestException({
-                message: "Unknown customer",
-                field: "customerId",
-            });
-        }
+        // Who it is for, and how it is paid (B13): checked before anything
+        // is priced, so a request that can't be served costs nothing.
+        assertOneParty(dto);
+        await this.assertNewOrderAllowed(storeId, userId, organizationId, dto);
         // Either vocabulary in; only what this release may write is stored
         // (fulfilment.ts: SHIPPING and the rest are refused until B2c).
         const type = typeOf(dto.fulfilment ?? "PICKUP");
@@ -180,8 +187,19 @@ export class OrdersService {
         // an order in any other is refused rather than silently mixed in.
         const settings = await prisma.storeSettings.findUnique({
             where: { storeId },
-            select: { currency: true },
+            select: {
+                currency: true,
+                fulfilmentTypes: true,
+                collectionEnabled: true,
+                shippingEnabled: true,
+            },
         });
+        // And a way the storefront offers (B13): New order v2 offers only
+        // those, so anything else is a forged request. A request from before
+        // v2 (no `payment`) is served as it was, whatever way it names.
+        if (dto.payment !== undefined) {
+            assertStorefrontOffers(type, storefrontOffers(settings));
+        }
         if (
             settings &&
             dto.currency !== undefined &&
@@ -258,10 +276,26 @@ export class OrdersService {
             });
         }
 
+        // Paid at the counter (B13): cash short of the total is refused.
+        const counter =
+            dto.payment && isCounterPayment(dto.payment.kind)
+                ? {
+                      kind: dto.payment.kind,
+                      receivedCents:
+                          dto.payment.kind === "CASH"
+                              ? cashReceivedCents(
+                                    dto.payment.received,
+                                    totalCents,
+                                    (cents) =>
+                                        formatMoney(fromCents(cents), currency),
+                                )
+                              : null,
+                  }
+                : null;
+
         const data = {
             storeId,
             organizationId,
-            customerId: dto.customerId,
             currency,
             subtotal: fromCents(subtotalCents),
             tax: fromCents(taxCents),
@@ -300,8 +334,16 @@ export class OrdersService {
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
+                        // Found or made in this transaction: an order that
+                        // fails leaves no customer behind (B13).
+                        const party = await orderPartyInTx(tx, {
+                            storeId,
+                            organizationId,
+                            userId,
+                            dto,
+                        });
                         const { items, ...order } = await tx.order.create({
-                            data: { ...data, orderId: orderNumber },
+                            data: { ...data, ...party, orderId: orderNumber },
                             select: {
                                 id: true,
                                 items: {
@@ -329,7 +371,28 @@ export class OrdersService {
                                 currency,
                             );
                         }
-                        return order;
+                        // Paid now at the counter, or its pay link (B11)
+                        // made with it: one or the other, or neither
+                        // (pay later).
+                        if (counter) {
+                            await takeCounterPaymentInTx(tx, {
+                                orderId: order.id,
+                                organizationId,
+                                userId,
+                                kind: counter.kind,
+                                receivedCents: counter.receivedCents,
+                                at: new Date(),
+                            });
+                        }
+                        const payLink =
+                            dto.payment?.kind === "LINK" && organizationId
+                                ? await issueOrderPayLinkInTx(
+                                      tx,
+                                      organizationId,
+                                      order.id,
+                                  )
+                                : null;
+                        return { ...order, payLink };
                     },
                     // Serializable ONLY for an order carrying a code: the
                     // cap re-count inside must see a concurrent redemption.
@@ -356,7 +419,9 @@ export class OrdersService {
                         created.id,
                     );
                 }
-                return { id: created.id };
+                return created.payLink
+                    ? { id: created.id, payLink: created.payLink }
+                    : { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
                 // A serialization failure only means something on the coded
@@ -371,6 +436,12 @@ export class OrdersService {
             }
         }
         throw new BadRequestException("Could not allocate an order number");
+    }
+
+    /** New order's lines (B13): see `new-order.ts`. */
+    async newOrderLines(storeId: string, userId: string, productIds: string[]) {
+        await this.requireWrite(storeId, userId);
+        return newOrderLines(storeId, productIds);
     }
 
     async updateStatus(
@@ -542,6 +613,38 @@ export class OrdersService {
                 ruleAmount: applied.ruleAmount,
             },
         });
+    }
+
+    /**
+     * What New order v2 asks beyond writing to the storefront (B13): a
+     * picked person is read by their email, which takes `contact:read` (as
+     * the search that found them does); a pay link takes `order:write` and
+     * a business that takes payments (B11).
+     */
+    private async assertNewOrderAllowed(
+        storeId: string,
+        userId: string,
+        organizationId: string | null,
+        dto: CreateOrderDto,
+    ): Promise<void> {
+        if (
+            dto.contactId &&
+            !(await this.stores.memberAllows(storeId, userId, "contact:read"))
+        ) {
+            throw new ForbiddenException(
+                "Your role can't look customers up. Take it as a walk-in, or add them by email.",
+            );
+        }
+        if (dto.payment?.kind !== "LINK") return;
+        if (!organizationId) {
+            throw new BadRequestException("A pay link needs a business.");
+        }
+        if (!(await this.stores.memberAllows(storeId, userId, "order:write"))) {
+            throw new ForbiddenException(
+                "Your role can't make a pay link. Take the payment at the counter, or leave it to pay later.",
+            );
+        }
+        await assertPaymentsOn(prisma, organizationId, "make a pay link");
     }
 
     /**

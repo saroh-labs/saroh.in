@@ -1466,8 +1466,12 @@ model Order {
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
   orderId    String // Store-specific order number (ORD-001, etc)
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
+  // Null only for a walk-in (plan B, B13): someone served at the counter who
+  // left no email, so no storefront customer and no contact is made. Their
+  // name (and phone, if given) stays on the order as `walkInName` and
+  // `walkInPhone`. Every other order names its storefront customer.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Pricing
   subtotal Decimal @db.Decimal(12, 2)
@@ -1563,6 +1567,13 @@ model Order {
   // single-column key, as Booking's: RLS keeps it in the business.
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  // A walk-in's name, and their phone if they gave one, for "call when it's
+  // ready" (plan B, B13). Set only when `customerId` is null; kept like any
+  // order's contact details (DEC-042). No contact is made from them, because
+  // a contact needs an email.
+  walkInName  String?
+  walkInPhone String?
 
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])

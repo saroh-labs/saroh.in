@@ -1523,7 +1523,10 @@ export class PaymentsService {
                 store: { select: { settings: { select: { pausedAt: true } } } },
             },
         });
-        if (!order || !customer.customerIds.includes(order.customerId)) {
+        if (
+            !order?.customerId ||
+            !customer.customerIds.includes(order.customerId)
+        ) {
             throw new NotFoundException("Order not found");
         }
         if (order.status === "CANCELLED") {

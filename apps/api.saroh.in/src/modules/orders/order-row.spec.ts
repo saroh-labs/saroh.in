@@ -332,4 +332,59 @@ describe("quickViewOf (B5)", () => {
         const gone = { ...read, customer: null } as OrderReadDto;
         expect(quickViewOf(gone, { contact: false }).customer).toBeNull();
     });
+
+    // B13: a walk-in's phone is left out as a customer's would be.
+    it("leaves a walk-in's phone out for a caller who doesn't read contacts", () => {
+        const walkIn = {
+            ...read,
+            customer: null,
+            walkIn: { name: "Ravi", phone: "+91 90000 11111" },
+        } as OrderReadDto;
+        expect(quickViewOf(walkIn, { contact: false }).walkIn).toEqual({
+            name: "Ravi",
+            phone: null,
+        });
+        expect(quickViewOf(walkIn, { contact: true }).walkIn?.phone).toBe(
+            "+91 90000 11111",
+        );
+    });
+});
+
+describe("a walk-in's row (B13)", () => {
+    it("has no customer, and carries the walk-in's name", () => {
+        const row = serializeOrderRow(
+            raw({
+                customerId: null,
+                customer: null,
+                walkInName: "Ravi",
+                walkInPhone: "+91 90000 11111",
+            }),
+            { money: true, contact: true, now },
+        );
+        expect(row.customer).toBeNull();
+        expect(row.walkIn).toEqual({
+            name: "Ravi",
+            phone: "+91 90000 11111",
+        });
+    });
+
+    it("keeps the walk-in's phone from a caller without contact:read", () => {
+        const row = serializeOrderRow(
+            raw({
+                customerId: null,
+                customer: null,
+                walkInName: "Ravi",
+                walkInPhone: "+91 90000 11111",
+            }),
+            { money: false, contact: false, now },
+        );
+        expect(row.walkIn).toEqual({ name: "Ravi", phone: null });
+    });
+
+    it("is null on a customer's row", () => {
+        expect(
+            serializeOrderRow(raw(), { money: true, contact: true, now })
+                .walkIn,
+        ).toBeNull();
+    });
 });

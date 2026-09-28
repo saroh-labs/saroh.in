@@ -121,6 +121,8 @@ export interface TodayOrderRow {
         lastName: string | null;
         email: string | null;
     } | null;
+    /** A walk-in's name when there is no customer (B13). */
+    walkInName?: string | null;
     /** Its storefront's late thresholds; absent reads the defaults. */
     store?: { settings: LateThresholdColumns | null } | null;
 }
@@ -245,6 +247,12 @@ const STAGE_WORDS: Record<string, string> = {
  * Minutes after placing a pick-up is due: the Pick-up threshold its
  * storefront sets (B17; DEC-045), the one its Late tag goes by.
  */
+/** A walk-in's name (B13), or null when none was kept. */
+function walkInNameOf(row: TodayOrderRow): string | null {
+    const name = row.walkInName?.trim();
+    return name !== undefined && name.length > 0 ? name : null;
+}
+
 function readyAfter(row: TodayOrderRow): number {
     return lateThresholdsOf(row.store?.settings).PICKUP;
 }
@@ -269,7 +277,7 @@ export function pickUpItems(
             row.createdAt.getTime() + readyAfter(row) * 60_000,
         );
         if (due < day.start || due >= day.end) continue;
-        const who = row.customer ? personName(row.customer) : null;
+        const who = row.customer ? personName(row.customer) : walkInNameOf(row);
         const stage = STAGE_WORDS[row.stage];
         items.push({
             id: row.id,
@@ -367,6 +375,8 @@ async function pickUpRows(
             customer: {
                 select: { firstName: true, lastName: true, email: true },
             },
+            // A walk-in is named by the name they gave (B13).
+            walkInName: true,
             store: { select: { settings: { select: LATE_THRESHOLD_SELECT } } },
         },
     });

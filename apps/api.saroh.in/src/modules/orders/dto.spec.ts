@@ -47,3 +47,74 @@ describe("the order DTOs' fulfilment (B2d)", () => {
         },
     );
 });
+
+/** New order v2's who and how it is paid (B13), as the pipe reads them. */
+describe("the create DTO's walk-in and payment (B13)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const parse = (value: Record<string, unknown>) =>
+        pipe.transform(value, { type: "body", metatype: CreateOrderDto });
+    const items = [{ productId: "p1", quantity: 1 }];
+
+    it("takes a walk-in with a name, and a phone if given", async () => {
+        await expect(
+            parse({
+                items,
+                walkIn: { name: " Asha ", phone: "+91 98450 00002" },
+                payment: { kind: "CASH", received: "500" },
+            }),
+        ).resolves.toMatchObject({
+            walkIn: { name: "Asha", phone: "+91 98450 00002" },
+            payment: { kind: "CASH", received: "500" },
+        });
+        await expect(
+            parse({ items, walkIn: { name: "Ravi", phone: "" } }),
+        ).resolves.toMatchObject({ walkIn: { name: "Ravi", phone: null } });
+    });
+
+    it("refuses a walk-in with no name with 400", async () => {
+        await expect(parse({ items, walkIn: { name: "  " } })).rejects.toThrow(
+            BadRequestException,
+        );
+    });
+
+    it("refuses a phone that isn't one, and an email that isn't one", async () => {
+        await expect(
+            parse({ items, walkIn: { name: "Asha", phone: "call me" } }),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+            parse({ items, customer: { email: "not-an-email" } }),
+        ).rejects.toThrow(BadRequestException);
+    });
+
+    it("lower-cases a new customer's email", async () => {
+        await expect(
+            parse({ items, customer: { email: " Nisha@Example.IN " } }),
+        ).resolves.toMatchObject({ customer: { email: "nisha@example.in" } });
+    });
+
+    it.each(["CASH", "UPI", "CARD", "LATER", "LINK"])(
+        "takes %s as how it is paid",
+        async (kind) => {
+            await expect(
+                parse({ items, walkIn: { name: "A" }, payment: { kind } }),
+            ).resolves.toMatchObject({ payment: { kind } });
+        },
+    );
+
+    it("refuses a payment kind it doesn't know, and cash that isn't an amount", async () => {
+        await expect(
+            parse({
+                items,
+                walkIn: { name: "A" },
+                payment: { kind: "CHEQUE" },
+            }),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+            parse({
+                items,
+                walkIn: { name: "A" },
+                payment: { kind: "CASH", received: "five hundred" },
+            }),
+        ).rejects.toThrow(BadRequestException);
+    });
+});

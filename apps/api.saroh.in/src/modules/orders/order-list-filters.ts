@@ -169,6 +169,8 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
     const parts: Prisma.Sql[] = [
         Prisma.sql`o."orderId" ILIKE ${pattern}`,
         Prisma.sql`CONCAT_WS(' ', c."firstName", c."lastName") ILIKE ${pattern}`,
+        // A walk-in is found by the name they gave (B13).
+        Prisma.sql`o."walkInName" ILIKE ${pattern}`,
     ];
     if (view.contact) {
         parts.push(Prisma.sql`c.email ILIKE ${pattern}`);
@@ -177,6 +179,9 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
         if (digits.length >= 3) {
             parts.push(
                 Prisma.sql`regexp_replace(COALESCE(c.phone, ''), '\\D', '', 'g') LIKE ${`%${digits}%`}`,
+            );
+            parts.push(
+                Prisma.sql`regexp_replace(COALESCE(o."walkInPhone", ''), '\\D', '', 'g') LIKE ${`%${digits}%`}`,
             );
         }
     }

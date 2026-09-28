@@ -125,5 +125,7 @@ async function orderMadeOnlineWith(
         where: { id: orderId, organizationId: message.organizationId },
         select: { placedOnline: true, customer: { select: { email: true } } },
     });
-    return Boolean(order?.placedOnline) && same(order?.customer.email, address);
+    return (
+        Boolean(order?.placedOnline) && same(order?.customer?.email, address)
+    );
 }

@@ -19,6 +19,11 @@ export interface PeekAttentionEntry {
     kind: AttentionKind;
     label: string;
     sensitive: boolean;
+    /**
+     * An Allergy entry's allergen, as every storefront names it: what New
+     * order checks a line against (B13). Absent where it wasn't read.
+     */
+    matchAllergens?: { id: string; name: string }[];
 }
 
 /**

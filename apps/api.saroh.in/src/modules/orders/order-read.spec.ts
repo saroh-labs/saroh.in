@@ -597,6 +597,56 @@ describe("the customer's own phone and email (review #19)", () => {
     );
 });
 
+// B13: a walk-in's order has no customer. It reads by the name they gave,
+// and their phone goes only where a customer's would.
+describe("a walk-in's order (B13)", () => {
+    const walkIn: RawOrderRead = {
+        ...base,
+        customer: null,
+        walkInName: "Asha",
+        walkInPhone: "+91 98450 00002",
+    };
+
+    it("has no customer, and names the walk-in", () => {
+        const read = serializeOrderRead(walkIn, {
+            ...opts(true),
+            contact: true,
+        });
+        expect(read.customer).toBeNull();
+        expect(read.walkIn).toEqual({
+            name: "Asha",
+            phone: "+91 98450 00002",
+        });
+    });
+
+    it("keeps their phone from a caller without contact:read", () => {
+        const read = serializeOrderRead(walkIn, {
+            ...opts(false),
+            contact: false,
+        });
+        expect(read.walkIn).toEqual({ name: "Asha", phone: null });
+        expect(JSON.stringify(read)).not.toContain("98450");
+    });
+
+    it("is null on an order with a customer", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                walkInName: null,
+                customer: {
+                    id: "cus_1",
+                    email: "p@example.in",
+                    firstName: "Priya",
+                    lastName: null,
+                    phone: null,
+                },
+            },
+            opts(true),
+        );
+        expect(read.walkIn).toBeNull();
+    });
+});
+
 describe("the order read's Needs attention (B15)", () => {
     const attention = {
         entries: [

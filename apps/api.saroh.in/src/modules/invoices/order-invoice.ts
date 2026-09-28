@@ -1,4 +1,5 @@
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
+import { orderPartyName } from "../orders/walk-in";
 import type { GstLine, GstLineInput, TaxType } from "./gst";
 import {
     allocate,
@@ -55,11 +56,13 @@ export interface OrderForInvoice {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    /** Null for a walk-in (B13), billed by `walkInName`. */
     customer: {
         firstName: string | null;
         lastName: string | null;
         email: string;
-    };
+    } | null;
+    walkInName?: string | null;
     items: {
         id: string;
         quantity: number;
@@ -126,6 +129,16 @@ export function orderBillTo(order: OrderForInvoice): BillTo {
               .filter((x) => x && x.trim() !== "")
               .join(", ")
         : null;
+    // A walk-in (B13) is billed by the name they gave, marked so, with no
+    // email: nobody to send it to, so it is never emailed.
+    if (!order.customer) {
+        return {
+            name: orderPartyName(order, { label: true }),
+            email: null,
+            address,
+            state: null,
+        };
+    }
     return {
         name: contactName(order.customer),
         email: order.customer.email,

@@ -2,10 +2,12 @@ import {
     Body,
     Controller,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
@@ -14,6 +16,7 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { orderPayLinkUrl } from "../invoices/pay-link-url";
 import { CreateOrderDto, UpdateOrderDto } from "./dto";
 import { OrdersService } from "./orders.service";
 
@@ -28,14 +31,52 @@ export class OrdersController {
         return this.orders.list(storeId, user.id);
     }
 
+    /**
+     * Make an order by hand. With New order v2's "Send a payment link"
+     * (B13) the answer carries the order's pay link — once: only its hash
+     * is kept (B11).
+     */
     @Post()
     @HttpCode(201)
-    create(
+    @Header("Cache-Control", "no-store")
+    async create(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
         @Body() dto: CreateOrderDto,
+    ): Promise<{
+        id: string;
+        payLink?: { url: string; payLinkCreatedAt: Date };
+    }> {
+        const made = await this.orders.create(storeId, user.id, dto);
+        return "payLink" in made && made.payLink
+            ? {
+                  id: made.id,
+                  payLink: {
+                      url: orderPayLinkUrl(made.payLink.token),
+                      payLinkCreatedAt: made.payLink.payLinkCreatedAt,
+                  },
+              }
+            : { id: made.id };
+    }
+
+    /**
+     * New order's lines (B13): the ways an order of these products can
+     * leave this storefront, with what each adds, and each product's
+     * allergens for the allergy clash. `?products=a,b`; none, the
+     * storefront's own ways.
+     */
+    @Get("new-order")
+    newOrderLines(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query("products") products?: string,
     ) {
-        return this.orders.create(storeId, user.id, dto);
+        const ids = (products ?? "")
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+            .slice(0, 100);
+        return this.orders.newOrderLines(storeId, user.id, ids);
     }
 
     @Get(":orderId")

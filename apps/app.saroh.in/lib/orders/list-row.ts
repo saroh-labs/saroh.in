@@ -171,14 +171,22 @@ export function rowSubline(
         .join(" · ");
 }
 
-/** The customer's name, or their email when there is no name. */
-export function rowCustomer(row: Pick<OrderRow, "customer">): string {
+/**
+ * The customer's name, or their email when there is no name; a walk-in
+ * (B13) by the name they gave.
+ */
+export function rowCustomer(
+    row: Pick<OrderRow, "customer"> & Partial<Pick<OrderRow, "walkIn">>,
+): string {
+    if (!row.customer && row.walkIn) return row.walkIn.name;
     return row.customer?.name ?? row.customer?.email ?? "Unknown customer";
 }
 
 /** Two letters from the name, or one from the email when there is no name. */
-export function rowInitials(row: Pick<OrderRow, "customer">): string {
-    const name = row.customer?.name ?? "";
+export function rowInitials(
+    row: Pick<OrderRow, "customer"> & Partial<Pick<OrderRow, "walkIn">>,
+): string {
+    const name = row.customer?.name ?? row.walkIn?.name ?? "";
     const letters = name
         .split(/[\s&]+/)
         .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w))

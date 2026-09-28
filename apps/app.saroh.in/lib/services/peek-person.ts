@@ -49,6 +49,9 @@ export async function readAttention(
                       kind: e.kind,
                       label: e.label,
                       sensitive: e.sensitive,
+                      ...(Array.isArray(e.matchAllergens)
+                          ? { matchAllergens: e.matchAllergens }
+                          : {}),
                   }))
                 : [],
             hiddenSensitiveCount:

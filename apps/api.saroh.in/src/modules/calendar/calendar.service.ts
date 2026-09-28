@@ -667,6 +667,8 @@ export class CalendarService {
                             email: true,
                         },
                     },
+                    // A walk-in (B13) is named by the name they gave.
+                    walkInName: true,
                     invoices: {
                         where: { kind: "INVOICE" },
                         select: { id: true },
@@ -690,7 +692,7 @@ export class CalendarService {
                 kind: "order_paid" as const,
                 layer: "orders" as const,
                 title: o.orderId,
-                subtitle: personName(o.customer),
+                subtitle: personName(o.customer) ?? o.walkInName,
                 currency: o.currency,
                 cents: toMinor(o.total),
                 links: [{ type: "order" as const, id: o.id }],
@@ -705,7 +707,7 @@ export class CalendarService {
                         kind: o.status === "CANCELLED" ? "cancelled" : "placed",
                         ...(flags.length ? { flags } : {}),
                         title: o.orderId,
-                        subtitle: personName(o.customer),
+                        subtitle: personName(o.customer) ?? o.walkInName,
                         at: o.createdAt.toISOString(),
                         ...(amounts
                             ? {

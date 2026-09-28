@@ -194,6 +194,11 @@ export interface OrderRead extends FulfilmentFields {
         orderCount: number;
         firstOrderAt: string | null;
     } | null;
+    /**
+     * A walk-in (B13): no customer record, only the name they gave and their
+     * phone (with `contact:read`). Optional: an API before B13 sends none.
+     */
+    walkIn?: { name: string; phone: string | null } | null;
     deliveryAddress: DeliveryAddress | null;
     notes: string | null;
     trackingUrl: string | null;

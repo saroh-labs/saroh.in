@@ -2,9 +2,9 @@ import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
 
 /**
- * One storefront's order writes for app.saroh.in: taking an order and
- * recording its status or a payment by hand. Forwards the session cookie to
- * api.saroh.in (store membership enforced). Server-only.
+ * One storefront's order writes for app.saroh.in: recording its status or
+ * a payment by hand (taking an order is `new-order-service.ts`). Forwards the
+ * session cookie to api.saroh.in (store membership enforced). Server-only.
  *
  * Reads are elsewhere: the business-wide list in `business-service.ts`, and
  * one order in `kitchen-service.ts` — the organization-scoped read that leaves
@@ -15,17 +15,6 @@ import { apiFetch } from "@/lib/api/http";
 export type OrderStatus =
     "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 export type PaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
-
-export interface CreateOrderInput {
-    customerId: string;
-    items: { productId: string; variantId?: string; quantity: number }[];
-    tax?: string;
-    shipping?: string;
-    discount?: string;
-    currency?: string;
-    /** A discount code; the API works out what it takes off. */
-    discountCode?: string;
-}
 
 export interface UpdateOrderInput {
     status?: OrderStatus;
@@ -48,10 +37,6 @@ async function mutate(
     // The API's envelope is `{ error: { message, details } }`; reading only a
     // top-level `message` turned every refusal into "Something went wrong".
     return toFailure(data, "Something went wrong");
-}
-
-export function createOrder(storeId: string, input: CreateOrderInput) {
-    return mutate(`/stores/${storeId}/orders`, "POST", input);
 }
 
 export function updateOrder(

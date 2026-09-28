@@ -61,6 +61,8 @@ export interface OrderRow extends FulfilmentFields {
         email?: string;
         phone?: string | null;
     } | null;
+    /** A walk-in (B13), with no customer record. Absent before B13. */
+    walkIn?: { name: string; phone: string | null } | null;
     status: string;
     paymentStatus: string;
     stage: string;

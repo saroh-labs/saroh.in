@@ -147,6 +147,32 @@ describe("an order's invoice", () => {
         expect(orderBillTo(order({ fulfilment: "PICKUP" })).address).toBeNull();
     });
 
+    // B13: a walk-in has no customer. The paper names them, says so, and
+    // carries no email, so it is never sent anywhere.
+    it("bills a walk-in by name, marked as one, with no email", () => {
+        const walkIn = order({
+            customer: null,
+            walkInName: "Asha",
+            fulfilment: "PICKUP",
+        });
+        expect(orderBillTo(walkIn)).toEqual({
+            name: "Asha (walk-in)",
+            email: null,
+            address: null,
+            state: null,
+        });
+        // The lines and sums don't depend on who it is for.
+        expect(buildOrderInvoice(walkIn, RYE)).toEqual(
+            buildOrderInvoice(order({ fulfilment: "PICKUP" }), RYE),
+        );
+    });
+
+    it("bills a walk-in who left no name as Walk-in", () => {
+        expect(
+            orderBillTo(order({ customer: null, walkInName: null })).name,
+        ).toBe("Walk-in");
+    });
+
     // B2a: the six types (DEC-045), read through `typeOf`. Whatever goes to
     // an address is taxed where it goes.
     it.each(["LOCAL_DELIVERY", "SHIPPING"])(

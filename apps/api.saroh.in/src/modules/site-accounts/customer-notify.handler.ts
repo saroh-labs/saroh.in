@@ -341,7 +341,7 @@ async function loadOrderStep(
             kind,
             order: {
                 business: await businessName(tx, organizationId),
-                firstName: firstWord(order.customer.firstName),
+                firstName: firstWord(order.customer?.firstName ?? null),
                 number: order.orderId,
                 stage,
                 pickup: order.fulfilment === "PICKUP",
@@ -361,7 +361,7 @@ async function loadOrderStep(
 export async function orderContactId(
     tx: Pick<Tx, "customerAccount" | "customerIdentityLink">,
     organizationId: string,
-    order: { customerId: string; customerAccountId: string | null },
+    order: { customerId: string | null; customerAccountId: string | null },
 ): Promise<string | null> {
     if (order.customerAccountId) {
         const account = await tx.customerAccount.findFirst({
@@ -370,6 +370,8 @@ export async function orderContactId(
         });
         if (account) return account.contactId;
     }
+    // A walk-in (B13) has no customer record, so no one to tell.
+    if (!order.customerId) return null;
     const link = await tx.customerIdentityLink.findFirst({
         where: { organizationId, customerId: order.customerId },
         orderBy: { createdAt: "asc" },

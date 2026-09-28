@@ -219,6 +219,51 @@ describe("invite", () => {
         );
     });
 
+    // B13: a walk-in left no email, so there is nobody to invite.
+    it("never invites a walk-in, who has no customer and no email", async () => {
+        db.order!.findFirst!.mockResolvedValue(
+            order({ customerId: null, customer: null, walkInName: "Asha" }),
+        );
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toMatchObject({ status: "skipped", reason: "no-email" });
+        expect(send).not.toHaveBeenCalled();
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("leaves walk-ins out of the orders it offers to invite", async () => {
+        db.order!.findMany!.mockResolvedValue([
+            {
+                id: "o_1",
+                orderId: "1001",
+                storeId: "s_1",
+                createdAt: new Date("2026-09-20T10:00:00Z"),
+                store: { name: "High Street" },
+                customer: null,
+                _count: { items: 1 },
+            },
+            {
+                id: "o_2",
+                orderId: "1002",
+                storeId: "s_1",
+                createdAt: new Date("2026-09-20T11:00:00Z"),
+                store: { name: "High Street" },
+                customer: {
+                    email: "ananya@example.com",
+                    firstName: "Ananya",
+                    lastName: null,
+                },
+                _count: { items: 1 },
+            },
+        ]);
+        const offered = await make().invitableOrders("org_1");
+        expect(offered.map((o) => o.id)).toEqual(["o_2"]);
+        expect(db.order!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ customerId: { not: null } }),
+            }),
+        );
+    });
+
     it("stops at the business's daily cap", async () => {
         const results = await make(1).invite(ctx, ["o_1", "o_2"]);
         expect(results.map((r) => r.status)).toEqual(["sent", "skipped"]);
