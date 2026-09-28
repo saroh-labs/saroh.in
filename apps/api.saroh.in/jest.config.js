@@ -207,6 +207,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // D17: sending an invoice, with the database mocked
+        // (invoice-send.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-send.service.spec.ts",
         // U5 GST: the tax maths, the states and GSTINs, and the order
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",

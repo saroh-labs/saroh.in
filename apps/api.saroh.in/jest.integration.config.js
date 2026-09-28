@@ -98,6 +98,8 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13 pay link: mocked-DB specs; invoice-pay-link.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // D17: mocked-DB; invoice-send.db.spec.ts runs here.
+        "<rootDir>/src/modules/invoices/invoice-send.service.spec.ts",
         // U5 GST: the tax maths, the states and GSTINs, and the order
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
