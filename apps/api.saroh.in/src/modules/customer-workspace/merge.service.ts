@@ -13,6 +13,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { reservedMergedEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
+import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
 import { absorbThread } from "../site-accounts/thread-store";
 import type {
     AccountPlan,
@@ -51,7 +52,9 @@ import { isRemovedContact } from "./resolve-contact";
  * 1. both contacts locked `FOR UPDATE` in id order;
  * 2. the refusals checked again under the locks: a tombstone is 404 ("already
  *    merged"), a removed contact 409, the same live plan or active course 409;
- * 3. every relation re-pointed by its rule (`merge-plan.ts` MERGE_RULES);
+ * 3. every relation re-pointed by its rule (`merge-plan.ts` MERGE_RULES),
+ *    except the merged contact's autopay mandates, which are cancelled
+ *    (D20);
  * 4. the merged contact made a tombstone — placeholder email, no personal
  *    values, `mergedIntoId`, `mergedAt` — BEFORE
  * 5. the survivor takes the chosen name, email and phone, so the unique
@@ -293,6 +296,16 @@ export class MergeService {
                 keptAddresses(s, o, pair.accounts, fields),
             );
             await applyAccountPlan(tx, pair, plan, now);
+            // The merged-away person's autopay is never moved: the survivor
+            // never authorised it (D20). It stops here, in the merge's
+            // transaction, and a `mandate.cancel` job asks the provider
+            // after commit, so a provider timeout can't undo the merge.
+            await cancelMandatesInTx(
+                tx,
+                { organizationId, contactId: other.id },
+                "MERGED",
+                { now },
+            );
 
             // The tombstone first: it gives up its email, so the survivor
             // can take it in the same transaction.
@@ -369,13 +382,10 @@ export class MergeService {
     }
 
     /**
-     * Work that follows a committed merge and must never roll it back.
-     *
-     * THE SEAM FOR D20: the merged-away contact's autopay mandates are
-     * cancelled here, never moved (the survivor never authorised them):
-     * `await this.mandates.cancelFor({ contactId: merged.mergedId }, "MERGED")`,
-     * which queues a `mandate.cancel` job so a provider timeout can't undo
-     * the merge. A12 releases a second waitlist hold here too.
+     * Work that follows a committed merge and must never roll it back. A12
+     * releases a second waitlist hold here. (The merged-away contact's
+     * mandates are cancelled inside the merge, with their `mandate.cancel`
+     * job written on its transaction: D20.)
      */
     protected afterCommit(merged: MergedEvent): Promise<void> {
         this.logger.log(
