@@ -71,11 +71,17 @@ const START_FROM = [
  * Built-ins are shown with their ticks locked. They are the same in every
  * business, which is what lets "Admin" mean one thing to everyone who reads
  * it; a business wanting a different set makes a role of its own.
+ *
+ * Within reach (F19): the viewer can give a role only what they hold
+ * themselves, so a permission they lack is locked with the reason beside it,
+ * and a role that can already do more than them is shown read-only. The API
+ * refuses both anyway; this is so nobody ticks a box only to be told no.
  */
 export function RolesTab({
     roles,
     catalogue,
     canEdit,
+    myActions,
     organizationName,
     builtInBlurb,
     builtInPlain,
@@ -84,6 +90,8 @@ export function RolesTab({
     catalogue: RoleCatalogue | null;
     /** Holds `member:role:update`. The API refuses writes without it anyway. */
     canEdit: boolean;
+    /** What the viewer may do; `null` when unknown, and nothing is held back. */
+    myActions: string[] | null;
     organizationName: string;
     /** What each built-in is for, in the words the People tab already uses. */
     builtInBlurb: Record<string, string>;
@@ -94,6 +102,7 @@ export function RolesTab({
         roles.find((r) => !r.system)?.key ?? "MEMBER",
     );
     const [creating, setCreating] = useState(false);
+    const holds = useMemo(() => viewerHolds(myActions), [myActions]);
 
     // `.at(0)` rather than `[0]`: an empty list is a real outcome — the roles
     // request failed — and it has to say so rather than render nothing.
@@ -163,6 +172,7 @@ export function RolesTab({
                 role={active}
                 catalogue={catalogue}
                 canEdit={canEdit && !active.system}
+                holds={holds}
                 blurb={
                     active.system
                         ? (builtInBlurb[active.key] ?? "")
@@ -177,11 +187,36 @@ export function RolesTab({
                     onOpenChange={setCreating}
                     roles={roles}
                     catalogue={catalogue}
+                    holds={holds}
                     onCreated={(key) => setActiveKey(key)}
                 />
             ) : null}
         </div>
     );
+}
+
+/**
+ * Whether the viewer holds an action, and so may give it to a role.
+ *
+ * Unknown viewer (an older response without actions): everything, and the
+ * API decides — it refuses what is out of reach whatever this says.
+ */
+export function viewerHolds(
+    myActions: readonly string[] | null,
+): (action: string) => boolean {
+    if (myActions === null) return () => true;
+    const mine = new Set(myActions);
+    return (action) => mine.has(action);
+}
+
+/** Why a permission's switch is locked for this viewer. */
+export const NOT_YOURS_TO_GIVE =
+    "You don't have this yourself, so you can't give it.";
+
+/** Why a role that can do more than the viewer is read-only for them. */
+export function aboveRoleNote(labels: readonly string[]): string {
+    const what = labels.length > 0 ? ` (${labels.join(", ")})` : "";
+    return `This role can do things you can't${what}, so only someone who can do all of them may change it.`;
 }
 
 function ListSection({
@@ -258,16 +293,28 @@ function RoleRow({
 function RoleDetail({
     role,
     catalogue,
-    canEdit,
+    canEdit: mayEditRoles,
+    holds,
     blurb,
     onRemoved,
 }: {
     role: Role;
     catalogue: RoleCatalogue | null;
     canEdit: boolean;
+    holds: (action: string) => boolean;
     blurb: string;
     onRemoved: () => void;
 }) {
+    // A role that can already do more than the viewer is not theirs to
+    // change, rename or remove — only to look at (F19).
+    const aboveViewer = role.system
+        ? []
+        : role.actions.filter((a) => !holds(a));
+    const canEdit = mayEditRoles && aboveViewer.length === 0;
+    const aboveLabels = aboveViewer.flatMap((a) => {
+        const c = catalogue?.capabilities.find((x) => x.action === a);
+        return c ? [c.label] : [];
+    });
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [label, setLabel] = useState(role.label);
@@ -396,6 +443,11 @@ function RoleDetail({
                                 {capabilities.map((c) => {
                                     const checked = granted.has(c.action);
                                     const id = `perm-${role.key}-${c.action}`;
+                                    // Only on a role the viewer may edit: on
+                                    // any other every switch is locked, and
+                                    // the footer says why.
+                                    const notYours =
+                                        canEdit && !holds(c.action);
                                     return (
                                         <div
                                             key={c.action}
@@ -413,11 +465,20 @@ function RoleDetail({
                                                         {c.note}
                                                     </span>
                                                 ) : null}
+                                                {notYours ? (
+                                                    <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted-foreground">
+                                                        {NOT_YOURS_TO_GIVE}
+                                                    </span>
+                                                ) : null}
                                             </label>
                                             <Switch
                                                 id={id}
                                                 checked={checked}
-                                                disabled={!canEdit || pending}
+                                                disabled={
+                                                    !canEdit ||
+                                                    notYours ||
+                                                    pending
+                                                }
                                                 onCheckedChange={(v) =>
                                                     toggle(c.action, v)
                                                 }
@@ -453,7 +514,9 @@ function RoleDetail({
                         <p className="min-w-0 flex-1 text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
                             {role.system
                                 ? "Built-in roles mean the same thing in every business, so they cannot be changed. Make a role of your own to grant a different set."
-                                : "Only someone who can change roles may edit this one."}
+                                : mayEditRoles && aboveViewer.length > 0
+                                  ? aboveRoleNote(aboveLabels)
+                                  : "Only someone who can change roles may edit this one."}
                         </p>
                     </>
                 ) : (
@@ -538,12 +601,14 @@ function NewRoleDialog({
     onOpenChange,
     roles,
     catalogue,
+    holds,
     onCreated,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     roles: Role[];
     catalogue: RoleCatalogue | null;
+    holds: (action: string) => boolean;
     onCreated: (key: string) => void;
 }) {
     const router = useRouter();
@@ -556,15 +621,19 @@ function NewRoleDialog({
         setFrom("");
     };
 
+    // What the copy takes from the role it starts from: what may be granted
+    // at all, and of that only what the viewer holds themselves (F19).
+    const grantable = new Set(
+        (catalogue?.capabilities ?? []).map((c) => c.action),
+    );
+    const copyable = (roles.find((r) => r.key === from)?.actions ?? []).filter(
+        (a) => grantable.has(a),
+    );
+    const actions = copyable.filter(holds);
+    const leftOff = copyable.length - actions.length;
+
     const create = () =>
         startTransition(async () => {
-            const grantable = new Set(
-                (catalogue?.capabilities ?? []).map((c) => c.action),
-            );
-            const base = roles.find((r) => r.key === from);
-            const actions = (base?.actions ?? []).filter((a) =>
-                grantable.has(a),
-            );
             const res = await createRole({ label: label.trim(), actions });
             if (!res.ok) {
                 showError(res.error);
@@ -637,6 +706,13 @@ function NewRoleDialog({
                             A copy, not a link — changing this role later does
                             not change the one it started from.
                         </p>
+                        {leftOff > 0 ? (
+                            <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                                {leftOff === 1
+                                    ? "1 of its permissions is one you don't have, so it is left off."
+                                    : `${leftOff} of its permissions are ones you don't have, so they are left off.`}
+                            </p>
+                        ) : null}
                     </fieldset>
                     <DialogFooter>
                         <Button
