@@ -158,6 +158,11 @@ const NEVER: Record<string, string> = {
     // (`appointmentsOpen`), as on the anonymous route.
     "site-accounts/account-bookings.controller.ts":
         "a signed-in customer booking on a published site — Appointments checked per service",
+    // A5: the customer's account area. It lists only the modules the
+    // business has rolled out and on (`account-home.service.ts`), and must
+    // stay reachable whichever are off: Me, receipts and sign-out.
+    "site-accounts/account.controller.ts":
+        "a signed-in customer's own account on a published site — modules checked per tab",
     // G11: a site's shop. Commerce being off is checked by the service
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":

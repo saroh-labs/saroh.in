@@ -7,6 +7,7 @@ import {
     IsString,
     Matches,
     MaxLength,
+    MinLength,
 } from "class-validator";
 
 import type { BookingLocationType, BookPay } from "../bookings/dto";
@@ -104,4 +105,54 @@ export class AccountBookDto {
     @IsString()
     @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
     intakeNote?: string;
+}
+
+// ---- The account area (A5) --------------------------------------------------
+
+/**
+ * The customer's own details in Me (default 75): a name, and a phone kept as
+ * a contact detail, never a way to sign in. An empty phone clears it. The
+ * email changes only with a code (`ChangeEmailDto`).
+ */
+export class UpdateDetailsDto {
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Enter your name" })
+    @MaxLength(128)
+    name?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(/^(\+?[\d\s-]{7,20})?$/, {
+        message: "Enter a phone number, like +91 98765 43210",
+    })
+    phone?: string;
+}
+
+/** Ask for a code at a new sign-in email. */
+export class ChangeEmailCodeDto {
+    @Transform(lowerTrim)
+    @IsEmail()
+    @MaxLength(254)
+    email!: string;
+
+    /** The bot challenge's token, when the sheet was asked for one. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2_048)
+    challenge?: string;
+}
+
+/** Change the sign-in email with the code sent to the new one. */
+export class ChangeEmailDto extends VerifyCodeDto {}
+
+/** A health note the customer sends to the team (default 12). */
+export class AddNoteDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "Write your note" })
+    @MaxLength(500, { message: "Keep it to 500 characters" })
+    text!: string;
 }
