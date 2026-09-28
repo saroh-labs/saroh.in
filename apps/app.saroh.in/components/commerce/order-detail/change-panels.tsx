@@ -22,7 +22,7 @@ export function ChangeCard({
     onFulfilment,
     onCancel,
 }: {
-    /** May change orders (`order:write`). */
+    /** May change orders (`order:edit`, B16). */
     canEdit: boolean;
     /** The order is still New (the API says). */
     editable: boolean;
@@ -41,7 +41,7 @@ export function ChangeCard({
     onCancel?: () => void;
 }) {
     const editNote = !canEdit
-        ? "Changing items is for owners and admins."
+        ? "Your role can't change orders."
         : editable
           ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
           : fulfilment === null

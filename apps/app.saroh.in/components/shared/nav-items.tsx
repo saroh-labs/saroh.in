@@ -131,6 +131,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:stage",
         "discount:read",
         "store:read",
+        // Sell › Customers (matrix W-1, B16).
+        "contact:read",
         "subscription:read",
         "invoice:read",
         "course:read",
@@ -157,6 +159,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "order:stage",
         "discount:read",
         "store:read",
+        // Sell › Customers (matrix W-1, B16).
+        "contact:read",
         "subscription:read",
         "invoice:read",
         "course:read",
@@ -241,13 +245,6 @@ export interface NavChild {
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
     /** Any one of several will do, e.g. Orders: `order:read` or `order:stage`. */
     action?: NavAction | readonly NavAction[];
-    /**
-     * Withheld from an actor who holds `holds` but not `without`, whatever
-     * `action` says. The API's rule for the store's customers: the kitchen's
-     * roles — `order:stage` without `order:read` — reach the store but are
-     * refused its customer list, which is emails and spend (R7, #508).
-     */
-    refusedTo?: { holds: NavAction; without: NavAction };
     /**
      * Offered only while the business tracks stock (#527): Sell › Stock
      * has nothing to show when every product sells without a count.
@@ -437,12 +434,11 @@ export const NAV_GROUPS: NavGroup[] = [
                     {
                         href: "/commerce/customers",
                         label: "Customers",
-                        action: "store:read",
-                        // Emails and spend: not the counter's (R7, #508).
-                        refusedTo: {
-                            holds: "order:stage",
-                            without: "order:read",
-                        },
+                        // Its own read (matrix W-1, B16): the list is the
+                        // business's contacts (DEC-041), which the API
+                        // serves to `contact:read`; the order columns in it
+                        // follow `order:read` there.
+                        action: "contact:read",
                     },
                     {
                         href: "/commerce/discounts",
@@ -821,9 +817,7 @@ export function filterNavGroupsByRole(
                 if (item.action && !navCan(actor, item.action)) return [];
                 if (item.children === undefined) return [item];
                 const children = item.children.filter(
-                    (child) =>
-                        (!child.action || navCan(actor, child.action)) &&
-                        !refuses(actor, child.refusedTo),
+                    (child) => !child.action || navCan(actor, child.action),
                 );
                 // A section whose every page is refused is not offered as an
                 // empty heading. Only a section that HAD pages: Website with
@@ -835,19 +829,6 @@ export function filterNavGroupsByRole(
             }),
         }))
         .filter((group) => group.items.length > 0);
-}
-
-/**
- * Does a child's {@link NavChild.refusedTo} withhold it from this actor?
- * Fails open like {@link navCan}: an actor we cannot judge holds `without`
- * too, so nothing is withheld.
- */
-function refuses(
-    actor: { role: NavRole | null; actions?: readonly string[] | null },
-    rule: NavChild["refusedTo"],
-): boolean {
-    if (!rule) return false;
-    return navCan(actor, rule.holds) && !navCan(actor, rule.without);
 }
 
 /**

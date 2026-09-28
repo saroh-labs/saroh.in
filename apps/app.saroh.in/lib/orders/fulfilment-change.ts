@@ -3,32 +3,31 @@ import type { FulfilmentType, OrderRead } from "./read";
 /**
  * Whether "Change how it's fulfilled…" and "Cancel order…" can open, for
  * this viewer: null when it can, else why not (the button's title). The
- * API's refusals come first; then the viewer's role. Undefined when the
- * API is from before B9: the buttons aren't drawn.
+ * API's refusals come first; then the viewer's powers (B16): a change of
+ * way is `order:edit`'s, and a cancel — a refund in full — is
+ * `order:refund`'s, paid or not. Undefined when the API is from before B9:
+ * the buttons aren't drawn.
  */
 export function changeAccess(
     order: Pick<OrderRead, "next" | "paymentStatus">,
-    can: { write: boolean; refund: boolean },
+    can: { edit: boolean; refund: boolean },
 ): { fulfilment?: string | null; cancel?: string | null } {
     const { fulfilment, cancel } = order.next;
     return {
         ...(fulfilment
             ? {
-                  fulfilment: !can.write
+                  fulfilment: !can.edit
                       ? "Your role can't change orders"
                       : fulfilment.refusal,
               }
             : {}),
         ...(cancel
             ? {
-                  cancel: !can.write
-                      ? "Your role can't change orders"
+                  cancel: !can.refund
+                      ? "Your role can't refund or cancel orders"
                       : cancel.pending
                         ? "Cancelling — waiting for the refund to be confirmed"
-                        : (cancel.refusal ??
-                          (order.paymentStatus === "PAID" && !can.refund
-                              ? "Your role can't refund"
-                              : null)),
+                        : cancel.refusal,
               }
             : {}),
     };

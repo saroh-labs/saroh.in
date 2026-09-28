@@ -5,7 +5,11 @@ import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
-import { orderLockedText, ordersAccess } from "@/lib/orders/access";
+import {
+    orderLockedText,
+    orderPowers,
+    ordersAccess,
+} from "@/lib/orders/access";
 import { allergyNotesOf } from "@/lib/orders/attention";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
@@ -63,13 +67,15 @@ export default async function OrderPage({
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // What this person may do to it, each the power its endpoint asks (B16).
+    const powers = orderPowers(organization);
 
     const contactId = order.customer?.contactId ?? null;
-    // A pay link (B11) is offered only to someone who may change the order,
-    // on an order that shows money, and only while a provider can open the
-    // checkout window (DEC-054).
+    // A pay link (B11) is offered only to someone who may take or change
+    // orders, on an order that shows money, and only while a provider can
+    // open the checkout window (DEC-054).
     const payOnline =
-        may("order:write") && order.money
+        powers.payLink && order.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
     // The allergy check reads the order's own Needs attention (B15), which
@@ -93,7 +99,7 @@ export default async function OrderPage({
             payOnline,
             // "Add an item" (B8): only while items can change, for someone who
             // may change them — from the order's own storefront (DEC-032).
-            may("order:write") && order.next.editable
+            powers.edit && order.next.editable
                 ? listProducts({ storefront: order.store.id })
                       .then((products) =>
                           // Set to Not sold (archived): nobody orders it.
@@ -122,9 +128,10 @@ export default async function OrderPage({
             notes={notes ?? "unavailable"}
             payments={payments}
             can={{
-                stage: may("order:stage"),
-                write: may("order:write"),
-                refund: may("payment:manage"),
+                stage: powers.stage,
+                edit: powers.edit,
+                payLink: powers.payLink,
+                refund: powers.refund,
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),
                 contact: may("contact:read"),

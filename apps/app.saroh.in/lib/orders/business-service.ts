@@ -158,6 +158,11 @@ export interface OrderListParams {
     /** ISO instant: only orders placed from it on (Home's "Last 24 hours"). */
     since?: string;
     cursor?: string;
+    /**
+     * This page is read for Export (B16): the API asks `order:export` of
+     * it, as a file of every order leaving Saroh is its own power.
+     */
+    export?: true;
 }
 
 export interface OrderListPage {
