@@ -162,13 +162,14 @@ each with why it stops there:
   to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
   the second allow-list file it re-exports; the order serializers are the
   next seam if A8 and A13 grow it further.
-- `home/home.service.ts` (778; 797 before F2) — `build()` is one parallel
+- `home/home.service.ts` (785 after F4; 797 before F2) — `build()` is one parallel
   read of every Home source, each behind its own guard, and the ranking of
   what they return. Round 2 put each source in its own file
   (`home-money-sources.ts`, `home-site-stock-sources.ts`,
   `home-people-sources.ts`, `home-today.ts`, `home-week.ts`, …); F2 also
-  moved the CRM reads to `home-crm-sources.ts` rather than grow it. The
-  refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
+  moved the CRM reads to `home-crm-sources.ts` rather than grow it, and
+  F4's inline actions are `HomeInlineService` in `home-inline.ts`, called
+  once. The refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
   and the schedule band are the next seams.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each

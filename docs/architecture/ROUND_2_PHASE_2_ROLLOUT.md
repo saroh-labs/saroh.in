@@ -566,6 +566,33 @@ date-range reads. Additive; each build holds a SHARE lock on its table
 (writes wait while it builds). Rollback: nothing to do — the old image
 reads the same; drop an index only if it is found to cost writes.
 
+## F4: Home's inline actions (wave 7a)
+
+Mark sent, Retry by pay link, Send reminder and Reply on Needs you's rows
+(`home/home-inline.ts`), each calling its target's existing endpoint.
+
+- **No migration.** Additive only: `GET /home`'s `inline` gains `yes`,
+  `done`, `sends`, `target`, `person`, `stage` and `via`, and
+  `POST subscriptions/:id/retry` also answers with the link's `url`.
+- **Either order.** The app draws a button only for a row whose `inline`
+  the API sent, so the new app on the old API shows links as before, and
+  the old app ignores the new fields.
+- **Reply stays dark** while `SITE_ACCOUNT_AREA` is off (as A13's thread
+  routes are). Send reminder's thread wording appears only once D17's
+  thread channel is on. Retry by mandate is D13's; until then Retry is a
+  pay link only.
+
+### Verify
+
+On Northwind, as the owner: an order ready to hand over offers Mark sent;
+the confirm says who is told; Undo within ten seconds puts it back to
+Ready. An overdue invoice, with an email provider connected, offers Send
+reminder; Undo within ten seconds sends nothing. A Member sees no buttons.
+
+### Rollback
+
+Deploy the previous API or app; nothing is stored.
+
 ## Before switching a flag on (advisory)
 
 These browser suites are skipped in CI while their features are off. Run

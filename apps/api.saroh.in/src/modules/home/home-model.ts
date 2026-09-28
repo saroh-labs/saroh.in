@@ -56,6 +56,8 @@ export interface HomeEvidence {
     headline?: string;
     /** A few more words for the line under it, e.g. an invoice's first line. */
     detail?: string;
+    /** The action the row offers in place (F4), set by `home-inline.ts`. */
+    inline?: HomeInline;
 }
 
 export interface HomeAction {
@@ -127,17 +129,52 @@ export interface HomeUnavailable {
     label: string;
 }
 
+/** The inline actions a Needs-you row can carry (F4). */
+export type HomeInlineKind = "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+
 /**
- * What an inline action on a Needs-you row will do (F4). F3 sends none: each
- * row is a link until F4 fills this in and the row grows its button.
+ * How a Retry is made (F4). Only a fresh pay link today; D13 adds
+ * `MANDATE`, a charge on the customer's autopay, and hides Retry while such
+ * a charge is PENDING ("Autopay charge in progress").
+ */
+export type HomeRetryVia = "PAY_LINK";
+
+/**
+ * What an inline action on a Needs-you row will do (F4), decided by the API
+ * (`home-inline.ts`): it is sent only to a viewer who may do it, only when
+ * the write it calls can take it, and its words say truthfully who is told
+ * and how. A row without one stays a link.
+ *
+ * Every action calls the target's own endpoint — the order's stage move,
+ * the subscription's retry, the invoice's reminder, the customer's thread —
+ * and Home adds no write of its own.
  */
 export interface HomeInline {
-    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    kind: HomeInlineKind;
+    /** The row's button: "Mark sent". */
     label: string;
     /** What will happen, and who is told, said before it happens. */
     confirm: string;
+    /** The confirm's button: "Mark sent and tell Anika". */
+    yes: string;
+    /** What the row says once it's done: "Reminder sent to Farah". */
+    done: string;
+    /**
+     * A message leaves the business. The app holds it ten seconds (default
+     * 51) before it goes, and Undo in that time means nothing leaves; after
+     * it, no Undo.
+     */
+    sends: boolean;
     /** Whether Undo is offered after (never once a message has left). */
     undoable: boolean;
+    /** What it acts on: the order, subscription, invoice or contact id. */
+    target: string;
+    /** The customer's first name, for what the toast says after; else null. */
+    person: string | null;
+    /** MARK_SENT: the step it moves the order to. */
+    stage?: string;
+    /** RETRY: how it is retried. */
+    via?: HomeRetryVia;
 }
 
 /**

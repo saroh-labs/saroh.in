@@ -3,7 +3,9 @@
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+
+import { openTotal } from "@/lib/home/inline-actions";
 
 import {
     formatList,
@@ -16,7 +18,10 @@ import {
 } from "@/lib/home/needs";
 import type { HomeNeed, HomeUnavailable } from "@/lib/home/service";
 
+import { InlineButton, InlineConfirm, InlineDone } from "./inline-action";
 import { TONE_BADGE } from "./tone";
+import type { DoneRow, InlineActions } from "./use-inline-actions";
+import { useInlineActions } from "./use-inline-actions";
 
 /**
  * Needs you, as the Home design draws it (round 2, F3): one flat list, one
@@ -30,7 +35,10 @@ import { TONE_BADGE } from "./tone";
  * when every source was read; with a part missing, the list says which part
  * it couldn't check instead (saroh-product-states).
  *
- * F4 adds each row's inline action (Mark sent, Retry, …) beside the tag.
+ * A row the API gave an inline action (F4: Mark sent, Retry by pay link,
+ * Send reminder, Reply) has its button beside the tag; it confirms in the
+ * row first, and once done the row stays, struck through, saying what
+ * happened (`use-inline-actions.ts`).
  */
 export function NeedsYou({
     needs,
@@ -49,6 +57,8 @@ export function NeedsYou({
     const [expanded, setExpanded] = useState(false);
     const state = needsState(needs, unavailable);
     const { rows, more } = shownNeeds(needs, expanded);
+    const actions = useInlineActions();
+    const doneHere = needs.filter((n) => n.id in actions.done).length;
 
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
@@ -60,7 +70,7 @@ export function NeedsYou({
                     Needs you
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
-                    {thingsLabel(total)}
+                    {thingsLabel(openTotal(total, doneHere))}
                 </span>
             </div>
 
@@ -88,7 +98,13 @@ export function NeedsYou({
             {state === "list" ? (
                 <ul className="overflow-hidden rounded-xl border border-border bg-card">
                     {rows.map((need, i) => (
-                        <NeedRow key={need.id} need={need} first={i === 0} />
+                        <NeedRow
+                            key={need.id}
+                            need={need}
+                            first={i === 0}
+                            actions={actions}
+                            done={actions.done[need.id] ?? null}
+                        />
                     ))}
                 </ul>
             ) : null}
@@ -107,12 +123,26 @@ export function NeedsYou({
     );
 }
 
-function NeedRow({ need, first }: { need: HomeNeed; first: boolean }) {
+function NeedRow({
+    need,
+    first,
+    actions,
+    done,
+}: {
+    need: HomeNeed;
+    first: boolean;
+    actions: InlineActions;
+    done: DoneRow | null;
+}) {
     const line = needLine(need);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const inline = need.inline;
+    const open = inline !== undefined && actions.open === need.id && !done;
     return (
         <li
             className={cn(
-                "bg-card px-4 py-[13px]",
+                "px-4 py-[13px] transition-colors duration-fast",
+                done ? "bg-muted" : "bg-card",
                 !first && "border-t border-border",
             )}
         >
@@ -123,7 +153,12 @@ function NeedRow({ need, first }: { need: HomeNeed; first: boolean }) {
                     href={need.href}
                     className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-brand-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
-                    <span className="text-sm font-semibold">
+                    <span
+                        className={cn(
+                            "text-sm font-semibold",
+                            done && "text-muted-foreground line-through",
+                        )}
+                    >
                         {needTitle(need)}
                     </span>
                     {line ? (
@@ -132,7 +167,7 @@ function NeedRow({ need, first }: { need: HomeNeed; first: boolean }) {
                         </span>
                     ) : null}
                 </Link>
-                {need.tag ? (
+                {need.tag && !done ? (
                     <Badge
                         variant={TONE_BADGE[need.tone]}
                         className="shrink-0 self-center whitespace-nowrap px-[9px] py-[3px] text-[11.5px] font-semibold"
@@ -140,7 +175,27 @@ function NeedRow({ need, first }: { need: HomeNeed; first: boolean }) {
                         {need.tag}
                     </Badge>
                 ) : null}
+                {inline && !done && !open ? (
+                    <InlineButton
+                        inline={inline}
+                        busy={actions.busy === need.id}
+                        onOpen={() => actions.openFor(need.id)}
+                        buttonRef={buttonRef}
+                    />
+                ) : null}
+                {done ? <InlineDone row={done} /> : null}
             </div>
+            {open ? (
+                <InlineConfirm
+                    need={need}
+                    inline={inline}
+                    actions={actions}
+                    onClose={() =>
+                        // The button is back once the confirm has gone.
+                        requestAnimationFrame(() => buttonRef.current?.focus())
+                    }
+                />
+            ) : null}
         </li>
     );
 }
