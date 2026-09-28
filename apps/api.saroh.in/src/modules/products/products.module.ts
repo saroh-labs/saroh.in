@@ -17,6 +17,8 @@ import { ProductImagesService } from "./product-images.service";
 import { ProductOverviewService } from "./product-overview.service";
 import { ProductsController } from "./products.controller";
 import { ProductsService } from "./products.service";
+import { PublicCatalogueController } from "./public-catalogue.controller";
+import { PublicCatalogueService } from "./public-catalogue.service";
 import { SoldOutService } from "./sold-out.service";
 import { VariantsService } from "./variants.service";
 
@@ -34,6 +36,8 @@ import { VariantsService } from "./variants.service";
         OrganizationListingsController,
         ProductsController,
         ProductDetailsController,
+        // The public shop's reads (G11): no guards, no organization context.
+        PublicCatalogueController,
     ],
     providers: [
         ProductAccess,
@@ -44,6 +48,7 @@ import { VariantsService } from "./variants.service";
         ProductOverviewService,
         ListingsService,
         SoldOutService,
+        PublicCatalogueService,
         OrganizationGuard,
     ],
     exports: [ProductsService],

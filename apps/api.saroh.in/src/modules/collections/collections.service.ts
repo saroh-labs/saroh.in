@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { allows, authorize } from "../organizations/organization-policy";
+import { shopRolloutOn } from "../sites/sells-from";
 import { slugify } from "../stores/slug";
 import type {
     CreateCollectionDto,
@@ -19,7 +20,11 @@ import type {
 } from "./dto";
 import { COLLECTION_PRODUCTS_MAX } from "./dto";
 import type { WebsitePlacement } from "./website-pages";
-import { websitePagesFor, websitePagesForCollections } from "./website-pages";
+import {
+    PRODUCT_BLOCKS,
+    websitePagesFor,
+    websitePagesForCollections,
+} from "./website-pages";
 
 export type CollectionKind = "HAND_PICKED" | "AUTOMATIC";
 
@@ -619,12 +624,18 @@ export async function productPlacement(
     const collections = await productCollections(organizationId, productId);
     return {
         collections,
-        website: await websitePagesFor(organizationId, {
-            productId,
-            collectionIds: collections
-                .filter((c) => c.showing)
-                .map((c) => c.id),
-        }),
+        website: await websitePagesFor(
+            organizationId,
+            {
+                productId,
+                collectionIds: collections
+                    .filter((c) => c.showing)
+                    .map((c) => c.id),
+            },
+            PRODUCT_BLOCKS,
+            // The site's `/shop` shows it once the shop is open (G11).
+            await shopRolloutOn(organizationId),
+        ),
     };
 }
 
