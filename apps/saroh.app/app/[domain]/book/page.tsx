@@ -7,8 +7,10 @@ import {
     BookingUnavailable,
     initialDateOf,
     initialTimeOf,
+    MoveClass,
 } from "@saroh/site-blocks";
 
+import { accountAreaOn, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getSignedInCustomer } from "@/lib/customer-session";
@@ -20,6 +22,7 @@ import {
     signOut,
     verifySignInCode,
 } from "../account/actions";
+import { moveBooking } from "../account/bookings/actions";
 import { bookSignedIn, creditFor } from "./actions";
 
 /**
@@ -41,6 +44,10 @@ import { bookSignedIn, creditFor } from "./actions";
  * not signed in, and the sheet goes without the phone line. The header's
  * place, hours and phone (E6) are the site's public visit read, the one
  * Visit us shows; without it the header names the business only.
+ *
+ * `?move=<ref>` (round-2 A6, behind the account area's switch) moves one
+ * of the signed-in customer's classes instead: "Moving: ‹class›", its other
+ * sessions, and "Move here", through `account/bookings/actions.ts`.
  *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
@@ -71,12 +78,29 @@ export default async function BookPage({
         service?: string | string[];
         date?: string | string[];
         start?: string | string[];
+        move?: string | string[];
     }>;
 }) {
     const { domain } = await params;
-    const { service, date, start } = await searchParams;
+    const { service, date, start, move } = await searchParams;
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
+
+    // Moving a class from the account (A6): its sessions, "Moving: ‹class›".
+    const moving =
+        typeof move === "string" && move.trim() && accountAreaOn()
+            ? move.trim().slice(0, 64)
+            : null;
+    if (moving) {
+        return (
+            <MoveClass
+                row={await getMyBooking(moving)}
+                apiUrl={publicApiUrl()}
+                businessName={resolved.snapshot.site.name}
+                move={moveBooking}
+            />
+        );
+    }
 
     const [lookup, visit, customer, options] = await Promise.all([
         getBookingPage(resolved.siteId),

@@ -185,11 +185,17 @@ describe("Home", () => {
         expect(
             screen.getByText("Unlimited · ₹2,500 / month"),
         ).toBeInTheDocument();
-        // No Orders card for a business that doesn't sell, no Classes left
-        // card without classes, and no Move or Cancel until A6.
+        // No Orders card for a business that doesn't sell, and no Classes
+        // left card without classes.
         expect(screen.queryByText("Your orders")).toBeNull();
         expect(screen.queryByText("Classes left")).toBeNull();
-        expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+        // Move and Cancel open their sheets on the Bookings tab (A6).
+        expect(
+            screen.getByRole("link", { name: "Move Check-up" }),
+        ).toHaveAttribute("href", "/account/bookings?move=bk_1");
+        expect(
+            screen.getByRole("link", { name: "Cancel Check-up" }),
+        ).toHaveAttribute("href", "/account/bookings?cancel=bk_1");
     });
 
     it("a failed read says so and never reads as none", () => {

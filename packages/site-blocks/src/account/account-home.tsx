@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BOOKINGS_HREF } from "./bookings-model";
 import type { AccountView, AccountHome as Home } from "./model";
 import {
     bookingWhen,
@@ -13,6 +14,7 @@ import {
     AccountCard,
     AccountRow,
     buttonClasses,
+    smallButton,
     Tag,
     Unavailable,
 } from "./parts";
@@ -23,9 +25,10 @@ import {
  * card, each read on its own. A card whose read failed says so and never
  * shows zero; a card for something the business doesn't offer isn't drawn.
  *
- * Move and Cancel on the next booking come with A6, "Order again" with the
- * shop (G13) and "Buy a pack" with A11: nothing here links to a page that
- * isn't there yet. An order on its way has Track (A7).
+ * Move and Cancel on the next booking open their sheets on the Bookings tab
+ * (A6). "Order again" comes with the shop (G13) and "Buy a pack" with A11:
+ * nothing here links to a page that isn't there yet. An order on its way
+ * has Track (A7).
  */
 export function AccountHome({
     account,
@@ -162,6 +165,24 @@ function NextBooking({
                         .join(" · ") || undefined
                 }
                 tag={<Tag tone="quiet">Booked</Tag>}
+                actions={
+                    <>
+                        <Link
+                            href={`${BOOKINGS_HREF}?move=${encodeURIComponent(next.ref)}`}
+                            className={smallButton}
+                            aria-label={`Move ${next.service}`}
+                        >
+                            Move
+                        </Link>
+                        <Link
+                            href={`${BOOKINGS_HREF}?cancel=${encodeURIComponent(next.ref)}`}
+                            className={smallButton}
+                            aria-label={`Cancel ${next.service}`}
+                        >
+                            Cancel
+                        </Link>
+                    </>
+                }
             />
         </AccountCard>
     );

@@ -101,6 +101,69 @@ test.describe("the account area (A5)", () => {
         await expect(page.getByText(next)).toBeVisible();
     });
 
+    test("Bookings: a booking made signed in is moved and cancelled by the customer (A6)", async ({
+        page,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const email = `a6-${testInfo.project.name}-${Date.now()}@example.in`;
+
+        // Book the walkthrough, paying at the desk, signing in at the end.
+        await page.goto(`${SITE}/book`);
+        await page
+            .getByRole("radio", { name: /Warehouse walkthrough/ })
+            .click();
+        const openDays = page.getByRole("radio", { name: /times? free/ });
+        await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
+        await openDays.nth((await openDays.count()) - 1).click();
+        const times = page.locator('[role="radiogroup"] button[role="radio"]', {
+            hasText: /^\d{2}:\d{2}$/,
+        });
+        await expect(times.first()).toBeVisible({ timeout: 15_000 });
+        await times.first().click();
+        await page.getByLabel("Name").fill("Asha Rao");
+        await page.getByRole("radio", { name: /Pay at the desk/ }).click();
+        await page
+            .getByRole("button", { name: "Continue to sign in" })
+            .first()
+            .click();
+        await signInOnSheet(page, email);
+        await expect(
+            page.getByRole("heading", { name: "You're booked, Asha." }),
+        ).toBeVisible({ timeout: 15_000 });
+
+        // Coming up, with Move and Cancel.
+        await page.goto(`${SITE}/account/bookings`);
+        const comingUp = page.getByRole("region", { name: "Coming up" });
+        await expect(
+            comingUp.getByText(/^Warehouse walkthrough · /),
+        ).toBeVisible();
+
+        // Move it to the first free time the sheet offers.
+        await comingUp
+            .getByRole("button", { name: /^Move Warehouse walkthrough/ })
+            .click();
+        const sheet = page.getByRole("dialog");
+        const firstTime = sheet.getByRole("radio").first();
+        await expect(firstTime).toBeVisible({ timeout: 15_000 });
+        await firstTime.click();
+        await sheet.getByRole("button", { name: /^Move to / }).click();
+        await expect(page.getByText(/^Moved to /)).toBeVisible();
+
+        // Cancel it: the sheet says what happens, then it's Cancelled.
+        await comingUp
+            .getByRole("button", { name: /^Cancel Warehouse walkthrough/ })
+            .click();
+        await expect(page.getByRole("dialog")).toContainText("Free to cancel");
+        await page.getByRole("button", { name: "Yes, cancel it" }).click();
+        await expect(page.getByText(/^Cancelled\./)).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "Cancelled" })
+                .getByText(/^Warehouse walkthrough · /),
+        ).toBeVisible();
+        await expect(comingUp.getByText("Nothing booked.")).toBeVisible();
+    });
+
     test("sign out leaves the header's Sign in", async ({ page }) => {
         const email = `a5-out-${Date.now()}@example.in`;
         await page.goto(`${SITE}/account`);
