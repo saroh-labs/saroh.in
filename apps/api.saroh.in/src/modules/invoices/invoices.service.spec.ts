@@ -666,6 +666,32 @@ describe("lists and what is owed", () => {
         });
     });
 
+    it("narrows to what it was for without letting a hidden draft back in (D18)", async () => {
+        db.invoice.findMany!.mockResolvedValue([]);
+        await service.list(owner, { view: "paid", source: "PACK" });
+        const where = db.invoice.findMany!.mock.calls[0]![0].where;
+        expect(where).toEqual({
+            organizationId: "org_1",
+            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+            status: "PAID",
+            AND: [
+                {
+                    OR: [
+                        { relatedInvoiceId: null, source: "PACK" },
+                        { relatedInvoice: { source: "PACK" } },
+                    ],
+                },
+            ],
+        });
+    });
+
+    it("refuses a Member a narrowed list too (D18)", async () => {
+        await expect(
+            service.list(member, { packId: "pk_1" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.invoice.findMany).not.toHaveBeenCalled();
+    });
+
     it("lists only what was paid since an instant, never a credit note (H-7)", async () => {
         db.invoice.findMany!.mockResolvedValue([]);
         const since = "2026-09-26T06:00:00.000Z";
