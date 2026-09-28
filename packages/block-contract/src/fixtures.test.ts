@@ -48,6 +48,33 @@ describe("block fixtures", () => {
         }
     });
 
+    it.each(types)(
+        "%s cases parse against its rendered schema and name a look it has",
+        (type) => {
+            const meta: { cases?: Record<string, unknown> } & {
+                variants: readonly { id: string }[];
+            } = BLOCK_META[type];
+            const ids = meta.variants.map((v) => v.id);
+            for (const [name, content] of Object.entries(meta.cases ?? {})) {
+                const result = parseRenderedContent(type, content);
+                if (!result.success) {
+                    throw new Error(
+                        `${type}/${name}: ${JSON.stringify(result.issues, null, 2)}`,
+                    );
+                }
+                expect(ids).toContain(
+                    (content as { variant?: string }).variant,
+                );
+            }
+        },
+    );
+
+    it("keeps the text block's photo case (G7)", () => {
+        const photo = BLOCK_META.richText.cases.photo;
+        expect(photo.image.src).not.toBe("");
+        expect(photo.image.alt.trim()).not.toBe("");
+    });
+
     it.each(types)("%s fixture declares its own variant id", (type) => {
         for (const [variantId, content] of Object.entries(
             BLOCK_META[type].fixtures,

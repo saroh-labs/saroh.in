@@ -330,6 +330,19 @@ describe("Business Calendar month (DB)", () => {
         expect(month.unavailable).toEqual([]);
     });
 
+    it("names the day the business joined, from when it was created", async () => {
+        const { createdAt } = await prisma.organization.findUniqueOrThrow({
+            where: { id: ctx.organizationId },
+            select: { createdAt: true },
+        });
+        const month = await calendar.month(ctx, "2026-09", NOW);
+        expect(month.joinedAt).toBe(
+            new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Kolkata",
+            }).format(createdAt),
+        );
+    });
+
     it("dates the weekly collections, the skipped week left out", async () => {
         const month = await calendar.month(ctx, "2026-09", NOW);
         const collected = month.days

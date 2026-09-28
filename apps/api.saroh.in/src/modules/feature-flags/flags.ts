@@ -23,11 +23,25 @@ export const FlagKey = {
     MODULE_CRM: "MODULE_CRM",
     MODULE_APPOINTMENTS: "MODULE_APPOINTMENTS",
     MODULE_COURSES: "MODULE_COURSES",
+    /**
+     * Class packs became their own module in round 2 (E12, default 44). The
+     * `class-packs-module` backfill registers this flag with Appointments'
+     * value, so no business that sold packs under Appointments loses them.
+     */
+    MODULE_CLASS_PACKS: "MODULE_CLASS_PACKS",
     MODULE_COMMERCE: "MODULE_COMMERCE",
     MODULE_PAYMENTS: "MODULE_PAYMENTS",
     MODULE_COMMUNICATIONS: "MODULE_COMMUNICATIONS",
     MODULE_AUTOMATIONS: "MODULE_AUTOMATIONS",
     MODULE_INSIGHTS: "MODULE_INSIGHTS",
+
+    /**
+     * The public shop on merchant sites (round-2 G11): `/shop`, the product
+     * pages, the Product grid's live reads and the "Sells from" setting.
+     * Off hides all of it. It stays off until the bag and checkout (G13)
+     * ship, so no product page goes live without a way to order.
+     */
+    SITE_SHOP: "SITE_SHOP",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -80,9 +94,18 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
     MODULE_CRM: MODULE_ROLLOUT("CRM"),
     MODULE_APPOINTMENTS: MODULE_ROLLOUT("Appointments"),
     MODULE_COURSES: MODULE_ROLLOUT("Courses"),
+    MODULE_CLASS_PACKS: MODULE_ROLLOUT("Class packs"),
     MODULE_COMMERCE: MODULE_ROLLOUT("Commerce"),
     MODULE_PAYMENTS: MODULE_ROLLOUT("Payments"),
     MODULE_COMMUNICATIONS: MODULE_ROLLOUT("Communications"),
     MODULE_AUTOMATIONS: MODULE_ROLLOUT("Automations"),
     MODULE_INSIGHTS: MODULE_ROLLOUT("Insights"),
+    SITE_SHOP: {
+        purpose:
+            "Opens the shop on a business's website: /shop, product pages and the Sells from setting. Turn it on only once the bag and checkout (G13) have shipped; off hides the shop everywhere.",
+        owner: "Release manager",
+        reviewBy: "2027-01-31",
+        removeWhen:
+            "The bag and checkout are live, the shop is on for every business on every instance, and it has needed no kill switch for a release.",
+    },
 };

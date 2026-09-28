@@ -36,6 +36,7 @@ const RichTextEditor = dynamic(
 import type { RichTextContent } from "@/lib/sites/service";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
+import { TextPhotoFields } from "./text-photo";
 
 /**
  * The `richText` section's editor fields.
@@ -91,6 +92,15 @@ export function RichTextFields({
                     />
                 )}
             </Field>
+            <TextPhotoFields
+                value={{ image: c.image, imageSide: c.imageSide }}
+                onChange={(photo) => {
+                    // Rebuilt rather than spread, so Remove leaves no
+                    // empty `image` or stray side behind in the content.
+                    const { image: _image, imageSide: _side, ...rest } = c;
+                    onChange({ ...section, content: { ...rest, ...photo } });
+                }}
+            />
         </div>
     );
 }

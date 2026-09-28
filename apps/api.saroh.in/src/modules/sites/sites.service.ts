@@ -49,6 +49,17 @@ import { checkRenderability } from "./publication-renderability";
 import type { ApprovalRow, ReviewRoute } from "./review-route";
 import { draftFingerprint, reviewStanding } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
+import type { SellsFromView } from "./sells-from";
+import {
+    assertSellsFromChoice,
+    automaticStorefront,
+    commerceOpen,
+    effectiveStorefront,
+    isShopPath,
+    sellsFromChoices,
+    sellsFromView,
+    shopRolloutOn,
+} from "./sells-from";
 import {
     assertPageInSite,
     assertPathIsFree,
@@ -58,7 +69,7 @@ import {
     reviewerScope,
 } from "./site-access";
 import type { Flag, FlagType } from "./site-flags";
-import { checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
+import { checkShop, checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
 import type { SiteNavigation } from "./site-navigation";
@@ -390,6 +401,12 @@ export interface SiteDetailView {
      * of the values that could drift from the server's.
      */
     styleOptions: SiteStyleOptions;
+    /**
+     * The storefront this site sells from, and the ones it could (G11).
+     * Null while the shop is not open for this business (the `SITE_SHOP`
+     * flag, off until checkout ships): the settings show no row then.
+     */
+    sellsFrom: SellsFromView | null;
 }
 
 /**
@@ -681,6 +698,12 @@ export class SitesService {
                     name: dto.name,
                     slug,
                     subdomain,
+                    // Where it sells from (G11): set only when there is
+                    // exactly one candidate, and the settings say so.
+                    storefrontId: await automaticStorefront(
+                        tx,
+                        ctx.organizationId,
+                    ),
                 },
                 select: { id: true, slug: true },
             });
@@ -895,6 +918,7 @@ export class SitesService {
                 postsPrefix: true,
                 footer: true,
                 navigation: true,
+                storefrontId: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -923,8 +947,14 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart. The footer is normalized here for the same reason — the
         // editor reads back exactly what publish would write.
-        const { style, footer, navigation, ...rest } = site;
+        const { style, footer, navigation, storefrontId, ...rest } = site;
         const pending = await this.pendingSectionChanges([site.id]);
+        const sellsFrom = (await shopRolloutOn(ctx.organizationId))
+            ? await sellsFromView(prisma, {
+                  organizationId: ctx.organizationId,
+                  storefrontId,
+              })
+            : null;
         return {
             ...rest,
             canEdit: allows(ctx, "section:write"),
@@ -950,6 +980,7 @@ export class SitesService {
             footer: parseSiteFooter(footer),
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
+            sellsFrom,
         };
     }
 
@@ -982,6 +1013,7 @@ export class SitesService {
             socialImageHeight?: number | null;
             socialImageBytes?: number | null;
             postsPrefix?: string | null;
+            storefrontId?: string | null;
         } = {};
         // The header's name, edited in the site editor's inspector (G6). The
         // slug stays: it is the address, and renaming must not move the site.
@@ -1012,12 +1044,27 @@ export class SitesService {
             );
         }
 
+        // Where the site sells from (G11). Unlike the rest, not draft state:
+        // the shop reads it live. Another business's storefront, or a closed
+        // one, is refused.
+        if (dto.storefrontId !== undefined) {
+            if (dto.storefrontId !== null) {
+                await assertSellsFromChoice(
+                    prisma,
+                    ctx.organizationId,
+                    dto.storefrontId,
+                );
+            }
+            data.storefrontId = dto.storefrontId;
+        }
+
         const site = await prisma.site.update({
             where: { id: siteId },
             data,
             select: {
                 id: true,
                 name: true,
+                storefrontId: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
@@ -2521,6 +2568,7 @@ export class SitesService {
                 currentPublicationId: true,
                 currentPublication: { select: { publishedAt: true } },
                 navigation: true,
+                storefrontId: true,
                 pages: {
                     select: {
                         id: true,
@@ -2595,6 +2643,30 @@ export class SitesService {
                 sections: page.versions.flatMap((v) => v.sections),
             })),
         });
+
+        // The shop's questions (G11), only while it is open for the business
+        // and Commerce is on: before that there is no shop to ask about.
+        if (
+            (await shopRolloutOn(ctx.organizationId)) &&
+            (await commerceOpen(prisma, ctx.organizationId))
+        ) {
+            const sellsFrom = {
+                organizationId: ctx.organizationId,
+                storefrontId: site.storefrontId,
+            };
+            const [chosen, choices] = await Promise.all([
+                effectiveStorefront(prisma, sellsFrom),
+                sellsFromChoices(prisma, ctx.organizationId),
+            ]);
+            flags.unshift(
+                ...checkShop({
+                    storefrontChosen: chosen !== null,
+                    candidates: choices.length,
+                    pages: site.pages,
+                    isShopPath,
+                }),
+            );
+        }
 
         // The two unimplementable types travel with the result so the editor
         // can say what is NOT being checked rather than implying nine.

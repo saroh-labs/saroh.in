@@ -85,4 +85,10 @@ export interface CalendarMonth {
     /** Money roles only; `total` null when a source it adds up failed. */
     takings?: { lead: LayerKey | null; total: MoneyTotal[] | null };
     unavailable: CalendarUnavailable[];
+    /**
+     * The day the business joined Saroh, in its zone ("YYYY-MM-DD") — the
+     * calendar's back edge (E21). Absent from an older API, null when it
+     * could not be read: no back edge then.
+     */
+    joinedAt?: string | null;
 }

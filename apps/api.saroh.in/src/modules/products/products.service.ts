@@ -21,6 +21,7 @@ import {
     saveProductFieldValues,
 } from "../catalogue/fields.service";
 import { isGstRate } from "../invoices/gst";
+import { productTypesOf } from "../orders/fulfilment";
 import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
 import { COUNTING_ROWS } from "../stock/tracking";
 import {
@@ -455,6 +456,9 @@ export class ProductsService {
                         seoTitle: dto.seoTitle ?? null,
                         seoDescription: dto.seoDescription ?? null,
                         optionId: dto.optionId ?? null,
+                        fulfilmentTypes: productTypesOf(
+                            dto.fulfilmentTypes ?? [],
+                        ),
                     },
                     select: { id: true },
                 });
@@ -696,6 +700,10 @@ export class ProductsService {
             if (has(key)) data[key] = dto[key] ?? null;
         }
         if (has("keyPoints")) data.keyPoints = cleanKeyPoints(dto.keyPoints);
+        // Only the new names, in table order (B12): B2d's cast finds nothing
+        // to convert.
+        if (has("fulfilmentTypes"))
+            data.fulfilmentTypes = productTypesOf(dto.fulfilmentTypes ?? []);
         if (has("madeHere")) data.madeHere = dto.madeHere;
         if (has("returnsMode")) data.returnsMode = dto.returnsMode;
         // Merged, not replaced: each section sends only the switches it

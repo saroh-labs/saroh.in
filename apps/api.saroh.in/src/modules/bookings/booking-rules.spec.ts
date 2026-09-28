@@ -1,5 +1,6 @@
 import {
     bookingWindowRefusal,
+    freeCancelDeadline,
     isLateCancel,
     NO_BOOKING_RULES,
     withinBookingWindow,
@@ -15,7 +16,9 @@ describe("booking rules (U3)", () => {
         expect(bookingWindowRefusal(at(24 * 400), NOW, NO_BOOKING_RULES)).toBe(
             null,
         );
-        expect(isLateCancel(at(0.5), NOW, NO_BOOKING_RULES)).toBe(false);
+        expect(isLateCancel({ startAt: at(0.5) }, NOW, NO_BOOKING_RULES)).toBe(
+            false,
+        );
     });
 
     it("refuses a start later than the latest-booking rule allows", () => {
@@ -38,9 +41,47 @@ describe("booking rules (U3)", () => {
 
     it("a cancel inside the free-cancellation window is late", () => {
         const rules = { ...NO_BOOKING_RULES, freeCancelHours: 12 };
-        expect(isLateCancel(at(13), NOW, rules)).toBe(false);
-        expect(isLateCancel(at(12), NOW, rules)).toBe(false);
-        expect(isLateCancel(at(11), NOW, rules)).toBe(true);
-        expect(isLateCancel(at(-1), NOW, rules)).toBe(true);
+        expect(isLateCancel({ startAt: at(13) }, NOW, rules)).toBe(false);
+        expect(isLateCancel({ startAt: at(12) }, NOW, rules)).toBe(false);
+        expect(isLateCancel({ startAt: at(11) }, NOW, rules)).toBe(true);
+        expect(isLateCancel({ startAt: at(-1) }, NOW, rules)).toBe(true);
+    });
+
+    it("fixes the free-cancel deadline at booking: the start less the rule's hours, or none (E8)", () => {
+        expect(
+            freeCancelDeadline(at(48), { freeCancelHours: 24 })?.toISOString(),
+        ).toBe(at(24).toISOString());
+        expect(freeCancelDeadline(at(48), { freeCancelHours: null })).toBe(
+            null,
+        );
+    });
+
+    it("judges a booking by the deadline it was given, never by where it was moved (DEC-051)", () => {
+        const rules = { ...NO_BOOKING_RULES, freeCancelHours: 24 };
+        // Made for three days out (deadline in two days), then moved a week
+        // later: cancelled on the old last day, it is still in time...
+        const booking = { startAt: at(24 * 10), freeCancelUntil: at(48) };
+        expect(isLateCancel(booking, at(47), rules)).toBe(false);
+        // ...and a moment after the fixed deadline it is late, though the
+        // new start is a week away.
+        expect(isLateCancel(booking, at(49), rules)).toBe(true);
+    });
+
+    it("a booking made before the column is judged by its start, as before", () => {
+        const rules = { ...NO_BOOKING_RULES, freeCancelHours: 12 };
+        expect(
+            isLateCancel(
+                { startAt: at(13), freeCancelUntil: null },
+                NOW,
+                rules,
+            ),
+        ).toBe(false);
+        expect(
+            isLateCancel(
+                { startAt: at(11), freeCancelUntil: null },
+                NOW,
+                rules,
+            ),
+        ).toBe(true);
     });
 });

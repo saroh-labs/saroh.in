@@ -20,6 +20,7 @@ const EVERYTHING = [
     "CRM",
     "APPOINTMENTS",
     "COURSES",
+    "CLASS_PACKS",
     "COMMERCE",
     "PAYMENTS",
     "INSIGHTS",

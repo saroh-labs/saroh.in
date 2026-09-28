@@ -348,6 +348,13 @@ model BusinessProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // The business's public phone (DEC-053): the merchant's own number, shown
+  // only on this business's site — the Visit us Call button and "Or call
+  // ‹Business› on ‹phone›" when a sign-in code can't be sent. E.164
+  // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
+  // no number, and the site shows no Call button rather than an empty one.
+  phone String?
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -594,6 +601,9 @@ model Store {
   stockLevels  StockLevel[]
   stockEntries StockEntry[]
 
+  // The sites that sell from it (G11, `Site.storefrontId`).
+  sitesSellingHere Site[] @relation("SiteStorefront")
+
   // The target of (storeId, organizationId) foreign keys: a listing or a
   // stock row can only name a storefront of its own business.
   @@unique([id, organizationId])
@@ -759,6 +769,13 @@ model Product {
 
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
+
+  // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
+  // or DIGITAL — only the new names, never COLLECT or DELIVERY, so B2d's
+  // cast finds nothing to convert. Empty: every way its storefronts offer
+  // (StoreSettings.fulfilmentTypes). An order offers only the types every
+  // item allows; read it through `productTypesOf` in orders/fulfilment.ts.
+  fulfilmentTypes OrderFulfilment[] @default([])
 
   // A product's address is unique in its business (#510).
   @@unique([organizationId, slug])
@@ -2807,10 +2824,20 @@ model Site {
   // site, and so the host, it was made for.
   customerSessions CustomerSession[]
 
+  // The storefront this site sells from (G11): what `/shop`, the Product
+  // grid and checkout read. Set on its own only when the business has
+  // exactly one open storefront with listings (the migration's backfill and
+  // site creation); otherwise the merchant picks it in the site's settings.
+  // Closing that storefront clears it. NoAction, not SetNull: a composite
+  // SetNull would null organizationId too, and storefronts are soft-deleted.
+  storefrontId String?
+  storefront   Store?  @relation("SiteStorefront", fields: [storefrontId, organizationId], references: [id, organizationId], onDelete: NoAction)
+
   @@unique([organizationId, slug])
   // The target of (siteId, organizationId) foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])
+  @@index([storefrontId])
 }
 
 // Page — a routable page within a Site, identified by its `path`.
@@ -3244,6 +3271,18 @@ model Contact {
   // Needs attention: one shared list of what the team must know (DEC-040, C1).
   attention ContactAttention[]
 
+  // A merge's tombstone (DEC-042, C9). The merged-away contact is never
+  // deleted: it keeps its id, holds only ids (a reserved placeholder email,
+  // no name, phone, company or address) and points at the survivor, so a
+  // late webhook, job or sign-in carrying its id lands on the survivor
+  // through `customer-workspace/resolve-contact.ts`. Never more than one hop:
+  // a merge re-points tombstones that already pointed at the merged contact.
+  // Deleting the survivor takes its tombstones with it.
+  mergedIntoId String?
+  mergedInto   Contact?  @relation("ContactMerge", fields: [mergedIntoId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  mergedFrom   Contact[] @relation("ContactMerge")
+  mergedAt     DateTime?
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -3252,6 +3291,8 @@ model Contact {
   // The target of (contactId, organizationId) foreign keys.
   @@unique([id, organizationId])
   @@index([organizationId])
+  // A survivor's tombstones (a merge re-points them), and "not a tombstone".
+  @@index([organizationId, mergedIntoId])
 }
 
 // Form — an org-owned enquiry form definition. Optionally bound to a Site so a
@@ -3724,6 +3765,12 @@ model Booking {
   // the account within the booking's business.
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  // The free-cancel deadline, fixed when the booking is made (E8, DEC-051):
+  // its start less the business's free-cancel hours then. A move never
+  // changes it. Null — bookings before the column, or made with no rule —
+  // is judged by its start and today's rules, as before.
+  freeCancelUntil DateTime?
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])

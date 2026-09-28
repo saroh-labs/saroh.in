@@ -65,14 +65,24 @@ export {
     formatAmount,
     percentOff,
     stockLabel,
+    useProductSelection,
 } from "./product/product-page";
 export type {
     ProductPageData,
     ProductPageImage,
     ProductPageReview,
     ProductPageVariant,
+    ProductSelection,
     StockWord,
 } from "./product/product-page";
+
+// The shop on a merchant's site (G11), `/shop`: every product its
+// sells-from storefront sells, each card opening the product page.
+export {
+    default as ShopListing,
+    ShopUnavailable,
+} from "./product/shop-listing";
+export type { ShopListingCard } from "./product/shop-listing";
 
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.

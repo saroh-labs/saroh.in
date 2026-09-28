@@ -63,6 +63,33 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("enable refuses Class packs while Appointments is off, in a sentence (E12)", async () => {
+        const db = makeDb(); // Appointments not enabled
+        const svc = new ModuleLifecycleService(makeReadiness(), db as never);
+        const refused = svc.enable(OWNER, "CLASS_PACKS");
+        await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+        await expect(refused).rejects.toThrow(
+            "Class packs needs Appointments. Turn on Appointments first.",
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+    });
+
+    it("disable refuses Appointments while Class packs is on, in a sentence", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([
+            { moduleKey: "CLASS_PACKS" },
+        ]);
+        const svc = new ModuleLifecycleService(makeReadiness(), db as never);
+        const refused = svc.disable(OWNER, "APPOINTMENTS");
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Class packs needs Appointments. Turn off Class packs first.",
+        );
+    });
+
     it("enable writes an ENABLED row and an audit event in one tx", async () => {
         const db = makeDb();
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);

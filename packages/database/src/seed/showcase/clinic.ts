@@ -13,6 +13,7 @@ import {
     KAVI_MODULES,
     KAVI_NAME,
     KAVI_OPENING_HOURS,
+    KAVI_PHONE_E164,
     KAVI_RULES,
     KAVI_SAC,
     KAVI_SERVICES,
@@ -86,6 +87,9 @@ export async function seedClinic(
         gstState: KAVI_GST.state,
         ...KAVI_ADDRESS,
         invoicePrefix: KAVI_GST.prefix,
+        // The public phone its site shows (DEC-053): Visit us, the booking
+        // page's header and "Or call Kavi Dental" on the sign-in sheet.
+        phone: KAVI_PHONE_E164,
     };
     await prisma.businessProfile.upsert({
         where: { organizationId: orgId },

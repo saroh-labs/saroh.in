@@ -17,7 +17,23 @@ import type { ModuleView } from "@/lib/modules/schema";
  * page remembering to make it.
  */
 
-function Unavailable({ capability }: { capability: ModuleView }) {
+/**
+ * Where a manager turns the module back on, when somewhere closer to the
+ * work than Settings › Modules flips the same switch: "Also sell" on
+ * Bookings › Services, for Courses and Class packs (E12).
+ */
+export interface SwitchedOnAt {
+    href: string;
+    label: string;
+}
+
+function Unavailable({
+    capability,
+    switchedOnAt,
+}: {
+    capability: ModuleView;
+    switchedOnAt?: SwitchedOnAt;
+}) {
     const archived = capability.lifecycle === "ARCHIVED";
     return (
         // The page keeps its skeleton. A gate that replaces the whole screen
@@ -36,8 +52,10 @@ function Unavailable({ capability }: { capability: ModuleView }) {
                 action={
                     capability.canManage ? (
                         <Button variant="brand" asChild>
-                            <Link href="/settings/modules">
-                                Manage capabilities
+                            <Link
+                                href={switchedOnAt?.href ?? "/settings/modules"}
+                            >
+                                {switchedOnAt?.label ?? "Manage capabilities"}
                             </Link>
                         </Button>
                     ) : (
@@ -55,9 +73,11 @@ function Unavailable({ capability }: { capability: ModuleView }) {
 
 export async function ModuleGate({
     moduleKey,
+    switchedOnAt,
     children,
 }: {
     moduleKey: string;
+    switchedOnAt?: SwitchedOnAt;
     children: ReactNode;
 }) {
     const access = await moduleAccess(moduleKey);
@@ -82,7 +102,12 @@ export async function ModuleGate({
                 />
             );
         }
-        return <Unavailable capability={access.module} />;
+        return (
+            <Unavailable
+                capability={access.module}
+                switchedOnAt={switchedOnAt}
+            />
+        );
     }
     // `available` and `unknown` both render. See moduleAccess: claiming a
     // capability is off because we could not look it up would be worse than

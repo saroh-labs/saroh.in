@@ -44,9 +44,10 @@ module.exports = {
     // the default/unit project — keep them out of the DB-backed run.
     // The organizations specs mock Prisma (pure unit tests), and the S1-006
     // store *.authorization specs mock Prisma + FeatureFlagService — both run in
-    // the default/unit project, so keep them out of the DB-backed run.
+    // the default/unit project, so keep them out of the DB-backed run. An
+    // organizations `*.db.spec.ts` (F19's role reach) is the exception.
     testPathIgnorePatterns: [
-        "<rootDir>/src/modules/organizations/",
+        "<rootDir>/src/modules/organizations/(?!.*\\.db\\.spec\\.ts$)",
         "<rootDir>/src/modules/admin/",
         "\\.authorization\\.spec\\.ts$",
         // #384 customer delete: mocked Prisma, runs in the unit project.
@@ -115,6 +116,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
         // D8: pure, with a mocked transaction; the real rows are in subscriptions.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
+        // D21: pure; the real rows are in plan-drafts-readers.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.

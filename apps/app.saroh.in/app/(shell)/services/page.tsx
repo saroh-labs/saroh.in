@@ -5,6 +5,8 @@ import Link from "next/link";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
+import { modulesOrUnknown } from "@/lib/modules/guard";
+import { alsoSellFeatures } from "@/lib/services/also-sell";
 import {
     businessCurrencyOf,
     readCanEditServices,
@@ -19,17 +21,19 @@ import { requireSession } from "@/lib/session";
  * Bookings › Services (U16, E2): what people can book, as the design's
  * cards. The services read is the page; the staff read (who takes each),
  * the bookings read (how each is used) and the sites read (whether there is
- * a booking page) degrade on their own and say so.
+ * a booking page) degrade on their own and say so. The module list, for
+ * "Also sell" (E12), leaves the card out when it can't be read.
  */
 export const metadata = { title: "Services" };
 
 export default async function ServicesPage() {
     await requireSession();
-    const [read, staffList, hasPage, canEdit] = await Promise.all([
+    const [read, staffList, hasPage, canEdit, modules] = await Promise.all([
         readServices(),
         readStaffOrNull(),
         readHasBookingPage(),
         readCanEditServices(),
+        modulesOrUnknown(),
     ]);
 
     if (!read.ok) {
@@ -89,6 +93,7 @@ export default async function ServicesPage() {
                     currency={businessCurrencyOf(services)}
                     canEdit={canEdit}
                     hasPage={hasPage}
+                    alsoSell={alsoSellFeatures(modules)}
                 />
             </div>
         </PageContainer>

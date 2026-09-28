@@ -77,7 +77,7 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
                   placeholder: "Wheat flour, water, salt…",
                   field: "Ingredients",
               },
-              saves: "Saves the ready line, ingredients and allergens.",
+              saves: "Saves the ready line, ingredients, allergens and how it's fulfilled.",
           }
         : {
               title: SECTION_NAMES.details,
@@ -94,7 +94,7 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
                       "Aqua, Ethyl ascorbic acid, Glycerin… — or 100% linen",
                   field: "Ingredients or material",
               },
-              saves: "Saves how to use it and what it is made of.",
+              saves: "Saves how to use it, what it is made of and how it's fulfilled.",
           };
 }
 

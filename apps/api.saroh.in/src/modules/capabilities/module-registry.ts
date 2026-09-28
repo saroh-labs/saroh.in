@@ -27,12 +27,13 @@ import { FlagKey, isKnownFlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-policy";
 import { ORG_ACTIONS } from "../organizations/organization-policy";
 
-/** The initial optional-module set. AI is excluded under DEC-015. */
+/** The optional-module set. AI is excluded under DEC-015. */
 export const MODULE_KEYS = [
     "WEBSITE",
     "CRM",
     "APPOINTMENTS",
     "COURSES",
+    "CLASS_PACKS",
     "COMMERCE",
     "PAYMENTS",
     "COMMUNICATIONS",
@@ -167,6 +168,24 @@ export const MODULES: readonly ModuleDescriptor[] = [
         rolloutFlag: FlagKey.MODULE_COURSES,
         readinessAdapter: "COURSES",
         deactivationPolicy: "COURSES",
+    },
+    {
+        // A pack is visits bought ahead and spent on bookings, so it rides on
+        // Appointments like Courses; a business that takes bookings need not
+        // sell packs (round 2 E12, default 44). Reached with `pack:read`, the
+        // read a role holds to see packs at all; writes and sales are refused
+        // per route (`pack:write`).
+        key: "CLASS_PACKS",
+        label: "Class packs",
+        description:
+            "A number of visits bought up front and used over time, on the services the pack names.",
+        rootRoutes: ["/class-packs"],
+        requiredAction: "pack:read",
+        dependencies: ["APPOINTMENTS"],
+        projectSelectable: true,
+        rolloutFlag: FlagKey.MODULE_CLASS_PACKS,
+        readinessAdapter: "CLASS_PACKS",
+        deactivationPolicy: "CLASS_PACKS",
     },
     {
         key: "COMMERCE",

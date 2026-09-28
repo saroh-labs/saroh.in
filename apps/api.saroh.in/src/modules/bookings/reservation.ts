@@ -8,13 +8,16 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
+import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
 import { courseSeatsHeld } from "./course-seats";
-import type { BookingLocationType, PaidWith } from "./dto";
+import type { BookingLocationType, BookPay, PaidWith } from "./dto";
+import { depositCents } from "./service-fields";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -33,10 +36,11 @@ export interface BookInput {
     staffId?: string;
     /**
      * How the booking page's booker pays (U19): NOW holds the place for
-     * 15 minutes (`HOLD_MINUTES`) while they pay online, DESK books it to
-     * pay on the day. Absent — the one-service booking block — books as before.
+     * 15 minutes (`HOLD_MINUTES`) while they pay online, DEPOSIT does the
+     * same for the service's deposit only (E8), DESK books it to pay on the
+     * day. Absent — the one-service booking block — books as before.
      */
-    pay?: "NOW" | "DESK";
+    pay?: BookPay;
     /**
      * Where, for a service offered either way (E7). Absent: in person. See
      * {@link bookingLocation}.
@@ -323,6 +327,12 @@ export async function reserveInTx(
     const organizationId = service.organizationId;
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
+    // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
+    // no later move changes it.
+    const freeCancelUntil = freeCancelDeadline(
+        startAt,
+        await loadBookingRules(tx, organizationId),
+    );
 
     // A signed-in customer booking a session they hold themselves, unpaid
     // (a pay-now they left, now at the desk or trying again): that hold is
@@ -424,6 +434,7 @@ export async function reserveInTx(
             ),
             intakeNote: intakeNoteOf(input.intakeNote),
             customerAccountId: by.account?.accountId ?? null,
+            freeCancelUntil,
             ...(person
                 ? {
                       staffId: person.staffId,
@@ -556,7 +567,20 @@ export function buildSnapshot(
             // bookings, never the ones already made (ADR-007).
             locationType: service.locationType,
             meetingUrl: service.meetingUrl,
+            depositMode: service.depositMode,
         },
+        // What was asked for at booking when only the deposit is paid online
+        // (E8): the rest is due at the visit. Absent for every other way.
+        ...(input.pay === "DEPOSIT"
+            ? {
+                  deposit: {
+                      cents: depositCents(
+                          service.priceCents,
+                          service.depositMode,
+                      ),
+                  },
+              }
+            : {}),
         slot: {
             startAt: startAt.toISOString(),
             endAt: endAt.toISOString(),
@@ -573,6 +597,10 @@ export function buildSnapshot(
  * The signed-in booker's own contact (A9). A name typed on the booking page
  * fills a contact that has none; a name the contact already has is kept,
  * and nothing else about it changes.
+ *
+ * The id comes from the session, read before this transaction, so it goes
+ * through `resolveContact` (C9): a booking racing a merge lands on the
+ * survivor, never on the tombstone.
  */
 async function accountContactInTx(
     tx: Prisma.TransactionClient,
@@ -580,8 +608,12 @@ async function accountContactInTx(
     who: SignedInBooker,
     input: BookInput,
 ): Promise<{ id: string }> {
+    const resolved = await resolveContact(tx, who.contactId, organizationId);
+    if (!resolved || resolved.removed) {
+        throw new NotFoundException("Sign in to continue.");
+    }
     const contact = await tx.contact.findFirst({
-        where: { id: who.contactId, organizationId },
+        where: { id: resolved.id, organizationId },
         select: { id: true, firstName: true, lastName: true },
     });
     if (!contact) throw new NotFoundException("Sign in to continue.");

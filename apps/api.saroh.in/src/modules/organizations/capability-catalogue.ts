@@ -122,7 +122,7 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "member:role:update",
         group: "team",
         label: "Change what a role can do",
-        note: "Includes inventing roles. Someone with this can widen their own reach.",
+        note: "Includes inventing roles. Someone with this can grant only what they hold themselves.",
     },
     {
         action: "project:access:manage",
@@ -197,6 +197,12 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "contact:write",
         group: "contacts",
         label: "Add and edit contacts",
+    },
+    {
+        action: "customer:merge",
+        group: "contacts",
+        label: "Merge duplicate customers",
+        note: "A merge can't be undone. The customer kept takes every order, booking, invoice and note of the other, and can see them if they sign in on your website.",
     },
     { action: "lead:read", group: "contacts", label: "See leads" },
     { action: "lead:write", group: "contacts", label: "Add and edit leads" },

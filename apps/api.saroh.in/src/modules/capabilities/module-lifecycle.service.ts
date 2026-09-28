@@ -83,8 +83,14 @@ export class ModuleLifecycleService {
                 (d) => !enabled.has(d),
             );
             if (missing.length > 0) {
+                // A sentence a merchant can act on, in the modules' own names
+                // ("Class packs needs Appointments. Turn on Appointments
+                // first."), not the registry's keys.
+                const needs = missing
+                    .map((d) => MODULE_BY_KEY.get(d)?.label ?? d)
+                    .join(" and ");
                 throw new BadRequestException(
-                    `Cannot enable ${moduleKey}: enable ${missing.join(", ")} first.`,
+                    `${descriptor.label} needs ${needs}. Turn on ${needs} first.`,
                 );
             }
         }
@@ -158,10 +164,15 @@ export class ModuleLifecycleService {
                 },
             );
             if (enabledDependents.length > 0) {
+                const on = enabledDependents
+                    .map(
+                        (d) =>
+                            MODULE_BY_KEY.get(d.moduleKey as ModuleKey)
+                                ?.label ?? d.moduleKey,
+                    )
+                    .join(" and ");
                 throw new ConflictException(
-                    `Cannot disable ${moduleKey}: disable ${enabledDependents
-                        .map((d) => d.moduleKey)
-                        .join(", ")} first.`,
+                    `${on} ${enabledDependents.length === 1 ? "needs" : "need"} ${descriptor.label}. Turn off ${on} first.`,
                 );
             }
         }

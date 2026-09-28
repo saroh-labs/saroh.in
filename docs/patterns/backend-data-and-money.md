@@ -159,6 +159,20 @@
   placeholder. A site account (`CustomerAccount`, ADR-011) is live in every
   status but REMOVED: a MERGED one keeps its email reserved in the partial
   unique index.
+- **Current** — **A merged contact is a tombstone, and a late writer goes
+  through `resolveContact`** (DEC-042, round-2 C9). A merge
+  (`customer-workspace/merge.service.ts`) never deletes the other contact:
+  it keeps its id with `mergedIntoId` pointing at the survivor (one hop; a
+  merge re-points older tombstones) and no personal values. Any write that
+  takes a contact id from outside the request's own reads — a webhook, a job
+  payload, a session's account, a token, a page loaded earlier — calls
+  `resolveContact(tx, contactId, organizationId)` in its transaction and
+  writes against the returned id; its `FOR SHARE` waits on the merge's
+  `FOR UPDATE`, so the write lands before the merge (and is moved) or after
+  it (on the survivor). Lists and search leave tombstones out
+  (`mergedIntoId: null`). Every relation to `Contact` needs a rule in
+  `merge-plan.ts` `MERGE_RULES`; `merge.relations.spec.ts` fails a new one
+  without.
 
 ## Money — **Current**
 

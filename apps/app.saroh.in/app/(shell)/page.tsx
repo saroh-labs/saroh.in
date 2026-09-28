@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { HomeSetup } from "@/components/home/home-dashboard";
 import { HomeDashboard } from "@/components/home/home-dashboard";
 import { HomeHeader } from "@/components/home/home-header";
+import { ReviewerHome } from "@/components/home/reviewer-home";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import { getHome } from "@/lib/home/service";
@@ -46,6 +47,24 @@ export default async function Home() {
         getHome(),
         resolveActiveOrganization(organizations),
     ]);
+
+    // A Reviewer's Home (F9): the greeting and what was sent to them for
+    // review — nothing about the business, so nothing else is read.
+    if (home.view === "reviewer") {
+        return (
+            <PageContainer width="full">
+                <HomeHeader
+                    lastDay={home.lastDay}
+                    name={session.user.name}
+                    businessName={business?.name ?? "This business"}
+                />
+                <div className="mt-5">
+                    <ReviewerHome home={home} />
+                </div>
+            </PageContainer>
+        );
+    }
+
     // A business with nothing on is asked what it wants to do first, and the
     // question needs to know what may be turned on and by whom. Everyone
     // else never pays for the read.

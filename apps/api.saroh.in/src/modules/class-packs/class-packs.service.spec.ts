@@ -1,6 +1,19 @@
 // Class packs with a mocked database: who may, whose ids are trusted, what a
 // sale writes, and the plain refusals. The races and balances run against a
 // real Postgres in class-packs.db.spec.ts.
+// A contact resolves to itself: no merges here (C9's resolve-contact.db.spec
+// covers following a tombstone).
+jest.mock("../customer-workspace/resolve-contact", () => ({
+    resolveContact: jest.fn(
+        (_tx: unknown, id: string, organizationId?: string) =>
+            Promise.resolve({
+                id,
+                organizationId: organizationId ?? "org_1",
+                mergedFrom: null,
+                removed: false,
+            }),
+    ),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
@@ -163,6 +176,33 @@ describe("selling a pack", () => {
         tx.organizationModule!.findFirst!.mockResolvedValue({ id: "mod_1" });
         await service.sell(owner, "pack_1", { contactId: "c_1" });
         expect(tx.packPurchase!.create).toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("refuses a sale once the business switched Class packs off (E12)", async () => {
+        // Only the CLASS_PACKS row is off; Payments stays on.
+        db.organizationModule!.findFirst!.mockImplementation(
+            (args: { where: { moduleKey: string } }) =>
+                Promise.resolve(
+                    args.where.moduleKey === "CLASS_PACKS"
+                        ? { id: "mod_packs" }
+                        : null,
+                ),
+        );
+        const refused = service.sell(owner, "pack_1", { contactId: "c_1" });
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Class packs is switched off, so Saroh can't sell a pack.",
+        );
+        expect(db.organizationModule!.findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                moduleKey: "CLASS_PACKS",
+                status: { not: "ENABLED" },
+            },
+            select: { id: true },
+        });
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
         expect(issueInTx).not.toHaveBeenCalled();
     });
 

@@ -25,6 +25,14 @@ jest.mock("@saroh/database", () => {
         page: {
             create: jest.fn(),
         },
+        // Where a new site sells from (G11): no storefront by default.
+        store: {
+            findMany: jest.fn(async () => []),
+            findFirst: jest.fn(async () => null),
+        },
+        // The shop's rollout flag, never configured here: off.
+        featureFlagOverride: { findUnique: jest.fn(async () => null) },
+        featureFlag: { findUnique: jest.fn(async () => null) },
     };
     return {
         ...actual,
@@ -202,6 +210,7 @@ describe("SitesService.createFromTemplate", () => {
                 name: "Acme",
                 slug: "acme",
                 subdomain: undefined,
+                storefrontId: null,
             },
             select: { id: true, slug: true },
         });

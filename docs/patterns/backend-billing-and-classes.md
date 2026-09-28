@@ -238,6 +238,30 @@
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
   CONFIRMED with `paidWith` DESK. No credits online (ADR-008).
+- **A deposit rides the same hold** (E8, default 39). `pay: "DEPOSIT"` makes
+  the hold's draft invoice for `depositCents(price, depositMode)`, worked
+  out on the server, and the snapshot records `deposit.cents`; the rest is
+  due at the visit (`booking-money.ts`). A service with a deposit is never
+  booked to pay at the desk (`payAtBooking`), and a FULL deposit is paying
+  now. The public read serves `depositCents`, never the mode.
+- **The free-cancel deadline is fixed at booking** (`Booking.freeCancelUntil`,
+  DEC-051), written by `reserveInTx` from the rule of that moment. A move
+  never changes it; `isLateCancel` reads it, falling back to the start and
+  today's rule for bookings made before the column.
+- **A cancel in time refunds money paid online for the booking, once**
+  (`payments/booking-refund.ts`). Lock order: the booking invoice's intents
+  (`lockBookingIntentsInTx`), then `lockBookingInTx`; re-read the booking,
+  and only a booking not yet cancelled reserves one PENDING `PaymentRefund`
+  keyed `deposit-refund:<bookingId>` in the cancel's transaction. The cancel
+  sends it after commit (`sendAutomaticRefund`, DEC-026); the refund webhook
+  settles it and makes the credit note on the booking's invoice
+  (`creditNoteForRefund`, DEC-023). A late cancel keeps the money; the
+  business's `returnCredit` override refunds it only with `payment:manage`.
+  A visit of a treatment has no booking invoice, so it never refunds here
+  (DEC-050): its money goes back through the order.
+- **The anonymous `POST public/services/:id/book` answers 410** "Sign in to
+  book" and reads no body (A9); bookings from a site go through
+  `POST public/site-accounts/bookings`.
 
 ## Subscriptions — **Current**
 
@@ -280,6 +304,14 @@
   currency and interval — a new interval starts its chain where the old
   period ended. Undo clears it; cancelling now drops it; archived plans are
   refused.
+- **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
+  String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
+  — subscribe, a plan change, and a sign-up from the site — calls
+  `assertPlanOnSale` (`subscriptions/plan-on-sale.ts`: a DRAFT is a 409
+  "This plan isn't published yet", ARCHIVED stays a 400). Every read that
+  lists plans for sale — the site's plan lists and blocks — filters by
+  `PLANS_ON_SALE`. "Sell again" and Archive refuse a DRAFT; a draft goes on
+  sale only by being published.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one
@@ -341,8 +373,16 @@
 
 - Subscriptions and invoices: PAYMENTS, with `@IgnoreModuleReadiness()` so a
   business with no provider still records payments by hand. Courses: its own
-  COURSES module (depends on APPOINTMENTS). Packs and online classes:
-  APPOINTMENTS.
+  COURSES module (depends on APPOINTMENTS). Class packs: its own CLASS_PACKS
+  module (depends on APPOINTMENTS; E12, default 44), reached with
+  `pack:read`. Online classes: APPOINTMENTS.
+- **Switched off, a module stops new work and keeps its rows** (DEC-016).
+  Class packs off refuses a sale from the row itself
+  (`class-packs/class-packs-on.ts`, a missing row counts as on), whatever
+  `MODULE_ENFORCEMENT` says; packs, purchases and classes spent stay, a
+  booking paid with one still says so, and a cancel in time still gives the
+  class back. "Also sell" on Bookings › Services and Settings › Modules flip
+  the same switch through `ModuleLifecycleService`.
 - A Member reads bookings, services and contacts but no billing, course or
   pack screen (DEC-020); every billing read names its own action.
 - Workspace routes: `/billing/{subscriptions,plans,invoices}` (the rail's

@@ -55,6 +55,83 @@ const PRODUCT_ROLES = {
         actions: ["order:read", "booking:read"],
     },
 };
+/**
+ * The role editor within reach (F19): a "Manager" the business handed
+ * `member:role:update` to, without any money. Counter is within their reach;
+ * Senior holds `payment:manage`, so it is above them.
+ */
+const MANAGER_ACTIONS = [
+    "org:read",
+    "member:read",
+    "member:role:update",
+    "store:read",
+    "store:write",
+    "inventory:write",
+    "order:read",
+];
+PRODUCT_ROLES.MANAGER = {
+    role: "MEMBER",
+    roleKey: "manager",
+    roleLabel: "Manager",
+    actions: MANAGER_ACTIONS,
+};
+const invented = (key, label, actions, members = 0) => ({
+    key,
+    label,
+    actions,
+    ringTone: "neutral",
+    system: false,
+    members,
+});
+const ROLES = [
+    {
+        key: "MEMBER",
+        label: "Member",
+        actions: ["org:read", "member:read", "store:read"],
+        ringTone: "saffron",
+        system: true,
+        members: 0,
+    },
+    invented("counter", "Counter", ["order:read", "store:read"]),
+    invented("senior", "Senior", ["order:read", "payment:manage"]),
+    invented(
+        "manager",
+        "Manager",
+        [
+            "member:read",
+            "member:role:update",
+            "store:read",
+            "store:write",
+            "order:read",
+        ],
+        1,
+    ),
+];
+const CATALOGUE = {
+    groups: ["team", "sell", "money"],
+    capabilities: [
+        {
+            action: "member:read",
+            group: "team",
+            label: "See who is in the team",
+        },
+        {
+            action: "member:role:update",
+            group: "team",
+            label: "Change what a role can do",
+            note: "Includes inventing roles. Someone with this can grant only what they hold themselves.",
+        },
+        { action: "store:read", group: "sell", label: "See storefronts" },
+        { action: "store:write", group: "sell", label: "Change storefronts" },
+        { action: "order:read", group: "sell", label: "See orders" },
+        {
+            action: "payment:manage",
+            group: "money",
+            label: "Manage payments",
+            note: "Includes refunds.",
+        },
+    ],
+};
 const STORE = {
     id: "store_1",
     name: "Hill Road",
@@ -292,6 +369,58 @@ createServer((req, res) => {
         return reply(403, {
             error: "Read-only roles must not load the editor draft",
         });
+    // Home (F9): a Reviewer's is the sites sent to them, and nothing else.
+    if (path.endsWith("/home"))
+        return reply(200, {
+            view: scenario === "REVIEWER" ? "reviewer" : "business",
+            ...(scenario === "REVIEWER"
+                ? {
+                      reviews: [
+                          {
+                              id: "site_1",
+                              name: "Permission test site",
+                              href: "/sites/site_1/review",
+                              requestedBy: "Priya Raman",
+                              requestedAt: "2026-09-17T06:00:00.000Z",
+                              openNotes: 2,
+                              pages: [
+                                  {
+                                      id: "page_1",
+                                      title: "Home",
+                                      path: "/",
+                                      openNotes: 2,
+                                      href: "/sites/site_1/review?page=page_1",
+                                  },
+                              ],
+                              pageCount: 1,
+                              subdomain: null,
+                              live: false,
+                          },
+                      ],
+                  }
+                : {}),
+            actions: [],
+            primaryAction: null,
+            hasAnyModule: true,
+            upcoming: [],
+            numbers: [],
+            unavailable: [],
+            needs: [],
+            needsTotal: 0,
+            today: null,
+            lastDay: {
+                zone: "Asia/Kolkata",
+                date: "2026-09-18",
+                partOfDay: "morning",
+                since: "2026-09-17T04:00:00.000Z",
+                fresh: false,
+                items: [],
+            },
+        });
+    // Team → Roles (F19).
+    if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);
+    if (path.endsWith("/roles")) return reply(200, ROLES);
+    if (path.endsWith("/members")) return reply(200, []);
     if (path.endsWith("/notifications/unread-count"))
         return reply(200, { count: 0 });
     return reply(404, { error: "Fixture route not found" });

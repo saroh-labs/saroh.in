@@ -1,7 +1,9 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import type { FulfilmentType } from "./fulfilment";
 import {
+    allowedTypes,
+    assertItemsAllow,
     DEFAULT_LATE_THRESHOLDS,
     FULFILMENT_RULES,
     FULFILMENT_TYPES,
@@ -15,6 +17,8 @@ import {
     lateStoredValues,
     legacyWord,
     movesFor,
+    PRODUCT_FULFILMENT_TYPES,
+    productTypesOf,
     shipsToAddress,
     stepIndexOf,
     stepsFor,
@@ -566,5 +570,103 @@ describe("going by courier", () => {
         ]) {
             expect(goesByCourier(stored, "NEW")).toBe(false);
         }
+    });
+});
+
+describe("product fulfilment types (B12)", () => {
+    const cake = {
+        name: "Chocolate cake",
+        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+    };
+    const jar = { name: "Honey jar", fulfilmentTypes: ["SHIPPING"] };
+    const anyWay = { name: "Candle", fulfilmentTypes: [] as string[] };
+    const all = ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"] as const;
+
+    it("a product is set to a storefront's ways or Digital, never an appointment", () => {
+        expect(PRODUCT_FULFILMENT_TYPES).toEqual([
+            "PICKUP",
+            "LOCAL_DELIVERY",
+            "SHIPPING",
+            "DIGITAL",
+        ]);
+    });
+
+    it("reads a stored list in table order, as types, without duplicates", () => {
+        expect(productTypesOf(["SHIPPING", "PICKUP", "SHIPPING"])).toEqual([
+            "PICKUP",
+            "SHIPPING",
+        ]);
+        // A legacy word reads as its type; an appointment is left out.
+        expect(
+            productTypesOf(["DELIVERY", "COLLECT", "APPOINTMENT_ONLINE"]),
+        ).toEqual(["PICKUP", "LOCAL_DELIVERY"]);
+        expect(productTypesOf([])).toEqual([]);
+        expect(() => productTypesOf(["TELEPORT"])).toThrow();
+    });
+
+    it("offers only what every item allows: a cake and a shipped jar share nothing", () => {
+        expect(allowedTypes([cake], all)).toEqual(["PICKUP", "LOCAL_DELIVERY"]);
+        expect(allowedTypes([cake, jar], all)).toEqual([]);
+        // The jar allows Pick-up and Local delivery too: both are offered.
+        const jarToo = {
+            ...jar,
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        };
+        expect(allowedTypes([cake, jarToo], all)).toEqual([
+            "PICKUP",
+            "LOCAL_DELIVERY",
+        ]);
+    });
+
+    it("an empty list is every way the storefront offers, and never Digital", () => {
+        expect(allowedTypes([anyWay], all)).toEqual([...all]);
+        expect(allowedTypes([anyWay], ["PICKUP"])).toEqual(["PICKUP"]);
+        expect(allowedTypes([anyWay, cake], ["PICKUP", "SHIPPING"])).toEqual([
+            "PICKUP",
+        ]);
+        // No items yet: what the storefront offers.
+        expect(allowedTypes([], ["SHIPPING"])).toEqual(["SHIPPING"]);
+        expect(allowedTypes([], [])).toEqual([]);
+    });
+
+    it("the storefront narrows its own ways, but Digital follows the products", () => {
+        const ebook = { name: "Recipe ebook", fulfilmentTypes: ["DIGITAL"] };
+        expect(allowedTypes([ebook], [])).toEqual(["DIGITAL"]);
+        expect(allowedTypes([ebook, ebook], all)).toEqual(["DIGITAL"]);
+        expect(allowedTypes([ebook, anyWay], all)).toEqual([]);
+        const giftCard = {
+            name: "Gift card",
+            fulfilmentTypes: ["DIGITAL", "SHIPPING"],
+        };
+        expect(allowedTypes([giftCard], ["PICKUP"])).toEqual(["DIGITAL"]);
+        expect(allowedTypes([giftCard], all)).toEqual(["SHIPPING", "DIGITAL"]);
+    });
+
+    it("refuses a type an item's own list leaves out, naming the item (409)", () => {
+        expect(() => assertItemsAllow([anyWay, cake], "SHIPPING")).toThrow(
+            ConflictException,
+        );
+        try {
+            assertItemsAllow([anyWay, cake], "SHIPPING");
+        } catch (error) {
+            expect((error as ConflictException).getResponse()).toEqual({
+                message:
+                    "Chocolate cake isn't sold for Shipping. It allows Pick-up and Local delivery only.",
+                field: "fulfilment",
+            });
+        }
+        expect(() => assertItemsAllow([jar], "PICKUP")).toThrow(
+            "Honey jar isn't sold for Pick-up. It allows Shipping only.",
+        );
+    });
+
+    it("lets through a type every list allows, and any type when no item has a list", () => {
+        expect(() => assertItemsAllow([cake], "PICKUP")).not.toThrow();
+        expect(() => assertItemsAllow([cake], "LOCAL_DELIVERY")).not.toThrow();
+        // An empty list behaves as before B12, whatever the type.
+        for (const type of FULFILMENT_TYPES) {
+            expect(() => assertItemsAllow([anyWay], type)).not.toThrow();
+        }
+        expect(() => assertItemsAllow([], "SHIPPING")).not.toThrow();
     });
 });

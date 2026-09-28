@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
 import { stateName } from "./gst-states";
@@ -365,6 +366,12 @@ async function writeCorrection(
     },
 ): Promise<{ id: string; number: string }> {
     const profile = await loadTaxProfile(tx, original.organizationId);
+    // A refund webhook can land after the person was merged (C9): the
+    // correction goes to the survivor, as the original did when the merge
+    // moved it. The bill-to below stays as printed on the original.
+    const contact = original.contactId
+        ? await resolveContact(tx, original.contactId, original.organizationId)
+        : null;
     // The series follows the business now; the paper follows the original.
     const number = await numberFor(
         tx,
@@ -382,7 +389,7 @@ async function writeCorrection(
             source: original.orderId ? "ORDER" : "MANUAL",
             relatedInvoiceId: original.id,
             orderId: original.orderId,
-            contactId: original.contactId,
+            contactId: contact?.id ?? null,
             paymentRefundId: extra.paymentRefundId ?? null,
             billToName: original.billToName,
             billToEmail: original.billToEmail,
@@ -523,7 +530,12 @@ export async function creditNoteForRefund(
             reason: true,
             status: true,
             paymentIntent: {
-                select: { id: true, orderId: true, status: true },
+                select: {
+                    id: true,
+                    orderId: true,
+                    invoiceId: true,
+                    status: true,
+                },
             },
             lines: {
                 select: {
@@ -536,7 +548,11 @@ export async function creditNoteForRefund(
     });
     if (!refund || refund.forEdit || refund.status === "FAILED") return null;
     const orderId = refund.paymentIntent.orderId;
-    if (!orderId) return null;
+    if (!orderId) {
+        return refund.paymentIntent.invoiceId
+            ? creditBookingInvoice(tx, refund, refund.paymentIntent.invoiceId)
+            : null;
+    }
     const invoice = await tx.invoice.findFirst({
         where: { orderId, kind: "INVOICE" },
         select: { id: true },
@@ -577,6 +593,35 @@ export async function creditNoteForRefund(
         });
     }
     return note;
+}
+
+/**
+ * The credit note a refund of a booking's own invoice makes (E8, DEC-023):
+ * a deposit or full price paid at booking, handed back when it was
+ * cancelled in time. Only the booking's issued, paid invoice — never a
+ * hand-written one, and never a hold's draft, which was never paid.
+ */
+async function creditBookingInvoice(
+    tx: Tx,
+    refund: { id: string; amountCents: number; reason: string | null },
+    invoiceId: string,
+): Promise<{ id: string; number: string | null } | null> {
+    const invoice = await tx.invoice.findFirst({
+        where: {
+            id: invoiceId,
+            kind: "INVOICE",
+            source: "BOOKING",
+            status: { in: ["PAID", "CREDITED"] },
+        },
+        select: { id: true },
+    });
+    if (!invoice) return null;
+    return issueCreditNote(tx, {
+        invoiceId: invoice.id,
+        amountCents: refund.amountCents,
+        paymentRefundId: refund.id,
+        note: refund.reason ?? "Refund",
+    });
 }
 
 /**

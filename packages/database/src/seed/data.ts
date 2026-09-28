@@ -47,9 +47,10 @@ export const CURRENCY = "INR";
  * when the rules change.
  *
  * The consequence, now that the fixture also carries sites, analytics and live
- * providers: every ENABLED module below evaluates to ACTIVE, except COURSES:
- * Northwind runs no course, so it asks for one (the showcase's Pulse Fitness
- * and Prana Yoga are where courses are seeded — ADR-007). AUTOMATIONS is the
+ * providers: every ENABLED module below evaluates to ACTIVE, except COURSES
+ * and CLASS_PACKS: Northwind runs no course and sells no pack, so each asks
+ * for one (the showcase's Pulse Fitness and Prana Yoga are where courses and
+ * packs are seeded — ADR-007). AUTOMATIONS is the
  * one capability left genuinely absent, and it short-circuits at the
  * "configured" gate rather than on readiness — so `SETUP_REQUIRED` and
  * `ATTENTION_REQUIRED` are no longer reachable from this fixture. Reaching them
@@ -74,6 +75,11 @@ export const MODULE_STATES: readonly {
         key: "COURSES",
         status: "ENABLED",
         why: "switched on but no course yet, so it reads SETUP_REQUIRED; the showcase's Pulse and Prana run courses",
+    },
+    {
+        key: "CLASS_PACKS",
+        status: "ENABLED",
+        why: "switched on but no pack yet, so it reads SETUP_REQUIRED and packs can be tried here; the showcase's Pulse and Prana sell them (E12)",
     },
     {
         key: "PAYMENTS",

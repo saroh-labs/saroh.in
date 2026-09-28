@@ -11,11 +11,16 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             update: jest.fn(),
         },
+        store: { findFirst: jest.fn() },
     };
     return { prisma: client };
 });
 
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -25,6 +30,7 @@ import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const siteUpdate = prisma.site.update as jest.Mock;
+const storeFindFirst = prisma.store.findFirst as jest.Mock;
 
 const OWNER: OrganizationContext = {
     organizationId: "org_1",
@@ -183,6 +189,56 @@ describe("SitesService.updateSettings — the site name (G6)", () => {
         await expect(
             service.updateSettings(BLOCKS_ONLY, SITE, { name: "Renamed" }),
         ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+});
+
+/*
+ * Where the site sells from (round 2, G11): `site:update`, and only an open
+ * storefront of the site's own business.
+ */
+describe("SitesService.updateSettings — sells from (G11)", () => {
+    it("saves an open storefront of this business, checked by the actor's organization", async () => {
+        storeFindFirst.mockResolvedValue({ id: "st_online" });
+        await service.updateSettings(OWNER, SITE, {
+            storefrontId: "st_online",
+        });
+        expect(storeFindFirst).toHaveBeenCalledWith({
+            where: {
+                id: "st_online",
+                organizationId: "org_1",
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        expect(siteUpdate.mock.calls[0][0].data).toEqual({
+            storefrontId: "st_online",
+        });
+    });
+
+    it("refuses another business's storefront, or a closed one, at save", async () => {
+        storeFindFirst.mockResolvedValue(null);
+        await expect(
+            service.updateSettings(OWNER, SITE, {
+                storefrontId: "st_other_business",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("clears the choice with null, without looking a storefront up", async () => {
+        await service.updateSettings(OWNER, SITE, { storefrontId: null });
+        expect(storeFindFirst).not.toHaveBeenCalled();
+        expect(siteUpdate.mock.calls[0][0].data).toEqual({
+            storefrontId: null,
+        });
+    });
+
+    it("needs site:update, like the rest of the settings", async () => {
+        await expect(
+            service.updateSettings(MEMBER, SITE, { storefrontId: "st_online" }),
+        ).rejects.toBeDefined();
+        expect(storeFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
     });
 });

@@ -154,14 +154,14 @@ const ACTIONS: {
         href: "/class-packs/new",
         label: "New class pack",
         icon: Ticket,
-        moduleKey: "APPOINTMENTS",
+        moduleKey: "CLASS_PACKS",
         action: "pack:write",
     },
     {
         href: "/class-packs?sell=1",
         label: "Sell a pack",
         icon: Ticket,
-        moduleKey: "APPOINTMENTS",
+        moduleKey: "CLASS_PACKS",
         action: "pack:write",
     },
     {

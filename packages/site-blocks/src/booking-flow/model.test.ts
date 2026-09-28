@@ -8,6 +8,7 @@ import {
     dateText,
     dayAria,
     dayCountLabel,
+    depositUnpayable,
     formatMoney,
     groupStarts,
     isBookingDays,
@@ -16,8 +17,10 @@ import {
     isHoldView,
     looksLikeEmail,
     orList,
+    payChoices,
     phoneProblem,
     placesText,
+    restAfterDeposit,
     rulesText,
     serviceLine,
     serviceWhere,
@@ -252,7 +255,10 @@ describe("Where (E7)", () => {
         expect(serviceWhere(service({ online: true }))).toBe("ONLINE");
         expect(serviceWhere(service())).toBe("IN_PERSON");
         expect(
-            isBookingPage({ ...page, services: [service({ where: "EITHER" })] }),
+            isBookingPage({
+                ...page,
+                services: [service({ where: "EITHER" })],
+            }),
         ).toBe(true);
         expect(isBookingPage({ ...page, services: [service()] })).toBe(true);
         expect(
@@ -305,7 +311,81 @@ describe("Where (E7)", () => {
             }),
         ).toBe(true);
         expect(
-            isHoldView({ ...hold, booking: { online: "yes", meetingUrl: null } }),
+            isHoldView({
+                ...hold,
+                booking: { online: "yes", meetingUrl: null },
+            }),
+        ).toBe(false);
+    });
+});
+
+describe("paying at booking (E8)", () => {
+    const pays = (over: Partial<BookingService>, online = true) =>
+        payChoices(service(over), online, "Kavi Dental").map((c) => c.pay);
+
+    it("a deposit: the deposit or the full price, never the desk", () => {
+        const choices = payChoices(
+            service({ depositCents: 30_000 }),
+            true,
+            "Kavi Dental",
+        );
+        expect(choices.map((c) => [c.pay, c.label, c.amount])).toEqual([
+            ["DEPOSIT", "Pay ₹300 deposit now", "₹300"],
+            ["NOW", "Pay the full ₹1,200 now", "₹1,200"],
+        ]);
+        expect(choices[0]?.sub).toBe(
+            "The rest (₹900) at Kavi Dental. Refunded if you cancel in time.",
+        );
+        expect(restAfterDeposit(service({ depositCents: 30_000 }))).toBe(
+            "₹900",
+        );
+    });
+
+    it("the full price as a deposit is paying now", () => {
+        expect(pays({ depositCents: 120_000 })).toEqual(["NOW"]);
+        expect(restAfterDeposit(service({ depositCents: 120_000 }))).toBe(null);
+    });
+
+    it("no deposit: now or at the desk, as before; only the desk offline", () => {
+        expect(pays({ depositCents: null })).toEqual(["NOW", "DESK"]);
+        expect(pays({})).toEqual(["NOW", "DESK"]);
+        expect(pays({}, false)).toEqual(["DESK"]);
+    });
+
+    it("a deposit that can't be taken online offers nothing, and says so", () => {
+        expect(pays({ depositCents: 30_000 }, false)).toEqual([]);
+        expect(depositUnpayable(service({ depositCents: 30_000 }), false)).toBe(
+            true,
+        );
+        expect(depositUnpayable(service({ depositCents: 30_000 }), true)).toBe(
+            false,
+        );
+        expect(depositUnpayable(service(), false)).toBe(false);
+    });
+
+    it("no price, nothing to choose", () => {
+        expect(pays({ priceCents: null })).toEqual([]);
+    });
+
+    it("reads a page with or without depositCents", () => {
+        const page = {
+            businessName: "Kavi Dental",
+            open: true,
+            timezone: ZONE,
+            payOnline: true,
+            rules: {
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: 24,
+            },
+            services: [service(), service({ depositCents: 30_000 })],
+        };
+        expect(isBookingPage(page)).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [{ ...service(), depositCents: "300" }],
+            }),
         ).toBe(false);
     });
 });

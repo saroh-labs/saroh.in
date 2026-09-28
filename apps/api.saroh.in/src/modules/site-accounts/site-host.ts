@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { businessPublicPhoneOf } from "../organizations/business-phone";
 import { normaliseHost } from "./site-relay";
 
 /**
@@ -73,15 +74,16 @@ export async function resolveSiteHost(rawHost: string): Promise<SiteHost> {
 }
 
 /**
- * HOOK — the business's public phone, for "Or call ‹Business› on ‹phone›"
- * when a code can't be sent (default 113).
+ * The business's public phone, for "Or call ‹Business› on ‹phone›" when a
+ * code can't be sent (default 113), in E.164; null when the business has set
+ * none (DEC-053), and the sheet then shows the try-again line alone.
  *
- * No such field exists yet: `BusinessProfile`, `Store` and `StoreSettings`
- * carry no phone, and the plans name "the business profile's public phone"
- * (plan G, G8) without a unit that adds it. Until a follow-up unit adds
- * the field and reads it here, this answers null and the sheet shows the
- * try-again line alone. Nothing else should guess a number.
+ * Read from the site's own business, which the host resolved — never a
+ * number taken from anywhere else (a Contact block, a member), which would
+ * publish something the merchant never offered here. Read live on each
+ * call, so a number removed in Settings › Business stops showing at once.
+ * Runs inside the caller's `runInOrgContext`.
  */
-export function businessPublicPhone(_site: SiteHost): Promise<string | null> {
-    return Promise.resolve(null);
+export function businessPublicPhone(site: SiteHost): Promise<string | null> {
+    return businessPublicPhoneOf(site.organizationId);
 }

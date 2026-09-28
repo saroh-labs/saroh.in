@@ -4,7 +4,10 @@ import { BookingDetailView } from "@/components/bookings/booking-detail";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
+import { packsOn } from "@/lib/class-packs/switched-on";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { canRefundPayments } from "@/lib/services/booking-money";
 import { hasEnded } from "@/lib/services/booking-state";
 import type { BookingDetail } from "@/lib/services/service";
 import { getBooking } from "@/lib/services/service";
@@ -51,6 +54,7 @@ export default async function BookingPage({
             booking={booking}
             past={hasEnded(booking)}
             packs={await packsFor(booking)}
+            canRefund={canRefundPayments(await resolveActiveOrganization())}
         />
     );
 }
@@ -59,12 +63,16 @@ export default async function BookingPage({
  * What the booking says about class packs (ADR-007): the pack paying for it,
  * and — when none is, it is still on, and this person may spend packs — the
  * booker's packs that cover this session. A failed read offers nothing
- * rather than failing the booking.
+ * rather than failing the booking. With Class packs switched off (E12) it
+ * still says which pack paid, and offers nothing to spend or take off.
  */
 async function packsFor(booking: BookingDetail) {
-    const organization = await resolveActiveOrganization();
+    const [organization, modules] = await Promise.all([
+        resolveActiveOrganization(),
+        modulesOrUnknown(),
+    ]);
     if (!canReadPacks(organization)) return undefined;
-    const canWrite = canWritePacks(organization);
+    const canWrite = canWritePacks(organization) && packsOn(modules);
     const live = booking.packRedemption?.reversedAt
         ? null
         : (booking.packRedemption?.purchase ?? null);

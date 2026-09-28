@@ -4,12 +4,14 @@ import type { ModuleStates } from "./panels";
 import { contactPanels, moduleOn, viewerCan } from "./panels";
 
 const on = (...keys: string[]): ModuleStates =>
-    ["PAYMENTS", "APPOINTMENTS", "COURSES", "CRM"].map((key) => ({
-        key,
-        readiness: keys.includes(key) ? "ACTIVE" : "DISABLED",
-    }));
+    ["PAYMENTS", "APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM"].map(
+        (key) => ({
+            key,
+            readiness: keys.includes(key) ? "ACTIVE" : "DISABLED",
+        }),
+    );
 
-const ALL = on("PAYMENTS", "APPOINTMENTS", "COURSES", "CRM");
+const ALL = on("PAYMENTS", "APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM");
 
 describe("contactPanels", () => {
     it("gives an owner with every module all four panels, each with its action", () => {
@@ -50,7 +52,7 @@ describe("contactPanels", () => {
     it("drops the money panels with Payments off, keeping packs and courses without invoice mentions", () => {
         const plan = contactPanels(
             { role: "OWNER" },
-            on("APPOINTMENTS", "COURSES", "CRM"),
+            on("APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM"),
         );
         expect(plan.panels).toEqual(["packs", "courses"]);
         expect(plan.canAct.subscriptions).toBe(false);
@@ -59,10 +61,22 @@ describe("contactPanels", () => {
         expect(plan.paymentsOn).toBe(false);
     });
 
-    it("drops packs with Appointments off and courses with Courses off", () => {
+    it("drops packs with Class packs off and courses with Courses off", () => {
         expect(contactPanels({ role: "ADMIN" }, on("PAYMENTS")).panels).toEqual(
             ["subscriptions", "invoices"],
         );
+    });
+
+    it("follows Class packs, not Appointments, for the packs panel (E12)", () => {
+        expect(
+            contactPanels(
+                { role: "OWNER" },
+                on("PAYMENTS", "APPOINTMENTS", "COURSES", "CRM"),
+            ).panels,
+        ).not.toContain("packs");
+        expect(
+            contactPanels({ role: "OWNER" }, on("CLASS_PACKS")).panels,
+        ).toContain("packs");
     });
 
     it("fails open when the modules could not be read", () => {

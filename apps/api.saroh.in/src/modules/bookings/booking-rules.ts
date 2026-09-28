@@ -73,16 +73,36 @@ export function withinBookingWindow(
 }
 
 /**
- * Whether cancelling now is inside the free-cancellation window, so a class
- * paid for stays used. No rule: never late.
+ * The free-cancel deadline a booking is given when it is made (E8,
+ * DEC-051): its start less the business's free-cancel hours, or null when
+ * the business has no such rule. Written once; a move never changes it.
+ */
+export function freeCancelDeadline(
+    startAt: Date,
+    rules: Pick<BookingRulesValue, "freeCancelHours">,
+): Date | null {
+    if (rules.freeCancelHours === null) return null;
+    return new Date(startAt.getTime() - rules.freeCancelHours * HOUR);
+}
+
+/**
+ * Whether cancelling now is past the free-cancellation window, so a class
+ * paid for stays used and a deposit is kept. The deadline fixed at booking
+ * decides when the booking has one (E8, DEC-051), so moving a booking later
+ * never makes a late cancel free. A booking made before the column (or with
+ * no rule then) is judged by its start and today's rule, as before. No
+ * rule: never late.
  */
 export function isLateCancel(
-    startAt: Date,
+    booking: { startAt: Date; freeCancelUntil?: Date | null },
     now: Date,
     rules: BookingRulesValue,
 ): boolean {
-    if (rules.freeCancelHours === null) return false;
-    return now.getTime() > startAt.getTime() - rules.freeCancelHours * HOUR;
+    if (booking.freeCancelUntil) {
+        return now.getTime() > booking.freeCancelUntil.getTime();
+    }
+    const deadline = freeCancelDeadline(booking.startAt, rules);
+    return deadline !== null && now.getTime() > deadline.getTime();
 }
 
 function describeMinutes(minutes: number): string {

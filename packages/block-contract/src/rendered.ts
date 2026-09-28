@@ -139,6 +139,9 @@ const renderedRichText = z.object({
     padding,
     format: z.enum(["html", "markdown"]).optional(),
     value: z.string(),
+    /** One photo beside the text (G7); absent side is the right. */
+    image: renderedImageSchema.optional(),
+    imageSide: z.enum(["left", "right"]).optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });

@@ -6,7 +6,14 @@ import type {
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
 import type { OrgAction } from "./organization-policy";
-import { authorize, can, ORG_ACTIONS } from "./organization-policy";
+import {
+    authorize,
+    can,
+    ORG_ACTIONS,
+    outOfReach,
+    resolveCapabilities,
+    withinReach,
+} from "./organization-policy";
 
 // The expected allow-set per role, written out independently of the
 // implementation so this test actually pins behavior rather than mirroring it.
@@ -223,5 +230,83 @@ describe("subscriptions, invoices, courses and class packs (ADR-007)", () => {
         expect(can("ADMIN", action)).toBe(true);
         expect(can("MEMBER", action)).toBe(false);
         expect(can("REVIEWER", action)).toBe(false);
+    });
+});
+
+describe("reach (F19): nobody grants what they don't hold", () => {
+    const manager: OrganizationContext = {
+        organizationId: "org_1",
+        userId: "user_1",
+        role: "MEMBER",
+        roleKey: "manager",
+        actions: resolveCapabilities("manager", [
+            "member:role:update",
+            "store:write",
+            "order:read",
+        ]),
+    };
+
+    it("is within reach when the actor holds every action", () => {
+        expect(withinReach(manager, ["order:read", "store:write"])).toBe(true);
+        expect(outOfReach(manager, ["order:read"])).toEqual([]);
+    });
+
+    it("names exactly the actions the actor lacks, once each", () => {
+        expect(
+            outOfReach(manager, [
+                "payment:manage",
+                "order:read",
+                "payment:manage",
+                "invoice:write",
+            ]),
+        ).toEqual(["payment:manage", "invoice:write"]);
+        expect(withinReach(manager, ["payment:manage"])).toBe(false);
+    });
+
+    it("counts implied holds: store:write brings inventory:write", () => {
+        expect(withinReach(manager, ["inventory:write"])).toBe(true);
+    });
+
+    it("an empty list is always within reach", () => {
+        expect(withinReach(ctx("REVIEWER"), [])).toBe(true);
+    });
+
+    it("falls back to the shipped map for a context without resolved actions", () => {
+        // OWNER holds everything; ADMIN everything except closing the
+        // business, so a role holding that is beyond an Admin.
+        expect(withinReach(ctx("OWNER"), ORG_ACTIONS)).toBe(true);
+        expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS)).toEqual(["org:delete"]);
+        expect(withinReach(ctx("MEMBER"), ["payment:manage"])).toBe(false);
+    });
+});
+
+describe("customer:merge (DEC-042, C9)", () => {
+    it("is Owner's and Admin's, never a Member's or a Reviewer's", () => {
+        expect(can("OWNER", "customer:merge")).toBe(true);
+        expect(can("ADMIN", "customer:merge")).toBe(true);
+        expect(can("MEMBER", "customer:merge")).toBe(false);
+        expect(can("REVIEWER", "customer:merge")).toBe(false);
+    });
+
+    it("is not implied by contact:write: a saved role that edits customers can't merge them", () => {
+        const editor = resolveCapabilities("front-desk", [
+            "contact:read",
+            "contact:write",
+        ]);
+        expect(editor.has("contact:write")).toBe(true);
+        expect(editor.has("customer:merge")).toBe(false);
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const merger = resolveCapabilities("merger", ["customer:merge"]);
+        expect(merger.has("customer:merge")).toBe(true);
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["contact:write"]),
+        };
+        expect(outOfReach(editor, merger)).toEqual(["customer:merge"]);
     });
 });

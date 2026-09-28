@@ -71,7 +71,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "imports/imports.controller.ts": "COMMERCE",
     "invoices/invoices.controller.ts": "PAYMENTS",
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
-    "class-packs/class-packs.controller.ts": "APPOINTMENTS",
+    // Both of its controllers: the packs, and using one on a booking (E12).
+    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
     "courses/courses.controller.ts": "COURSES",
 };
 
@@ -155,6 +156,10 @@ const NEVER: Record<string, string> = {
     // (`appointmentsOpen`), as on the anonymous route.
     "site-accounts/account-bookings.controller.ts":
         "a signed-in customer booking on a published site — Appointments checked per service",
+    // G11: a site's shop. Commerce being off is checked by the service
+    // (`commerceOpen`), which answers 404, as a site with no shop does.
+    "products/public-catalogue.controller.ts":
+        "a published site's shop and product pages — Commerce checked by the service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
@@ -282,6 +287,12 @@ describe("module enforcement rollout (#117)", () => {
         ]) {
             expect(declared.has(key)).toBe(true);
         }
+    });
+
+    it("gates both Class packs controllers on CLASS_PACKS, not Appointments (E12)", () => {
+        const text = source("class-packs/class-packs.controller.ts");
+        expect(text.match(/@RequireModule\("CLASS_PACKS"\)/g)).toHaveLength(2);
+        expect(text).not.toContain('@RequireModule("APPOINTMENTS")');
     });
 
     it("exports the metadata key the guard reads", () => {

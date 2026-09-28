@@ -1,16 +1,28 @@
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { OrgRole } from "../../common/types/organization-context";
+import type {
+    OrganizationContext,
+    OrgRole,
+} from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
-import { grantableCapabilities } from "./capability-catalogue";
+import {
+    CAPABILITY_BY_ACTION,
+    grantableCapabilities,
+} from "./capability-catalogue";
 import type { OrgAction } from "./organization-actions";
-import { builtInActions, isBuiltInRole } from "./organization-policy";
+import {
+    builtInActions,
+    isBuiltInRole,
+    outOfReach,
+    resolveCapabilities,
+} from "./organization-policy";
 
 /** A role as the Team screen renders it, built-in or invented. */
 export interface RoleView {
@@ -65,6 +77,11 @@ const INVENTED_RING = "neutral";
  * refuses them — letting a business re-permission OWNER would make role names
  * mean different things in different businesses, and the Owner's guarantee is
  * the one thing no screen may take away.
+ *
+ * Every write is bounded by the writer's reach (F19): a role can be given only
+ * what the person saving it holds themselves, and a role that can already do
+ * more than they can is not theirs to change or remove. Without it, anyone
+ * holding `member:role:update` could tick `payment:manage` onto their own role.
  */
 @Injectable()
 export class OrganizationRolesService {
@@ -113,9 +130,10 @@ export class OrganizationRolesService {
     }
 
     async create(
-        organizationId: string,
+        ctx: OrganizationContext,
         input: { label: string; actions: string[] },
     ): Promise<RoleView> {
+        const { organizationId } = ctx;
         const label = input.label.trim();
         if (label.length === 0) {
             throw new BadRequestException("A role needs a name");
@@ -148,12 +166,15 @@ export class OrganizationRolesService {
             );
         }
 
+        const actions = this.vetActions(input.actions);
+        this.assertCanGrant(ctx, key, actions);
+
         const created = await prisma.organizationRole.create({
             data: {
                 organizationId,
                 key,
                 label,
-                actions: this.vetActions(input.actions),
+                actions,
                 ringTone: INVENTED_RING,
             },
         });
@@ -168,24 +189,49 @@ export class OrganizationRolesService {
         };
     }
 
+    /**
+     * Rename or re-permission an invented role.
+     *
+     * Two reach checks, in this order. The role as it stands must already be
+     * within the writer's reach — even for a rename, because a role above you
+     * is held by people who can do more than you, and editing it would let
+     * you strip powers from them. Then everything it would hold after the
+     * save must be too. Taking away a permission you hold is always fine.
+     * Editing your own role follows the same rule, so it can never add what
+     * you lack.
+     */
     async update(
-        organizationId: string,
+        ctx: OrganizationContext,
         key: string,
         input: { label?: string; actions?: string[] },
     ): Promise<RoleView> {
+        const { organizationId } = ctx;
         const role = await this.requireInvented(organizationId, key);
+        this.assertCanChange(ctx, role, "change");
 
-        const updated = await prisma.organizationRole.update({
-            where: { id: role.id },
+        const actions =
+            input.actions !== undefined
+                ? this.vetActions(input.actions)
+                : undefined;
+        if (actions) this.assertCanGrant(ctx, key, actions);
+
+        // Only if nobody saved it since it was checked: a role widened by
+        // someone else in between would otherwise be written over by a
+        // person it is now beyond.
+        const { count } = await prisma.organizationRole.updateMany({
+            where: { id: role.id, updatedAt: role.updatedAt },
             data: {
                 ...(input.label !== undefined
                     ? { label: input.label.trim() }
                     : {}),
-                ...(input.actions !== undefined
-                    ? { actions: this.vetActions(input.actions) }
-                    : {}),
+                ...(actions ? { actions } : {}),
             },
         });
+        if (count === 0) throw roleChangedMeanwhile();
+        const updated = await prisma.organizationRole.findUnique({
+            where: { id: role.id },
+        });
+        if (!updated) throw roleChangedMeanwhile();
 
         const members = await prisma.membership.count({
             where: { organizationId, role: key },
@@ -208,9 +254,14 @@ export class OrganizationRolesService {
      * key is deliberately not a foreign key, and a dangling one resolves to
      * the read-only floor — but "your permissions silently shrank" is not
      * something to do to someone behind their back. Move them first.
+     *
+     * Refused, too, when the role can do more than the person removing it:
+     * the same reach rule as changing it.
      */
-    async remove(organizationId: string, key: string): Promise<void> {
+    async remove(ctx: OrganizationContext, key: string): Promise<void> {
+        const { organizationId } = ctx;
         const role = await this.requireInvented(organizationId, key);
+        this.assertCanChange(ctx, role, "remove");
 
         const members = await prisma.membership.count({
             where: { organizationId, role: key },
@@ -223,7 +274,52 @@ export class OrganizationRolesService {
             );
         }
 
-        await prisma.organizationRole.delete({ where: { id: role.id } });
+        const { count } = await prisma.organizationRole.deleteMany({
+            where: { id: role.id, updatedAt: role.updatedAt },
+        });
+        if (count === 0) throw roleChangedMeanwhile();
+    }
+
+    /**
+     * Refuse to touch a role that can already do more than the writer.
+     *
+     * Judged on what the role RESOLVES to, implied holds included — the set
+     * a person holding it actually gets.
+     */
+    private assertCanChange(
+        ctx: OrganizationContext,
+        role: { key: string; actions: string[] },
+        verb: "change" | "remove",
+    ): void {
+        const beyond = outOfReach(
+            ctx,
+            resolveCapabilities(role.key, role.actions),
+        );
+        if (beyond.length > 0) {
+            throw new ForbiddenException(
+                `You can't ${verb} a role that can do more than you can: ${labelsOf(beyond)}.`,
+            );
+        }
+    }
+
+    /**
+     * Refuse to give a role a permission the writer doesn't hold.
+     *
+     * The role's resolved set is checked, so a permission that brings
+     * another with it can't carry the second one past the rule. The message
+     * names what was ticked where it can, since that is what the person chose.
+     */
+    private assertCanGrant(
+        ctx: OrganizationContext,
+        key: string,
+        actions: readonly OrgAction[],
+    ): void {
+        const beyond = outOfReach(ctx, resolveCapabilities(key, actions));
+        if (beyond.length === 0) return;
+        const ticked = beyond.filter((a) => actions.includes(a));
+        throw new ForbiddenException(
+            `You can't give a role a permission you don't have: ${labelsOf(ticked.length > 0 ? ticked : beyond)}.`,
+        );
     }
 
     /** The invented role, or the reason it cannot be written to. */
@@ -268,4 +364,18 @@ export class OrganizationRolesService {
             .replace(/^-+|-+$/g, "");
         return KEY_PATTERN.test(key) ? key : "";
     }
+}
+
+/** Permissions as the owner reads them on Team: "Manage payments, See invoices". */
+function labelsOf(actions: readonly OrgAction[]): string {
+    return actions
+        .map((a) => CAPABILITY_BY_ACTION.get(a)?.label ?? a)
+        .join(", ");
+}
+
+/** The role was saved or removed by someone else between the check and the write. */
+function roleChangedMeanwhile(): ConflictException {
+    return new ConflictException(
+        "Someone changed this role while you were editing it. Reload to see it, then try again.",
+    );
 }

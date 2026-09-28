@@ -237,6 +237,31 @@ describe("pay now (U19)", () => {
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
+    it("counts only a provider whose checkout can open: not a Razorpay one missing its public key id (DEC-054)", async () => {
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "NOW" }),
+            "iphash",
+            NOW,
+        );
+        expect(db.merchantPaymentProvider.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    status: "CONNECTED",
+                    OR: [
+                        { provider: { not: "RAZORPAY" } },
+                        {
+                            AND: [
+                                { publicKey: { not: null } },
+                                { publicKey: { not: "" } },
+                            ],
+                        },
+                    ],
+                }),
+            }),
+        );
+    });
+
     it("hands a replayed hold a fresh token, to the same booker only", async () => {
         db.booking.findUnique.mockResolvedValue(
             created({
@@ -303,6 +328,210 @@ describe("pay now (U19)", () => {
                 { type: "body", metatype: BookServiceDto },
             ),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("a deposit at booking (E8)", () => {
+    const half = () => service({ depositMode: "PERCENT_50" });
+
+    it("holds the place with a draft invoice for the deposit, worked out on the server", async () => {
+        db.service.findUnique.mockResolvedValue(half());
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DEPOSIT" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data.status).toBe("PENDING");
+        // The snapshot says only the deposit was asked for: ₹400 of ₹800.
+        expect(data.snapshot).toMatchObject({
+            service: { priceCents: 80_000, depositMode: "PERCENT_50" },
+            deposit: { cents: 40_000 },
+        });
+        const invoice = db.invoice.create.mock.calls[0][0].data;
+        expect(String(invoice.total)).toBe("400.00");
+        const line = db.invoiceLine.createMany.mock.calls[0]?.[0]?.data?.[0];
+        expect(line?.description).toMatch(/^Deposit for Personal training · /);
+    });
+
+    it("pays the whole price now when asked, with no deposit in the snapshot", async () => {
+        db.service.findUnique.mockResolvedValue(half());
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "NOW" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data.snapshot.deposit).toBeUndefined();
+        expect(String(db.invoice.create.mock.calls[0][0].data.total)).toBe(
+            "800.00",
+        );
+    });
+
+    it("never books a deposit service to pay at the desk, holding nothing", async () => {
+        db.service.findUnique.mockResolvedValue(half());
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(
+                new PublicBookingsService().bookOnline(
+                    "svc_1",
+                    input({ pay }),
+                    "iphash",
+                    NOW,
+                ),
+            ).rejects.toMatchObject({
+                response: {
+                    message:
+                        "This takes a deposit when you book. Pay the deposit or the full price online.",
+                    field: "pay",
+                },
+            });
+        }
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("a full-price deposit is paying now", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "FULL" }),
+        );
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DEPOSIT" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data.snapshot.deposit).toBeUndefined();
+        expect(String(db.invoice.create.mock.calls[0][0].data.total)).toBe(
+            "800.00",
+        );
+    });
+
+    it("refuses a deposit for a service that takes none", async () => {
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DEPOSIT" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("says the deposit can't be taken when no provider is connected", async () => {
+        db.service.findUnique.mockResolvedValue(half());
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DEPOSIT" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
+            },
+        });
+    });
+
+    it("fixes the free-cancel deadline when the booking is made", async () => {
+        db.bookingRules.findUnique.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: 24,
+        });
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        // Mon 21 Sep 10:00, less 24 hours.
+        expect(data.freeCancelUntil.toISOString()).toBe(
+            "2026-09-20T10:00:00.000Z",
+        );
+    });
+
+    it("no free-cancel rule: no deadline, judged later by the start", async () => {
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        expect(db.booking.create.mock.calls[0][0].data.freeCancelUntil).toBe(
+            null,
+        );
+    });
+
+    it("replays a deposit hold to the same request only", async () => {
+        db.service.findUnique.mockResolvedValue(half());
+        db.booking.findUnique.mockResolvedValue(
+            created({
+                status: "PENDING",
+                holdExpiresAt: new Date(NOW.getTime() + 10 * 60_000),
+                snapshot: {
+                    service: { name: "Personal training" },
+                    deposit: { cents: 40_000 },
+                },
+            }),
+        );
+        const svc = new PublicBookingsService();
+        const out = await svc.bookOnline(
+            "svc_1",
+            input({ pay: "DEPOSIT" }),
+            "iphash",
+            NOW,
+        );
+        expect(out.payToken).toEqual(expect.any(String));
+        await expect(
+            svc.bookOnline("svc_1", input({ pay: "NOW" }), "iphash", NOW),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("the page serves each service's deposit, worked out on the server", async () => {
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Kavi Dental" },
+        });
+        db.service.findMany.mockResolvedValue([
+            {
+                id: "svc_1",
+                name: "Root canal",
+                description: null,
+                durationMinutes: 60,
+                capacity: 1,
+                priceCents: 450_000,
+                currency: "INR",
+                locationType: "IN_PERSON",
+                depositMode: "PERCENT_25",
+                staffServices: [],
+            },
+            {
+                id: "svc_2",
+                name: "Check-up",
+                description: null,
+                durationMinutes: 30,
+                capacity: 1,
+                priceCents: 80_000,
+                currency: "INR",
+                locationType: "IN_PERSON",
+                depositMode: "NONE",
+                staffServices: [],
+            },
+        ]);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(page.services.map((s) => s.depositCents)).toEqual([
+            112_500,
+            null,
+        ]);
     });
 });
 

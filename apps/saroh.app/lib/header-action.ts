@@ -10,9 +10,11 @@ import type { BookingPageLookup } from "./booking-page";
  *   Appointments with nothing to book leads to an empty page, so it gets
  *   no button.
  * - **Order**, to `/shop`, only once `/shop` serves for this site (G11:
- *   Commerce on and a sells-from storefront with listings). Until G11 lands
- *   every caller passes `shopServes: false`, so a Commerce-only site has no
- *   main button and the header never links to a page that isn't there.
+ *   Commerce on and a sells-from storefront with listings). `/shop` exists
+ *   since G11 but stays hidden behind the API's `SITE_SHOP` flag until the
+ *   bag and checkout (G13) ship, and the header must not link to a shop
+ *   nobody can order from. So every caller still passes `shopServes:
+ *   false`; G13 passes `getCatalogue(siteId).ok` (`lib/catalogue.ts`).
  * - Otherwise none. A site whose booking read failed gets none too: a
  *   header without a button is better than one that promises a page the
  *   API couldn't vouch for.

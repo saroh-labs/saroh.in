@@ -284,6 +284,7 @@ export function TeamScreen({
                     roles={roles}
                     catalogue={catalogue}
                     canEdit={canEditRoles}
+                    myActions={myActions}
                     organizationName={organizationName}
                     builtInBlurb={ROLE_BLURB}
                     builtInPlain={ROLE_PLAIN}

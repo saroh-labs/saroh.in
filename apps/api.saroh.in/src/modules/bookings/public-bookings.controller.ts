@@ -1,8 +1,8 @@
 import {
     BadRequestException,
-    Body,
     Controller,
     Get,
+    GoneException,
     Header,
     HttpCode,
     Ip,
@@ -16,7 +16,6 @@ import { hashClientIp } from "../../common/client-ip";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
-import { BookServiceDto } from "./dto";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -134,44 +133,25 @@ export class PublicBookingsController {
     }
 
     /**
-     * The ANONYMOUS booking route (U19): name and email typed on the page.
+     * The ANONYMOUS booking route (U19) is closed: it answers 410 "Sign in
+     * to book" (A9, ADR-011; ROUND_2_PHASE_1_ROLLOUT "Later releases").
      *
-     * Sign-in is always on (A9, ADR-011): the booking page books through
-     * `POST public/site-accounts/bookings` now, and no site code calls this
-     * any more (`apps/saroh.app/lib/no-anonymous-booking.test.ts` pins it).
-     * It keeps serving for the release that moved the page, so a page
-     * loaded before that deploy still books; the next release makes it
-     * answer 410 "Sign in to book". Staff bookings are another route.
-     *
-     * Reserve a slot on `:serviceId`. The source IP (from `@Ip()`) is immediately
-     * hashed (sha256) and only the hash is ever passed on — the raw IP never
-     * leaves this handler.
-     *
-     * Answers with the booker's own booking only — time, service, and the
-     * link to join if it is online — never the stored row (ADR-007).
+     * Sign-in is always on: the booking page books through
+     * `POST public/site-accounts/bookings`, and no site code calls this
+     * (`apps/saroh.app/lib/no-anonymous-booking.test.ts` pins it). The
+     * release that moved the page kept this serving so a page loaded before
+     * that deploy still booked; that release is in production, so nothing
+     * current posts here. The body is never read or validated: whatever is
+     * sent, nothing is booked and no contact is made. Staff bookings are
+     * another route.
      */
     @Post(":serviceId/book")
-    async book(
-        @Param("serviceId") serviceId: string,
-        @Body() dto: BookServiceDto,
-        @Ip() ip: string,
-    ): Promise<PublicBookingResult> {
-        const { booking, payToken } = await this.bookings.bookOnline(
-            serviceId,
-            {
-                startAt: dto.startAt,
-                bookerName: dto.bookerName,
-                bookerEmail: dto.bookerEmail,
-                bookerPhone: dto.bookerPhone,
-                idempotencyKey: dto.idempotencyKey,
-                staffId: dto.staffId,
-                pay: dto.pay,
-                locationType: dto.locationType,
-                intakeNote: dto.intakeNote,
-            },
-            hashClientIp(ip),
-        );
-        return publicBookingResult(booking, payToken);
+    @Header("Cache-Control", "no-store")
+    book(): never {
+        throw new GoneException({
+            message: "Sign in to book.",
+            details: { reason: "sign-in" },
+        });
     }
 }
 

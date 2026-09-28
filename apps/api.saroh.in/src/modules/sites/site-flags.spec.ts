@@ -141,6 +141,71 @@ describe("placeholder text", () => {
     });
 });
 
+describe("the text block's photo (G7)", () => {
+    const text = (image?: unknown, hidden = false) =>
+        page([
+            {
+                type: "richText",
+                content: { format: "html", value: "<p>Our story</p>", image },
+                hidden,
+            },
+        ]);
+
+    it("flags a photo with no description, pointing at the photo", () => {
+        const flags = checkPage(
+            text({ src: "https://cdn.example.com/a.jpg", alt: "  " }),
+            ["/"],
+        );
+        expect(flags).toHaveLength(1);
+        expect(flags[0]).toMatchObject({
+            type: "emptyRequiredField",
+            field: "image",
+            sectionIndex: 0,
+        });
+        expect(flags[0].message).toMatch(/no description/);
+    });
+
+    it("flags a photo whose alt was never written at all", () => {
+        const flags = checkPage(
+            text({ src: "https://cdn.example.com/a.jpg" }),
+            ["/"],
+        );
+        expect(types(flags)).toEqual(["emptyRequiredField"]);
+    });
+
+    it("says nothing once the photo is described", () => {
+        const flags = checkPage(
+            text({ src: "https://cdn.example.com/a.jpg", alt: "The counter" }),
+            ["/"],
+        );
+        expect(flags).toEqual([]);
+    });
+
+    it("says nothing about a text block with no photo — it is optional", () => {
+        expect(checkPage(text(), ["/"])).toEqual([]);
+    });
+
+    it("says nothing about a hidden text block's photo", () => {
+        expect(
+            checkPage(text({ src: "https://cdn.example.com/a.jpg" }, true), [
+                "/",
+            ]),
+        ).toEqual([]);
+    });
+
+    it("reaches the pre-publish check, not only the rail", () => {
+        const flags = checkSite(
+            site({
+                pages: [text({ src: "https://cdn.example.com/a.jpg" })],
+            }),
+        );
+        expect(flags.map((f) => [f.type, f.field])).toContainEqual([
+            "emptyRequiredField",
+            "image",
+        ]);
+    });
+});
+
 describe("missing images", () => {
     it("flags a hero with no image and a gallery with none", () => {
         const flags = checkPage(

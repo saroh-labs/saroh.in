@@ -1,8 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { ProductPageData } from "./product-page";
-import ProductPage, { formatAmount, percentOff } from "./product-page";
+import ProductPage, {
+    formatAmount,
+    percentOff,
+    useProductSelection,
+} from "./product-page";
 
 const dress: ProductPageData = {
     name: "Linen Wrap Dress",
@@ -112,11 +116,11 @@ describe("ProductPage", () => {
     });
 
     it("in preview, the basket says nothing was added", () => {
-        const add = vi.fn();
-        render(<ProductPage product={dress} onAddToBasket={add} />);
+        render(<ProductPage product={dress} action={<p>Never shown</p>} />);
         fireEvent.click(screen.getByRole("button", { name: "Add to basket" }));
         expect(screen.getByRole("status")).toHaveTextContent(/preview/);
-        expect(add).not.toHaveBeenCalled();
+        // The action slot belongs to the live page only.
+        expect(screen.queryByText("Never shown")).not.toBeInTheDocument();
     });
 
     it("leaves out a field that is team only, and draws markers only when asked", () => {
@@ -200,5 +204,59 @@ describe("ProductPage", () => {
         expect(
             screen.getByRole("link", { name: "Open video" }),
         ).toHaveAttribute("href", "https://img.test/twirl.mov");
+    });
+});
+
+/** What G13's Add to bag will read: the choice, through the slot. */
+function SelectionProbe() {
+    const chosen = useProductSelection();
+    return (
+        <p data-testid="probe">
+            {chosen
+                ? `${chosen.variantId ?? "none"} ${chosen.price} ${chosen.soldOut ? "off" : "on"}`
+                : "outside"}
+        </p>
+    );
+}
+
+describe("ProductPage on the live site (G11)", () => {
+    it("draws no staff controls: no markers, no preview basket", () => {
+        render(<ProductPage product={dress} preview={false} markers />);
+        expect(screen.queryByLabelText("Note 1")).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Add to basket" }),
+        ).not.toBeInTheDocument();
+        // The product itself is all there.
+        expect(screen.getByText("Linen Wrap Dress")).toBeInTheDocument();
+        expect(screen.getByText("Only 2 left")).toBeInTheDocument();
+    });
+
+    it("leaves the action slot empty until checkout fills it", () => {
+        render(<ProductPage product={dress} preview={false} />);
+        expect(screen.queryByTestId("probe")).toBeNull();
+        expect(
+            screen.queryByRole("button", { name: /bag|basket/i }),
+        ).toBeNull();
+    });
+
+    it("hands the slot the chosen variant, and turns the action off when it is sold out", () => {
+        render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                action={<SelectionProbe />}
+            />,
+        );
+        expect(screen.getByTestId("probe")).toHaveTextContent("m 2499.00 on");
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(screen.getByTestId("probe")).toHaveTextContent("l 2699.00 on");
+        fireEvent.click(screen.getByRole("button", { name: "S — sold out" }));
+        expect(screen.getByTestId("probe")).toHaveTextContent("s 2499.00 off");
+        expect(screen.getByText("Sold out")).toBeInTheDocument();
+    });
+
+    it("reads nothing outside a product page", () => {
+        render(<SelectionProbe />);
+        expect(screen.getByTestId("probe")).toHaveTextContent("outside");
     });
 });

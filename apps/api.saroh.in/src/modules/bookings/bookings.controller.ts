@@ -24,7 +24,11 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { payLinkUrl } from "../invoices/pay-link-url";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
-import type { BookingDetailView, BookingsCalendar } from "./bookings.service";
+import type {
+    BookingDetailView,
+    BookingsCalendar,
+    CancelledBooking,
+} from "./bookings.service";
 import { BookingsService } from "./bookings.service";
 import {
     AddRuleDto,
@@ -259,7 +263,7 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
-    ): Promise<WithoutIntakeNote<Booking>> {
+    ): Promise<WithoutIntakeNote<CancelledBooking>> {
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",

@@ -1,10 +1,14 @@
 import type { INestApplication } from "@nestjs/common";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import type { Booking } from "@saroh/database";
 import { createHash } from "node:crypto";
 
 import { trustProxy } from "../../common/trust-proxy";
-import { PublicBookingsController } from "./public-bookings.controller";
+import {
+    PublicBookingsController,
+    publicBookingResult,
+} from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
 
 function build() {
@@ -57,7 +61,7 @@ describe("PublicBookingsController.services (#255)", () => {
     });
 });
 
-describe("PublicBookingsController.book (ADR-007)", () => {
+describe("publicBookingResult (ADR-007)", () => {
     const row = {
         id: "bk_1",
         organizationId: "org_1",
@@ -65,6 +69,7 @@ describe("PublicBookingsController.book (ADR-007)", () => {
         ipHash: "hash",
         idempotencyKey: "key_1",
         status: "CONFIRMED",
+        holdExpiresAt: null,
         startAt: new Date("2026-07-20T09:00:00.000Z"),
         endAt: new Date("2026-07-20T10:00:00.000Z"),
         snapshot: {
@@ -75,26 +80,11 @@ describe("PublicBookingsController.book (ADR-007)", () => {
             },
             booker: { email: "jane@example.com" },
         },
-    };
-    const dto = {
-        startAt: "2026-07-20T09:00:00.000Z",
-        bookerEmail: "jane@example.com",
-        idempotencyKey: "key_1",
-    };
+    } as unknown as Booking;
 
-    it("answers with the booker-safe shape, and a replay answers the same", async () => {
-        const bookOnline = jest
-            .fn()
-            .mockResolvedValue({ booking: row, payToken: null });
-        const controller = new PublicBookingsController({
-            bookOnline,
-        } as unknown as PublicBookingsService);
-
-        const first = await controller.book("svc_1", dto, "1.2.3.4");
-        // The service replays an existing booking for the same key.
-        const replay = await controller.book("svc_1", dto, "1.2.3.4");
-
-        expect(first).toEqual(replay);
+    it("answers with the booker-safe shape, the same for a replay", () => {
+        const first = publicBookingResult(row, null);
+        expect(first).toEqual(publicBookingResult(row, null));
         expect(Object.keys(first).sort()).toEqual([
             "endAt",
             "holdExpiresAt",
@@ -112,6 +102,54 @@ describe("PublicBookingsController.book (ADR-007)", () => {
             payToken: null,
         });
         expect(JSON.stringify(first)).not.toMatch(/org_1|contact_1|hash/);
+    });
+});
+
+describe("the anonymous booking route is closed (A9)", () => {
+    let app: INestApplication | undefined;
+
+    afterEach(async () => {
+        await app?.close();
+        app = undefined;
+    });
+
+    it("answers 410 Sign in to book, books nothing, and never reads the body", async () => {
+        const bookOnline = jest.fn();
+        const moduleRef = await Test.createTestingModule({
+            controllers: [PublicBookingsController],
+            providers: [
+                { provide: PublicBookingsService, useValue: { bookOnline } },
+            ],
+        }).compile();
+        app = moduleRef.createNestApplication({ logger: false });
+        // The global pipe as main.ts sets it: a body it would refuse must
+        // still answer 410, not 400.
+        app.useGlobalPipes(
+            new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+        );
+        await app.listen(0, "127.0.0.1");
+        const url = await app.getUrl();
+        for (const body of [
+            {
+                startAt: "2026-07-20T09:00:00.000Z",
+                bookerName: "Asha Rao",
+                bookerEmail: "asha@example.in",
+                pay: "DESK",
+            },
+            { anything: "at all" },
+        ]) {
+            const res = await fetch(`${url}/public/services/svc_1/book`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            expect(res.status).toBe(410);
+            expect(res.headers.get("cache-control")).toBe("no-store");
+            expect(await res.json()).toMatchObject({
+                message: "Sign in to book.",
+            });
+        }
+        expect(bookOnline).not.toHaveBeenCalled();
     });
 });
 

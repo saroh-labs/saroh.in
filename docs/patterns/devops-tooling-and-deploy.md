@@ -117,5 +117,10 @@ audit that blocks on critical advisories; plus integration tests,
   back up, migrate, deploy the API and wait for `/health/ready`, then
   saroh.app, then the other frontends; run the C1 and C2 backfills after;
   roll saroh.app back together with the API.
+- **Current** — **Round 2's Phase 2 checkpoints** keep their release steps in
+  `docs/architecture/ROUND_2_PHASE_2_ROLLOUT.md`, one section per unit that
+  needs one. D22 (CP-1): run the Razorpay public key backfill **before** the
+  new API serves — that API takes no online payment through a Razorpay
+  connection without one — and again after.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

@@ -60,6 +60,11 @@ import {
     prefixOf,
     RESTART_LABEL,
 } from "@/lib/invoices/invoice-number";
+import {
+    PHONE_EXAMPLE,
+    phoneLabel,
+    phoneProblem,
+} from "@/lib/organizations/business-phone";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -80,6 +85,11 @@ const formSchema = z
         taxId: z.string().optional(),
         contactEmail: optionalText(z.string().email("Enter a valid email")),
         website: optionalText(z.string().url("Enter a valid URL")),
+        // The public phone (DEC-053): E.164 once saved; the API judges it.
+        phone: z.string().superRefine((v, ctx) => {
+            const problem = phoneProblem(v);
+            if (problem) ctx.addIssue({ code: "custom", message: problem });
+        }),
         // An IANA zone, or "" for none; the API checks it's a real one.
         timezone: z.string(),
         // GST (ADR-008). The API checks the GSTIN's state and check
@@ -134,6 +144,7 @@ const PROFILE_KEYS = [
     "contactEmail",
     "website",
     "timezone",
+    "phone",
 ] as const;
 
 /** Where the API names a refused field, the form field it belongs on. */
@@ -152,6 +163,7 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     postalCode: "postalCode",
     name: "name",
     timezone: "timezone",
+    phone: "phone",
 };
 
 /** Delivery always carries a rate: no "Not set" row. */
@@ -187,6 +199,7 @@ function valuesOf(settings: OrganizationSettings): FormValues {
         taxId: settings.profile?.taxId ?? "",
         contactEmail: settings.profile?.contactEmail ?? "",
         website: settings.profile?.website ?? "",
+        phone: phoneLabel(settings.profile?.phone),
         timezone: settings.profile?.timezone ?? "",
         gstRegistered: settings.tax?.registered ?? false,
         gstState: settings.tax?.state ?? "",
@@ -216,7 +229,7 @@ const SECTIONS = {
     contact: {
         title: "Contact",
         lead: "How customers reach you",
-        fields: ["contactEmail", "website"],
+        fields: ["contactEmail", "phone", "website"],
     },
     tax: {
         title: "Tax and invoices",
@@ -597,6 +610,12 @@ export function OrganizationSettingsForm({
         contact: [
             { label: "Contact email", value: saved.contactEmail ?? "" },
             {
+                label: "Phone on your website",
+                value: saved.phone,
+                empty: "None — your website shows no Call button",
+                mono: true,
+            },
+            {
                 label: "Website",
                 value: saved.website ?? "",
                 empty: "None outside Saroh",
@@ -924,6 +943,31 @@ export function OrganizationSettingsForm({
                             </FormControl>
                             <FormDescription>
                                 Where customers can reach the business.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                        <FormItem {...at("100%")}>
+                            <FormLabel>Phone on your website</FormLabel>
+                            <FormControl>
+                                <Input
+                                    {...field}
+                                    type="tel"
+                                    inputMode="tel"
+                                    autoComplete="tel"
+                                    placeholder={PHONE_EXAMPLE}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Your site shows it with a Call button, and
+                                offers it when a sign-in code can&apos;t be
+                                sent. Start with + and the country code. Leave
+                                it empty to show none.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
