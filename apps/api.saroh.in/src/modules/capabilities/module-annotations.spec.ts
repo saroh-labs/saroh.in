@@ -172,6 +172,10 @@ const NEVER: Record<string, string> = {
     // payment already made still lands through the webhook.
     "orders/public-checkout.controller.ts":
         "a published site's bag and checkout — Commerce checked by the service",
+    // G9: a site's Plans block. Payments being off is checked by the
+    // service (`paymentsOffered`), which answers 404, as a site with no plans.
+    "subscriptions/public-plans.controller.ts":
+        "a published site's Plans block — Payments checked by the service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",

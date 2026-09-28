@@ -498,6 +498,28 @@ export const BLOCK_META = {
             },
         },
     },
+    plans: {
+        label: "Plans",
+        description:
+            "The business's subscription plans on sale, with price and how often, read live from Payments.",
+        variants: soleVariant(
+            "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample plans.
+            default: { variant: "default", title: "Memberships" },
+        },
+        cases: {
+            // No highlight, no descriptions, the merchant's own button.
+            plain: {
+                variant: "default",
+                title: "Bread every week",
+                highlight: "none",
+                buttonLabel: "Ask to join",
+                showDescriptions: false,
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */

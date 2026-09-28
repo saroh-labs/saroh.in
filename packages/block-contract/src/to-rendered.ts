@@ -114,6 +114,8 @@ export const TO_RENDERED = {
     visitUs: identity,
     // A title, a count and two switches; the posts are read live.
     journal: identity,
+    // A title and display options; the plans are read live.
+    plans: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

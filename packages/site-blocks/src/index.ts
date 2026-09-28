@@ -17,6 +17,7 @@ export type { Section } from "./section-renderer";
 
 export {
     BlockFixturePreview,
+    SAMPLE_PLANS,
     SAMPLE_POSTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
@@ -42,6 +43,15 @@ export {
     todayHref,
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
+export {
+    PLANS_BUTTON,
+    default as PlansSection,
+    joinHref,
+    planEvery,
+    planPrice,
+    plansOf,
+} from "./blocks/plans";
+export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";

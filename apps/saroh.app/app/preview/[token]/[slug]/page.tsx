@@ -12,6 +12,7 @@ import {
     getPreviewPosts,
     postsPrefix,
 } from "@/lib/publication";
+import { getPreviewPlansFeed } from "@/lib/site-plans";
 
 /** A draft's inner page, or its posts index, behind a preview token (#198). */
 export default async function PreviewPage({
@@ -45,12 +46,17 @@ export default async function PreviewPage({
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
 
-    // The draft's posts (G10), as the preview's own index shows them.
-    const journal = await getPreviewJournalFeed(
-        page.sections,
-        preview.snapshot,
-        token,
-    );
+    // The draft's posts (G10), as the preview's own index shows them, and
+    // the plans on sale now (G9): a draft plan never shows, even here.
+    const [journal, plans] = await Promise.all([
+        getPreviewJournalFeed(page.sections, preview.snapshot, token),
+        getPreviewPlansFeed(
+            page.sections,
+            preview.snapshot,
+            preview.siteId,
+            token,
+        ),
+    ]);
 
     return (
         <PageSections
@@ -58,6 +64,7 @@ export default async function PreviewPage({
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
             journal={journal}
+            plans={plans}
         />
     );
 }

@@ -12,6 +12,7 @@ import {
     Newspaper,
     PanelTop,
     Quote,
+    Repeat,
     Sparkles,
 } from "lucide-react";
 
@@ -37,4 +38,5 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     servicesList: LayoutList,
     visitUs: Clock,
     journal: Newspaper,
+    plans: Repeat,
 };

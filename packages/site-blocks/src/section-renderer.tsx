@@ -8,6 +8,7 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedJournal,
+    RenderedPlans,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -24,6 +25,8 @@ import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { PlansFeed } from "./blocks/plans";
+import PlansSection from "./blocks/plans";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -62,6 +65,7 @@ export default function SectionRenderer({
     bookHref,
     siteId,
     journal,
+    plans,
 }: {
     section: Section;
     /**
@@ -84,6 +88,12 @@ export default function SectionRenderer({
      * them itself and says so when there are none.
      */
     journal?: JournalFeed;
+    /**
+     * The business's plans on sale, read by the page that serves the site
+     * (G9), for the Plans block. Undefined on the editor's canvas, where the
+     * block reads them itself and says why when there are none.
+     */
+    plans?: PlansFeed;
 }) {
     switch (section.type) {
         case "hero":
@@ -159,6 +169,15 @@ export default function SectionRenderer({
                     siteId={siteId}
                 />
             );
+        case "plans":
+            return (
+                <PlansSection
+                    content={section.content as RenderedPlans}
+                    feed={plans}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -207,6 +226,7 @@ export function PageSections({
     bookHref,
     siteId,
     journal,
+    plans,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
@@ -217,6 +237,8 @@ export function PageSections({
     siteId?: string | null;
     /** The site's latest posts, for the Journal block (G10). */
     journal?: JournalFeed;
+    /** The business's plans on sale, for the Plans block (G9). */
+    plans?: PlansFeed;
 }) {
     return (
         <>
@@ -229,6 +251,7 @@ export function PageSections({
                         bookHref={bookHref}
                         siteId={siteId}
                         journal={journal}
+                        plans={plans}
                     />
                 );
                 return style === undefined ? (
