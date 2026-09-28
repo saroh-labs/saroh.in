@@ -19,6 +19,7 @@ import {
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { PRODUCT_LINES } from "../orders/order-line";
+import { contactReviewsWhere } from "./contact-reviews";
 import type { IneligibleReason } from "./eligibility";
 import { INELIGIBLE_MESSAGE, orderIneligibility } from "./eligibility";
 import { MAX_REVIEW_SENDS, mintReviewToken, REVIEW_LINK_DAYS } from "./token";
@@ -165,11 +166,21 @@ export class ProductReviewsService {
 
     async list(
         organizationId: string,
-        filter: { productId?: string; status?: string } = {},
+        filter: {
+            productId?: string;
+            status?: string;
+            contactId?: string;
+        } = {},
     ): Promise<ReviewView[]> {
+        // One customer's reviews (C6): through their confirmed links only.
+        const byContact = filter.contactId
+            ? await contactReviewsWhere(organizationId, filter.contactId)
+            : undefined;
+        if (byContact === null) return [];
         const rows = await prisma.productReview.findMany({
             where: {
                 organizationId,
+                ...byContact,
                 ...(filter.productId ? { productId: filter.productId } : {}),
                 ...(filter.status === "PUBLISHED" || filter.status === "HIDDEN"
                     ? { status: filter.status }

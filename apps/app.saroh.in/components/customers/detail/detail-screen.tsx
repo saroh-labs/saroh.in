@@ -30,6 +30,7 @@ import {
 } from "@/lib/customer-workspace/site-account";
 import type {
     OrderFilter,
+    ReviewsRead,
     TabKey,
     ThreadRead,
 } from "@/lib/customer-workspace/view";
@@ -63,6 +64,7 @@ import { OrdersTab } from "./orders-tab";
 import { Overview } from "./overview";
 import { Failed } from "./parts";
 import { RemoveDetailsDialog } from "./remove-details-dialog";
+import { ReviewsTab } from "./reviews-tab";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18), after "Saroh Customer Detail":
@@ -87,6 +89,8 @@ export function CustomerDetailScreen({
     suggestions,
     duplicates,
     thread = null,
+    reviews = null,
+    canReplyReviews = false,
     nowIso,
 }: {
     d: CustomerDetail;
@@ -110,12 +114,16 @@ export function CustomerDetailScreen({
     duplicates: DuplicateSuggestion[];
     /** Their message thread (A13), for the Messages tab. */
     thread?: ThreadRead;
+    /** Their product reviews (C6), for the Reviews tab. */
+    reviews?: ReviewsRead;
+    /** `product-review:write`: reply to and hide a review. */
+    canReplyReviews?: boolean;
     nowIso: string;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d, thread);
+    const tabs = tabsFor(d, thread, reviews);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
     const [editing, setEditing] = useState(0);
@@ -265,6 +273,16 @@ export function CustomerDetailScreen({
                     />
                 ) : (
                     <Failed what="Invoices" />
+                );
+            case "rev":
+                return reviews && reviews !== "failed" ? (
+                    <ReviewsTab
+                        reviews={reviews}
+                        firstName={first}
+                        canReply={canReplyReviews}
+                    />
+                ) : (
+                    <Failed what="Reviews" />
                 );
             case "msg":
                 return thread && thread !== "failed" ? (
