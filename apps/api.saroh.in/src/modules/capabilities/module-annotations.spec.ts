@@ -162,6 +162,11 @@ const NEVER: Record<string, string> = {
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // G13: a site's bag and checkout. Never module-gated off mid-payment;
+    // the service asks `commerceOpen` before it starts a checkout, and a
+    // payment already made still lands through the webhook.
+    "orders/public-checkout.controller.ts":
+        "a published site's bag and checkout — Commerce checked by the service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",

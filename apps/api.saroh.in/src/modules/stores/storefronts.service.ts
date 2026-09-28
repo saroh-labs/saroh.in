@@ -103,6 +103,9 @@ export interface StorefrontSettings extends StorefrontSummary {
     guestCheckout: boolean;
     /** ISO, when paused; `null` while taking payments. */
     pausedAt: string | null;
+    /** The site checkout's flat delivery fees (G13); `null` is free. */
+    localDeliveryFee: string | null;
+    shippingFee: string | null;
     /** The provider this storefront's checkout names, if it names one. */
     checkoutProvider: string | null;
     /**
@@ -250,6 +253,12 @@ export class StorefrontsService {
             guestCheckout: settings?.guestCheckout ?? true,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
             paused: Boolean(settings?.pausedAt),
+            localDeliveryFee: settings?.localDeliveryFee
+                ? toMoneyString(settings.localDeliveryFee)
+                : null,
+            shippingFee: settings?.shippingFee
+                ? toMoneyString(settings.shippingFee)
+                : null,
             checkoutProvider: named,
             effectiveProvider: named
                 ? connected.some((p) => p.provider === named)
@@ -374,6 +383,12 @@ export class StorefrontsService {
                 : {}),
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
+                : {}),
+            ...(dto.localDeliveryFee !== undefined
+                ? { localDeliveryFee: feeOrNull(dto.localDeliveryFee) }
+                : {}),
+            ...(dto.shippingFee !== undefined
+                ? { shippingFee: feeOrNull(dto.shippingFee) }
                 : {}),
             // Which ways it offers follows the toggle an app from before
             // B17's chips saves (B2a) — only the one it sent (O-4). The
@@ -606,4 +621,10 @@ export class StorefrontsService {
         if (!store) throw new NotFoundException("Storefront not found");
         return store;
     }
+}
+
+/** A fee as stored: nothing, or zero, is free (null). */
+function feeOrNull(value: string | null): string | null {
+    if (value === null || value === "") return null;
+    return Number(value) > 0 ? value : null;
 }

@@ -71,6 +71,8 @@ export interface PublicCatalogue {
 /** One product's page: `ProductPageData`, plus its address and search text. */
 export interface PublicProduct {
     slug: string;
+    /** The listing at the site's storefront: what the bag holds (G13). */
+    listingId: string;
     name: string;
     currency: string;
     price: string;
