@@ -8,6 +8,7 @@ import type {
     DetailPack,
 } from "./detail";
 import {
+    allowanceChangeLine,
     bookingLists,
     bookingRow,
     canStopOffers,
@@ -408,6 +409,28 @@ describe("a gym customer's bookings and classes", () => {
 
     it("says the next class uses the membership while it has classes", () => {
         expect(nextCredit(gym())).toBe("Next class uses: membership");
+    });
+
+    it("says what a membership's classes become at its next renewal (D10)", () => {
+        // 1 Nov 00:00 in Kolkata.
+        const from = "2026-10-31T18:30:00Z";
+        expect(
+            allowanceChangeLine(
+                { nextPeriod: { perMonth: 10, from } },
+                IST,
+                NOW,
+            ),
+        ).toBe("10 a month from 1 Nov");
+        expect(
+            allowanceChangeLine(
+                { nextPeriod: { perMonth: null, from } },
+                IST,
+                NOW,
+            ),
+        ).toBe("Unlimited classes from 1 Nov");
+        // Nothing changes, or an API from before D10.
+        expect(allowanceChangeLine({ nextPeriod: null }, IST, NOW)).toBeNull();
+        expect(allowanceChangeLine({}, IST, NOW)).toBeNull();
     });
 
     it("lists a pack with its use-by, soon in amber, and a lost one", () => {
