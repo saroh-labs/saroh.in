@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { realOrderWhere } from "../orders/open-orders";
+import { ensureThread } from "./thread-store";
 
 /**
  * What moves when staff say "This isn't them" about a site account (A4,
@@ -131,6 +132,56 @@ function bookingInvoices(scope: UnlinkScope, bookingOn: string[]) {
     };
 }
 
+/** Messages the account wrote in the thread of the contact it is leaving. */
+function writtenByAccount(scope: UnlinkScope) {
+    return {
+        organizationId: scope.organizationId,
+        author: "CUSTOMER" as const,
+        customerAccountId: scope.accountId,
+        thread: { contactId: scope.fromContactId },
+        createdAt: { gte: scope.since },
+    };
+}
+
+/**
+ * Thread messages the customer wrote from the account since it linked
+ * (A13): they move into the new contact's thread, keeping their times. What
+ * the team or Saroh wrote to the contact stays in the contact's thread.
+ */
+export const THREAD_MESSAGES_MOVER: UnlinkMover = {
+    key: "messages",
+    model: "CustomerThreadMessage",
+    noun: ["message", "messages"],
+    count: (tx, scope) =>
+        tx.customerThreadMessage.count({ where: writtenByAccount(scope) }),
+    move: async (tx, scope) => {
+        const rows = await tx.customerThreadMessage.findMany({
+            where: writtenByAccount(scope),
+            select: { id: true, createdAt: true },
+            orderBy: { createdAt: "asc" },
+        });
+        if (rows.length === 0) return 0;
+        const newest = rows[rows.length - 1].createdAt;
+        const thread = await ensureThread(
+            tx,
+            scope.organizationId,
+            scope.toContactId,
+            newest,
+        );
+        const moved = await tx.customerThreadMessage.updateMany({
+            where: { id: { in: rows.map((r) => r.id) } },
+            data: { threadId: thread.id },
+        });
+        // The customer wrote them, so they have read up to them.
+        await tx.customerThread.update({
+            where: { id: thread.id },
+            data: { lastMessageAt: newest, customerReadAt: newest },
+            select: { id: true },
+        });
+        return moved.count;
+    },
+};
+
 /**
  * The identity links the account's own orders made (A7): a store customer
  * linked to the contact being left, since the account linked, by the
@@ -210,6 +261,7 @@ export const UNLINK_MOVERS: readonly UnlinkMover[] = [
     BOOKINGS_MOVER,
     BOOKING_INVOICES_MOVER,
     ORDERS_MOVER,
+    THREAD_MESSAGES_MOVER,
 ];
 
 /**

@@ -13,6 +13,7 @@ import {
     pickKind,
     picksAllergen,
     rowTags,
+    setAsideText,
     SUGGESTION_KINDS,
     suggestionDraft,
     suggestionsTitle,
@@ -73,7 +74,7 @@ describe("tags", () => {
             "Blood thinners · from the booking page",
         );
         expect(tagTitle(entry({ source: "CUSTOMER" }))).toBe(
-            "Takes warfarin. Check before any extraction · from the customer",
+            "Takes warfarin. Check before any extraction · from their account",
         );
     });
 });
@@ -158,7 +159,7 @@ describe("who added it", () => {
             ),
         ).toMatch(/^From the booking page · /);
         expect(entryMeta(entry({ source: "CUSTOMER" }), null, TZ, NOW)).toMatch(
-            /^From the customer · /,
+            /^From their account · /,
         );
     });
 
@@ -417,13 +418,39 @@ describe("booking-page notes (C12)", () => {
     });
 
     it("says how many notes wait, and who wrote each and when", () => {
-        expect(suggestionsTitle(1)).toBe("1 note from the booking page");
-        expect(suggestionsTitle(2)).toBe("2 notes from the booking page");
-        expect(suggestionWhen("Rahul", rahul.createdAt, TZ, NOW)).toBe(
+        expect(suggestionsTitle([rahul])).toBe("1 note from the booking page");
+        expect(suggestionsTitle([rahul, rahul])).toBe(
+            "2 notes from the booking page",
+        );
+        expect(suggestionWhen("Rahul", rahul, TZ, NOW)).toBe(
             "Rahul wrote this when booking online, 18 Sep at 10:42",
         );
-        expect(suggestionWhen(null, rahul.createdAt, TZ, NOW)).toBe(
+        expect(suggestionWhen(null, rahul, TZ, NOW)).toBe(
             "They wrote this when booking online, 18 Sep at 10:42",
+        );
+        expect(setAsideText(rahul)).toBe(
+            "Set aside. The note stays in their booking history.",
+        );
+    });
+
+    it("words a note sent from their account (A5) by where it came from", () => {
+        const fromAccount = { ...rahul, source: "CUSTOMER" as const };
+        expect(suggestionsTitle([fromAccount])).toBe(
+            "1 note from their account",
+        );
+        expect(suggestionsTitle([fromAccount, rahul])).toBe(
+            "2 notes from the customer",
+        );
+        expect(suggestionWhen("Rahul", fromAccount, TZ, NOW)).toBe(
+            "Rahul sent this from their account, 18 Sep at 10:42",
+        );
+        // Set aside, it leaves their list: it isn't kept on a booking.
+        expect(setAsideText(fromAccount)).toBe(
+            "Set aside. It won't be added to their record.",
+        );
+        const added = { ...fromAccount, status: "ACTIVE" as const };
+        expect(entryMeta(added, "user_1", TZ, NOW)).toBe(
+            "From their account · 18 Sep",
         );
     });
 

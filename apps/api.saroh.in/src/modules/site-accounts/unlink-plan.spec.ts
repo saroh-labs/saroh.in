@@ -77,6 +77,14 @@ describe("unlinkSentence", () => {
     });
 });
 
+/** A thread with nothing the account wrote in it (A13's mover). */
+function noMessages() {
+    return {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+    };
+}
+
 describe("counting and moving", () => {
     const scope = {
         organizationId: "org_1",
@@ -131,11 +139,12 @@ describe("counting and moving", () => {
         });
     });
 
-    it("moves bookings the account made, their invoices and its orders, by default (A9, review C-1, A7)", () => {
+    it("moves bookings the account made, their invoices, its orders (A7) and the messages it wrote (A13), by default (A9, review C-1)", () => {
         expect(UNLINK_MOVERS.map((m) => [m.key, m.model])).toEqual([
             ["bookings", "Booking"],
             ["invoices", "Booking"],
             ["orders", "Order"],
+            ["messages", "CustomerThreadMessage"],
         ]);
     });
 
@@ -205,6 +214,7 @@ describe("counting and moving", () => {
             booking,
             invoice,
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
+            customerThreadMessage: noMessages(),
         } as unknown as Prisma.TransactionClient;
         const where = {
             organizationId: "org_1",
@@ -236,6 +246,7 @@ describe("counting and moving", () => {
             booking,
             invoice,
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
+            customerThreadMessage: noMessages(),
         } as unknown as Prisma.TransactionClient;
         const theirBooking = (on: string[]) => ({
             organizationId: "org_1",

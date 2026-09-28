@@ -16,8 +16,10 @@ import {
     getMergePreview,
     getUnlinkPreview,
     linkCustomer,
+    markThreadRead,
     mergeContacts,
     removeAttention,
+    replyToThread,
     unlinkAccount,
     updateAttention,
     updateDetails,
@@ -195,5 +197,17 @@ export async function mergeAction(
         revalidatePath(`/customers/${contactId}`);
         revalidatePath(`/customers/${otherId}`);
     }
+    return result;
+}
+
+/** Messages opened (A13): nothing is re-read, the tab clears its own dot. */
+export async function markThreadReadAction(contactId: string) {
+    return markThreadRead(contactId);
+}
+
+/** Answer the customer in their thread (A13). */
+export async function replyAction(contactId: string, text: string) {
+    const result = await replyToThread(contactId, text);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
     return result;
 }

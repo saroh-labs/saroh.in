@@ -55,8 +55,8 @@ beforeAll(async () => {
                 ),
             inject: [SiteCodeAlerts],
         })
-        // Health notes open, as they will be once C12 ships; the module's
-        // own default (closed) is pinned in site-accounts.module.spec.ts.
+        // Health notes open, as the module's own default is since A13
+        // (pinned in site-accounts.module.spec.ts).
         .overrideProvider(CUSTOMER_NOTES_OPEN)
         .useValue(true)
         .overrideProvider(EMAIL_CHANGED_SENDER)
@@ -237,14 +237,16 @@ describe("Me", () => {
             email: atClinic.email,
             phone: null,
             businessName: "Kavi Dental",
-            // Only Home and Me have shipped (A5); A6 adds Appointments.
+            // Home, Messages (A13) and Me have shipped; A6 adds Appointments.
             tabs: [
                 { key: "home", label: "Home" },
+                { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: true,
+            unreadMessages: 0,
         });
 
         const b = await call("GET", ME, {

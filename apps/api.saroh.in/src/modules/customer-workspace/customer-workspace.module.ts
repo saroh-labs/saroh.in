@@ -11,16 +11,18 @@ import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 import { CustomersListService } from "./customers-list.service";
 import { MergeService } from "./merge.service";
+import { CustomerThreadsController } from "./threads.controller";
 
 /**
  * Unified customer workspace (#120). Depends on CapabilitiesModule for the
  * module-availability projection (to gate the timeline) and OrganizationsModule
  * for the OrganizationGuard's context service, and SiteAccountsModule for
- * "This isn't them" on a customer's site account (A4).
+ * "This isn't them" on a customer's site account (A4) and the customer's
+ * message thread (A13).
  */
 @Module({
     imports: [CapabilitiesModule, OrganizationsModule, SiteAccountsModule],
-    controllers: [CustomerWorkspaceController],
+    controllers: [CustomerWorkspaceController, CustomerThreadsController],
     providers: [
         CustomerWorkspaceService,
         CustomerDetailService,

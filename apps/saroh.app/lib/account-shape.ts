@@ -3,6 +3,7 @@ import type {
     AccountBooking,
     AccountClasses,
     AccountHomeData,
+    AccountMessage,
     AccountNote,
     AccountOrder,
     AccountOrderDetail,
@@ -15,6 +16,7 @@ import type {
     AccountSubscription,
     AccountTab,
     AccountTabKey,
+    AccountThread,
     AccountTrackStep,
     AccountView,
 } from "@saroh/site-blocks";
@@ -68,7 +70,9 @@ export function isAccountView(v: unknown): v is AccountView {
         isBoolean(v.offers.plans) &&
         (v.bookingsLabel === "Bookings" ||
             v.bookingsLabel === "Appointments") &&
-        isBoolean(v.healthNotes)
+        isBoolean(v.healthNotes) &&
+        // A13's unread count; an API from before it sends none.
+        (v.unreadMessages === undefined || isNumber(v.unreadMessages))
     );
 }
 
@@ -396,6 +400,25 @@ function planRefusal(status: number, body: unknown, fallback: string): string {
     return refusalMessage(status, body, fallback);
 }
 
+// ---- Messages (A13) ---------------------------------------------------------
+
+export function isMessage(v: unknown): v is AccountMessage {
+    return (
+        isRecord(v) &&
+        isString(v.ref) &&
+        (v.from === "me" || v.from === "business") &&
+        isString(v.text) &&
+        isString(v.sentAt)
+    );
+}
+
+/** The customer's thread (A13), or null when it came back in a shape we don't know. */
+export function threadResult(v: unknown): AccountThread | null {
+    if (!isRecord(v) || !Array.isArray(v.messages)) return null;
+    if (!v.messages.every(isMessage) || !isBoolean(v.earlier)) return null;
+    return { messages: v.messages, earlier: v.earlier };
+}
+
 /**
  * What `POST me/email` answered, for the sign-in sheet in its email-change
  * role. 200 is the same neutral answer whatever happened; the new email is
@@ -435,8 +458,9 @@ export function emailChangeAnswer(
 /**
  * What to tell the customer when the API refused a change. Only a 400's
  * field messages (the DTO's, written for the customer: "Enter a phone
- * number, like +91 98765 43210") and the account area's own 409 are passed
- * on; anything else is the page's own sentence.
+ * number, like +91 98765 43210"), and the account area's own 409 and 429
+ * (A13's "Wait a minute, then try again") are passed on; anything else is
+ * the page's own sentence.
  */
 export function refusalMessage(
     status: number,
@@ -448,7 +472,11 @@ export function refusalMessage(
         const first: unknown = error.details[0];
         if (isString(first) && first.trim()) return first;
     }
-    if (status === 409 && isString(error?.message) && error.message.trim()) {
+    if (
+        (status === 409 || status === 429) &&
+        isString(error?.message) &&
+        error.message.trim()
+    ) {
         return error.message;
     }
     return fallback;

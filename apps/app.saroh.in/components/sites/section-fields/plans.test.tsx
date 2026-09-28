@@ -119,7 +119,6 @@ describe("the Plans block's fields (G9)", () => {
         const onChange = render({ buttonLabel: "Ask" });
         const inputs = host.querySelectorAll<HTMLInputElement>("input");
         const button = inputs[1];
-        if (!button) throw new Error("No button field");
         expect(button.placeholder).toBe("Ask about joining");
         type(button, "Join us");
         expect(lastContent(onChange)).toEqual({ buttonLabel: "Join us" });

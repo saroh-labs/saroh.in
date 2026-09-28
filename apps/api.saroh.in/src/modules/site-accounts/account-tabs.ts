@@ -47,6 +47,8 @@ export const SHIPPED_ACCOUNT_TABS: ReadonlySet<AccountTabKey> = new Set([
     "orders",
     // A8: the plan and packs.
     "plan",
+    // A13: the customer's thread.
+    "messages",
     "me",
 ]);
 

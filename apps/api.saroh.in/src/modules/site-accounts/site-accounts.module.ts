@@ -8,6 +8,7 @@ import {
     CUSTOMER_NOTES_OPEN_DEFAULT,
 } from "./account-home.service";
 import { AccountLinkingService } from "./account-linking.service";
+import { AccountMessagesController } from "./account-messages.controller";
 import { AccountOrdersController } from "./account-orders.controller";
 import { AccountOrdersService } from "./account-orders.service";
 import { AccountUnlinkService } from "./account-unlink.service";
@@ -25,6 +26,7 @@ import { SessionsService } from "./sessions.service";
 import { SignInCodesService } from "./sign-in-codes.service";
 import { SignInController } from "./sign-in.controller";
 import { SiteRelayGuard } from "./site-relay";
+import { ThreadsService } from "./threads.service";
 
 /**
  * A business's customers signing in on its own site (ADR-011, DEC-037;
@@ -35,7 +37,9 @@ import { SiteRelayGuard } from "./site-relay";
  * calls (`AccountUnlinkService`). A5 adds the account area (`/me`: Me,
  * Home, receipts, health notes and the email change), dark behind
  * `SITE_ACCOUNT_AREA` until A6–A8 and A13 ship with it. A7 adds Orders
- * and Track (`/me/orders`).
+ * and Track (`/me/orders`). A13 adds the customer's message thread
+ * (`/me/messages`), which the workspace answers through the exported
+ * `ThreadsService`.
  */
 @Module({
     controllers: [
@@ -43,6 +47,7 @@ import { SiteRelayGuard } from "./site-relay";
         SessionsController,
         AccountController,
         AccountOrdersController,
+        AccountMessagesController,
     ],
     providers: [
         AccountOrdersService,
@@ -52,7 +57,7 @@ import { SiteRelayGuard } from "./site-relay";
         AccountAreaGuard,
         AccountHomeService,
         EmailChangeService,
-        // Health notes stay closed until C12; tests open them here.
+        // Health notes: open since A13 worded C12's staff card per source.
         { provide: CUSTOMER_NOTES_OPEN, useValue: CUSTOMER_NOTES_OPEN_DEFAULT },
         { provide: EMAIL_CHANGED_SENDER, useValue: sendSiteEmailChangedEmail },
         ChallengeVerifier,
@@ -62,6 +67,7 @@ import { SiteRelayGuard } from "./site-relay";
         SignInCodesService,
         SiteRelayGuard,
         CustomerSessionGuard,
+        ThreadsService,
     ],
     exports: [
         CustomerAccountRepository,
@@ -69,6 +75,8 @@ import { SiteRelayGuard } from "./site-relay";
         SiteRelayGuard,
         SessionsService,
         CustomerSessionGuard,
+        ThreadsService,
+        AccountAreaGuard,
     ],
 })
 export class SiteAccountsModule {}

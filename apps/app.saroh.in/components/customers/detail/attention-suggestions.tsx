@@ -31,6 +31,7 @@ import {
     KIND_WORD,
     pickKind,
     picksAllergen,
+    setAsideText,
     SUGGESTION_KINDS,
     SUGGESTION_LABEL_MAX,
     suggestionDraft,
@@ -50,9 +51,10 @@ const CHOICE =
     "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11";
 
 /**
- * Notes from the booking page (C12, "Saroh Customer Detail" › patient notes):
- * what a booker wrote in "Anything we should know?", waiting above the tabs
- * for someone to check it with them. Add puts it on Needs attention with the
+ * Notes from the customer (C12, "Saroh Customer Detail" › patient notes):
+ * what a booker wrote in "Anything we should know?", or a health note they
+ * sent from their account on the site (A5, source CUSTOMER), waiting above
+ * the tabs for someone to check it with them. Each says where it came from. Add puts it on Needs attention with the
  * label, kind and sensitive tick chosen here; "Nothing to add" sets it aside
  * — the note stays on the booking either way.
  *
@@ -115,21 +117,19 @@ export function AttentionSuggestions({
                 }
             },
         });
-        toastId = showUndo(
-            "Set aside. The note stays in their booking history.",
-            () => void held.undo(),
-            { duration: HOLD_UNDO_MS },
-        );
+        toastId = showUndo(setAsideText(entry), () => void held.undo(), {
+            duration: HOLD_UNDO_MS,
+        });
     }
 
     return (
         <section
-            aria-label="Notes from the booking page"
+            aria-label={suggestionsTitle(shown)}
             className="mb-3.5 grid gap-3 rounded-xl border border-highlight bg-brand-subtle px-4 py-3.5"
         >
             <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-[13.5px] font-semibold text-brand-subtle-foreground">
-                    {suggestionsTitle(shown.length)}
+                    {suggestionsTitle(shown)}
                 </span>
                 <span className="text-pretty text-[12px] text-muted-foreground">
                     Check it with them, then add it to Needs attention so the
@@ -142,7 +142,7 @@ export function AttentionSuggestions({
                     contactId={contactId}
                     entry={s}
                     choices={choices}
-                    when={suggestionWhen(firstName, s.createdAt, timeZone, now)}
+                    when={suggestionWhen(firstName, s, timeZone, now)}
                     onSetAside={() => setAside(s)}
                 />
             ))}
