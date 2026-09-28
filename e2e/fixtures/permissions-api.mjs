@@ -320,6 +320,22 @@ createServer((req, res) => {
                     dependencies: [],
                     blockers: [{ code: "UNAUTHORIZED" }],
                 },
+                // Sell is out of a Reviewer's reach, as the real API says —
+                // so its gate, not the Orders page, answers them (DEC-056).
+                ...(scenario === "REVIEWER"
+                    ? [
+                          {
+                              key: "COMMERCE",
+                              label: "Sell",
+                              lifecycle: "ENABLED",
+                              readiness: "DISABLED",
+                              selectedForProject: true,
+                              canManage: false,
+                              dependencies: [],
+                              blockers: [{ code: "UNAUTHORIZED" }],
+                          },
+                      ]
+                    : []),
             ],
             meta: { organizationId: "org_1" },
         });
