@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { addedByHand, addedLine } from "@/lib/customer-workspace/added";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import { addressLine } from "@/lib/customer-workspace/details";
 import type { OrderFilter, Tile } from "@/lib/customer-workspace/view";
@@ -62,9 +63,11 @@ export function Overview({
             {attention}
             {orders && d.orders && rows.length === 0 ? (
                 <Empty title="No orders yet">
+                    {addedByHand(d)
+                        ? `${addedLine(d.contact, d.timezone, now)}. `
+                        : null}
                     Totals, favourites and how they get their orders fill in
-                    from their first order. Orders reach this page through a
-                    store customer linked to them.
+                    from their first order.
                 </Empty>
             ) : null}
             {d.bookings !== undefined ? (

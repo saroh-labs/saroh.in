@@ -1,34 +1,20 @@
 "use client";
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { deleteContact } from "@/lib/contacts/actions";
-import { deletedLine, REMOVED_TOAST } from "@/lib/contacts/removal";
 import {
     restoreOffersAction,
     stopOffersAction,
-    unlinkAccountAction,
-    unlinkPreviewAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
-import type { MergeTarget } from "@/lib/customer-workspace/merge";
-import { clashTarget, suggestedTarget } from "@/lib/customer-workspace/merge";
-import { hasMoneyRecords, moreMenu } from "@/lib/customer-workspace/more-menu";
 import { pageMissing } from "@/lib/customer-workspace/packs";
 import type {
     DuplicateSuggestion,
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
-import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
-import {
-    signsInLine,
-    unlinkConfirm,
-    unlinkedLine,
-} from "@/lib/customer-workspace/site-account";
+import { signsInLine } from "@/lib/customer-workspace/site-account";
 import type {
     OrderFilter,
     ReviewsRead,
@@ -45,7 +31,6 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
-import { IdentityLinkDialog } from "../identity-link-dialog";
 import {
     AttentionCard,
     AttentionEditor,
@@ -55,10 +40,9 @@ import {
 import { AttentionSuggestions } from "./attention-suggestions";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
-import { EditSheet } from "./edit-sheet";
 import { Crumbs, Header, Tabs } from "./header";
-import { MergeDialog } from "./merge-dialog";
 import { MessagesTab } from "./messages-tab";
+import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
@@ -66,7 +50,6 @@ import { Overview } from "./overview";
 import type { PackSale } from "./packs-tab";
 import { useCustomerPacks } from "./packs-tab";
 import { Failed } from "./parts";
-import { RemoveDetailsDialog } from "./remove-details-dialog";
 import { ReviewsTab } from "./reviews-tab";
 
 /**
@@ -135,27 +118,23 @@ export function CustomerDetailScreen({
     const tabs = tabsFor(d, thread, reviews);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
-    const [editing, setEditing] = useState(0);
-    const [linking, setLinking] = useState(false);
-    const [removing, setRemoving] = useState(false);
-    // "Remove their details (privacy request)…" (C11).
-    const [removingDetails, setRemovingDetails] = useState(false);
     const [stopping, setStopping] = useState(false);
-    const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
-    // The merge (C10): with the other record known, or null to search.
-    // Offered only with `customer:merge`.
-    const [merging, setMerging] = useState<{
-        target: MergeTarget | null;
-    } | null>(null);
-    const mergeWith = (target: MergeTarget | null) => setMerging({ target });
-    const mergeDuplicate = canMerge
-        ? (dup: DuplicateSuggestion) => mergeWith(suggestedTarget(dup))
-        : undefined;
     const attention = useAttention({
         contactId: d.contact.id,
         attention: d.attention,
     });
     const name = d.contact.name;
+    // Edit details and ⋯ More actions, and what each opens (C14).
+    const more = useMoreActions({
+        d,
+        name,
+        sells,
+        canWrite,
+        canMerge,
+        canRemove,
+        suggestions,
+        duplicates,
+    });
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
         : (name.split(" ")[0] ?? name);
@@ -193,55 +172,6 @@ export function CustomerDetailScreen({
             });
         });
     }
-
-    // "This isn't them" (A4): read what would move, then ask.
-    async function askNotThem() {
-        const res = await unlinkPreviewAction(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        setNotThem(res.data);
-    }
-
-    async function separate(preview: UnlinkPreview) {
-        setNotThem(null);
-        const res = await unlinkAccountAction(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(unlinkedLine(preview.email));
-        router.refresh();
-    }
-
-    async function remove() {
-        setRemoving(false);
-        const res = await deleteContact(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(deletedLine(name, res.data));
-        router.push(sells ? "/commerce/customers" : "/contacts");
-    }
-
-    // After a privacy removal there is no one left to show: back to the
-    // list, in the design's words.
-    function removedDetails() {
-        setRemovingDetails(false);
-        showSuccess(REMOVED_TOAST);
-        router.push(sells ? "/commerce/customers" : "/contacts");
-    }
-
-    const menu = moreMenu(
-        {
-            canWrite,
-            canMerge,
-            canRemove,
-            canLink: d.linkedCustomers !== undefined,
-            canUnlink: !!d.siteAccount?.canUnlink,
-            hasRecords: hasMoneyRecords(d),
-        },
-        {
-            merge: () => mergeWith(null),
-            link: () => setLinking(true),
-            notThem: () => void askNotThem(),
-            remove: () => setRemoving(true),
-            removeDetails: () => setRemovingDetails(true),
-        },
-    );
 
     const panel = () => {
         switch (tab) {
@@ -377,12 +307,12 @@ export function CustomerDetailScreen({
                     attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
                     canMore={canWrite || canMerge || canRemove}
-                    onEdit={() => setEditing((n) => n + 1)}
-                    menu={menu}
+                    onEdit={more.edit}
+                    menu={more.menu}
                 />
                 <DuplicateNotice
                     duplicates={duplicates}
-                    onMerge={mergeDuplicate}
+                    onMerge={more.mergeDuplicate}
                 />
                 {canWrite && d.attention?.suggestions?.length ? (
                     <AttentionSuggestions
@@ -408,44 +338,14 @@ export function CustomerDetailScreen({
                     <PossibleMatch
                         matches={d.possibleMatches ?? []}
                         canLink={canWrite}
-                        onLink={() => setLinking(true)}
+                        onLink={more.link}
                     />
                 ) : null}
                 {panel()}
             </div>
 
-            {editing ? (
-                <EditSheet
-                    key={editing}
-                    open
-                    onOpenChange={(o) => (o ? null : setEditing(0))}
-                    contact={d.contact}
-                    signsInWith={d.siteAccount?.email ?? null}
-                    onMerge={
-                        canMerge
-                            ? (holder) => mergeWith(clashTarget(holder))
-                            : undefined
-                    }
-                />
-            ) : null}
-            {canRemove && removingDetails ? (
-                <RemoveDetailsDialog
-                    contactId={d.contact.id}
-                    name={name}
-                    open
-                    onOpenChange={setRemovingDetails}
-                    onRemoved={removedDetails}
-                />
-            ) : null}
+            {more.dialogs}
             {packs.dialogs}
-            {merging ? (
-                <MergeDialog
-                    hereId={d.contact.id}
-                    target={merging.target}
-                    open
-                    onOpenChange={(o) => (o ? null : setMerging(null))}
-                />
-            ) : null}
             {canWrite ? (
                 <AttentionEditor
                     state={attention}
@@ -454,36 +354,6 @@ export function CustomerDetailScreen({
                     canSensitive={canSensitive}
                 />
             ) : null}
-            {canWrite ? (
-                <IdentityLinkDialog
-                    contactId={d.contact.id}
-                    suggestions={suggestions}
-                    duplicates={duplicates}
-                    onMerge={mergeDuplicate}
-                    open={linking}
-                    onOpenChange={setLinking}
-                />
-            ) : null}
-            {notThem ? (
-                <ConfirmDialog
-                    open
-                    onOpenChange={(o) => (o ? null : setNotThem(null))}
-                    {...unlinkConfirm(name, notThem)}
-                    confirmLabel="Separate them"
-                    cancelLabel="Keep them together"
-                    icon={Unlink}
-                    onConfirm={() => void separate(notThem)}
-                />
-            ) : null}
-            <ConfirmDialog
-                open={removing}
-                onOpenChange={setRemoving}
-                title={`Delete ${name}?`}
-                description={`Their notes, leads, subscriptions and class packs go with them, and future classes paid with those packs are cancelled. Orders, bookings and invoices stay on record under the name they gave, and a store customer with the same email is kept. This cannot be undone.`}
-                confirmLabel="Delete record"
-                cancelLabel="Keep them"
-                onConfirm={() => void remove()}
-            />
         </>
     );
 }

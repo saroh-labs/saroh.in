@@ -1,9 +1,9 @@
 import { clock } from "@/lib/calendar/layers";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import type { Review } from "@/lib/product-reviews/service";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
+import { addedLine } from "./added";
 import type {
     CustomerDetail,
     DetailBooking,
@@ -16,6 +16,9 @@ import type {
 } from "./detail";
 import { packHref } from "./packs";
 import type { CustomerThread } from "./thread";
+import { monthText, whenText } from "./when";
+
+export { monthText, whenText };
 
 /**
  * How Customer Detail says a customer (plan 2026-09-23-003, U18, after
@@ -168,38 +171,13 @@ export function totals(list: MoneyTotal[]): string {
         : "—";
 }
 
-/** "August 2026" in the business's zone. */
-export function monthText(at: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        month: "long",
-        year: "numeric",
-    }).format(new Date(at));
-}
-
-function localDate(at: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(new Date(at));
-}
-
-/** "Today", "Yesterday" or "18 Sep" — the design's short when. */
-export function whenText(at: string, timeZone: string, now: Date): string {
-    const day = localDate(at, timeZone);
-    if (day === localDate(now.toISOString(), timeZone)) return "Today";
-    const yesterday = new Date(now.getTime() - 86_400_000).toISOString();
-    if (day === localDate(yesterday, timeZone)) return "Yesterday";
-    return dayText(at, timeZone, now);
-}
-
 // ---------------------------------------------------------------- header
 
 export interface Tag {
     label: string;
     tone: Tone;
+    /** What the word means, on hover: "Returning: 2 or more orders". */
+    title?: string;
 }
 
 /**
@@ -219,9 +197,10 @@ export function tagFor(d: CustomerDetail): Tag | null {
     }
     const orders = d.stats.orders;
     if (orders === undefined || orders === null) return null;
+    const title = "Returning: 2 or more orders";
     return orders >= 2
-        ? { label: "Returning", tone: "ok" }
-        : { label: "New", tone: "off" };
+        ? { label: "Returning", tone: "ok", title }
+        : { label: "New", tone: "off", title };
 }
 
 /** The line under the name: since when, and where or how often. */
@@ -254,7 +233,7 @@ export function sinceLine(
             .filter(Boolean)
             .join(" · ");
     }
-    const added = `Added ${dayText(d.contact.createdAt, tz, now)}`;
+    const added = addedLine(d.contact, tz, now);
     // Orders not read for this viewer, or not read at all, say nothing of
     // orders: "no orders yet" would be a claim the page cannot make.
     if (!d.orders) return added;
@@ -265,7 +244,6 @@ export function sinceLine(
     return [
         `Customer since ${monthText(first, tz)}`,
         `buys at ${joinAnd(where)}`,
-        "Returning means 2 or more orders",
     ].join(" · ");
 }
 
@@ -345,17 +323,16 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
             opens: open.length ? "open" : "all",
         },
     ];
-    const first = rows.map((o) => o.placedAt).sort()[0];
     if (d.money && d.stats.spent) {
         const owed = d.stats.owed?.totals ?? [];
         tiles.push({
             label: "Spent",
             value: totals(d.stats.spent),
+            // Net of refunds and credit notes (C14); an order's delivery is
+            // part of what they paid.
             note: owed.length
                 ? `${totals(owed)} still owed`
-                : first
-                  ? `Since ${monthText(first, tz)}`
-                  : "",
+                : "Including delivery",
             opens: null,
         });
     }
