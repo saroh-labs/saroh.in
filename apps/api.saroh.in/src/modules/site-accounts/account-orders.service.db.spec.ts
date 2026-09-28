@@ -365,7 +365,7 @@ describe("Orders", () => {
         });
         expect(
             (me.body as { tabs: { key: string }[] }).tabs.map((x) => x.key),
-        ).toEqual(["home", "orders", "me"]);
+        ).toEqual(["home", "orders", "messages", "me"]);
 
         // Home's latest orders are the same orders.
         const home = await call("GET", "/public/site-accounts/me/home", {

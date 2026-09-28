@@ -260,6 +260,7 @@ describe("the Plan tab", () => {
         expect(me.body.tabs.map((t: { key: string }) => t.key)).toEqual([
             "home",
             "plan",
+            "messages",
             "me",
         ]);
     });
@@ -279,7 +280,7 @@ describe("the Plan tab", () => {
                     token: m.token,
                 })
             ).body.tabs.map((t: { key: string }) => t.key);
-        expect(await tabs()).toEqual(["home", "me"]);
+        expect(await tabs()).toEqual(["home", "messages", "me"]);
 
         const pack = await prisma.classPack.create({
             data: {
@@ -308,7 +309,7 @@ describe("the Plan tab", () => {
         await bought(-1, 5); // expired: not listed
 
         // A pack of their own opens the tab.
-        expect(await tabs()).toEqual(["home", "plan", "me"]);
+        expect(await tabs()).toEqual(["home", "plan", "messages", "me"]);
         const tab = await call("GET", PLAN, { host: biz.host, token: m.token });
         expect(tab.body.subscriptions).toEqual({ ok: true, value: [] });
         expect(tab.body.packs.value).toEqual([
