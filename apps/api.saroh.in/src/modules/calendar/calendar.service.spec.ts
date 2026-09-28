@@ -119,6 +119,8 @@ interface Fixture {
     bookings?: object[];
     classes?: object[];
     failInvoices?: boolean;
+    /** When the business was created; `"fail"` makes the read throw. */
+    createdAt?: Date | "fail";
 }
 
 function build(
@@ -151,6 +153,16 @@ function build(
     );
 
     const db = {
+        organization: {
+            findUnique: jest.fn(() =>
+                f.createdAt === "fail"
+                    ? Promise.reject(new Error("connection reset"))
+                    : Promise.resolve({
+                          createdAt:
+                              f.createdAt ?? new Date("2026-06-02T05:00:00Z"),
+                      }),
+            ),
+        },
         businessProfile: {
             findUnique: jest
                 .fn()
@@ -675,5 +687,24 @@ describe("CalendarService.month", () => {
         await expect(
             service.month({ ...OWNER, role: "REVIEWER" }, "2026-09", NOW),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+    it("names the day the business joined, in its own zone", async () => {
+        // 20:00 UTC on 31 May is already 1 June in India.
+        const { service } = build(undefined, {
+            createdAt: new Date("2026-05-31T20:00:00Z"),
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.joinedAt).toBe("2026-06-01");
+    });
+
+    it("leaves the joined day out, not the month, when it cannot be read", async () => {
+        const { service } = build(undefined, {
+            createdAt: "fail",
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+        });
+        const res = await service.month(OWNER, "2026-09", NOW);
+        expect(res.joinedAt).toBeNull();
+        expect(res.totals.orders).toBe(1);
+        expect(res.unavailable).toEqual([]);
     });
 });

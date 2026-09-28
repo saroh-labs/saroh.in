@@ -10,6 +10,8 @@ import {
     leadingBlanks,
 } from "@/lib/calendar/layers";
 import { shortMoney, wholeMoney } from "@/lib/calendar/money";
+import type { CalendarRange } from "@/lib/calendar/range";
+import { inRange } from "@/lib/calendar/range";
 import type { CalendarDay } from "@/lib/calendar/types";
 
 import { TONE_FILL } from "./tones";
@@ -27,11 +29,14 @@ const cellEdge = "border-b border-r border-foreground/10";
  * what needs acting on first, then a count per layer — and, for a role that
  * reads money, what was taken that day as a bar scaled to the busiest day.
  * Below 760px each chip is a dot per layer, red when something needs acting
- * on, and the tapped day is listed under the month.
+ * on, and the tapped day is listed under the month. A day the calendar does
+ * not reach — before the business joined, or past what can be planned — is
+ * greyed and cannot be picked.
  */
 export function MonthGrid({
     month,
     days,
+    range,
     layers,
     off,
     today,
@@ -42,6 +47,8 @@ export function MonthGrid({
 }: {
     month: string;
     days: CalendarDay[];
+    /** The days the calendar reaches; the rest are greyed. */
+    range: CalendarRange;
     layers: LayerStyle[];
     off: Off;
     today: string;
@@ -89,6 +96,7 @@ export function MonthGrid({
             <div className="grid grid-cols-7">
                 {Array.from({ length: blanks }, (_, i) => blank(`b${i}`))}
                 {days.map((day, i) => {
+                    const outside = !inRange(day.date, range);
                     const past = day.date < today;
                     const isToday = day.date === today;
                     const on = day.date === selected;
@@ -114,26 +122,31 @@ export function MonthGrid({
                             key={day.date}
                             type="button"
                             onClick={() => onPick(day.date)}
+                            disabled={outside}
                             aria-label={label}
-                            aria-pressed={on}
+                            aria-pressed={outside ? undefined : on}
                             aria-current={isToday ? "date" : undefined}
                             className={cn(
                                 cellEdge,
                                 "block min-h-[54px] w-full min-w-0 px-[5px] py-1.5 text-left align-top font-sans min-[760px]:min-h-[92px] min-[760px]:px-2 min-[760px]:py-[7px]",
-                                on
-                                    ? "bg-brand-subtle ring-2 ring-inset ring-highlight"
-                                    : "bg-card hover:bg-muted",
+                                outside
+                                    ? "cursor-default bg-neutral-50 dark:bg-muted"
+                                    : on
+                                      ? "bg-brand-subtle ring-2 ring-inset ring-highlight"
+                                      : "bg-card hover:bg-muted",
                             )}
                         >
                             <span className="flex items-baseline gap-1.5">
                                 <span
                                     className={cn(
                                         "text-[13px]",
-                                        isToday
-                                            ? "font-bold text-brand"
-                                            : past
-                                              ? "font-medium text-muted-foreground"
-                                              : "font-medium text-foreground",
+                                        outside
+                                            ? "font-medium text-neutral-400 dark:text-muted-foreground"
+                                            : isToday
+                                              ? "font-bold text-brand"
+                                              : past
+                                                ? "font-medium text-muted-foreground"
+                                                : "font-medium text-foreground",
                                     )}
                                 >
                                     {Number(day.date.slice(8))}

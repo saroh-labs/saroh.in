@@ -65,13 +65,13 @@ function month(over: Partial<CalendarMonth> = {}): CalendarMonth {
 }
 
 describe("layersFor", () => {
-    it("a shop reads Orders, Collections, Subscriptions, Invoices in the design's colours", () => {
+    it("a shop reads Orders, Pick-ups, Subscriptions, Invoices in the design's colours", () => {
         expect(layersFor(month()).map((l) => [l.key, l.label, l.tone])).toEqual(
             [
                 ["orders", "Orders", 1],
-                ["collections", "Collections", 2],
+                ["collections", "Pick-ups", 2],
                 ["subscriptions", "Subscriptions", 3],
-                ["invoices", "Invoices", 4],
+                ["invoices", "Invoices", 7],
             ],
         );
     });
@@ -95,12 +95,12 @@ describe("layersFor", () => {
                 },
             }),
         );
-        // Collections with nothing all month is not offered as a switch.
+        // Pick-ups with nothing all month is not offered as a switch.
         expect(layers.map((l) => [l.key, l.label, l.tone])).toEqual([
             ["bookings", "Bookings", 1],
             ["classes", "Classes", 3],
             ["subscriptions", "Memberships", 2],
-            ["invoices", "Invoices", 4],
+            ["invoices", "Invoices", 7],
         ]);
     });
 
@@ -179,6 +179,47 @@ describe("a day's chips", () => {
             "1 order",
             "2 renewals",
         ]);
+    });
+
+    it("counts weekly collections as pick-ups, in their own words", () => {
+        const pickups = day("2026-09-16", {
+            collections: [
+                item({
+                    kind: "collection",
+                    link: { type: "subscription", id: "s1" },
+                }),
+                item({
+                    id: "i2",
+                    kind: "collection",
+                    link: { type: "subscription", id: "s2" },
+                }),
+            ],
+        });
+        expect(dayChips(pickups, layers, {}).map((c) => c.text)).toEqual([
+            "2 pick-ups",
+        ]);
+    });
+
+    it("invoices wear a tone no other layer uses, for a shop and a diary alike", () => {
+        const shop = layersFor(month());
+        const diary = layersFor(
+            month({
+                layers: ["bookings", "classes", "subscriptions", "invoices"],
+                totals: {
+                    bookings: 1,
+                    classes: 1,
+                    subscriptions: 1,
+                    invoices: 1,
+                },
+            }),
+        );
+        for (const set of [shop, diary]) {
+            const invoices = set.find((l) => l.key === "invoices");
+            expect(invoices?.tone).toBe(7);
+            expect(set.filter((l) => l.tone === invoices?.tone)).toHaveLength(
+                1,
+            );
+        }
     });
 });
 
