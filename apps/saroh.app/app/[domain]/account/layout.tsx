@@ -81,7 +81,10 @@ export default async function AccountLayout({
             <main className="mx-auto w-full max-w-[640px] px-[18px] pb-[96px] pt-4">
                 {children}
             </main>
-            <AccountTabBar tabs={lookup.account.tabs} />
+            <AccountTabBar
+                tabs={lookup.account.tabs}
+                unreadMessages={lookup.account.unreadMessages ?? 0}
+            />
         </>
     );
 }

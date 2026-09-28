@@ -9,7 +9,9 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PaymentsModule } from "../payments/payments.module";
+import { AccountBookingsTabController } from "../site-accounts/account-bookings-tab.controller";
 import { AccountBookingsController } from "../site-accounts/account-bookings.controller";
+import { AccountBookingsService } from "../site-accounts/account-bookings.service";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { BookingsController } from "./bookings.controller";
 import { BookingsService } from "./bookings.service";
@@ -37,7 +39,9 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * is served by {@link BookingsService}, the second by
  * {@link PublicBookingsService}; both write through the same reservation.
  * A signed-in customer books through {@link AccountBookingsController}
- * (round-2 A9), on the same service and limiter.
+ * (round-2 A9), on the same service and limiter, and moves and cancels
+ * their own bookings through {@link AccountBookingsTabController} (A6), on
+ * the same writes as the team's.
  */
 @Module({
     imports: [
@@ -47,7 +51,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         JobsModule,
         // Sends a cancel's refund of money paid online (E8).
         PaymentsModule,
-        // The customer session guard for signed-in booking (A9).
+        // The customer session guard for signed-in booking (A9), and the
+        // account area's switch (A6).
         SiteAccountsModule,
     ],
     controllers: [
@@ -55,11 +60,13 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicBookingsController,
         PublicBookingPageController,
         AccountBookingsController,
+        AccountBookingsTabController,
     ],
     providers: [
         BookingsService,
         PublicBookingsService,
         PublicTodayService,
+        AccountBookingsService,
         ReleaseHoldsHandler,
         OrganizationGuard,
     ],

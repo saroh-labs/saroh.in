@@ -163,6 +163,23 @@ const NEVER: Record<string, string> = {
     // stay reachable whichever are off: Me, receipts and sign-out.
     "site-accounts/account.controller.ts":
         "a signed-in customer's own account on a published site — modules checked per tab",
+    // A6, A7, A8: the account's Bookings, Orders and Plan tabs. Each shows
+    // only the customer's own records, which stay theirs to read whichever
+    // modules are off; the tab bar hides a tab whose module is off
+    // (`account-home.service.ts`). Dark with the account area.
+    "site-accounts/account-bookings-tab.controller.ts":
+        "a signed-in customer's own bookings — the tab follows Appointments, dark with the account area",
+    "site-accounts/account-orders.controller.ts":
+        "a signed-in customer's own orders — the tab follows Commerce, dark with the account area",
+    "site-accounts/account-plan.controller.ts":
+        "a signed-in customer's own plans and packs — the tab follows what's on sale, dark with the account area",
+    // A13: the customer's message thread. Every business can be written
+    // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
+    // a module, on both sides.
+    "site-accounts/account-messages.controller.ts":
+        "a signed-in customer's own thread with the business — dark with the account area, not a module",
+    "customer-workspace/threads.controller.ts":
+        "the team's side of a customer's thread — message:read / message:write, dark with the account area",
     // G11: a site's shop. Commerce being off is checked by the service
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
@@ -172,6 +189,10 @@ const NEVER: Record<string, string> = {
     // payment already made still lands through the webhook.
     "orders/public-checkout.controller.ts":
         "a published site's bag and checkout — Commerce checked by the service",
+    // G9: a site's Plans block. Payments being off is checked by the
+    // service (`paymentsOffered`), which answers 404, as a site with no plans.
+    "subscriptions/public-plans.controller.ts":
+        "a published site's Plans block — Payments checked by the service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",

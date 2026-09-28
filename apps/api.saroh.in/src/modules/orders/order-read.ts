@@ -1,6 +1,8 @@
 import { toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { OrderAttention } from "./order-attention";
+import type { ChangeOptions } from "./order-change-types";
 import type { OrderLineKind } from "./order-line";
 import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
@@ -16,6 +18,12 @@ import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
  * (ADR-008, "No money figures without a money read"). A Member at the
  * counter holds `order:stage` and no money read, so `money` is null, lines
  * carry no price, and timeline steps carry no amount.
+ *
+ * The customer's own phone and email go only to a caller holding
+ * `contact:read` (review #19), on this read, the list's rows and the quick
+ * view alike: a Member holding `contact:read` sees both. The delivery
+ * address's phone is the order's, not the customer's record: whoever works
+ * the order sees it, since a local delivery can't go out without it.
  */
 
 interface DecimalLike {
@@ -142,8 +150,9 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     customer: {
         id: string;
         name: string | null;
+        /** Their own phone: null without `contact:read` (review #19). */
         phone: string | null;
-        /** Only with `order:read` — the kitchen needs a name, not an inbox. */
+        /** Only with `contact:read` (review #19). */
         email?: string;
         /**
          * The contact this store customer is confirmed as (a
@@ -182,7 +191,7 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         undo: { eventId: string; until: Date } | null;
         /** Items, address and fulfilment can still change. */
         editable: boolean;
-    };
+    } & Partial<ChangeOptions>;
     /** Null for a role without a money read. */
     money: OrderMoneyDto | null;
     /**
@@ -191,6 +200,13 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * `invoice:read` — invoice ids and numbers go only to it.
      */
     invoices: OrderInvoiceDto[] | null;
+    /**
+     * The customer's Needs attention this caller may see (B15): sensitive
+     * entries only to a caller who may read them, the rest to whoever reads
+     * the order, the kitchen included. Null when it couldn't be read, so
+     * the screen says so rather than showing nothing.
+     */
+    attention?: OrderAttention | null;
 }
 
 export interface OrderInvoiceDto {
@@ -313,8 +329,18 @@ export interface RawOrderRead {
 export interface ReadOptions {
     /** The caller holds a money read (`payment:read`). */
     money: boolean;
-    /** The caller holds `order:read` (customer email). */
+    /** The caller holds `order:read` (the pay link's date). */
     fullRead: boolean;
+    /**
+     * The caller holds `contact:read`: the customer's own phone and email
+     * (review #19). Never the delivery phone, which the order needs.
+     */
+    contact: boolean;
+    /**
+     * The customer's Needs attention as the caller may see it (B15); null
+     * when it couldn't be read. Absent, the read carries none.
+     */
+    attention?: OrderAttention | null;
     /** The caller holds `invoice:read` (the order's paper). */
     invoiceRead?: boolean;
     /** Names for the people on the timeline. */
@@ -440,8 +466,8 @@ export function serializeOrderRead(
             ? {
                   id: order.customer.id,
                   name: name || null,
-                  phone: order.customer.phone,
-                  ...(opts.fullRead ? { email: order.customer.email } : {}),
+                  phone: opts.contact ? order.customer.phone : null,
+                  ...(opts.contact ? { email: order.customer.email } : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
                   orderCount: order.customer._count?.orders ?? 1,
@@ -566,6 +592,7 @@ export function serializeOrderRead(
                       : null,
               }
             : null,
+        ...(opts.attention === undefined ? {} : { attention: opts.attention }),
     };
 }
 

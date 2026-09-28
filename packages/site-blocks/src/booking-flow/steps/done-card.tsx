@@ -1,7 +1,7 @@
 import { cn } from "../../lib/utils";
 import type { Phase } from "../flow-state";
 import type { BookingPageData } from "../model";
-import { buildIcs, changeText } from "../model";
+import { buildIcs, changeText, firstVisitText } from "../model";
 import { card, focusRing } from "../styles";
 
 export function DoneCard({
@@ -10,6 +10,7 @@ export function DoneCard({
     business,
     where,
     rules,
+    visits = 1,
     onAgain,
 }: {
     phase: Extract<Phase, { kind: "done" }>;
@@ -21,6 +22,8 @@ export function DoneCard({
      */
     where: string | null;
     rules: BookingPageData["rules"];
+    /** More than one: visit 1 of a treatment was booked (E10). */
+    visits?: number;
     onAgain: () => void;
 }) {
     const { booking } = phase;
@@ -68,7 +71,12 @@ export function DoneCard({
                 You&apos;re booked{phase.first ? `, ${phase.first}` : ""}.
             </h2>
             <p className="text-site-fg text-[15px] leading-[1.55] opacity-90">
-                {[booking.serviceName, where, phase.when]
+                {[
+                    booking.serviceName,
+                    firstVisitText(visits),
+                    where,
+                    phase.when,
+                ]
                     .filter(Boolean)
                     .join(" · ")}
             </p>

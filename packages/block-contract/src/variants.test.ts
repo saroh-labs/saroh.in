@@ -423,3 +423,62 @@ describe("journal", () => {
         expect(resolveVariant("journal", {})).toBe("default");
     });
 });
+
+/** G9 — Plans lists the business's plans on sale, read live. */
+describe("plans", () => {
+    it("is valid with nothing set, so a just-added block saves", () => {
+        expect(parseSectionContent("plans", 1, {}).success).toBe(true);
+    });
+
+    it("keeps a title, a highlight, a button label and the switch", () => {
+        const parsed = parseSectionContent("plans", 1, {
+            title: "  Memberships ",
+            highlight: "none",
+            buttonLabel: " Ask to join ",
+            showDescriptions: false,
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            title: "Memberships",
+            highlight: "none",
+            buttonLabel: "Ask to join",
+            showDescriptions: false,
+        });
+    });
+
+    it("refuses any other highlight", () => {
+        for (const highlight of ["last", "all", 1, true]) {
+            expect(parseSectionContent("plans", 1, { highlight }).success).toBe(
+                false,
+            );
+        }
+    });
+
+    it("never stores the plans themselves, so a price can't go stale", () => {
+        const parsed = parseSectionContent("plans", 1, {
+            title: "Plans",
+            plans: [{ name: "Copied plan", price: "99.00" }],
+        });
+        expect(parsed.success && parsed.data).toEqual({ title: "Plans" });
+    });
+
+    it("refuses an over-long title or button label", () => {
+        expect(
+            parseSectionContent("plans", 1, { title: "x".repeat(161) }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("plans", 1, { buttonLabel: "x".repeat(41) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("publishes exactly what was authored", () => {
+        const draft = { title: "Plans", highlight: "first" as const };
+        expect(
+            toRendered("plans", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("has one look, and content without one wears it", () => {
+        expect(resolveVariant("plans", {})).toBe("default");
+    });
+});

@@ -378,7 +378,7 @@ test.describe("orders list filters (B4)", () => {
         await expect(page).not.toHaveURL(/step=|date=/);
     });
 
-    test("Late is a toggle in the address; Needs attention waits for B15", async ({
+    test("Late and Needs attention are toggles in the address (B15)", async ({
         page,
     }) => {
         await signIn(page);
@@ -390,8 +390,33 @@ test.describe("orders list filters (B4)", () => {
         await late.click();
         await expect(page).toHaveURL(/late=true/);
         await expect(late).toHaveAttribute("aria-pressed", "true");
+
+        const attention = bar.getByRole("button", { name: "Needs attention" });
+        await expect(attention).toHaveAttribute("aria-pressed", "false");
+        await attention.click();
+        await expect(page).toHaveURL(/attention=true/);
+        await expect(attention).toHaveAttribute("aria-pressed", "true");
+        await page.reload();
         await expect(
             bar.getByRole("button", { name: "Needs attention" }),
+        ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    test("a customer's allergy tags their orders, and the filter keeps them (B15)", async ({
+        page,
+    }) => {
+        // Rye & Co. is read here, never changed: Priya's sesame allergy.
+        await signIn(page);
+        await page.goto(`/open/${RYE}`);
+        await page.goto("/commerce/orders?attention=true");
+        const tag = page
+            .getByRole("img", { name: /Needs attention: Allergy: Sesame/ })
+            .locator("visible=true")
+            .first();
+        await expect(tag).toBeVisible();
+        await expect(tag).toHaveText(/Allergy: Sesame/);
+        await expect(
+            page.getByRole("img", { name: /Needs attention couldn't/ }),
         ).toHaveCount(0);
     });
 });

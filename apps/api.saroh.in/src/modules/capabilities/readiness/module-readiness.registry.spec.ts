@@ -21,13 +21,16 @@ function dbWith(counts: Record<string, number>) {
                 ),
             ),
         },
-        // Class packs asks twice: all of them, then the ones on sale.
+        // Class packs asks three times: the published ones, the ones on
+        // sale, and the drafts (E14).
         classPack: {
-            count: jest.fn((args?: { where?: { status?: string } }) =>
+            count: jest.fn((args?: { where?: { status?: unknown } }) =>
                 Promise.resolve(
                     args?.where?.status === "ACTIVE"
                         ? (counts.packOnSale ?? 0)
-                        : (counts.classPack ?? 0),
+                        : args?.where?.status === "DRAFT"
+                          ? (counts.packDraft ?? 0)
+                          : (counts.classPack ?? 0),
                 ),
             ),
         },
@@ -107,6 +110,14 @@ describe("ModuleReadinessRegistry", () => {
                 )
             ).readiness,
         ).toBe("ACTIVE");
+    });
+
+    it("Class packs: a draft alone isn't a pack to sell (E14)", async () => {
+        const [blocker] = (
+            await registry({ packDraft: 1 }).evaluate("CLASS_PACKS", input)
+        ).blockers;
+        expect(blocker?.code).toBe("CLASS_PACKS_NO_PACK");
+        expect(blocker?.message).toBe("Publish a pack to start selling it.");
     });
 
     it("Class packs: turning it off is never blocked", async () => {

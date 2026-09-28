@@ -5,15 +5,21 @@ import { revalidatePath } from "next/cache";
 import { setConsent } from "@/lib/messages/service";
 
 import type { AttentionInput, SuggestionInput } from "./attention";
+import type { MergeBody, MergeColumn, MergePreviews } from "./merge";
+import { keptColumn } from "./merge";
 import type { NoteInput, WorkspaceResult } from "./service";
 import {
     confirmAttention,
     createAttention,
     createNote,
     deleteNote,
+    getMergePreview,
     getUnlinkPreview,
     linkCustomer,
+    markThreadRead,
+    mergeContacts,
     removeAttention,
+    replyToThread,
     unlinkAccount,
     updateAttention,
     updateDetails,
@@ -142,5 +148,66 @@ export async function unlinkAccountAction(contactId: string) {
         revalidatePath(`/customers/${contactId}`);
         revalidatePath(`/customers/${result.data.contactId}`);
     }
+    return result;
+}
+
+/**
+ * What merging `otherId` with this customer would do (C10), read both
+ * ways — first keeping the record the API offers (the older, default 22),
+ * then keeping the other — so the dialog can switch which one stays
+ * without waiting.
+ */
+export async function mergePreviewAction(
+    contactId: string,
+    otherId: string,
+): Promise<
+    | { ok: true; data: MergePreviews; offered: MergeColumn }
+    | { ok: false; error: string }
+> {
+    const offered = await getMergePreview(contactId, otherId);
+    if (!offered.ok) return offered;
+    const keep = keptColumn(offered.data, contactId);
+    const rest = await getMergePreview(
+        contactId,
+        otherId,
+        keep === "here" ? otherId : contactId,
+    );
+    if (!rest.ok) return rest;
+    return {
+        ok: true,
+        offered: keep,
+        data:
+            keep === "here"
+                ? { here: offered.data, there: rest.data }
+                : { here: rest.data, there: offered.data },
+    };
+}
+
+/**
+ * Merge the two (C10). Both pages change — the one kept gains the other's
+ * history and the other's address now leads to it — so both are read again.
+ */
+export async function mergeAction(
+    contactId: string,
+    otherId: string,
+    body: MergeBody,
+) {
+    const result = await mergeContacts(contactId, otherId, body);
+    if (result.ok) {
+        revalidatePath(`/customers/${contactId}`);
+        revalidatePath(`/customers/${otherId}`);
+    }
+    return result;
+}
+
+/** Messages opened (A13): nothing is re-read, the tab clears its own dot. */
+export async function markThreadReadAction(contactId: string) {
+    return markThreadRead(contactId);
+}
+
+/** Answer the customer in their thread (A13). */
+export async function replyAction(contactId: string, text: string) {
+    const result = await replyToThread(contactId, text);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
     return result;
 }

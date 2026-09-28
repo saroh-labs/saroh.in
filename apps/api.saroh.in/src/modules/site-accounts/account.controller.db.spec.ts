@@ -55,8 +55,8 @@ beforeAll(async () => {
                 ),
             inject: [SiteCodeAlerts],
         })
-        // Health notes open, as they will be once C12 ships; the module's
-        // own default (closed) is pinned in site-accounts.module.spec.ts.
+        // Health notes open, as the module's own default is since A13
+        // (pinned in site-accounts.module.spec.ts).
         .overrideProvider(CUSTOMER_NOTES_OPEN)
         .useValue(true)
         .overrideProvider(EMAIL_CHANGED_SENDER)
@@ -237,14 +237,17 @@ describe("Me", () => {
             email: atClinic.email,
             phone: null,
             businessName: "Kavi Dental",
-            // Only Home and Me have shipped (A5); A6 adds Appointments.
+            // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
                 { key: "home", label: "Home" },
+                { key: "bookings", label: "Appointments" },
+                { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: true,
+            unreadMessages: 0,
         });
 
         const b = await call("GET", ME, {
@@ -635,6 +638,8 @@ describe("receipts", () => {
                 ref: paid.id,
                 number: "KD-0001",
                 total: "12000.00",
+                // Not registered for GST: a receipt, never a bill of supply.
+                billOfSupply: false,
             }),
         ]);
 
@@ -648,6 +653,7 @@ describe("receipts", () => {
             number: "KD-0001",
             status: "PAID",
             total: "12000.00",
+            billOfSupply: false,
             lines: [expect.objectContaining({ description: "Root canal" })],
         });
 

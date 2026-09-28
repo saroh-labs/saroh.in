@@ -4,6 +4,7 @@ import type { UnlinkMover } from "./unlink-plan";
 import {
     applyUnlinkMoves,
     countUnlinkMoves,
+    ORDERS_MOVER,
     UNLINK_MOVERS,
     UNLINK_STAYS,
     unlinkMoves,
@@ -76,6 +77,14 @@ describe("unlinkSentence", () => {
     });
 });
 
+/** A thread with nothing the account wrote in it (A13's mover). */
+function noMessages() {
+    return {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+    };
+}
+
 describe("counting and moving", () => {
     const scope = {
         organizationId: "org_1",
@@ -130,11 +139,66 @@ describe("counting and moving", () => {
         });
     });
 
-    it("moves bookings the account made, and their invoices, by default (A9, review C-1)", () => {
+    it("moves bookings the account made, their invoices, its orders (A7) and the messages it wrote (A13), by default (A9, review C-1)", () => {
         expect(UNLINK_MOVERS.map((m) => [m.key, m.model])).toEqual([
             ["bookings", "Booking"],
             ["invoices", "Booking"],
+            ["orders", "Order"],
+            ["messages", "CustomerThreadMessage"],
         ]);
+    });
+
+    it("moves the identity links the account's own orders made, and counts those orders (A7)", async () => {
+        const customerIdentityLink = {
+            findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: "link_1", customerId: "cus_1" }]),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        };
+        const order = { count: jest.fn().mockResolvedValue(2) };
+        const db = {
+            customerIdentityLink,
+            order,
+        } as unknown as Prisma.TransactionClient;
+
+        expect(await ORDERS_MOVER.count(db, scope)).toBe(2);
+        const linkWhere = customerIdentityLink.findMany.mock.calls[0][0].where;
+        expect(linkWhere).toMatchObject({
+            organizationId: "org_1",
+            contactId: "c_farah",
+            reason: { in: ["SITE_ACCOUNT", "BOOKING"] },
+            createdAt: { gte: scope.since },
+        });
+        expect(order.count.mock.calls[0][0].where).toMatchObject({
+            organizationId: "org_1",
+            customerAccountId: "acc_1",
+            customerId: { in: ["cus_1"] },
+        });
+
+        expect(
+            await ORDERS_MOVER.move(db, { ...scope, toContactId: "c_new" }),
+        ).toBe(2);
+        expect(customerIdentityLink.updateMany).toHaveBeenCalledWith({
+            where: { id: { in: ["link_1"] } },
+            data: { contactId: "c_new" },
+        });
+    });
+
+    it("moves no link when the account's orders made none", async () => {
+        const customerIdentityLink = {
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn(),
+        };
+        const order = { count: jest.fn() };
+        const db = {
+            customerIdentityLink,
+            order,
+        } as unknown as Prisma.TransactionClient;
+        expect(
+            await ORDERS_MOVER.move(db, { ...scope, toContactId: "c_new" }),
+        ).toBe(0);
+        expect(customerIdentityLink.updateMany).not.toHaveBeenCalled();
+        expect(order.count).not.toHaveBeenCalled();
     });
 
     it("counts and moves only what the account made on that contact since it linked", async () => {
@@ -146,7 +210,12 @@ describe("counting and moving", () => {
             count: jest.fn().mockResolvedValue(0),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         };
-        const db = { booking, invoice } as unknown as Prisma.TransactionClient;
+        const db = {
+            booking,
+            invoice,
+            customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
+            customerThreadMessage: noMessages(),
+        } as unknown as Prisma.TransactionClient;
         const where = {
             organizationId: "org_1",
             customerAccountId: "acc_1",
@@ -173,7 +242,12 @@ describe("counting and moving", () => {
             count: jest.fn().mockResolvedValue(1),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         };
-        const db = { booking, invoice } as unknown as Prisma.TransactionClient;
+        const db = {
+            booking,
+            invoice,
+            customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
+            customerThreadMessage: noMessages(),
+        } as unknown as Prisma.TransactionClient;
         const theirBooking = (on: string[]) => ({
             organizationId: "org_1",
             customerAccountId: "acc_1",

@@ -5,8 +5,9 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
+import { prisma, Prisma as PrismaNamespace } from "@saroh/database";
 
+import { readPending } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -20,10 +21,26 @@ import { assertClassPacksOn } from "./class-packs-on";
 import type {
     ListPacksQueryDto,
     ListPurchasesQueryDto,
+    PackDraftDto,
     PackInputDto,
     SellPackDto,
     UsePackDto,
 } from "./dto";
+import type { PackEditorView } from "./pack-draft-view";
+import {
+    lockPack,
+    PACK_DRAFT_FIELDS,
+    readPackEditor,
+    revised,
+} from "./pack-draft-view";
+import {
+    createPackDraft,
+    deletePackDraft,
+    discardPackChanges,
+    publishPack,
+    savePackDraft,
+} from "./pack-drafts";
+import { assertPackOnSale, PACK_DRAFT } from "./pack-on-sale";
 import { redeemPackInTx, reversePackInTx } from "./redeem-pack";
 
 const DAY_MS = 86_400_000;
@@ -55,6 +72,13 @@ export interface PackView {
     sold: number;
     /** Purchases that still have classes and time left. */
     activeHolders: number;
+    /** A live pack holds unpublished changes (E14): "Changes not published". */
+    hasPendingChanges: boolean;
+    /**
+     * When its draft was last saved (E14): a DRAFT's, or a live pack's
+     * unpublished changes'. Null when a live pack has none.
+     */
+    pendingChangedAt: string | null;
     createdAt: string;
 }
 
@@ -134,11 +158,15 @@ export class ClassPacksService {
         query: ListPacksQueryDto,
     ): Promise<PackView[]> {
         authorize(ctx, "pack:read");
+        // Drafts only when asked (E14): an app before the Pack Editor would
+        // draw one as a pack on sale.
+        const status = query.status
+            ? { status: query.status }
+            : query.include === "drafts"
+              ? {}
+              : { status: { not: PACK_DRAFT } };
         const rows = await prisma.classPack.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                ...(query.status ? { status: query.status } : {}),
-            },
+            where: { organizationId: ctx.organizationId, ...status },
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             include: PACK_INCLUDE,
         });
@@ -226,9 +254,20 @@ export class ClassPacksService {
         }
 
         await prisma.$transaction(async (tx) => {
+            // A draft is edited only through its revision-checked autosave
+            // (E14); this whole-pack PATCH is the old form's, which never
+            // saw a draft. A change here moves the revision, so a Pack
+            // Editor open on the pack is told who changed it.
+            await this.lockOutOfDraft(
+                tx,
+                ctx.organizationId,
+                id,
+                "This pack is a draft. Change it in the pack editor.",
+            );
             await tx.classPack.updateMany({
                 where: { id, organizationId: ctx.organizationId },
                 data: {
+                    ...revised(ctx),
                     ...(dto.name !== undefined ? { name: dto.name } : {}),
                     ...(dto.description !== undefined
                         ? { description: dto.description }
@@ -264,7 +303,11 @@ export class ClassPacksService {
         return this.readPack(ctx.organizationId, id);
     }
 
-    /** Archived packs are not sold; everyone holding one carries on using it. */
+    /**
+     * Archived packs are not sold; everyone holding one carries on using it.
+     * A draft is neither archived nor sold again: it goes on sale only by
+     * being published (E14), and is deleted rather than archived.
+     */
     async setPackStatus(
         ctx: OrganizationContext,
         id: string,
@@ -272,11 +315,86 @@ export class ClassPacksService {
     ): Promise<PackView> {
         authorize(ctx, "pack:write");
         await this.readPack(ctx.organizationId, id);
-        await prisma.classPack.updateMany({
-            where: { id, organizationId: ctx.organizationId },
-            data: { status },
+        await prisma.$transaction(async (tx) => {
+            const was = await this.lockOutOfDraft(
+                tx,
+                ctx.organizationId,
+                id,
+                "This pack is a draft. Publish it, or delete the draft.",
+            );
+            if (was === status) return;
+            await tx.classPack.updateMany({
+                where: { id, organizationId: ctx.organizationId },
+                data: { status, ...revised(ctx) },
+            });
         });
         return this.readPack(ctx.organizationId, id);
+    }
+
+    // — Drafts (E14): the Pack Editor's read and writes ——————————————
+    // Each write answers with the pack as the editor reads it; a stale
+    // `revision` is a 409 naming who saved since, and writes nothing.
+
+    /** A pack as the editor reads it: values, what's live, the revision. */
+    async getPackEditor(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<PackEditorView> {
+        authorize(ctx, "pack:read");
+        return readPackEditor(ctx.organizationId, id);
+    }
+
+    /** The editor's first save of a new pack: a DRAFT nobody can buy. */
+    async createPackDraft(
+        ctx: OrganizationContext,
+        dto: PackInputDto,
+    ): Promise<PackEditorView> {
+        authorize(ctx, "pack:write");
+        const id = await createPackDraft(ctx, dto);
+        return readPackEditor(ctx.organizationId, id);
+    }
+
+    /** Autosave: a draft's fields, or a live pack's unpublished changes. */
+    async savePackDraft(
+        ctx: OrganizationContext,
+        id: string,
+        dto: PackDraftDto,
+    ): Promise<PackEditorView> {
+        authorize(ctx, "pack:write");
+        await savePackDraft(ctx, id, dto);
+        return readPackEditor(ctx.organizationId, id);
+    }
+
+    /** Put a draft on sale, or make a live pack's changes its terms. */
+    async publishPack(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<PackEditorView> {
+        authorize(ctx, "pack:write");
+        await publishPack(ctx, id, revision);
+        return readPackEditor(ctx.organizationId, id);
+    }
+
+    /** Drop a live pack's unpublished changes. */
+    async discardPackChanges(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<PackEditorView> {
+        authorize(ctx, "pack:write");
+        await discardPackChanges(ctx, id, revision);
+        return readPackEditor(ctx.organizationId, id);
+    }
+
+    /** Delete a draft nobody has bought. */
+    async deletePackDraft(
+        ctx: OrganizationContext,
+        id: string,
+        revision: number,
+    ): Promise<void> {
+        authorize(ctx, "pack:write");
+        await deletePackDraft(ctx, id, revision);
     }
 
     // — Purchases ——————————————————————————————————————————————————
@@ -305,11 +423,8 @@ export class ClassPacksService {
         ]);
         if (!pack) notFound("Class pack");
         if (!contact) notFound("Contact", "contactId");
-        if (pack.status !== "ACTIVE") {
-            throw new ConflictException(
-                "That pack is archived and is not sold any more.",
-            );
-        }
+        // A draft isn't published yet, an archived pack isn't sold (E14).
+        assertPackOnSale(pack);
 
         const price = toMoneyString(pack.price);
         const id = await prisma.$transaction(async (tx) => {
@@ -510,6 +625,31 @@ export class ClassPacksService {
 
     // — internals —————————————————————————————————————————————————
 
+    /**
+     * Take the pack's row lock, and refuse a draft with `message` (409): the
+     * old whole-pack writes never see one. Answers the status it had.
+     */
+    private async lockOutOfDraft(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+        id: string,
+        message: string,
+    ): Promise<string> {
+        await lockPack(tx, organizationId, id);
+        const row = await tx.classPack.findFirst({
+            where: { id, organizationId },
+            select: { status: true },
+        });
+        if (!row) notFound("Class pack");
+        if (row.status === PACK_DRAFT) {
+            throw new ConflictException({
+                message,
+                details: { field: "status" },
+            });
+        }
+        return row.status;
+    }
+
     /** Every service id from the client belongs to this business, or it is a 404. */
     private async assertServices(
         organizationId: string,
@@ -598,9 +738,14 @@ export class ClassPacksService {
             status: string;
             createdAt: Date;
             services: { service: { id: string; name: string } }[];
+            pendingChanges?: unknown;
+            pendingChangedAt?: Date | null;
         },
         holders: { sold: number; active: number } | undefined,
     ): PackView {
+        const pending =
+            row.status !== PACK_DRAFT &&
+            readPending(PACK_DRAFT_FIELDS, row.pendingChanges) !== null;
         return {
             id: row.id,
             name: row.name,
@@ -613,6 +758,11 @@ export class ClassPacksService {
             services: row.services.map((s) => s.service),
             sold: holders?.sold ?? 0,
             activeHolders: holders?.active ?? 0,
+            hasPendingChanges: pending,
+            pendingChangedAt:
+                row.status === PACK_DRAFT || pending
+                    ? (row.pendingChangedAt?.toISOString() ?? null)
+                    : null,
             createdAt: row.createdAt.toISOString(),
         };
     }

@@ -124,6 +124,12 @@ export const sheetInput = cn(
     focusRing,
 );
 
+/** A sheet's second way out, under its main button ("Pause instead"). */
+export const sheetAltButton = cn(
+    "text-site-fg mt-2 block h-11 w-full cursor-pointer text-sm font-semibold underline hover:opacity-80 active:opacity-70 disabled:cursor-default disabled:opacity-60",
+    focusRing,
+);
+
 /** A sheet's main button: the accent when it can go, quiet when not. */
 export function sheetButton(off: boolean): string {
     return cn(

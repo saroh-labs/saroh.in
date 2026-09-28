@@ -13,6 +13,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
+import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
     LineRefundRequest,
     PlannedLineRefund,
@@ -112,6 +113,8 @@ export interface InitiateRefundResult {
 interface RefundRow {
     id: string;
     paymentIntentId: string;
+    /** A cancel's refund carries its key (`orders/order-cancel.ts`, B9). */
+    idempotencyKey: string | null;
     amountCents: number;
     currency: string;
     status: string;
@@ -667,6 +670,44 @@ export class PaymentsService {
     }
 
     /**
+     * "Cancel order…" (B9): everything still refundable, by what is left of
+     * each line, with the reason, through the same two phases as any
+     * refund. `payment:manage`. `guard` runs under the order's row lock
+     * before anything is reserved, so the cancel's own refusals (handed
+     * over, cancelled already) are read where no stage move can slip in.
+     * The refund rows carry the cancel's key (`order-cancel.ts`); the order
+     * is marked cancelled as the provider answers for them.
+     */
+    async refundOrderForCancel(
+        ctx: OrganizationContext,
+        orderId: string,
+        input: {
+            reason: string | null;
+            idempotencyKey: string;
+            guard: (tx: Prisma.TransactionClient) => Promise<void>;
+        },
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "payment:manage");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        return this.refundOrder(ctx, order, {
+            idempotencyKey: input.idempotencyKey,
+            reason: input.reason,
+            forEdit: false,
+            plan: async (tx) => {
+                await input.guard(tx);
+                const refundable = await refundableLines(tx, order.id);
+                return {
+                    amountCents: "REMAINING",
+                    lines: planRemainingLines(
+                        refundable,
+                        totalToCents(order.discount),
+                    ),
+                };
+            },
+        });
+    }
+
+    /**
      * Take the difference when an order is edited up after it was paid (U6):
      * a new payment on the ORDER for exactly that amount — the order stays
      * the ledger for its own payments. `payment:manage`. Idempotent by key.
@@ -1211,6 +1252,23 @@ export class PaymentsService {
             } catch (err) {
                 this.logger.warn(
                     `Refund ${row.id} taken; its credit note waits for the webhook: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+        // A cancel's refund (B9): once the provider has every part of it,
+        // the order is marked cancelled — here, or by whichever path hears
+        // of its last part.
+        if (taken.some(({ row }) => isCancelRefundKey(row.idempotencyKey))) {
+            try {
+                await prisma.$transaction(async (tx) => {
+                    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+                    await finishCancelInTx(tx, orderId, ctx.userId);
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Refund for cancelling order ${orderId} taken; the cancel waits for the webhook: ${
                         err instanceof Error ? err.message : String(err)
                     }`,
                 );

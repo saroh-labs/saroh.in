@@ -32,7 +32,7 @@ import {
     typeOf,
 } from "./fulfilment";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
-import type { OrderListQuery } from "./order-list";
+import type { OrderListCaller, OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
 import { orderFilterOptions, searchOrderProducts } from "./order-list-options";
 import { retireOrderPayLinkInTx } from "./order-pay-link";
@@ -88,13 +88,16 @@ export class OrdersService {
      * and NEVER by a store id the caller sent: `storeId` and every other
      * filter only NARROW inside the organization, so a tampered value can at
      * worst return nothing. See `order-list.ts`.
+     *
+     * With the caller (`viewer`), each row carries the customer's Needs
+     * attention as they may see it, and the filter reads the same (B15).
      */
     listRows(
         organizationId: string,
         query: OrderListQuery,
-        view: { money: boolean; contact: boolean },
+        caller: OrderListCaller,
     ) {
-        return listOrderRows(organizationId, query, view);
+        return listOrderRows(organizationId, query, caller);
     }
 
     /**

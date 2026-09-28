@@ -24,6 +24,7 @@ describe("the Add block groups", () => {
             "servicesList",
             "visitUs",
             "journal",
+            "plans",
         ]);
     });
 });

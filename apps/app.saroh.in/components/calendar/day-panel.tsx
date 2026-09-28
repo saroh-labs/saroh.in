@@ -12,6 +12,8 @@ import {
     itemsTotal,
 } from "@/lib/calendar/layers";
 import { toMajor, wholeMoney } from "@/lib/calendar/money";
+import type { ProblemCan } from "@/lib/calendar/problems";
+import { problemAction, problemOf } from "@/lib/calendar/problems";
 import type { Shortcut } from "@/lib/calendar/range";
 import type { CalendarDay, LayerKey } from "@/lib/calendar/types";
 
@@ -35,7 +37,9 @@ const LAYER_HOME: Record<LayerKey, string> = {
  * One day, grouped by layer, each thing a link to its record. The side panel
  * on the desk, the sheet between 760 and 1100px, and the list under the month
  * on a phone — one body, so the three cannot say different things. A day
- * from today offers what can be made on it (E21).
+ * from today offers what can be made on it (E21), and a named problem —
+ * a failed renewal, a late order, an overdue invoice, a no-show — shows
+ * its fix beside it (E22).
  */
 export function DayPanel({
     day,
@@ -46,6 +50,7 @@ export function DayPanel({
     currency,
     heading,
     shortcuts = [],
+    can,
 }: {
     day: CalendarDay;
     layers: LayerStyle[];
@@ -57,8 +62,12 @@ export function DayPanel({
     heading: (title: string) => React.ReactNode;
     /** "New order", "Book": what this person may make on this day. */
     shortcuts?: Shortcut[];
+    /** The fixes this person may make to a named problem (E22). */
+    can: ProblemCan;
 }) {
     const n = dayCount(day, layers, off);
+    // A shop's renewals are subscriptions; a diary's, memberships.
+    const shop = layers.some((l) => l.key === "orders");
     const ahead = day.date > today;
     const groups = layers.filter(
         (l) => !off[l.key] && (day.layers[l.key]?.count ?? 0) > 0,
@@ -140,11 +149,20 @@ export function DayPanel({
                                     timeZone,
                                     ahead,
                                 });
+                                // A named problem carries its fix (E22). The
+                                // whole row opens where the fix is made.
+                                const problem = problemOf(layer.key, item, {
+                                    date: day.date,
+                                    today,
+                                });
+                                const action = problem
+                                    ? problemAction(problem, { can, shop })
+                                    : null;
                                 return (
                                     <li key={item.id}>
                                         <Link
                                             href={line.href}
-                                            className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-[7px] text-foreground hover:bg-muted"
+                                            className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-[7px] text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
                                         >
                                             <span className="min-w-0 flex-1">
                                                 <span className="block truncate text-[13px] font-semibold">
@@ -167,6 +185,11 @@ export function DayPanel({
                                                 >
                                                     {line.flag.label}
                                                 </Badge>
+                                            ) : null}
+                                            {action ? (
+                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-brand underline underline-offset-2">
+                                                    {action}
+                                                </span>
                                             ) : null}
                                             {item.amount !== undefined &&
                                             item.currency ? (

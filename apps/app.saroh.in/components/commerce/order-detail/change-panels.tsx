@@ -1,19 +1,26 @@
 import { Button } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
 
 import { actionClass, Panel, PanelTitle } from "./parts";
 
 /**
  * "Change this order", under Items where the controls sit by what they
- * change: edit items or address (only before preparing), and refund by line.
- * Only for Owner and Admin — a Member's page has neither (DEC-024), so it is
- * not drawn for them at all rather than drawn disabled.
+ * change: edit items or address (only before preparing), refund by line,
+ * and — until it is handed over — change how it's fulfilled and cancel as
+ * a refund in full (B9). Only for someone who may change or refund orders:
+ * a Member's page has none of it (DEC-024), so it is not drawn for them at
+ * all rather than drawn disabled. Each button says why when it can't.
  */
 export function ChangeCard({
     canEdit,
     editable,
     canRefund,
+    fulfilment = undefined,
+    cancel = undefined,
     onEdit,
     onRefund,
+    onFulfilment,
+    onCancel,
 }: {
     /** May change orders (`order:write`). */
     canEdit: boolean;
@@ -21,14 +28,25 @@ export function ChangeCard({
     editable: boolean;
     /** Null when a refund can be started; else why not. */
     canRefund: string | null;
+    /**
+     * "Change how it's fulfilled…": null when it can open, else why not.
+     * Undefined (an API before B9): not drawn.
+     */
+    fulfilment?: string | null;
+    /** "Cancel order…": null when it can open, else why not. */
+    cancel?: string | null;
     onEdit: () => void;
     onRefund: () => void;
+    onFulfilment?: () => void;
+    onCancel?: () => void;
 }) {
     const editNote = !canEdit
         ? "Changing items is for owners and admins."
         : editable
-          ? "Items and address can change until preparing starts."
-          : "Preparing has started — refund what is wrong and add a new order.";
+          ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
+          : fulfilment === null
+            ? "Items are locked now that preparing has started. How it's fulfilled can still change until it's handed over."
+            : "Preparing has started — refund what is wrong and add a new order.";
     return (
         <Panel aria-labelledby="od-change">
             <PanelTitle id="od-change" className="mb-2.5">
@@ -59,6 +77,34 @@ export function ChangeCard({
                 >
                     Refund…
                 </Button>
+                {fulfilment !== undefined ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={actionClass("ghost")}
+                        disabled={fulfilment !== null}
+                        title={fulfilment ?? undefined}
+                        onClick={onFulfilment}
+                    >
+                        Change how it&apos;s fulfilled…
+                    </Button>
+                ) : null}
+                {cancel !== undefined ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                            actionClass("ghost"),
+                            cancel === null &&
+                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                        )}
+                        disabled={cancel !== null}
+                        title={cancel ?? undefined}
+                        onClick={onCancel}
+                    >
+                        Cancel order…
+                    </Button>
+                ) : null}
             </div>
             <p className="mt-[7px] text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
                 {editNote}

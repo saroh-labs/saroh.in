@@ -7,6 +7,7 @@ import {
     changedSections,
     depositNote,
     draftOf,
+    draftVisits,
     fromMinor,
     glance,
     needsMeetingLink,
@@ -21,6 +22,7 @@ import {
     statePill,
     timeNote,
     toMinor,
+    TREATMENT_NEEDS_STOREFRONT,
     whereNote,
 } from "./service-editor";
 
@@ -77,6 +79,7 @@ describe("draftOf", () => {
             kind: "one",
             minutes: "60",
             gap: "15",
+            visits: "3",
             places: "",
             where: "IN_PERSON",
             meetingUrl: "",
@@ -211,7 +214,7 @@ describe("serviceProblems", () => {
 });
 
 describe("serviceInput", () => {
-    it("sends the fields as the API takes them, the deposit's mode, and never visits", () => {
+    it("sends the fields as the API takes them, the deposit's mode and the visits", () => {
         const input = serviceInput(
             draft({ where: "EITHER", meetingUrl: " https://meet.x/y " }),
             "INR",
@@ -232,8 +235,8 @@ describe("serviceInput", () => {
             meetingUrl: "https://meet.x/y",
             showOnBookingPage: true,
             depositMode: "PERCENT_50",
+            visits: 3,
         });
-        expect(input).not.toHaveProperty("visits");
         // Never an amount: the server works the deposit out (E8).
         expect(input).not.toHaveProperty("depositCents");
     });
@@ -375,7 +378,9 @@ describe("the words around the editor", () => {
 
 describe("glance", () => {
     it("shows the price, the time it needs and how it is booked", () => {
-        expect(glance(draft(), { thisWeek: 4, comingUp: 7 }, "INR")).toEqual([
+        expect(
+            glance(draft({ visits: "1" }), { thisWeek: 4, comingUp: 7 }, "INR"),
+        ).toEqual([
             ["Price", "₹1,200"],
             ["Time needed", "60 min + 15 min gap"],
             ["Booked this week", "4"],
@@ -383,8 +388,18 @@ describe("glance", () => {
         ]);
     });
 
+    it("a treatment's price is for every visit, and so is its time (E10)", () => {
+        expect(glance(draft(), { thisWeek: 4, comingUp: 7 }, "INR")).toEqual([
+            ["Price", "₹1,200 for 3 visits"],
+            ["Per visit", "₹400"],
+            ["Time needed", "3 × 60 min"],
+            ["Booked this week", "4"],
+            ["Still to come", "7"],
+        ]);
+    });
+
     it("says Free at 0, a dash for no price, and a failed count as such", () => {
-        const rows = glance(draft({ price: "0" }), null, "INR");
+        const rows = glance(draft({ price: "0", visits: "1" }), null, "INR");
         expect(rows[0]).toEqual(["Price", "Free"]);
         expect(rows[2]).toEqual(["Booked this week", "Couldn't count"]);
         expect(glance(draft({ price: "" }), null, "INR")[0]).toEqual([
@@ -462,6 +477,57 @@ describe("At booking, they pay (E8)", () => {
     it("counts a changed deposit as a change to Price", () => {
         expect(changedSections(draft(), draft({ deposit: "FULL" }))).toEqual([
             "Price",
+        ]);
+    });
+});
+
+describe("visits (E10)", () => {
+    it("reads a class as one visit, and never sends visits for one", () => {
+        expect(draftOf(service({ capacity: 8 }), [], "UTC").visits).toBe("1");
+        expect(
+            serviceInput(draft({ kind: "class", places: "8" }), "INR").visits,
+        ).toBe(1);
+        expect(draftVisits({ kind: "one", visits: "" })).toBe(1);
+        expect(draftVisits({ kind: "one", visits: "40" })).toBe(12);
+    });
+
+    it("refuses visits outside 1 to 12 on a one-to-one", () => {
+        expect(serviceProblems(draft({ visits: "0" }), false)).toContain(
+            "Visits has to be between 1 and 12.",
+        );
+        expect(serviceProblems(draft({ visits: "13" }), false)).toContain(
+            "Visits has to be between 1 and 12.",
+        );
+        expect(
+            serviceProblems(
+                draft({ kind: "class", places: "8", visits: "0" }),
+                false,
+            ),
+        ).not.toContain("Visits has to be between 1 and 12.");
+    });
+
+    it("refuses a treatment without a storefront, and says where to add one", () => {
+        expect(serviceProblems(draft(), false, true)).toContain(
+            TREATMENT_NEEDS_STOREFRONT,
+        );
+        expect(serviceProblems(draft({ visits: "1" }), false, true)).toEqual(
+            [],
+        );
+        expect(serviceProblems(draft(), false, false)).toEqual([]);
+    });
+
+    it("says how the visits are booked, and the rest paid over them", () => {
+        expect(timeNote("one", true, 3, 60)).toBe(
+            "3 visits of 60 min, booked one at a time. The order is fulfilled after the last visit.",
+        );
+        expect(depositNote("PERCENT_50", "1200", "INR", 3)).toBe(
+            "They pay ₹600 when booking, and the rest (₹600) over the visits. Refunded if they cancel in time.",
+        );
+    });
+
+    it("counts a change of visits under Time", () => {
+        expect(changedSections(draft(), draft({ visits: "4" }))).toEqual([
+            "Time",
         ]);
     });
 });

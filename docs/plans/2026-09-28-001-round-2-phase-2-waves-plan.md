@@ -196,7 +196,8 @@ one exists.
 | Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later |
 | Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later |
 | Z3 | Remove the calendar's month-query alias | After E20 is live |
-| Z4 | Remove the `company` business-type alias | A release after F10 |
+| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 |
+| Z4 | Remove the `company` business-type alias | A release after F10b |
 | Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it |
 | Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 |
 

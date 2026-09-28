@@ -17,6 +17,7 @@ export type { Section } from "./section-renderer";
 
 export {
     BlockFixturePreview,
+    SAMPLE_PLANS,
     SAMPLE_POSTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
@@ -42,6 +43,15 @@ export {
     todayHref,
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
+export {
+    PLANS_BUTTON,
+    default as PlansSection,
+    joinHref,
+    planEvery,
+    planPrice,
+    plansOf,
+} from "./blocks/plans";
+export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
@@ -160,27 +170,74 @@ export { SignInSheet } from "./account/sign-in-sheet";
 export type { SignInSheetProps } from "./account/sign-in-sheet";
 
 // The customer account area (plan A, A5): the header's entry, the tab bar,
-// Home and Me. Data arrives from the site's server; changes go through its
+// Home, Me and Messages (A13). Data arrives from the site's server; changes go through its
 // server actions.
 export { AccountEntry } from "./account/account-entry";
 export { AccountHome } from "./account/account-home";
 export { Me } from "./account/me";
 export type { DetailsResult, MeApi, MeProps, NoteResult } from "./account/me";
+export { AccountMessages } from "./account/messages";
+export type {
+    AccountMessagesProps,
+    MessagesApi,
+    SendResult,
+} from "./account/messages";
+// A7: the Orders tab and an order's Track; A8: the Plan tab.
 export type {
     Block as AccountBlock,
     AccountBooking,
     AccountClasses,
     AccountHome as AccountHomeData,
+    AccountMessage,
     AccountNote,
     AccountOrder,
+    AccountOrderDetail,
+    AccountOrderLine,
+    AccountOrderVisit,
+    AccountPack,
     AccountPlan,
+    AccountPlanTab,
     AccountReceipt,
+    AccountSubscription,
     AccountTab,
     AccountTabKey,
+    AccountThread,
+    AccountTrackStep,
     AccountView,
 } from "./account/model";
+export { AccountOrders, ORDERS_HREF, trackHref } from "./account/orders-list";
+// A6: the Bookings tab, its Move and Cancel sheets, and a class moved on the
+// booking page.
+export type {
+    CancelResult as AccountCancelAnswer,
+    MoveResult as AccountMoveAnswer,
+    TimesResult as AccountTimesAnswer,
+    VisitResult as AccountVisitAnswer,
+    BookingsApi,
+} from "./account/bookings-api";
+export { AccountBookingsTab } from "./account/bookings-list";
+export { BOOKINGS_HREF, moveClassHref } from "./account/bookings-model";
+export type {
+    AccountBookingRow,
+    AccountBookingState,
+    AccountBookings,
+    AccountCancelResult,
+    AccountCancelTerms,
+    AccountTimes,
+    AccountTreatment,
+    AccountTreatmentVisit,
+} from "./account/bookings-model";
+export { MoveClass } from "./account/move-class";
 export { AccountCard } from "./account/parts";
+export { PlanTab } from "./account/plan-tab";
+export type {
+    PayNowResult,
+    PlanApi,
+    PlanChangeResult,
+    PlanTabProps,
+} from "./account/plan-tab";
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+export type { TrackLookup } from "./account/track-sheet";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";

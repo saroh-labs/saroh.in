@@ -22,7 +22,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
-import type { BookInput } from "./reservation";
+import type { BookInput, SignedInBooker } from "./reservation";
 import { loadBookableService, reserveInTx } from "./reservation";
 
 /*
@@ -108,6 +108,39 @@ export async function requireTreatmentStorefront(
         });
     }
     return store;
+}
+
+/** Why a service of more than one visit can't be saved (E10). */
+export const TREATMENT_NEEDS_STOREFRONT =
+    "Treatments are sold as orders — add a storefront first.";
+
+/**
+ * The Service Editor's rule (E10): a service of more than one visit is a
+ * treatment, sold as an order, so it needs a storefront to sell from, and
+ * it is one-to-one (a class is booked a session at a time). Asked when a
+ * service is made a treatment — created with visits, or raised from one —
+ * so a service that already is one still saves when its storefront is
+ * closed later; the booking page refuses it then (E9).
+ */
+export async function assertTreatmentSellable(
+    service: Pick<Service, "organizationId" | "siteId">,
+    input: { visits: number; capacity: number; wasTreatment: boolean },
+): Promise<void> {
+    if (input.visits <= 1) return;
+    if (input.capacity > 1) {
+        throw new BadRequestException({
+            message:
+                "Visits are for one-to-one services. A class is booked a session at a time.",
+            details: { field: "visits" },
+        });
+    }
+    if (input.wasTreatment) return;
+    if (!(await treatmentStorefront(prisma, service))) {
+        throw new ConflictException({
+            message: TREATMENT_NEEDS_STOREFRONT,
+            details: { reason: "no-storefront", field: "visits" },
+        });
+    }
 }
 
 /** The email a treatment's bill goes to, or the refusal that asks for one. */
@@ -271,6 +304,8 @@ export async function startTreatmentInTx(
             tax: fromCents(taxCents),
             total: fromCents(priceCents),
             fulfilment: appointmentType(booking, service),
+            // Booked signed in: the account's Orders find it by this (A7).
+            customerAccountId: booking.customerAccountId,
             items: {
                 create: {
                     serviceId: service.id,
@@ -308,9 +343,17 @@ export interface BookVisitInput {
  * treatment was sold once, on its order.
  */
 export async function bookVisit(
-    ctx: OrganizationContext,
+    ctx: Pick<OrganizationContext, "organizationId"> & {
+        userId: string | null;
+    },
     orderId: string,
     dto: BookVisitInput,
+    /**
+     * The customer booking it themselves from their account (A6): the
+     * booking goes on their account's contact, names the account, and a
+     * time they can't have reads as gone rather than why.
+     */
+    customer?: SignedInBooker,
 ): Promise<Booking> {
     const n = dto.visitNumber;
     const order = await prisma.order.findFirst({
@@ -376,7 +419,7 @@ export async function bookVisit(
         staffing,
         startAt,
         dto.staffId,
-        "team",
+        customer ? "public" : "team",
     );
     // The treatment's customer, as its first visit was booked.
     const first = order.bookings.length > 0 ? order.bookings[0] : null;
@@ -417,7 +460,13 @@ export async function bookVisit(
                     startAt,
                     endAt,
                     booker,
-                    { source: "manual", actorUserId: ctx.userId },
+                    customer
+                        ? {
+                              source: `booking:service:${service.id}`,
+                              actorUserId: null,
+                              account: customer,
+                          }
+                        : { source: "manual", actorUserId: ctx.userId },
                     undefined,
                     {
                         ...person,

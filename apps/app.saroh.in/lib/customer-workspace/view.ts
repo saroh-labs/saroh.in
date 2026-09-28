@@ -13,6 +13,7 @@ import type {
     MembershipAllowance,
     MoneyTotal,
 } from "./detail";
+import type { CustomerThread } from "./thread";
 
 /**
  * How Customer Detail says a customer (plan 2026-09-23-003, U18, after
@@ -35,7 +36,7 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
-export type TabKey = "over" | "ord" | "bk" | "sub" | "inv" | "notes";
+export type TabKey = "over" | "ord" | "bk" | "sub" | "inv" | "msg" | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -50,7 +51,7 @@ export interface Tab {
  * A block this viewer may not read is absent from the read, so its tab is
  * too: a Member sees no Subscriptions or Invoices.
  */
-export function tabsFor(d: CustomerDetail): Tab[] {
+export function tabsFor(d: CustomerDetail, thread: ThreadRead = null): Tab[] {
     const kind = kindOf(d);
     const tabs: Tab[] = [{ key: "over", label: "Overview", count: null }];
     if (d.orders !== undefined) {
@@ -81,12 +82,39 @@ export function tabsFor(d: CustomerDetail): Tab[] {
             count: d.invoices ? d.invoices.rows.length : null,
         });
     }
+    if (showsThread(thread)) {
+        tabs.push({
+            key: "msg",
+            label: "Messages",
+            // New from the customer: the tab's count is what's unread.
+            count: thread === "failed" ? null : thread.unread || null,
+        });
+    }
     tabs.push({
         key: "notes",
         label: "Notes",
         count: d.notes ? d.notes.rows.length : null,
     });
     return tabs;
+}
+
+/**
+ * The Messages tab's read (A13): the thread, "failed" when it couldn't be
+ * read, or null when there is nothing to show — the viewer can't read
+ * messages, or the account area is still off.
+ */
+export type ThreadRead = CustomerThread | "failed" | null;
+
+/**
+ * Messages shows for someone who can write in (they sign in on the site) or
+ * has written already, and when the read failed, so the failure is said.
+ */
+export function showsThread(
+    thread: ThreadRead,
+): thread is CustomerThread | "failed" {
+    if (thread === null) return false;
+    if (thread === "failed") return true;
+    return thread.signsIn || thread.messages.length > 0;
 }
 
 /** `?tab=` — one of this customer's tabs, else Overview. */

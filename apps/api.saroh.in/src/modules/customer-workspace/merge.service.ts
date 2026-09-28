@@ -13,6 +13,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { reservedMergedEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
+import { absorbThread } from "../site-accounts/thread-store";
 import type {
     AccountPlan,
     ConsentChannel,
@@ -623,7 +624,13 @@ async function countMoves(
         tx.contactAttention.count({
             where: { contactId: from, removedAt: null },
         }),
-        tx.message.count({ where: { contactId: from } }),
+        // Emails, and messages in their account thread (A13).
+        Promise.all([
+            tx.message.count({ where: { contactId: from } }),
+            tx.customerThreadMessage.count({
+                where: { thread: { contactId: from } },
+            }),
+        ]).then(([emails, thread]) => emails + thread),
         tx.lead.count({ where: { contactId: from } }),
         tx.submission.count({ where: { contactId: from } }),
         tx.customerIdentityLink.count({
@@ -677,6 +684,9 @@ async function moveRelations(tx: Tx, pair: Pair): Promise<void> {
     await tx.customerIdentityLink.updateMany(move);
 
     await collapseAttention(tx, pair);
+
+    // One thread: the survivor's absorbs the other's (A13).
+    await absorbThread(tx, pair.survivor.organizationId, from, to);
 
     // "This isn't them" stays true of the survivor, unless the account now
     // signs in on it (then there is nobody to part it from).

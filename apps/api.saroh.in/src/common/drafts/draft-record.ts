@@ -16,8 +16,29 @@ import { ConflictException } from "@nestjs/common";
  * not a stable API, and a DTO field (the revision) is not a record field.
  */
 
-/** A value a draft field holds: money travels as "1500.00". */
-export type DraftValue = string | number | null;
+/**
+ * A value a draft field holds: money travels as "1500.00". A list (a pack's
+ * services, E14) is a set of ids the record keeps sorted, so two lists are
+ * the same value only when they hold the same ids in the same order.
+ */
+export type DraftValue = string | number | null | readonly string[];
+
+/** Whether two field values are the same: lists by their items. */
+export function sameValue(a: DraftValue, b: DraftValue): boolean {
+    if (Array.isArray(a) || Array.isArray(b)) {
+        if (!Array.isArray(a) || !Array.isArray(b)) return false;
+        return a.length === b.length && a.every((v, i) => v === b[i]);
+    }
+    return a === b;
+}
+
+/** A stored value a field can hold: a string, a number, null or a string list. */
+function isDraftValue(v: unknown): v is DraftValue {
+    if (v === null || typeof v === "string" || typeof v === "number") {
+        return true;
+    }
+    return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
 
 /** A record's values: every field a {@link DraftValue}. */
 export type DraftValues<V> = Record<keyof V, DraftValue>;
@@ -61,9 +82,7 @@ export function readPending<V extends DraftValues<V>>(
     for (const field of fields) {
         if (!(field in raw)) continue;
         const v = raw[field];
-        if (v === null || typeof v === "string" || typeof v === "number") {
-            out[field] = v;
-        }
+        if (isDraftValue(v)) out[field] = v;
     }
     return Object.keys(out).length ? (out as DraftPatch<V>) : null;
 }
@@ -91,7 +110,7 @@ export function nextPending<V extends DraftValues<V>>(
     for (const field of fields) {
         if (!(field in merged)) continue;
         const v = merged[field] as DraftValue;
-        if (v !== live[field]) out[field] = v;
+        if (!sameValue(v, live[field])) out[field] = v;
     }
     return Object.keys(out).length ? (out as DraftPatch<V>) : null;
 }
@@ -104,7 +123,7 @@ export function diffValues<V extends DraftValues<V>>(
 ): DraftChanges<V> {
     const out: DraftChanges<V> = {};
     for (const field of fields) {
-        if (before[field] !== after[field]) {
+        if (!sameValue(before[field], after[field])) {
             out[field] = [before[field], after[field]];
         }
     }
@@ -119,11 +138,9 @@ export function samePending<V extends DraftValues<V>>(
     const ka = Object.keys(a ?? {});
     const kb = Object.keys(b ?? {});
     if (ka.length !== kb.length) return false;
-    return ka.every(
-        (k) =>
-            (a as Record<string, unknown>)[k] ===
-            (b as Record<string, unknown> | null)?.[k],
-    );
+    const av = (a ?? {}) as Record<string, DraftValue>;
+    const bv = (b ?? {}) as Record<string, DraftValue>;
+    return ka.every((k) => k in bv && sameValue(av[k], bv[k]));
 }
 
 /** The last save to a record's draft state, for a stale editor's 409. */

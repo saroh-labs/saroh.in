@@ -38,11 +38,14 @@ import type {
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PauseWeeks,
     PlanDraftDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
+    SubscriptionSettingsDto,
 } from "./dto";
+import { overdueInvoiceOf, takesPaymentOnline } from "./member-invoices";
 import type { PauseEnded } from "./pause-until";
 import {
     pausedEventData,
@@ -75,11 +78,17 @@ import type {
 } from "./subscription-events";
 import {
     collectionChanges,
+    customerActor,
     JOB,
     listSubscriptionEvents,
     subscriptionActor,
     subscriptionEventLog,
 } from "./subscription-events";
+import type { SubscriptionSettingsView } from "./subscription-settings";
+import {
+    readSubscriptionSettings,
+    writeSubscriptionSettings,
+} from "./subscription-settings";
 
 type Tx = Prisma.TransactionClient;
 
@@ -208,6 +217,17 @@ export interface SubscriptionView {
      */
     startedAt: string;
     createdAt: string;
+}
+
+/**
+ * A member acting on their own subscription from their account on the
+ * business's site (round-2 A8): the business, their contact, and the site
+ * account that acted, as `CustomerSessionGuard` resolved them.
+ */
+export interface CustomerScope {
+    organizationId: string;
+    contactId: string;
+    accountId: string;
 }
 
 /** What the renewal job did to one subscription, for its run's log. */
@@ -647,28 +667,61 @@ export class SubscriptionsService {
         authorize(ctx, "subscription:write");
         await prisma.$transaction(async (tx) => {
             const sub = await this.lock(tx, ctx.organizationId, id);
-            if (sub.status !== "ACTIVE") {
-                throw new ConflictException(
-                    sub.status === "PAUSED"
-                        ? "This subscription is already paused."
-                        : "A cancelled subscription cannot be paused.",
-                );
-            }
-            const now = new Date();
-            const pausedUntil = pauseEnd(dto, now, sub.timezone);
-            await tx.customerSubscription.update({
-                where: { id },
-                data: { status: "PAUSED", pausedAt: now, pausedUntil },
-            });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("PAUSED", {
-                data: pausedEventData(pausedUntil),
-            });
+            await this.pauseLocked(tx, sub, dto, this.log(tx, ctx, id));
         });
         return this.read(ctx, id);
+    }
+
+    /**
+     * A member pausing their own plan from their account (round-2 A8): for
+     * a number of weeks only, so it always has an end date — "until I
+     * resume" stays a staff choice (D8). Found by id **and** the member's
+     * contact: anyone else's is a 404. Whether the business lets members
+     * pause is the caller's check (`account-plan.service.ts`).
+     */
+    async pauseForCustomer(
+        member: CustomerScope,
+        id: string,
+        weeks: PauseWeeks,
+    ): Promise<{ pausedUntil: Date | null; timezone: string }> {
+        return prisma.$transaction(async (tx) => {
+            const sub = await this.lock(
+                tx,
+                member.organizationId,
+                id,
+                member.contactId,
+            );
+            const pausedUntil = await this.pauseLocked(
+                tx,
+                sub,
+                { weeks },
+                this.customerLog(tx, member, id),
+            );
+            return { pausedUntil, timezone: sub.timezone };
+        });
+    }
+
+    private async pauseLocked(
+        tx: Tx,
+        sub: SubscriptionRow,
+        dto: PauseSubscriptionDto,
+        log: SubscriptionEventLog,
+    ): Promise<Date | null> {
+        if (sub.status !== "ACTIVE") {
+            throw new ConflictException(
+                sub.status === "PAUSED"
+                    ? "This subscription is already paused."
+                    : "A cancelled subscription cannot be paused.",
+            );
+        }
+        const now = new Date();
+        const pausedUntil = pauseEnd(dto, now, sub.timezone);
+        await tx.customerSubscription.update({
+            where: { id: sub.id },
+            data: { status: "PAUSED", pausedAt: now, pausedUntil },
+        });
+        await log("PAUSED", { data: pausedEventData(pausedUntil) });
+        return pausedUntil;
     }
 
     /**
@@ -691,6 +744,50 @@ export class SubscriptionsService {
             });
         });
         return this.read(ctx, id);
+    }
+
+    /**
+     * A member resuming their own paused plan from their account (A8), by
+     * the same code as a resume by hand. Found by id and the member's
+     * contact. A restart past the paid period bills, so with Payments off
+     * it is refused in the member's words rather than the team's.
+     */
+    async resumeForCustomer(
+        member: CustomerScope,
+        id: string,
+    ): Promise<{ restarted: boolean; renewsAt: Date; timezone: string }> {
+        return prisma.$transaction(async (tx) => {
+            const sub = await this.lock(
+                tx,
+                member.organizationId,
+                id,
+                member.contactId,
+            );
+            if (sub.status !== "PAUSED" || !sub.pausedAt) {
+                throw new ConflictException("This plan isn't paused.");
+            }
+            const now = new Date();
+            const restarts =
+                now >= sub.currentPeriodEnd && !sub.cancelAtPeriodEnd;
+            if (restarts && !(await paymentsOn(tx, sub.organizationId))) {
+                throw new ConflictException(
+                    "Your plan can't restart online just now. Ask the business to restart it for you.",
+                );
+            }
+            await this.resumeLocked(tx, sub, this.customerLog(tx, member, id), {
+                now,
+                createdByUserId: null,
+            });
+            const after = await tx.customerSubscription.findFirstOrThrow({
+                where: { id, organizationId: member.organizationId },
+                select: { currentPeriodEnd: true },
+            });
+            return {
+                restarted: restarts,
+                renewsAt: after.currentPeriodEnd,
+                timezone: sub.timezone,
+            };
+        });
     }
 
     /**
@@ -868,6 +965,64 @@ export class SubscriptionsService {
             });
         });
         return this.read(ctx, id);
+    }
+
+    /**
+     * A member cancelling their own plan from their account (A8): at the
+     * end of the period, never today, so they keep what they paid for. A
+     * paused plan has nothing running to let run out, so it stops now, as
+     * a team member's cancel does. A plan already set to end changes
+     * nothing and records nothing: `already`.
+     */
+    async cancelForCustomer(
+        member: CustomerScope,
+        id: string,
+    ): Promise<{
+        outcome: "scheduled" | "already" | "now";
+        endsAt: Date;
+        timezone: string;
+    }> {
+        return prisma.$transaction(async (tx) => {
+            const sub = await this.lock(
+                tx,
+                member.organizationId,
+                id,
+                member.contactId,
+            );
+            const said = {
+                endsAt: sub.currentPeriodEnd,
+                timezone: sub.timezone,
+            };
+            if (sub.status === "CANCELLED") {
+                throw new ConflictException("This plan has already ended.");
+            }
+            if (sub.status === "ACTIVE" && sub.cancelAtPeriodEnd) {
+                return { outcome: "already", ...said };
+            }
+            const log = this.customerLog(tx, member, id);
+            if (sub.status === "PAUSED") {
+                const now = new Date();
+                await tx.customerSubscription.update({
+                    where: { id },
+                    data: {
+                        status: "CANCELLED",
+                        cancelledAt: now,
+                        cancelAtPeriodEnd: false,
+                        pendingPlanId: null,
+                    },
+                });
+                await log("CANCELLED");
+                return { outcome: "now", endsAt: now, timezone: sub.timezone };
+            }
+            await tx.customerSubscription.update({
+                where: { id },
+                data: { cancelAtPeriodEnd: true },
+            });
+            await log("CANCEL_SCHEDULED", {
+                data: { endsAt: sub.currentPeriodEnd.toISOString() },
+            });
+            return { outcome: "scheduled", ...said };
+        });
     }
 
     /** Take back a cancel-at-period-end before the period runs out. */
@@ -1212,6 +1367,78 @@ export class SubscriptionsService {
             );
             await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
             return { invoiceId: failed.id, token };
+        });
+    }
+
+    /** The business's subscription settings (A8). */
+    async settings(
+        ctx: OrganizationContext,
+    ): Promise<SubscriptionSettingsView> {
+        authorize(ctx, "subscription:read");
+        return readSubscriptionSettings(ctx.organizationId);
+    }
+
+    /** Turn "Members can pause from their account" on or off (A8). */
+    async updateSettings(
+        ctx: OrganizationContext,
+        dto: SubscriptionSettingsDto,
+    ): Promise<SubscriptionSettingsView> {
+        authorize(ctx, "subscription:write");
+        return writeSubscriptionSettings(ctx.organizationId, {
+            membersCanPause: dto.membersCanPause,
+        });
+    }
+
+    /**
+     * "Pay now" from a member's account (A8): a fresh pay link for their
+     * plan's oldest overdue invoice, replacing the old one, recorded as a
+     * RETRIED by the member. Refused while an autopay charge is under way
+     * on it (`chargePending`, D13: 409 "Autopay charge in progress"), or
+     * when the business can't take payment online.
+     */
+    async payLinkForCustomer(
+        member: CustomerScope,
+        id: string,
+        chargePending: (invoiceId: string) => Promise<boolean>,
+    ): Promise<{ invoiceId: string; token: string }> {
+        return prisma.$transaction(async (tx) => {
+            const sub = await this.lock(
+                tx,
+                member.organizationId,
+                id,
+                member.contactId,
+            );
+            const invoice =
+                sub.status === "CANCELLED"
+                    ? null
+                    : await overdueInvoiceOf(tx, member, id, new Date());
+            if (!invoice) {
+                throw new ConflictException("Nothing is overdue on this plan.");
+            }
+            if (await chargePending(invoice.id)) {
+                throw new ConflictException({
+                    message: "Autopay charge in progress",
+                    details: { reason: "autopay-pending" },
+                });
+            }
+            if (!(await takesPaymentOnline(tx, member.organizationId))) {
+                throw new ConflictException(
+                    "This can't be paid online just now. Ask the business how to pay.",
+                );
+            }
+            const { token } = await this.invoices.payLinkForCustomer(
+                tx,
+                member.organizationId,
+                invoice.id,
+            );
+            await this.customerLog(
+                tx,
+                member,
+                id,
+            )("RETRIED", {
+                invoiceId: invoice.id,
+            });
+            return { invoiceId: invoice.id, token };
         });
     }
 
@@ -1676,15 +1903,42 @@ export class SubscriptionsService {
         });
     }
 
-    /** Take the row lock, then read it — scoped to the business. */
+    /** The member's own log, in this transaction (A8). */
+    private customerLog(
+        tx: Tx,
+        member: CustomerScope,
+        id: string,
+    ): SubscriptionEventLog {
+        return subscriptionEventLog(
+            tx,
+            member.organizationId,
+            id,
+            customerActor(member.accountId),
+        );
+    }
+
+    /**
+     * Take the row lock, then read it — scoped to the business, and to one
+     * person when `contactId` is given (a member acting from their account):
+     * anyone else's subscription is not found, and never locked.
+     */
     private async lock(
         tx: Tx,
         organizationId: string,
         id: string,
+        contactId?: string,
     ): Promise<SubscriptionRow> {
-        await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+        if (contactId === undefined) {
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+        } else {
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} AND "organizationId" = ${organizationId} AND "contactId" = ${contactId} FOR UPDATE`;
+        }
         const sub = await tx.customerSubscription.findFirst({
-            where: { id, organizationId },
+            where: {
+                id,
+                organizationId,
+                ...(contactId === undefined ? {} : { contactId }),
+            },
             select: SUBSCRIPTION_SELECT,
         });
         if (!sub) notFound("Subscription");

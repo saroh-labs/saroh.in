@@ -11,6 +11,7 @@ import {
     dayAria,
     dayCountLabel,
     depositUnpayable,
+    firstVisitText,
     formatMoney,
     groupStarts,
     isBookingDays,
@@ -18,6 +19,7 @@ import {
     isBookResult,
     isCreditAnswer,
     isHoldView,
+    laterVisitsText,
     looksLikeEmail,
     orList,
     payChoices,
@@ -28,6 +30,7 @@ import {
     serviceLine,
     serviceWhere,
     timeIn,
+    visitsOf,
     whereLabel,
     whereText,
 } from "./model";
@@ -474,5 +477,67 @@ describe("a class credit (A10)", () => {
         expect(creditUsedText(MEMBER)).toBe(
             "Used 1 credit from your membership — 7 left in December.",
         );
+    });
+});
+
+describe("visits (E10)", () => {
+    it("reads a service without visits, or with one, as one visit", () => {
+        expect(visitsOf(service())).toBe(1);
+        expect(visitsOf(service({ visits: 1 }))).toBe(1);
+        expect(visitsOf(null)).toBe(1);
+        expect(visitsOf(service({ visits: 3 }))).toBe(3);
+    });
+
+    it("names the visits in the service's line", () => {
+        expect(serviceLine(service({ visits: 3, staff: [] }))).toBe(
+            "3 visits of 60 min · one-to-one",
+        );
+    });
+
+    it("says when the later visits are booked", () => {
+        expect(laterVisitsText(1)).toBeNull();
+        expect(laterVisitsText(2)).toBe(
+            "We'll book visit 2 with you at the first appointment",
+        );
+        expect(laterVisitsText(3)).toBe(
+            "We'll book visits 2 and 3 with you at the first appointment",
+        );
+        expect(laterVisitsText(6)).toBe(
+            "We'll book visits 2 to 6 with you at the first appointment",
+        );
+        expect(firstVisitText(1)).toBeNull();
+        expect(firstVisitText(3)).toBe(
+            "Visit 1 of 3. We'll book the rest with you then",
+        );
+    });
+
+    it("pays for all the visits at once", () => {
+        const choices = payChoices(service({ visits: 3 }), true, "Kavi Dental");
+        expect(choices.map((c) => c.label)).toEqual([
+            "Pay ₹1,200 for all 3 visits now",
+            "Pay at the desk",
+        ]);
+    });
+
+    it("accepts visits in the page's read, and refuses a wrong one", () => {
+        const page = {
+            businessName: "Kavi Dental",
+            open: true,
+            timezone: ZONE,
+            payOnline: true,
+            rules: {
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+            },
+            services: [service({ visits: 3 })],
+        };
+        expect(isBookingPage(page)).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [{ ...service(), visits: "3" }],
+            }),
+        ).toBe(false);
     });
 });

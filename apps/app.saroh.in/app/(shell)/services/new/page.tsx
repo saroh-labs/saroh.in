@@ -22,8 +22,15 @@ export default async function NewServicePage() {
             />
         );
     }
-    const { services, staff, hasPage, canEdit, timezone, currency } =
-        read.context;
+    const {
+        services,
+        staff,
+        hasPage,
+        hasStorefront,
+        canEdit,
+        timezone,
+        currency,
+    } = read.context;
     return (
         <ServiceEditor
             service={null}
@@ -35,6 +42,7 @@ export default async function NewServicePage() {
             canEdit={canEdit}
             kindUp={showKind(services, null)}
             hasPage={hasPage}
+            hasStorefront={hasStorefront}
         />
     );
 }

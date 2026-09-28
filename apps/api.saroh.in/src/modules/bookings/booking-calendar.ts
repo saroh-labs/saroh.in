@@ -1,5 +1,7 @@
 import type { PaidWith } from "./dto";
 import { PAID_WITH } from "./dto";
+import type { TreatmentRow, TreatmentView } from "./treatment-view";
+import { treatmentOf } from "./treatment-view";
 
 /**
  * The bookings calendar as one read (plan 2026-09-23-003, U4): the org's
@@ -40,6 +42,8 @@ export interface DiaryRow {
         durationMinutes: number;
         priceCents: number | null;
         currency: string | null;
+        /** How many visits one booking of it is (E10); absent reads as 1. */
+        visits?: number;
     };
     contact: {
         id: string;
@@ -52,6 +56,9 @@ export interface DiaryRow {
         reversedAt: Date | null;
         purchase: { pack: { name: string } };
     } | null;
+    /** A visit of a treatment (E10): its number, and its order. */
+    visitNumber?: number | null;
+    order?: TreatmentRow["order"];
 }
 
 export interface DiaryPerson {
@@ -94,6 +101,8 @@ export interface DiaryBooking {
     packName: string | null;
     /** The membership whose monthly classes it uses. */
     subscriptionId: string | null;
+    /** A visit of a treatment (E10): "Visit 2 of 3", with its order. */
+    treatment: TreatmentView | null;
 }
 
 /** One start of a class: the places, who holds them, and how each paid. */
@@ -176,6 +185,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
                 ? pack.purchase.pack.name
                 : null,
         subscriptionId: row.subscriptionId,
+        treatment: treatmentOf(row),
     };
 }
 

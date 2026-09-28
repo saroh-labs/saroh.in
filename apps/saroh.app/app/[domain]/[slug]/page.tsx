@@ -13,6 +13,7 @@ import {
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
+import { getPlansFeed } from "@/lib/site-plans";
 
 /**
  * Tenant sub-page (S2-006).
@@ -115,8 +116,12 @@ export default async function SitePostPage({
         notFound();
     }
 
-    // The Journal's posts (G10), read only when the page draws one.
-    const journal = await getJournalFeed(page.sections, snapshot, siteId);
+    // The Journal's posts (G10) and the plans on sale (G9), each read only
+    // when the page draws its block.
+    const [journal, plans] = await Promise.all([
+        getJournalFeed(page.sections, snapshot, siteId),
+        getPlansFeed(page.sections, snapshot, siteId),
+    ]);
 
     return (
         <PageSections
@@ -125,6 +130,7 @@ export default async function SitePostPage({
             bookHref="/book"
             siteId={siteId}
             journal={journal}
+            plans={plans}
         />
     );
 }

@@ -5,7 +5,8 @@ import type { AuditEventRow } from "./activity";
 import { ACTIVITY_ACTIONS } from "./activity";
 
 /**
- * The last changes to this business's settings and team, newest first, from
+ * The last changes to this business's settings, team and customer records
+ * (C10), newest first, from
  * `GET /organizations/:id/audit` (`audit:read`: Owner and Admin). Server-only,
  * through `lib/api/http.ts`.
  *

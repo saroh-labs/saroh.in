@@ -57,6 +57,14 @@ beforeAll(async () => {
         where: { id: siteId },
         data: { currentPublicationId: publication.id },
     });
+    // A storefront to sell treatments from (E10, DEC-050).
+    await prisma.store.create({
+        data: {
+            name: "Kavi Dental",
+            slug: `e1-kavi-store-${process.pid}`,
+            organizationId: org.id,
+        },
+    });
     // Made the way every service was before E1: no new field named.
     existing = (
         await prisma.service.create({
@@ -87,7 +95,7 @@ describe("service fields (E1, real database)", () => {
         expect(page.services.map((s) => s.name)).toContain("Check-up");
     });
 
-    it("round-trips 3 visits and a 50% deposit on the staff read, and the public reads serve neither", async () => {
+    it("round-trips 3 visits and a 50% deposit on the staff read; the booking page serves the visits and the deposit's amount", async () => {
         const made = await bookings.createService(owner, {
             name: "Root canal",
             durationMinutes: 60,
@@ -114,14 +122,15 @@ describe("service fields (E1, real database)", () => {
         const shown = page.services.find((s) => s.id === made.id);
         // Either isn't online-only; the page asks Where for it (E7). The
         // booking page serves the deposit the server worked out (E8), never
-        // the mode; visits wait for E10.
+        // the mode, and the visits (E10).
         expect(shown).toMatchObject({
             online: false,
             where: "EITHER",
             depositCents: 600_025,
+            visits: 3,
         });
         expect(JSON.stringify(shown)).not.toMatch(
-            /visits|depositMode|showOnBookingPage/i,
+            /depositMode|showOnBookingPage/i,
         );
         const [listItem] = await publicBookings.publicServices([made.id]);
         expect(listItem).toBeDefined();

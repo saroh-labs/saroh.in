@@ -31,6 +31,10 @@ export async function subscribe(input: SubscribeInput) {
 export async function pauseSubscription(id: string, choice: PauseChoice) {
     return then(api.pauseSubscription(id, choice));
 }
+/** "Members can pause from their account" (A8). */
+export async function setMembersCanPause(on: boolean) {
+    return then(api.setMembersCanPause(on));
+}
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));
 }

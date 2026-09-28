@@ -14,9 +14,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { formatMoney } from "@/lib/format/money";
 import { listAvailability, readBookingPerson } from "@/lib/services/actions";
-import type { DiaryBooking } from "@/lib/services/booking-calendar";
+import type {
+    DiaryBooking,
+    TreatmentView,
+} from "@/lib/services/booking-calendar";
 import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
 import type { Block, LocalDate } from "@/lib/services/diary";
 import {
@@ -32,6 +36,13 @@ import {
 import type { PeekPerson } from "@/lib/services/peek";
 import { attentionText, phoneText } from "@/lib/services/peek";
 import type { Slot } from "@/lib/services/service";
+import {
+    orderHref,
+    orderLabel,
+    visitLabel,
+    visitsDoneText,
+    visitToBook,
+} from "@/lib/services/treatment";
 
 import { ClassSeats } from "./class-seats";
 import { Eyebrow, StatePill } from "./parts";
@@ -193,16 +204,23 @@ function OneToOne({
     const price = ctx.money
         ? formatMoney(b.service.priceCents ?? null, b.service.currency ?? null)
         : null;
-    const paid =
-        b.paidWith === "PAID"
-            ? price
-                ? `${price} paid`
-                : "Paid"
-            : b.paidWith === "DESK"
-              ? "Not yet — pays at the session"
-              : paidText(b);
+    // A visit of a treatment is paid on its order (E10, DEC-050).
+    const paid: ReactNode = b.treatment ? (
+        <OrderText treatment={b.treatment} canRead={!!ctx.canReadOrder} />
+    ) : b.paidWith === "PAID" ? (
+        price ? (
+            `${price} paid`
+        ) : (
+            "Paid"
+        )
+    ) : b.paidWith === "DESK" ? (
+        "Not yet — pays at the session"
+    ) : (
+        paidText(b)
+    );
     const open = state === "booked" || state === "pending";
     const actions: ReactNode[] = [];
+    const nextVisit = ctx.canBook ? visitToBook(b.treatment, whoFor(b)) : null;
     if (undo) {
         actions.push(
             <Button
@@ -274,6 +292,25 @@ function OneToOne({
             </Button>,
         );
     }
+    if (!undo && nextVisit) {
+        actions.push(
+            <NewBookingDialog
+                key="visit"
+                services={[
+                    {
+                        id: b.service.id,
+                        name: b.service.name,
+                        timezone: b.service.timezone,
+                        minutes: b.service.durationMinutes,
+                        priceCents: b.service.priceCents ?? null,
+                    },
+                ]}
+                people={{ canSearch: false, payLink: false }}
+                visit={nextVisit}
+                triggerClassName={btn.ghost}
+            />,
+        );
+    }
     if (!undo && ctx.canBook && state === "noshow") {
         actions.push(
             <Button
@@ -297,6 +334,7 @@ function OneToOne({
             <Rows
                 rows={[
                     ["Service", b.service.name],
+                    ...visitRow(b),
                     ["With", b.staff?.name ?? "Unassigned"],
                     ["Paid", paid],
                     [
@@ -363,6 +401,33 @@ function usePerson(contactId: string | null): PeekPerson | null {
         };
     }, [contactId]);
     return read?.id === contactId ? read.person : null;
+}
+
+/** "Visit 2 of 3" for a visit of a treatment (E10); "· all booked" once none are left. */
+function visitRow(b: DiaryBooking): [string, string][] {
+    const t = b.treatment;
+    if (!t) return [];
+    const done = visitsDoneText(t);
+    return [["Visit", done ? `${visitLabel(t)} · ${done}` : visitLabel(t)]];
+}
+
+/** "With order #…": a link for someone who may read orders, else words. */
+function OrderText({
+    treatment,
+    canRead,
+}: {
+    treatment: TreatmentView;
+    canRead: boolean;
+}) {
+    if (!canRead) return <>{orderLabel(treatment)}</>;
+    return (
+        <Link
+            href={orderHref(treatment)}
+            className="rounded-sm font-medium underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+            {orderLabel(treatment)}
+        </Link>
+    );
 }
 
 /** The design's "Needs attention" row, only when there is something. */

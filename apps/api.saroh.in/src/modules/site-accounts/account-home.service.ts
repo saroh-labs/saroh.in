@@ -13,12 +13,14 @@ import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
+import { PLANS_ON_SALE } from "../subscriptions/plan-on-sale";
 import {
     readClasses,
     readLatestOrders,
     readNextBooking,
     readPlan,
 } from "./account-home-reads";
+import { ownOrdersWhere } from "./account-orders.service";
 import type { AccountOffers } from "./account-tabs";
 import { accountTabs } from "./account-tabs";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -35,6 +37,7 @@ import type {
 } from "./customer-view";
 import { accountView, noteView, receiptView } from "./customer-view";
 import type { AddNoteDto, UpdateDetailsDto } from "./dto";
+import { unreadCount } from "./thread-store";
 
 /**
  * The account area's reads and the customer's own changes to their details
@@ -53,10 +56,11 @@ import type { AddNoteDto, UpdateDetailsDto } from "./dto";
 /**
  * Whether a customer's health note can be sent (default 12): only once staff
  * can see and act on suggestions from customers (C12). Until then Me has no
- * "Add a health note" and the route is a 404. C12 flips the default.
+ * "Add a health note" and the route is a 404. Open since A13: C12's staff
+ * card names where each note came from ("from their account").
  */
 export const CUSTOMER_NOTES_OPEN = Symbol("CUSTOMER_NOTES_OPEN");
-export const CUSTOMER_NOTES_OPEN_DEFAULT = false;
+export const CUSTOMER_NOTES_OPEN_DEFAULT = true;
 
 /** A customer can have this many notes waiting for the team at once. */
 export const MAX_WAITING_NOTES = 10;
@@ -97,7 +101,16 @@ export class AccountHomeService {
             },
         });
         if (!account) throw new NotFoundException();
-        const offers = await this.offers(ctx);
+        const [offers, unreadMessages] = await Promise.all([
+            this.offers(ctx),
+            // The tab's dot (A13); a failed count never hides the account.
+            unreadCount(
+                prisma,
+                ctx.organizationId,
+                ctx.contactId,
+                "customer",
+            ).catch(() => 0),
+        ]);
         return accountView({
             account,
             contact: account.contact,
@@ -106,6 +119,7 @@ export class AccountHomeService {
             offers,
             bookingsLabel: offers.bookingsLabel,
             healthNotes: this.notesOpen,
+            unreadMessages,
         });
     }
 
@@ -144,18 +158,26 @@ export class AccountHomeService {
      */
     async offers(ctx: Ctx): Promise<AccountOffers> {
         const { organizationId, contactId } = ctx;
-        const [appointments, orders, livePlans, ownPlan, classes] =
+        const [appointments, orders, livePlans, ownPlan, ownPacks, classes] =
             await Promise.all([
                 this.moduleOffered(organizationId, "APPOINTMENTS"),
                 this.moduleOffered(organizationId, "COMMERCE"),
+                // Only what is on sale: a draft is never shown (D21).
                 prisma.subscriptionPlan.count({
-                    where: { organizationId, status: "ACTIVE" },
+                    where: { organizationId, ...PLANS_ON_SALE },
                 }),
                 prisma.customerSubscription.count({
                     where: {
                         organizationId,
                         contactId,
                         status: { not: "CANCELLED" },
+                    },
+                }),
+                prisma.packPurchase.count({
+                    where: {
+                        organizationId,
+                        contactId,
+                        expiresAt: { gt: new Date() },
                     },
                 }),
                 prisma.service.count({
@@ -169,8 +191,8 @@ export class AccountHomeService {
         return {
             appointments,
             orders,
-            plans: livePlans > 0 || ownPlan > 0,
-            // Every business can be written to; A13 builds the thread.
+            plans: livePlans > 0 || ownPlan > 0 || ownPacks > 0,
+            // Every business can be written to (A13).
             messages: true,
             bookingsLabel: classes > 0 ? "Bookings" : "Appointments",
         };
@@ -231,14 +253,18 @@ export class AccountHomeService {
 
     // ---- Receipts --------------------------------------------------------
 
-    /** Paid invoices billed to the customer, newest first. */
+    /** Paid invoices billed to the customer or their orders, newest first. */
     async receipts(ctx: Ctx): Promise<AccountReceipt[]> {
         const rows = await prisma.invoice.findMany({
             where: {
                 organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
                 status: "PAID",
                 number: { not: null },
+                // Billed to the customer, or their own order's (A7).
+                OR: [
+                    { contactId: ctx.contactId },
+                    { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
+                ],
             },
             orderBy: [{ paidAt: "desc" }, { issuedAt: "desc" }],
             take: RECEIPT_ROWS,
@@ -249,6 +275,10 @@ export class AccountHomeService {
                 paidAt: true,
                 total: true,
                 currency: true,
+                // Whether it is a bill of supply (D15); only that leaves.
+                kind: true,
+                sellerGstin: true,
+                lines: { select: { gstRate: true } },
             },
         });
         return rows.map(receiptView);
@@ -263,9 +293,14 @@ export class AccountHomeService {
             where: {
                 id: invoiceId,
                 organizationId: ctx.organizationId,
-                contactId: ctx.contactId,
                 status: "PAID",
                 number: { not: null },
+                // Billed to the customer, or the invoice of one of their
+                // own orders (A7): an order's invoice names no contact.
+                OR: [
+                    { contactId: ctx.contactId },
+                    { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
+                ],
             },
             select: { id: true },
         });
@@ -356,8 +391,11 @@ export function noteLabel(text: string): string {
     return `${(space > 20 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
-/** Read one Home block on its own; a failure is logged and said, never zero. */
-async function block<T>(
+/**
+ * Read one block on its own; a failure is logged and said, never zero.
+ * Home's cards and the Plan tab's parts (A8) each go through it.
+ */
+export async function block<T>(
     name: string,
     read: () => Promise<T>,
 ): Promise<Block<T>> {

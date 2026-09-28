@@ -41,6 +41,12 @@ const service = {
     sellingTerms: jest.fn(),
     useOnBooking: jest.fn(),
     removeFromBooking: jest.fn(),
+    getPackEditor: jest.fn(),
+    createPackDraft: jest.fn(),
+    savePackDraft: jest.fn(),
+    publishPack: jest.fn(),
+    discardPackChanges: jest.fn(),
+    deletePackDraft: jest.fn(),
 };
 const packs = new ClassPacksController(service as unknown as ClassPacksService);
 const onBooking = new BookingClassPackController(
@@ -125,5 +131,34 @@ describe("routes", () => {
 
         await onBooking.remove(ctx, "bk_1");
         expect(service.removeFromBooking).toHaveBeenCalledWith(ctx, "bk_1");
+    });
+
+    it("hands the Pack Editor's reads and writes, with the revision, to the service (E14)", async () => {
+        await packs.createDraft(ctx, { name: "10 classes" });
+        expect(service.createPackDraft).toHaveBeenCalledWith(ctx, {
+            name: "10 classes",
+        });
+
+        await packs.getDraft(ctx, "pack_1");
+        expect(service.getPackEditor).toHaveBeenCalledWith(ctx, "pack_1");
+
+        await packs.saveDraft(ctx, "pack_1", { price: "5000", revision: 2 });
+        expect(service.savePackDraft).toHaveBeenCalledWith(ctx, "pack_1", {
+            price: "5000",
+            revision: 2,
+        });
+
+        await packs.publish(ctx, "pack_1", { revision: 3 });
+        expect(service.publishPack).toHaveBeenCalledWith(ctx, "pack_1", 3);
+
+        await packs.discard(ctx, "pack_1", { revision: 4 });
+        expect(service.discardPackChanges).toHaveBeenCalledWith(
+            ctx,
+            "pack_1",
+            4,
+        );
+
+        await packs.remove(ctx, "pack_1", { revision: 5 });
+        expect(service.deletePackDraft).toHaveBeenCalledWith(ctx, "pack_1", 5);
     });
 });

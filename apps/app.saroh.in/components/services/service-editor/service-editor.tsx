@@ -31,6 +31,7 @@ import {
     staffFor,
     stateLine,
     statePill,
+    TREATMENT_NEEDS_STOREFRONT,
 } from "@/lib/services/service-editor";
 import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
@@ -56,9 +57,9 @@ const SERVICES_HREF = "/services";
  * At a glance; everything else the old forms had is under More settings.
  * One Save, in the header, applies to bookings made after it.
  *
- * "At booking, they pay" sits under Price (E8). Visits (E10) are not
- * offered until the booking page honours them; the Time section leaves
- * room for them.
+ * "At booking, they pay" sits under Price (E8), and Visits under Time
+ * (E10): more than one makes it a treatment, which needs a storefront to
+ * be sold from — said under Time, with the way to add one.
  */
 export function ServiceEditor({
     service,
@@ -70,6 +71,7 @@ export function ServiceEditor({
     canEdit,
     kindUp,
     hasPage,
+    hasStorefront = null,
 }: {
     /** Null while creating. */
     service: Service | null;
@@ -88,6 +90,8 @@ export function ServiceEditor({
     kindUp: boolean;
     /** Whether the business has a booking page; null when unknown. */
     hasPage: boolean | null;
+    /** A storefront to sell treatments from (E10); null when unknown. */
+    hasStorefront?: boolean | null;
 }) {
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -103,9 +107,18 @@ export function ServiceEditor({
     const set = (patch: Partial<ServiceDraft>) =>
         setDraft((d) => ({ ...d, ...patch }));
 
+    // The API said there is no storefront to sell a treatment from (E10),
+    // though the page couldn't tell: said under Time from then on.
+    const [refusedStorefront, setRefusedStorefront] = useState(false);
+    // A service already a treatment keeps saving when its storefront has
+    // gone since; the booking page refuses it then (E9).
+    const wasTreatment = (service?.visits ?? 1) > 1;
+    const noStorefront =
+        !wasTreatment && (hasStorefront === false || refusedStorefront);
+
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
-    const problems = serviceProblems(draft, hasStaff);
+    const problems = serviceProblems(draft, hasStaff, noStorefront);
     const bad = problems.length > 0;
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
     const pill = statePill(isNew, draft.taking);
@@ -136,6 +149,15 @@ export function ServiceEditor({
         return null;
     }
 
+    /** A refused save: said under Time when it is the storefront (E10). */
+    function refused(error: string) {
+        if (error === TREATMENT_NEEDS_STOREFRONT) {
+            setRefusedStorefront(true);
+            return;
+        }
+        showError(error);
+    }
+
     async function save() {
         if (!canEdit || bad || saving || (!dirty && !isNew)) return;
         setSaving(true);
@@ -153,7 +175,7 @@ export function ServiceEditor({
             );
             if (!res.ok) {
                 setSaving(false);
-                showError(res.error);
+                refused(res.error);
                 return;
             }
             const whoError = staff
@@ -173,7 +195,7 @@ export function ServiceEditor({
         const res = await createService(input);
         if (!res.ok) {
             setSaving(false);
-            showError(res.error);
+            refused(res.error);
             return;
         }
         const whoError = await setWho(res.data.id, draft.staffIds);
@@ -312,7 +334,12 @@ export function ServiceEditor({
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
                     <WhatItIs draft={draft} set={set} kindUp={kindUp} />
-                    <TimeSection draft={draft} set={set} hasStaff={hasStaff} />
+                    <TimeSection
+                        draft={draft}
+                        set={set}
+                        hasStaff={hasStaff}
+                        noStorefront={noStorefront}
+                    />
                     <PriceSection draft={draft} set={set} currency={currency} />
                     <WhoTakesIt
                         draft={draft}

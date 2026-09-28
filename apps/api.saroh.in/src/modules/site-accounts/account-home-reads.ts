@@ -1,12 +1,12 @@
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { realOrderWhere } from "../orders/open-orders";
 import {
     ALLOWANCE_SELECT,
     classesAllowance,
     HAS_ALLOWANCE_WHERE,
 } from "../subscriptions/classes-allowance";
+import { readOrders } from "./account-orders.service";
 import type { CustomerContext } from "./customer-context.decorator";
 import type {
     AccountBooking,
@@ -14,13 +14,7 @@ import type {
     AccountOrder,
     AccountPlan,
 } from "./customer-view";
-import {
-    bookingView,
-    ORDER_ROW_ITEMS,
-    orderView,
-    packView,
-    planView,
-} from "./customer-view";
+import { bookingView, packView, planView } from "./customer-view";
 
 /**
  * Home's reads in the customer's account (round-2 plan A, A5), one per
@@ -103,31 +97,9 @@ export async function readClasses(
     ]);
 
     let membership: AccountClasses["membership"] = null;
-    const perMonth = sub ? classesAllowance(sub) : null;
-    if (sub && perMonth !== null) {
-        const month = DateTime.fromJSDate(now)
-            .setZone(sub.timezone)
-            .startOf("month");
-        const next = month.plus({ months: 1 });
-        const used = await prisma.booking.count({
-            where: {
-                organizationId,
-                subscriptionId: sub.id,
-                startAt: {
-                    gte: month.toUTC().toJSDate(),
-                    lt: next.toUTC().toJSDate(),
-                },
-                OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
-            },
-        });
-        const paused = sub.status === "PAUSED";
-        membership = {
-            plan: sub.plan.name,
-            perMonth,
-            left: paused ? 0 : Math.max(0, perMonth - used),
-            resetsAt: next.toUTC().toJSDate().toISOString(),
-            paused,
-        };
+    const month = sub ? await membershipMonth(organizationId, sub, now) : null;
+    if (sub && month) {
+        membership = { plan: sub.plan.name, ...month };
     }
     const livePacks = packs
         .map((p) =>
@@ -144,53 +116,64 @@ export async function readClasses(
 }
 
 /**
- * The customer's latest orders: those of every store customer linked to
- * their contact (C2's identity links, confirmed by staff or made while
- * signed in).
+ * A membership's classes this month (D10's allowance, `classes-allowance.ts`):
+ * how many it includes, how many are left, and when they start again.
+ * Null when it includes no number (unlimited, or no classes). A paused one
+ * has none left. Home's "Classes left" and the Plan tab (A8) both read it.
  */
-export async function readLatestOrders(
-    ctx: Ctx,
+export async function membershipMonth(
+    organizationId: string,
+    sub: {
+        id: string;
+        status: string;
+        timezone: string;
+        classesPerPeriod: number | null;
+        classesPerPeriodSetAt: Date | null;
+        plan: { classesPerMonth: number | null };
+    },
+    now: Date,
+): Promise<{
+    perMonth: number;
+    left: number;
+    resetsAt: string;
+    paused: boolean;
+} | null> {
+    const perMonth = classesAllowance(sub);
+    if (perMonth === null) return null;
+    const month = DateTime.fromJSDate(now)
+        .setZone(sub.timezone)
+        .startOf("month");
+    const next = month.plus({ months: 1 });
+    const used = await prisma.booking.count({
+        where: {
+            organizationId,
+            subscriptionId: sub.id,
+            startAt: {
+                gte: month.toUTC().toJSDate(),
+                lt: next.toUTC().toJSDate(),
+            },
+            OR: [{ status: "CONFIRMED" }, { cancelledLate: true }],
+        },
+    });
+    const paused = sub.status === "PAUSED";
+    return {
+        perMonth,
+        left: paused ? 0 : Math.max(0, perMonth - used),
+        resetsAt: next.toUTC().toJSDate().toISOString(),
+        paused,
+    };
+}
+
+/**
+ * The customer's latest orders: the same orders the Orders tab lists
+ * (`account-orders.service.ts`, A7) — those of every store customer linked
+ * to their contact, and those the account placed signed in.
+ */
+export function readLatestOrders(
+    ctx: Ctx & Pick<CustomerContext, "accountId">,
     take: number = HOME_ORDERS,
 ): Promise<AccountOrder[]> {
-    const links = await prisma.customerIdentityLink.findMany({
-        where: {
-            organizationId: ctx.organizationId,
-            contactId: ctx.contactId,
-        },
-        select: { customerId: true },
-    });
-    if (links.length === 0) return [];
-    const rows = await prisma.order.findMany({
-        where: {
-            organizationId: ctx.organizationId,
-            customerId: { in: links.map((l) => l.customerId) },
-            // Never an abandoned site checkout (B1).
-            ...realOrderWhere(),
-        },
-        orderBy: { createdAt: "desc" },
-        take,
-        select: {
-            id: true,
-            orderId: true,
-            createdAt: true,
-            total: true,
-            currency: true,
-            status: true,
-            paymentStatus: true,
-            stage: true,
-            _count: { select: { items: true } },
-            items: {
-                take: ORDER_ROW_ITEMS,
-                orderBy: { id: "asc" },
-                select: {
-                    quantity: true,
-                    product: { select: { name: true } },
-                    service: { select: { name: true } },
-                },
-            },
-        },
-    });
-    return rows.map(orderView);
+    return readOrders(ctx, take);
 }
 
 /** The customer's live membership, or null. */
@@ -211,6 +194,7 @@ export async function readPlan(ctx: Ctx): Promise<AccountPlan | null> {
             currentPeriodEnd: true,
             cancelAtPeriodEnd: true,
             pausedUntil: true,
+            timezone: true,
             plan: { select: { name: true } },
         },
     });

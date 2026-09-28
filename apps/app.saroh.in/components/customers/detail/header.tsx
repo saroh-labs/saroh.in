@@ -67,6 +67,7 @@ export function Header({
     signsIn,
     attention,
     canEdit,
+    canMore = canEdit,
     onEdit,
     menu,
 }: {
@@ -81,6 +82,8 @@ export function Header({
     /** Needs attention's tags, beside the name (C5). */
     attention?: React.ReactNode;
     canEdit: boolean;
+    /** More opens (edit, or merge on its own permission); `canEdit` by default. */
+    canMore?: boolean;
     onEdit: () => void;
     /** What More holds; empty hides it. */
     menu: { label: string; danger?: boolean; go: () => void }[];
@@ -159,9 +162,9 @@ export function Header({
                                 <Button
                                     variant="outline"
                                     className={HEAD_BTN}
-                                    disabled={!canEdit}
+                                    disabled={!canMore}
                                     title={
-                                        canEdit
+                                        canMore
                                             ? undefined
                                             : "Owners and admins only"
                                     }

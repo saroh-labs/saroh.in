@@ -231,6 +231,37 @@ test.describe("order detail", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
     });
 
+    test("the customer card says their Needs attention, for the counter too (B15)", async ({
+        browser,
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${RYE}`);
+        const orderId = await priyaOrderToday(page);
+        await page.goto(`/commerce/orders/${orderId}`);
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(
+            card.getByRole("list", { name: "Needs attention" }),
+        ).toContainText("Allergy: Sesame");
+
+        // A Member at the counter (order:stage, contact:read) sees the same
+        // allergy, and the banner still checks the lines by allergen.
+        const counter = await memberPage(browser);
+        await counter.goto(`/open/${RYE}`);
+        await counter.goto(`/commerce/orders/${orderId}`);
+        await expect(
+            counter
+                .getByRole("region", { name: "Customer" })
+                .getByRole("list", { name: "Needs attention" }),
+        ).toContainText("Allergy: Sesame");
+        await expect(
+            counter.getByRole("alert").filter({
+                hasText: "Priya is allergic to sesame",
+            }),
+        ).toBeVisible();
+        await counter.close();
+    });
+
     test("a Member moves stages but sees no money, refund or edit", async ({
         browser,
     }) => {
@@ -572,5 +603,108 @@ test.describe("shipping on order detail", () => {
                 .getByRole("region", { name: "Customer" })
                 .getByText("Tracking"),
         ).toHaveCount(0);
+    });
+});
+
+/**
+ * Change how it's fulfilled, and cancel as a full refund (round-2 B9): both
+ * until handover. Written on Northwind, on unpaid orders it makes, so no
+ * money moves and no provider is needed.
+ */
+test.describe("change and cancel on order detail (B9)", () => {
+    test("change how it's fulfilled: the step says what it was and what it is", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await freshOrder(page, "PICKUP", { paid: false });
+        await page.goto(`/commerce/orders/${id}`);
+
+        const open = page.getByRole("button", {
+            name: "Change how it's fulfilled…",
+        });
+        test.skip(
+            await open.isDisabled(),
+            "Northwind's storefront offers one way only for this product.",
+        );
+        await open.click();
+        const sheet = page.getByRole("dialog", {
+            name: "Change how it's fulfilled",
+        });
+        const other = sheet.locator('[role="radio"][aria-checked="false"]');
+        const label = (await other.first().textContent()) ?? "";
+        await other.first().click();
+        if (/delivery|shipping/i.test(label)) {
+            await sheet.getByLabel("Street and number").fill(ADDRESS.line1);
+            await sheet.getByLabel("Town or city").fill(ADDRESS.city);
+            await sheet.getByLabel("State").fill(ADDRESS.state);
+            await sheet.getByLabel("PIN code").fill(ADDRESS.postalCode);
+        }
+        await sheet.getByLabel("Delivery charge").fill("0");
+        await sheet.getByRole("button", { name: /^Save/ }).click();
+        await expect(shown(page, /^Now /)).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText(`Changed from Pick-up to ${label}`),
+        ).toBeVisible();
+    });
+
+    test("cancel an unpaid order: held, then kept as cancelled with its reason", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await freshOrder(page, "PICKUP", { paid: false });
+        await page.goto(`/commerce/orders/${id}`);
+
+        await page.getByRole("button", { name: "Cancel order…" }).click();
+        const sheet = page.getByRole("region", { name: /^Cancel #/ });
+        await expect(
+            sheet.getByText(/It stays on record as cancelled, never deleted/),
+        ).toBeVisible();
+        await sheet.getByLabel("Why").selectOption({ label: "Late" });
+        await sheet.getByRole("button", { name: "Cancel order" }).click();
+        await expect(page.getByText(/Cancelling in \d+s/)).toBeVisible();
+        await page.getByRole("button", { name: "Cancel now" }).click();
+        await expect(
+            shown(page, "Order cancelled. It stays in Orders as cancelled."),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText("Cancelled · late"),
+        ).toBeVisible();
+    });
+
+    test("from the handover on, change and cancel say why not", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await readyOrder(page, "LOCAL_DELIVERY");
+        const headers = {
+            "x-organization-id": NORTHWIND,
+            origin: urls.APP_URL,
+        };
+        const moved = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND}/orders/${id}/stage`,
+            { headers, data: { to: "OUT_FOR_DELIVERY" } },
+        );
+        expect(moved.ok()).toBe(true);
+        await page.goto(`/commerce/orders/${id}`);
+
+        const cancel = page.getByRole("button", { name: "Cancel order…" });
+        await expect(cancel).toBeDisabled();
+        await expect(cancel).toHaveAttribute(
+            "title",
+            "It has been handed over, so it can't be cancelled. Refund it instead.",
+        );
+        await expect(
+            page.getByRole("button", { name: "Change how it's fulfilled…" }),
+        ).toBeDisabled();
     });
 });

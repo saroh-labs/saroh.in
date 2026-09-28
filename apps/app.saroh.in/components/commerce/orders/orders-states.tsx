@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
     FailedState,
+    PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -32,9 +33,9 @@ import { ORDER_GRID } from "./order-row";
  *   business with no orders says "No orders yet";
  * - failed: "Couldn't load orders" with Try again, and never an empty list;
  * - locked: for someone holding neither `order:read` nor `order:stage`, why
- *   and who can change it, rather than a hidden screen.
- *
- * The partial state (Needs attention couldn't be read) arrives with B15.
+ *   and who can change it, rather than a hidden screen;
+ * - partial: Needs attention couldn't be read (B15), so each row's tag says
+ *   "Not available" — never no tag, which would read as "nothing to know".
  */
 
 /** The page's heading, which every state keeps so no one wonders where they are. */
@@ -179,6 +180,35 @@ export function OrdersFailed({
                 }
             />
         </>
+    );
+}
+
+/**
+ * The partial state (B15): the orders arrived, but their customers' Needs
+ * attention couldn't be read. A banner above the rows, in the design's
+ * partial treatment, says what is missing and that the rows are still
+ * whole; each row's tag reads "Not available".
+ */
+export function OrdersAttentionPartial({ onRetry }: { onRetry: () => void }) {
+    return (
+        <PartialNotice
+            className="mb-3.5"
+            action={
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onRetry}
+                    className="wk-press h-[30px] flex-none rounded-lg border-brand/50 bg-card px-3 text-[12.5px] font-semibold text-brand-subtle-foreground coarse:h-11"
+                >
+                    Try again
+                </Button>
+            }
+        >
+            Needs attention couldn&apos;t be read, so allergies and other notes
+            show as &ldquo;Not available&rdquo;. The orders below arrived
+            normally. Check with the customer before an order goes out.
+        </PartialNotice>
     );
 }
 

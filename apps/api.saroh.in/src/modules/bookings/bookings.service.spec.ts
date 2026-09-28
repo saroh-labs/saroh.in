@@ -40,8 +40,10 @@ jest.mock("@saroh/database", () => {
         },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
-        site: { findUnique: jest.fn() },
+        site: { findUnique: jest.fn(), findFirst: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        // A storefront to sell treatments from (E10) unless a test says not.
+        store: { findFirst: jest.fn().mockResolvedValue({ id: "store_1" }) },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
         course: { findFirst: jest.fn().mockResolvedValue(null) },
         packRedemption: {
@@ -1378,6 +1380,77 @@ describe("service fields: visits, Either, deposit, booking page (E1)", () => {
         expect(saved).toMatchObject({
             depositCents: 37_500,
             showOnBookingPage: false,
+        });
+    });
+
+    describe("a treatment needs a storefront (E10)", () => {
+        const storeFindFirst = prisma.store.findFirst as jest.Mock;
+
+        it("refuses 3 visits in a business with no storefront, with the sentence, and saves nothing", async () => {
+            storeFindFirst.mockResolvedValueOnce(null);
+            const err = await create({ visits: 3 }).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(ConflictException);
+            expect((err as ConflictException).getResponse()).toMatchObject({
+                message:
+                    "Treatments are sold as orders — add a storefront first.",
+                details: { reason: "no-storefront", field: "visits" },
+            });
+            expect(serviceCreate).not.toHaveBeenCalled();
+
+            serviceFindUnique.mockResolvedValue(PRICED);
+            storeFindFirst.mockResolvedValueOnce(null);
+            await expect(
+                new BookingsService().updateService(ctx(), "svc_1", {
+                    visits: 3,
+                }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(serviceUpdate).not.toHaveBeenCalled();
+        });
+
+        it("refuses a treatment with Commerce switched off, where its orders live", async () => {
+            moduleFindFirst.mockResolvedValueOnce({ id: "mod_commerce" });
+            await expect(create({ visits: 2 })).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(serviceCreate).not.toHaveBeenCalled();
+        });
+
+        it("asks nothing of a one-visit service, nor of one already a treatment", async () => {
+            storeFindFirst.mockResolvedValue(null);
+            try {
+                await create({ visits: 1 });
+                expect(serviceCreate).toHaveBeenCalledTimes(1);
+
+                // Already 3 visits: its storefront closing later never
+                // stops it saving (the booking page refuses it then).
+                serviceFindUnique.mockResolvedValue({ ...PRICED, visits: 3 });
+                serviceUpdate.mockResolvedValue({ ...PRICED, visits: 3 });
+                await new BookingsService().updateService(ctx(), "svc_1", {
+                    visits: 3,
+                    priceCents: 90_000,
+                });
+                expect(serviceUpdate).toHaveBeenCalledTimes(1);
+            } finally {
+                storeFindFirst.mockResolvedValue({ id: "store_1" });
+            }
+        });
+
+        it("refuses visits on a class", async () => {
+            const err = await create({ visits: 3, capacity: 8 }).catch(
+                (e: unknown) => e,
+            );
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect((err as BadRequestException).getResponse()).toMatchObject({
+                details: { field: "visits" },
+            });
+
+            serviceFindUnique.mockResolvedValue({ ...PRICED, visits: 3 });
+            await expect(
+                new BookingsService().updateService(ctx(), "svc_1", {
+                    capacity: 6,
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(serviceUpdate).not.toHaveBeenCalled();
         });
     });
 

@@ -211,6 +211,66 @@ describe("serializeOrderRow", () => {
     });
 });
 
+describe("the row's Needs attention (B15)", () => {
+    const entry = (over: Record<string, unknown> = {}) => ({
+        id: "a1",
+        kind: "ALLERGY" as const,
+        label: "Sesame",
+        detail: "Allergic to sesame",
+        sensitive: false,
+        allergen: { id: "al1", name: "Sesame" },
+        matchAllergens: [{ id: "al1", name: "Sesame" }],
+        source: "BOOKING_PAGE" as const,
+        ...over,
+    });
+
+    it("carries each entry's kind and words, never its allergen ids or who wrote it", () => {
+        const row = serializeOrderRow(raw(), {
+            money: false,
+            contact: false,
+            now,
+            attention: { entries: [entry()], hiddenSensitiveCount: 2 },
+        });
+        expect(row.attention).toEqual([
+            {
+                id: "a1",
+                kind: "ALLERGY",
+                label: "Sesame",
+                detail: "Allergic to sesame",
+                source: "BOOKING_PAGE",
+            },
+        ]);
+        // How many sensitive entries there are is not the row's to say.
+        expect(JSON.stringify(row)).not.toContain("hiddenSensitiveCount");
+    });
+
+    it("is null when it couldn't be read, so the app says Not available", () => {
+        const row = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+            attention: null,
+        });
+        expect(row.attention).toBeNull();
+    });
+
+    it("is empty when there is nothing, and absent when not asked for", () => {
+        const empty = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+            attention: { entries: [], hiddenSensitiveCount: 0 },
+        });
+        expect(empty.attention).toEqual([]);
+        const old = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+        });
+        expect(old).not.toHaveProperty("attention");
+    });
+});
+
 describe("quickViewOf (B5)", () => {
     const read = {
         id: "o1",

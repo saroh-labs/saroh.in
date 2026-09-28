@@ -1,5 +1,6 @@
 import { Transform, Type } from "class-transformer";
 import {
+    IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
@@ -242,6 +243,12 @@ export class CancelSubscriptionDto {
     /** `periodEnd` lets the paid period run out; `now` ends it today. */
     @IsIn(["now", "periodEnd"])
     when!: "now" | "periodEnd";
+}
+
+/** The business's subscription settings (A8): "Members can pause from their account". */
+export class SubscriptionSettingsDto {
+    @IsBoolean()
+    membersCanPause!: boolean;
 }
 
 export class ListSubscriptionsQueryDto {

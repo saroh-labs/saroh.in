@@ -245,9 +245,13 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
         // D10: a subscription's own classes a month, and the fallback.
         "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
+        // G9: the order a site lists plans in, and Most chosen.
+        "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        // E14: which packs are on sale; a DRAFT is refused.
+        "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
         // A10: spending a pack as the team and as the customer, mocked tx.
         "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",

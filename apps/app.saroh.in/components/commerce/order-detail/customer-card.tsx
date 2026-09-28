@@ -2,8 +2,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
-import type { AllergyNote, OrderRead } from "@/lib/orders/read";
+import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
 import { FOCUS, Panel } from "./parts";
 
@@ -19,8 +20,9 @@ function initials(name: string): string {
 
 /**
  * Who it is for: name (to their page), how long they have ordered here,
- * their allergy note in red, then how to reach them and — for a delivery
- * only — where it goes and how to follow it. A collection order shows no
+ * their Needs attention in red (B15), then how to reach them (with
+ * `contact:read`) and — for a delivery only — where it goes, the number it
+ * goes to, and how to follow it. A collection order shows no
  * address: the design's audit found a home address on a counter order read
  * as "deliver this".
  */
@@ -28,17 +30,35 @@ export function CustomerCard({
     customer,
     href,
     notes,
+    attention,
+    contact = true,
     address,
+    deliveryPhone = null,
     shipment,
     onChangeTracking,
     orderNote,
 }: {
     customer: NonNullable<OrderRead["customer"]>;
     href: string;
-    /** Notes that name allergens; null when they could not be read. */
+    /**
+     * Notes that name allergens; null when they could not be read. Drawn
+     * only from an API before B15, which sends no `attention`.
+     */
     notes: AllergyNote[] | null;
+    /** Their Needs attention, as the API let this viewer see it (B15). */
+    attention?: OrderAttention | null;
+    /**
+     * The viewer reads contacts: their own phone and email. Without it the
+     * API sends neither (review #19), so "No phone" would be untrue.
+     */
+    contact?: boolean;
     /** Delivery orders only. */
     address: string | null;
+    /**
+     * The number the order is delivered to (delivery orders only): the
+     * order's own, which whoever works it sees.
+     */
+    deliveryPhone?: string | null;
     /** Who took it and how to follow it, once it's with a courier (B10). */
     shipment: Shipment | null;
     /** Opens the panel to add or correct them. */
@@ -81,7 +101,9 @@ export function CustomerCard({
                     </div>
                 </div>
             </div>
-            {notes && notes.length > 0 ? (
+            {attention !== undefined ? (
+                <AttentionBlock attention={attention} />
+            ) : notes && notes.length > 0 ? (
                 <div className="mt-2.5 rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground">
                     {notes.map((n) => n.body).join(" · ")}
                 </div>
@@ -90,10 +112,26 @@ export function CustomerCard({
                 {customer.email ? (
                     <span className="break-all">{customer.email}</span>
                 ) : null}
-                <span>{customer.phone ?? "No phone"}</span>
+                {contact ? <span>{customer.phone ?? "No phone"}</span> : null}
                 {address ? (
                     <span className="whitespace-pre-line text-muted-foreground">
                         {address}
+                    </span>
+                ) : null}
+                {deliveryPhone && deliveryPhone !== customer.phone ? (
+                    <span>
+                        <span className="text-muted-foreground">
+                            Delivery phone{" "}
+                        </span>
+                        <a
+                            href={`tel:${deliveryPhone.replace(/[^\d+]/g, "")}`}
+                            className={cn(
+                                FOCUS,
+                                "rounded-sm text-foreground underline-offset-4 hover:underline active:opacity-80",
+                            )}
+                        >
+                            {deliveryPhone}
+                        </a>
                     </span>
                 ) : null}
             </div>
@@ -107,6 +145,66 @@ export function CustomerCard({
                 <TrackingRow shipment={shipment} onChange={onChangeTracking} />
             ) : null}
         </Panel>
+    );
+}
+
+/**
+ * The customer's Needs attention (B15), in the design's red box: each entry
+ * as "Allergy: Sesame", with its detail and where it came from ("from the
+ * booking page") on hover and to a screen reader. A sensitive entry reaches
+ * only a role that may read it, and never the printed ticket. What this
+ * viewer can't see is counted, never shown; a failed read says so.
+ */
+function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
+    if (attention === null) {
+        return (
+            <div
+                role="status"
+                className="mt-2.5 rounded-lg bg-muted px-2.5 py-2 text-[12.5px] leading-[1.45] text-muted-foreground"
+            >
+                <span className="font-semibold text-foreground">
+                    Needs attention: not available.
+                </span>{" "}
+                Check with them before it goes out.
+            </div>
+        );
+    }
+    const card = cardAttention(attention);
+    if (card.entries.length === 0 && !card.hidden) return null;
+    return (
+        <div className="mt-2.5">
+            {card.entries.length > 0 ? (
+                <ul
+                    aria-label="Needs attention"
+                    className="flex flex-wrap gap-x-1 rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground"
+                >
+                    {card.entries.map((e, i) => (
+                        <li
+                            key={e.id}
+                            title={e.title}
+                            className={cn(e.sensitive && "print:hidden")}
+                        >
+                            {i > 0 ? (
+                                <span aria-hidden className="pr-1">
+                                    ·
+                                </span>
+                            ) : null}
+                            {e.text}
+                            {e.title !== e.text ? (
+                                <span className="sr-only">
+                                    {`, ${e.title}`}
+                                </span>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+            {card.hidden ? (
+                <p className="mt-1 text-[11.5px] text-muted-foreground print:hidden">
+                    {card.hidden}
+                </p>
+            ) : null}
+        </div>
     );
 }
 

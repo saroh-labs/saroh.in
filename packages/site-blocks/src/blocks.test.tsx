@@ -8,6 +8,7 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedJournal,
+    RenderedPlans,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -17,7 +18,11 @@ import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { SAMPLE_POSTS, SAMPLE_VISIT } from "./block-fixture-preview";
+import {
+    SAMPLE_PLANS,
+    SAMPLE_POSTS,
+    SAMPLE_VISIT,
+} from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
@@ -27,6 +32,7 @@ import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import JournalSection from "./blocks/journal";
+import PlansSection from "./blocks/plans";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -414,6 +420,30 @@ describe("block rendering", () => {
             />,
         );
         expect(container.querySelector("img")).toBeNull();
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // Sample plans rather than a fetch: the page serving the site reads them
+    // and hands them in (G9).
+    it("plans", () => {
+        const { container } = render(
+            <PlansSection
+                content={BLOCK_META.plans.fixtures.default as RenderedPlans}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("plans, no highlight or descriptions, the merchant's button", () => {
+        const { container } = render(
+            <PlansSection
+                content={BLOCK_META.plans.cases.plain as RenderedPlans}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/" }}
+            />,
+        );
+        expect(screen.queryByText("Most chosen")).toBeNull();
+        expect(screen.getAllByText("Ask to join")).toHaveLength(3);
         expect(container.innerHTML).toMatchSnapshot();
     });
 

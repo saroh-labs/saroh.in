@@ -1,20 +1,20 @@
 import Link from "next/link";
 
+import { BOOKINGS_HREF } from "./bookings-model";
 import type { AccountView, AccountHome as Home } from "./model";
 import {
-    accountDate,
-    accountMoney,
     bookingWhen,
     classesLine,
     firstName,
-    orderTitle,
     planLine,
     planPrice,
 } from "./model";
+import { OrderRow } from "./orders-list";
 import {
     AccountCard,
     AccountRow,
     buttonClasses,
+    smallButton,
     Tag,
     Unavailable,
 } from "./parts";
@@ -25,9 +25,10 @@ import {
  * card, each read on its own. A card whose read failed says so and never
  * shows zero; a card for something the business doesn't offer isn't drawn.
  *
- * Move and Cancel on the next booking come with A6, "Order again" with the
- * shop (G13) and "Buy a pack" with A11: nothing here links to a page that
- * isn't there yet.
+ * Move and Cancel on the next booking open their sheets on the Bookings tab
+ * (A6). "Order again" comes with the shop (G13) and "Buy a pack" with A11:
+ * nothing here links to a page that isn't there yet. An order on its way
+ * has Track (A7).
  */
 export function AccountHome({
     account,
@@ -38,6 +39,8 @@ export function AccountHome({
 }) {
     const first = firstName(account.name);
     const clinic = account.bookingsLabel === "Appointments";
+    // The Plan tab's page (A8), linked only when this business shows it.
+    const planTab = account.tabs.some((t) => t.key === "plan");
     return (
         <div className="grid gap-3.5">
             <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
@@ -82,15 +85,11 @@ export function AccountHome({
                 >
                     {home.orders.ok ? (
                         home.orders.value.map((order) => (
-                            <AccountRow
+                            // Track opens on the Orders tab (A7).
+                            <OrderRow
                                 key={order.ref}
-                                title={orderTitle(order)}
-                                sub={`${accountDate(order.placedAt)} · ${accountMoney(order.total, order.currency)}`}
-                                tag={
-                                    <Tag tone={order.open ? "accent" : "quiet"}>
-                                        {order.status}
-                                    </Tag>
-                                }
+                                order={order}
+                                details={false}
                             />
                         ))
                     ) : (
@@ -101,7 +100,20 @@ export function AccountHome({
 
             {home.plan.ok ? (
                 home.plan.value ? (
-                    <AccountCard labelledBy="account-plan" title="Membership">
+                    <AccountCard
+                        labelledBy="account-plan"
+                        title="Membership"
+                        actions={
+                            planTab ? (
+                                <Link
+                                    href="/account/plan"
+                                    className={buttonClasses(false)}
+                                >
+                                    Manage plan
+                                </Link>
+                            ) : undefined
+                        }
+                    >
                         <AccountRow
                             title={`${home.plan.value.name} · ${planPrice(home.plan.value)}`}
                             sub={planLine(home.plan.value)}
@@ -168,6 +180,24 @@ function NextBooking({
                         .join(" · ") || undefined
                 }
                 tag={<Tag tone="quiet">Booked</Tag>}
+                actions={
+                    <>
+                        <Link
+                            href={`${BOOKINGS_HREF}?move=${encodeURIComponent(next.ref)}`}
+                            className={smallButton}
+                            aria-label={`Move ${next.service}`}
+                        >
+                            Move
+                        </Link>
+                        <Link
+                            href={`${BOOKINGS_HREF}?cancel=${encodeURIComponent(next.ref)}`}
+                            className={smallButton}
+                            aria-label={`Cancel ${next.service}`}
+                        >
+                            Cancel
+                        </Link>
+                    </>
+                }
             />
         </AccountCard>
     );

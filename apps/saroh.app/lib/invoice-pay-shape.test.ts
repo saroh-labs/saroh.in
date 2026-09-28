@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPayInvoice, payDate, payMoney } from "./invoice-pay-shape";
+import { isPayInvoice, payDate, payMoney, payTitle } from "./invoice-pay-shape";
 
 const INVOICE = {
     businessName: "Lotus Yoga",
@@ -30,6 +30,18 @@ describe("isPayInvoice", () => {
         expect(
             isPayInvoice({ ...INVOICE, theme: { "--site-bg": "#fff" } }),
         ).toBe(true);
+    });
+
+    it("reads whether it is a bill of supply, and an older API without it (D15)", () => {
+        expect(isPayInvoice({ ...INVOICE, billOfSupply: true })).toBe(true);
+        expect(isPayInvoice({ ...INVOICE, billOfSupply: false })).toBe(true);
+        expect(isPayInvoice({ ...INVOICE, billOfSupply: "yes" })).toBe(false);
+    });
+
+    it("names the paper as the business's copy does", () => {
+        expect(payTitle({ billOfSupply: true })).toBe("Bill of supply");
+        expect(payTitle({ billOfSupply: false })).toBe("Invoice");
+        expect(payTitle({})).toBe("Invoice");
     });
 
     it("refuses a body in the wrong shape rather than drawing it", () => {

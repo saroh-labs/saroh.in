@@ -2105,3 +2105,104 @@ describe("the header's facts (E6)", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("a treatment of several visits (E10)", () => {
+    /** Personal training sold as 3 visits of 60 min, ₹1,200 for all. */
+    const VISITS_PAGE: BookingPageData = {
+        ...PAGE,
+        services: [{ ...PAGE.services[0], visits: 3 }, PAGE.services[1]],
+    };
+
+    it("says 3 visits of 60 min, asks for the first visit, and pays for all 3", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow page={VISITS_PAGE} apiUrl={API} account={account()} />,
+        );
+        expect(
+            screen.getByRole("radio", {
+                name: /3 visits of 60 min · one-to-one · with Karan Mehta/,
+            }),
+        ).toBeInTheDocument();
+        await chooseOneToOne();
+        expect(
+            screen.getByRole("heading", { name: "When is your first visit?" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("radio", {
+                name: /Pay ₹1,200 for all 3 visits now/,
+            }),
+        ).toBeInTheDocument();
+
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText("Personal training · 3 visits"),
+        ).toBeInTheDocument();
+        expect(within(aside).getByText("First visit")).toBeInTheDocument();
+        expect(
+            within(aside).getByText(
+                "We'll book visits 2 and 3 with you at the first appointment",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("confirms visit 1 of 3, the rest booked with them then", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow page={VISITS_PAGE} apiUrl={API} account={account()} />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        expect(
+            await screen.findByText(
+                /Personal training · Visit 1 of 3\. We'll book the rest with you then/,
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("with a deposit, the full price is for all the visits", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json({}, 500),
+        );
+        render(
+            <BookingFlow
+                page={{
+                    ...PAGE,
+                    services: [
+                        {
+                            ...PAGE.services[0],
+                            visits: 3,
+                            depositCents: 60_000,
+                        },
+                    ],
+                }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        expect(
+            screen.getByRole("radio", {
+                name: "Pay the full ₹1,200 for all 3 visits now Online, in one payment",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("a service of one visit reads as before", async () => {
+        serve(() => json(ONE_DAYS));
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        expect(
+            screen.getByRole("heading", { name: "When?" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/visits/)).toBeNull();
+    });
+});

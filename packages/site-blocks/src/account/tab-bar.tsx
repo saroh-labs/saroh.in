@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { cn } from "../lib/utils";
 import type { AccountTab, AccountTabKey } from "./model";
@@ -10,7 +11,9 @@ import type { AccountTab, AccountTabKey } from "./model";
  * The account's bottom tab bar (round-2 plan A, A5; Saroh Customer Site
  * design): only this business's tabs (e.g. a clinic: Home · Appointments ·
  * Messages · Me), fixed to the foot of the screen, the current one in the
- * accent's deep shade. The API decides which tabs there are; this draws them.
+ * accent's deep shade, and a dot on Messages while the business has written
+ * something not yet opened (A13). The API decides which tabs there are;
+ * this draws them.
  */
 
 export const ACCOUNT_TAB_HREF: Record<AccountTabKey, string> = {
@@ -53,8 +56,22 @@ export function currentTab(
     return best;
 }
 
-export function AccountTabBar({ tabs }: { tabs: AccountTab[] }) {
+export function AccountTabBar({
+    tabs,
+    unreadMessages = 0,
+}: {
+    tabs: AccountTab[];
+    /** Messages from the business not yet opened (A13): a dot on Messages. */
+    unreadMessages?: number;
+}) {
     const current = currentTab(usePathname(), tabs);
+    // The layout (and this count) isn't read again on moving between tabs,
+    // so a visit to Messages clears the dot here until the count changes.
+    const [opened, setOpened] = useState<number | null>(null);
+    if (current === "messages" && opened !== unreadMessages) {
+        setOpened(unreadMessages);
+    }
+    const unread = opened === unreadMessages ? 0 : unreadMessages;
     return (
         <nav
             aria-label="Account"
@@ -68,6 +85,8 @@ export function AccountTabBar({ tabs }: { tabs: AccountTab[] }) {
             >
                 {tabs.map((tab) => {
                     const on = tab.key === current;
+                    // Opening Messages clears it; on the page, no dot.
+                    const dot = tab.key === "messages" && !on && unread > 0;
                     return (
                         <Link
                             key={tab.key}
@@ -98,6 +117,17 @@ export function AccountTabBar({ tabs }: { tabs: AccountTab[] }) {
                                 />
                             </svg>
                             <span>{tab.label}</span>
+                            {dot ? (
+                                <>
+                                    <span
+                                        aria-hidden="true"
+                                        className="bg-site-accent absolute right-[calc(50%-16px)] top-1 size-2 rounded-full"
+                                    />
+                                    <span className="sr-only">
+                                        {`(${unread} new)`}
+                                    </span>
+                                </>
+                            ) : null}
                         </Link>
                     );
                 })}

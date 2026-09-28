@@ -282,6 +282,10 @@ model Organization {
   // storefront people the F16 backfill put on the team (DEC-048). Null: not
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
+
+  // A customer's message thread with the business (round-2 A13).
+  customerThreads        CustomerThread[]
+  customerThreadMessages CustomerThreadMessage[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -294,7 +298,7 @@ model BusinessProfile {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   legalName    String?
-  type         String? // individual, company, ...
+  type         String? // individual, partnership, llp, pvt, public, trust; `company` = pvt until F10b (business-type.ts)
   country      String?
   taxId        String?
   contactEmail String?
@@ -360,6 +364,13 @@ model BusinessProfile {
   // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
+
+  // "Members can pause from their account" (round-2 A8), beside the
+  // subscriptions' time zone above: on, a member pauses their own plan for
+  // 2, 4 or 8 weeks from the account area on the business's site; off, the
+  // account shows no Pause and the API refuses a customer's pause (403).
+  // Staff pause either way. No profile yet reads as on.
+  membersCanPause Boolean @default(true)
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -1536,6 +1547,15 @@ model Order {
   // site's checkout.
   checkoutKey String?
 
+  // The customer's site account when they placed it signed in: at the
+  // site's checkout (G13), or a treatment booked signed in (E9, A9). The
+  // account's Orders read it beside the contact's identity links, so an
+  // order it placed shows even when its store customer stands for someone
+  // else; "This isn't them" (A4) moves what it made (round 2, A7). A
+  // single-column key, as Booking's: RLS keeps it in the business.
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
   @@index([storeId])
@@ -1544,6 +1564,8 @@ model Order {
   // The calendar's Orders layer and Home's week read a business's orders
   // by when they were placed (round 2, E20).
   @@index([organizationId, createdAt])
+  // What an account ordered, newest first (A7).
+  @@index([customerAccountId, createdAt])
 }
 
 model OrderItem {
@@ -3333,6 +3355,10 @@ model Contact {
   state        String?
   postalCode   String?
   country      String?
+
+  // Their message thread with the business, written from their account on
+  // the business's site and answered by the team (round-2 A13). At most one.
+  customerThread CustomerThread?
 
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
@@ -5177,6 +5203,9 @@ model Invoice {
   // Emails that sent it or reminded about it (D17).
   messages Message[]
 
+  // Account-thread posts that sent it or reminded about it (D17, A13).
+  threadMessages CustomerThreadMessage[]
+
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
   // key. Voided invoices are left out, so a voided period can be reissued.
@@ -5331,7 +5360,7 @@ model ClassPack {
   validityDays Int
   price        Decimal @db.Decimal(12, 2)
   currency     String
-  status       String  @default("ACTIVE") // ACTIVE | ARCHIVED
+  status       String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED (E14)
 
   services  ClassPackService[]
   purchases PackPurchase[]
@@ -5340,6 +5369,23 @@ model ClassPack {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+
+  // Drafts (round-2 E14, `common/drafts/`, as a plan's in D5). A live pack's
+  // unpublished changes: only the fields that differ from the published
+  // columns (and services), which sales keep reading. Null when there are
+  // none. A DRAFT pack writes its columns directly and never holds a set.
+  pendingChanges   Json?
+  // When the pending set (or a draft's columns) was last saved. Null once
+  // published or discarded.
+  pendingChangedAt DateTime?
+  // Bumped by every draft save, publish, discard and pack write, so an
+  // editor holding an older revision is refused instead of overwriting (#285).
+  draftRevision    Int       @default(0)
+  // Who moved the revision last, and when: named in a stale editor's 409.
+  // No foreign key: a teammate who leaves keeps their saves; a Saroh
+  // operator's is never stored (DEC-035), so a time with no person is theirs.
+  revisedAt        DateTime?
+  revisedById      String?
 }
 
 model ClassPackService {
@@ -5462,6 +5508,11 @@ model CustomerAccount {
 
   // Bookings made signed in (A9).
   bookings Booking[]
+  // Orders placed signed in (A7).
+  orders   Order[]
+
+  // Messages the customer wrote to the business from this account (A13).
+  threadMessages CustomerThreadMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5532,4 +5583,79 @@ model CustomerSession {
   @@index([accountId])
   @@index([siteId])
   @@index([expiresAt])
+}
+
+/// Who wrote a thread message (A13): the customer from their account, a
+/// staff member from the workspace, or Saroh itself for the business (an
+/// invoice sent, and later A14's order and booking notices).
+enum CustomerThreadAuthor {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+/// A customer's one message thread with the business (round-2 A13, R14,
+/// default 77): the customer writes from their account on the business's
+/// site, and the team answers in the workspace. Rooted on the Contact, so a
+/// merge absorbs the other's thread (C9) and a removal deletes it (C11).
+model CustomerThread {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The newest message, for the order threads are listed in.
+  lastMessageAt  DateTime  @default(now())
+  // When each side last opened it: a message from the other side after this
+  // is unread, and opening clears the dot.
+  customerReadAt DateTime?
+  staffReadAt    DateTime?
+
+  messages CustomerThreadMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One thread per customer.
+  @@unique([contactId, organizationId])
+  // The target of (threadId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId, lastMessageAt])
+}
+
+/// One message in a customer's thread (A13). Plain text, never rendered as
+/// HTML.
+model CustomerThreadMessage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  threadId String
+  thread   CustomerThread @relation(fields: [threadId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  author CustomerThreadAuthor
+  body   String
+
+  // The account that wrote it (CUSTOMER). "This isn't them" moves the
+  // messages the account wrote since it linked (unlink-plan.ts).
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  // The staff member who wrote it (STAFF), or sent the invoice (SYSTEM).
+  authorUserId      String?
+
+  // What a SYSTEM message says happened, and the invoice it is about: D17's
+  // INVOICE_SENT | INVOICE_REMINDER. The invoice's once-sent and
+  // one-reminder-a-day rules count these beside its emails.
+  event     String?
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([threadId, createdAt])
+  @@index([customerAccountId, createdAt])
+  @@index([invoiceId, createdAt])
 }

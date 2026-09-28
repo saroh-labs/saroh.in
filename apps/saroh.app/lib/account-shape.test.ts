@@ -4,9 +4,13 @@ import {
     emailChangeAnswer,
     homeResult,
     isAccountView,
+    isMessage,
     notesResult,
+    orderDetailResult,
+    ordersResult,
     receiptsResult,
     refusalMessage,
+    threadResult,
 } from "./account-shape";
 
 /**
@@ -91,6 +95,95 @@ describe("homeResult", () => {
     });
 });
 
+describe("orders and Track (A7)", () => {
+    const row = {
+        ref: "ord_1",
+        number: "1019",
+        placedAt: "2026-10-02T06:00:00.000Z",
+        total: "450.00",
+        currency: "INR",
+        open: true,
+        status: "Ready",
+        fulfilment: "Pick-up",
+        items: [{ name: "Sourdough", quantity: 2 }],
+        moreItems: 0,
+    };
+    const detail = {
+        ref: "ord_1",
+        number: "1019",
+        placedAt: "2026-10-02T06:00:00.000Z",
+        total: "450.00",
+        currency: "INR",
+        fulfilment: "Shipping",
+        state: "open",
+        status: "Handed to courier",
+        lines: [
+            { name: "Sourdough", quantity: 2, kind: "product", visits: null },
+            {
+                name: "Root canal",
+                quantity: 1,
+                kind: "service",
+                visits: [
+                    {
+                        number: 1,
+                        startAt: null,
+                        timezone: null,
+                        state: "to-book",
+                    },
+                ],
+            },
+        ],
+        steps: [
+            {
+                label: "New",
+                state: "done",
+                line: "Done",
+                at: "2026-10-02T06:00:00.000Z",
+            },
+            {
+                label: "Handed to courier",
+                state: "now",
+                line: "Now · Delhivery has it",
+                at: null,
+            },
+        ],
+        courier: {
+            name: "Delhivery",
+            trackingNumber: "DL1",
+            trackingUrl: null,
+        },
+        refund: null,
+        receipt: "inv_1",
+    };
+
+    it("reads the list only when every row checks, fulfilment included", () => {
+        expect(ordersResult([row])).toEqual([row]);
+        expect(ordersResult([])).toEqual([]);
+        const { fulfilment: _, ...before } = row;
+        expect(ordersResult([before])).toBe(null);
+        expect(ordersResult({ rows: [row] })).toBe(null);
+    });
+
+    it("reads a Track only in the shape it knows", () => {
+        expect(orderDetailResult(detail)).toEqual(detail);
+        expect(orderDetailResult({ ...detail, courier: null })).not.toBe(null);
+        expect(orderDetailResult({ ...detail, state: "lost" })).toBe(null);
+        expect(
+            orderDetailResult({
+                ...detail,
+                steps: [{ label: "New", state: "soon", line: "", at: null }],
+            }),
+        ).toBe(null);
+        expect(
+            orderDetailResult({
+                ...detail,
+                lines: [{ name: "X", quantity: 1, kind: "gift", visits: null }],
+            }),
+        ).toBe(null);
+        expect(orderDetailResult(null)).toBe(null);
+    });
+});
+
 describe("receipts and notes", () => {
     it("reads a list only when every row checks", () => {
         const row = {
@@ -103,6 +196,10 @@ describe("receipts and notes", () => {
         };
         expect(receiptsResult([row])).toEqual([row]);
         expect(receiptsResult([{ ...row, total: 12000 }])).toBe(null);
+        // D15: a bill of supply says so; an older API leaves it out.
+        const exempt = { ...row, billOfSupply: true };
+        expect(receiptsResult([exempt])).toEqual([exempt]);
+        expect(receiptsResult([{ ...row, billOfSupply: "yes" }])).toBe(null);
         const note = {
             ref: "n",
             text: "Blood thinners",
@@ -175,5 +272,68 @@ describe("refusalMessage", () => {
             ),
         ).toBe("fallback");
         expect(refusalMessage(400, null, "fallback")).toBe("fallback");
+    });
+});
+
+describe("the message thread (A13)", () => {
+    const THREAD = {
+        messages: [
+            {
+                ref: "m1",
+                from: "business",
+                text: "Your crown is ready.",
+                sentAt: "2026-10-04T09:00:00.000Z",
+            },
+            {
+                ref: "m2",
+                from: "me",
+                text: "Thanks!",
+                sentAt: "2026-10-04T10:00:00.000Z",
+            },
+        ],
+        earlier: false,
+    };
+
+    it("reads the API's thread, and refuses one it doesn't know", () => {
+        expect(threadResult(THREAD)).toEqual(THREAD);
+        expect(threadResult({ messages: [], earlier: false })).toEqual({
+            messages: [],
+            earlier: false,
+        });
+        expect(
+            threadResult({
+                ...THREAD,
+                messages: [{ ...THREAD.messages[0], from: "staff" }],
+            }),
+        ).toBe(null);
+        expect(threadResult({ messages: THREAD.messages })).toBe(null);
+        expect(threadResult(null)).toBe(null);
+    });
+
+    it("a message is exactly its four fields' kinds", () => {
+        expect(isMessage(THREAD.messages[1])).toBe(true);
+        expect(isMessage({ ...THREAD.messages[1], text: 3 })).toBe(false);
+    });
+
+    it("Me's unread count is read when sent, and optional from an older API", () => {
+        expect(isAccountView({ ...ACCOUNT, unreadMessages: 2 })).toBe(true);
+        expect(isAccountView({ ...ACCOUNT, unreadMessages: "2" })).toBe(false);
+    });
+
+    it("passes on the too-many sentence (429)", () => {
+        expect(
+            refusalMessage(
+                429,
+                {
+                    error: {
+                        message:
+                            "You're sending messages quickly. Wait a minute, then try again.",
+                    },
+                },
+                "fallback",
+            ),
+        ).toBe(
+            "You're sending messages quickly. Wait a minute, then try again.",
+        );
     });
 });

@@ -1,4 +1,5 @@
 import { fromMajor, toMajor } from "./money";
+import { dayProblems, problemChip } from "./problems";
 import type {
     CalendarDay,
     CalendarItem,
@@ -121,17 +122,6 @@ const LABELS: Record<
 /** The layers switched off, by key. */
 export type Off = Partial<Record<LayerKey, boolean>>;
 
-/** How many things on a day need acting on, among the layers switched on. */
-export function actOnCount(day: CalendarDay, off: Off): number {
-    const failed = off.subscriptions
-        ? 0
-        : (day.layers.subscriptions?.kinds.failed ?? 0);
-    const overdue = off.invoices
-        ? 0
-        : (day.layers.invoices?.kinds.overdue ?? 0);
-    return failed + overdue;
-}
-
 export interface DayChip {
     key: LayerKey | "act";
     text: string;
@@ -139,18 +129,19 @@ export interface DayChip {
 }
 
 /**
- * A day's chips: what needs acting on first, then a count per layer that has
- * anything. The desk shows the first three; the phone draws each as a dot.
+ * A day's chips: its named problem first ("1 late order", "2 need you",
+ * E22), then a count per layer that has anything. The desk shows the first
+ * three; the phone draws each as a dot, the problem's red.
  */
 export function dayChips(
     day: CalendarDay,
     layers: LayerStyle[],
     off: Off,
+    today: string,
 ): DayChip[] {
     const chips: DayChip[] = [];
-    const act = actOnCount(day, off);
-    if (act > 0)
-        chips.push({ key: "act", text: `${act} to act on`, tone: "act" });
+    const problem = problemChip(dayProblems(day, off, today));
+    if (problem) chips.push({ key: "act", text: problem, tone: "act" });
     for (const layer of layers) {
         if (off[layer.key]) continue;
         const n = day.layers[layer.key]?.count ?? 0;
@@ -271,7 +262,10 @@ export function describeItem(
                 at ? `Placed ${at}` : null,
                 item.kind === "cancelled"
                     ? { label: "Cancelled", tone: "bad" }
-                    : null,
+                    : // Past its storefront's late time (E20's flag, E22).
+                      item.flags?.includes("late")
+                      ? { label: "Late", tone: "bad" }
+                      : null,
             );
         case "collections":
             return line(`Collects · ${item.title}`, item.subtitle);

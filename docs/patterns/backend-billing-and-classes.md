@@ -159,6 +159,29 @@
   back) writes a RETURNED entry then; a refund that fails puts nothing back.
   A line-less refund (the provider's dashboard) releases only when it brings
   the order to fully refunded; an edit's difference never does.
+- **Cancel is a refund in full (round-2 B9, `orders/order-cancel.ts`).**
+  An order paid online is cancelled through the one refund path
+  (`PaymentsService.refundOrderForCancel`, everything left by line); its
+  refund rows carry the key `order-cancel:<order>:<request>`, and the order
+  is marked CANCELLED only once nothing taken online is left and the
+  provider has answered for every refund (`finishCancelInTx`). Every path
+  that learns of a refund calls it under the order's lock — the cancel
+  itself (`recordRefundTaken`), try-again, the `payments.send-refund` job
+  the cancel writes for an unanswered part, and the refund webhook — so a
+  lost answer keeps the order open with the money held, and whichever
+  hears last finishes it once. Its stock comes back as each refund is
+  confirmed (above), never on the cancel. Unpaid or paid by hand, it is
+  cancelled at once and its stock released there. A treatment's visits
+  still to come are cancelled with it (`bookings/treatment-cancel.ts`).
+  Refused from the handover on, and once a visit was attended.
+- **Changing how an order is fulfilled (B9)** re-prices only its delivery
+  charge, typed by staff, under the order's lock. On an order paid online
+  more is a supplementary invoice and the difference is owed — the order's
+  pay link takes it (`payLinkStanding` reads a paid order that owes more as
+  DUE, except a site checkout's, whose first payment held its stock) — and
+  less is a refund of the difference (`forEdit`) with a credit note, as an
+  edit's. The invoice correction is a line with no product, at the
+  business's delivery rate and SAC.
 - **A kitchen undo of a fulfilment** reverses each line's sale and holds it
   again, refused once a line has a confirmed refund or the order a RETURNED
   entry. An edit refuses a variant the order's storefront doesn't sell and
@@ -264,6 +287,14 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Cancel and move have one write each, whoever acts** (A6):
+  `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
+  from `BookingsService`, the customer from their account
+  (`site-accounts/account-bookings.service.ts`) with no actor, so the
+  history reads "by the customer". The customer's own rules sit on top: no
+  move inside the free-cancel window ("Call ‹business› to change this"), a
+  new time only where the booking page would offer it, and never a refund
+  by hand. A visit of a treatment takes its order's lock first.
 - **The anonymous `POST public/services/:id/book` answers 410** "Sign in to
   book" and reads no body (A9); bookings from a site go through
   `POST public/site-accounts/bookings`.
@@ -351,6 +382,20 @@
   and a recorded change or an archive bumps the revision. **The staff list
   hides drafts unless asked** (`include=drafts` or `status=DRAFT`), so an
   app from before the Plan Editor never draws one as a live card.
+- **Pack drafts** (round-2 E14) follow the plan's rules on the same shared
+  helper, with the same routes under `class-packs` and the same editor
+  shape (`class-packs/{pack-drafts,pack-draft-view}.ts`). Only an ACTIVE
+  pack is sold: `assertPackOnSale` (`class-packs/pack-on-sale.ts`; a DRAFT
+  is a 409 "This pack isn't published yet"), and a list of packs a buyer
+  can choose filters by `PACKS_ON_SALE`. A pack's services are a draft
+  field too (a sorted id list; `sameValue` compares lists): a draft's are
+  written to `ClassPackService` directly, a live pack's wait in the pending
+  set, and sales and redemptions keep reading the published ones until
+  Publish. There are no pack events yet (E13 adds `PackEvent`), so who
+  moved the revision is kept on the pack itself (`revisedAt`,
+  `revisedById`; null for an operator, named Saroh support). E13 adds the
+  kind and first-pack-only fields to `PACK_DRAFT_FIELDS` and owns the kind
+  lock at publish.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one

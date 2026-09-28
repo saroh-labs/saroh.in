@@ -98,6 +98,11 @@ export interface PublicBookingPage {
          * desk; one whose deposit is the full price is paid now.
          */
         depositCents: number | null;
+        /**
+         * How many visits one booking of it is (E10): more than one is a
+         * treatment, sold whole and booked a visit at a time.
+         */
+        visits: number;
         /** Online only. A service offered either way is not (see `where`). */
         online: boolean;
         /**
@@ -304,6 +309,7 @@ export async function publicBookingPage(
                       currency: true,
                       locationType: true,
                       depositMode: true,
+                      visits: true,
                       staffServices: {
                           where: { staff: { status: "ACTIVE" } },
                           select: { staff: { select: { name: true } } },
@@ -331,6 +337,7 @@ export async function publicBookingPage(
             priceCents: svc.priceCents,
             currency: svc.currency,
             depositCents: depositCents(svc.priceCents, svc.depositMode),
+            visits: svc.visits,
             online: svc.locationType === "ONLINE",
             // The page asks Where for EITHER (E7); anything unknown reads
             // as in person, which asks nothing and shows no link.

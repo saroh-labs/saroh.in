@@ -8,13 +8,12 @@ import type { FulfilmentType } from "./read";
 
 /**
  * The Orders list's filter bar (plan B, B4), after the "Saroh Orders
- * Screen" design: date, step, fulfilment, payment, product and Late. Every
+ * Screen" design: date, step, fulfilment, payment, product, Needs attention
+ * (B15) and Late. Every
  * filter lives in the address, so a filtered list is a link someone can
  * share, and the API narrows the rows, the tab counts and the pages alike.
  * Pure: `list-query.ts` reads and writes the address through it, and the
  * bar and the empty state take their words from it.
- *
- * Needs attention joins Late as a toggle with B15; there is no stand-in.
  */
 
 /** The date menu: the API's presets, and a custom range of days. */
@@ -34,6 +33,11 @@ export interface OrdersFilters {
     payment: OrdersPayment | null;
     /** A product id. */
     product: string | null;
+    /**
+     * Only orders whose customer has Needs attention the viewer may see
+     * (B15). The API decides what counts for them.
+     */
+    attention: boolean;
     late: boolean;
 }
 
@@ -45,6 +49,7 @@ export const NO_FILTERS: OrdersFilters = {
     fulfilment: null,
     payment: null,
     product: null,
+    attention: false,
     late: false,
 };
 
@@ -129,6 +134,7 @@ export function readOrdersFilters(params: Params): OrdersFilters {
         payment:
             PAYMENT_OPTIONS.find((p) => p.value === payment)?.value ?? null,
         product: product && ID_RE.test(product) ? product : null,
+        attention: one(params, "attention") === "true",
         late: one(params, "late") === "true",
     };
 }
@@ -149,6 +155,7 @@ export function writeOrdersFilters(
     }
     if (filters.payment) q.set("payment", filters.payment);
     if (filters.product) q.set("product", filters.product);
+    if (filters.attention) q.set("attention", "true");
     if (filters.late) q.set("late", "true");
 }
 
@@ -161,6 +168,7 @@ export function filtersActive(filters: OrdersFilters): boolean {
         !!filters.fulfilment ||
         !!filters.payment ||
         !!filters.product ||
+        filters.attention ||
         filters.late
     );
 }
@@ -178,6 +186,7 @@ export function filterParams(
     | "payment"
     | "productId"
     | "late"
+    | "attention"
 > {
     let from = filters.date === "custom" ? filters.from : null;
     let to = filters.date === "custom" ? filters.to : null;
@@ -197,6 +206,7 @@ export function filterParams(
             : undefined,
         productId: filters.product ?? undefined,
         late: filters.late ? true : undefined,
+        attention: filters.attention ? true : undefined,
     };
 }
 
@@ -296,6 +306,7 @@ export function filteredEmptyTitle(
         );
     }
     if (product) words.push(`with ${product}`);
+    if (filters.attention) words.push("that need attention");
     if (filters.date && filters.date !== "custom") {
         words.push(DATE_WORDS[filters.date]);
     } else if (filters.date === "custom") {

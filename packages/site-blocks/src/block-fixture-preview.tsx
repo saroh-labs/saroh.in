@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import type {
     RenderedBooking,
     RenderedJournal,
+    RenderedPlans,
     RenderedServicesList,
     RenderedVisitUs,
     SectionType,
@@ -15,6 +16,8 @@ import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
 import type { JournalPost } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { PublicPlan } from "./blocks/plans";
+import PlansSection from "./blocks/plans";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
 import type { PublicVisit } from "./blocks/visit-us";
@@ -112,6 +115,41 @@ export const SAMPLE_POSTS: JournalPost[] = [
 ];
 
 /**
+ * Plans for previewing `plans` where there are no real ones: the catalog and
+ * the Add-section picker (G9). The first is the most chosen, so the
+ * highlight's badge shows; the last has no description.
+ */
+export const SAMPLE_PLANS: PublicPlan[] = [
+    {
+        id: "sample-weekly",
+        name: "Weekly loaf",
+        description: "One sourdough every Saturday, collected at the counter.",
+        price: "350.00",
+        currency: "INR",
+        interval: "WEEK",
+        mostChosen: true,
+    },
+    {
+        id: "sample-monthly",
+        name: "Monthly box",
+        description: "Four loaves and a jar of something seasonal.",
+        price: "1200.00",
+        currency: "INR",
+        interval: "MONTH",
+        mostChosen: false,
+    },
+    {
+        id: "sample-yearly",
+        name: "Bread for a year",
+        description: null,
+        price: "12000.00",
+        currency: "INR",
+        interval: "YEAR",
+        mostChosen: false,
+    },
+];
+
+/**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
  * in the viewer's own time zone as the block itself would show them.
  */
@@ -192,6 +230,12 @@ const LIVE_DATA_PREVIEWS: Partial<
         <JournalSection
             content={content as RenderedJournal}
             feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
+        />
+    ),
+    plans: (content) => (
+        <PlansSection
+            content={content as RenderedPlans}
+            feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
         />
     ),
     visitUs: (content) => (

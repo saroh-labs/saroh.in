@@ -14,6 +14,7 @@ import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { exemptNote } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import type { InvoiceTab } from "@/lib/invoices/status";
 import {
@@ -114,6 +115,9 @@ export function InvoicesScreen({
         return tab !== "all" && parent !== undefined && inTab(parent, tab);
     });
     const tabLabel = INVOICE_TABS.find((t) => t.id === tab)?.label ?? "";
+    // Every issued paper a bill of supply (D15): the line says so, rather
+    // than "GST tax invoices".
+    const exempt = exemptNote(invoices);
 
     return (
         // One block: the page container spaces its children apart, and the
@@ -143,11 +147,13 @@ export function InvoicesScreen({
             />
             <p className="mb-3 text-[12px] text-muted-foreground">
                 Orders and subscription renewals make their invoice themselves.
-                {tax
-                    ? tax.registered
-                        ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
-                        : " Not GST-registered — no tax is charged."
-                    : null}
+                {exempt
+                    ? ` ${exempt}`
+                    : tax
+                      ? tax.registered
+                          ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
+                          : " Not GST-registered — no tax is charged."
+                      : null}
             </p>
 
             <div

@@ -80,6 +80,7 @@ const base: RawOrderRead = {
 const opts = (money: boolean) => ({
     money,
     fullRead: money,
+    contact: true,
     actors: new Map([["user_1", "Meera"]]),
     now: new Date(at.getTime() + 1000),
 });
@@ -391,7 +392,7 @@ describe("amountDueCents", () => {
                     },
                 ],
             },
-            opts(false),
+            { ...opts(false), contact: false },
         );
         expect(read.items[0].allergens).toEqual({
             contains: [{ id: "al_g", name: "Gluten" }],
@@ -404,7 +405,7 @@ describe("amountDueCents", () => {
                 firstOrderAt: at,
             }),
         );
-        // The kitchen's view still has no inbox in it.
+        // A kitchen without contact:read has no inbox in it.
         expect(read.customer).not.toHaveProperty("email");
     });
 
@@ -541,5 +542,90 @@ describe("serializeOrderRead: a treatment's order (E9, DEC-050)", () => {
             due: "0.00",
         });
         expect(amountDueCents(paid)).toBe(0);
+    });
+});
+
+describe("the customer's own phone and email (review #19)", () => {
+    const withCustomer: RawOrderRead = {
+        ...base,
+        deliveryName: "Priya",
+        deliveryPhone: "+91 99000 00001",
+        customer: {
+            id: "cus_1",
+            email: "priya@example.in",
+            firstName: "Priya",
+            lastName: null,
+            phone: "+91 98450 00001",
+        },
+    };
+
+    it("go to a caller holding contact:read and order:read", () => {
+        const read = serializeOrderRead(withCustomer, {
+            ...opts(true),
+            contact: true,
+        });
+        expect(read.customer).toMatchObject({
+            phone: "+91 98450 00001",
+            email: "priya@example.in",
+        });
+    });
+
+    it("the counter (contact:read, no order:read) gets the phone and the email", () => {
+        const read = serializeOrderRead(withCustomer, {
+            ...opts(false),
+            contact: true,
+        });
+        expect(read.customer?.phone).toBe("+91 98450 00001");
+        expect(read.customer?.email).toBe("priya@example.in");
+    });
+
+    it.each([true, false])(
+        "never to one without it, whatever else they hold; the delivery phone stays (money read: %s)",
+        (money) => {
+            const read = serializeOrderRead(withCustomer, {
+                ...opts(money),
+                contact: false,
+            });
+            expect(read.customer?.phone).toBeNull();
+            expect(read.customer).not.toHaveProperty("email");
+            expect(read.customer?.name).toBe("Priya");
+            // A local delivery can't go out without it.
+            expect(read.deliveryAddress?.phone).toBe("+91 99000 00001");
+            expect(JSON.stringify(read)).not.toContain("98450");
+            expect(JSON.stringify(read)).not.toContain("priya@example.in");
+        },
+    );
+});
+
+describe("the order read's Needs attention (B15)", () => {
+    const attention = {
+        entries: [
+            {
+                id: "a1",
+                kind: "ALLERGY" as const,
+                label: "Sesame",
+                detail: null,
+                sensitive: false,
+                allergen: { id: "al_s", name: "Sesame" },
+                matchAllergens: [{ id: "al_s", name: "Sesame" }],
+                source: "STAFF" as const,
+            },
+        ],
+        hiddenSensitiveCount: 1,
+    };
+
+    it("carries what the caller may see, as the helper decided it", () => {
+        const read = serializeOrderRead(base, { ...opts(false), attention });
+        expect(read.attention).toEqual(attention);
+    });
+
+    it("is null when it couldn't be read, and absent when not asked for", () => {
+        expect(
+            serializeOrderRead(base, { ...opts(true), attention: null })
+                .attention,
+        ).toBeNull();
+        expect(serializeOrderRead(base, opts(true))).not.toHaveProperty(
+            "attention",
+        );
     });
 });

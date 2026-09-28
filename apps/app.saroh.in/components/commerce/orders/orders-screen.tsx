@@ -29,7 +29,11 @@ import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
 import { OrderTabs } from "./order-tabs";
-import { OrdersEmpty, OrdersHeading } from "./orders-states";
+import {
+    OrdersAttentionPartial,
+    OrdersEmpty,
+    OrdersHeading,
+} from "./orders-states";
 
 /**
  * Sell → Orders, after the "Saroh Orders Screen" design (plan B, B3): every
@@ -118,6 +122,9 @@ export function OrdersScreen({
         !!page.nextCursor,
     );
     const firstStore = stores.length === 1 ? stores[0] : undefined;
+    // Needs attention couldn't be read for this page (B15): the API sends
+    // null rather than an empty list, and the page says so.
+    const attentionUnread = rows.some((r) => r.attention === null);
 
     return (
         <>
@@ -194,6 +201,11 @@ export function OrdersScreen({
             <OrderFilters query={query} options={filterOptions} go={go} />
 
             <div aria-busy={navigating} className="pt-3.5">
+                {attentionUnread ? (
+                    <OrdersAttentionPartial
+                        onRetry={() => startNavigation(() => router.refresh())}
+                    />
+                ) : null}
                 {rows.length === 0 ? (
                     <OrdersEmpty
                         query={query}

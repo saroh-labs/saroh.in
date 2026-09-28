@@ -15,14 +15,24 @@ import {
     unlinkPreviewAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
-import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
+import type { MergeTarget } from "@/lib/customer-workspace/merge";
+import { clashTarget, suggestedTarget } from "@/lib/customer-workspace/merge";
+import { moreMenu } from "@/lib/customer-workspace/more-menu";
+import type {
+    DuplicateSuggestion,
+    IdentitySuggestion,
+} from "@/lib/customer-workspace/service";
 import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
 import {
     signsInLine,
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
-import type { OrderFilter, TabKey } from "@/lib/customer-workspace/view";
+import type {
+    OrderFilter,
+    TabKey,
+    ThreadRead,
+} from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
     initials,
@@ -45,11 +55,13 @@ import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { EditSheet } from "./edit-sheet";
 import { Crumbs, Header, Tabs } from "./header";
+import { MergeDialog } from "./merge-dialog";
+import { MessagesTab } from "./messages-tab";
 import { Notes } from "./notes";
-import { PartialNotice, PossibleMatch } from "./notices";
+import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
 import { Overview } from "./overview";
-import { Empty } from "./parts";
+import { Failed } from "./parts";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18), after "Saroh Customer Detail":
@@ -66,9 +78,12 @@ export function CustomerDetailScreen({
     bizName,
     sells,
     canWrite,
+    canMerge,
     canConsent,
     userId,
     suggestions,
+    duplicates,
+    thread = null,
     nowIso,
 }: {
     d: CustomerDetail;
@@ -78,16 +93,22 @@ export function CustomerDetailScreen({
     sells: boolean;
     /** `contact:write`: edit, link, delete, add notes. */
     canWrite: boolean;
+    /** `customer:merge`: merge with a duplicate (C10). */
+    canMerge: boolean;
     /** `consent:write`: record that they asked to stop. */
     canConsent: boolean;
     userId: string | null;
     suggestions: IdentitySuggestion[];
+    /** Other records that look like the same person (C2). */
+    duplicates: DuplicateSuggestion[];
+    /** Their message thread (A13), for the Messages tab. */
+    thread?: ThreadRead;
     nowIso: string;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d);
+    const tabs = tabsFor(d, thread);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
     const [editing, setEditing] = useState(0);
@@ -95,6 +116,15 @@ export function CustomerDetailScreen({
     const [removing, setRemoving] = useState(false);
     const [stopping, setStopping] = useState(false);
     const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
+    // The merge (C10): with the other record known, or null to search.
+    // Offered only with `customer:merge`.
+    const [merging, setMerging] = useState<{
+        target: MergeTarget | null;
+    } | null>(null);
+    const mergeWith = (target: MergeTarget | null) => setMerging({ target });
+    const mergeDuplicate = canMerge
+        ? (dup: DuplicateSuggestion) => mergeWith(suggestedTarget(dup))
+        : undefined;
     const attention = useAttention({
         contactId: d.contact.id,
         attention: d.attention,
@@ -153,30 +183,20 @@ export function CustomerDetailScreen({
         router.push(sells ? "/commerce/customers" : "/contacts");
     }
 
-    // Drawn for every role, disabled with its reason for one that may not.
-    const menu = [
-        ...(d.linkedCustomers !== undefined
-            ? [
-                  {
-                      label: "Link a store customer…",
-                      go: () => setLinking(true),
-                  },
-              ]
-            : []),
-        ...(d.siteAccount?.canUnlink
-            ? [
-                  {
-                      label: "This isn't them…",
-                      go: () => void askNotThem(),
-                  },
-              ]
-            : []),
+    const menu = moreMenu(
         {
-            label: "Delete their record…",
-            danger: true,
-            go: () => setRemoving(true),
+            canWrite,
+            canMerge,
+            canLink: d.linkedCustomers !== undefined,
+            canUnlink: !!d.siteAccount?.canUnlink,
         },
-    ];
+        {
+            merge: () => mergeWith(null),
+            link: () => setLinking(true),
+            notThem: () => void askNotThem(),
+            remove: () => setRemoving(true),
+        },
+    );
 
     const panel = () => {
         switch (tab) {
@@ -225,6 +245,18 @@ export function CustomerDetailScreen({
                     />
                 ) : (
                     <Failed what="Invoices" />
+                );
+            case "msg":
+                return thread && thread !== "failed" ? (
+                    <MessagesTab
+                        contactId={d.contact.id}
+                        thread={thread}
+                        firstName={first}
+                        timeZone={d.timezone}
+                        now={now}
+                    />
+                ) : (
+                    <Failed what="Messages" />
                 );
             case "notes":
                 return d.notes ? (
@@ -288,8 +320,13 @@ export function CustomerDetailScreen({
                     }
                     attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
+                    canMore={canWrite || canMerge}
                     onEdit={() => setEditing((n) => n + 1)}
                     menu={menu}
+                />
+                <DuplicateNotice
+                    duplicates={duplicates}
+                    onMerge={mergeDuplicate}
                 />
                 {canWrite && d.attention?.suggestions?.length ? (
                     <AttentionSuggestions
@@ -330,6 +367,19 @@ export function CustomerDetailScreen({
                     onOpenChange={(o) => (o ? null : setEditing(0))}
                     contact={d.contact}
                     signsInWith={d.siteAccount?.email ?? null}
+                    onMerge={
+                        canMerge
+                            ? (holder) => mergeWith(clashTarget(holder))
+                            : undefined
+                    }
+                />
+            ) : null}
+            {merging ? (
+                <MergeDialog
+                    hereId={d.contact.id}
+                    target={merging.target}
+                    open
+                    onOpenChange={(o) => (o ? null : setMerging(null))}
                 />
             ) : null}
             {canWrite ? (
@@ -343,6 +393,8 @@ export function CustomerDetailScreen({
                 <IdentityLinkDialog
                     contactId={d.contact.id}
                     suggestions={suggestions}
+                    duplicates={duplicates}
+                    onMerge={mergeDuplicate}
                     open={linking}
                     onOpenChange={setLinking}
                 />
@@ -368,14 +420,5 @@ export function CustomerDetailScreen({
                 onConfirm={() => void remove()}
             />
         </>
-    );
-}
-
-function Failed({ what }: { what: string }) {
-    return (
-        <Empty title={`${what} couldn't be read`}>
-            The connection dropped while we were fetching them. Nothing has
-            changed — try again in a minute.
-        </Empty>
     );
 }

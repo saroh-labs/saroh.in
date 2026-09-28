@@ -7,6 +7,7 @@ import type {
     BookingService,
     BookingStart,
 } from "../model";
+import { visitsOf } from "../model";
 import { card, focusRing, quietFill } from "../styles";
 import { OneToOne } from "./one-to-one";
 import { Sessions } from "./sessions";
@@ -49,7 +50,14 @@ export function WhenStep({
 }) {
     return (
         <div className={card}>
-            <StepHead n={2} title="When?" />
+            <StepHead
+                n={2}
+                title={
+                    visitsOf(service) > 1
+                        ? "When is your first visit?"
+                        : "When?"
+                }
+            />
             {daysState.kind === "loading" ? (
                 <div
                     role="status"

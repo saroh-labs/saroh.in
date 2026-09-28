@@ -39,6 +39,7 @@ export function OrderActions({
     paymentStatus,
     pending,
     onPendingChange,
+    withCancel = true,
 }: {
     storeId: string;
     orderId: string;
@@ -47,6 +48,11 @@ export function OrderActions({
     paymentStatus: PaymentStatus;
     pending: Pending | null;
     onPendingChange: (p: Pending | null) => void;
+    /**
+     * Offer "Cancel order" here: only against an API before B9. From B9 it
+     * is "Cancel order…" on the Change card, a refund in full.
+     */
+    withCancel?: boolean;
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
@@ -54,6 +60,7 @@ export function OrderActions({
     // cash, a bank transfer. A card refund goes through Refund instead, which
     // actually sends the money back.
     const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus];
+    const cancellable = withCancel && canCancel(status);
 
     async function commit(p: Pending) {
         const res = await updateOrder(
@@ -79,7 +86,7 @@ export function OrderActions({
 
     return (
         <>
-            {canCancel(status) || paymentMoves.length > 0 ? (
+            {cancellable || paymentMoves.length > 0 ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
@@ -102,7 +109,7 @@ export function OrderActions({
                                 Record as {PAYMENT_LABEL[to].toLowerCase()}
                             </DropdownMenuItem>
                         ))}
-                        {canCancel(status) ? (
+                        {cancellable ? (
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onSelect={() => setPending({ kind: "cancel" })}

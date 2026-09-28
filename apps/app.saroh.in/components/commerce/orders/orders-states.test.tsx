@@ -5,6 +5,7 @@ import { readOrdersQuery } from "@/lib/orders/list-query";
 
 import {
     OrderLocked,
+    OrdersAttentionPartial,
     OrdersEmpty,
     OrdersFailed,
     OrdersLoading,
@@ -34,6 +35,21 @@ describe("OrdersFailed", () => {
 
     it("never says there are no orders", () => {
         expect(html).not.toMatch(/No orders|No refunds|Nothing left/);
+    });
+});
+
+describe("OrdersAttentionPartial (B15)", () => {
+    const html = renderToStaticMarkup(
+        <OrdersAttentionPartial onRetry={noop} />,
+    );
+
+    it("says what is missing, that the rows are whole, and offers a retry", () => {
+        expect(html).toContain('role="status"');
+        expect(html).toContain("Needs attention couldn&#x27;t be read");
+        expect(html).toContain("Not available");
+        expect(html).toContain("arrived normally");
+        expect(html).toContain("Try again");
+        expect(html).not.toContain('role="alert"');
     });
 });
 
