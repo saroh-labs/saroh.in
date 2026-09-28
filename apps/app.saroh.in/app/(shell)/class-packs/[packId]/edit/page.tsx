@@ -1,17 +1,17 @@
-import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-
-import { PackForm } from "@/components/class-packs/pack-form";
-import { PageContainer } from "@/components/shared/page-container";
-import { getPack } from "@/lib/class-packs/service";
-import { listServices } from "@/lib/services/service";
+import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
+import { PackEditor } from "@/components/class-packs/pack-editor/pack-editor";
+import { loadPackEditorContext } from "@/lib/class-packs/editor-data";
+import { readPackEditor, readPackSold } from "@/lib/class-packs/pack-drafts";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Edit class pack" };
+export const metadata = { title: "Edit pack" };
 
-/** Change a pack. What was already sold keeps its classes, price and days. */
+/**
+ * Bookings › Packs › a pack (E18): the Pack Editor. A draft autosaves and
+ * goes on sale at Publish; a pack on sale keeps its edits as unpublished
+ * changes until Publish changes, and what was sold keeps its terms. A pack
+ * that can't be read says so rather than "isn't here".
+ */
 export default async function EditClassPackPage({
     params,
 }: {
@@ -19,47 +19,46 @@ export default async function EditClassPackPage({
 }) {
     await requireSession();
     const { packId } = await params;
-    const [pack, services] = await Promise.all([
-        getPack(packId),
-        listServices(),
+    const retryHref = `/class-packs/${packId}/edit`;
+    const [read, context] = await Promise.all([
+        readPackEditor(packId),
+        loadPackEditorContext(),
     ]);
-    if (!pack) notFound();
-
-    // Services taking bookings, and any the pack already names — so a
-    // paused one stays chosen rather than vanishing from the picker.
-    const named = new Set(pack.services.map((s) => s.id));
-    const options = services
-        .filter((s) => s.status === "ACTIVE" || named.has(s.id))
-        .map((s) => ({ id: s.id, label: s.name }));
+    if (!read.ok) {
+        return <PackEditorState state={read.reason} retryHref={retryHref} />;
+    }
+    const record = read.record;
+    const here = record.published?.name ?? record.values.name;
+    if (!context.canWrite) {
+        return (
+            <PackEditorState
+                state="readOnly"
+                retryHref={retryHref}
+                here={here}
+            />
+        );
+    }
+    if (record.status === "ARCHIVED") {
+        return (
+            <PackEditorState
+                state="archived"
+                retryHref={retryHref}
+                here={here}
+            />
+        );
+    }
+    // A draft has never been sold; a live pack's sales lock its kind (E13).
+    const sold = record.status === "DRAFT" ? 0 : await readPackSold(packId);
 
     return (
-        <PageContainer width="full">
-            <div className="flex flex-col gap-6">
-                <PageHeader
-                    className="mb-0"
-                    breadcrumb={[
-                        <Link
-                            key="packs"
-                            href="/class-packs"
-                            className="hover:text-foreground"
-                        >
-                            Class packs
-                        </Link>,
-                        pack.name,
-                    ]}
-                    title={`Edit ${pack.name}`}
-                    actions={
-                        <Button variant="outline" asChild>
-                            <Link href="/class-packs">Back to class packs</Link>
-                        </Button>
-                    }
-                />
-                <PackForm
-                    pack={pack}
-                    services={options}
-                    defaultCurrency={pack.currency}
-                />
-            </div>
-        </PageContainer>
+        <PackEditor
+            // A different pack starts from its own saved values.
+            key={record.id}
+            initial={record}
+            emptyValues={record.values}
+            services={context.services}
+            sold={sold}
+            canEdit
+        />
     );
 }
