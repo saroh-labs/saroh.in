@@ -863,10 +863,10 @@ export class PaymentsService {
                 },
             },
         });
-        if (!row || row.status !== "PENDING" || row.providerRefundId) {
+        if (row?.status !== "PENDING" || row.providerRefundId) {
             return "DONE";
         }
-        let found: RefundResult | null = null;
+        let found: RefundResult | null;
         try {
             const call = await this.refundCall(
                 organizationId,
