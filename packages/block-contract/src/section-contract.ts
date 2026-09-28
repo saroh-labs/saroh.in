@@ -573,6 +573,51 @@ const plansV1 = z.object({
     showDescriptions: z.boolean().optional(),
 });
 
+/** How many products a Product grid shows, at most, and when it isn't set. */
+export const PRODUCT_GRID_MAX = 12;
+export const PRODUCT_GRID_DEFAULT_COUNT = 4;
+
+/**
+ * productGrid v1 — products from the catalogue, read live (G12).
+ *
+ * A bound block (ADR-004): it stores the title and WHICH products by id,
+ * never a product's name, photo or price. They are read when the page is
+ * served (`GET public/sites/:siteId/shop/products?source=…`), at the site's
+ * sells-from storefront: only published products listed there, with only
+ * the variants sold there, and nothing at all while the shop is not open
+ * for the business. A picked product later archived or unlisted drops out
+ * at view time, and the editor flags it before publish.
+ *
+ * - `source` ABSENT means `newest`: the newest products sold there.
+ * - `collection`: the products of `collectionId` (DEC-031), hand-picked in
+ *   their order or automatic by name.
+ * - `picked`: `productIds`, in the merchant's order.
+ * - `count` ABSENT means {@link PRODUCT_GRID_DEFAULT_COUNT}.
+ * - `showPrices` defaults to on, so ABSENT means shown.
+ *
+ * A just-added block, or one whose collection or products are still to be
+ * chosen, saves: a draft is saved as it is typed. It renders nothing live
+ * until there is something to show, and the flag engine says why. Whether
+ * an id is the business's own is checked by the API at save, not here.
+ */
+const productGridV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    source: z.enum(["newest", "collection", "picked"]).optional(),
+    collectionId: z.string().trim().min(1).max(64).optional(),
+    productIds: z
+        .array(z.string().trim().min(1).max(64))
+        .max(PRODUCT_GRID_MAX)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A product is picked twice",
+        )
+        .optional(),
+    count: z.number().int().min(1).max(PRODUCT_GRID_MAX).optional(),
+    showPrices: z.boolean().optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -673,6 +718,7 @@ export const SECTION_TYPES = [
     "visitUs",
     "journal",
     "plans",
+    "productGrid",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -811,6 +857,14 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // A title and display options; the plans are read live.
         schema: plansV1,
+        sanitizedFields: [],
+    },
+    [key("productGrid", 1)]: {
+        type: "productGrid",
+        version: 1,
+        // A title, which products by id, a count and a switch; the products
+        // themselves are read live.
+        schema: productGridV1,
         sanitizedFields: [],
     },
 };

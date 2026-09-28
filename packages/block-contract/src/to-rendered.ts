@@ -116,6 +116,8 @@ export const TO_RENDERED = {
     journal: identity,
     // A title and display options; the plans are read live.
     plans: identity,
+    // A title and which products by id; the products are read live.
+    productGrid: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

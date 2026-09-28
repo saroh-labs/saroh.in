@@ -520,6 +520,29 @@ export const BLOCK_META = {
             },
         },
     },
+    productGrid: {
+        label: "Product grid",
+        description:
+            "Products from the catalogue, the newest, a collection's or hand-picked, read live from the storefront the site sells from.",
+        variants: soleVariant(
+            "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample products.
+            default: { variant: "default", title: "From the counter" },
+        },
+        cases: {
+            // Hand-picked, two of them, no prices.
+            picked: {
+                variant: "default",
+                title: "Our favourites",
+                source: "picked",
+                productIds: ["sample-sourdough", "sample-croissant"],
+                count: 2,
+                showPrices: false,
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */
