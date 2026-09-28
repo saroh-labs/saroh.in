@@ -1,3 +1,4 @@
+import { Checkbox } from "@saroh/ui/checkbox";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -41,21 +42,53 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
 export const ORDER_GRID =
     "grid grid-cols-[minmax(210px,1fr)_minmax(86px,122px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
 
+/** The same grid with the design's 38px selection column first (B6). */
+export const ORDER_GRID_SELECT =
+    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,122px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+
+/** A row's selection box (B6): checked, and what toggling it does. */
+export interface RowSelect {
+    checked: boolean;
+    onToggle: () => void;
+}
+
+/** The design's 17px box, above the row's full-row link. */
+const BOX =
+    "relative z-[1] size-[17px] cursor-pointer rounded-[5px] hover:border-foreground/60 active:scale-95";
+
 /** The column heads over the desk rows. */
-export function OrderGridHead({ money }: { money: boolean }) {
+export function OrderGridHead({
+    money,
+    select,
+}: {
+    money: boolean;
+    /** Select every order on the page (B6); absent without `order:stage`. */
+    select?: { state: boolean | "indeterminate"; onToggle: () => void };
+}) {
     return (
         <div
-            aria-hidden
             className={cn(
-                ORDER_GRID,
+                select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "h-10 rounded-t-[11px] border-b border-border bg-muted text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
             )}
         >
-            <div>Order</div>
-            <div>Status</div>
-            <div>Placed</div>
-            <div className="text-right">{money ? "Total" : ""}</div>
-            <div />
+            {select ? (
+                <div>
+                    <Checkbox
+                        checked={select.state}
+                        onCheckedChange={select.onToggle}
+                        aria-label="Select every order in this view"
+                        className={BOX}
+                    />
+                </div>
+            ) : null}
+            <div aria-hidden>Order</div>
+            <div aria-hidden>Status</div>
+            <div aria-hidden>Placed</div>
+            <div aria-hidden className="text-right">
+                {money ? "Total" : ""}
+            </div>
+            <div aria-hidden />
         </div>
     );
 }
@@ -115,9 +148,12 @@ export function OrderGridRow({
     open,
     onOpen,
     menu,
+    select,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** Its selection box (B6); absent without `order:stage`. */
+    select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
     open?: boolean;
     /** Open its quick view (B5); without it the name links to the page. */
@@ -129,11 +165,22 @@ export function OrderGridRow({
     return (
         <li
             className={cn(
-                ORDER_GRID,
+                select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "relative border-b border-border py-[11px] transition-colors duration-fast last:rounded-b-[11px] last:border-b-0 hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                open && "bg-brand-subtle hover:bg-brand-subtle",
+                (open === true || select?.checked === true) &&
+                    "bg-brand-subtle hover:bg-brand-subtle",
             )}
         >
+            {select ? (
+                <div className="flex items-center">
+                    <Checkbox
+                        checked={select.checked}
+                        onCheckedChange={select.onToggle}
+                        aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
+                        className={BOX}
+                    />
+                </div>
+            ) : null}
             <div className="flex min-w-0 items-center gap-[11px] pr-3.5">
                 <Avatar row={row} />
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -199,13 +246,16 @@ export function OrderGridRow({
 export function OrderCard({
     row,
     showStore,
+    select,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** Its selection box (B6), the design's 24px one; absent without `order:stage`. */
+    select?: RowSelect;
 }) {
     const v = rowView(row, showStore);
-    return (
-        <li className="relative flex min-w-0 flex-col gap-1 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035]">
+    const card = (
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex min-w-0 items-baseline gap-2">
                 <Link
                     href={v.href}
@@ -234,6 +284,25 @@ export function OrderCard({
                     {v.money.unpaid}
                 </div>
             ) : null}
+        </div>
+    );
+    return (
+        <li
+            className={cn(
+                "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
+                select?.checked &&
+                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+            )}
+        >
+            {select ? (
+                <Checkbox
+                    checked={select.checked}
+                    onCheckedChange={select.onToggle}
+                    aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
+                    className={cn(BOX, "mt-px size-6 flex-none rounded-[6px]")}
+                />
+            ) : null}
+            {card}
         </li>
     );
 }

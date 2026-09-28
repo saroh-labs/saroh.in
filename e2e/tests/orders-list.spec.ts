@@ -652,3 +652,93 @@ test.describe("orders quick view and row menu (B5)", () => {
         expect(stale.status()).toBe(404);
     });
 });
+
+test.describe("orders bulk kitchen moves (B6)", () => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(
+            testInfo.project.name === "phone",
+            "Drawn at the desk here; the phone's cards carry the same box.",
+        );
+        await page.setViewportSize({ width: 1440, height: 900 });
+    });
+
+    const rowOf = (page: Page, orderId: string) =>
+        page
+            .getByRole("list", { name: "Orders" })
+            .first()
+            .getByRole("listitem")
+            .filter({ hasText: `#${orderId}` });
+    const bar = (page: Page) =>
+        page.getByRole("region", { name: "Selected orders" });
+
+    test("select Preparing rows, Mark ready, and Undo all during the hold moves nothing", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(
+            page,
+            NORTHWIND,
+            "&tab=open&step=preparing",
+        );
+        const picked = rows
+            .filter((r) => r.fulfilmentType === "PICKUP")
+            .slice(0, 2);
+        test.skip(
+            picked.length < 2,
+            "Needs two Pick-up orders at Preparing on Northwind.",
+        );
+
+        await page.goto("/commerce/orders?tab=open&step=preparing");
+        for (const r of picked) {
+            await rowOf(page, r.orderId)
+                .getByRole("checkbox", {
+                    name: `Select order number ${r.orderId}`,
+                })
+                .click();
+        }
+        await expect(bar(page)).toContainText("2 orders selected");
+        await bar(page).getByRole("button", { name: "Mark ready (2)" }).click();
+
+        const held = page.getByRole("status").filter({
+            hasText: /Marking 2 ready in \d+s/,
+        });
+        await expect(held).toBeVisible();
+        await expect(held).toContainText(
+            "It still goes ahead if you leave this page.",
+        );
+        await held.getByRole("button", { name: "Undo all" }).click();
+        await expect(
+            page.getByText("Back to Preparing. Nothing was sent."),
+        ).toBeVisible();
+
+        // Nothing moved on the server.
+        const after = await list(page, NORTHWIND, "&tab=open&step=preparing");
+        for (const r of picked) {
+            expect(after.rows.some((x) => x.id === r.id)).toBe(true);
+        }
+    });
+
+    test("select every row by keyboard, and Clear empties the selection", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        test.skip(rows.length === 0, "No orders here.");
+
+        await page.goto("/commerce/orders");
+        const all = page.getByRole("checkbox", {
+            name: "Select every order in this view",
+        });
+        await all.focus();
+        await page.keyboard.press("Space");
+        await expect(bar(page)).toContainText(
+            rows.length === 1
+                ? "1 order selected"
+                : `${rows.length} orders selected`,
+        );
+        await bar(page).getByRole("button", { name: "Clear" }).click();
+        await expect(bar(page)).toHaveCount(0);
+    });
+});
