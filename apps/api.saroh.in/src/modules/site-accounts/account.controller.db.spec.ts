@@ -20,6 +20,7 @@ import { env } from "../../env";
 import {
     AccountHomeService,
     CUSTOMER_NOTES_OPEN,
+    NOTE_ROWS,
 } from "./account-home.service";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import { CUSTOMER_SESSION_HEADER } from "./customer-session.guard";
@@ -730,5 +731,33 @@ describe("health notes", () => {
             body: { text: "One more" },
         });
         expect(eleventh.status).toBe(409);
+    });
+
+    it("lists the newest notes only", async () => {
+        const biz = await business("Kavi Dental", ["APPOINTMENTS"]);
+        const { token, account } = await signIn(biz.host);
+        const start = Date.now() - 60 * 60_000;
+        for (let i = 0; i < NOTE_ROWS + 3; i += 1) {
+            await prisma.contactAttention.create({
+                data: {
+                    organizationId: biz.organizationId,
+                    contactId: account.contactId,
+                    source: "CUSTOMER",
+                    status: "ACTIVE",
+                    sensitive: true,
+                    kind: "OTHER",
+                    label: `Old note ${i}`,
+                    createdAt: new Date(start + i * 60_000),
+                },
+            });
+        }
+        const list = await call("GET", `${ME}/notes`, {
+            host: biz.host,
+            token,
+        });
+        expect(list.status).toBe(200);
+        const body = list.body as unknown as { text: string }[];
+        expect(body).toHaveLength(NOTE_ROWS);
+        expect(body[0]?.text).toBe(`Old note ${NOTE_ROWS + 2}`);
     });
 });

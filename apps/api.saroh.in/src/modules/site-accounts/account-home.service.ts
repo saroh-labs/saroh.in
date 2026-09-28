@@ -64,6 +64,8 @@ export const MAX_WAITING_NOTES = 10;
 const LABEL_MAX = 60;
 
 const RECEIPT_ROWS = 20;
+/** The newest notes the account lists; older ones stay on the record. */
+export const NOTE_ROWS = 12;
 
 type Ctx = Pick<CustomerContext, "organizationId" | "contactId" | "accountId">;
 
@@ -284,6 +286,7 @@ export class AccountHomeService {
                 removedAt: null,
             },
             orderBy: { createdAt: "desc" },
+            take: NOTE_ROWS,
             select: {
                 id: true,
                 label: true,
