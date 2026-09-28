@@ -5,8 +5,19 @@ import { ModuleGate } from "@/components/modules/module-gate";
 /**
  * Capability gate for Courses (ADR-007), its own module. A deep link reaches
  * these routes whatever the rail shows, so the gate sits here once for every
- * nested route.
+ * nested route. Switched off, it points at "Also sell" on Services, which
+ * flips the same switch as Settings (E12).
  */
 export default function Layout({ children }: { children: ReactNode }) {
-    return <ModuleGate moduleKey="COURSES">{children}</ModuleGate>;
+    return (
+        <ModuleGate
+            moduleKey="COURSES"
+            switchedOnAt={{
+                href: "/services",
+                label: "Turn it on in Services",
+            }}
+        >
+            {children}
+        </ModuleGate>
+    );
 }

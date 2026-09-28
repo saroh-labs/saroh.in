@@ -94,8 +94,8 @@ export interface ReadyChecklist {
 const business = (section: string) =>
     `/settings/organization?${BUSINESS_TAB_PARAM}=${section}`;
 
-/** Modules that take money for something: a sale, a booking, a course. */
-const SELLING = ["COMMERCE", "APPOINTMENTS", "COURSES"] as const;
+/** Modules that take money for something: a sale, a booking, a course, a pack. */
+const SELLING = ["COMMERCE", "APPOINTMENTS", "COURSES", "CLASS_PACKS"] as const;
 
 type Check = ReadyItem & { left: boolean };
 

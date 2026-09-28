@@ -8,9 +8,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { StatePill } from "@/components/bookings/calendar/parts";
+import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { formatMoney } from "@/lib/format/money";
 import { updateService } from "@/lib/services/actions";
+import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import type { Service } from "@/lib/services/service";
 import {
     lengthLine,
@@ -30,7 +32,8 @@ const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
  * who takes it, and how it is being used. New service and Edit (View for a
  * role that can't change services) open the Service Editor; Stop taking
  * bookings takes a service off the booking page and keeps the bookings
- * already made, with Undo.
+ * already made, with Undo. "Also sell" (E12) switches Courses and Class
+ * packs on or off, for whoever may switch modules.
  */
 export function ServicesScreen({
     services,
@@ -39,6 +42,7 @@ export function ServicesScreen({
     currency,
     canEdit,
     hasPage,
+    alsoSell,
 }: {
     services: Service[];
     /** Null when the staff read failed. */
@@ -49,6 +53,8 @@ export function ServicesScreen({
     canEdit: boolean;
     /** Whether the business has a booking page; null when unknown. */
     hasPage: boolean | null;
+    /** Courses and Class packs, on or off; null for no card. */
+    alsoSell: AlsoSellFeature[] | null;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState<string | null>(null);
@@ -100,6 +106,7 @@ export function ServicesScreen({
                 number of places. Changing a price only affects bookings made
                 after.
             </p>
+            {alsoSell ? <AlsoSell features={alsoSell} /> : null}
             {canEdit ? null : (
                 <ReadOnlyNote>
                     Your role can see these services but not change them.

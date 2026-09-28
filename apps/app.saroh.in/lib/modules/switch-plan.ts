@@ -106,6 +106,8 @@ const SETUP_ACTION: Record<string, string> = {
     APPOINTMENTS_NO_AVAILABILITY: "Set availability",
     COURSES_NO_COURSE: "Make a course",
     COURSES_NONE_OPEN: "Open a course",
+    CLASS_PACKS_NO_PACK: "Make a pack",
+    CLASS_PACKS_NONE_ON_SALE: "Go to Class packs",
     COMMERCE_NO_CATALOG: "Add a product",
     PAYMENTS_NO_PROVIDER: "Connect a provider",
     PAYMENTS_PROVIDER_DISABLED: "Go to Providers",

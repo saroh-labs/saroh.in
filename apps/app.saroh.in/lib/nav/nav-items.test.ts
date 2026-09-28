@@ -830,11 +830,11 @@ describe("Courses (ADR-007), its own module", () => {
 });
 
 describe("Class packs (ADR-007), a page under Bookings", () => {
-    it("offers an owner Class packs where Appointments is on, after Courses", () => {
+    it("offers an owner Class packs where Class packs is on, after Courses", () => {
         const offered = hrefs(
             navFor({
                 role: "OWNER",
-                moduleKeys: ["APPOINTMENTS", "COURSES"],
+                moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
             }),
         );
         expect(offered).toContain("/class-packs");
@@ -844,7 +844,10 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
     });
 
     it("sits in the Bookings section beside Calendar and Services", () => {
-        const bookings = navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })
+        const bookings = navFor({
+            role: "OWNER",
+            moduleKeys: ["APPOINTMENTS", "CLASS_PACKS"],
+        })
             .flatMap((g) => g.items)
             .find((i) => i.label === "Bookings");
         expect(bookings?.children?.map((c) => c.href)).toEqual([
@@ -886,6 +889,12 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         expect(isNavItemActive("/class-packs", "/bookings")).toBe(false);
     });
 
+    it("leaves it out with Class packs off, Appointments on or not (E12)", () => {
+        expect(
+            hrefs(navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS"] })),
+        ).not.toContain("/class-packs");
+    });
+
     it("leaves it out without Appointments", () => {
         expect(
             hrefs(navFor({ role: "OWNER", moduleKeys: ["COMMERCE"] })),
@@ -923,7 +932,10 @@ describe("Bookings, a section across two modules", () => {
 
     it("keeps every address it holds", () => {
         const offered = hrefs(
-            navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS", "COURSES"] }),
+            navFor({
+                role: "OWNER",
+                moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
+            }),
         );
         for (const href of [
             "/bookings",
@@ -951,7 +963,10 @@ describe("Bookings, a section across two modules", () => {
 
     it("marks Bookings on its pages outside /bookings", () => {
         const bookings = bookingsOf(
-            navFor({ role: "OWNER", moduleKeys: ["APPOINTMENTS", "COURSES"] }),
+            navFor({
+                role: "OWNER",
+                moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
+            }),
         );
         if (!bookings) throw new Error("Bookings missing");
         for (const page of [
@@ -965,14 +980,14 @@ describe("Bookings, a section across two modules", () => {
         expect(isNavSectionActive("/commerce/orders", bookings)).toBe(false);
     });
 
-    it("tells Modules which rows Appointments, Courses and Payments own", () => {
+    it("tells Modules which rows Appointments, Courses, Class packs and Payments own", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
             "Calendar",
             "Services",
             "Availability",
-            "Class packs",
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
+        expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);
         expect(navRowsForModule("PAYMENTS")).toEqual([
             "Payments",
             "Subscriptions",

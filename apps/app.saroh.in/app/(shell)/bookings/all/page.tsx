@@ -7,7 +7,9 @@ import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { packsOn } from "@/lib/class-packs/switched-on";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -100,10 +102,12 @@ export default async function BookingsPage({
                                     priceCents: s.priceCents,
                                 }))}
                             people={people}
-                            // Paying with a class pack spends one (ADR-007).
+                            // Paying with a class pack spends one (ADR-007),
+                            // while Class packs is on (E12).
                             canUsePacks={
                                 canReadPacks(organization) &&
-                                canWritePacks(organization)
+                                canWritePacks(organization) &&
+                                packsOn(await modulesOrUnknown())
                             }
                         />
                     </>
