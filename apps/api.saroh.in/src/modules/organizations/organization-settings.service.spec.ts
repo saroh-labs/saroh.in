@@ -302,6 +302,96 @@ describe("OrganizationSettingsService", () => {
             expect(record).not.toHaveBeenCalled();
         });
 
+        describe("the public phone (DEC-053, F20)", () => {
+            it("stores a typed number as E.164 and audits it by name only", async () => {
+                await service.update(ctx(), {
+                    profile: { phone: " +91 98450-12345 " },
+                });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        create: {
+                            organizationId: "org_1",
+                            phone: "+919845012345",
+                        },
+                        update: { phone: "+919845012345" },
+                    }),
+                );
+                const row = record.mock.calls[0]?.[0] as {
+                    metadata: { fields: string[]; changes: unknown[] };
+                };
+                expect(row.metadata.fields).toEqual(["phone"]);
+                // A phone is a person's: never its value (S1-009).
+                expect(JSON.stringify(row.metadata)).not.toContain("98450");
+            });
+
+            it("clears it with an empty string, to null", async () => {
+                await service.update(ctx(), { profile: { phone: "" } });
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({ update: { phone: null } }),
+                );
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        metadata: { fields: ["phone"], changes: [] },
+                    }),
+                );
+            });
+
+            it("refuses a number with no country code on the field, and writes nothing", async () => {
+                const refusal = await service
+                    .update(ctx(), { profile: { phone: "98450 12345" } })
+                    .catch((e: BadRequestException) => e.getResponse());
+                expect(refusal).toEqual(
+                    expect.objectContaining({
+                        message: expect.stringContaining("country code"),
+                        details: { field: "phone" },
+                    }),
+                );
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+                expect(record).not.toHaveBeenCalled();
+            });
+
+            it("leaves the phone alone when a save does not send it", async () => {
+                await service.update(ctx(), {
+                    profile: { contactEmail: "hi@acme.test" },
+                });
+                const call = profileUpsert.mock.calls[0]?.[0] as {
+                    update: Record<string, unknown>;
+                };
+                expect(call.update).not.toHaveProperty("phone");
+            });
+
+            it("reads the saved phone back with the profile", async () => {
+                orgFindUnique.mockResolvedValue({
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                    businessProfile: {
+                        legalName: null,
+                        type: null,
+                        country: "IN",
+                        taxId: null,
+                        contactEmail: null,
+                        website: null,
+                        timezone: null,
+                        phone: "+919845012345",
+                    },
+                });
+                const settings = await service.get(ctx());
+                expect(settings.profile?.phone).toBe("+919845012345");
+                expect(orgFindUnique).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        select: expect.objectContaining({
+                            businessProfile: {
+                                select: expect.objectContaining({
+                                    phone: true,
+                                }),
+                            },
+                        }),
+                    }),
+                );
+            });
+        });
+
         it("writes nothing and emits no audit row when the patch is empty", async () => {
             await service.update(ctx(), {});
 

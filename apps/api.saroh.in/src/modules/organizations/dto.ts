@@ -88,6 +88,17 @@ export class BusinessProfileDto {
     @IsString()
     @MaxLength(64)
     timezone?: string;
+
+    /**
+     * The business's public phone (DEC-053), shown on its site. "" clears
+     * it. Its shape — E.164, "+91 98450 12345" kept as "+919845012345" — is
+     * checked by the settings save (`business-phone.ts`), which names the
+     * field; onboarding does not take it.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(32, { message: "That phone number is too long" })
+    phone?: string;
 }
 
 /**

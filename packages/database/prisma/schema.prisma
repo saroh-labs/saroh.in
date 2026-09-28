@@ -348,6 +348,13 @@ model BusinessProfile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // The business's public phone (DEC-053): the merchant's own number, shown
+  // only on this business's site — the Visit us Call button and "Or call
+  // ‹Business› on ‹phone›" when a sign-in code can't be sent. E.164
+  // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
+  // no number, and the site shows no Call button rather than an empty one.
+  phone String?
 }
 
 // Membership: links a User to an Organization with a role (renamed from
