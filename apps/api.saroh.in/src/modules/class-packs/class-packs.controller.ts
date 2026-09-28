@@ -20,11 +20,14 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { ClassPacksService } from "./class-packs.service";
 import {
     DeletePackDraftQueryDto,
+    ExtendPurchaseDto,
+    ListPackEventsQueryDto,
     ListPacksQueryDto,
     ListPurchasesQueryDto,
     PackDraftDto,
     PackInputDto,
     PackRevisionDto,
+    PackUsedQueryDto,
     SellPackDto,
     UsePackDto,
 } from "./dto";
@@ -77,9 +80,54 @@ export class ClassPacksController {
         return this.packs.getPurchase(ctx, id);
     }
 
+    /** Give a holder's pack more days: at most 30 at a time, with a reason. */
+    @Post("purchases/:purchaseId/extend")
+    @HttpCode(200)
+    extend(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("purchaseId") id: string,
+        @Body() dto: ExtendPurchaseDto,
+    ) {
+        return this.packs.extend(ctx, id, dto);
+    }
+
+    /** The pack with Pack Detail's Overview figures (E13). */
     @Get(":packId")
     get(@OrgContext() ctx: OrganizationContext, @Param("packId") id: string) {
         return this.packs.getPack(ctx, id);
+    }
+
+    // — Pack Detail's tabs (E13). `pack:read` covers each, money included.
+
+    @Get(":packId/holders")
+    holders(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+    ) {
+        return this.packs.listHolders(ctx, id);
+    }
+
+    @Get(":packId/used")
+    used(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Query() query: PackUsedQueryDto,
+    ) {
+        return this.packs.listUsed(ctx, id, query);
+    }
+
+    @Get(":packId/sales")
+    sales(@OrgContext() ctx: OrganizationContext, @Param("packId") id: string) {
+        return this.packs.listSales(ctx, id);
+    }
+
+    @Get(":packId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Query() query: ListPackEventsQueryDto,
+    ) {
+        return this.packs.listEvents(ctx, id, query);
     }
 
     @Post()

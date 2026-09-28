@@ -22,6 +22,7 @@ import type { PackDraftRow, PackValues } from "./pack-draft-view";
 import {
     checkPackRevision,
     columnValues,
+    kindLockOf,
     lockPack,
     PACK_DRAFT_FIELDS,
     PACK_DRAFT_SELECT,
@@ -33,6 +34,13 @@ import {
     timesSold,
     valueColumns,
 } from "./pack-draft-view";
+import {
+    diffPack,
+    packActor,
+    recordPackChange,
+    recordPackEvent,
+} from "./pack-events";
+import { DEFAULT_PACK_KIND } from "./pack-kind";
 import { PACK_DRAFT, PACK_ON_SALE } from "./pack-on-sale";
 
 /**
@@ -110,6 +118,12 @@ async function patchOf(
     const sent = dto as Record<string, unknown>;
     if (sent.name === null) fieldError("Give the pack a name", "name");
     if (sent.currency === null) fieldError("Choose a currency", "currency");
+    if (sent.kind === null) {
+        fieldError("Choose classes or one-to-one sessions", "kind");
+    }
+    if (sent.firstPackOnly === null) {
+        fieldError("Say who can buy it", "firstPackOnly");
+    }
     const patch = pickPatch<PackValues>(PACK_DRAFT_FIELDS, sent);
     if (typeof patch.price === "string") {
         patch.price = toMoneyString(patch.price);
@@ -170,6 +184,8 @@ export async function createPackDraft(
             price: patch.price ?? null,
             currency,
             serviceIds: patch.serviceIds ?? [],
+            kind: patch.kind ?? DEFAULT_PACK_KIND,
+            firstPackOnly: patch.firstPackOnly ?? false,
         };
         const now = new Date();
         // Revision 0: the editor's first answer carries it.
@@ -185,6 +201,15 @@ export async function createPackDraft(
             select: { id: true },
         });
         await writeServices(tx, organizationId, pack.id, [], values.serviceIds);
+        // Its first event (E13). A draft's later autosaves record nothing;
+        // Publish records the terms it goes on sale with.
+        await recordPackEvent(tx, {
+            organizationId,
+            packId: pack.id,
+            kind: "CREATED",
+            actor: packActor(ctx),
+            details: diffPack(null, values),
+        });
         return pack.id;
     });
 }
@@ -287,7 +312,14 @@ export async function publishPack(
         if (!isDraft && !held) return;
         const target = isDraft ? live : mergeForEditor(live, held);
 
-        const problems = await packProblems(tx, organizationId, target);
+        // The kind lock is E13's: a sold pack's pending kind change is a 409
+        // here, and the published pack stays as it was.
+        const problems = await packProblems(
+            tx,
+            organizationId,
+            target,
+            kindLockOf(row),
+        );
         if (problems.length) refuse(problems[0].message, problems[0].field);
 
         await tx.classPack.updateMany({
@@ -306,6 +338,25 @@ export async function publishPack(
             live.serviceIds,
             target.serviceIds,
         );
+        // A draft goes on sale with these terms (PUBLISHED); a live pack's
+        // changes become its terms for new sales (CHANGED).
+        if (isDraft) {
+            await recordPackEvent(tx, {
+                organizationId,
+                packId: id,
+                kind: "PUBLISHED",
+                actor: packActor(ctx),
+                details: diffPack(null, target),
+            });
+        } else {
+            await recordPackChange(tx, {
+                organizationId,
+                packId: id,
+                actor: packActor(ctx),
+                before: live,
+                after: target,
+            });
+        }
     });
 }
 
