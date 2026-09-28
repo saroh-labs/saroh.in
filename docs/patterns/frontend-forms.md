@@ -42,7 +42,11 @@ Live · Live with unpublished changes), "Not saved" with Try again, and the
 `lib/editor-shell/state.ts` and `autosave.ts`; a record service reads a
 refused write with `editorFailure` (`lib/editor-shell/result.ts`) so a stale
 revision becomes the conflict state. Don't give a record type its own save
-loop.
+loop. The Plan Editor (`components/subscriptions/plan-editor/`, D7) is the
+reference caller: the form's rules (problems, the save blocker, "When you
+publish" lines) are pure in `lib/subscriptions/plan-editor.ts`, and
+`plan-editor-adapter.ts` turns the typed form into the API's values and
+back.
 
 ## Rules
 
