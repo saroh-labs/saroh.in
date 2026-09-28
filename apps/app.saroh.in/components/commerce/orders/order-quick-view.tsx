@@ -77,14 +77,25 @@ export function OrderQuickView({
     useEffect(() => {
         if (!id) return;
         let live = true;
-        void loadOrderQuickView(id, ref).then((res) => {
-            if (!live) return;
-            setRead(
-                res.ok
-                    ? { state: "ready", order: res.data }
-                    : { state: "failed", error: res.error },
-            );
-        });
+        // The action itself can fail — the server down, a 500 before it
+        // answers — and then it rejects rather than returning an error.
+        loadOrderQuickView(id, ref).then(
+            (res) => {
+                if (!live) return;
+                setRead(
+                    res.ok
+                        ? { state: "ready", order: res.data }
+                        : { state: "failed", error: res.error },
+                );
+            },
+            () => {
+                if (!live) return;
+                setRead({
+                    state: "failed",
+                    error: `Order ${ref} couldn't be loaded. Try again.`,
+                });
+            },
+        );
         return () => {
             live = false;
         };

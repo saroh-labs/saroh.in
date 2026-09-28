@@ -402,7 +402,11 @@ test.describe("orders list filters (B4)", () => {
  * pay link) happen on Northwind only, never on a demo store.
  */
 test.describe("orders quick view and row menu (B5)", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(
+            testInfo.project.name === "phone",
+            "The quick view and row menu are drawn from 760px only; a phone's card opens the order's page.",
+        );
         await page.setViewportSize({ width: 1440, height: 900 });
     });
 
