@@ -8,6 +8,7 @@ import {
 import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { toMinor } from "../../common/money";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import {
@@ -24,6 +25,7 @@ import {
 import type { PaymentStatus } from "../orders/dto";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
+import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
@@ -711,11 +713,70 @@ export class WebhooksService {
         intent: IntentRow,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // A treatment's booking invoice names its order (E9, DEC-050): its
+        // refund is the order's, so the order is locked first, as every
+        // refund of an order takes it.
+        const invoice = intent.invoiceId
+            ? await tx.invoice.findUnique({
+                  where: { id: intent.invoiceId },
+                  select: { orderId: true, source: true, kind: true },
+              })
+            : null;
+        const orderId =
+            invoice?.source === "BOOKING" && invoice.kind === "INVOICE"
+                ? invoice.orderId
+                : null;
+        if (orderId) {
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+        }
         const settled = await this.settleRefund(tx, intent, event);
         if (settled.refundId && settled.settledNow) {
             await creditNoteForRefund(tx, settled.refundId);
         }
+        // Paid in full online and every rupee of it back: the treatment's
+        // order is refunded, and books no more visits. A balance recorded
+        // by hand was not handed back here, so that order stays as it is.
+        if (orderId && (await this.treatmentRefundedInFull(tx, orderId))) {
+            const moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
+            return { applied: settled.applied || moved };
+        }
         return settled;
+    }
+
+    /**
+     * Whether a treatment's order took its whole total online (its own
+     * payments and its booking invoice's) and has had all of it back —
+     * settled refunds only.
+     */
+    private async treatmentRefundedInFull(
+        tx: Tx,
+        orderId: string,
+    ): Promise<boolean> {
+        const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { paymentStatus: true, total: true },
+        });
+        if (order?.paymentStatus !== "PAID") return false;
+        const payments = await tx.paymentIntent.findMany({
+            where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
+            select: {
+                amountCents: true,
+                refunds: {
+                    where: { status: "SUCCEEDED" },
+                    select: { amountCents: true },
+                },
+            },
+        });
+        const captured = payments.reduce((s, p) => s + p.amountCents, 0);
+        const refunded = payments.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        );
+        return (
+            captured > 0 &&
+            captured >= toMinor(order.total) &&
+            refunded >= captured
+        );
     }
 
     /**

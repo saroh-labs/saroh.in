@@ -318,6 +318,7 @@ export async function bookVisit(
         select: {
             id: true,
             status: true,
+            paymentStatus: true,
             items: {
                 where: { serviceId: { not: null } },
                 select: { serviceId: true },
@@ -340,11 +341,7 @@ export async function bookVisit(
     if (!serviceId) {
         throw new ConflictException("This order isn't a treatment.");
     }
-    if (order.status === "CANCELLED") {
-        throw new ConflictException(
-            "This treatment's order was cancelled, so no more visits can be booked.",
-        );
-    }
+    refuseClosedTreatment(order);
     const { service, rules } = await loadBookableService(serviceId);
     if (service.organizationId !== ctx.organizationId) {
         throw new NotFoundException("Order not found");
@@ -398,7 +395,13 @@ export async function bookVisit(
     try {
         return await prisma.$transaction(
             async (tx) => {
-                await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${order.id} FOR UPDATE`;
+                // The order as it stands under its lock: a cancel or a full
+                // refund that landed since it was read ends the treatment.
+                const [locked] = await tx.$queryRaw<
+                    { status: string; paymentStatus: string }[]
+                >`SELECT status::text AS status, "paymentStatus"::text AS "paymentStatus"
+                  FROM "Order" WHERE id = ${order.id} FOR UPDATE`;
+                refuseClosedTreatment(locked);
                 const again = await tx.booking.findMany({
                     where: { orderId: order.id, status: { not: "CANCELLED" } },
                     select: { visitNumber: true },
@@ -443,6 +446,26 @@ export async function bookVisit(
             );
         }
         throw err;
+    }
+}
+
+/**
+ * A treatment whose order was cancelled, or refunded in full, books no more
+ * visits. Checked on the order as read, and again under its lock.
+ */
+export function refuseClosedTreatment(
+    order: { status: string; paymentStatus: string } | undefined,
+): void {
+    if (!order) throw new NotFoundException("Order not found");
+    if (order.status === "CANCELLED") {
+        throw new ConflictException(
+            "This treatment's order was cancelled, so no more visits can be booked.",
+        );
+    }
+    if (order.paymentStatus === "REFUNDED") {
+        throw new ConflictException(
+            "This treatment was refunded, so no more visits can be booked.",
+        );
     }
 }
 

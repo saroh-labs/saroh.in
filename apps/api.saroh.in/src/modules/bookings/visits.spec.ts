@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import {
     assertVisitBookable,
     isTreatment,
+    refuseClosedTreatment,
     TREATMENT_NEEDS_EMAIL,
     treatmentEmail,
 } from "./visits";
@@ -13,6 +14,26 @@ describe("visits", () => {
         expect(isTreatment({ visits: 1 })).toBe(false);
         expect(isTreatment({ visits: 2 })).toBe(true);
         expect(isTreatment({ visits: 12 })).toBe(true);
+    });
+
+    it("books no visit of a treatment cancelled or refunded in full", () => {
+        expect(() =>
+            refuseClosedTreatment({ status: "PENDING", paymentStatus: "PAID" }),
+        ).not.toThrow();
+        expect(() =>
+            refuseClosedTreatment({
+                status: "CANCELLED",
+                paymentStatus: "PAID",
+            }),
+        ).toThrow(ConflictException);
+        expect(() =>
+            refuseClosedTreatment({
+                status: "PENDING",
+                paymentStatus: "REFUNDED",
+            }),
+        ).toThrow(
+            "This treatment was refunded, so no more visits can be booked.",
+        );
     });
 
     describe("assertVisitBookable", () => {

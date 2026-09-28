@@ -552,6 +552,27 @@ describe("a treatment sold as one order (E9, real database)", () => {
                 idempotencyKey: `treat-refund-${tag}-now-2`,
             }),
         ).rejects.toThrow("Nothing is left to refund on this order");
+
+        // The provider confirms it: the treatment's order is refunded, and
+        // books no more visits.
+        const intent = await prisma.paymentIntent.findUniqueOrThrow({
+            where: { id: row.paymentIntentId },
+        });
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: intent.providerIntentId,
+            providerRefundId: result.refunds[0].providerRefundId ?? undefined,
+            refundReference: row.id,
+            refundAmountCents: 1_200_000,
+        });
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("REFUNDED");
+        await expect(visit(orderId, 2)).rejects.toThrow(
+            "This treatment was refunded, so no more visits can be booked.",
+        );
     });
 
     it("a deposit at booking and the balance by hand: the order's refund hands back only the deposit it received", async () => {
@@ -575,6 +596,25 @@ describe("a treatment sold as one order (E9, real database)", () => {
             _sum: { amountCents: true },
         });
         expect(total._sum.amountCents).toBe(600_000);
+
+        // Confirmed, the order stays paid: its balance was taken by hand
+        // and not handed back here.
+        const row = await prisma.paymentRefund.findUniqueOrThrow({
+            where: { id: result.refunds[0].id },
+            include: { paymentIntent: true },
+        });
+        await webhook({
+            eventType: "refund.processed",
+            outcome: "REFUNDED",
+            providerIntentId: row.paymentIntent.providerIntentId,
+            providerRefundId: row.providerRefundId ?? undefined,
+            refundReference: row.id,
+            refundAmountCents: 600_000,
+        });
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("PAID");
 
         // Another amount past what came in is refused.
         await expect(
