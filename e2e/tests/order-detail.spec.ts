@@ -231,6 +231,37 @@ test.describe("order detail", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
     });
 
+    test("the customer card says their Needs attention, for the counter too (B15)", async ({
+        browser,
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${RYE}`);
+        const orderId = await priyaOrderToday(page);
+        await page.goto(`/commerce/orders/${orderId}`);
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(
+            card.getByRole("list", { name: "Needs attention" }),
+        ).toContainText("Allergy: Sesame");
+
+        // A Member at the counter (order:stage, contact:read) sees the same
+        // allergy, and the banner still checks the lines by allergen.
+        const counter = await memberPage(browser);
+        await counter.goto(`/open/${RYE}`);
+        await counter.goto(`/commerce/orders/${orderId}`);
+        await expect(
+            counter
+                .getByRole("region", { name: "Customer" })
+                .getByRole("list", { name: "Needs attention" }),
+        ).toContainText("Allergy: Sesame");
+        await expect(
+            counter.getByRole("alert").filter({
+                hasText: "Priya is allergic to sesame",
+            }),
+        ).toBeVisible();
+        await counter.close();
+    });
+
     test("a Member moves stages but sees no money, refund or edit", async ({
         browser,
     }) => {

@@ -26,13 +26,14 @@ const DATE_FIELD =
 /**
  * The Orders list's filter bar (plan B, B4), after the "Saroh Orders
  * Screen" design: Date (with a custom range), Step, How it's fulfilled,
- * Payment, Product and the Late toggle, then Clear filters once any is on.
- * Each change goes into the address (`list-filters.ts`), and the server
- * asks the API for the first page again.
+ * Payment, Product and the Needs attention (B15) and Late toggles, then
+ * Clear filters once any is on. Each change goes into the address
+ * (`list-filters.ts`), and the server asks the API for the first page again.
  *
  * Step and Fulfilment offer only what the business's orders show (the
  * API's `options`). When those couldn't be read the two menus are left
- * out, rather than offered empty. Needs attention joins Late with B15.
+ * out, rather than offered empty. What counts as Needs attention is the
+ * API's: a sensitive entry only for a role that may read it.
  */
 export function OrderFilters({
     query,
@@ -147,6 +148,11 @@ export function OrderFilters({
                 onChange={(product) => go({ product })}
             />
             <Toggle
+                label="Needs attention"
+                on={query.attention}
+                onFlip={() => go({ attention: !query.attention })}
+            />
+            <Toggle
                 label="Late"
                 on={query.late}
                 onFlip={() => go({ late: !query.late })}
@@ -180,10 +186,10 @@ function Toggle({
             aria-pressed={on}
             onClick={onFlip}
             className={cn(
-                "h-[34px] shrink-0 rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
+                "h-[34px] shrink-0 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
                 on
-                    ? "border-foreground bg-foreground font-semibold text-background"
-                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
+                    ? "border-foreground bg-foreground font-semibold text-background hover:bg-foreground/90 active:bg-foreground/80"
+                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted active:bg-foreground/[0.08]",
             )}
         >
             {label}

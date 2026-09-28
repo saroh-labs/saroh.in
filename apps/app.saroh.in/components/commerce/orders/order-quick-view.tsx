@@ -10,6 +10,7 @@ import { QuickLook } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { attentionLines } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { loadOrderQuickView } from "@/lib/orders/list-actions";
@@ -40,7 +41,8 @@ const CHIP = {
 /**
  * An order's quick view, from the Orders list (plan B, B5), after the
  * "Saroh Orders Screen" design's side panel: the steps with the one it is
- * at, the items, the money (with `order:read`), the customer (their phone
+ * at, the customer's Needs attention (B15, as the API lets this viewer see
+ * it), the items, the money (with `order:read`), the customer (their phone
  * and email only with `contact:read`, which the API decides), the address
  * and notes — then "Open full page" and the next action ("Mark ready").
  *
@@ -233,6 +235,9 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                       .filter(Boolean)
                       .join(" "),
                   order.deliveryAddress.state,
+                  // The number it's delivered to: the order's own, which
+                  // whoever works it sees (review #19).
+                  order.deliveryAddress.phone,
               ]
                   .filter(Boolean)
                   .join("\n")
@@ -261,6 +266,30 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                     </li>
                 ))}
             </ol>
+
+            {/* Needs attention (B15): what the API let this viewer see. */}
+            {attentionLines(order.attention).map((a) => (
+                <div
+                    key={a.id}
+                    role="alert"
+                    className="rounded-[9px] bg-destructive-subtle px-[11px] py-[9px] text-[13px] leading-[1.45] text-destructive-subtle-foreground"
+                >
+                    <strong>{a.head}</strong>
+                    {a.detail ? ` ${a.detail}` : null}
+                </div>
+            ))}
+            {order.attention === null ? (
+                <div
+                    role="status"
+                    className="rounded-[9px] bg-muted px-[11px] py-[9px] text-[13px] leading-[1.45] text-muted-foreground"
+                >
+                    <strong className="text-foreground">
+                        Needs attention: not available.
+                    </strong>{" "}
+                    It couldn&apos;t be read, so check with the customer before
+                    it goes out.
+                </div>
+            ) : null}
 
             <section
                 aria-label="Items"

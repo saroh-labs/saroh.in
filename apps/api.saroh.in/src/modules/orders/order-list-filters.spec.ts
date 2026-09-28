@@ -167,6 +167,46 @@ describe("the conditions", () => {
         );
     });
 
+    it("filters on Needs attention the viewer may see (B15)", () => {
+        const plain = text(
+            orderConditions(
+                "org_1",
+                { attention: true },
+                { contact: false },
+                {},
+            ),
+        );
+        expect(plain).toContain(`FROM "CustomerIdentityLink" l`);
+        expect(plain).toContain(`JOIN "ContactAttention" a`);
+        expect(plain).toContain("a.status::text = 'ACTIVE'");
+        expect(plain).toContain(`a."removedAt" IS NULL`);
+        // Without the sensitive permission a sensitive entry never matches.
+        expect(plain).toContain("NOT a.sensitive");
+        const all = text(
+            orderConditions(
+                "org_1",
+                { attention: true },
+                { contact: false, sensitive: true },
+                {},
+            ),
+        );
+        expect(all).not.toContain("NOT a.sensitive");
+        const none = text(
+            orderConditions(
+                "org_1",
+                { attention: false },
+                { contact: false },
+                {},
+            ),
+        );
+        expect(none).toContain(
+            'NOT EXISTS ( SELECT 1 FROM "CustomerIdentityLink"',
+        );
+        expect(
+            text(orderConditions("org_1", {}, { contact: false }, {})),
+        ).not.toContain("ContactAttention");
+    });
+
     it("narrows to orders placed since an instant, bound as the stored wall-clock", () => {
         const s = orderConditions(
             "org_1",
@@ -238,6 +278,11 @@ describe("ListOrdersQuery", () => {
         expect((await parse({ since: "" })).since).toBeUndefined();
     });
 
+    it("takes Needs attention as true or false (B15)", async () => {
+        expect((await parse({ attention: "true" })).attention).toBe("true");
+        expect((await parse({ attention: "false" })).attention).toBe("false");
+    });
+
     it("treats a blank storefront as every storefront", async () => {
         const q = await parse({ storeId: "" });
         expect(q.storeId).toBeUndefined();
@@ -259,7 +304,7 @@ describe("ListOrdersQuery", () => {
         // The legacy words went with it.
         { fulfilment: "COLLECT" },
         { fulfilment: "delivery" },
-        { attention: "true" },
+        { attention: "yes" },
     ])("refuses %o", async (value) => {
         await expect(parse(value)).rejects.toThrow(BadRequestException);
     });

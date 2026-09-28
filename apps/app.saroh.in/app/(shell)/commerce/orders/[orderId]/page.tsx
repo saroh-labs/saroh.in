@@ -6,6 +6,7 @@ import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
+import { allergyNotesOf } from "@/lib/orders/attention";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
 import { arrivalOf } from "@/lib/orders/row-menu";
@@ -29,10 +30,11 @@ export const metadata = { title: "Order" };
  * store, so this page no longer uses it. `?storefront=` in older links is
  * ignored: the organization scopes the read.
  *
- * Beside it, each read on its own so one failing costs only its panel: the
- * customer's allergy notes (the contact's detail read, U8 — only for a
- * customer confirmed as a contact), the provider's payment attempts (money
- * roles), and the review invitation (`order:read`).
+ * The allergy check reads the customer's Needs attention from the order
+ * read itself (B15), so the kitchen's view has it too. Beside it, each read
+ * on its own so one failing costs only its panel: the provider's payment
+ * attempts (money roles) and the review invitation (`order:read`) — and,
+ * from an API before B15 only, the contact's allergy notes (U8).
  *
  * Someone holding neither `order:read` nor `order:stage` gets the design's
  * locked card before the order is read (B7), rather than the generic denial
@@ -70,11 +72,17 @@ export default async function OrderPage({
         may("order:write") && order.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
+    // The allergy check reads the order's own Needs attention (B15), which
+    // reaches the kitchen too; an API before B15 sends none, and the
+    // contact's notes are read instead.
+    const fromOrder = allergyNotesOf(order.attention);
     const [notes, payments, reviewState, canPayOnline, addable] =
         await Promise.all([
-            contactId
-                ? getAllergyNotes(contactId)
-                : Promise.resolve<AllergyNote[]>([]),
+            fromOrder !== undefined
+                ? Promise.resolve(fromOrder)
+                : contactId
+                  ? getAllergyNotes(contactId)
+                  : Promise.resolve<AllergyNote[]>([]),
             order.money
                 ? getOrderPayments(order.id).catch(() => null)
                 : Promise.resolve(null),
@@ -119,6 +127,7 @@ export default async function OrderPage({
                 refund: may("payment:manage"),
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),
+                contact: may("contact:read"),
             }}
             customerHref={
                 contactId

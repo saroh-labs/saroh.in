@@ -1,6 +1,8 @@
 import { fromMinor, toMoneyString } from "../../common/money";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { OrderAttention, OrderAttentionTag } from "./order-attention";
+import { attentionTags } from "./order-attention";
 import { lineName } from "./order-line";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
@@ -20,8 +22,8 @@ import { orderStanding } from "./order-standing";
  * B2a adds how it leaves: the type, its `steps` and `stepIndex`
  * (`fulfilment.ts`). B2b adds whether it is late (`late`,
  * `lateBy`, `lateAfterMinutes`, by the rule in `fulfilment.ts`, the same one
- * the Late filter runs in SQL) and the courier. B15 adds `attention`, with no
- * stand-in here. B5 adds when the order's pay link was made, for the row
+ * the Late filter runs in SQL) and the courier. B15 adds `attention`: the
+ * customer's Needs attention this viewer may see (`order-attention.ts`). B5 adds when the order's pay link was made, for the row
  * menu's "New pay link" (never the link: only its hash is kept), and the
  * quick view's projection of the order read (`quickViewOf`).
  */
@@ -73,6 +75,13 @@ export interface OrderRowDto extends FulfilmentView, LateView {
      * with `order:read`. Never the link: only its hash is kept.
      */
     payLinkCreatedAt?: Date | null;
+    /**
+     * The customer's Needs attention this viewer may see (B15), in order:
+     * Allergy first. Empty when there is none; null when it couldn't be read
+     * (the app then says "Not available", never nothing). A sensitive entry
+     * is here only for a viewer who may read sensitive entries.
+     */
+    attention?: OrderAttentionTag[] | null;
 }
 
 /** What `order-list.ts` loads for each row. */
@@ -122,6 +131,11 @@ export interface RowView {
      * absent. The list reads them once per storefront in the page.
      */
     lateThresholds?: LateThresholds;
+    /**
+     * The customer's Needs attention as this viewer may see it (B15); null
+     * when it couldn't be read. Absent, the row carries no `attention`.
+     */
+    attention?: OrderAttention | null;
 }
 
 export function serializeOrderRow(
@@ -210,16 +224,23 @@ export function serializeOrderRow(
         moreProducts: Math.max(0, names.length - 2),
         courierName: order.courierName,
         trackingNumber: order.trackingNumber,
+        ...(view.attention === undefined
+            ? {}
+            : {
+                  attention: view.attention
+                      ? attentionTags(view.attention)
+                      : null,
+              }),
     };
 }
 
 /**
  * The order read as the Orders list's quick view asks for it (B5,
- * `GET :orderId?view=quick`): Order Detail's read, with the customer's phone
- * and email left out for a caller without `contact:read` — the rule the
- * list's rows already follow, so opening a row never shows more of the
- * customer than the row did. Everything else (money, the pay link's date)
- * is already left out by the read itself for whoever may not see it.
+ * `GET :orderId?view=quick`). Order Detail's read already leaves out what
+ * the caller may not see — the customer's phone and email without
+ * `contact:read` (review #19), money without a money read — so opening a row
+ * never shows more of the customer than the row did. Kept as the quick
+ * view's one seam, and to hold that line should the read ever widen.
  */
 export function quickViewOf(
     read: OrderReadDto,

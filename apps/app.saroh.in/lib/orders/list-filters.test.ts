@@ -51,6 +51,7 @@ describe("readOrdersFilters", () => {
                 fulfilment: "shipping",
                 payment: "Unpaid",
                 product: "p_cake",
+                attention: "true",
                 late: "true",
             }),
         ).toEqual({
@@ -61,6 +62,7 @@ describe("readOrdersFilters", () => {
             fulfilment: "SHIPPING",
             payment: "unpaid",
             product: "p_cake",
+            attention: true,
             late: true,
         });
     });
@@ -73,6 +75,7 @@ describe("readOrdersFilters", () => {
                 fulfilment: "teleport",
                 payment: "sometimes",
                 product: "../x",
+                attention: "yes",
                 late: "yes",
             }),
         ).toEqual(NO_FILTERS);
@@ -95,11 +98,12 @@ describe("the filters in the address", () => {
             step: "ready",
             fulfilment: "shipping",
             date: "7d",
+            attention: "true",
             late: "true",
         });
         const href = ordersHref(q);
         expect(href).toBe(
-            "/commerce/orders?tab=open&date=7d&step=ready&fulfilment=shipping&late=true",
+            "/commerce/orders?tab=open&date=7d&step=ready&fulfilment=shipping&attention=true&late=true",
         );
         const again = readOrdersQuery(
             Object.fromEntries(new URL(href, "https://x").searchParams),
@@ -132,6 +136,7 @@ describe("filterParams — what the API is asked", () => {
             product: "p_cake",
             step: "ready",
             late: "true",
+            attention: "true",
         });
         expect(orderListParams(q)).toMatchObject({
             date: "today",
@@ -140,6 +145,7 @@ describe("filterParams — what the API is asked", () => {
             productId: "p_cake",
             step: "ready",
             late: true,
+            attention: true,
         });
         expect(orderListParams(q).from).toBeUndefined();
     });
@@ -157,7 +163,7 @@ describe("filterParams — what the API is asked", () => {
         });
     });
 
-    it("never asks for Late false: off is every order", () => {
+    it("never asks for Late or Needs attention false: off is every order", () => {
         expect(filterParams(NO_FILTERS)).toEqual({
             date: undefined,
             from: undefined,
@@ -167,7 +173,9 @@ describe("filterParams — what the API is asked", () => {
             payment: undefined,
             productId: undefined,
             late: undefined,
+            attention: undefined,
         });
+        expect(filterParams(NO_FILTERS)).toHaveProperty("attention", undefined);
     });
 });
 
@@ -179,6 +187,7 @@ describe("filtersActive", () => {
             filtersActive({ ...NO_FILTERS, date: "custom", to: "2026-09-01" }),
         ).toBe(true);
         expect(filtersActive({ ...NO_FILTERS, late: true })).toBe(true);
+        expect(filtersActive({ ...NO_FILTERS, attention: true })).toBe(true);
     });
 });
 
@@ -207,6 +216,13 @@ describe("the empty state for filters", () => {
             kind: "filter",
             action: "clear-filters",
         });
+    });
+
+    it("says Needs attention in the sentence (B15)", () => {
+        const q = readOrdersQuery({ attention: "true", date: "today" });
+        expect(filteredEmptyTitle(q, options)).toBe(
+            "No orders that need attention today",
+        );
     });
 
     it("puts every filter into the sentence", () => {

@@ -74,7 +74,11 @@ describe("OrganizationOrdersController", () => {
         expect(listRows).toHaveBeenCalledWith(
             "org_1",
             {},
-            { money: false, contact: true },
+            expect.objectContaining({
+                money: false,
+                contact: true,
+                viewer: expect.anything(),
+            }),
         );
     });
 
@@ -85,7 +89,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 {},
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         },
     );
@@ -119,7 +127,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { storeId: "s1", q: "x" },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -128,7 +140,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { storeId: "s1" },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -142,7 +158,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { tab: "open", late: true, stage: ["READY"] },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -151,7 +171,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { late: false },
-                { money: false, contact: true },
+                expect.objectContaining({
+                    money: false,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -164,7 +188,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { late: undefined },
-                { money: false, contact: false },
+                expect.objectContaining({
+                    money: false,
+                    contact: false,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -184,7 +212,27 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { step: "handed-to-courier", date: "7d", late: undefined },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
+            );
+        });
+
+        it("passes Needs attention through as a boolean, with the caller (B15)", async () => {
+            const ctx = as("MEMBER");
+            await controller.list(ctx, { v: "2", attention: "true" });
+            expect(listRows).toHaveBeenLastCalledWith(
+                "org_1",
+                expect.objectContaining({ attention: true }),
+                expect.objectContaining({ viewer: ctx }),
+            );
+            await controller.list(ctx, { v: "2", attention: "false" });
+            expect(listRows).toHaveBeenLastCalledWith(
+                "org_1",
+                expect.objectContaining({ attention: false }),
+                expect.anything(),
             );
         });
     });

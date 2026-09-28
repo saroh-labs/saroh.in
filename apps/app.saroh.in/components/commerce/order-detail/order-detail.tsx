@@ -59,6 +59,12 @@ export interface OrderPermissions {
     payOnline?: boolean;
     /** May connect a provider in Settings (`payment:manage`). */
     manageProviders?: boolean;
+    /**
+     * Reads contacts (`contact:read`): the customer's own phone and email.
+     * Without it the API sends neither (review #19), and the card says
+     * nothing about them rather than "No phone". Unknown reads as true.
+     */
+    contact?: boolean;
 }
 
 const STANDING: Record<string, { label: string; tone: PillTone }> = {
@@ -430,7 +436,14 @@ export function OrderDetail({
                                 notes={
                                     notes === "unavailable" ? null : noteList
                                 }
+                                attention={order.attention}
+                                contact={can.contact ?? true}
                                 address={delivery ? addressText : null}
+                                deliveryPhone={
+                                    delivery
+                                        ? (order.deliveryAddress?.phone ?? null)
+                                        : null
+                                }
                                 shipment={shipment}
                                 onChangeTracking={() => setPanel("tracking")}
                                 orderNote={order.notes}
