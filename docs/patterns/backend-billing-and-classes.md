@@ -400,6 +400,20 @@
   without `invoice:read`. No backfill: without a SUBSCRIBED event the read
   says `earlierUnrecorded`. Home's failed-renewal source reads its
   RENEWAL_FAILED and MANDATE_LIMIT_LOW events (F1, written by D13).
+- **A mandate ends with its subscription, a privacy removal or a merge**
+  (round-2 D20, DEC-038). A `PaymentMandate` belongs to one subscription.
+  Every write that moves a subscription to CANCELLED calls
+  `cancelMandatesInTx` (`payments/mandate-cancel-job.ts`) in its own
+  transaction, after its event: the live mandates are marked CANCELLED at
+  once — never charged again — with a MANDATE_CANCELLED event (actor JOB,
+  `data.reason`), and a `mandate.cancel` job asks the provider after
+  commit, so a provider timeout never undoes the cancel. A new path to
+  CANCELLED must call it too. A merge does the same for the merged-away
+  contact's mandates (never moved to the survivor). A privacy removal
+  (C11) calls `MandatesService.cancelFor({ organizationId, contactId },
+"PRIVACY_REMOVAL")` before its transaction and refuses while
+  `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
+  "being confirmed" (DEC-026); a confirmed row is never asked again.
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.
