@@ -222,6 +222,20 @@ describe("BusinessCalendar: days off and the team filter (E24)", () => {
         );
     });
 
+    it("switches to the week holding the day picked, keeping the person (E25)", () => {
+        render(kavi(), PILLAI);
+        act(() => cell("2026-09-23")?.click());
+        const week = Array.from(
+            host.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+        ).find((r) => r.textContent === "Week");
+        expect(week?.getAttribute("aria-checked")).toBe("false");
+        act(() => week?.click());
+        expect(push).toHaveBeenCalledWith(
+            `/calendar?view=week&day=2026-09-23&team=${PILLAI}`,
+            { scroll: false },
+        );
+    });
+
     it("shows no filter to a business with no staff", () => {
         render(kavi({ hasStaff: false, staff: [], daysOff: [] }));
         expect(filter()).toBeNull();
