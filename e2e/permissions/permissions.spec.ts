@@ -96,6 +96,32 @@ for (const role of ["MEMBER", "REVIEWER"]) {
     });
 }
 
+test("REVIEWER's Home is what was sent to them for review, and nothing about the business", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "REVIEWER");
+    await page.goto("/");
+    await expect(
+        page.getByRole("heading", { name: "Sent to you for review" }),
+    ).toBeVisible();
+    // A row per page waiting, opening the Review tab on that page.
+    const row = page.getByRole("link", { name: /Home.*From Priya Raman/ });
+    await expect(row).toHaveAttribute(
+        "href",
+        "/sites/site_1/review?page=page_1",
+    );
+    await expect(row).toContainText("2 notes open");
+    // None of the business's bands.
+    for (const band of ["Needs you", "Today", "This week"]) {
+        await expect(
+            page.getByRole("heading", { name: band, exact: true }),
+        ).toHaveCount(0);
+    }
+    await row.click();
+    await expect(page).toHaveURL(/\/sites\/site_1\/review\?page=page_1$/);
+});
+
 test("production 403 uses the editor permission boundary", async ({
     page,
     context,

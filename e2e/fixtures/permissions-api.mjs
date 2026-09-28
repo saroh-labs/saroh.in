@@ -292,6 +292,54 @@ createServer((req, res) => {
         return reply(403, {
             error: "Read-only roles must not load the editor draft",
         });
+    // Home (F9): a Reviewer's is the sites sent to them, and nothing else.
+    if (path.endsWith("/home"))
+        return reply(200, {
+            view: scenario === "REVIEWER" ? "reviewer" : "business",
+            ...(scenario === "REVIEWER"
+                ? {
+                      reviews: [
+                          {
+                              id: "site_1",
+                              name: "Permission test site",
+                              href: "/sites/site_1/review",
+                              requestedBy: "Priya Raman",
+                              requestedAt: "2026-09-17T06:00:00.000Z",
+                              openNotes: 2,
+                              pages: [
+                                  {
+                                      id: "page_1",
+                                      title: "Home",
+                                      path: "/",
+                                      openNotes: 2,
+                                      href: "/sites/site_1/review?page=page_1",
+                                  },
+                              ],
+                              pageCount: 1,
+                              subdomain: null,
+                              live: false,
+                          },
+                      ],
+                  }
+                : {}),
+            actions: [],
+            primaryAction: null,
+            hasAnyModule: true,
+            upcoming: [],
+            numbers: [],
+            unavailable: [],
+            needs: [],
+            needsTotal: 0,
+            today: null,
+            lastDay: {
+                zone: "Asia/Kolkata",
+                date: "2026-09-18",
+                partOfDay: "morning",
+                since: "2026-09-17T04:00:00.000Z",
+                fresh: false,
+                items: [],
+            },
+        });
     if (path.endsWith("/notifications/unread-count"))
         return reply(200, { count: 0 });
     return reply(404, { error: "Fixture route not found" });
