@@ -34,7 +34,7 @@ function order(over: Partial<OrderForInvoice> = {}): OrderForInvoice {
         shipping: "59.00",
         discount: "47.80",
         total: "489.20",
-        fulfilment: "DELIVERY",
+        fulfilment: "LOCAL_DELIVERY",
         deliveryName: "Meera Iyer",
         deliveryLine1: "12 Church Street",
         deliveryLine2: null,
@@ -102,7 +102,7 @@ describe("an order's invoice", () => {
     it("a collected order is supplied where the business is", () => {
         const doc = buildOrderInvoice(
             order({
-                fulfilment: "COLLECT",
+                fulfilment: "PICKUP",
                 deliveryState: "Goa",
                 shipping: "0",
                 total: "430.20",
@@ -144,15 +144,13 @@ describe("an order's invoice", () => {
                 "Meera Iyer, 12 Church Street, Bengaluru 560001, Karnataka",
             state: null,
         });
-        expect(
-            orderBillTo(order({ fulfilment: "COLLECT" })).address,
-        ).toBeNull();
+        expect(orderBillTo(order({ fulfilment: "PICKUP" })).address).toBeNull();
     });
 
-    // B2a: the six types (DEC-045), read through `typeOf`. A row in the new
-    // names (written by the switch release) invoices as its legacy word did.
+    // B2a: the six types (DEC-045), read through `typeOf`. Whatever goes to
+    // an address is taxed where it goes.
     it.each(["LOCAL_DELIVERY", "SHIPPING"])(
-        "a %s order is taxed where it goes, and billed to its address, as DELIVERY is",
+        "a %s order is taxed where it goes, and billed to its address",
         (fulfilment) => {
             const doc = buildOrderInvoice(
                 order({ fulfilment, deliveryState: "Goa" }),

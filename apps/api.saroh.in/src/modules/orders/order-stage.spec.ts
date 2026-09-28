@@ -14,7 +14,7 @@ const order = (over: Partial<StageSubject> = {}): StageSubject => ({
     stage: "NEW",
     status: "PENDING",
     paymentStatus: "PAID",
-    fulfilment: "COLLECT",
+    fulfilment: "PICKUP",
     ...over,
 });
 
@@ -37,7 +37,7 @@ describe("the kitchen flow (order-stage)", () => {
     });
 
     it("a delivery (B2c): Ready → Out for delivery (SHIPPED) → Delivered", () => {
-        let o = order({ fulfilment: "DELIVERY" });
+        let o = order({ fulfilment: "LOCAL_DELIVERY" });
         o = step(step(o, "PREPARING"), "READY");
         expect(nextStages(o)).toEqual(["OUT_FOR_DELIVERY"]);
         o = step(o, "OUT_FOR_DELIVERY");
@@ -47,8 +47,8 @@ describe("the kitchen flow (order-stage)", () => {
     });
 
     it.each<[OrderFulfilment, OrderStage]>([
-        ["DELIVERY", "COLLECTED"],
-        ["COLLECT", "HANDED_TO_COURIER"],
+        ["LOCAL_DELIVERY", "COLLECTED"],
+        ["PICKUP", "HANDED_TO_COURIER"],
     ])("a %s order cannot become %s", (fulfilment, to) => {
         expect(() =>
             planStageMove(
@@ -205,12 +205,12 @@ describe("editing and the legacy status PATCH", () => {
     });
 
     it("keeps the stage in step with a status set by the old PATCH", () => {
-        const cur = { stage: "NEW" as const, fulfilment: "COLLECT" as const };
+        const cur = { stage: "NEW" as const, fulfilment: "PICKUP" as const };
         expect(stageForStatus("PROCESSING", cur).stage).toBe("PREPARING");
         expect(stageForStatus("DELIVERED", cur).stage).toBe("COLLECTED");
         const courier = {
             stage: "READY" as const,
-            fulfilment: "DELIVERY" as const,
+            fulfilment: "LOCAL_DELIVERY" as const,
         };
         expect(stageForStatus("SHIPPED", courier)).toEqual({
             stage: "OUT_FOR_DELIVERY",
@@ -218,7 +218,7 @@ describe("editing and the legacy status PATCH", () => {
         expect(
             stageForStatus("DELIVERED", {
                 stage: "HANDED_TO_COURIER",
-                fulfilment: "DELIVERY",
+                fulfilment: "LOCAL_DELIVERY",
             }).stage,
         ).toBe("DELIVERED");
         expect(stageForStatus("CANCELLED", cur)).toEqual({ stage: "NEW" });
@@ -228,10 +228,9 @@ describe("editing and the legacy status PATCH", () => {
     // delivery at HANDED_TO_COURIER. It never changes the type now.
     it.each<[OrderFulfilment, RegExp]>([
         [
-            "COLLECT",
+            "PICKUP",
             /^A pick-up order isn't shipped\. Change how it's fulfilled first\.$/,
         ],
-        ["PICKUP", /^A pick-up order isn't shipped/],
         ["DIGITAL", /^A digital order isn't shipped/],
         ["APPOINTMENT_ONLINE", /^An appointment isn't shipped/],
     ])(
@@ -259,16 +258,9 @@ describe("editing and the legacy status PATCH", () => {
         expect(stageForStatus("SHIPPED", at("SHIPPING")).stage).toBe(
             "HANDED_TO_COURIER",
         );
-        // Release 1 wrote today's handover for a local delivery…
-        expect(
-            stageForStatus("SHIPPED", at("LOCAL_DELIVERY"), false).stage,
-        ).toBe("HANDED_TO_COURIER");
-        // …and the switch release (now) its own, except for one already
-        // with a courier the old way.
+        // A local delivery goes out for delivery, except one already with
+        // a courier the old way.
         expect(stageForStatus("SHIPPED", at("LOCAL_DELIVERY")).stage).toBe(
-            "OUT_FOR_DELIVERY",
-        );
-        expect(stageForStatus("SHIPPED", at("DELIVERY")).stage).toBe(
             "OUT_FOR_DELIVERY",
         );
         expect(
@@ -297,7 +289,7 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
         over: Partial<StageSubject> = {},
     ) => order({ fulfilment, ...over });
 
-    it("both vocabularies walk the same steps: PICKUP as COLLECT, LOCAL_DELIVERY as DELIVERY", () => {
+    it("a pick-up and a local delivery walk their own steps, each onto its status", () => {
         const walk = (fulfilment: OrderFulfilment, stages: OrderStage[]) => {
             let o = paid(fulfilment);
             const statuses: string[] = [];
@@ -308,15 +300,18 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
             return statuses;
         };
         const pickUp: OrderStage[] = ["PREPARING", "READY", "COLLECTED"];
-        expect(walk("PICKUP", pickUp)).toEqual(walk("COLLECT", pickUp));
+        expect(walk("PICKUP", pickUp)).toEqual([
+            "PROCESSING",
+            "PROCESSING",
+            "DELIVERED",
+        ]);
         const local: OrderStage[] = [
             "PREPARING",
             "READY",
             "OUT_FOR_DELIVERY",
             "DELIVERED",
         ];
-        expect(walk("LOCAL_DELIVERY", local)).toEqual(walk("DELIVERY", local));
-        expect(walk("DELIVERY", local)).toEqual([
+        expect(walk("LOCAL_DELIVERY", local)).toEqual([
             "PROCESSING",
             "PROCESSING",
             "SHIPPED",
@@ -324,8 +319,8 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
         ]);
     });
 
-    it("from the switch release a ready local delivery goes out for delivery, never to a courier", () => {
-        for (const fulfilment of ["LOCAL_DELIVERY", "DELIVERY"] as const) {
+    it("a ready local delivery goes out for delivery, never to a courier", () => {
+        for (const fulfilment of ["LOCAL_DELIVERY"] as const) {
             const ready = paid(fulfilment, {
                 stage: "READY",
                 status: "PROCESSING",
@@ -354,9 +349,9 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
     });
 
     it("a local delivery handed to a courier before the switch reaches Delivered after it", () => {
-        // The migration renames DELIVERY to LOCAL_DELIVERY and leaves the
-        // stage: the legacy move takes it on, under either name.
-        for (const fulfilment of ["DELIVERY", "LOCAL_DELIVERY"] as const) {
+        // B2c's migration renamed DELIVERY to LOCAL_DELIVERY and left the
+        // stage: the legacy move takes it on, and still does after B2d.
+        for (const fulfilment of ["LOCAL_DELIVERY"] as const) {
             const o = paid(fulfilment, {
                 stage: "HANDED_TO_COURIER",
                 status: "SHIPPED",

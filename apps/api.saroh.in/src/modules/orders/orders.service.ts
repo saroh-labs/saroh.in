@@ -42,11 +42,7 @@ import {
 } from "./order-pricing";
 import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
-import {
-    serializeOrderDetail,
-    serializeOrderSummary,
-    serializeOrganizationOrder,
-} from "./serialize";
+import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -84,49 +80,12 @@ export class OrdersService {
     }
 
     /**
-     * Every order in the business, newest first — the list behind Sell →
-     * Orders.
-     *
-     * Scoped by `organizationId` from the request context and NEVER by a store
-     * id the caller sent, which is what lets one screen span storefronts
-     * without becoming a way to read someone else's. `storeId` here only
-     * NARROWS that set, so a tampered value can at worst return nothing.
-     *
-     * The route's answer WITHOUT `v=2`: the whole set, unpaged, exactly as
-     * before B1, kept for one release so an app deployed before the API
-     * keeps working. The paged, filtered list is {@link listRows}; B2d
-     * removes this once every caller is on it.
-     */
-    async listForOrganization(
-        organizationId: string,
-        filter?: { storeId?: string },
-        view: { kitchenOnly?: boolean } = {},
-    ) {
-        const orders = await prisma.order.findMany({
-            where: {
-                organizationId,
-                ...(filter?.storeId ? { storeId: filter.storeId } : {}),
-                // An abandoned checkout is not an order (plan B, B1).
-                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
-            },
-            orderBy: { createdAt: "desc" },
-            include: {
-                customer: CUSTOMER_SELECT,
-                store: { select: { id: true, name: true } },
-                _count: { select: { items: true } },
-            },
-        });
-        return orders.map((o) => serializeOrganizationOrder(o, view));
-    }
-
-    /**
-     * The Orders list, v2 (plan B, B1): filtered, paged and counted by the
-     * API, with money only for `order:read` and a customer's phone and email
-     * only for `contact:read`. Scoped like {@link listForOrganization}: every
-     * filter narrows inside the organization. See `order-list.ts`.
-     *
-     * `listForOrganization` answers the route without `v=2` for one release,
-     * so an app deployed before this API keeps working (B2d removes it).
+     * The Orders list (plan B, B1): filtered, paged and counted by the API,
+     * with money only for `order:read` and a customer's phone and email only
+     * for `contact:read`. Scoped by `organizationId` from the request context
+     * and NEVER by a store id the caller sent: `storeId` and every other
+     * filter only NARROW inside the organization, so a tampered value can at
+     * worst return nothing. See `order-list.ts`.
      */
     listRows(
         organizationId: string,

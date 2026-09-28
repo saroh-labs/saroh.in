@@ -24,24 +24,17 @@ import {
  */
 
 describe("fulfilment words (read through fulfilment.ts, B2a)", () => {
-    it("matches a type's legacy word too, until B2d drops it", () => {
-        expect(storedValuesOf(["PICKUP"]).sort()).toEqual([
-            "COLLECT",
-            "PICKUP",
-        ]);
-        expect(storedValuesOf(["DELIVERY"]).sort()).toEqual([
-            "DELIVERY",
-            "LOCAL_DELIVERY",
-        ]);
+    it("matches each type as itself, with no legacy word (B2d)", () => {
+        expect(storedValuesOf(["PICKUP"])).toEqual(["PICKUP"]);
+        expect(storedValuesOf(["LOCAL_DELIVERY"])).toEqual(["LOCAL_DELIVERY"]);
         expect(storedValuesOf(["SHIPPING"])).toEqual(["SHIPPING"]);
-        expect(storedValuesOf(["COLLECT", "SHIPPING"]).sort()).toEqual([
-            "COLLECT",
+        expect(storedValuesOf(["SHIPPING", "PICKUP"])).toEqual([
             "PICKUP",
             "SHIPPING",
         ]);
     });
 
-    it("judges late by the type's storefront column, under both words (B17)", () => {
+    it("judges late by the type's storefront column (B17)", () => {
         const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
         for (const column of [
             'ss."pickupLateAfterMinutes"',
@@ -201,9 +194,9 @@ describe("the conditions", () => {
         const s = lateSql(new Date("2026-09-01T00:00:00.000Z"));
         expect(s.values).toEqual(
             expect.arrayContaining([
-                "COLLECT",
+                "PICKUP",
                 120,
-                "DELIVERY",
+                "LOCAL_DELIVERY",
                 1440,
                 "SHIPPING",
                 2880,
@@ -256,6 +249,12 @@ describe("ListOrdersQuery", () => {
         { since: "yesterday" },
         { since: "2026-02-30T10:00:00Z" },
         { v: "3" },
+        // The bare array went in the contract release (B2d): nothing asks
+        // for it by name.
+        { v: "1" },
+        // The legacy words went with it.
+        { fulfilment: "COLLECT" },
+        { fulfilment: "delivery" },
         { attention: "true" },
     ])("refuses %o", async (value) => {
         await expect(parse(value)).rejects.toThrow(BadRequestException);

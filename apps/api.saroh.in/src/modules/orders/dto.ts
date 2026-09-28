@@ -79,18 +79,12 @@ export const FULFILMENT_TYPES = [
 export type FulfilmentType = (typeof FULFILMENT_TYPES)[number];
 
 /**
- * The words the column held before the six types: COLLECT means PICKUP and
- * DELIVERY means LOCAL_DELIVERY. Accepted until the contract release (B2d)
- * drops them, because an app built before B2a still sends them.
+ * Every value `Order.fulfilment` can hold, and a client can send: the six
+ * types. The legacy words COLLECT and DELIVERY went in the contract release
+ * (B2d, `20261013100000_order_fulfilment_contract`); a client sending one
+ * gets 400.
  */
-export const LEGACY_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
-export type LegacyFulfilment = (typeof LEGACY_FULFILMENTS)[number];
-
-/** Every value `Order.fulfilment` can hold, and a client can send, today. */
-export const ORDER_FULFILMENTS = [
-    ...LEGACY_FULFILMENTS,
-    ...FULFILMENT_TYPES,
-] as const;
+export const ORDER_FULFILMENTS = FULFILMENT_TYPES;
 export type OrderFulfilment = (typeof ORDER_FULFILMENTS)[number];
 
 const trim = ({ value }: { value: unknown }) =>
@@ -218,9 +212,8 @@ export class CreateOrderDto {
     discountCode?: string;
 
     /**
-     * How it leaves: picked up (the default) or delivered (ADR-008). Either
-     * vocabulary; until B2c only the two types a legacy word names can be
-     * written (`fulfilment.ts`).
+     * How it leaves (DEC-045): Pick-up by default. An appointment type is
+     * refused: it is made by booking it (`fulfilment.ts`).
      */
     @IsOptional()
     @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
@@ -393,14 +386,15 @@ const blankToUndefined = ({ value }: { value: unknown }) => {
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * `GET organizations/:org/orders` (plan B, B1). Without `v=2` only `storeId`
- * is read and the route answers today's bare array; with it, every filter
- * applies and the answer is `{ rows, counts, nextCursor }`.
+ * `GET organizations/:org/orders` (plan B, B1): every filter applies and the
+ * answer is `{ rows, counts, nextCursor }`. The bare array an app before B1
+ * read without `v=2` went in the contract release (B2d); `v=2` is still
+ * accepted, and changes nothing, because the app sends it.
  */
 export class ListOrdersQuery {
     @IsOptional()
-    @IsIn(["1", "2"], { message: "Unknown list version" })
-    v?: "1" | "2";
+    @IsIn(["2"], { message: "Unknown list version" })
+    v?: "2";
 
     @IsOptional()
     @Transform(({ value }: { value: unknown }) =>
@@ -415,7 +409,7 @@ export class ListOrdersQuery {
     @IsIn(ORDER_STAGES, { each: true, message: "Unknown step" })
     stage?: string[];
 
-    /** The types, or the legacy words (matched as their types until B2d). */
+    /** The types (DEC-045). */
     @IsOptional()
     @Transform(listOf)
     @IsArray()

@@ -15,7 +15,6 @@ import {
     lateAfterMinutesOf,
     lateOf,
     lateStoredValues,
-    legacyWord,
     movesFor,
     PRODUCT_FULFILMENT_TYPES,
     productTypesOf,
@@ -23,21 +22,17 @@ import {
     stepIndexOf,
     stepsFor,
     storedValueFor,
+    storedValuesOf,
     storefrontTypesFrom,
     storefrontTypesOf,
     typeOf,
-    WRITES_NEW_FULFILMENT_VALUES,
 } from "./fulfilment";
 import { canTransitionStatus } from "./order-state";
 
 const words = (type: FulfilmentType, stage = "NEW" as const) =>
-    stepsFor(type, stage, true).map((s) => s.label);
+    stepsFor(type, stage).map((s) => s.label);
 
 describe("the fulfilment rule table (DEC-045)", () => {
-    it("is release 2: the write switch is on (B2c)", () => {
-        expect(WRITES_NEW_FULFILMENT_VALUES).toBe(true);
-    });
-
     it("gives each type the designs' steps, late default, ticket and done word", () => {
         expect(words("PICKUP")).toEqual([
             "New",
@@ -94,13 +89,11 @@ describe("the fulfilment rule table (DEC-045)", () => {
     it.each(FULFILMENT_TYPES)(
         "every %s move maps onto a status move the status table allows (or is the kitchen's own)",
         (type) => {
-            for (const writesNew of [false, true]) {
-                for (const m of movesFor(type, writesNew)) {
-                    if (m.fromStatus === m.toStatus || m.direct) continue;
-                    expect(canTransitionStatus(m.fromStatus, m.toStatus)).toBe(
-                        true,
-                    );
-                }
+            for (const m of movesFor(type)) {
+                if (m.fromStatus === m.toStatus || m.direct) continue;
+                expect(canTransitionStatus(m.fromStatus, m.toStatus)).toBe(
+                    true,
+                );
             }
         },
     );
@@ -108,12 +101,12 @@ describe("the fulfilment rule table (DEC-045)", () => {
     it.each(FULFILMENT_TYPES)(
         "every %s move goes between two of its own steps (the legacy courier move aside)",
         (type) => {
-            for (const m of movesFor(type, true)) {
-                const stages = stepsFor(type, m.from, true).map((s) => s.stage);
+            for (const m of movesFor(type)) {
+                const stages = stepsFor(type, m.from).map((s) => s.stage);
                 expect(stages).toContain(m.from);
-                expect(
-                    stepsFor(type, m.to, true).map((s) => s.stage),
-                ).toContain(m.to);
+                expect(stepsFor(type, m.to).map((s) => s.stage)).toContain(
+                    m.to,
+                );
             }
         },
     );
@@ -126,9 +119,7 @@ describe("the fulfilment rule table (DEC-045)", () => {
 });
 
 describe("the normaliser", () => {
-    it("reads a legacy word as its type, and a type as itself", () => {
-        expect(typeOf("COLLECT")).toBe("PICKUP");
-        expect(typeOf("DELIVERY")).toBe("LOCAL_DELIVERY");
+    it("reads a type as itself", () => {
         for (const t of FULFILMENT_TYPES) expect(typeOf(t)).toBe(t);
     });
 
@@ -136,15 +127,21 @@ describe("the normaliser", () => {
         expect(() => typeOf("TELEPORT")).toThrow(/Unknown order fulfilment/);
     });
 
-    it("answers the legacy word an old app reads: an address is DELIVERY, the rest COLLECT", () => {
-        expect(FULFILMENT_TYPES.map(legacyWord)).toEqual([
-            "COLLECT",
-            "DELIVERY",
-            "DELIVERY",
-            "COLLECT",
-            "COLLECT",
-            "COLLECT",
+    it("no longer knows the legacy words: the contract release dropped them (B2d)", () => {
+        expect(() => typeOf("COLLECT")).toThrow(/Unknown order fulfilment/);
+        expect(() => typeOf("DELIVERY")).toThrow(/Unknown order fulfilment/);
+        expect(FULFILMENT_TYPES).not.toContain("COLLECT");
+        expect(FULFILMENT_TYPES).not.toContain("DELIVERY");
+    });
+
+    it("a filter by type matches each type once, as itself, in table order", () => {
+        expect(storedValuesOf(["SHIPPING", "PICKUP", "SHIPPING"])).toEqual([
+            "PICKUP",
+            "SHIPPING",
         ]);
+        expect(() => storedValuesOf(["COLLECT"])).toThrow(
+            /Unknown order fulfilment/,
+        );
     });
 
     it("only a local delivery and a shipment go to an address (bill-to, place of supply)", () => {
@@ -155,24 +152,8 @@ describe("the normaliser", () => {
     });
 });
 
-describe("the write switch", () => {
-    it("off (release 1): stores the legacy word, and refuses the types that image's predecessor can't read", () => {
-        expect(storedValueFor("PICKUP", false)).toBe("COLLECT");
-        expect(storedValueFor("LOCAL_DELIVERY", false)).toBe("DELIVERY");
-        for (const t of [
-            "SHIPPING",
-            "DIGITAL",
-            "APPOINTMENT_IN_PERSON",
-            "APPOINTMENT_ONLINE",
-        ] as const) {
-            expect(() => storedValueFor(t, false)).toThrow(BadRequestException);
-        }
-        expect(() => storedValueFor("SHIPPING", false)).toThrow(
-            "Shipping isn't available yet.",
-        );
-    });
-
-    it("on (B2c, the default now): stores each physical type and Digital as itself", () => {
+describe("what a write stores", () => {
+    it("stores each physical type and Digital as itself", () => {
         for (const t of [
             "PICKUP",
             "LOCAL_DELIVERY",
@@ -183,7 +164,7 @@ describe("the write switch", () => {
         }
     });
 
-    it("on: an appointment is never typed into an order; it is booked (E9)", () => {
+    it("an appointment is never typed into an order; it is booked (E9)", () => {
         for (const t of [
             "APPOINTMENT_IN_PERSON",
             "APPOINTMENT_ONLINE",
@@ -195,80 +176,43 @@ describe("the write switch", () => {
         }
     });
 
-    it("on: the default moves are the final table", () => {
+    it("the moves are the table's", () => {
         for (const t of FULFILMENT_TYPES) {
             expect(movesFor(t)).toEqual(FULFILMENT_RULES[t].moves);
         }
     });
 
-    it("off: a local delivery is handed over as today; on: sent out for delivery", () => {
-        const fromReady = (writesNew: boolean) =>
-            movesFor("LOCAL_DELIVERY", writesNew)
-                .filter((m) => m.from === "READY")
-                .map((m) => m.to);
-        expect(fromReady(false)).toEqual(["HANDED_TO_COURIER"]);
-        expect(fromReady(true)).toEqual(["OUT_FOR_DELIVERY"]);
-        // Moves out of the new stage stay either way: release 1 serves
-        // release 2's rows.
-        for (const writesNew of [false, true]) {
-            expect(
-                movesFor("LOCAL_DELIVERY", writesNew)
-                    .filter((m) => m.to === "DELIVERED")
-                    .map((m) => m.from),
-            ).toEqual(["OUT_FOR_DELIVERY", "HANDED_TO_COURIER"]);
-        }
+    it("a ready local delivery goes out for delivery; one with a courier the old way still moves on", () => {
+        const moves = movesFor("LOCAL_DELIVERY");
+        expect(
+            moves.filter((m) => m.from === "READY").map((m) => m.to),
+        ).toEqual(["OUT_FOR_DELIVERY"]);
+        // The legacy move stays after the contract release: it is a stage,
+        // not an enum value, and old orders keep it (B2d).
+        expect(
+            moves.filter((m) => m.to === "DELIVERED").map((m) => m.from),
+        ).toEqual(["OUT_FOR_DELIVERY", "HANDED_TO_COURIER"]);
     });
 });
 
 describe("steps and where an order stands", () => {
-    it("a local delivery shows the handover it takes: today's before the switch", () => {
+    it("a local delivery shows the handover it takes, or took the old way", () => {
         const fourth = (
             stage: "READY" | "OUT_FOR_DELIVERY" | "HANDED_TO_COURIER",
-            on: boolean,
-        ) => stepsFor("LOCAL_DELIVERY", stage, on)[3];
-        expect(fourth("READY", false)).toEqual({
-            stage: "HANDED_TO_COURIER",
-            label: "Handed to courier",
-        });
-        expect(fourth("READY", true)).toEqual({
+        ) => stepsFor("LOCAL_DELIVERY", stage)[3];
+        expect(fourth("READY")).toEqual({
             stage: "OUT_FOR_DELIVERY",
             label: "Out for delivery",
         });
-        // A row the switch release wrote reads as what it is…
-        expect(fourth("OUT_FOR_DELIVERY", false).stage).toBe(
-            "OUT_FOR_DELIVERY",
-        );
-        // …and one handed over the old way keeps its step after the switch.
-        expect(fourth("HANDED_TO_COURIER", true).stage).toBe(
-            "HANDED_TO_COURIER",
-        );
+        expect(fourth("OUT_FOR_DELIVERY").stage).toBe("OUT_FOR_DELIVERY");
+        // One handed over the old way (before B2c) keeps its step for good.
+        expect(fourth("HANDED_TO_COURIER")).toEqual({
+            stage: "HANDED_TO_COURIER",
+            label: "Handed to courier",
+        });
     });
 
-    it("after the switch, a backfilled order reads exactly as its legacy word did", () => {
-        // COLLECT → PICKUP and DELIVERY → LOCAL_DELIVERY by the migration:
-        // the same type, steps, step index, label and ticket either way.
-        for (const stage of [
-            "NEW",
-            "PREPARING",
-            "READY",
-            "COLLECTED",
-        ] as const) {
-            expect(fulfilmentView("PICKUP", stage)).toEqual(
-                fulfilmentView("COLLECT", stage),
-            );
-        }
-        for (const stage of [
-            "NEW",
-            "READY",
-            "OUT_FOR_DELIVERY",
-            "HANDED_TO_COURIER",
-            "DELIVERED",
-        ] as const) {
-            expect(fulfilmentView("LOCAL_DELIVERY", stage)).toEqual(
-                fulfilmentView("DELIVERY", stage),
-            );
-        }
-        // A ready local delivery is now offered Out for delivery next.
+    it("a ready local delivery is offered Out for delivery next", () => {
         expect(
             fulfilmentView("LOCAL_DELIVERY", "READY").steps.map((s) => s.label),
         ).toEqual([
@@ -293,28 +237,26 @@ describe("steps and where an order stands", () => {
         ).toBe(1);
     });
 
-    it("answers the legacy word and the type together, for both vocabularies", () => {
-        const collect = fulfilmentView("COLLECT", "READY");
-        expect(collect).toEqual(fulfilmentView("PICKUP", "READY"));
-        expect(collect).toMatchObject({
-            fulfilment: "COLLECT",
+    it("answers the type, its label, steps and ticket, and no legacy word (B2d)", () => {
+        const pickup = fulfilmentView("PICKUP", "READY");
+        expect(pickup).toMatchObject({
             fulfilmentType: "PICKUP",
             fulfilmentLabel: "Pick-up",
             stepIndex: 2,
             ticketName: "Order ticket",
         });
-        expect(fulfilmentView("DELIVERY", "HANDED_TO_COURIER")).toMatchObject({
-            fulfilment: "DELIVERY",
+        expect(pickup).not.toHaveProperty("fulfilment");
+        expect(
+            fulfilmentView("LOCAL_DELIVERY", "HANDED_TO_COURIER"),
+        ).toMatchObject({
             fulfilmentType: "LOCAL_DELIVERY",
             stepIndex: 3,
             ticketName: "Packing slip",
         });
         expect(fulfilmentView("SHIPPING", "NEW")).toMatchObject({
-            fulfilment: "DELIVERY",
             fulfilmentType: "SHIPPING",
         });
         expect(fulfilmentView("DIGITAL", "SENT")).toMatchObject({
-            fulfilment: "COLLECT",
             stepIndex: 1,
             ticketName: null,
         });
@@ -351,7 +293,12 @@ describe("a storefront's ways", () => {
 
     it("read a stored list as types, leaving out anything not a storefront's own", () => {
         expect(
-            storefrontTypesOf(["SHIPPING", "DELIVERY", "DIGITAL", "PICKUP"]),
+            storefrontTypesOf([
+                "SHIPPING",
+                "LOCAL_DELIVERY",
+                "DIGITAL",
+                "PICKUP",
+            ]),
         ).toEqual(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]);
     });
 
@@ -391,7 +338,7 @@ describe("the late rule (DEC-045, default 16)", () => {
     const after = (minutes: number) =>
         new Date(placedAt.getTime() + minutes * 60_000);
     const open = {
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         stage: "NEW",
         status: "PENDING",
         paymentStatus: "PAID",
@@ -415,9 +362,7 @@ describe("the late rule (DEC-045, default 16)", () => {
     });
 
     it.each([
-        ["COLLECT", 120],
         ["PICKUP", 120],
-        ["DELIVERY", 1440],
         ["LOCAL_DELIVERY", 1440],
         ["SHIPPING", 2880],
     ])(
@@ -485,7 +430,7 @@ describe("the late rule (DEC-045, default 16)", () => {
         const cases = [
             { stage: "COLLECTED", status: "DELIVERED" },
             {
-                fulfilment: "DELIVERY",
+                fulfilment: "LOCAL_DELIVERY",
                 stage: "HANDED_TO_COURIER",
                 status: "SHIPPED",
             },
@@ -538,10 +483,8 @@ describe("the late rule (DEC-045, default 16)", () => {
         ).toBe(false);
     });
 
-    it("gives the list's SQL each stored value's type and the same steps, under both vocabularies", () => {
+    it("gives the list's SQL each stored value's type and the same steps", () => {
         expect(Object.fromEntries(lateStoredValues())).toEqual({
-            COLLECT: "PICKUP",
-            DELIVERY: "LOCAL_DELIVERY",
             PICKUP: "PICKUP",
             LOCAL_DELIVERY: "LOCAL_DELIVERY",
             SHIPPING: "SHIPPING",
@@ -554,15 +497,11 @@ describe("the late rule (DEC-045, default 16)", () => {
 describe("going by courier", () => {
     it("a shipment does, and a local delivery only if handed over the old way; the rest never", () => {
         expect(goesByCourier("SHIPPING", "READY")).toBe(true);
-        expect(goesByCourier("DELIVERY", "HANDED_TO_COURIER")).toBe(true);
         expect(goesByCourier("LOCAL_DELIVERY", "HANDED_TO_COURIER")).toBe(true);
-        // With the switch on a local delivery goes out for delivery.
-        for (const stored of ["DELIVERY", "LOCAL_DELIVERY"]) {
-            expect(goesByCourier(stored, "READY")).toBe(false);
-            expect(goesByCourier(stored, "OUT_FOR_DELIVERY")).toBe(false);
-        }
+        // A local delivery goes out for delivery.
+        expect(goesByCourier("LOCAL_DELIVERY", "READY")).toBe(false);
+        expect(goesByCourier("LOCAL_DELIVERY", "OUT_FOR_DELIVERY")).toBe(false);
         for (const stored of [
-            "COLLECT",
             "PICKUP",
             "DIGITAL",
             "APPOINTMENT_IN_PERSON",
@@ -596,9 +535,9 @@ describe("product fulfilment types (B12)", () => {
             "PICKUP",
             "SHIPPING",
         ]);
-        // A legacy word reads as its type; an appointment is left out.
+        // An appointment is left out.
         expect(
-            productTypesOf(["DELIVERY", "COLLECT", "APPOINTMENT_ONLINE"]),
+            productTypesOf(["LOCAL_DELIVERY", "PICKUP", "APPOINTMENT_ONLINE"]),
         ).toEqual(["PICKUP", "LOCAL_DELIVERY"]);
         expect(productTypesOf([])).toEqual([]);
         expect(() => productTypesOf(["TELEPORT"])).toThrow();

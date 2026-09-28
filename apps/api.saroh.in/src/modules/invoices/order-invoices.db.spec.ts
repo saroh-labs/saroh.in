@@ -158,7 +158,7 @@ async function unpaidOrder(): Promise<{ id: string; intentId: string }> {
             shipping: "59.00",
             discount: "47.80",
             total: "489.20",
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             deliveryLine1: "12 Church Street",
             deliveryCity: "Bengaluru",
             deliveryState: "Karnataka",

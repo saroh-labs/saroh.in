@@ -1,17 +1,15 @@
 /**
  * The Orders list, v2 (plan B, B1), against a real Postgres: paging and tab
  * counts, every filter, what a caller without money or contact rights gets,
- * days in the business's zone, late, and the old bare array beside it.
+ * days in the business's zone and late. The only shape since B2d.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
 import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import type { StoresService } from "../stores/stores.service";
 import type { OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
-import { OrdersService } from "./orders.service";
 
 const NOW = new Date("2026-09-27T06:30:00.000Z"); // noon IST
 const MIN = 60_000;
@@ -36,7 +34,7 @@ async function order(
         status?: string;
         paymentStatus?: string;
         stage?: "NEW" | "PREPARING" | "READY" | "COLLECTED" | "DELIVERED";
-        fulfilment?: "COLLECT" | "DELIVERY";
+        fulfilment?: "PICKUP" | "LOCAL_DELIVERY";
         placedOnline?: boolean;
         product?: string;
         org?: string;
@@ -56,7 +54,7 @@ async function order(
             status: over.status ?? "PENDING",
             paymentStatus: over.paymentStatus ?? "PAID",
             stage: over.stage ?? "NEW",
-            fulfilment: over.fulfilment ?? "COLLECT",
+            fulfilment: over.fulfilment ?? "PICKUP",
             placedOnline: over.placedOnline ?? false,
             createdAt:
                 over.at ??
@@ -209,10 +207,15 @@ describe("paging and counts", () => {
         expect(second.counts).toEqual(first.counts);
     });
 
-    it("answers the same set as the old bare array", async () => {
-        const service = new OrdersService({} as unknown as StoresService);
-        const old = await service.listForOrganization(orgId);
-        expect((await everyRow()).sort()).toEqual(old.map((o) => o.id).sort());
+    it("answers every order of the business, across its pages", async () => {
+        const all = await prisma.order.findMany({
+            where: {
+                organizationId: orgId,
+                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
+            },
+            select: { id: true },
+        });
+        expect((await everyRow()).sort()).toEqual(all.map((o) => o.id).sort());
     });
 
     it("narrows to one storefront, and a storefront from another business finds nothing", async () => {
@@ -249,12 +252,12 @@ describe("filters, tabs and rows", () => {
 
     beforeAll(async () => {
         unpaidDelivery = await order({
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             paymentStatus: "UNPAID",
             minutesAgo: 10,
         });
         await order({
-            fulfilment: "COLLECT",
+            fulfilment: "PICKUP",
             paymentStatus: "UNPAID",
             minutesAgo: 11,
         });
@@ -338,16 +341,12 @@ describe("filters, tabs and rows", () => {
         });
         expect(byType.rows.map((r) => r.id)).toEqual([unpaidDelivery]);
         expect(byType.rows[0]).toMatchObject({
-            fulfilment: "DELIVERY",
             fulfilmentType: "LOCAL_DELIVERY",
             payment: "UNPAID",
             unpaidAmount: "610.00",
         });
-        const byWord = await list({
-            payment: "UNPAID",
-            fulfilment: ["DELIVERY"],
-        });
-        expect(byWord.rows.map((r) => r.id)).toEqual([unpaidDelivery]);
+        // No legacy word beside the type since the contract release (B2d).
+        expect(byType.rows[0]).not.toHaveProperty("fulfilment");
     });
 
     it("matches nothing for a type no order has yet, without failing", async () => {
@@ -458,7 +457,7 @@ describe("late", () => {
             late.push(
                 await order({
                     store: stores[1 + (i % 2)],
-                    fulfilment: "DELIVERY",
+                    fulfilment: "LOCAL_DELIVERY",
                     minutesAgo: 25 * 60 + i,
                 }),
             );
@@ -467,7 +466,7 @@ describe("late", () => {
         late.push(await order({ paymentStatus: "UNPAID", minutesAgo: 180 }));
         notLate.push(
             await order({ minutesAgo: 60 }),
-            await order({ fulfilment: "DELIVERY", minutesAgo: 180 }),
+            await order({ fulfilment: "LOCAL_DELIVERY", minutesAgo: 180 }),
             await order({
                 minutesAgo: 300,
                 status: "DELIVERED",

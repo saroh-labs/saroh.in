@@ -36,7 +36,7 @@ async function order(
         ago: number;
         status?: string;
         paymentStatus?: string;
-        fulfilment?: "COLLECT" | "DELIVERY";
+        fulfilment?: "PICKUP" | "LOCAL_DELIVERY";
         placedOnline?: boolean;
         org?: string;
         store?: string;
@@ -56,7 +56,7 @@ async function order(
             status: over.status ?? "PENDING",
             paymentStatus: over.paymentStatus ?? "PAID",
             stage: "NEW",
-            fulfilment: over.fulfilment ?? "DELIVERY",
+            fulfilment: over.fulfilment ?? "LOCAL_DELIVERY",
             placedOnline: over.placedOnline ?? false,
             createdAt: new Date(NOW.getTime() - over.ago),
             // The product is the first business's: another's order has none.
@@ -114,13 +114,13 @@ beforeAll(async () => {
         await order(`due${h}`, { ago: h * HOUR });
     }
     // A pick-up 150 minutes old: late (2 hours), and newer than all five.
-    await order("latePickup", { ago: 150 * MIN, fulfilment: "COLLECT" });
+    await order("latePickup", { ago: 150 * MIN, fulfilment: "PICKUP" });
     // Shipped: open until delivered, never late.
     await order("shipped", { ago: 10 * HOUR, status: "SHIPPED" });
     // Paid online: a real order, open.
     await order("paidOnline", {
         ago: 30 * MIN,
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         placedOnline: true,
     });
     // Not open: delivered, cancelled, refunded in full.
@@ -131,7 +131,7 @@ beforeAll(async () => {
     // to be late, and a pick-up due today — counted nowhere.
     await order("abandoned", {
         ago: 3 * HOUR,
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         placedOnline: true,
         paymentStatus: "UNPAID",
     });

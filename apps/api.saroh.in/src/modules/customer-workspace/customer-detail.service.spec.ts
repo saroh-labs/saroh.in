@@ -48,7 +48,7 @@ const ORDER = {
     currency: "INR",
     store: BAKERY,
     _count: { items: 3 },
-    fulfilment: "DELIVERY",
+    fulfilment: "LOCAL_DELIVERY",
     stage: "DELIVERED",
     deliveryLine1: "14 Hill Road",
     deliveryLine2: null,
@@ -341,6 +341,8 @@ describe("CustomerDetailService", () => {
                 cancelledLate: false,
             }),
         );
+        // No legacy word beside the type since the contract release (B2d).
+        expect(detail.orders?.rows[0]).not.toHaveProperty("fulfilment");
         expect(detail.orders?.rows[0]).toEqual(
             expect.objectContaining({
                 items: [
@@ -351,7 +353,7 @@ describe("CustomerDetailService", () => {
                         quantity: 2,
                     },
                 ],
-                fulfilment: "DELIVERY",
+                fulfilmentType: "LOCAL_DELIVERY",
                 delivery: "14 Hill Road, Bengaluru, Karnataka 560038",
             }),
         );

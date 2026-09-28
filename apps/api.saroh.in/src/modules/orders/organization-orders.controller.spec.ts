@@ -27,14 +27,13 @@ import { OrganizationOrdersController } from "./organization-orders.controller";
  * every order, with customer names, emails and totals.
  */
 describe("OrganizationOrdersController", () => {
-    const listForOrganization = jest.fn().mockResolvedValue([]);
     const listRows = jest.fn().mockResolvedValue({
         rows: [],
         counts: { all: 0, open: 0, refunded: 0 },
         nextCursor: null,
     });
     const controller = new OrganizationOrdersController(
-        { listForOrganization, listRows } as unknown as OrdersService,
+        { listRows } as unknown as OrdersService,
         {} as unknown as OrderKitchenService,
     );
 
@@ -49,7 +48,6 @@ describe("OrganizationOrdersController", () => {
     });
 
     beforeEach(() => {
-        listForOrganization.mockClear();
         listRows.mockClear();
     });
 
@@ -57,15 +55,15 @@ describe("OrganizationOrdersController", () => {
         expect(() => controller.list(as("REVIEWER"))).toThrow(
             ForbiddenException,
         );
-        expect(listForOrganization).not.toHaveBeenCalled();
+        expect(listRows).not.toHaveBeenCalled();
     });
 
     it("gives a MEMBER, who moves kitchen stages, the kitchen's view", async () => {
         await controller.list(as("MEMBER"));
-        expect(listForOrganization).toHaveBeenCalledWith(
+        expect(listRows).toHaveBeenCalledWith(
             "org_1",
-            { storeId: undefined },
-            { kitchenOnly: true },
+            {},
+            { money: false, contact: true },
         );
     });
 
@@ -73,10 +71,10 @@ describe("OrganizationOrdersController", () => {
         "lets a %s read them in full",
         async (role) => {
             await controller.list(as(role));
-            expect(listForOrganization).toHaveBeenCalledWith(
+            expect(listRows).toHaveBeenCalledWith(
                 "org_1",
-                { storeId: undefined },
-                { kitchenOnly: false },
+                {},
+                { money: true, contact: true },
             );
         },
     );
@@ -87,7 +85,7 @@ describe("OrganizationOrdersController", () => {
             actions: resolveCapabilities("stock-clerk", ["order:read"]),
         });
         await controller.list(clerk);
-        expect(listForOrganization).toHaveBeenCalled();
+        expect(listRows).toHaveBeenCalled();
 
         const tidier = as("MEMBER", {
             roleKey: "shelf-tidier",
@@ -96,14 +94,30 @@ describe("OrganizationOrdersController", () => {
         expect(() => controller.list(tidier)).toThrow(ForbiddenException);
     });
 
-    describe("v=2 (plan B, B1)", () => {
-        it("answers the old bare array without v=2, with the storefront only", async () => {
-            await controller.list(as("OWNER"), { storeId: "s1", q: "x" });
-            expect(listRows).not.toHaveBeenCalled();
-            expect(listForOrganization).toHaveBeenCalledWith(
+    describe("rows, counts and a cursor (plan B, B1)", () => {
+        it("answers the paged rows without v=2 too: the bare array is gone (B2d)", async () => {
+            const page = await controller.list(as("OWNER"), {
+                storeId: "s1",
+                q: "x",
+            });
+            expect(page).toEqual({
+                rows: [],
+                counts: { all: 0, open: 0, refunded: 0 },
+                nextCursor: null,
+            });
+            expect(listRows).toHaveBeenCalledWith(
+                "org_1",
+                { storeId: "s1", q: "x" },
+                { money: true, contact: true },
+            );
+        });
+
+        it("answers the same with v=2, which the app still sends", async () => {
+            await controller.list(as("OWNER"), { v: "2", storeId: "s1" });
+            expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { storeId: "s1" },
-                { kitchenOnly: false },
+                { money: true, contact: true },
             );
         });
 
@@ -114,7 +128,6 @@ describe("OrganizationOrdersController", () => {
                 late: "true",
                 stage: ["READY"],
             });
-            expect(listForOrganization).not.toHaveBeenCalled();
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { tab: "open", late: true, stage: ["READY"] },

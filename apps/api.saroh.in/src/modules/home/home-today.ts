@@ -252,8 +252,7 @@ function readyAfter(row: TodayOrderRow): number {
 /**
  * Open pick-ups due today, each at the time it should be ready: placed, plus
  * its storefront's Pick-up threshold (the one the Orders list's Late filter
- * reads). Both fulfilment vocabularies read as pick-up (COLLECT and PICKUP)
- * while the enum moves (B2a–B2d). No late tag: that is the order's own
+ * reads). No late tag: that is the order's own
  * `late`, and Home never works lateness out for itself.
  */
 export function pickUpItems(
