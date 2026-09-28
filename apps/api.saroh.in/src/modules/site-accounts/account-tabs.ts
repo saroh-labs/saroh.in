@@ -27,6 +27,7 @@ export interface AccountOffers {
     /**
      * A plan on sale (never a draft, `PLANS_ON_SALE`), one this customer is
      * on, or a pack of theirs not yet expired: what the Plan tab shows (A8).
+     * Or a pack on sale, which the Plan tab sells (A11).
      */
     plans: boolean;
     /** The customer can message the business (A13). */

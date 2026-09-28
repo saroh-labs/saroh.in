@@ -236,6 +236,17 @@ export type {
     PlanChangeResult,
     PlanTabProps,
 } from "./account/plan-tab";
+// A11: buying a class pack from the Plan tab.
+export { BuyPackSheet } from "./account/buy-pack-sheet";
+export type {
+    AccountPackAttempt,
+    AccountPackCheckout,
+    AccountPackOnSale,
+    AccountPacksOnSale,
+    PackResult,
+    PacksApi,
+    PlanPacksShop,
+} from "./account/packs-api";
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
 export type { TrackLookup } from "./account/track-sheet";
 

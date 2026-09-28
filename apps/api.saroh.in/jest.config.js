@@ -254,6 +254,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
         // A10: spending a pack as the team and as the customer, mocked tx.
         "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
+        // A11: a pack bought online — its snapshot, words and dates. Pure.
+        "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import { discardStalePackDrafts } from "../class-packs/pack-checkout";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
 
 export { RELEASE_HOLDS_TYPE } from "./booking-hold";
@@ -15,6 +16,8 @@ export const RELEASE_BATCH = 200;
 /**
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
  * hold ran out is cancelled and its draft invoice voided (`releaseHoldInTx`).
+ * Each run also voids the online pack drafts nobody paid within 24 hours
+ * (A11, `class-packs/pack-checkout.ts`).
  *
  * Reads never wait for this — a hold past its time already holds nothing
  * (`holdsPlace`) — so the sweep only writes down what is already true, and a
@@ -36,6 +39,7 @@ export class ReleaseHoldsHandler {
                 `Hold release run failed before it finished: ${String(error)}`,
             );
         }
+        await this.discardPackDrafts(new Date());
         const next = new Date(Date.now() + (full ? 0 : RELEASE_EVERY_MS));
         if (!(await this.schedule(next))) {
             throw new Error(
@@ -43,6 +47,26 @@ export class ReleaseHoldsHandler {
             );
         }
     };
+
+    /**
+     * The same tidy-up for packs bought online (A11): drafts nobody paid
+     * within 24 hours are voided (`discardStalePackDrafts`). Never throws;
+     * a failed run is logged and the next one tries again.
+     */
+    async discardPackDrafts(now: Date): Promise<number> {
+        try {
+            const discarded = await discardStalePackDrafts(now);
+            if (discarded > 0) {
+                this.logger.log(`Discarded ${discarded} unpaid pack drafts`);
+            }
+            return discarded;
+        } catch (error) {
+            this.logger.error(
+                `Could not discard unpaid pack drafts: ${String(error)}`,
+            );
+            return 0;
+        }
+    }
 
     /**
      * Release one batch of holds that ran out by `now`. True when the batch
