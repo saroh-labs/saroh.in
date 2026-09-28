@@ -109,7 +109,8 @@ export class ContactsService {
         authorize(ctx, "contact:read");
 
         const contacts = await prisma.contact.findMany({
-            where: { organizationId: ctx.organizationId },
+            // A merge's tombstone is never a row (C9): its survivor is.
+            where: { organizationId: ctx.organizationId, mergedIntoId: null },
             orderBy: { createdAt: "desc" },
         });
         if (contacts.length === 0) return [];
@@ -575,6 +576,14 @@ export class ContactsService {
         });
         if (contact?.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Contact not found");
+        }
+        // A merge's tombstone (C9) is read, edited and deleted as its
+        // survivor; this id says where that is.
+        if (contact.mergedIntoId) {
+            throw new NotFoundException({
+                message: "This contact was merged into another",
+                details: { mergedInto: contact.mergedIntoId },
+            });
         }
         return contact;
     }

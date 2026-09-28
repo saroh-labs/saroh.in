@@ -2,6 +2,19 @@
 // what pause, resume, cancel and renewal each do to the period. The database
 // and the invoices service are mocked; the calendar has its own spec
 // (periods.spec.ts), and the real-database races are in the .db spec.
+// A contact resolves to itself: no merges here (C9's resolve-contact.db.spec
+// covers following a tombstone).
+jest.mock("../customer-workspace/resolve-contact", () => ({
+    resolveContact: jest.fn(
+        (_tx: unknown, id: string, organizationId?: string) =>
+            Promise.resolve({
+                id,
+                organizationId: organizationId ?? "org_1",
+                mergedFrom: null,
+                removed: false,
+            }),
+    ),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {

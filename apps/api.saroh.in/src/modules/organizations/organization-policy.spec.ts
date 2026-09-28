@@ -279,3 +279,34 @@ describe("reach (F19): nobody grants what they don't hold", () => {
         expect(withinReach(ctx("MEMBER"), ["payment:manage"])).toBe(false);
     });
 });
+
+describe("customer:merge (DEC-042, C9)", () => {
+    it("is Owner's and Admin's, never a Member's or a Reviewer's", () => {
+        expect(can("OWNER", "customer:merge")).toBe(true);
+        expect(can("ADMIN", "customer:merge")).toBe(true);
+        expect(can("MEMBER", "customer:merge")).toBe(false);
+        expect(can("REVIEWER", "customer:merge")).toBe(false);
+    });
+
+    it("is not implied by contact:write: a saved role that edits customers can't merge them", () => {
+        const editor = resolveCapabilities("front-desk", [
+            "contact:read",
+            "contact:write",
+        ]);
+        expect(editor.has("contact:write")).toBe(true);
+        expect(editor.has("customer:merge")).toBe(false);
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const merger = resolveCapabilities("merger", ["customer:merge"]);
+        expect(merger.has("customer:merge")).toBe(true);
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["contact:write"]),
+        };
+        expect(outOfReach(editor, merger)).toEqual(["customer:merge"]);
+    });
+});

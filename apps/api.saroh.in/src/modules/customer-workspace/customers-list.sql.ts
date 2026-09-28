@@ -33,24 +33,25 @@ export const PAID_NON_ORDER_INVOICE = Prisma.sql`(i.status = 'PAID' AND i."order
 /** An order that counts at all: never an abandoned checkout (plan B, B1). */
 const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`;
 
-const RETIRED_DOMAIN = RESERVED_CONTACT_EMAIL_DOMAINS.find(
-    (d) => d === "removed.invalid",
-) as string;
-
 /** True when `column` holds one of `contact-email.ts`'s placeholders. */
 function reservedEmail(column: Prisma.Sql): Prisma.Sql {
     const patterns = RESERVED_CONTACT_EMAIL_DOMAINS.map((d) => `%@${d}`);
     return Prisma.sql`(lower(btrim(${column})) LIKE ANY (${patterns}::text[]))`;
 }
 
+/** A privacy removal's placeholder (`reservedRemovedEmail`), until C11. */
+const REMOVED_PLACEHOLDER = "removed+%@removed.invalid";
+
 /**
- * Not a merge's tombstone or a privacy removal. Both carry a
- * `…@removed.invalid` placeholder (`contact-email.ts`); C9 and C11 add
- * `mergedIntoId` and `removedAt`, and then this reads those columns. A site
- * account's separate contact (`…@account.invalid`) is a customer.
+ * Not a merge's tombstone (C9: `mergedIntoId`) or a privacy removal. A
+ * removal is still read from its `removed+<id>@removed.invalid` placeholder
+ * (`contact-email.ts`) until C11 adds `removedAt`, and then this reads that
+ * column. A site account's separate contact (`…@account.invalid`) is a
+ * customer.
  */
 export function notRetired(alias: string): Prisma.Sql {
-    return Prisma.sql`lower(btrim(${Prisma.raw(`${alias}.email`)})) NOT LIKE ${`%@${RETIRED_DOMAIN}`}`;
+    const column = (name: string) => Prisma.raw(`${alias}."${name}"`);
+    return Prisma.sql`(${column("mergedIntoId")} IS NULL AND lower(btrim(${column("email")})) NOT LIKE ${REMOVED_PLACEHOLDER})`;
 }
 
 /**

@@ -198,6 +198,12 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "contacts",
         label: "Add and edit contacts",
     },
+    {
+        action: "customer:merge",
+        group: "contacts",
+        label: "Merge duplicate customers",
+        note: "A merge can't be undone. The customer kept takes every order, booking, invoice and note of the other, and can see them if they sign in on your website.",
+    },
     { action: "lead:read", group: "contacts", label: "See leads" },
     { action: "lead:write", group: "contacts", label: "Add and edit leads" },
     { action: "pipeline:read", group: "contacts", label: "See the pipeline" },
