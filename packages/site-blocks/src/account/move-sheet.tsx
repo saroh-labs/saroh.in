@@ -10,6 +10,7 @@ import { OFFLINE } from "./bookings-api";
 import type { AccountTimes } from "./bookings-model";
 import { timeLabel } from "./bookings-model";
 import { Sheet, sheetButton } from "./sheet";
+import { ACCOUNT_TAB_HREF } from "./tab-bar";
 
 /**
  * Picking a new time in a sheet (round-2 plan A, A6; Saroh Customer Site
@@ -71,7 +72,6 @@ interface TimesSheetProps {
     onDone: (label: string) => void;
     onClose: () => void;
     businessName: string;
-    phone: string | null;
 }
 
 function OpenTimesSheet({
@@ -85,7 +85,6 @@ function OpenTimesSheet({
     onDone,
     onClose,
     businessName,
-    phone,
 }: TimesSheetProps) {
     const [state, setState] = useState<Load>({ kind: "loading" });
     const [pick, setPick] = useState<string | null>(null);
@@ -156,20 +155,16 @@ function OpenTimesSheet({
             ) : state.times.times.length === 0 ? (
                 <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                     No free times in the next two weeks.{" "}
-                    {phone ? (
-                        <a
-                            href={telHref(phone)}
-                            className={cn(
-                                "text-site-fg rounded-sm font-semibold underline",
-                                focusRing,
-                            )}
-                        >
-                            Call {businessName}
-                        </a>
-                    ) : (
-                        `Call ${businessName}`
-                    )}{" "}
-                    and they'll fit you in.
+                    <a
+                        href={ACCOUNT_TAB_HREF.messages}
+                        className={cn(
+                            "text-site-fg rounded-sm font-semibold underline",
+                            focusRing,
+                        )}
+                    >
+                        Send a message
+                    </a>{" "}
+                    and {businessName} will fit you in.
                 </p>
             ) : (
                 <>

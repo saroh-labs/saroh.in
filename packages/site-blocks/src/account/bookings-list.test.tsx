@@ -295,6 +295,36 @@ describe("the Bookings tab (A6)", () => {
         expect(router.refresh).toHaveBeenCalled();
     });
 
+    it("with no free times, Move points to Messages", async () => {
+        draw(
+            lists(),
+            api({
+                moveTimes: vi.fn().mockResolvedValue({
+                    ok: true,
+                    times: {
+                        service: "Check-up",
+                        staff: "Dr. Rao",
+                        timezone: "Asia/Kolkata",
+                        times: [],
+                    },
+                }),
+            }),
+        );
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Move Check-up · Mon 5 Oct, 10:00",
+            }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        const link = await within(sheet).findByRole("link", {
+            name: "Send a message",
+        });
+        expect(link).toHaveAttribute("href", "/account/messages");
+        expect(
+            within(sheet).getByText(/and Kavi Dental will fit you in\./),
+        ).toBeInTheDocument();
+    });
+
     it("a time that just went is said, and the times are read again", async () => {
         const calls = draw(
             lists(),

@@ -227,7 +227,6 @@ export function AccountBookingsTab({
                 onDone={(label) => done(`Moved to ${label}.`)}
                 onClose={close}
                 businessName={businessName}
-                phone={phone}
             />
             <TimesSheet
                 open={open?.kind === "visit"}
@@ -262,7 +261,6 @@ export function AccountBookingsTab({
                 }
                 onClose={close}
                 businessName={businessName}
-                phone={phone}
             />
             <CallSheet
                 open={open?.kind === "call"}
