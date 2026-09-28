@@ -27,6 +27,7 @@ import { PaymentsService } from "../payments/payments.service";
 import { returnableUnits } from "../stock/reserve";
 import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
 import {
+    assertItemsAllow,
     FULFILMENT_RULES,
     goesByCourier,
     isHandedOver,
@@ -576,6 +577,25 @@ export class OrderKitchenService {
                     field: "address",
                 });
             }
+            // A product that lists how it may leave refuses any other way
+            // (B12): checked when the way changes or a line comes in, over
+            // every line the order keeps.
+            if (newStored || added.length > 0) {
+                const removed = new Set(
+                    (dto.lines ?? [])
+                        .filter((c) => c.quantity === 0)
+                        .map((c) => c.itemId),
+                );
+                assertItemsAllow(
+                    [
+                        ...order.items
+                            .filter((i) => !removed.has(i.id))
+                            .map((i) => i.product),
+                        ...added,
+                    ],
+                    type,
+                );
+            }
             if (newStored) {
                 changes.push(
                     type === "LOCAL_DELIVERY"
@@ -990,7 +1010,13 @@ async function lockOrder(
             items: {
                 orderBy: { id: "asc" },
                 include: {
-                    product: { select: { name: true, status: true } },
+                    product: {
+                        select: {
+                            name: true,
+                            status: true,
+                            fulfilmentTypes: true,
+                        },
+                    },
                     refundLines: {
                         where: {
                             paymentRefund: { status: { not: "FAILED" } },

@@ -20,6 +20,9 @@ export interface PricedLine {
     quantity: number;
     priceCents: number;
     categoryId: string | null;
+    /** The product's name and the ways it allows (B12), for `assertItemsAllow`. */
+    name: string;
+    fulfilmentTypes: string[];
 }
 
 /**
@@ -72,6 +75,7 @@ export async function priceOrderLines(
                 currency: true,
                 status: true,
                 categoryId: true,
+                fulfilmentTypes: true,
                 variants: {
                     select: {
                         id: true,
@@ -147,6 +151,8 @@ export async function priceOrderLines(
             quantity: item.quantity,
             priceCents: toCents(unitPrice),
             categoryId: product.categoryId,
+            name: product.name,
+            fulfilmentTypes: product.fulfilmentTypes,
         });
     }
     return lines;

@@ -25,7 +25,12 @@ import type {
     PaymentStatus,
     UpdateOrderDto,
 } from "./dto";
-import { shipsToAddress, storedValueFor, typeOf } from "./fulfilment";
+import {
+    assertItemsAllow,
+    shipsToAddress,
+    storedValueFor,
+    typeOf,
+} from "./fulfilment";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import type { OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
@@ -186,6 +191,8 @@ export class OrdersService {
         }
 
         const lines = await priceOrderLines(storeId, dto.items);
+        // A product that lists how it may leave refuses any other way (B12).
+        assertItemsAllow(lines, type);
 
         // An order is taken in its storefront's currency. The form never sent
         // one, so every order fell to the column's USD — a rupee shop's
