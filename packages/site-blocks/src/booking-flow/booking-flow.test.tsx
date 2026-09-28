@@ -337,7 +337,7 @@ describe("the booking page (U19)", () => {
                 name: "Pay ₹1,200 to confirm your place",
             }),
         ).toBeInTheDocument();
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         const intent = calls.find((c) => c.url.endsWith("/payment-intent"));
         expect(intent?.url).toBe(`${API}/public/invoices/tok_1/payment-intent`);
         expect(JSON.parse(intent?.init?.body as string)).not.toHaveProperty(
@@ -946,7 +946,7 @@ describe("Where and anything we should know (E7)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
 
         holdState = "CONFIRMED";
@@ -962,7 +962,7 @@ describe("Where and anything we should know (E7)", () => {
     });
 });
 
-describe("UPI and card checkout (E11)", () => {
+describe("online checkout (E11)", () => {
     const HANDOFF = {
         paymentIntentId: "pi_1",
         provider: "RAZORPAY",
@@ -1001,7 +1001,7 @@ describe("UPI and card checkout (E11)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         // The card can draw before the effect that opens the window runs; on a
         // slow runner the test answered a window not yet made (CI, #687).
         await waitFor(() => expect(checkouts.opened.length).toBeGreaterThan(0));
@@ -1020,7 +1020,7 @@ describe("UPI and card checkout (E11)", () => {
         });
     };
 
-    it("offers UPI or card in the designs' words: an appointment now, a class for the class", async () => {
+    it("offers paying online, naming no methods (DEC-059): an appointment now, a class for the class", async () => {
         serve((url) =>
             url.includes("svc_hiit") ? json(CLASS_DAYS) : json(ONE_DAYS),
         );
@@ -1028,7 +1028,7 @@ describe("UPI and card checkout (E11)", () => {
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹1,200 now UPI or card — your appointment is confirmed straight away",
+                name: "Pay ₹1,200 now Online — your appointment is confirmed straight away",
             }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
@@ -1043,9 +1043,11 @@ describe("UPI and card checkout (E11)", () => {
         );
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹500 for this class UPI or card — your place is confirmed straight away",
+                name: "Pay ₹500 for this class Online — your place is confirmed straight away",
             }),
         ).toBeInTheDocument();
+        // Saroh can't vouch for the account's methods, so it names none.
+        expect(screen.queryByText(/UPI|netbanking/i)).toBeNull();
     });
 
     it("pays: opens the provider on the hold's order, says Paying… and confirms when the webhook does", async () => {
@@ -1216,7 +1218,7 @@ describe("UPI and card checkout (E11)", () => {
                 name: "07:00 with Karan Mehta",
             }),
         );
-        expect(screen.queryByText(/UPI or card/)).toBeNull();
+        expect(screen.queryByText(/Online — /)).toBeNull();
         expect(checkouts.opened).toHaveLength(0);
     });
 });
@@ -1854,7 +1856,7 @@ describe("a deposit at booking (E8)", () => {
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByRole("radio", {
-                name: "Pay the full ₹1,200 now UPI or card",
+                name: "Pay the full ₹1,200 now Online, in one payment",
             }),
         ).toBeInTheDocument();
         expect(screen.queryByRole("radio", { name: /at the desk/ })).toBeNull();
@@ -1863,7 +1865,7 @@ describe("a deposit at booking (E8)", () => {
 
         fireEvent.click(
             screen.getByRole("radio", {
-                name: "Pay the full ₹1,200 now UPI or card",
+                name: "Pay the full ₹1,200 now Online, in one payment",
             }),
         );
         expect(

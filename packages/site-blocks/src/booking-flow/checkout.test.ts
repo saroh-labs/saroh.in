@@ -7,8 +7,8 @@ import { openProviderCheckout, RAZORPAY_SDK } from "./checkout";
 /**
  * The provider's window (E11), against stand-ins for the providers' browser
  * SDKs: what it is opened with — the handoff's order, the business's public
- * key, UPI and card only, never an amount of the page's — and how each way
- * it can end is read.
+ * key, no payment methods of Saroh's choosing (DEC-059), never an amount of
+ * the page's — and how each way it can end is read.
  */
 
 type Options = Record<string, unknown> & {
@@ -73,7 +73,7 @@ afterEach(() => {
 });
 
 describe("the provider's window (E11)", () => {
-    it("opens Razorpay on the handoff's order with the public key, UPI and card only", async () => {
+    it("opens Razorpay on the handoff's order with the public key, and the methods the account has on", async () => {
         fakeRazorpay();
         openProviderCheckout(request());
         await flush();
@@ -94,23 +94,10 @@ describe("the provider's window (E11)", () => {
             },
             retry: { enabled: false },
         });
-        const display = (
-            made.options.config as {
-                display: {
-                    blocks: Record<
-                        string,
-                        { instruments: { method: string }[] }
-                    >;
-                    preferences: { show_default_blocks: boolean };
-                };
-            }
-        ).display;
-        expect(
-            Object.values(display.blocks).flatMap((b) =>
-                b.instruments.map((i) => i.method),
-            ),
-        ).toEqual(["upi", "card"]);
-        expect(display.preferences.show_default_blocks).toBe(false);
+        // Saroh doesn't choose or restrict the methods (DEC-059): no
+        // display config, so the window shows what the account has on.
+        expect(made.options).not.toHaveProperty("config");
+        expect(made.options).not.toHaveProperty("method");
     });
 
     it("reads a payment, a refusal and a dismissal — and only the first answer", async () => {

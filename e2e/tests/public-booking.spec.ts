@@ -231,7 +231,7 @@ test.describe("the booking page", () => {
         const { label, serviceId } = await pickTime(page, 2);
         await details(page);
         await expect(
-            page.getByRole("radio", { name: /^Pay ₹\S+ now UPI or card/ }),
+            page.getByRole("radio", { name: /^Pay ₹\S+ now Online/ }),
         ).toHaveAttribute("aria-checked", "true");
 
         const intent = page.waitForRequest((r) =>
@@ -347,7 +347,7 @@ test.describe("the booking page", () => {
             await cancel(page, b.id);
     });
 
-    test("pay now completes against a fake provider: UPI or card, then Paying… until the hold is confirmed (E11)", async ({
+    test("pay now completes against a fake provider: the account's methods, then Paying… until the hold is confirmed (E11)", async ({
         page,
         request,
     }, testInfo) => {
@@ -424,24 +424,15 @@ test.describe("the booking page", () => {
             key: string;
             order_id: string;
             prefill: { email: string };
-            config: {
-                display: {
-                    blocks: Record<
-                        string,
-                        { instruments: { method: string }[] }
-                    >;
-                };
-            };
+            config?: unknown;
         };
         expect(opened.key).toBe("rzp_test_e2e");
         expect(opened.order_id).toBe("order_e2e");
         // The account's verified email, not one typed on the page.
         expect(opened.prefill.email).toBe(email);
-        expect(
-            Object.values(opened.config.display.blocks).flatMap((b) =>
-                b.instruments.map((i) => i.method),
-            ),
-        ).toEqual(["upi", "card"]);
+        // Saroh sets no methods: the window shows what the account has on
+        // (DEC-059).
+        expect(opened.config).toBeUndefined();
 
         confirmed = true;
         await expect(
