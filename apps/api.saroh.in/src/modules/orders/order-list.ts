@@ -133,6 +133,8 @@ export async function listOrderRows(
                   createdAt: true,
                   courierName: true,
                   trackingNumber: true,
+                  // Whether a pay link is out (B11), for the row menu (B5).
+                  payLinkCreatedAt: true,
                   store: { select: { id: true, name: true } },
                   customer: {
                       select: {

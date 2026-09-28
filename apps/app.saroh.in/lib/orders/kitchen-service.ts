@@ -25,6 +25,30 @@ export async function getOrderRead(orderId: string): Promise<OrderRead | null> {
 }
 
 /**
+ * The order as the Orders list's quick view reads it (B5): Order Detail's
+ * read, with the customer's phone and email left out by the API for a role
+ * that doesn't read contacts (`?view=quick`). Not `getJson`: the quick view
+ * is one panel over the list, so a refusal or a failure is said in the panel
+ * and never takes over the page.
+ */
+export async function readOrderQuickView(
+    orderId: string,
+): Promise<
+    | { ok: true; order: OrderRead }
+    | { ok: false; reason: "gone" | "denied" | "failed" }
+> {
+    const base = await orgBase();
+    if (!base) return { ok: false, reason: "failed" };
+    const res = await apiFetch(
+        `${base}/orders/${encodeURIComponent(orderId)}?view=quick`,
+    );
+    if (res.status === 404) return { ok: false, reason: "gone" };
+    if (res.status === 403) return { ok: false, reason: "denied" };
+    if (!res.ok) return { ok: false, reason: "failed" };
+    return { ok: true, order: (await res.json()) as OrderRead };
+}
+
+/**
  * What the customer's notes say they are allergic to, from the contact's
  * detail read (U8) — each note that names allergens, by the ids of every
  * storefront's allergen of that name.
