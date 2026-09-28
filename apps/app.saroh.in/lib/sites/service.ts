@@ -217,6 +217,17 @@ export interface ProductGridContent {
     showPrices?: boolean;
 }
 
+/**
+ * `packs` — how the business's class packs on sale show (G20). The packs
+ * themselves are read live by the site, never stored here.
+ * `showDescriptions` absent means shown.
+ */
+export interface PacksContent {
+    title?: string;
+    buttonLabel?: string;
+    showDescriptions?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -278,6 +289,7 @@ export interface SectionContentByType {
     visitUs: VisitUsContent;
     journal: JournalContent;
     plans: PlansContent;
+    packs: PacksContent;
     productGrid: ProductGridContent;
 }
 
