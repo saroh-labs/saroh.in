@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import type {
     FulfilmentType,
@@ -485,6 +485,101 @@ export function storefrontTypesFrom(settings: {
               ? settings.shippingEnabled
               : settings.localDelivery,
     );
+}
+
+/**
+ * The ways a product can be set to (B12): a storefront's three, and
+ * Digital, which follows the product rather than the storefront. Never an
+ * appointment — a service is booked, and is never a Product (DEC-050) —
+ * and never a legacy word.
+ */
+export const PRODUCT_FULFILMENT_TYPES = [
+    ...STOREFRONT_FULFILMENT_TYPES,
+    "DIGITAL",
+] as const satisfies readonly FulfilmentType[];
+export type ProductFulfilmentType = (typeof PRODUCT_FULFILMENT_TYPES)[number];
+
+const isProductType = (t: FulfilmentType): t is ProductFulfilmentType =>
+    (PRODUCT_FULFILMENT_TYPES as readonly string[]).includes(t);
+
+/**
+ * A product's stored list, as its ways in table order: a legacy word is
+ * read as its type (the column never holds one, but a reader never
+ * compares the raw enum), and anything a product can't be set to is left
+ * out. Empty stays empty: every way its storefronts offer.
+ */
+export function productTypesOf(
+    stored: readonly string[],
+): ProductFulfilmentType[] {
+    const types = new Set(stored.map(typeOf));
+    return PRODUCT_FULFILMENT_TYPES.filter((t) => types.has(t));
+}
+
+/** What an order line says about how its product may leave. */
+export interface ItemFulfilment {
+    /** The product's name, for the sentence that refuses it. */
+    name: string;
+    /** `Product.fulfilmentTypes` as stored; empty means no limit of its own. */
+    fulfilmentTypes: readonly string[];
+}
+
+/**
+ * The types an order of these items can take at a storefront offering
+ * `storefront` (B12; default 15): those every item allows, and the
+ * storefront offers when it is one of its own ways. An item with no list
+ * of its own allows whatever the storefront offers; Digital is offered
+ * only when every item lists it. In table order. The API answers this to
+ * New order (B13), the change sheet (B9) and the shop (G13); the app keeps
+ * no copy.
+ */
+export function allowedTypes(
+    items: readonly ItemFulfilment[],
+    storefront: readonly StorefrontFulfilmentType[],
+): ProductFulfilmentType[] {
+    return PRODUCT_FULFILMENT_TYPES.filter(
+        (t) =>
+            (t === "DIGITAL"
+                ? items.length > 0
+                : (storefront as readonly string[]).includes(t)) &&
+            items.every((item) => itemAllows(item, t)),
+    );
+}
+
+/** Whether a line's product allows a type: its own list, or no list. */
+function itemAllows(item: ItemFulfilment, type: FulfilmentType): boolean {
+    const own = productTypesOf(item.fulfilmentTypes);
+    if (own.length === 0) return type !== "DIGITAL";
+    return isProductType(type) && own.includes(type);
+}
+
+/** "Pick-up", "Pick-up and Local delivery", "A, B and C". */
+function typeList(types: readonly FulfilmentType[]): string {
+    const words = types.map((t) => FULFILMENT_RULES[t].label);
+    return words.length <= 1
+        ? (words[0] ?? "")
+        : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/**
+ * Refuses an order of `type` when one of its items' products doesn't allow
+ * it (B12): 409 naming the first such item and what it does allow. Only a
+ * product's own list refuses — an item with none leaves the order as it
+ * was before B12 (an empty list behaves as today), and the storefront's
+ * ways are not checked here.
+ */
+export function assertItemsAllow(
+    items: readonly ItemFulfilment[],
+    type: FulfilmentType,
+): void {
+    for (const item of items) {
+        const own = productTypesOf(item.fulfilmentTypes);
+        if (own.length === 0 || (isProductType(type) && own.includes(type)))
+            continue;
+        throw new ConflictException({
+            message: `${item.name} isn't sold for ${FULFILMENT_RULES[type].label}. It allows ${typeList(own)} only.`,
+            field: "fulfilment",
+        });
+    }
 }
 
 /**
