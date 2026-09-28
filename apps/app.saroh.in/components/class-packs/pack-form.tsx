@@ -28,6 +28,7 @@ import {
     updatePack,
 } from "@/lib/class-packs/actions";
 import type { ClassPack } from "@/lib/class-packs/service";
+import { MIN_VALIDITY_DAYS, validityProblem } from "@/lib/class-packs/validity";
 
 const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
 
@@ -42,7 +43,11 @@ const schema = z.object({
     name: z.string().trim().min(1, "Give the pack a name").max(120),
     description: z.string().max(500),
     credits: whole("A whole number of classes, from 1 to 500", 1, 500),
-    validityDays: whole("A whole number of days, from 1 to 3650", 1, 3650),
+    // A week at least, as the API insists (E13): said here, before saving.
+    validityDays: z.string().superRefine((v, ctx) => {
+        const problem = validityProblem(v);
+        if (problem) ctx.addIssue({ code: "custom", message: problem });
+    }),
     price: z
         .string()
         .trim()
@@ -208,8 +213,8 @@ export function PackForm({
                                     />
                                 </FormControl>
                                 <FormDescription>
-                                    From the day it is sold. Unused classes stop
-                                    then.
+                                    At least {MIN_VALIDITY_DAYS}, from the day
+                                    it is sold. Unused classes stop then.
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
