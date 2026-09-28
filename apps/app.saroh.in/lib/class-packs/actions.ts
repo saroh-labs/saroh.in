@@ -73,6 +73,11 @@ export async function extendHolder(
     return then(detail.extendPurchase(purchaseId, days, reason));
 }
 
+/** Older activity for Pack Detail (E17): the page after `cursor`. A read. */
+export async function olderPackEvents(packId: string, cursor: string) {
+    return detail.readPackEvents(packId, cursor);
+}
+
 export async function takePackOffBooking(bookingId: string) {
     const res = await then(api.removeFromBooking(bookingId));
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);

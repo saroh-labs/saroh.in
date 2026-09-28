@@ -184,4 +184,21 @@ export interface CalendarMonth {
     money?: { total: MoneyCell[] | null; entries: MoneyEntry[] };
     /** The team, for someone who reads bookings (E20). */
     staff?: { id: string; name: string; title: string | null }[];
+    /**
+     * The team's working hours on each day read (E27), whose only for
+     * `booking:read`. Absent from an older API, null when unread: the hour
+     * grid then shades nothing.
+     */
+    hours?: WorkingHours[] | null;
+}
+
+/** A stretch someone works on one day (E27, the API's `working-hours.ts`). */
+export interface WorkingHours {
+    /** "YYYY-MM-DD" in the business's zone. */
+    date: string;
+    /** Minutes from local midnight; the end is exclusive. */
+    startMinute: number;
+    endMinute: number;
+    /** `booking:read` only. */
+    staffId?: string;
 }

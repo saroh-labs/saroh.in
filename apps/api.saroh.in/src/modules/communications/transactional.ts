@@ -32,9 +32,18 @@ export const NOTICE_TEMPLATES = [
 ] as const;
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
+/**
+ * F14's alerts to the business's own team (a new order, a booking, a failed
+ * payment, someone joining), worded by `notifications/team-alert.handler.ts`
+ * and sent only to the people who chose email for them.
+ */
+export const TEAM_TEMPLATES = ["TEAM_ALERT"] as const;
+export type TeamTemplate = (typeof TEAM_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
     ...INVOICE_TEMPLATES,
     ...NOTICE_TEMPLATES,
+    ...TEAM_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
 

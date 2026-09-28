@@ -721,7 +721,7 @@ export class InvoicesService {
      * back, so does the invoice and the number it took. A registered
      * business's is a tax invoice, its lines taxed at the rates they carry.
      *
-     * Authorization is the caller's: selling a pack under `pack:write` issues
+     * Authorization is the caller's: selling a pack under `pack:sell` issues
      * its invoice without also needing `invoice:write`.
      */
     async issueInTx(

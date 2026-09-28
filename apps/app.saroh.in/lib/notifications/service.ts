@@ -1,4 +1,19 @@
-import { apiFetch, getActiveOrgId, getList, readError } from "@/lib/api/http";
+import type { CrmResult } from "@/lib/api/http";
+import {
+    apiFetch,
+    getActiveOrgId,
+    getJson,
+    getList,
+    mutate,
+    orgBase,
+    readError,
+} from "@/lib/api/http";
+
+import type {
+    AlertChange,
+    AlertPreferences,
+    AlertPreferencesRead,
+} from "./preferences";
 
 /**
  * In-app notification data access for app.saroh.in (S3-006). The owner/admin
@@ -96,4 +111,31 @@ export async function markAllNotificationsRead(): Promise<
     } | null;
     if (res.ok) return { ok: true, data: { updated: data?.updated ?? 0 } };
     return { ok: false, error: readError(data, "Could not mark all as read") };
+}
+
+// ---- Your alerts (round-2 F14) ---------------------------------------------
+
+/**
+ * The signed-in person's alerts in the active business
+ * (`lib/notifications/preferences.ts`). An older API with no alerts (404)
+ * reads `not-available`; any other failure throws to the profile tab's
+ * boundary, so a failed read never shows as a set of choices.
+ */
+export async function getAlertPreferences(): Promise<AlertPreferencesRead> {
+    const base = await orgBase();
+    if (!base) return { status: "not-available" };
+    const prefs = await getJson<AlertPreferences>(`${base}/me/alerts`);
+    return prefs ? { status: "ok", prefs } : { status: "not-available" };
+}
+
+/** Flip one of your own switches; the API answers with the whole grid. */
+export function updateAlert(
+    change: AlertChange,
+): Promise<CrmResult<AlertPreferences>> {
+    return mutate<AlertPreferences>(
+        "/me/alerts",
+        "PATCH",
+        change,
+        "Couldn't save that alert",
+    );
 }

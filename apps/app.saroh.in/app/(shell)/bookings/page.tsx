@@ -6,7 +6,7 @@ import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
-import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
@@ -179,7 +179,7 @@ export default async function BookingsPage({
                             // while Class packs is on (E12).
                             canUsePacks={
                                 canReadPacks(organization) &&
-                                canWritePacks(organization) &&
+                                canUsePacksOnBookings(organization) &&
                                 packsOn(await modulesOrUnknown())
                             }
                         />

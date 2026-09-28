@@ -320,6 +320,14 @@ function bookingsCount(n: number): string {
 }
 
 /** The line under the title: unsaved, new, or what is still to come. */
+/**
+ * What the Service Editor says in place of its buttons to someone without
+ * `service:write` ("Change services, hours, time off and booking rules",
+ * E26): its fields are disabled, and it says why in plain words.
+ */
+export const VIEW_ONLY =
+    "View only — your role can't change services, hours or booking rules.";
+
 export function stateLine({
     isNew,
     dirty,

@@ -123,12 +123,13 @@ describe("sinceScope", () => {
         expect(sinceScope(member, ALL)?.money).toBe(false);
     });
 
-    it("asks for invoice:read beside payment:read, as the rows are invoices", () => {
+    it("gives money to payment:read alone, linked to the Calendar without invoice:read (F11)", () => {
         const scope = sinceScope(holding(["payment:read"]), ALL);
-        expect(scope).toBeNull();
-        expect(
-            sinceScope(holding(["payment:read", "invoice:read"]), ALL)?.money,
-        ).toBe(true);
+        expect(scope?.money).toBe(true);
+        expect(scope?.moneyIn).toBe("calendar");
+        const both = sinceScope(holding(["payment:read", "invoice:read"]), ALL);
+        expect(both?.money).toBe(true);
+        expect(both?.moneyIn).toBeUndefined();
     });
 
     it("counts orders for the kitchen, who move them without reading them", () => {

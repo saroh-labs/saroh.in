@@ -32,6 +32,7 @@ import {
     stateLine,
     statePill,
     TREATMENT_NEEDS_STOREFRONT,
+    VIEW_ONLY,
 } from "@/lib/services/service-editor";
 import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
@@ -313,8 +314,7 @@ export function ServiceEditor({
                     </div>
                 ) : (
                     <span className="text-[12.5px] text-muted-foreground">
-                        View only — changing services needs permission to change
-                        booking settings.
+                        {VIEW_ONLY}
                     </span>
                 )}
             </div>

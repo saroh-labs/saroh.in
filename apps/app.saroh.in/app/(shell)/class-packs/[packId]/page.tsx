@@ -13,8 +13,11 @@ import {
 import { detailHeader, tabFromQuery } from "@/lib/class-packs/pack-detail";
 import {
     getPackDetail,
+    readPackEvents,
     readPackHolders,
     readPackPurchases,
+    readPackSales,
+    readPackUsed,
     readSellContext,
 } from "@/lib/class-packs/pack-detail-data";
 import { readFreeCancelHours } from "@/lib/class-packs/packs-page";
@@ -30,8 +33,9 @@ export const metadata = { title: "Pack" };
 const FALLBACK_ZONE = "Asia/Kolkata";
 
 /**
- * Bookings › Packs › one pack (round-2 E16), after "Saroh Pack Detail":
- * Overview and Who has it, with Extend. `pack:read` covers the whole pack,
+ * Bookings › Packs › one pack (round-2 E16 and E17), after "Saroh Pack
+ * Detail": Overview, Who has it with Extend, Used this week, Sales and
+ * Activity, each tab's read on its own. `pack:read` covers the whole pack,
  * its prices and takings included (DEC-039), so it is the one gate; the
  * receipts behind the Overview's card are asked for only by someone who
  * may open invoices while Payments is on, and the sell dialog's reads
@@ -75,14 +79,25 @@ export default async function PackDetailPage({
             ? organization.actions.includes("invoice:read")
             : organization?.role === "OWNER" || organization?.role === "ADMIN");
 
-    const [holders, purchases, services, freeCancelHours, sell] =
-        await Promise.all([
-            readPackHolders(pack.id),
-            readsInvoices ? readPackPurchases(pack.id) : null,
-            readServices(),
-            readFreeCancelHours(),
-            canSell && pack.status === "ACTIVE" ? readSell() : null,
-        ]);
+    const [
+        holders,
+        used,
+        sales,
+        events,
+        purchases,
+        services,
+        freeCancelHours,
+        sell,
+    ] = await Promise.all([
+        readPackHolders(pack.id),
+        readPackUsed(pack.id),
+        readPackSales(pack.id),
+        readPackEvents(pack.id),
+        readsInvoices ? readPackPurchases(pack.id) : null,
+        readServices(),
+        readFreeCancelHours(),
+        canSell && pack.status === "ACTIVE" ? readSell() : null,
+    ]);
     const own = services.ok
         ? services.services.filter((s) =>
               pack.services.some((p) => p.id === s.id),
@@ -105,6 +120,10 @@ export default async function PackDetailPage({
                 key={pack.id}
                 pack={pack}
                 holders={holders}
+                used={used}
+                sales={sales}
+                events={events}
+                invoices={readsInvoices}
                 receipts={
                     purchases?.state === "ok"
                         ? purchases.data.map((p) => ({

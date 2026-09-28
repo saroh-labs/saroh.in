@@ -23,8 +23,18 @@ import {
     timeNote,
     toMinor,
     TREATMENT_NEEDS_STOREFRONT,
+    VIEW_ONLY,
     whereNote,
 } from "./service-editor";
+
+describe("VIEW_ONLY (E26)", () => {
+    it("says the role can't change set-up, in words, with no permission code", () => {
+        expect(VIEW_ONLY).toBe(
+            "View only — your role can't change services, hours or booking rules.",
+        );
+        expect(VIEW_ONLY).not.toMatch(/:|booking settings/);
+    });
+});
 
 const service = (over: Partial<Service> = {}): Service => ({
     id: "sv_1",

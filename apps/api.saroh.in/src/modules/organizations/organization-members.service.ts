@@ -19,6 +19,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
 import type { InviteMemberDto, UpdateMemberRoleDto } from "./members.dto";
@@ -511,6 +512,12 @@ export class OrganizationMembersService {
                     // Spent: the link cannot be replayed.
                     tokenHash: `accepted:${invitation.id}`,
                 },
+            });
+            // The team's "Someone joins the team" (F14), with the join.
+            await enqueueTeamAlert(tx, invitation.organizationId, {
+                event: "team",
+                userId: user.id,
+                invitationId: invitation.id,
             });
         });
 

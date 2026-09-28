@@ -18,6 +18,7 @@ import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import type { MergeTarget } from "@/lib/customer-workspace/merge";
 import { clashTarget, suggestedTarget } from "@/lib/customer-workspace/merge";
 import { hasMoneyRecords, moreMenu } from "@/lib/customer-workspace/more-menu";
+import { pageMissing } from "@/lib/customer-workspace/packs";
 import type {
     DuplicateSuggestion,
     IdentitySuggestion,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/customer-workspace/site-account";
 import type {
     OrderFilter,
+    ReviewsRead,
     TabKey,
     ThreadRead,
 } from "@/lib/customer-workspace/view";
@@ -61,8 +63,11 @@ import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
 import { Overview } from "./overview";
+import type { PackSale } from "./packs-tab";
+import { useCustomerPacks } from "./packs-tab";
 import { Failed } from "./parts";
 import { RemoveDetailsDialog } from "./remove-details-dialog";
+import { ReviewsTab } from "./reviews-tab";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18), after "Saroh Customer Detail":
@@ -87,6 +92,10 @@ export function CustomerDetailScreen({
     suggestions,
     duplicates,
     thread = null,
+    reviews = null,
+    canReplyReviews = false,
+    packSale = null,
+    canExtendPacks = false,
     nowIso,
 }: {
     d: CustomerDetail;
@@ -110,12 +119,20 @@ export function CustomerDetailScreen({
     duplicates: DuplicateSuggestion[];
     /** Their message thread (A13), for the Messages tab. */
     thread?: ThreadRead;
+    /** Their product reviews (C6), for the Reviews tab. */
+    reviews?: ReviewsRead;
+    /** `product-review:write`: reply to and hide a review. */
+    canReplyReviews?: boolean;
+    /** Selling them a pack (C7); null when this viewer may not. */
+    packSale?: PackSale | null;
+    /** `pack:write`: give one of their packs more days (E16). */
+    canExtendPacks?: boolean;
     nowIso: string;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d, thread);
+    const tabs = tabsFor(d, thread, reviews);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
     const [editing, setEditing] = useState(0);
@@ -142,6 +159,14 @@ export function CustomerDetailScreen({
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
         : (name.split(" ")[0] ?? name);
+    // Their packs (C7): the tab, and selling and extending from here.
+    const packs = useCustomerPacks({
+        d,
+        sale: packSale,
+        canExtend: canExtendPacks,
+        first,
+        nowIso,
+    });
 
     const go = (key: TabKey) => {
         setTab(key);
@@ -239,6 +264,8 @@ export function CustomerDetailScreen({
                 ) : (
                     <Failed what="Bookings" />
                 );
+            case "pk":
+                return packs.tab;
             case "sub":
                 return d.subscriptions ? (
                     <SubscriptionsTab
@@ -265,6 +292,16 @@ export function CustomerDetailScreen({
                     />
                 ) : (
                     <Failed what="Invoices" />
+                );
+            case "rev":
+                return reviews && reviews !== "failed" ? (
+                    <ReviewsTab
+                        reviews={reviews}
+                        firstName={first}
+                        canReply={canReplyReviews}
+                    />
+                ) : (
+                    <Failed what="Reviews" />
                 );
             case "msg":
                 return thread && thread !== "failed" ? (
@@ -317,6 +354,7 @@ export function CustomerDetailScreen({
                             go("ord");
                         }}
                         onBookings={() => go("bk")}
+                        onSellPack={packs.onSell}
                     />
                 );
         }
@@ -365,10 +403,7 @@ export function CustomerDetailScreen({
                 aria-labelledby={`tab-${tab}`}
                 className="px-[26px] pb-[30px] pt-5"
             >
-                <PartialNotice
-                    first={first}
-                    missing={d.unavailable.map((u) => u.label)}
-                />
+                <PartialNotice first={first} missing={pageMissing(d)} />
                 {tab === "over" || tab === "ord" ? (
                     <PossibleMatch
                         matches={d.possibleMatches ?? []}
@@ -402,6 +437,7 @@ export function CustomerDetailScreen({
                     onRemoved={removedDetails}
                 />
             ) : null}
+            {packs.dialogs}
             {merging ? (
                 <MergeDialog
                     hereId={d.contact.id}

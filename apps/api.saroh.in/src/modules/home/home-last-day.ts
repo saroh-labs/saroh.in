@@ -5,6 +5,7 @@ import { paidSinceFilter } from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeLastDay, HomeSinceItem } from "./home-model";
 import { holds } from "./home-model";
+import { onOneStore, storeWhere } from "./home-staff";
 import { businessDay } from "./home-today";
 
 /**
@@ -21,8 +22,9 @@ import { businessDay } from "./home-today";
  * Each figure asks for its own read, so the API leaves out what the caller
  * may not see: orders with `order:read` or `order:stage`, bookings with
  * `booking:read`, reviews with `product-review:read`, and money with
- * `payment:read` — and `invoice:read`, since the rows it counts are
- * invoices. A Reviewer's Home is its own (F9) and gets no strip.
+ * `payment:read` (F11; its link opens the invoices counted only for someone
+ * who also holds `invoice:read`). A Reviewer's Home is its own (F9) and
+ * gets no strip.
  */
 
 type Db = typeof prisma;
@@ -36,7 +38,19 @@ export interface SinceScope {
     bookings: boolean;
     reviews: boolean;
     money: boolean;
+    /**
+     * Money read by someone who may not open the invoices behind it: the
+     * figure links to the Calendar's money instead (F11).
+     */
+    moneyIn?: "calendar";
 }
+
+/**
+ * Where money taken links for someone who holds `payment:read` but not
+ * `invoice:read`: the Calendar, whose money is `payment:read`'s (E19), not
+ * an Invoices list that would only tell them they can't open it.
+ */
+export const MONEY_ON_THE_CALENDAR = "/calendar";
 
 export function sinceScope(
     input: HomeInput,
@@ -44,16 +58,18 @@ export function sinceScope(
 ): SinceScope | null {
     if (input.organizationRole === "REVIEWER") return null;
     const commerce = available.has("COMMERCE");
+    // Money taken is `payment:read`'s alone (the permission matrix; F11).
+    const money = available.has("PAYMENTS") && holds(input, "payment:read");
     const scope: SinceScope = {
         orders:
             commerce &&
             (holds(input, "order:read") || holds(input, "order:stage")),
         bookings: available.has("APPOINTMENTS") && holds(input, "booking:read"),
         reviews: commerce && holds(input, "product-review:read"),
-        money:
-            available.has("PAYMENTS") &&
-            holds(input, "payment:read") &&
-            holds(input, "invoice:read"),
+        money,
+        ...(money && !holds(input, "invoice:read")
+            ? { moneyIn: "calendar" as const }
+            : {}),
     };
     return Object.values(scope).some(Boolean) ? scope : null;
 }
@@ -110,29 +126,32 @@ export function paidSinceWhere(organizationId: string, since: Date) {
 
 /**
  * The strip's figures above zero, in the design's order: orders, bookings,
- * reviews, money. Money is one figure per currency, as it came in.
+ * reviews, money. Money is one figure per currency, as it came in. A staff
+ * member's orders and reviews are their storefronts' (F11, `storeIds`).
  */
 export async function readSince(
     db: Db,
     organizationId: string,
     scope: SinceScope,
     sinceIso: string,
+    storeIds: readonly string[] | null = null,
 ): Promise<HomeSinceItem[]> {
     const since = new Date(sinceIso);
     const newSince = { organizationId, createdAt: { gte: since } };
+    const inTheirs = { ...newSince, ...storeWhere(storeIds) };
     const [orders, bookings, reviews, money] = await Promise.all([
         // Real orders only, as the Orders list its link opens counts them:
         // an abandoned online checkout (placed online, never paid) is not
         // a new order.
         scope.orders
-            ? db.order.count({ where: { ...newSince, ...realOrderWhere() } })
+            ? db.order.count({ where: { ...inTheirs, ...realOrderWhere() } })
             : 0,
         // Confirmed: a hold still waiting on payment, or one let go, isn't
         // a booking anyone will turn up for.
         scope.bookings
             ? db.booking.count({ where: { ...newSince, status: "CONFIRMED" } })
             : 0,
-        scope.reviews ? db.productReview.count({ where: newSince }) : 0,
+        scope.reviews ? db.productReview.count({ where: inTheirs }) : 0,
         scope.money
             ? db.invoice.groupBy({
                   by: ["currency"],
@@ -152,7 +171,12 @@ export async function readSince(
                 count: n,
                 amountMinor: null,
                 currency: null,
-                href: sinceHref(SINCE_PATHS[kind], sinceIso),
+                href: sinceHref(
+                    kind === "ORDERS"
+                        ? onOneStore(SINCE_PATHS.ORDERS, storeIds)
+                        : SINCE_PATHS[kind],
+                    sinceIso,
+                ),
             });
         }
     };
@@ -168,7 +192,10 @@ export async function readSince(
             count: row._count._all,
             amountMinor,
             currency: row.currency,
-            href: sinceHref(SINCE_PATHS.PAYMENTS, sinceIso),
+            href:
+                scope.moneyIn === "calendar"
+                    ? MONEY_ON_THE_CALENDAR
+                    : sinceHref(SINCE_PATHS.PAYMENTS, sinceIso),
         });
     }
     return items;
@@ -201,13 +228,15 @@ export async function isFresh(
 /**
  * The whole header: the clock, whether the business is new, and — for one
  * that isn't — the strip. Throws when a read fails; `HomeService` names the
- * part and falls back to {@link lastDayHeader}.
+ * part and falls back to {@link lastDayHeader}. A staff member's strip
+ * counts their storefronts' orders and reviews (F11, `storeIds`).
  */
 export async function readLastDay(
     db: Db,
     input: HomeInput,
     available: ReadonlySet<string>,
     clock: { now: Date; zone: string },
+    storeIds: readonly string[] | null = null,
 ): Promise<HomeLastDay> {
     const header = lastDayHeader(clock.now, clock.zone);
     const mayOrganize =
@@ -219,6 +248,12 @@ export async function readLastDay(
     if (!scope) return header;
     return {
         ...header,
-        items: await readSince(db, input.organizationId, scope, header.since),
+        items: await readSince(
+            db,
+            input.organizationId,
+            scope,
+            header.since,
+            storeIds,
+        ),
     };
 }

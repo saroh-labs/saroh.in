@@ -4,6 +4,7 @@ import { localDateKey } from "@/lib/format/datetime";
 
 import { monthSpan, monthToOpen } from "./range";
 import type { CalendarMonth } from "./types";
+import { weekSpan } from "./week";
 
 /**
  * What reading a month came to:
@@ -33,9 +34,28 @@ export type CalendarRead =
 export async function getCalendarMonth(
     month: string,
 ): Promise<CalendarRead | null> {
+    const { from, to } = monthSpan(month);
+    return readCalendar(from, to);
+}
+
+/**
+ * The Week (plan 005 E25): Monday to Sunday of the week holding `day`, in
+ * one read even when it crosses into another month. Read and refused as a
+ * month is; `data.month` is the month the Monday is in.
+ */
+export async function getCalendarWeek(
+    day: string,
+): Promise<CalendarRead | null> {
+    const { from, to } = weekSpan(day);
+    return readCalendar(from, to);
+}
+
+async function readCalendar(
+    from: string,
+    to: string,
+): Promise<CalendarRead | null> {
     const base = await orgBase();
     if (!base) return null;
-    const { from, to } = monthSpan(month);
     const path = `${base}/calendar?from=${from}&to=${to}`;
     const res = await apiFetch(path);
     if (res.status === 404) return null;

@@ -44,6 +44,7 @@ import { readPayments } from "./payments-layer";
 import type { CalendarQuery } from "./range";
 import { assertWithinReach, monthOf, reachOf, spanOf, windowOf } from "./range";
 import { collectionsInMonth, upcomingRenewals } from "./schedules";
+import type { WorkingHours } from "./working-hours";
 
 /**
  * The Business Calendar's month (plan 2026-09-23-003, U4, R8, R18): one
@@ -170,6 +171,11 @@ export interface CalendarMonth {
     hasStaff: boolean | null;
     /** `booking:read` only: the team, for the team filter. */
     staff?: CalendarStaff[];
+    /**
+     * The team's working hours on each day read (E27, `working-hours.ts`),
+     * whose only with `booking:read`; null when days off could not be read.
+     */
+    hours: WorkingHours[] | null;
 }
 
 /**
@@ -515,6 +521,7 @@ export class CalendarService {
             daysOff: off?.daysOff ?? null,
             hasStaff: off ? off.hasStaff : null,
             ...(off?.staff ? { staff: off.staff } : {}),
+            hours: off?.hours ?? null,
         };
     }
 
@@ -529,7 +536,7 @@ export class CalendarService {
         appointments: boolean,
         named: boolean,
     ): Promise<Awaited<ReturnType<typeof readDaysOff>> | null> {
-        if (!appointments) return { daysOff: [], hasStaff: false };
+        if (!appointments) return { daysOff: [], hasStaff: false, hours: [] };
         try {
             return await readDaysOff(
                 this.db,

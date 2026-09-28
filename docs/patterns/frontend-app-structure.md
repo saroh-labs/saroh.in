@@ -102,6 +102,13 @@ components/shared/             app shell, navigation, command menu
   address shows `ModulePageUnavailable`, never a 404; an unknown state shows
   the page. A menu made only of module pages gets Home in front
   (`siteMenu` in `site-blocks/src/site-chrome.tsx`).
+- **Current** — The menu follows the modules at view time only (round-2
+  G19). Publish keeps every module page in the navigation with its `kind`;
+  `siteMenu` is the one place an entry is dropped, from the read's
+  `modules`, so a module turned off or back on needs no republish. Never
+  filter the menu at publish. A draft preview gets the same `modules` from
+  its read and passes them to `SiteHeader` and its `[slug]`. The main
+  button follows the same modules through `lib/header-action.ts`.
 
 ## Not adopted
 

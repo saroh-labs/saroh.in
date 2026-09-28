@@ -73,6 +73,10 @@ jest.mock("../class-packs/pack-checkout", () => ({
 jest.mock("../bookings/booking-pay-link", () => ({
     markBookingPaidInTx: jest.fn().mockResolvedValue(true),
 }));
+// The team's alerts (F14): only that one is queued, and with what.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
 
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
@@ -80,6 +84,7 @@ import { createHmac } from "node:crypto";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
@@ -415,6 +420,25 @@ describe("webhook failure on an invoice intent", () => {
         expect(orderFindUnique).not.toHaveBeenCalled();
     });
 
+    it("queues the team's Payment failed alert with the failure (F14)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        intentUpdateMany.mockResolvedValue({ count: 1 });
+
+        await deliver(
+            bodyOf({ eventType: "payment.failed", outcome: "FAILED" }),
+        );
+
+        expect(enqueueTeamAlert).toHaveBeenCalledTimes(1);
+        expect((enqueueTeamAlert as jest.Mock).mock.calls[0].slice(1)).toEqual([
+            INTENT.organizationId,
+            {
+                event: "failed",
+                invoiceId: INTENT.invoiceId,
+                paymentIntentId: "pi_inv_1",
+            },
+        ]);
+    });
+
     it.each([
         ["succeeded", "SUCCEEDED"],
         ["superseded by an edit", "SUPERSEDED"],
@@ -431,6 +455,8 @@ describe("webhook failure on an invoice intent", () => {
             );
 
             expect(result).toEqual({ status: "ignored", changed: false });
+            // Nothing failed, so nobody is told it did (F14).
+            expect(enqueueTeamAlert).not.toHaveBeenCalled();
             expect(intentUpdate).not.toHaveBeenCalled();
             const where = (
                 intentUpdateMany.mock.calls[0] as [

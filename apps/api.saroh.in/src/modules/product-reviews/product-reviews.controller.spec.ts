@@ -92,4 +92,54 @@ describe("ProductReviewsController authorization", () => {
             ForbiddenException,
         );
     });
+
+    describe("one customer's reviews (C6)", () => {
+        it("passes the contact on for a Member, who reads reviews and customers", () => {
+            void controller.list(as("MEMBER"), undefined, undefined, "ct_1");
+            expect(service.list).toHaveBeenCalledWith("org_1", {
+                productId: undefined,
+                status: undefined,
+                contactId: "ct_1",
+            });
+        });
+
+        it("refuses, in words, a role that reads reviews but not customers", () => {
+            const reviewsOnly = as("MEMBER", {
+                roleKey: "reviews-only",
+                actions: resolveCapabilities("reviews-only", [
+                    "product-review:read",
+                ]),
+            });
+            // The product page's list is still theirs.
+            void controller.list(reviewsOnly);
+            expect(service.list).toHaveBeenCalledTimes(1);
+            expect(() =>
+                controller.list(reviewsOnly, undefined, undefined, "ct_1"),
+            ).toThrow("Your role can't see customers.");
+            expect(service.list).toHaveBeenCalledTimes(1);
+        });
+
+        it("refuses a role that reads customers but not reviews", () => {
+            const customersOnly = as("MEMBER", {
+                roleKey: "customers-only",
+                actions: resolveCapabilities("customers-only", [
+                    "contact:read",
+                ]),
+            });
+            expect(() =>
+                controller.list(customersOnly, undefined, undefined, "ct_1"),
+            ).toThrow(ForbiddenException);
+            expect(service.list).not.toHaveBeenCalled();
+        });
+
+        it("still refuses a Member's reply from the tab", () => {
+            expect(() =>
+                controller.reply(as("MEMBER"), "r_1", { reply: "Thanks" }),
+            ).toThrow(ForbiddenException);
+            expect(() => controller.hide(as("MEMBER"), "r_1")).toThrow(
+                ForbiddenException,
+            );
+            expect(service.reply).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -2,6 +2,8 @@ import type { prisma } from "@saroh/database";
 
 import type { MonthWindow } from "./month";
 import { dayOf } from "./month";
+import type { WorkingHours } from "./working-hours";
+import { readWorkingHours } from "./working-hours";
 
 /**
  * Days off on the calendar (plan 005 E20, R16): the business closed (E3's
@@ -16,11 +18,18 @@ import { dayOf } from "./month";
  * (`booking:read`); anyone else learns that someone is off, not who.
  *
  * Archived people take no bookings and are left out, with their time off.
+ *
+ * The read also carries the team's working hours on each day (E27,
+ * `working-hours.ts`), which the Week's hour grid shades outside of.
  */
 
 type Db = Pick<
     typeof prisma,
-    "businessClosure" | "staffTimeOff" | "staffMember"
+    | "businessClosure"
+    | "staffTimeOff"
+    | "staffMember"
+    | "staffHours"
+    | "staffExtraHours"
 >;
 
 export interface DayOff {
@@ -52,6 +61,8 @@ export interface DaysOffRead {
     hasStaff: boolean;
     /** `booking:read` only: the team, by name. */
     staff?: CalendarStaff[];
+    /** The team's working hours on each day read (E27). */
+    hours: WorkingHours[];
 }
 
 /** The days of `window` a stretch touches (its end is exclusive). */
@@ -87,7 +98,7 @@ export async function readDaysOff(
         startAt: { lt: window.end },
         endAt: { gt: window.start },
     };
-    const [closures, timeOff, staff] = await Promise.all([
+    const [closures, timeOff, staff, hours] = await Promise.all([
         db.businessClosure.findMany({
             where: { organizationId, ...overlaps },
             orderBy: { startAt: "asc" },
@@ -113,6 +124,7 @@ export async function readDaysOff(
             orderBy: { name: "asc" },
             select: { id: true, name: true, title: true },
         }),
+        readWorkingHours(db, organizationId, window.days, named),
     ]);
 
     const stretch = (r: { startAt: Date; endAt: Date; allDay: boolean }) => ({
@@ -145,5 +157,6 @@ export async function readDaysOff(
         daysOff,
         hasStaff: staff.length > 0,
         ...(named ? { staff } : {}),
+        hours,
     };
 }

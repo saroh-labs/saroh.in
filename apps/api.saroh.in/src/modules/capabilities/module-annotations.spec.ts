@@ -111,6 +111,9 @@ const NEVER: Record<string, string> = {
     "contacts/contact-search.controller.ts":
         "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
+    // F14: a person's own alert choices; the rows follow their role and
+    // the modules on, read by the service.
+    "notifications/notification-preferences.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":

@@ -236,8 +236,22 @@ export interface HomeWeek {
     owed?: HomeWeekOwed;
 }
 
-/** Whose Home this is (F9): the business's, or a Reviewer's. */
-export type HomeView = "business" | "reviewer";
+/**
+ * Whose Home this is: the business's, a Reviewer's (F9), or a staff
+ * member's, narrowed to their storefronts and their own diary (F11).
+ */
+export type HomeView = "business" | "reviewer" | "staff";
+
+/**
+ * What a staff member's Home covers (F11). Which rows they see is still
+ * their own capabilities', decided by the API.
+ */
+export interface HomeStaff {
+    /** The storefronts they work on; null for every storefront. */
+    stores: { id: string; name: string }[] | null;
+    /** Today shows their own bookings: they are on the diary. */
+    ownDiary: boolean;
+}
 
 /** A page of a site a Reviewer was asked to review (F9). */
 export interface HomeReviewPage {
@@ -272,6 +286,8 @@ export interface HomeReviewSite {
 export interface HomeModel {
     /** Absent from an API before F9, which is the business's Home. */
     view: HomeView;
+    /** A staff member's narrowing (F11); null on any other Home. */
+    staff: HomeStaff | null;
     /** A Reviewer's sites (F9); only on `view: "reviewer"`. */
     reviews?: HomeReviewSite[];
     actions: HomeAction[];
@@ -295,6 +311,7 @@ export interface HomeModel {
 
 const EMPTY: HomeModel = {
     view: "business",
+    staff: null,
     actions: [],
     primaryAction: null,
     hasAnyModule: false,
@@ -329,9 +346,14 @@ async function readHome(projectId?: string): Promise<HomeModel> {
     // One from before F6 sends no `lastDay`: a plain greeting, no strip.
     // One from before F9 sends no `view`: it is the business's Home.
     // One from before F7 sends no `week` (nor does a Reviewer's): no panel.
+    // One from before F11 sends a staff member the business's view.
     const model: HomeModel = {
         ...read,
-        view: read.view === "reviewer" ? "reviewer" : "business",
+        view:
+            read.view === "reviewer" || read.view === "staff"
+                ? read.view
+                : "business",
+        staff: read.view === "staff" ? (read.staff ?? null) : null,
         today: read.today ?? null,
         lastDay: read.lastDay ?? null,
         week: read.week ?? null,

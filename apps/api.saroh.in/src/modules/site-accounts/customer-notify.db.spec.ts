@@ -510,8 +510,13 @@ describe("a booking (real database)", () => {
         await runBookingJobs(b.owner.organizationId);
         await runBookingJobs(b.owner.organizationId);
 
+        // The online booking itself is a "New booking" notice since F14's
+        // team alerts; the cancel adds exactly one of its own.
         const inbox = await prisma.notification.findMany({
-            where: { organizationId: b.owner.organizationId },
+            where: {
+                organizationId: b.owner.organizationId,
+                type: "booking.cancelled",
+            },
         });
         expect(inbox).toHaveLength(1);
         expect(inbox[0]).toMatchObject({

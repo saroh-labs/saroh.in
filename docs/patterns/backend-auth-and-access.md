@@ -101,6 +101,22 @@ what the API allows.
   `invoice:read`; Spent, which sums orders and invoices, needs both.
   Customer refusals read "Your role can't …" (`customer-access.ts`).
   `customer-permissions.db.spec.ts` pins one row per customer endpoint.
+- **Current** (E26, DEC-039) — **Each booking, service and pack endpoint
+  asks its own power.** `service:write` is relabelled "Change services,
+  hours, time off and booking rules" and covers all of that set-up; there is
+  no `booking:settings` key (one power, one key). `pack:sell` ("Sell class
+  packs and book with them") sells a pack at the desk and spends or gives
+  back a holder's class on a booking (with `booking:write`); `pack:write`
+  ("Make and change class packs") creates, edits, publishes, extends and
+  archives. `pack:read` shows the whole pack, prices and sales included:
+  there is no money-free pack read. `resolveCapabilities` adds implied
+  holds: `booking:write` → `booking:read`, `service:write` → `service:read`,
+  `pack:write` → `pack:sell` → `pack:read`, so a role saved with
+  `pack:write` still sells; no backfill. Owner and Admin hold all three pack
+  powers; a Member holds none of them until F18 (matrix Q1). Refusals read
+  "Your role can't …" (`bookings/booking-access.ts`).
+  `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
+  service or pack endpoint adds its row there.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,

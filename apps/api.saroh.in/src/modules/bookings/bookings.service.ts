@@ -14,10 +14,11 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { isGstRate } from "../invoices/gst";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { isValidSlotStart } from "./availability";
+import { CANT_USE_PACKS, requireBookingPower } from "./booking-access";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import type { CancelledBooking } from "./booking-cancel";
@@ -228,7 +229,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         dto: CreateServiceDto,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         this.assertValidTimezone(dto.timezone);
         if (dto.siteId) {
@@ -277,7 +278,7 @@ export class BookingsService {
 
     /** List the org's services, newest first (excludes soft-deleted). `service:read`. */
     async listServices(ctx: OrganizationContext): Promise<ServiceView[]> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         const services = await prisma.service.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
@@ -290,7 +291,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         return toServiceView(await this.requireOwnedService(ctx, serviceId));
     }
 
@@ -303,7 +304,7 @@ export class BookingsService {
         serviceId: string,
         dto: UpdateServiceDto,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
 
@@ -402,7 +403,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
     ): Promise<{ id: string; deleted: true }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
         await prisma.service.update({
@@ -416,7 +417,7 @@ export class BookingsService {
 
     /** List a service's availability rules. `service:read`. */
     async listRules(ctx: OrganizationContext, serviceId: string) {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         await this.requireOwnedService(ctx, serviceId);
         return prisma.availabilityRule.findMany({
             where: { serviceId, organizationId: ctx.organizationId },
@@ -434,7 +435,7 @@ export class BookingsService {
         serviceId: string,
         rules: AvailabilityRuleDto[],
     ) {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
         rules.forEach((rule) => this.assertRuleWellFormed(rule));
 
@@ -464,7 +465,7 @@ export class BookingsService {
         serviceId: string,
         rule: AvailabilityRuleDto,
     ) {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
         this.assertRuleWellFormed(rule);
 
@@ -485,7 +486,7 @@ export class BookingsService {
         serviceId: string,
         ruleId: string,
     ): Promise<{ id: string; deleted: true }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
 
         const rule = await prisma.availabilityRule.findUnique({
@@ -514,7 +515,7 @@ export class BookingsService {
         toISO: string,
         staffId?: string,
     ): Promise<AvailableSlot[]> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         const service = await this.requireOwnedService(ctx, serviceId);
         const { from, to } = parseRange(fromISO, toISO);
         const rules = await prisma.availabilityRule.findMany({
@@ -541,7 +542,7 @@ export class BookingsService {
      * `contact:read`.
      */
     async listBookings(ctx: OrganizationContext, serviceId?: string) {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         if (serviceId) {
             // Ensure the service is owned before filtering by it (404 otherwise).
             await this.requireOwnedService(ctx, serviceId);
@@ -585,7 +586,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         query: { from: string; to: string; staffId?: string },
     ): Promise<BookingsCalendar> {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         const from = new Date(query.from);
         const to = new Date(query.to);
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
@@ -689,7 +690,7 @@ export class BookingsService {
         now: Date = new Date(),
         options: { returnCredit?: boolean; closesClass?: boolean } = {},
     ): Promise<CancelledBooking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);
         return cancelFoundBooking(
             found,
@@ -742,7 +743,7 @@ export class BookingsService {
         outcome: BookingOutcome,
         now: Date = new Date(),
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const booking = await this.requireOwnedBooking(ctx, bookingId);
 
         if (booking.status === "CANCELLED") {
@@ -778,7 +779,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
     ): Promise<BookingDetailView> {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         await this.requireOwnedBooking(ctx, bookingId);
         const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: bookingId },
@@ -824,7 +825,7 @@ export class BookingsService {
         bookingId: string,
         input: { startAt: string },
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const booking = await this.requireOwnedBooking(ctx, bookingId);
 
         if (booking.status === "CANCELLED") {
@@ -907,7 +908,7 @@ export class BookingsService {
             subscriptionId?: string;
         },
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const withPack =
             dto.useClassPack === true ||
             !!dto.packPurchaseId ||
@@ -935,8 +936,8 @@ export class BookingsService {
         }
         // Spending someone's prepaid classes is its own power (ADR-007) —
         // a pack's, or a membership's month (U3).
-        if (withPack) authorize(ctx, "pack:write");
-        if (withMembership) authorize(ctx, "subscription:write");
+        if (withPack) requireBookingPower(ctx, "pack:sell", CANT_USE_PACKS);
+        if (withMembership) requireBookingPower(ctx, "subscription:write");
 
         const { service, rules } = await loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
@@ -1163,7 +1164,7 @@ export class BookingsService {
         orderId: string,
         dto: BookVisitInput,
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         return bookVisit(ctx, orderId, dto);
     }
 
@@ -1178,8 +1179,12 @@ export class BookingsService {
         bookingId: string,
         now: Date = new Date(),
     ): Promise<{ token: string }> {
-        authorize(ctx, "booking:write");
-        authorize(ctx, "invoice:write");
+        requireBookingPower(ctx, "booking:write");
+        requireBookingPower(
+            ctx,
+            "invoice:write",
+            "Your role can't send pay links, because it can't issue invoices.",
+        );
         await this.requireOwnedBooking(ctx, bookingId);
         // Only a connection that can open the checkout window counts: a
         // Razorpay one still missing its public key id would make a link

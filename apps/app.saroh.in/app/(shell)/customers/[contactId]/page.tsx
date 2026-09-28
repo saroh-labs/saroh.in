@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 
 import { CustomerDetailScreen } from "@/components/customers/detail/detail-screen";
+import type { PackSale } from "@/components/customers/detail/packs-tab";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
+import { loadContactHoldings } from "@/lib/contacts/holdings";
+import { sellPacksOnly } from "@/lib/contacts/panels";
 import { getCustomerDetail } from "@/lib/customer-workspace/detail";
 import {
     isMergedRedirect,
@@ -13,9 +17,10 @@ import type {
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
 import { getSuggestions, getThread } from "@/lib/customer-workspace/service";
-import type { ThreadRead } from "@/lib/customer-workspace/view";
+import type { ReviewsRead, ThreadRead } from "@/lib/customer-workspace/view";
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Customer" };
@@ -83,7 +88,29 @@ export default async function CustomerDetailPage({
     const thread: ThreadRead = may("message:read")
         ? await getThread(contactId).catch((): ThreadRead => "failed")
         : null;
-    const tabs = tabsFor(detail, thread);
+    // Their product reviews (C6), where the business sells and for whoever
+    // may read reviews; a failed read shows the tab with the failure said.
+    const reviews: ReviewsRead =
+        detail.linkedCustomers !== undefined && may("product-review:read")
+            ? await contactReviews(contactId).catch((): ReviewsRead => "failed")
+            : null;
+    // Their packs are in the read only where Class packs is on and the
+    // viewer reads them (C7). Selling one needs the packs on sale; a list
+    // that can't be read offers no Sell rather than an empty dialog.
+    const packsShown = detail.packs !== undefined;
+    const packSale: PackSale | null =
+        packsShown && canSellPacks(organization)
+            ? await loadContactHoldings(contactId, sellPacksOnly()).then(
+                  ({ choices }) =>
+                      choices.packs
+                          ? {
+                                packs: choices.packs,
+                                invoicesOnSale: choices.invoicesOnSale,
+                            }
+                          : null,
+              )
+            : null;
+    const tabs = tabsFor(detail, thread, reviews);
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
@@ -118,6 +145,10 @@ export default async function CustomerDetailPage({
                     (s): s is DuplicateSuggestion => s.kind === "contact",
                 )}
                 thread={thread}
+                reviews={reviews}
+                canReplyReviews={may("product-review:write")}
+                packSale={packSale}
+                canExtendPacks={packsShown && canWritePacks(organization)}
                 nowIso={new Date().toISOString()}
             />
         </PageContainer>

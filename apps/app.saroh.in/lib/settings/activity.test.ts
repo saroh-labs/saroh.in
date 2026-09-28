@@ -278,6 +278,33 @@ describe("activityLine — values a save recorded (#509)", () => {
         expect(ACTIVITY_ACTIONS).toContain("storefront.same-email.update");
     });
 
+    it("says someone changed one of their own alerts (F14)", () => {
+        const alert = (channel: string, before: boolean, after: boolean) =>
+            said({
+                action: "member.alerts.update",
+                targetType: "member",
+                metadata: {
+                    alert: "order",
+                    channel,
+                    changes: [{ field: "alertOn", before, after }],
+                },
+            });
+        expect(alert("email", false, true)).toBe(
+            "Sanjay turned email on for New order, for themselves → Alerts",
+        );
+        expect(alert("bell", true, false)).toBe(
+            "Sanjay turned the bell off for New order, for themselves → Alerts",
+        );
+        // An alert this page doesn't know is said generally, never as a key.
+        expect(
+            said({
+                action: "member.alerts.update",
+                metadata: { alert: "weekly", channel: "email", changes: [] },
+            }),
+        ).toBe("Sanjay changed their own alerts → Alerts");
+        expect(ACTIVITY_ACTIONS).toContain("member.alerts.update");
+    });
+
     it("says opening hours, modules and plans", () => {
         expect(
             said({

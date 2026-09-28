@@ -16,7 +16,9 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import { ModuleReadinessRegistry } from "../capabilities/readiness/module-readiness.registry";
 import { checkRenderability } from "./publication-renderability";
+import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
 const sites = new SitesService({
@@ -615,5 +617,120 @@ describe("module pages on the public site read (G15, real database)", () => {
             "siteId",
             "snapshot",
         ]);
+    });
+});
+
+describe("the menu follows the modules (G19, real database)", () => {
+    type Snapshot = {
+        site: { navigation: { label: string; href: string; kind?: string }[] };
+    };
+    const commerce = (organizationId: string, status: "ENABLED" | "DISABLED") =>
+        prisma.organizationModule.upsert({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId,
+                    moduleKey: "COMMERCE",
+                },
+            },
+            create: { organizationId, moduleKey: "COMMERCE", status },
+            update: { status },
+        });
+
+    it("Commerce off takes Shop out, and on again brings it back, with one publish", async () => {
+        const b = await business();
+        await freePage(b, "/about", "About");
+        await sites.createPage(b.ctx, b.siteId, { kind: "SHOP" });
+        await sites.publishSite(b.ctx, b.siteId);
+
+        const on = await sites.getPublicationBySiteId(b.siteId);
+        // The published menu keeps Shop, tagged, whatever the module does:
+        // the site decides at view time.
+        const menu = (on.snapshot as Snapshot).site.navigation;
+        expect(menu).toContainEqual({
+            label: "Shop",
+            href: "/shop",
+            kind: "SHOP",
+        });
+        expect(on.modules).toEqual({ SHOP: "on" });
+
+        await commerce(b.ctx.organizationId, "DISABLED");
+        const off = await sites.getPublicationBySiteId(b.siteId);
+        expect(off.snapshot).toEqual(on.snapshot);
+        expect(off.modules).toEqual({ SHOP: "off" });
+
+        await commerce(b.ctx.organizationId, "ENABLED");
+        expect((await sites.getPublicationBySiteId(b.siteId)).modules).toEqual({
+            SHOP: "on",
+        });
+    });
+
+    it("tells the draft preview which module pages show, as the live read does", async () => {
+        const b = await business();
+        // Added while Appointments was on, then switched off.
+        await sites.createPage(b.ctx, b.siteId, { kind: "BOOK" });
+        await sites.createPage(b.ctx, b.siteId, { kind: "CONTACT" });
+        await prisma.organizationModule.create({
+            data: {
+                organizationId: b.ctx.organizationId,
+                moduleKey: "APPOINTMENTS",
+                status: "DISABLED",
+            },
+        });
+
+        // A link is made by someone.
+        const user = await prisma.user.create({
+            data: {
+                name: "Demo Owner",
+                email: `${uniq("g19-owner-")}@example.test`,
+            },
+            select: { id: true },
+        });
+        const previews = new SitePreviewLinksService(sites);
+        const link = await previews.create(
+            { ...b.ctx, userId: user.id },
+            b.siteId,
+            {
+                expiresInDays: 1,
+            },
+        );
+        const view = await previews.resolve(link.token);
+        expect(view.modules).toEqual({ BOOK: "off", CONTACT: "on" });
+    });
+
+    it("says what leaves the website when Commerce goes off, by the page's menu name", async () => {
+        const b = await business();
+        const shop = await sites.createPage(b.ctx, b.siteId, { kind: "SHOP" });
+        await prisma.page.update({
+            where: { id: shop.id },
+            data: { title: "Bakes" },
+        });
+        await sites.publishSite(b.ctx, b.siteId);
+
+        const items = await new ModuleReadinessRegistry(
+            prisma,
+        ).deactivationImpact("COMMERCE", {
+            organizationId: b.ctx.organizationId,
+        });
+        expect(items).toContainEqual({
+            code: "COMMERCE_SITE_SHOP_PAGE",
+            moduleKey: "COMMERCE",
+            count: 1,
+            message: "Your website stops showing Bakes.",
+        });
+    });
+
+    it("says nothing of a website that never added a Shop page", async () => {
+        const b = await business();
+        await freePage(b, "/about", "About");
+        await sites.publishSite(b.ctx, b.siteId);
+
+        const items = await new ModuleReadinessRegistry(
+            prisma,
+        ).deactivationImpact("COMMERCE", {
+            organizationId: b.ctx.organizationId,
+        });
+        expect(items.map((i) => i.code)).not.toContain(
+            "COMMERCE_SITE_SHOP_PAGE",
+        );
     });
 });

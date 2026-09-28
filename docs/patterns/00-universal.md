@@ -76,8 +76,10 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,411 after E19, E20 and B13, whose range,
-  days-off and payments reads already sit in their own files; split next),
+  (1,293 after C7, which moved the packs read out to `customer-detail-packs.ts`;
+  1,351 before), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  days-off, payments and working-hours reads already sit in their own files;
+  E27 added only the response's `hours` field; split next),
   `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
   B9 kept its change of fulfilment and its cancel out of the kitchen
   service (`order-fulfilment-change.service.ts`, 402, one transaction and
@@ -135,7 +137,22 @@ each with why it stops there:
   month strip to `month-strip.tsx`; E24 (388) moved the ‹ › month steps
   to `month-step.tsx` to make room for the team filter, whose select is
   `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
-  which needed nothing new from the API.
+  which needed nothing new from the API. E25 (the Week's card columns)
+  left `layers.ts` and the API untouched too — the week is one E20
+  `from`/`to` read — and brought `business-calendar.tsx` down to 304: the
+  row under the title (‹ › , Month | Week, the team filter, the switches)
+  went to `calendar-toolbar.tsx` and `view-switch.tsx`, the missing-layer
+  notice to `calendar-missing.tsx` and the day's sheet to `day-sheet.tsx`,
+  which the Week shares. The Week itself is `business-week.tsx`, its
+  columns `week-columns.tsx`, and its rules `lib/calendar/week.ts` (dates,
+  title, edges, address) and `lib/calendar/week-columns.ts` (what each
+  column and card says).
+  E27 (the Week's hour grid for a business with a team) left `layers.ts`
+  and `business-calendar.tsx` untouched too: the grid is
+  `week-hour-grid.tsx`, its days `lib/calendar/week-hours.ts` and its
+  geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
+  chooses between it and the columns. The API's working hours are
+  `calendar/working-hours.ts`, read beside the days off.
 - `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
   F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
@@ -162,15 +179,17 @@ each with why it stops there:
   to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
   the second allow-list file it re-exports; the order serializers are the
   next seam if A8 and A13 grow it further.
-- `home/home.service.ts` (785 after F4; 797 before F2) — `build()` is one parallel
+- `home/home.service.ts` (778 after F11; 785 after F4; 797 before F2) — `build()` is one parallel
   read of every Home source, each behind its own guard, and the ranking of
   what they return. Round 2 put each source in its own file
   (`home-money-sources.ts`, `home-site-stock-sources.ts`,
   `home-people-sources.ts`, `home-today.ts`, `home-week.ts`, …); F2 also
   moved the CRM reads to `home-crm-sources.ts` rather than grow it, and
   F4's inline actions are `HomeInlineService` in `home-inline.ts`, called
-  once. The refunds-owed read (to `home-money-sources.ts` once D13 has landed there)
-  and the schedule band are the next seams.
+  once. F11's staff landing is `home-staff.ts` (who is narrowed to which
+  storefronts and diary, and the where-helpers each source takes), and it
+  moved the schedule band to `home-schedule.ts`. The refunds-owed read (to
+  `home-money-sources.ts` once D13 has landed there) is the next seam.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:

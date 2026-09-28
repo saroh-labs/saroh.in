@@ -72,6 +72,35 @@ const MANAGER_ACTIONS = [
     "inventory:write",
     "order:read",
 ];
+// The staff landing (F11): a Member who works on Hill Road only.
+PRODUCT_ROLES.STAFF = {
+    role: "MEMBER",
+    roleLabel: null,
+    actions: ["org:read", "store:read", "booking:read", "order:stage"],
+};
+const STAFF_HOME = {
+    staff: {
+        stores: [{ id: "store_1", name: "Hill Road" }],
+        ownDiary: false,
+    },
+    needs: [
+        {
+            id: "COMMERCE_OPEN_ORDERS:ord_1",
+            code: "COMMERCE_OPEN_ORDERS",
+            severity: "OVERDUE",
+            title: "Send order #1042 to Anika Rao",
+            sub: "2 × Sourdough",
+            amountMinor: null,
+            currency: null,
+            amountIn: null,
+            tag: "Due today",
+            tone: "due",
+            href: "/commerce/orders/ord_1?storefront=store_1",
+            moduleKey: "COMMERCE",
+        },
+    ],
+    needsTotal: 1,
+};
 PRODUCT_ROLES.MANAGER = {
     role: "MEMBER",
     roleKey: "manager",
@@ -406,9 +435,15 @@ createServer((req, res) => {
             error: "Read-only roles must not load the editor draft",
         });
     // Home (F9): a Reviewer's is the sites sent to them, and nothing else.
+    // A staff member's (F11) is their storefront's work, said in the header.
     if (path.endsWith("/home"))
         return reply(200, {
-            view: scenario === "REVIEWER" ? "reviewer" : "business",
+            view:
+                scenario === "REVIEWER"
+                    ? "reviewer"
+                    : scenario === "STAFF"
+                      ? "staff"
+                      : "business",
             ...(scenario === "REVIEWER"
                 ? {
                       reviews: [
@@ -452,6 +487,7 @@ createServer((req, res) => {
                 fresh: false,
                 items: [],
             },
+            ...(scenario === "STAFF" ? STAFF_HOME : {}),
         });
     // Team → Roles (F19).
     if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);

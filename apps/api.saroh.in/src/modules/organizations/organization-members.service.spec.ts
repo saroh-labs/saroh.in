@@ -35,6 +35,10 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
+// The team's "Someone joins the team" alert (F14): only that it is queued.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
 jest.mock("../../common/email", () => ({
     sendOrganizationInvitationEmail: jest.fn().mockResolvedValue(undefined),
 }));
@@ -47,6 +51,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { hashInviteToken } from "./invite-token";
 import { OrganizationMembersService } from "./organization-members.service";
 
@@ -421,6 +426,11 @@ describe("accepting", () => {
             organizationId: "org_1",
             siteId: "site_1",
         });
+        // The team hears of it, keyed to this invitation (F14).
+        expect((enqueueTeamAlert as jest.Mock).mock.calls[0].slice(1)).toEqual([
+            "org_1",
+            { event: "team", userId: "user_new", invitationId: "inv_1" },
+        ]);
     });
 
     it("refuses a token that was already spent, in the same words as an unknown one", async () => {
@@ -435,6 +445,7 @@ describe("accepting", () => {
 
         expect(spent.message).toBe(unknown.message);
         expect(db.membership.upsert).not.toHaveBeenCalled();
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
     });
 
     it("refuses an expired invitation and marks it so", async () => {

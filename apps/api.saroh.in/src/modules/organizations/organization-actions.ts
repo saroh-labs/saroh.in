@@ -120,7 +120,16 @@ export type OrgAction =
     // Courses and class packs (ADR-007) — booked time, sold ahead.
     | "course:read"
     | "course:write"
+    // See class packs whole: who holds one, balances, prices and sales
+    // (DEC-039, E26). There is no money-free projection of a pack.
     | "pack:read"
+    // Sell a pack at the desk, and spend or give back one of a holder's
+    // classes on a booking (E26; matrix answer 7). Narrower than
+    // `pack:write` on purpose: a trainer sells a pack without setting its
+    // price or validity. Implied by `pack:write`, and implies `pack:read`
+    // (`resolveCapabilities`), so a role saved before the split still sells.
+    | "pack:sell"
+    // Make and change packs: create, edit, publish, extend, archive.
     | "pack:write"
     | "message:read"
     | "message:write"
@@ -212,6 +221,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "course:read",
     "course:write",
     "pack:read",
+    "pack:sell",
     "pack:write",
     "message:read",
     "message:write",

@@ -537,7 +537,7 @@ export function recordBookingOutcome(
 export type BookByHandInput = {
     startAt: string;
     idempotencyKey?: string;
-    /** Pay with this class pack (ADR-007); needs `pack:write`. */
+    /** Pay with this class pack (ADR-007); needs `pack:sell`. */
     packPurchaseId?: string;
     /** Who takes it (U3); absent, whoever is free. */
     staffId?: string;

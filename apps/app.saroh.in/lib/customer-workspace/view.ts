@@ -1,6 +1,7 @@
 import { clock } from "@/lib/calendar/layers";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { goesToAddress } from "@/lib/orders/lifecycle";
+import type { Review } from "@/lib/product-reviews/service";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
 import type {
@@ -13,6 +14,7 @@ import type {
     MembershipAllowance,
     MoneyTotal,
 } from "./detail";
+import { packHref } from "./packs";
 import type { CustomerThread } from "./thread";
 
 /**
@@ -36,7 +38,8 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
-export type TabKey = "over" | "ord" | "bk" | "sub" | "inv" | "msg" | "notes";
+export type TabKey =
+    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -49,9 +52,14 @@ export interface Tab {
  * The tabs by business kind — commerce: Overview, Orders, Subscriptions,
  * Invoices, Notes; bookings: Overview, Bookings, Membership, Invoices, Notes.
  * A block this viewer may not read is absent from the read, so its tab is
- * too: a Member sees no Subscriptions or Invoices.
+ * too: a Member sees no Subscriptions or Invoices. Reviews (C6) follow
+ * Invoices, from their own read (`product-review:read`), where they sell.
  */
-export function tabsFor(d: CustomerDetail, thread: ThreadRead = null): Tab[] {
+export function tabsFor(
+    d: CustomerDetail,
+    thread: ThreadRead = null,
+    reviews: ReviewsRead = null,
+): Tab[] {
     const kind = kindOf(d);
     const tabs: Tab[] = [{ key: "over", label: "Overview", count: null }];
     if (d.orders !== undefined) {
@@ -68,6 +76,14 @@ export function tabsFor(d: CustomerDetail, thread: ThreadRead = null): Tab[] {
             count: d.bookings ? upcomingOf(d.bookings.upcoming).length : null,
         });
     }
+    // Their class packs (C7), where the design's Courses tab sits.
+    if (d.packs !== undefined) {
+        tabs.push({
+            key: "pk",
+            label: "Packs",
+            count: d.packs ? d.packs.rows.length : null,
+        });
+    }
     if (d.subscriptions !== undefined) {
         tabs.push({
             key: "sub",
@@ -80,6 +96,13 @@ export function tabsFor(d: CustomerDetail, thread: ThreadRead = null): Tab[] {
             key: "inv",
             label: "Invoices",
             count: d.invoices ? d.invoices.rows.length : null,
+        });
+    }
+    if (reviews !== null) {
+        tabs.push({
+            key: "rev",
+            label: "Reviews",
+            count: reviews === "failed" ? null : reviews.length,
         });
     }
     if (showsThread(thread)) {
@@ -104,6 +127,13 @@ export function tabsFor(d: CustomerDetail, thread: ThreadRead = null): Tab[] {
  * messages, or the account area is still off.
  */
 export type ThreadRead = CustomerThread | "failed" | null;
+
+/**
+ * The Reviews tab's read (C6): their reviews, "failed" when it couldn't be
+ * read, or null when the tab doesn't belong — the viewer can't read reviews
+ * or the business doesn't sell.
+ */
+export type ReviewsRead = Review[] | "failed" | null;
 
 /**
  * Messages shows for someone who can write in (they sign in on the site) or
@@ -566,6 +596,8 @@ export const BOOKINGS_EMPTY: Record<BookingFilter, string> = {
 
 export interface CreditLine {
     name: string;
+    /** Its Pack Detail (C7). */
+    href: string;
     left: string;
     pct: number;
     bar: "ok" | "accent" | "off";
@@ -604,6 +636,7 @@ export function packLines(
             }`;
             return {
                 name: `${p.pack.name} pack`,
+                href: packHref(p.pack.id),
                 left: expired ? "Ended" : `${p.left} of ${p.credits}`,
                 pct: Math.round((100 * p.left) / Math.max(1, p.credits)),
                 bar: expired ? "off" : soon ? "accent" : "ok",

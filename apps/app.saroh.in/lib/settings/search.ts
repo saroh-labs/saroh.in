@@ -105,7 +105,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     { label: "Change plan", page: "/settings/billing" },
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
-    { label: "Alerts — email, WhatsApp", page: "/settings/profile" },
+    { label: "Alerts — the bell and email", page: "/settings/profile" },
     { label: "Activity — who changed what", page: "/settings/activity" },
     {
         label: "Providers — hosting, email, payments",

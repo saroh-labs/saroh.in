@@ -94,7 +94,8 @@ module.exports = {
         // G12: pure; the real rows are in public-catalogue-grid.db.spec.ts.
         "<rootDir>/src/modules/products/product-grid.spec.ts",
         "<rootDir>/src/modules/categories/categories.service.spec.ts",
-        "<rootDir>/src/modules/product-reviews/",
+        // Mocked Prisma; C6's contact-reviews.db.spec.ts runs here.
+        "<rootDir>/src/modules/product-reviews/(?!.*\\.db\\.spec\\.ts$)",
         // ADR-007 invoices: DB-free specs run in the unit project; only
         // invoices.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/totals.spec.ts",
