@@ -8,6 +8,7 @@ import {
     moduleOff,
     modulePageStatesOf,
     moduleRoute,
+    pricesPageHref,
 } from "./module-pages";
 
 /**
@@ -20,6 +21,20 @@ const ABOUT = { path: "/about", title: "About" };
 const BOOK = { path: "/book", title: "Book a class", kind: "BOOK" };
 const SHOP = { path: "/shop", title: "Shop", kind: "SHOP" };
 const PRICES = { path: "/prices", title: "Prices", kind: "PRICES" };
+
+describe("the account's See plans (G20)", () => {
+    it("goes to the Prices page at whatever address it has", () => {
+        expect(pricesPageHref([HOME, PRICES], {})).toBe("/prices");
+        expect(
+            pricesPageHref([HOME, { ...PRICES, path: "/pricing" }], null),
+        ).toBe("/pricing");
+    });
+
+    it("goes nowhere without one, or while its module is off", () => {
+        expect(pricesPageHref([HOME, ABOUT], {})).toBeNull();
+        expect(pricesPageHref([HOME, PRICES], { PRICES: "off" })).toBeNull();
+    });
+});
 
 describe("modulePageStatesOf", () => {
     it("keeps only on and off, by kind", () => {
