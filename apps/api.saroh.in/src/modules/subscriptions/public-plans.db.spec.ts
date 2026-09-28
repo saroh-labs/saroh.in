@@ -34,6 +34,13 @@ async function business(
         data: { name: "Plans", slug: uniq("g9-org") },
     });
     if (over.rolledOut !== false) {
+        // The flag's own row first (off for everyone): an override
+        // references it, and a fresh test schema has none.
+        await prisma.featureFlag.upsert({
+            where: { key: "MODULE_PAYMENTS" },
+            create: { key: "MODULE_PAYMENTS", enabledByDefault: false },
+            update: {},
+        });
         await prisma.featureFlagOverride.create({
             data: {
                 flagKey: "MODULE_PAYMENTS",
