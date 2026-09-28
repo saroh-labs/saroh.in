@@ -156,7 +156,10 @@ test.describe("Customer Detail — merge", () => {
             phone: `+91 91111 ${String(stamp).slice(-5)}`,
         });
         await page.goto(`/customers/${lone}`);
-        await page.getByRole("button", { name: "More" }).click();
+        await page
+            .getByRole("main")
+            .getByRole("button", { name: "More" })
+            .click();
         await page
             .getByRole("menuitem", { name: "Merge with a duplicate…" })
             .click();
