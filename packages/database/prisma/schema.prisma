@@ -4876,6 +4876,15 @@ model CustomerSubscription {
   // renewal job resumes it then; null pauses until someone resumes it.
   pausedUntil DateTime?
 
+  // The classes a month this period includes (D10): the plan's value, taken
+  // at subscribe and at each renewal, so a plan's new allowance reaches a
+  // member at their next renewal. Null is no allowance (unlimited). Only a
+  // set `classesPerPeriodSetAt` makes it authoritative: while that is null
+  // (a row the previous image wrote), readers take the plan's value
+  // (`subscriptions/classes-allowance.ts`), until follow-up Z1.
+  classesPerPeriod      Int?
+  classesPerPeriodSetAt DateTime?
+
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))

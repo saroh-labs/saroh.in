@@ -870,6 +870,9 @@ export function planSubscriptions(
             cancelAtPeriodEnd,
             cancelledAt,
             createdByUserId: staff,
+            // Its plan's classes a month, as its last renewal took them (D10).
+            classesPerPeriod: plan.classesPerMonth ?? null,
+            classesPerPeriodSetAt: current.start,
             createdAt: subscribedAt,
             updatedAt: earliest(
                 now,
