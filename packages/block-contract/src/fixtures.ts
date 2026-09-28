@@ -476,6 +476,28 @@ export const BLOCK_META = {
             },
         },
     },
+    journal: {
+        label: "Journal",
+        description:
+            "The site's latest published posts, newest first, read live from the posts the site owns.",
+        variants: soleVariant(
+            "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample posts.
+            default: { variant: "default", title: "Journal", count: 3 },
+        },
+        cases: {
+            // Two rows, words only: the switches off and the larger count.
+            plain: {
+                variant: "default",
+                title: "From the kitchen",
+                count: 6,
+                showExcerpts: false,
+                showImages: false,
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */
