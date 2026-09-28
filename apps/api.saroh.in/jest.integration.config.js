@@ -130,6 +130,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         // E14: pure; the real rows are in class-packs.drafts.db.spec.ts.
         "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
+        // A11: pure; the real rows are in public-pack-purchase.service.db.spec.ts.
+        "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
         "<rootDir>/src/modules/staff/staff.service.spec.ts",

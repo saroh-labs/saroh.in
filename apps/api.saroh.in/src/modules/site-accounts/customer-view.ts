@@ -23,6 +23,8 @@ import { orderTrack, REFUND_LINE } from "./account-track";
 
 // A6's bookings: their own allow-list file, part of this one.
 export * from "./account-bookings-view";
+// A11's packs on sale and pack purchases: the same.
+export * from "./account-packs-view";
 
 /** A read that failed says so; it never reads as "none" (A5). */
 export type Block<T> = { ok: true; value: T } | { ok: false };

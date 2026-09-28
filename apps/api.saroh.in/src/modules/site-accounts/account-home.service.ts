@@ -10,6 +10,8 @@ import { prisma } from "@saroh/database";
 import { structuredLogger } from "../../common/logging/structured-logger";
 import type { ModuleKey } from "../capabilities/module-registry";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
+import { PACKS_ON_SALE } from "../class-packs/pack-on-sale";
+import { packsOffered } from "../class-packs/packs-offered";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
@@ -188,14 +190,33 @@ export class AccountHomeService {
                     },
                 }),
             ]);
+        // A pack on sale online (A11) opens the Plan tab too, where it is
+        // bought; read only when nothing else has opened it.
+        const plans =
+            livePlans > 0 ||
+            ownPlan > 0 ||
+            ownPacks > 0 ||
+            (await this.packsOnSale(organizationId));
         return {
             appointments,
             orders,
-            plans: livePlans > 0 || ownPlan > 0 || ownPacks > 0,
+            plans,
             // Every business can be written to (A13).
             messages: true,
             bookingsLabel: classes > 0 ? "Bookings" : "Appointments",
         };
+    }
+
+    /**
+     * Whether a pack is on sale here (A11): Class packs rolled out and on,
+     * and a published pack — never a draft (E14) or an archived one.
+     */
+    private async packsOnSale(organizationId: string): Promise<boolean> {
+        if (!(await packsOffered(organizationId, this.flags))) return false;
+        const onSale = await prisma.classPack.count({
+            where: { organizationId, ...PACKS_ON_SALE },
+        });
+        return onSale > 0;
     }
 
     private async moduleOffered(

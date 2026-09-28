@@ -64,6 +64,11 @@ jest.mock("@saroh/database", () => {
 jest.mock("../bookings/booking-hold", () => ({
     confirmHoldInTx: jest.fn(),
 }));
+// A pack bought online (A11): its own rules are in
+// `public-pack-purchase.service.db.spec.ts`.
+jest.mock("../class-packs/pack-checkout", () => ({
+    completePackDraftInTx: jest.fn(),
+}));
 // A booking's pay link (E4): its own rules are `booking-pay-link.spec.ts`'s.
 jest.mock("../bookings/booking-pay-link", () => ({
     markBookingPaidInTx: jest.fn().mockResolvedValue(true),
@@ -74,6 +79,7 @@ import { createHmac } from "node:crypto";
 
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
+import { completePackDraftInTx } from "../class-packs/pack-checkout";
 
 import { encryptSecret } from "../payments/crypto";
 import { PaymentsService } from "../payments/payments.service";
@@ -592,6 +598,84 @@ describe("webhook success on a pay-now hold's invoice (U19)", () => {
         expect(confirmHold).not.toHaveBeenCalled();
         expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
             status: "CAPTURED_NEEDS_REFUND",
+        });
+    });
+});
+
+describe("webhook success on an online pack's draft (A11)", () => {
+    const completePack = completePackDraftInTx as jest.Mock;
+    const confirmHold = confirmHoldInTx as jest.Mock;
+
+    it("makes the purchase through the draft, and records the capture", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "DRAFT",
+            source: "PACK",
+        });
+        completePack.mockResolvedValue("bought");
+
+        const result = await deliver(bodyOf());
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(completePack).toHaveBeenCalledWith(expect.anything(), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: expect.any(Date),
+            payment: {
+                paymentMethod: "ONLINE",
+                paymentReference: "pay_1",
+                paymentNote: "Paid online through Razorpay",
+            },
+        });
+        expect(confirmHold).not.toHaveBeenCalled();
+        // The draft numbers and pays itself; the webhook doesn't.
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED",
+            providerRef: "pay_1",
+        });
+    });
+
+    it("owes the money back when the draft can't be bought any more", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "DRAFT",
+            source: "PACK",
+        });
+        completePack.mockResolvedValue("gone");
+
+        await deliver(bodyOf());
+
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+            rawResponse: { invoiceStatus: "PACK_NOT_BOUGHT" },
+        });
+    });
+
+    it("owes back a payment on a discarded draft, and buys nothing", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({ status: "VOID", source: "PACK" });
+
+        await deliver(bodyOf());
+
+        expect(completePack).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+            rawResponse: { invoiceStatus: "VOID" },
+        });
+    });
+
+    it("a second intent paid on a bought pack is owed back, never a second pack", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT, id: "pi_inv_2" });
+        invoiceFindFirst.mockResolvedValue({ status: "PAID", source: "PACK" });
+
+        await deliver(bodyOf({ providerEventId: "evt_2" }));
+
+        expect(completePack).not.toHaveBeenCalled();
+        expect(attemptCreate.mock.calls[0][0].data).toMatchObject({
+            status: "CAPTURED_NEEDS_REFUND",
+            rawResponse: { invoiceStatus: "PAID" },
         });
     });
 });

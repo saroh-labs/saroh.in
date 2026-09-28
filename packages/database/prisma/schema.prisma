@@ -5226,6 +5226,16 @@ model Invoice {
   @@index([organizationId, status, paidAt])
   @@index([organizationId, paidAt])
   @@index([organizationId, issuedAt])
+
+  // A pack bought online (round-2 A11): the pack and its terms — name,
+  // credits, validity, price — as they were when the customer started
+  // paying, on the source PACK draft. The payment's webhook numbers the
+  // invoice and makes the purchase from this, so a pack changed or archived
+  // meanwhile still sells on what was shown. Null on every other invoice.
+  packTerms Json?
+
+  // The sweep that discards online pack drafts nobody paid (A11).
+  @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
 }
 
 model InvoiceLine {

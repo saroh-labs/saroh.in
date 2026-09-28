@@ -238,7 +238,8 @@
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
 - **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
-  an unnumbered booking invoice out of the invoice list and customer paper.
+  an unnumbered booking invoice — and an unnumbered online pack draft
+  (A11, below) — out of the invoice list and customer paper.
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
   CONFIRMED with `paidWith` DESK. A class credit online is below (A10,
@@ -446,6 +447,23 @@
   (`reserve`'s `retryOnce`), so two tabs spending the last class get one
   booking and one "no classes left". The booking reads at the desk exactly
   as a desk-made one (`paidWith`, the redemption, the money).
+- **A pack bought online** (round-2 A11, ADR-011;
+  `class-packs/{pack-checkout,public-pack-purchase.service}.ts`). Only a
+  signed-in customer, at `public/site-accounts/me/packs`, only an ACTIVE
+  pack (a draft or archived one is a 404), and only while Class packs is
+  rolled out and on (`packs-offered.ts`, DEC-057). Starting makes a DRAFT
+  invoice (source PACK, no number) priced from the pack on the server, with
+  its terms snapshotted in `Invoice.packTerms`, and an intent through the
+  invoice payment path on a provider whose window can open. The webhook
+  (`applyInvoiceSuccess` → `completePackDraftInTx`, under the intent's and
+  the invoice's locks) makes the `PackPurchase` from the snapshot — expiry
+  counted from the payment — and numbers the invoice PAID (`ONLINE`), so a
+  pack changed or archived meanwhile still sells on the terms shown; a
+  second payment on it, or one on a discarded draft, is
+  `CAPTURED_NEEDS_REFUND`. The same pack on the same terms reuses its
+  draft; changed terms void the old one; at most three packs wait at once.
+  The hold sweep voids drafts unpaid after 24 hours
+  (`discardStalePackDrafts`), so no abandoned attempt ever takes a number.
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).

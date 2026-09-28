@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 import { toMinor } from "../../common/money";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
+import { completePackDraftInTx } from "../class-packs/pack-checkout";
 import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
@@ -1048,6 +1049,19 @@ export class WebhooksService {
                       payment,
                   })
                 : null;
+        // A pack bought online (A11): the purchase is made from the draft's
+        // snapshot and the invoice numbered and paid — unless the draft was
+        // discarded or its buyer removed meanwhile, and then the money is
+        // owed back, below.
+        const bought =
+            invoice?.status === "DRAFT" && invoice.source === "PACK"
+                ? await completePackDraftInTx(tx, {
+                      invoiceId,
+                      organizationId: intent.organizationId,
+                      now: new Date(),
+                      payment,
+                  })
+                : null;
         // A booking's pay link (E4) paid after the booking was cancelled:
         // cancelling retires the link, but a checkout already open can still
         // take the money. The place is gone, so it is owed back, not a
@@ -1062,7 +1076,8 @@ export class WebhooksService {
                 : false;
         if (
             (invoice?.status === "ISSUED" && !cancelledBooking) ||
-            held === "confirmed"
+            held === "confirmed" ||
+            bought === "bought"
         ) {
             if (invoice?.status === "ISSUED") {
                 await tx.invoice.update({
@@ -1092,9 +1107,11 @@ export class WebhooksService {
         const found =
             held === "released"
                 ? "RELEASED_HOLD"
-                : cancelledBooking
-                  ? "CANCELLED_BOOKING"
-                  : (invoice?.status ?? "MISSING");
+                : bought === "gone"
+                  ? "PACK_NOT_BOUGHT"
+                  : cancelledBooking
+                    ? "CANCELLED_BOOKING"
+                    : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,
