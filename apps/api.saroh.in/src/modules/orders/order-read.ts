@@ -1,13 +1,17 @@
 import { toMoneyString } from "../../common/money";
+import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
+import type { RawOrderInvoice } from "./order-invoice-title";
+import { orderInvoiceTitle } from "./order-invoice-title";
 import type { OrderLineKind } from "./order-line";
 import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
+import type { OrderVisitsDto } from "./order-visits";
 
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14): the
@@ -207,6 +211,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * the screen says so rather than showing nothing.
      */
     attention?: OrderAttention | null;
+    /**
+     * A treatment's visits (B14, E9): the Visits card and what the header
+     * offers next. Absent on an order that isn't one; null when they
+     * couldn't be read, so the card says so.
+     */
+    visits?: OrderVisitsDto | null;
 }
 
 export interface OrderInvoiceDto {
@@ -215,6 +225,11 @@ export interface OrderInvoiceDto {
     /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY */
     kind: string;
     status: string;
+    /**
+     * What the paper is called (D15, `invoice-title.ts`): a registered
+     * business's paper whose every line is exempt is a "Bill of supply".
+     */
+    title: InvoiceTitle;
 }
 
 export interface RawOrderRead {
@@ -246,7 +261,7 @@ export interface RawOrderRead {
     deliveryState: string | null;
     deliveryPostalCode: string | null;
     store: { id: string; name: string };
-    invoices?: OrderInvoiceDto[];
+    invoices?: RawOrderInvoice[];
     customer: {
         id: string;
         email: string;
@@ -554,6 +569,7 @@ export function serializeOrderRead(
                   number: i.number,
                   kind: i.kind,
                   status: i.status,
+                  title: orderInvoiceTitle(i, opts.now),
               }))
             : null,
         money: opts.money

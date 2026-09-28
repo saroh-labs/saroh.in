@@ -51,6 +51,7 @@ import {
     applyInventoryTransition,
     phaseOf,
 } from "./order-inventory";
+import { INVOICE_TITLE_SELECT } from "./order-invoice-title";
 import { isServiceLine } from "./order-line";
 import {
     fromCents,
@@ -62,6 +63,9 @@ import {
 import type { OrderReadDto } from "./order-read";
 import { serializeOrderRead } from "./order-read";
 import { canEditItems, planStageMove, planUndo } from "./order-stage";
+import type { VisitAttended } from "./order-visit-attend";
+import { markVisitAttended } from "./order-visit-attend";
+import { visitsForRead } from "./order-visits";
 import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
 
 /**
@@ -175,10 +179,24 @@ export class OrderKitchenService {
         const withNotice = {
             ...read,
             customerNotice: await this.noticeOf(ctx, order),
+            // A treatment's visits (B14), in their own file.
+            ...(await visitsForRead(order, this.logger)),
         };
         return change
             ? { ...withNotice, next: { ...withNotice.next, ...change } }
             : withNotice;
+    }
+
+    /**
+     * "Mark visit N attended" (B14): `order:stage`, once the visit has
+     * started; the last one fulfils the order (`order-visit-attend.ts`).
+     */
+    markVisitAttended(
+        ctx: OrganizationContext,
+        orderId: string,
+        visitNumber: number,
+    ): Promise<VisitAttended> {
+        return markVisitAttended(ctx, orderId, visitNumber);
     }
 
     /** How the order's notices reach its customer (A14); null if unknown. */
@@ -1118,6 +1136,8 @@ const READ_INCLUDE = {
             status: true,
             source: true,
             paymentIntents: LEDGER_PAYMENTS,
+            // What the paper is called (D15): frozen on issue.
+            ...INVOICE_TITLE_SELECT,
         },
     },
     paymentIntents: {
