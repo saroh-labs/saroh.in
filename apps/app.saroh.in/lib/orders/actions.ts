@@ -11,6 +11,7 @@ import {
     changeOrderFulfilment,
     createOrderPayLink,
     editOrderBeforePreparing,
+    markOrderVisitAttended,
     moveOrderStage,
     refundOrderLines,
     retryOrderRefund,
@@ -41,6 +42,11 @@ export async function moveStage(orderId: string, input: MoveStageInput) {
 
 export async function saveCourier(orderId: string, input: CourierFields) {
     return saveOrderCourier(orderId, input);
+}
+
+/** "Mark visit N attended" on a treatment's order (B14). */
+export async function markVisitAttended(orderId: string, visitNumber: number) {
+    return markOrderVisitAttended(orderId, visitNumber);
 }
 
 export async function undoStage(orderId: string, eventId: string) {

@@ -128,6 +128,9 @@ export default async function OrderPage({
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),
                 contact: may("contact:read"),
+                // A treatment's visits (B14): open one, book the next.
+                bookingRead: may("booking:read"),
+                bookingWrite: may("booking:write"),
             }}
             customerHref={
                 contactId

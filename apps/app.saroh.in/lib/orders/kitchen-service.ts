@@ -126,6 +126,32 @@ export function saveOrderCourier(
     );
 }
 
+/**
+ * "Mark visit N attended" on a treatment's order (B14, `order:stage`): only
+ * once the visit has started; the last one fulfils the order.
+ */
+export function markOrderVisitAttended(
+    orderId: string,
+    visitNumber: number,
+): Promise<
+    CrmResult<{
+        visitNumber: number;
+        attended: number;
+        visits: number;
+        done: boolean;
+    }>
+> {
+    return mutate(
+        path(
+            orderId,
+            `/visits/${encodeURIComponent(String(visitNumber))}/attended`,
+        ),
+        "POST",
+        {},
+        "The visit wasn't marked. Try again.",
+    );
+}
+
 export function undoOrderStage(
     orderId: string,
     eventId: string,

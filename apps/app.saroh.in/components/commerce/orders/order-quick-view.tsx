@@ -23,6 +23,7 @@ import {
     quickPayment,
     quickSteps,
 } from "@/lib/orders/row-menu";
+import { quickVisitsText } from "@/lib/orders/visits";
 
 import { useOrderStep } from "./use-order-step";
 
@@ -398,7 +399,12 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                 {appointment ? (
                     <>
                         <dt className="text-muted-foreground">Visits</dt>
-                        <dd>Marked on the full page, as each one happens.</dd>
+                        <dd>
+                            {order.visits
+                                ? `${quickVisitsText(order.visits, order.visits.service.timezone, new Date())}. `
+                                : null}
+                            Marked on the full page, as each one happens.
+                        </dd>
                     </>
                 ) : null}
             </dl>

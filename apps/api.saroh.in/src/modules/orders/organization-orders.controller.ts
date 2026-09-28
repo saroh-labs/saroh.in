@@ -5,6 +5,7 @@ import {
     Header,
     HttpCode,
     Param,
+    ParseIntPipe,
     Patch,
     Post,
     Query,
@@ -174,6 +175,20 @@ export class OrganizationOrdersController {
         @Body() dto: MoveStageDto,
     ) {
         return this.kitchen.moveStage(ctx, orderId, dto);
+    }
+
+    /**
+     * "Mark visit N attended" on a treatment's order (B14): `order:stage`,
+     * once the visit has started. The last visit attended fulfils the order.
+     */
+    @Post(":orderId/visits/:visitNumber/attended")
+    @HttpCode(200)
+    markVisitAttended(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Param("visitNumber", ParseIntPipe) visitNumber: number,
+    ) {
+        return this.kitchen.markVisitAttended(ctx, orderId, visitNumber);
     }
 
     /** Undo the last kitchen step (`order:stage`). */

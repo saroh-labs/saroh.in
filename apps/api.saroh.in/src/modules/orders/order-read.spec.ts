@@ -155,7 +155,62 @@ describe("serializeOrderRead", () => {
         expect(
             serializeOrderRead(withPaper, { ...opts(true), invoiceRead: true })
                 .invoices,
-        ).toEqual(paper);
+        ).toEqual([
+            // An unregistered business's paid paper is a receipt (D15).
+            { ...paper[0], title: "Receipt" },
+            { ...paper[1], title: "Credit note" },
+        ]);
+    });
+
+    describe("names each paper as the invoice read does (D15)", () => {
+        const read = (invoice: Record<string, unknown>) =>
+            serializeOrderRead(
+                {
+                    ...base,
+                    invoices: [
+                        {
+                            id: "inv_1",
+                            number: "KD-0001",
+                            kind: "INVOICE",
+                            status: "PAID",
+                            ...invoice,
+                        },
+                    ],
+                },
+                { ...opts(true), invoiceRead: true },
+            ).invoices?.[0]?.title;
+
+        it("a registered clinic's treatment, every line at 0%, is a bill of supply", () => {
+            expect(
+                read({
+                    sellerGstin: "29ABCDE1234F1Z5",
+                    lines: [{ gstRate: "0.00" }],
+                }),
+            ).toBe("Bill of supply");
+        });
+
+        it("a registered business's taxed paper is a tax invoice", () => {
+            expect(
+                read({
+                    sellerGstin: "29ABCDE1234F1Z5",
+                    lines: [{ gstRate: "0.00" }, { gstRate: "5.00" }],
+                }),
+            ).toBe("Tax invoice");
+        });
+
+        it("a line whose rate was never set is not exempt", () => {
+            expect(
+                read({
+                    sellerGstin: "29ABCDE1234F1Z5",
+                    lines: [{ gstRate: null }],
+                }),
+            ).toBe("Tax invoice");
+        });
+
+        it("an unregistered business's paper is an invoice until it is paid", () => {
+            expect(read({ status: "ISSUED", dueAt: null })).toBe("Invoice");
+            expect(read({ status: "PAID" })).toBe("Receipt");
+        });
     });
 
     it("answers the type with its steps, and no legacy word (B2a, contracted by B2d)", () => {

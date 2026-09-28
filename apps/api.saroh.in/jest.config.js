@@ -146,6 +146,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/fulfilment.spec.ts",
         "<rootDir>/src/modules/orders/order-refunds.spec.ts",
         "<rootDir>/src/modules/orders/order-read.spec.ts",
+        // B14: a treatment's Visits card and its next action, pure.
+        "<rootDir>/src/modules/orders/order-visits.spec.ts",
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
