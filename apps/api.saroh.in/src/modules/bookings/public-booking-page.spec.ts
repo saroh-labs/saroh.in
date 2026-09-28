@@ -29,6 +29,12 @@ jest.mock("@saroh/database", () => {
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         merchantPaymentProvider: { findFirst: jest.fn() },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        // The class waitlist (A12): nobody in line, no place held.
+        classWaitlistEntry: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         staffService: { findMany: jest.fn().mockResolvedValue([]) },
         bookingRules: { findUnique: jest.fn().mockResolvedValue(null) },
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },

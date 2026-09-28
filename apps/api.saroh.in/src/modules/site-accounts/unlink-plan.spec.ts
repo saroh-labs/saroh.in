@@ -9,6 +9,7 @@ import {
     UNLINK_STAYS,
     unlinkMoves,
     unlinkSentence,
+    WAITLIST_MOVER,
 } from "./unlink-plan";
 
 /**
@@ -78,6 +79,14 @@ describe("unlinkSentence", () => {
 });
 
 /** A thread with nothing the account wrote in it (A13's mover). */
+/** No places in line (A12). */
+function noEntries() {
+    return {
+        count: jest.fn().mockResolvedValue(0),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+}
+
 function noMessages() {
     return {
         count: jest.fn().mockResolvedValue(0),
@@ -145,7 +154,35 @@ describe("counting and moving", () => {
             ["invoices", "Booking"],
             ["orders", "Order"],
             ["messages", "CustomerThreadMessage"],
+            ["waitlist", "ClassWaitlistEntry"],
         ]);
+    });
+
+    it("moves the places in line the account joined (A12), counting the live ones", async () => {
+        const classWaitlistEntry = {
+            count: jest.fn().mockResolvedValue(1),
+            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        };
+        const db = {
+            classWaitlistEntry,
+        } as unknown as Prisma.TransactionClient;
+        const where = {
+            organizationId: "org_1",
+            customerAccountId: "acc_1",
+            contactId: "c_farah",
+            createdAt: { gte: scope.since },
+        };
+        expect(await WAITLIST_MOVER.count(db, scope)).toBe(1);
+        expect(classWaitlistEntry.count).toHaveBeenCalledWith({
+            where: { ...where, status: { in: ["WAITING", "OFFERED"] } },
+        });
+        expect(
+            await WAITLIST_MOVER.move(db, { ...scope, toContactId: "c_new" }),
+        ).toBe(2);
+        expect(classWaitlistEntry.updateMany).toHaveBeenCalledWith({
+            where,
+            data: { contactId: "c_new" },
+        });
     });
 
     it("moves the identity links the account's own orders made, and counts those orders (A7)", async () => {
@@ -215,6 +252,7 @@ describe("counting and moving", () => {
             invoice,
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
             customerThreadMessage: noMessages(),
+            classWaitlistEntry: noEntries(),
         } as unknown as Prisma.TransactionClient;
         const where = {
             organizationId: "org_1",
@@ -247,6 +285,7 @@ describe("counting and moving", () => {
             invoice,
             customerIdentityLink: { findMany: jest.fn().mockResolvedValue([]) },
             customerThreadMessage: noMessages(),
+            classWaitlistEntry: noEntries(),
         } as unknown as Prisma.TransactionClient;
         const theirBooking = (on: string[]) => ({
             organizationId: "org_1",

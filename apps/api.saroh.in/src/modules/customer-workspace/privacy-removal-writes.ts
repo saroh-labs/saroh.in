@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { removeWaitlistInTx } from "../bookings/waitlist-merge";
 import { reservedRemovedEmail } from "../contacts/contact-email";
 import { anonymiseStoreCustomersInTx } from "../customers/anonymise-customer";
 import { destinationHashFor } from "../site-accounts/sign-in-codes.service";
@@ -204,6 +205,8 @@ export async function removeDetailsInTx(
     const threadMessages = await tx.customerThreadMessage.count({
         where: { organizationId, thread: { contactId } },
     });
+    // Their places in line go; a place held for them passes on (A12).
+    await removeWaitlistInTx(tx, { organizationId, contactId, now });
     // The thread goes with every message in it (A13).
     await tx.customerThread.deleteMany({
         where: { organizationId, contactId },

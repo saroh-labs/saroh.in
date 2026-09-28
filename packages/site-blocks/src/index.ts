@@ -163,6 +163,19 @@ export type {
     CreditFor,
     SignedInBookRequest,
 } from "./booking-flow/api";
+// A full class's waitlist (A12): the site's server actions join, leave and
+// read it with the session, and answer the page in the page's own terms.
+export {
+    isWaitlistJoined,
+    isWaitlistLeft,
+    isWaitlistPlaces,
+} from "./booking-flow/waitlist";
+export type {
+    WaitlistApi,
+    WaitlistJoined,
+    WaitlistPlaces,
+    WaitlistSession,
+} from "./booking-flow/waitlist";
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.

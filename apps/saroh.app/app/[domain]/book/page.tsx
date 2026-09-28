@@ -23,7 +23,13 @@ import {
     verifySignInCode,
 } from "../account/actions";
 import { moveBooking } from "../account/bookings/actions";
-import { bookSignedIn, creditFor } from "./actions";
+import {
+    bookSignedIn,
+    creditFor,
+    joinWaitlist,
+    leaveWaitlist,
+    waitlistFor,
+} from "./actions";
 
 /**
  * The customer's booking page on a merchant's site (U19): `/<domain>/book`,
@@ -44,6 +50,9 @@ import { bookSignedIn, creditFor } from "./actions";
  * not signed in, and the sheet goes without the phone line. The header's
  * place, hours and phone (E6) are the site's public visit read, the one
  * Visit us shows; without it the header names the business only.
+ *
+ * A full class offers its waitlist (round-2 A12): joined, read and left
+ * through `./actions.ts` with the session, like booking.
  *
  * `?move=<ref>` (round-2 A6, behind the account area's switch) moves one
  * of the signed-in customer's classes instead: "Moving: ‹class›", its other
@@ -131,6 +140,12 @@ export default async function BookPage({
                 book: bookSignedIn,
                 credit: creditFor,
                 signOut,
+                // A full class's waitlist (A12).
+                waitlist: {
+                    mine: waitlistFor,
+                    join: joinWaitlist,
+                    leave: leaveWaitlist,
+                },
             }}
             apiUrl={publicApiUrl()}
             initialServiceId={typeof service === "string" ? service : null}

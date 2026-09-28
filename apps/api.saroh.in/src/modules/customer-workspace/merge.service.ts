@@ -11,6 +11,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
+import { mergeWaitlistInTx } from "../bookings/waitlist-merge";
 import { reservedMergedEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
@@ -382,10 +383,11 @@ export class MergeService {
     }
 
     /**
-     * Work that follows a committed merge and must never roll it back. A12
-     * releases a second waitlist hold here. (The merged-away contact's
-     * mandates are cancelled inside the merge, with their `mandate.cancel`
-     * job written on its transaction: D20.)
+     * Work that follows a committed merge and must never roll it back. (The
+     * merged-away contact's mandates are cancelled inside the merge, with
+     * their `mandate.cancel` job written on its transaction: D20; a second
+     * waitlist hold is given up there too, its `waitlist.offer` job on the
+     * same transaction: A12.)
      */
     protected afterCommit(merged: MergedEvent): Promise<void> {
         this.logger.log(
@@ -697,6 +699,14 @@ async function moveRelations(tx: Tx, pair: Pair): Promise<void> {
 
     // One thread: the survivor's absorbs the other's (A13).
     await absorbThread(tx, pair.survivor.organizationId, from, to);
+
+    // Places in line: one per class, the better kept (A12).
+    await mergeWaitlistInTx(tx, {
+        organizationId: pair.survivor.organizationId,
+        from,
+        to,
+        now: new Date(),
+    });
 
     // "This isn't them" stays true of the survivor, unless the account now
     // signs in on it (then there is nobody to part it from).

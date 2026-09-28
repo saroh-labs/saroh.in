@@ -11,6 +11,7 @@ import { hasLiveAccount, noticeChannels } from "./notice-reach";
 import type { NoticeVars } from "./notify-templates";
 import { noticeSentence, renderNotice } from "./notify-templates";
 import { appendMessage } from "./thread-store";
+import { loadWaitlistOffer } from "./waitlist-notice";
 
 export { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
 
@@ -87,7 +88,7 @@ export class CustomerNotifyService {
         });
         if (claimed.count === 0) return { ...NOTHING, duplicate: true };
 
-        const subject = await loadSubject(tx, organizationId, payload);
+        const subject = await loadSubject(tx, organizationId, payload, now);
         if (!subject) return NOTHING;
         const contact = await resolveContact(
             tx,
@@ -189,6 +190,7 @@ export async function loadSubject(
     tx: Tx,
     organizationId: string,
     payload: CustomerNotifyPayload,
+    now: Date = new Date(),
 ): Promise<NoticeSubject | null> {
     switch (payload.kind) {
         case "BOOKING_CONFIRMED":
@@ -199,8 +201,8 @@ export async function loadSubject(
         case "ORDER_HANDED_OVER":
             return loadOrderStep(tx, organizationId, payload.kind, payload);
         case "WAITLIST_OFFER":
-            // A12 enqueues the offer and adds its reader here.
-            return null;
+            // A place held for them (A12), while it still is.
+            return loadWaitlistOffer(tx, organizationId, payload, now);
     }
 }
 

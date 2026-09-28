@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { discardStalePackDrafts } from "../class-packs/pack-checkout";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
+import { deleteOldEntries, expireLapsedOffers } from "./waitlist-offer";
 
 export { RELEASE_HOLDS_TYPE } from "./booking-hold";
 
@@ -17,7 +18,9 @@ export const RELEASE_BATCH = 200;
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
  * hold ran out is cancelled and its draft invoice voided (`releaseHoldInTx`).
  * Each run also voids the online pack drafts nobody paid within 24 hours
- * (A11, `class-packs/pack-checkout.ts`).
+ * (A11, `class-packs/pack-checkout.ts`), ends waitlist offers nobody
+ * answered in time — offering each place to the next in line — and deletes
+ * places in line closed 30 days ago (A12, `waitlist-offer.ts`).
  *
  * Reads never wait for this — a hold past its time already holds nothing
  * (`holdsPlace`) — so the sweep only writes down what is already true, and a
@@ -40,6 +43,7 @@ export class ReleaseHoldsHandler {
             );
         }
         await this.discardPackDrafts(new Date());
+        await this.tidyWaitlist(new Date());
         const next = new Date(Date.now() + (full ? 0 : RELEASE_EVERY_MS));
         if (!(await this.schedule(next))) {
             throw new Error(
@@ -65,6 +69,27 @@ export class ReleaseHoldsHandler {
                 `Could not discard unpaid pack drafts: ${String(error)}`,
             );
             return 0;
+        }
+    }
+
+    /**
+     * The class waitlist's part (A12): offers whose time ran out are ended
+     * and their places offered on (`expireLapsedOffers`; an offer's own
+     * delayed job normally gets there first), and places in line closed 30
+     * days ago are deleted (default 74). Never throws; a failed run is
+     * logged and the next one tries again.
+     */
+    async tidyWaitlist(now: Date): Promise<void> {
+        try {
+            const ended = await expireLapsedOffers(now);
+            if (ended > 0) {
+                this.logger.log(`Ended ${ended} unanswered waitlist offers`);
+            }
+            await deleteOldEntries(now);
+        } catch (error) {
+            this.logger.error(
+                `Could not tidy the class waitlists: ${String(error)}`,
+            );
         }
     }
 

@@ -30,6 +30,7 @@ export function DetailsStep({
     note,
     onWhere,
     onNote,
+    forWaitlist = false,
 }: {
     /** The flow's `useId()`, so each field's id is its own. */
     ids: string;
@@ -47,6 +48,11 @@ export function DetailsStep({
     note: string;
     onWhere: (where: BookingWhere) => void;
     onNote: (note: string) => void;
+    /**
+     * Joining a full class's waitlist (A12): who they are is all it needs,
+     * so Where and the note wait for the booking.
+     */
+    forWaitlist?: boolean;
 }) {
     const asksName = !customer?.name;
     return (
@@ -74,7 +80,8 @@ export function DetailsStep({
             ) : (
                 <p className="text-site-muted -mt-1.5 mb-3 ml-[38px] text-[13px]">
                     You&apos;ll confirm your email with a code. No password.
-                    Only used so {business} can reach you about this booking.
+                    Only used so {business} can reach you about this{" "}
+                    {forWaitlist ? "class" : "booking"}.
                 </p>
             )}
             {asksName ? (
@@ -91,15 +98,17 @@ export function DetailsStep({
                     }
                 />
             ) : null}
-            <WhereAndNote
-                ids={ids}
-                business={business}
-                asksWhere={asksWhere}
-                where={where}
-                note={note}
-                onWhere={onWhere}
-                onNote={onNote}
-            />
+            {forWaitlist ? null : (
+                <WhereAndNote
+                    ids={ids}
+                    business={business}
+                    asksWhere={asksWhere}
+                    where={where}
+                    note={note}
+                    onWhere={onWhere}
+                    onNote={onNote}
+                />
+            )}
         </div>
     );
 }

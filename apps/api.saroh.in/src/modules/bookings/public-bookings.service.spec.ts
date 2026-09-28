@@ -42,6 +42,12 @@ jest.mock("@saroh/database", () => {
         site: { findUnique: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        // The class waitlist (A12): nobody in line, no place held.
+        classWaitlistEntry: {
+            count: jest.fn().mockResolvedValue(0),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         course: { findFirst: jest.fn().mockResolvedValue(null) },
         packRedemption: {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),

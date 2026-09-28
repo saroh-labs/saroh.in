@@ -12,11 +12,12 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
-import { courseSeatsHeld } from "./course-seats";
+import { seatsHeld } from "./held-seats";
 import type { ReserveWith } from "./reservation";
 import { assertPersonFreeInTx } from "./reservation";
 import { useMembershipInTx } from "./use-membership";
 import { refuseClosedTreatment } from "./visits";
+import { acceptWaitlistInTx, offerFreedPlaceInTx } from "./waitlist-queue";
 
 /*
  * Moving a booking to another start (#121, U3), whoever moves it: the team
@@ -156,11 +157,14 @@ export async function moveFoundBooking(
                             id: { not: booking.id },
                         },
                     });
-                    const held = await courseSeatsHeld(
+                    // With what courses and waitlist offers hold (A12) —
+                    // a place held for this very person is theirs to take.
+                    const held = await seatsHeld(
                         tx,
                         service.id,
                         clear.startAt,
                         clear.endAt,
+                        { exceptContactId: booking.contactId },
                     );
                     if (count + held >= service.capacity) {
                         throw taken(
@@ -215,6 +219,24 @@ export async function moveFoundBooking(
                     where: { id: booking.id },
                     data: { startAt, endAt },
                 });
+                // The place it left is free for the old session's line,
+                // and a place they were in line for here is taken (A12).
+                if (booking.startAt.getTime() !== startAt.getTime()) {
+                    await offerFreedPlaceInTx(tx, {
+                        organizationId: actor.organizationId,
+                        serviceId: service.id,
+                        startAt: booking.startAt,
+                    });
+                }
+                if (booking.contactId) {
+                    await acceptWaitlistInTx(tx, {
+                        serviceId: service.id,
+                        startAt,
+                        contactId: booking.contactId,
+                        bookingId: booking.id,
+                        now: new Date(),
+                    });
+                }
                 // No actor is the customer themselves ("by the customer").
                 const event = await tx.bookingEvent.create({
                     data: {

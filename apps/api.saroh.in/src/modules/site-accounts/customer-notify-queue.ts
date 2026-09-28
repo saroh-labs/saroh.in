@@ -35,6 +35,8 @@ export interface CustomerNotifyPayload {
     orderId?: string;
     /** The OrderEvent it is about: the step an Undo names. */
     orderEventId?: string;
+    /** The place in line a freed place is offered to (A12). */
+    waitlistEntryId?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job">;

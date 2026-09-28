@@ -22,7 +22,7 @@ import {
     workingIntervals,
 } from "./availability";
 import { holdsPlace } from "./booking-hold";
-import { courseSeatIntervals } from "./course-seats";
+import { heldSeatIntervals } from "./held-seats";
 import type { ReserveWith } from "./reservation";
 import {
     businessTimezone,
@@ -279,7 +279,8 @@ export async function refuseIfClosed(
 
 /**
  * What fills a service's time over `[from, to)`: its confirmed bookings,
- * and the seats open courses still hold on their sessions (ADR-007).
+ * the seats open courses still hold on their sessions (ADR-007), and the
+ * places held for someone on a class's waitlist (A12).
  */
 export async function busyOverlapping(
     serviceId: string,
@@ -288,7 +289,7 @@ export async function busyOverlapping(
 ): Promise<Interval[]> {
     const [confirmed, held] = await Promise.all([
         confirmedOverlapping(serviceId, from, to),
-        courseSeatIntervals(prisma, serviceId, from, to),
+        heldSeatIntervals(prisma, serviceId, from, to),
     ]);
     return [...confirmed, ...held];
 }

@@ -232,3 +232,22 @@ export class AccountBookingTimeDto {
     @IsISO8601()
     startAt!: string;
 }
+
+// ---- The class waitlist (A12) -----------------------------------------------
+
+/** One session of a class: its service and its start. */
+export class WaitlistSessionDto {
+    @IsString()
+    @MaxLength(64)
+    serviceId!: string;
+
+    @IsISO8601()
+    startAt!: string;
+}
+
+/** The customer's places in line for one service's classes. */
+export class WaitlistQueryDto {
+    @IsString()
+    @MaxLength(64)
+    serviceId!: string;
+}
