@@ -3370,6 +3370,13 @@ model Contact {
   // merge: the merged-away person's are cancelled (D20).
   paymentMandates PaymentMandate[]
 
+  // When staff removed their details for a privacy request (DEC-042, C11).
+  // The row stays so orders, invoices and bookings keep their keys; its
+  // email is the `removed+<id>@removed.invalid` placeholder, and name,
+  // phone, company and address are cleared. Lists, search and Customer
+  // Detail leave it out, and `resolveContact` writers refuse it.
+  removedAt DateTime?
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same

@@ -60,6 +60,10 @@ export const AuditAction = {
     // the timeline reads it as "Details changed". Metadata names the parts
     // that changed (`fields`: firstName, email, address, …), never a value.
     CustomerDetailsChanged: "customer.details.changed",
+    // A customer's details removed for a privacy request (DEC-042, C11),
+    // written in the removal's transaction with the contact as the target.
+    // Counts only (what was deleted, blanked or cancelled), never a value.
+    CustomerRemoved: "customer.removed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
