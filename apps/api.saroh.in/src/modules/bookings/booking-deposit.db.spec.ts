@@ -5,7 +5,8 @@
  * once — PENDING, then SUCCEEDED with a credit note when the provider
  * confirms — and a late one keeping it; the free-cancel deadline fixed at
  * booking, so a move never makes a late cancel free; an unsure provider
- * holding the refund; and two cancels racing for one refund.
+ * holding the refund; and two cancels racing for one refund. And the
+ * business's own refund policy for cancels in time (E30, DEC-058).
  *
  * Only the app env is stubbed; the provider and the webhook verifier are
  * the network-free fakes. Runs in the integration project.
@@ -28,6 +29,7 @@ import {
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
 import { PublicInvoicesService } from "../payments/public-invoices.service";
+import { StaffService } from "../staff/staff.service";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -187,6 +189,8 @@ describe("a deposit at booking (E8, real database)", () => {
             deposit: true,
             dueCents: 40_000,
             refund: null,
+            refundableCents: 40_000,
+            refundInTimeCancels: true,
         });
     });
 
@@ -537,5 +541,158 @@ describe("cancelling a booking with a deposit (E8, DEC-051, real database)", () 
         expect(out.money).toEqual({ refund: null, kept: null });
         const detail = await bookings.getBooking(owner, booking.id);
         expect(detail.money.paidOnlineCents).toBe(0);
+    });
+});
+
+describe("the business's refund policy for cancels in time (E30, DEC-058, real database)", () => {
+    const staff = new StaffService();
+    const inTime = (startAt: Date) => new Date(startAt.getTime() - 48 * HOUR);
+    afterEach(async () => {
+        await staff.updateBookingRules(owner, { refundInTimeCancels: true });
+    });
+
+    it("never set: on, as E8 shipped, and the booking page says so", async () => {
+        await expect(
+            prisma.bookingRules.findUniqueOrThrow({
+                where: { organizationId: owner.organizationId },
+            }),
+        ).resolves.toMatchObject({
+            freeCancelHours: 24,
+            refundInTimeCancels: true,
+        });
+        const { booking, startAt } = await depositPaid(
+            "policy-default@example.in",
+        );
+        const before = await bookings.getBooking(owner, booking.id);
+        expect(before.money).toMatchObject({
+            paidOnlineCents: 40_000,
+            refundableCents: 40_000,
+            refundInTimeCancels: true,
+        });
+        const out = await bookings.cancelBooking(
+            owner,
+            booking.id,
+            inTime(startAt),
+        );
+        expect(out.money.refund).toMatchObject({ amountCents: 40_000 });
+        const after = await bookings.getBooking(owner, booking.id);
+        expect(after.money.refundableCents).toBe(0);
+    });
+
+    it("off: a cancel in time keeps what was paid, and the booking page says so", async () => {
+        await expect(
+            staff.updateBookingRules(owner, { refundInTimeCancels: false }),
+        ).resolves.toMatchObject({
+            freeCancelHours: 24,
+            refundInTimeCancels: false,
+        });
+        const { booking, startAt } = await depositPaid("policy-off@example.in");
+        expect(
+            (await bookings.getBooking(owner, booking.id)).money
+                .refundInTimeCancels,
+        ).toBe(false);
+        const calls = fake.refundCalls.length;
+
+        const out = await bookings.cancelBooking(
+            desk,
+            booking.id,
+            inTime(startAt),
+        );
+        expect(out.cancelledLate).toBe(false);
+        expect(out.money).toEqual({
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        });
+        expect(fake.refundCalls.length).toBe(calls);
+        expect(
+            await prisma.paymentRefund.count({
+                where: { idempotencyKey: `deposit-refund:${booking.id}` },
+            }),
+        ).toBe(0);
+    });
+
+    it("off: someone who may refund hands it back by hand; the desk can't", async () => {
+        await staff.updateBookingRules(owner, { refundInTimeCancels: false });
+        const first = await depositPaid("policy-off-owner@example.in");
+        const byOwner = await bookings.cancelBooking(
+            owner,
+            first.booking.id,
+            inTime(first.startAt),
+            { returnCredit: true },
+        );
+        expect(byOwner.money.refund).toMatchObject({ amountCents: 40_000 });
+        await expect(
+            prisma.paymentRefund.findFirstOrThrow({
+                where: { idempotencyKey: `deposit-refund:${first.booking.id}` },
+            }),
+        ).resolves.toMatchObject({
+            amountCents: 40_000,
+            reason: "Booking cancelled by the business",
+        });
+
+        const second = await depositPaid("policy-off-desk@example.in");
+        const byDesk = await bookings.cancelBooking(
+            desk,
+            second.booking.id,
+            inTime(second.startAt),
+            { returnCredit: true },
+        );
+        expect(byDesk.money).toEqual({
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        });
+    });
+
+    it("on: a late cancel is still kept", async () => {
+        const { booking, startAt } = await depositPaid(
+            "policy-late@example.in",
+        );
+        const out = await bookings.cancelBooking(
+            owner,
+            booking.id,
+            new Date(startAt.getTime() - 2 * HOUR),
+        );
+        expect(out.money).toEqual({
+            refund: null,
+            kept: { amountCents: 40_000, currency: "INR" },
+        });
+    });
+
+    it("never refunds more than is left of what was received", async () => {
+        const { booking, intent, startAt } = await depositPaid(
+            "policy-cap@example.in",
+        );
+        const row = await prisma.paymentIntent.findFirstOrThrow({
+            where: { providerIntentId: intent.providerIntentId },
+        });
+        // 150 already went back; a refund that failed doesn't count.
+        await prisma.paymentRefund.createMany({
+            data: [
+                {
+                    organizationId: owner.organizationId,
+                    paymentIntentId: row.id,
+                    amountCents: 15_000,
+                    currency: "INR",
+                    status: "SUCCEEDED",
+                },
+                {
+                    organizationId: owner.organizationId,
+                    paymentIntentId: row.id,
+                    amountCents: 40_000,
+                    currency: "INR",
+                    status: "FAILED",
+                },
+            ],
+        });
+        expect(
+            (await bookings.getBooking(owner, booking.id)).money
+                .refundableCents,
+        ).toBe(25_000);
+        const out = await bookings.cancelBooking(
+            owner,
+            booking.id,
+            inTime(startAt),
+        );
+        expect(out.money.refund).toMatchObject({ amountCents: 25_000 });
     });
 });

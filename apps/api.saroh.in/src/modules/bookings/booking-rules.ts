@@ -8,20 +8,40 @@ import type { Prisma } from "@saroh/database";
  *
  * Book-ahead and latest-booking bind the customer (the booking page); the
  * merchant booking someone in by hand is not held to their own customer
- * rules. Free cancellation decides only whether a class that was paid for —
- * by a pack or a membership — comes back.
+ * rules. Free cancellation decides whether a class that was paid for — by
+ * a pack or a membership — comes back, and whether a cancel is in time.
+ *
+ * `refundInTimeCancels` is the business's refund policy (E30, DEC-058):
+ * whether money paid online goes back automatically when a booking is
+ * cancelled in time. On by default — what E8 shipped — so a business that
+ * never set it, or has no rules row, keeps refunding.
  */
 export interface BookingRulesValue {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
     freeCancelHours: number | null;
+    refundInTimeCancels: boolean;
 }
 
 export const NO_BOOKING_RULES: BookingRulesValue = {
     bookAheadDays: null,
     latestBookingMinutes: null,
     freeCancelHours: null,
+    refundInTimeCancels: true,
 };
+
+/**
+ * Whether a cancel refunds what was paid online on its own (DEC-058): only
+ * in time, and only when the business's policy says so. A late cancel never
+ * does; money is handed back past that only by someone who may refund
+ * (`payment:manage`), by hand. Pure.
+ */
+export function refundsAutomatically(
+    inTime: boolean,
+    rules: Pick<BookingRulesValue, "refundInTimeCancels">,
+): boolean {
+    return inTime && rules.refundInTimeCancels;
+}
 
 /** A refusal the error filter carries to the form as `details.field`. */
 export interface FieldRefusal {
@@ -130,6 +150,7 @@ export async function loadBookingRules(
             bookAheadDays: true,
             latestBookingMinutes: true,
             freeCancelHours: true,
+            refundInTimeCancels: true,
         },
     });
     return row ?? NO_BOOKING_RULES;

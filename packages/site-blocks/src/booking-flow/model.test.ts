@@ -139,6 +139,32 @@ describe("the words on the booking page (U19)", () => {
         expect(text).not.toMatch(/email|text|link|SMS/i);
     });
 
+    it("states a no-refund policy only to someone paying online (E30)", () => {
+        const kept = {
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: 12,
+            refundInTimeCancels: false,
+        };
+        expect(rulesText(kept, true)).toBe(
+            "Free to cancel until 12 hours before the start. What you pay online isn't refunded automatically if you cancel.",
+        );
+        expect(rulesText(kept, false)).toBe(
+            "Free to cancel until 12 hours before the start.",
+        );
+        expect(changeText("Kavi Dental", kept, true)).toBe(
+            "Need to change it? Get in touch with Kavi Dental. Free to cancel until 12 hours before the start. What you pay online isn't refunded automatically if you cancel.",
+        );
+        // On, or from an API older than the policy: reads as before.
+        const on = { ...kept, refundInTimeCancels: true };
+        expect(rulesText(on, true)).toBe(
+            "Free to cancel until 12 hours before the start.",
+        );
+        expect(changeText("Kavi Dental", on, true)).toBe(
+            "Need to change it? Get in touch with Kavi Dental. Free to cancel until 12 hours before the start.",
+        );
+    });
+
     it("counts a class's places", () => {
         expect(placesText(0)).toBe("Full");
         expect(placesText(1)).toBe("1 place left");

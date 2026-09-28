@@ -31,8 +31,8 @@ export function DoneCard({
             startAt: booking.startAt,
             endAt: booking.endAt,
             description: booking.meetingUrl
-                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules)}`
-                : changeText(business, rules),
+                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules, phase.paid)}`
+                : changeText(business, rules, phase.paid),
         });
         const url = URL.createObjectURL(
             new Blob([ics], { type: "text/calendar;charset=utf-8" }),
@@ -113,7 +113,7 @@ export function DoneCard({
                 </button>
             </div>
             <p className="text-site-muted border-site-border mt-4 border-t pt-3.5 text-[12.5px] leading-[1.55]">
-                {changeText(business, rules)}
+                {changeText(business, rules, phase.paid)}
             </p>
         </div>
     );
