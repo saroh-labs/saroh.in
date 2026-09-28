@@ -550,6 +550,29 @@ const journalV1 = z.object({
     showImages: z.boolean().optional(),
 });
 
+/**
+ * plans v1 — the business's subscription plans on sale, read live (G9).
+ *
+ * A bound block (ADR-004): it stores the section title and how the plans
+ * show, never a plan. They are read when the page is served
+ * (`GET public/sites/:siteId/plans`): only plans on sale (published and
+ * active), with their published values, never a draft or an unpublished
+ * change, and nothing at all while Payments is off for the business.
+ *
+ * `highlight` marks the first plan ("Most chosen"); ABSENT means `first`.
+ * `buttonLabel` is the card's button; ABSENT means the block's own default.
+ * `showDescriptions` defaults to on, so ABSENT means shown. With no plan on
+ * sale the block renders nothing on the site; the editor's canvas says why.
+ */
+const plansV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    highlight: z.enum(["first", "none"]).optional(),
+    buttonLabel: z.string().trim().max(40).optional(),
+    showDescriptions: z.boolean().optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -649,6 +672,7 @@ export const SECTION_TYPES = [
     "servicesList",
     "visitUs",
     "journal",
+    "plans",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -780,6 +804,13 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // A title, a count and two switches; the posts are read live.
         schema: journalV1,
+        sanitizedFields: [],
+    },
+    [key("plans", 1)]: {
+        type: "plans",
+        version: 1,
+        // A title and display options; the plans are read live.
+        schema: plansV1,
         sanitizedFields: [],
     },
 };

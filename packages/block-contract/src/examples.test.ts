@@ -36,6 +36,7 @@ describe("the example a block starts with", () => {
             "servicesList",
             "visitUs",
             "journal",
+            "plans",
         ] as const) {
             expect(blockExample(type)).toBeUndefined();
         }

@@ -391,6 +391,7 @@ describe("per-section padding override (#189)", () => {
         servicesList: { serviceIds: ["svc_1"] },
         visitUs: {},
         journal: {},
+        plans: {},
     };
 
     it("is accepted on every section type", () => {
