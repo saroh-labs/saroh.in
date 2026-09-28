@@ -8,7 +8,7 @@ import type { WeekColumn } from "@/lib/calendar/week-columns";
 import { TONE_FILL } from "./tones";
 
 /** Closed, or the person picked is off: the month's stripes (E24). */
-const STRIPED =
+export const STRIPED =
     "bg-[repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--neutral-50))_6px_12px)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--muted))_6px_12px)]";
 
 /** The day header for a date, for handing focus back when its sheet closes. */

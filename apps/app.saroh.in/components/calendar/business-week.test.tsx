@@ -232,3 +232,124 @@ describe("BusinessWeek: the Week as card columns (E25)", () => {
         ).toBe(true);
     });
 });
+
+/**
+ * Pulse's week (E27): a business with a team sees an hour grid. Vikram has
+ * personal training at 07:00 on Tuesday and Neha a class at 07:30 that
+ * overlaps it; a renewal falls on Wednesday. Vikram works 06:00–10:00.
+ */
+function timed(
+    id: string,
+    type: "booking" | "service",
+    time: string,
+    minutes: number,
+    staffId: string,
+): CalendarItem {
+    return {
+        id,
+        kind: "booked",
+        title: `${id} · Kiran Das`,
+        subtitle: null,
+        at: at("2026-09-15", time),
+        link: { type, id },
+        staffId,
+        durationMinutes: minutes,
+        amount: "1200.00",
+        currency: "INR",
+    };
+}
+
+function pulse(): CalendarMonth {
+    return rye({
+        layers: ["bookings", "classes", "subscriptions"],
+        totals: { bookings: 1, classes: 1, subscriptions: 1 },
+        days: weekDates("2026-09-14").map((date) =>
+            date === "2026-09-15"
+                ? day(date, {
+                      bookings: [timed("pt", "booking", "07:00", 60, "vikram")],
+                      classes: [timed("hatha", "service", "07:30", 75, "neha")],
+                  })
+                : date === "2026-09-16"
+                  ? day(date, {
+                        subscriptions: [
+                            {
+                                id: "m1",
+                                kind: "renewal",
+                                title: "Meghna Iyer",
+                                subtitle: "Monthly",
+                                at: null,
+                                link: { type: "subscription", id: "m1" },
+                            },
+                        ],
+                    })
+                  : { date, layers: {}, toActOn: 0 },
+        ),
+        hasStaff: true,
+        staff: [
+            { id: "neha", name: "Neha", title: "Yoga teacher" },
+            { id: "vikram", name: "Vikram", title: "Trainer" },
+        ],
+        hours: weekDates("2026-09-14")
+            .slice(0, 6)
+            .map((date) => ({
+                date,
+                startMinute: 360,
+                endMinute: 600,
+                staffId: "vikram",
+            })),
+    });
+}
+
+describe("BusinessWeek: the hour grid for a business with a team (E27)", () => {
+    it("draws bookings and classes by the hour, side by side where they overlap", () => {
+        render(pulse());
+        expect(host.textContent).toContain("All day");
+        const pt = host.querySelector<HTMLAnchorElement>(
+            'a[href="/bookings/pt"]',
+        );
+        const yoga = host.querySelector<HTMLAnchorElement>(
+            'a[href="/services/hatha"]',
+        );
+        expect(pt?.textContent).toContain("07:00–08:00");
+        expect(pt?.style.width).toBe("calc(50% - 4px)");
+        expect(yoga?.textContent).toContain("07:30–08:45");
+        expect(yoga?.style.left).toBe("calc(50% + 2px)");
+        // One hour below 06:00 is 44px, less the 1px inset.
+        expect(pt?.style.top).toBe("45px");
+        // Each day's header still opens it.
+        expect(
+            host.querySelectorAll("#calendar-week button[data-day]"),
+        ).toHaveLength(7);
+    });
+
+    it("puts a renewal in the All day row, opening its record", () => {
+        render(pulse());
+        const renewal = host.querySelector<HTMLAnchorElement>(
+            'a[href="/billing/subscriptions/m1"]',
+        );
+        expect(renewal?.textContent).toBe("Renewed · Meghna Iyer");
+    });
+
+    it("no block carries a price", () => {
+        render(pulse());
+        expect(host.querySelector("#calendar-week")?.textContent).not.toContain(
+            "₹",
+        );
+    });
+
+    it("a business without a team keeps the card columns", () => {
+        render(rye());
+        expect(host.textContent).not.toContain("All day");
+    });
+
+    it("opens the day as a sheet from the grid's header", () => {
+        render(pulse());
+        const header = host.querySelector<HTMLButtonElement>(
+            '#calendar-week [data-day="2026-09-15"]',
+        );
+        act(() => header?.click());
+        expect(
+            document.querySelector('[role="dialog"]')?.textContent,
+        ).toContain("Tue 15 Sep");
+    });
+});

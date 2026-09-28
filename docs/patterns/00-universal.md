@@ -76,8 +76,9 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,411 after E19, E20 and B13, whose range,
-  days-off and payments reads already sit in their own files; split next),
+  (1,173), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  days-off, payments and working-hours reads already sit in their own files;
+  E27 added only the response's `hours` field; split next),
   `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
   B9 kept its change of fulfilment and its cancel out of the kitchen
   service (`order-fulfilment-change.service.ts`, 402, one transaction and
@@ -145,6 +146,12 @@ each with why it stops there:
   columns `week-columns.tsx`, and its rules `lib/calendar/week.ts` (dates,
   title, edges, address) and `lib/calendar/week-columns.ts` (what each
   column and card says).
+  E27 (the Week's hour grid for a business with a team) left `layers.ts`
+  and `business-calendar.tsx` untouched too: the grid is
+  `week-hour-grid.tsx`, its days `lib/calendar/week-hours.ts` and its
+  geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
+  chooses between it and the columns. The API's working hours are
+  `calendar/working-hours.ts`, read beside the days off.
 - `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
   F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
