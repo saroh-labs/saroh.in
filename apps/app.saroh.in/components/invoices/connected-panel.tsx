@@ -9,6 +9,7 @@ import {
     sourceHint,
     sourceHref,
 } from "@/lib/invoices/links";
+import { sentLine } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, isOwed, paidBy, sourceLine } from "@/lib/invoices/status";
 
@@ -151,8 +152,9 @@ export function ConnectedPanel({
 }
 
 /**
- * "What happened", newest first — from the invoice's own dates, so it says
- * only what is recorded: drafted, issued, paid (and how), voided, and the
+ * "What happened", newest first — from the invoice's own dates and its
+ * sends, so it says only what is recorded: drafted, issued, sent and
+ * reminded (D17, and why one didn't go), paid (and how), voided, and the
  * corrections made against it.
  */
 export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
@@ -180,6 +182,9 @@ export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
                 : "Paid",
             when: i.paidAt,
         });
+    }
+    for (const s of i.sent ?? []) {
+        events.push({ key: s.id, what: sentLine(s), when: s.at });
     }
     if (i.issuedAt) {
         const by = i.order
