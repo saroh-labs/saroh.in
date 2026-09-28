@@ -28,6 +28,7 @@ const LAYER_HOME: Record<LayerKey, string> = {
     invoices: "/billing/invoices",
     bookings: "/bookings",
     classes: "/bookings",
+    payments: "/billing/invoices",
 };
 
 /**

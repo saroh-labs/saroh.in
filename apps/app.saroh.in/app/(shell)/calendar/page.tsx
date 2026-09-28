@@ -32,10 +32,12 @@ const FALLBACK_ZONE = "Asia/Kolkata";
  * is, and on the rare hour the server's guess falls in a different month, the
  * page reads again rather than open on the wrong one. A month before the
  * business joined, or past what can be planned, opens the nearest one the
- * calendar reaches (E21). `?day=YYYY-MM-DD` opens it on that day: a key in
- * the grid that moves past the month's edge asks for it (E28).
+ * calendar reaches (E21): the API refuses it and names that month (E20).
+ * `?day=YYYY-MM-DD` opens it on that day: a key in the grid that moves past
+ * the month's edge asks for it (E28).
  *
- * A role that reads none of the layers is told so before anything is read.
+ * A role that reads none of the layers is told so before anything is read,
+ * and again if the API refuses it (E20's 403).
  */
 export default async function CalendarPage({
     searchParams,
@@ -57,10 +59,25 @@ export default async function CalendarPage({
     const chosen =
         typeof asked === "string" && MONTH.test(asked) ? asked : null;
 
-    let data = await getCalendarMonth(chosen ?? monthNow(FALLBACK_ZONE));
-    if (data && !chosen && data.month !== monthNow(data.timezone)) {
-        data = await getCalendarMonth(monthNow(data.timezone));
+    let read = await getCalendarMonth(chosen ?? monthNow(FALLBACK_ZONE));
+    if (
+        read?.kind === "month" &&
+        !chosen &&
+        read.data.month !== monthNow(read.data.timezone)
+    ) {
+        read = await getCalendarMonth(monthNow(read.data.timezone));
     }
+    if (read?.kind === "locked") return <CalendarLocked />;
+    // Out of reach (E20): the API names the month to open — the joined one,
+    // or the last that can be planned — so open it rather than fail.
+    if (read?.kind === "open") {
+        redirect(
+            read.month === monthNow(FALLBACK_ZONE)
+                ? "/calendar"
+                : `/calendar?month=${read.month}`,
+        );
+    }
+    const data = read?.kind === "month" ? read.data : null;
 
     if (data && chosen) {
         const thisMonth = monthNow(data.timezone);
