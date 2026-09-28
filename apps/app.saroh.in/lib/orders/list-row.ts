@@ -99,7 +99,7 @@ export function ageWords(minutes: number): string {
  * How long a row has waited, and "Late · 3 h" once the API says it is late.
  * Only while the order is still on its way: a finished, refunded or
  * cancelled order has nothing to wait for. An appointment goes by its
- * visits, not the clock, so it shows none (B14 brings "Next visit").
+ * visits, not the clock, so it shows none ("Next 19 Sep" is a follow-up to B14).
  */
 export function rowAge(
     row: Pick<
