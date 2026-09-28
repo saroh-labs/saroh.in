@@ -4810,7 +4810,7 @@ model SubscriptionPlan {
   price       Decimal @db.Decimal(12, 2)
   currency    String
   interval    String // WEEK | MONTH | QUARTER | YEAR
-  status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
+  status      String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED — only ACTIVE takes new subscribers (D21)
 
   // A membership's classes a month (U3). Null: as many as they like.
   classesPerMonth Int?
@@ -4829,6 +4829,20 @@ model SubscriptionPlan {
   // business's plan.
   @@unique([id, organizationId])
   @@index([organizationId])
+
+  // Drafts (round-2 D5, `common/drafts/`). A live plan's unpublished changes:
+  // only the fields that differ from the published columns, which buyers
+  // keep reading. Null when there are none. A DRAFT plan writes its columns
+  // directly and never holds a pending set.
+  pendingChanges     Json?
+  // When, and by whom, the pending set (or a draft's columns) was last
+  // saved. Null once published or discarded. No foreign key: a teammate who
+  // leaves keeps their saves; a Saroh operator's is never stored (DEC-035).
+  pendingChangedAt   DateTime?
+  pendingChangedById String?
+  // Bumped by every draft save, publish, discard and plan write, so an
+  // editor holding an older revision is refused instead of overwriting (#285).
+  draftRevision      Int       @default(0)
 }
 
 // One change to a plan: who made it, when, and each changed field's value
