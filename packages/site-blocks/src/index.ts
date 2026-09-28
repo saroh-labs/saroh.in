@@ -95,11 +95,16 @@ export type {
     BookingFlowProps,
 } from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
-export { isBookResult, isBookingPage } from "./booking-flow/model";
+export {
+    isBookResult,
+    isBookingPage,
+    isCreditAnswer,
+} from "./booking-flow/model";
 export type {
     BookResult,
     BookingPageData,
     BookingService,
+    CreditAnswer,
 } from "./booking-flow/model";
 // Booking signed in (A9): the site's server action books, and answers the
 // page in the page's own terms.
@@ -107,6 +112,7 @@ export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
 export type {
     BookSignedIn,
     Result as BookingResult,
+    CreditFor,
     SignedInBookRequest,
 } from "./booking-flow/api";
 

@@ -33,8 +33,19 @@ export function accountBookingBody(
     const idempotencyKey = text(r.idempotencyKey, MAX_KEY);
     if (!serviceId || !startAt || !idempotencyKey) return null;
     // A deposit (E8) is one of the page's ways to pay; its amount is the
-    // server's.
-    if (r.pay !== "NOW" && r.pay !== "DEPOSIT" && r.pay !== "DESK") {
+    // server's. A credit (A10) names the pack or the membership it was
+    // offered, one of them — the API checks it is theirs.
+    if (
+        r.pay !== "NOW" &&
+        r.pay !== "DEPOSIT" &&
+        r.pay !== "DESK" &&
+        r.pay !== "CREDIT"
+    ) {
+        return null;
+    }
+    const packPurchaseId = text(r.packPurchaseId, MAX_ID);
+    const subscriptionId = text(r.subscriptionId, MAX_ID);
+    if (r.pay === "CREDIT" && !packPurchaseId === !subscriptionId) {
         return null;
     }
     if (
@@ -50,6 +61,10 @@ export function accountBookingBody(
         idempotencyKey,
         pay: r.pay,
     };
+    if (r.pay === "CREDIT") {
+        if (packPurchaseId) body.packPurchaseId = packPurchaseId;
+        if (subscriptionId) body.subscriptionId = subscriptionId;
+    }
     const staffId = text(r.staffId, MAX_ID);
     if (staffId) body.staffId = staffId;
     const bookerName = text(r.bookerName, MAX_NAME);

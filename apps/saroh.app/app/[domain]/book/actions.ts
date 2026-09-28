@@ -3,9 +3,15 @@
 import type {
     BookingResult,
     BookResult,
+    CreditAnswer,
     SignedInBookRequest,
 } from "@saroh/site-blocks";
-import { isBookResult, OFFLINE_RESULT, resultOf } from "@saroh/site-blocks";
+import {
+    isBookResult,
+    isCreditAnswer,
+    OFFLINE_RESULT,
+    resultOf,
+} from "@saroh/site-blocks";
 
 import { accountBookingBody } from "@/lib/account-booking";
 import { accountFetch } from "@/lib/customer-session";
@@ -48,5 +54,45 @@ export async function bookSignedIn(
         call.res.status,
         await call.res.json().catch(() => null),
         isBookResult,
+    );
+}
+
+const MAX_ID = 64;
+
+/**
+ * The class credit the signed-in customer could pay with (round-2 A10), for
+ * the pay step: `GET public/site-accounts/bookings/credit` with the session.
+ * The API decides what is on offer; the page books with what this returns.
+ * Without a session there is no credit to offer — not an error. Its
+ * argument comes from the browser, so it is read as unknown.
+ */
+export async function creditFor(
+    request: unknown,
+): Promise<BookingResult<CreditAnswer>> {
+    if (!(await siteOrigin())) {
+        return { ok: false, status: 403, message: TROUBLE };
+    }
+    const r = (request && typeof request === "object" ? request : {}) as Record<
+        string,
+        unknown
+    >;
+    const serviceId = typeof r.serviceId === "string" ? r.serviceId.trim() : "";
+    const startAt = typeof r.startAt === "string" ? r.startAt.trim() : "";
+    if (
+        !serviceId ||
+        serviceId.length > MAX_ID ||
+        !startAt ||
+        Number.isNaN(Date.parse(startAt))
+    ) {
+        return { ok: false, status: 400, message: TROUBLE };
+    }
+    const query = new URLSearchParams({ serviceId, startAt });
+    const call = await accountFetch(`bookings/credit?${query}`);
+    if (!call) return { ok: true, value: { credit: null } };
+    if (!call.ok) return OFFLINE_RESULT;
+    return resultOf(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        isCreditAnswer,
     );
 }

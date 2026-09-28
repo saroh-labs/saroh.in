@@ -43,13 +43,15 @@ export function DoneCard({
         a.click();
         URL.revokeObjectURL(url);
     };
-    const payText = phase.paid
+    const paidText = phase.paid
         ? phase.rest
             ? `Paid a ${phase.price ?? ""} deposit. The rest (${phase.rest}) is paid at ${business}.`
             : `Paid ${phase.price ?? ""} online.`
         : phase.price
           ? `Pay ${phase.price} at the front desk when you arrive.`
           : "Nothing to pay in advance.";
+    // Paid with a class credit (A10): what it came from and what is left.
+    const payText = phase.creditText ?? paidText;
     return (
         <div className={cn(card, "px-[26px] py-7")}>
             <div
