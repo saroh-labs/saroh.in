@@ -91,6 +91,29 @@ export {
 } from "./product/shop-listing";
 export type { ShopListingCard } from "./product/shop-listing";
 
+// The bag and checkout on a merchant's site (G13): Add to bag or "Ask about
+// ordering" in the product page's action slot, and the header's bag with
+// its sheets. The site's server actions arrive as a `ShopCheckoutApi`.
+export { AddToBag } from "./shop/add-to-bag";
+export { SHOP_OFFLINE } from "./shop/api";
+export type {
+    CheckoutQuote,
+    CheckoutStanding,
+    CheckoutStarted,
+    DeliveryAddress,
+    QuoteLine,
+    QuoteWay,
+    ShopCheckoutApi,
+    ShopProblem,
+    ShopResult,
+    ShopWay,
+    StartCheckout,
+} from "./shop/api";
+export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
+export { ShopBag } from "./shop/bag";
+export type { ShopBagProps } from "./shop/bag";
+export type { BagItem } from "./shop/bag-store";
+
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
 export {

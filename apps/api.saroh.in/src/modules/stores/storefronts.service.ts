@@ -25,6 +25,7 @@ import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
+import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
 import type { LateRuleNotice } from "./storefront-fulfilment";
 import {
@@ -103,6 +104,14 @@ export interface StorefrontSettings extends StorefrontSummary {
     guestCheckout: boolean;
     /** ISO, when paused; `null` while taking payments. */
     pausedAt: string | null;
+    /** The site checkout's flat delivery fees (G13); `null` is free. */
+    localDeliveryFee: string | null;
+    shippingFee: string | null;
+    /**
+     * Whether the business's site shop is open (the `SITE_SHOP` rollout
+     * flag, G11/G13): the fees above are asked for only then.
+     */
+    siteShop: boolean;
     /** The provider this storefront's checkout names, if it names one. */
     checkoutProvider: string | null;
     /**
@@ -184,6 +193,7 @@ export class StorefrontsService {
             providers,
             onHand,
             promised,
+            siteShop,
         ] = await Promise.all([
             prisma.storeSettings.findUnique({ where: { storeId } }),
             prisma.order.count({
@@ -212,6 +222,9 @@ export class StorefrontsService {
                 where: { storeId, promised: { gt: 0 } },
                 _sum: { promised: true },
             }),
+            // Only whether to ask for the website's delivery fees: a flag
+            // that can't be read hides them rather than the screen.
+            shopRolloutOn(organizationId).catch(() => false),
         ]);
         const connected = providers.filter((p) => p.status === "CONNECTED");
         const named = settings?.checkoutProvider ?? null;
@@ -250,6 +263,13 @@ export class StorefrontsService {
             guestCheckout: settings?.guestCheckout ?? true,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
             paused: Boolean(settings?.pausedAt),
+            localDeliveryFee: settings?.localDeliveryFee
+                ? toMoneyString(settings.localDeliveryFee)
+                : null,
+            shippingFee: settings?.shippingFee
+                ? toMoneyString(settings.shippingFee)
+                : null,
+            siteShop,
             checkoutProvider: named,
             effectiveProvider: named
                 ? connected.some((p) => p.provider === named)
@@ -374,6 +394,12 @@ export class StorefrontsService {
                 : {}),
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
+                : {}),
+            ...(dto.localDeliveryFee !== undefined
+                ? { localDeliveryFee: feeOrNull(dto.localDeliveryFee) }
+                : {}),
+            ...(dto.shippingFee !== undefined
+                ? { shippingFee: feeOrNull(dto.shippingFee) }
                 : {}),
             // Which ways it offers follows the toggle an app from before
             // B17's chips saves (B2a) — only the one it sent (O-4). The
@@ -606,4 +632,10 @@ export class StorefrontsService {
         if (!store) throw new NotFoundException("Storefront not found");
         return store;
     }
+}
+
+/** A fee as stored: nothing, or zero, is free (null). */
+function feeOrNull(value: string | null): string | null {
+    if (value === null || value === "") return null;
+    return Number(value) > 0 ? value : null;
 }

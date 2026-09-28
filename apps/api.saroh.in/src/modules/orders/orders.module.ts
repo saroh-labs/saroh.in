@@ -1,15 +1,25 @@
+import type { OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { DiscountsModule } from "../discounts/discounts.module";
+import { JobHandlerRegistry } from "../jobs/job-handler.registry";
+import { JobsModule } from "../jobs/jobs.module";
 import { PaymentsModule } from "../payments/payments.module";
+import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { StoresModule } from "../stores/stores.module";
+import {
+    CLOSE_ABANDONED_CHECKOUT_TYPE,
+    CloseAbandonedCheckoutHandler,
+} from "./close-abandoned-checkout.handler";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
+import { PublicCheckoutController } from "./public-checkout.controller";
+import { PublicCheckoutService } from "./public-checkout.service";
 
 @Module({
     imports: [
@@ -18,11 +28,38 @@ import { OrganizationOrdersController } from "./organization-orders.controller";
         AnalyticsCoreModule,
         DiscountsModule,
         // The kitchen flow takes or returns the difference when an order is
-        // edited (U6).
+        // edited (U6); the site's checkout makes its intent (G13).
         PaymentsModule,
+        // The customer session guard for the site's checkout (G13).
+        SiteAccountsModule,
+        // Closing abandoned checkouts (G13).
+        JobsModule,
     ],
-    controllers: [OrdersController, OrganizationOrdersController],
-    providers: [OrdersService, OrderKitchenService, OrderPayLinkService],
+    controllers: [
+        OrdersController,
+        OrganizationOrdersController,
+        PublicCheckoutController,
+    ],
+    providers: [
+        OrdersService,
+        OrderKitchenService,
+        OrderPayLinkService,
+        PublicCheckoutService,
+        CloseAbandonedCheckoutHandler,
+    ],
     exports: [OrdersService],
 })
-export class OrdersModule {}
+export class OrdersModule implements OnModuleInit {
+    constructor(
+        private readonly registry: JobHandlerRegistry,
+        private readonly closeAbandoned: CloseAbandonedCheckoutHandler,
+    ) {}
+
+    /** The job each checkout start writes, a day ahead (G13). */
+    onModuleInit(): void {
+        this.registry.register(
+            CLOSE_ABANDONED_CHECKOUT_TYPE,
+            this.closeAbandoned.handle,
+        );
+    }
+}

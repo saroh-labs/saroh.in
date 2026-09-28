@@ -130,6 +130,8 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     id: string;
     orderId: string;
     placedAt: Date;
+    /** Placed by the customer at the site's checkout (G13). */
+    placedOnline: boolean;
     updatedAt: Date;
     store: { id: string; name: string };
     status: string;
@@ -203,6 +205,7 @@ export interface RawOrderRead {
     id: string;
     orderId: string;
     createdAt: Date;
+    placedOnline?: boolean;
     updatedAt: Date;
     status: string;
     paymentStatus: string;
@@ -405,6 +408,7 @@ export function serializeOrderRead(
         id: order.id,
         orderId: order.orderId,
         placedAt: order.createdAt,
+        placedOnline: order.placedOnline ?? false,
         updatedAt: order.updatedAt,
         // Only who it is: the settings row the late rule read stays here.
         store: { id: order.store.id, name: order.store.name },

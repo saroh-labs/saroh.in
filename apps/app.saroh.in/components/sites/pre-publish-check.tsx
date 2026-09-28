@@ -39,6 +39,7 @@ const TYPE_LABEL: Record<FlagType, string> = {
     phoneWidth: "Breaks at phone width",
     storefrontUnchosen: "No storefront to sell from",
     reservedAddress: "Change address",
+    shopCantTakeOrders: "Can't take orders online",
 };
 
 /**

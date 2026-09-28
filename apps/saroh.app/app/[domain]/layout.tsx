@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import type { SignedInCustomer } from "@saroh/site-blocks";
-import { AccountEntry, SiteTheme } from "@saroh/site-blocks";
+import type { SignedInCustomer, SignInOptions } from "@saroh/site-blocks";
+import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
 import { getBookingPage } from "@/lib/booking-page";
+import { getCatalogue } from "@/lib/catalogue";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
@@ -13,6 +14,8 @@ import {
     getSiteForHost,
     shareImages,
 } from "@/lib/publication";
+import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { getSignInOptions } from "@/lib/sign-in";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import {
@@ -20,6 +23,7 @@ import {
     requestSignInCode,
     verifySignInCode,
 } from "./account/actions";
+import { checkoutStanding, quoteBag, startCheckout } from "./shop/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -116,12 +120,56 @@ export default async function SiteLayout({
     /*
      * The header's main button (G17) follows what the business offers now,
      * not what was published: a merchant who turns Appointments off loses
-     * "Book" at once. `/book` reads the same page, once per request.
+     * "Book" at once. `/book` reads the same page, once per request. "Order"
+     * follows the shop (G11): the API serves `/shop` only while it is open
+     * for the business (`SITE_SHOP`), and `/shop` reads the same list.
      */
-    const action = headerAction({
-        booking: siteId ? await getBookingPage(siteId) : null,
-        shopServes: false,
-    });
+    const [booking, catalogue, checkout] = siteId
+        ? await Promise.all([
+              getBookingPage(siteId),
+              getCatalogue(siteId),
+              getCheckoutOptions(siteId),
+          ])
+        : [null, null, null];
+    const shopServes = catalogue?.ok ?? false;
+    const action = headerAction({ booking, shopServes });
+
+    /*
+     * The bag (G13), only where the site takes an online order now: the
+     * shop serves, a provider can take the payment and the storefront isn't
+     * paused. Elsewhere the product page offers "Ask about ordering".
+     */
+    const takesOrders = shopServes && checkout?.canOrder === true;
+    const [customer, signInOptions] = takesOrders
+        ? await Promise.all([
+              getSignedInCustomer().catch((): SignedInCustomer | null => null),
+              getSignInOptions().catch((): SignInOptions | null => null),
+          ])
+        : [null, null];
+    const bag =
+        takesOrders && siteId ? (
+            <ShopBag
+                site={siteId}
+                businessName={snapshot.site.name}
+                api={{
+                    quote: quoteBag,
+                    start: startCheckout,
+                    standing: checkoutStanding,
+                }}
+                account={{
+                    customer,
+                    options: signInOptions ?? {
+                        businessName: snapshot.site.name,
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: requestSignInCode,
+                        verifyCode: verifySignInCode,
+                    },
+                }}
+            />
+        ) : null;
 
     /*
      * The header's Sign in / account entry (A5, G17's account slot), on
@@ -151,6 +199,7 @@ export default async function SiteLayout({
                 navigation={snapshot.site.navigation ?? []}
                 action={action}
                 account={account}
+                bag={bag}
             />
 
             <div>{children}</div>

@@ -70,6 +70,8 @@
         // TMPDIR, so on macOS the api fell back to /tmp while the runner read
         // /var/folders/…/T and never found a code.
         "TMPDIR",
+        // Runs the site shop's e2e (G13) where the stack has the shop on.
+        "E2E_SITE_SHOP",
         "npm_package_version"
     ],
     "tasks": {

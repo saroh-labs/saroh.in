@@ -1360,6 +1360,74 @@ export class PaymentsService {
     }
 
     /**
+     * The site checkout's create-intent (round-2 G13), for an unpaid online
+     * order the signed-in customer started. Beside
+     * {@link createIntentForOrderPublic}, through the same core: the amount
+     * is `order.total` and nothing else, so a tampered client can't change
+     * what is charged. The provider is the one the storefront takes payment
+     * through ({@link payLinkProvider}, B11's rule), never one the request
+     * names.
+     *
+     * Refused unless the order is this business's, was placed online by
+     * this customer's store customer, is still open and owed, and its
+     * storefront isn't paused. The same idempotency key returns the same
+     * intent.
+     */
+    async createIntentForOnlineOrder(
+        customer: { organizationId: string; customerIds: readonly string[] },
+        orderId: string,
+        idempotencyKey: string,
+    ): Promise<CreateIntentResult> {
+        const order = await prisma.order.findFirst({
+            where: {
+                id: orderId,
+                organizationId: customer.organizationId,
+                placedOnline: true,
+            },
+            select: {
+                id: true,
+                storeId: true,
+                customerId: true,
+                total: true,
+                currency: true,
+                status: true,
+                paymentStatus: true,
+                store: { select: { settings: { select: { pausedAt: true } } } },
+            },
+        });
+        if (!order || !customer.customerIds.includes(order.customerId)) {
+            throw new NotFoundException("Order not found");
+        }
+        if (order.status === "CANCELLED") {
+            throw new ConflictException("This checkout has closed.");
+        }
+        if (
+            order.paymentStatus !== "UNPAID" &&
+            order.paymentStatus !== "FAILED"
+        ) {
+            throw new ConflictException("This order is already paid.");
+        }
+        if (order.store.settings?.pausedAt) {
+            throw new ConflictException(
+                "This storefront is paused and is not taking payments.",
+            );
+        }
+        await assertOrganizationOpen(customer.organizationId);
+        const { organizationId } = customer;
+        return this.createIntentFor(
+            organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: totalToCents(order.total),
+                currency: order.currency,
+            },
+            idempotencyKey,
+            () => payLinkProvider(prisma, organizationId, order.storeId),
+        );
+    }
+
+    /**
      * The shared server-authoritative core behind every intent, for an Order
      * or an Invoice. The target's id is the merchant reference handed to the
      * provider (and echoed back by its webhooks); the amount was derived by
