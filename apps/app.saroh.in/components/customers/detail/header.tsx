@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
-import { Globe, Lock } from "lucide-react";
+import { Globe } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
 
@@ -54,8 +54,9 @@ export function Crumbs({ here, sells }: { here: string; sells: boolean }) {
 
 /**
  * Who they are: initials, name and its word (Returning, Member), what the
- * team must know (Needs attention's tags), since when, and how to reach them — then Edit details and More, which are for owners
- * and admins. A Member reads the page and is told what is not theirs.
+ * team must know (Needs attention's tags), since when, and how to reach
+ * them — then Edit details (`contact:write`) and More (edit, merge or
+ * remove, each on its own permission). A role that only reads is told so.
  */
 export function Header({
     name,
@@ -108,34 +109,24 @@ export function Header({
                     <p className="mt-1 text-[13px] text-muted-foreground">
                         {since}
                     </p>
-                    {canEdit ? (
-                        <div className="mt-[5px] flex flex-wrap gap-3.5 text-[13px]">
-                            {email ? (
-                                <a
-                                    href={`mailto:${email}`}
-                                    className="text-brand hover:text-foreground"
-                                >
-                                    {email}
-                                </a>
-                            ) : (
-                                <span className="text-foreground/75">
-                                    No email
-                                </span>
-                            )}
-                            <span className="text-foreground/75">
-                                {phone?.trim() ? phone : "No phone"}
-                            </span>
-                        </div>
-                    ) : (
-                        <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                            <Lock
-                                aria-hidden
-                                className="size-[13px] shrink-0"
-                            />
-                            Contact details are visible to owners and admins.
-                            Ask an owner if you need them.
-                        </div>
-                    )}
+                    {/* Phone and email are part of the person: whoever
+                        reads the customer (`contact:read`) sees them
+                        (matrix §3). */}
+                    <div className="mt-[5px] flex flex-wrap gap-3.5 text-[13px]">
+                        {email ? (
+                            <a
+                                href={`mailto:${email}`}
+                                className="text-brand hover:text-foreground"
+                            >
+                                {email}
+                            </a>
+                        ) : (
+                            <span className="text-foreground/75">No email</span>
+                        )}
+                        <span className="text-foreground/75">
+                            {phone?.trim() ? phone : "No phone"}
+                        </span>
+                    </div>
                     {signsIn ? (
                         <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
                             <Globe
@@ -151,7 +142,11 @@ export function Header({
                         variant="outline"
                         className={HEAD_BTN}
                         disabled={!canEdit}
-                        title={canEdit ? undefined : "Owners and admins only"}
+                        title={
+                            canEdit
+                                ? undefined
+                                : "Your role can't change their details"
+                        }
                         onClick={onEdit}
                     >
                         Edit details
@@ -166,7 +161,7 @@ export function Header({
                                     title={
                                         canMore
                                             ? undefined
-                                            : "Owners and admins only"
+                                            : "Your role can't change this customer"
                                     }
                                 >
                                     More
@@ -196,8 +191,8 @@ export function Header({
             </div>
             {!canEdit ? (
                 <p className="-mt-1.5 mb-3 text-[12px] text-muted-foreground">
-                    You can read this customer and their notes; editing, linking
-                    and removing are for owners and admins.
+                    Your role can read this customer and their notes, but can't
+                    change their details.
                 </p>
             ) : null}
         </>

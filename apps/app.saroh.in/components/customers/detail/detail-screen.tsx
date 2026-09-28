@@ -82,6 +82,7 @@ export function CustomerDetailScreen({
     canMerge,
     canRemove = false,
     canConsent,
+    canSensitive,
     userId,
     suggestions,
     duplicates,
@@ -101,6 +102,8 @@ export function CustomerDetailScreen({
     canRemove?: boolean;
     /** `consent:write`: record that they asked to stop. */
     canConsent: boolean;
+    /** `customer:sensitive`: may mark a Needs attention note sensitive. */
+    canSensitive: boolean;
     userId: string | null;
     suggestions: IdentitySuggestion[];
     /** Other records that look like the same person (C2). */
@@ -331,9 +334,7 @@ export function CustomerDetailScreen({
                     email={d.contact.email}
                     phone={d.contact.phone}
                     signsIn={
-                        d.siteAccount
-                            ? signsInLine(d.siteAccount, canWrite)
-                            : null
+                        d.siteAccount ? signsInLine(d.siteAccount, true) : null
                     }
                     attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
@@ -353,6 +354,7 @@ export function CustomerDetailScreen({
                         firstName={first}
                         timeZone={d.timezone}
                         now={now}
+                        canSensitive={canSensitive}
                     />
                 ) : null}
                 <Tabs tabs={tabs} value={tab} onChange={go} />
@@ -413,6 +415,7 @@ export function CustomerDetailScreen({
                     state={attention}
                     contactId={d.contact.id}
                     choices={d.notes?.allergenChoices ?? []}
+                    canSensitive={canSensitive}
                 />
             ) : null}
             {canWrite ? (

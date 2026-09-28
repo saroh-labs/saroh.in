@@ -9,7 +9,6 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize } from "../organizations/organization-policy";
 import { allergenKey } from "./allergen-match";
 import type {
     AttentionEntryView,
@@ -23,6 +22,7 @@ import {
     attentionViews,
     canSeeSensitive,
 } from "./attention-read";
+import { requireCustomerPower } from "./customer-access";
 import type {
     AttentionKind,
     ConfirmAttentionDto,
@@ -69,7 +69,7 @@ export class ContactAttentionService {
         ctx: OrganizationContext,
         contactId: string,
     ): Promise<ContactAttentionView> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         await this.requireContact(ctx, contactId);
         const [read, suggestions] = await Promise.all([
             attentionFor(ctx, [contactId], this.db),
@@ -89,7 +89,7 @@ export class ContactAttentionService {
         contactId: string,
         dto: CreateAttentionDto,
     ): Promise<AttentionEntryView> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         await this.requireContact(ctx, contactId);
         const { fields, allergenName } = await this.settle(ctx, {
             kind: dto.kind,
@@ -136,7 +136,7 @@ export class ContactAttentionService {
         entryId: string,
         dto: UpdateAttentionDto,
     ): Promise<AttentionEntryView> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         const current = await this.find(ctx, contactId, entryId);
         this.requireSensitiveReader(ctx, current.sensitive);
 
@@ -191,7 +191,7 @@ export class ContactAttentionService {
         contactId: string,
         entryId: string,
     ): Promise<void> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         const current = await this.find(ctx, contactId, entryId);
         this.requireSensitiveReader(ctx, current.sensitive);
         await this.db.$transaction(async (tx) => {
@@ -224,7 +224,7 @@ export class ContactAttentionService {
         entryId: string,
         dto: ConfirmAttentionDto = {},
     ): Promise<AttentionEntryView> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         const current = await this.find(ctx, contactId, entryId);
         this.requireSensitiveReader(ctx, current.sensitive);
         if (current.status === "ACTIVE") {

@@ -85,6 +85,22 @@ what the API allows.
   role that writes to its storefront still does (DEC-048).
   `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
   order endpoint adds its row there.
+- **Current** (C13, DEC-039) — **Each customer endpoint asks its own power.**
+  `contact:read` ("See customers and contacts") reads the list, Customer
+  Detail and search, phone and email included; `contact:write` ("Edit
+  customers and contacts") edits, and hard-deletes a record with no orders or
+  invoices, and implies `contact:read`. `customer:sensitive` shows Medical
+  and other sensitive Needs attention entries and booking-page intake notes;
+  `canSeeSensitive` in `customer-workspace/attention-read.ts` is the one seam
+  every surface asks, and nothing implies it (a front desk with
+  `contact:write` doesn't read medical notes). `customer:merge` and
+  `customer:remove` stand alone. Owner and Admin hold all five; a Member
+  holds `contact:read`. Inside Customer Detail each part follows its own
+  read: an order's total with `order:read`, a pack's price with `pack:read`,
+  subscriptions with `subscription:read`, invoices and Owed with
+  `invoice:read`; Spent, which sums orders and invoices, needs both.
+  Customer refusals read "Your role can't …" (`customer-access.ts`).
+  `customer-permissions.db.spec.ts` pins one row per customer endpoint.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,

@@ -397,3 +397,108 @@ describe("the split order powers (DEC-039, B16)", () => {
         expect(withinReach(cashier, ["order:refund", "order:read"])).toBe(true);
     });
 });
+
+/**
+ * The customer rows of the permission matrix (DEC-039, C13; matrix §2 and
+ * §4). Each row here is one line of the matrix page, so the page and the
+ * policy can't drift apart.
+ */
+describe("the customer capabilities (DEC-039, C13)", () => {
+    const BUNDLES: [OrgAction, Record<OrgRole, boolean>][] = [
+        [
+            "contact:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "contact:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:sensitive",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:merge",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:remove",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+    ];
+
+    it.each(BUNDLES)(
+        "%s follows matrix §4's default bundles",
+        (action, want) => {
+            for (const role of ORG_ROLES) {
+                expect(can(role, action)).toBe(want[role]);
+            }
+        },
+    );
+
+    it("contact:write implies contact:read, so a role saved with only the write still sees", () => {
+        const set = resolveCapabilities("editor", ["contact:write"]);
+        expect([...set].sort()).toEqual(["contact:read", "contact:write"]);
+    });
+
+    it("nothing implies customer:sensitive, merge or remove", () => {
+        const set = resolveCapabilities("front-desk", [
+            "contact:write",
+            "booking:write",
+            "order:write",
+            "payment:manage",
+        ]);
+        for (const action of [
+            "customer:sensitive",
+            "customer:merge",
+            "customer:remove",
+        ] as const) {
+            expect(set.has(action)).toBe(false);
+        }
+    });
+
+    it("a Practitioner holds customer:sensitive and contact:read, and can't edit", () => {
+        const practitioner: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "practitioner",
+            actions: resolveCapabilities("practitioner", [
+                "booking:read",
+                "service:read",
+                "contact:read",
+                "customer:sensitive",
+            ]),
+        };
+        expect(() =>
+            authorize(practitioner, "customer:sensitive"),
+        ).not.toThrow();
+        expect(() => authorize(practitioner, "contact:write")).toThrow(
+            ForbiddenException,
+        );
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", [
+                "member:role:update",
+                "contact:write",
+            ]),
+        };
+        expect(
+            outOfReach(
+                editor,
+                resolveCapabilities("practitioner", [
+                    "contact:read",
+                    "customer:sensitive",
+                ]),
+            ),
+        ).toEqual(["customer:sensitive"]);
+        // The read it implies is theirs to give.
+        expect(withinReach(editor, ["contact:read"])).toBe(true);
+    });
+});

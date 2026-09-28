@@ -97,6 +97,8 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     // pipeline or anything to do with money.
     "booking:read",
     "service:read",
+    // Phone and email are part of the person (matrix §3): no separate key.
+    // Sensitive Needs attention is `customer:sensitive`, never on the floor.
     "contact:read",
 ];
 
@@ -281,9 +283,14 @@ const ORDER_POWERS: readonly OrgAction[] = [
  * power over an order shows the whole order (matrix §1 rule 2). Applied in
  * that order, so `order:write` and `payment:manage` reach `order:read`
  * through their parts. `order:stage` does not imply `order:read` until F18.
+ *
+ * Customers (C13, matrix §2): `contact:write` → `contact:read`, since editing
+ * a person means seeing them. Nothing implies `customer:sensitive`,
+ * `customer:merge` or `customer:remove`: each is granted on its own.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("store:write")) set.add("inventory:write");
+    if (set.has("contact:write")) set.add("contact:read");
     if (set.has("order:write")) {
         for (const part of ORDER_WRITE_PARTS) set.add(part);
     }

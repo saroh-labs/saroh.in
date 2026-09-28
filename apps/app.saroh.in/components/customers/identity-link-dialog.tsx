@@ -161,7 +161,7 @@ export function IdentityLinkDialog({
                                         </Button>
                                     ) : (
                                         <span className="shrink-0 text-xs text-muted-foreground">
-                                            An owner or admin can merge them
+                                            Your role can't merge them
                                         </span>
                                     )}
                                 </li>

@@ -29,6 +29,7 @@ import {
     draftTag,
     fieldOf,
     KIND_WORD,
+    NO_SENSITIVE_NOTE,
     pickKind,
     picksAllergen,
     setAsideText,
@@ -58,8 +59,10 @@ const CHOICE =
  * label, kind and sensitive tick chosen here; "Nothing to add" sets it aside
  * — the note stays on the booking either way.
  *
- * The API sends these only to someone who can add them and may read
- * sensitive notes, so this draws whatever it is given and hides nothing.
+ * The API sends these only to someone who can add them, and a sensitive
+ * one only to someone who may read it, so this draws whatever it is given
+ * and hides nothing. Without `customer:sensitive` the sensitive tick isn't
+ * offered: the API would refuse it.
  * "Nothing to add" waits ten seconds before it is sent (`lib/hold-undo.ts`),
  * so it can be undone.
  */
@@ -70,6 +73,7 @@ export function AttentionSuggestions({
     firstName,
     timeZone,
     now,
+    canSensitive = true,
 }: {
     contactId: string;
     suggestions: AttentionEntry[];
@@ -78,6 +82,8 @@ export function AttentionSuggestions({
     firstName: string | null;
     timeZone: string;
     now: Date;
+    /** `customer:sensitive`: may mark a note sensitive (C13). */
+    canSensitive?: boolean;
 }) {
     const router = useRouter();
     const [gone, setGone] = useState<string[]>([]);
@@ -144,6 +150,7 @@ export function AttentionSuggestions({
                     choices={choices}
                     when={suggestionWhen(firstName, s, timeZone, now)}
                     onSetAside={() => setAside(s)}
+                    canSensitive={canSensitive}
                 />
             ))}
         </section>
@@ -157,12 +164,14 @@ function SuggestionCard({
     choices,
     when,
     onSetAside,
+    canSensitive,
 }: {
     contactId: string;
     entry: AttentionEntry;
     choices: Choice[];
     when: string;
     onSetAside: () => void;
+    canSensitive: boolean;
 }) {
     const router = useRouter();
     const id = useId();
@@ -307,7 +316,9 @@ function SuggestionCard({
                                 role="radio"
                                 aria-checked={on}
                                 disabled={saving}
-                                onClick={() => change(pickKind(draft, k))}
+                                onClick={() =>
+                                    change(pickKind(draft, k, canSensitive))
+                                }
                                 className={cn(
                                     CHOICE,
                                     on
@@ -334,20 +345,27 @@ function SuggestionCard({
                     {labelError ?? allergenError}
                 </span>
             ) : null}
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-foreground/75 coarse:min-h-11">
-                <Checkbox
-                    checked={draft.sensitive}
-                    disabled={saving}
-                    onCheckedChange={(v) =>
-                        change({
-                            ...draft,
-                            sensitive: v === true,
-                            sensitiveSet: true,
-                        })
-                    }
-                />
-                Sensitive — only people who can edit customers can read it
-            </label>
+            {canSensitive ? (
+                <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-foreground/75 coarse:min-h-11">
+                    <Checkbox
+                        checked={draft.sensitive}
+                        disabled={saving}
+                        onCheckedChange={(v) =>
+                            change({
+                                ...draft,
+                                sensitive: v === true,
+                                sensitiveSet: true,
+                            })
+                        }
+                    />
+                    Sensitive — only people who can see sensitive notes can read
+                    it
+                </label>
+            ) : (
+                <p className="text-[12.5px] text-muted-foreground">
+                    {NO_SENSITIVE_NOTE}
+                </p>
+            )}
             {unplaced ? (
                 <p
                     role="alert"

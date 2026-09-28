@@ -103,6 +103,13 @@ export default async function CustomerDetailPage({
                 canMerge={canMerge}
                 canRemove={canRemove}
                 canConsent={may("consent:write")}
+                // Owner and Admin hold it, including on an API from before
+                // C13, whose list doesn't name it yet.
+                canSensitive={
+                    may("customer:sensitive") ||
+                    organization?.role === "OWNER" ||
+                    organization?.role === "ADMIN"
+                }
                 userId={session.user.id}
                 suggestions={suggestions.filter(
                     (s): s is IdentitySuggestion => s.kind === "customer",

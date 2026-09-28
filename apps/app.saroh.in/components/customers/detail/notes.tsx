@@ -88,7 +88,7 @@ export function Notes({
         <>
             <p className="mb-2.5 text-[12.5px] text-muted-foreground">
                 Team only — never shown to the customer. Everyone on the team
-                can read them{canWrite ? "" : "; owners and admins add them"}.
+                can read them{canWrite ? "" : ". Your role can't add them"}.
             </p>
             {canWrite ? (
                 <div className="mb-3 rounded-xl border border-border bg-card px-3.5 py-3">
