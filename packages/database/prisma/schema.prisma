@@ -286,6 +286,10 @@ model Organization {
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]
+
+  // A class pack's history and its holders' extensions (round-2 E13).
+  packEvents     PackEvent[]
+  packExtensions PackExtension[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -5386,6 +5390,17 @@ model ClassPack {
   // operator's is never stored (DEC-035), so a time with no person is theirs.
   revisedAt        DateTime?
   revisedById      String?
+
+  // Round-2 E13 (defaults 45, 46). CLASSES pays for classes (capacity > 1),
+  // ONE_TO_ONE for one-to-one sessions (capacity 1); locked once sold.
+  kind          String      @default("CLASSES") // CLASSES | ONE_TO_ONE
+  // Sold only to someone who has never bought a pack of this kind.
+  firstPackOnly Boolean     @default(false)
+  events        PackEvent[]
+
+  // The composite key a pack event points at, so an event can't name
+  // another business's pack.
+  @@unique([id, organizationId])
 }
 
 model ClassPackService {
@@ -5429,6 +5444,70 @@ model PackPurchase {
   @@index([organizationId])
   @@index([contactId])
   @@index([packId])
+
+  // How the sale was paid (round-2 E13): CASH | UPI | CARD | BANK | ONLINE |
+  // NONE. A record of what the desk took, never a restriction on how anyone
+  // pays (DEC-059). Null: sold before it was recorded.
+  paidBy     String?
+  extensions PackExtension[]
+  events     PackEvent[]
+
+  // The composite key an extension points at (one business's purchase).
+  @@unique([id, organizationId])
+}
+
+// A holder's pack given more days (round-2 E13, default 46): at most 30 at a
+// time, moving `PackPurchase.expiresAt`. Append-only.
+model PackExtension {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseId     String
+  purchase       PackPurchase @relation(fields: [purchaseId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  days          Int // 1–30, checked in the migration too
+  reason        String
+  // The use-by date before and after.
+  expiresBefore DateTime
+  expiresAfter  DateTime
+  // Who gave it. Not a foreign key: a teammate who leaves keeps their
+  // extensions. Null for a Saroh operator, never stored (DEC-035).
+  byUserId      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, purchaseId])
+}
+
+// A class pack's history (round-2 E13): created, published, changed, sold,
+// extended, archived, restored. Append-only, written in the change's own
+// transaction (PACK_EVENT_KINDS in class-packs/pack-events.ts).
+model PackEvent {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packId         String
+  pack           ClassPack     @relation(fields: [packId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  // The sale an event is about (SOLD, EXTENDED). Kept when the purchase
+  // goes with its contact, as history without a name.
+  purchaseId     String?
+  purchase       PackPurchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  kind        String
+  // TEAM | CUSTOMER | OPERATOR (`subscriptions/event-actors.ts`). An
+  // operator's reads as Saroh support (DEC-035).
+  actorKind   String
+  // Not a foreign key: someone who leaves keeps their history.
+  actorUserId String?
+  // What happened, by kind: `{ field: [before, after] }` for a change; the
+  // price and how it was paid for a sale; the days, reason and use-by dates
+  // for an extension.
+  details     Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, packId, createdAt])
+  @@index([purchaseId])
 }
 
 // One credit spent on one booking. Cancelling the booking reverses it.
