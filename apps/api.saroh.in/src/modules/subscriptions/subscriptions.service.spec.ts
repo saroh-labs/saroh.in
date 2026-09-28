@@ -43,6 +43,9 @@ jest.mock("@saroh/database", () => {
         },
         invoice: { findFirst: jest.fn(), findMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        // D20: a subscription's autopay ends with it.
+        paymentMandate: { findMany: jest.fn(), updateMany: jest.fn() },
+        job: { create: jest.fn() },
     };
     return {
         ...actual,
@@ -175,6 +178,7 @@ beforeEach(() => {
     tx.subscriptionSkip!.findFirst!.mockResolvedValue(null);
     tx.subscriptionSkip!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.count!.mockResolvedValue(0);
+    tx.paymentMandate!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.create!.mockResolvedValue({ id: "sub_1" });
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
@@ -505,6 +509,59 @@ describe("cancelling", () => {
         });
     });
 
+    it("ends its autopay with it, and asks the provider by a job (D20)", async () => {
+        tx.paymentMandate!.findMany!.mockResolvedValue([
+            { id: "man_1", subscriptionId: "sub_1", providerMandateId: "p_1" },
+        ]);
+        tx.paymentMandate!.updateMany!.mockResolvedValue({ count: 1 });
+        await service.cancel(owner, "sub_1", { when: "now" });
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    subscriptionId: "sub_1",
+                }),
+            }),
+        );
+        expect(tx.paymentMandate!.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "man_1",
+                status: { in: ["PENDING", "ACTIVE", "PAUSED"] },
+            },
+            data: expect.objectContaining({
+                status: "CANCELLED",
+                cancelReason: "SUBSCRIPTION_ENDED",
+                cancelConfirmedAt: null,
+            }),
+        });
+        expect(tx.subscriptionEvent!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "MANDATE_CANCELLED",
+                actorKind: "JOB",
+                data: { reason: "SUBSCRIPTION_ENDED" },
+            }),
+        });
+        expect(tx.job!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "mandate.cancel",
+                payload: { subscriptionId: "sub_1" },
+            }),
+        });
+    });
+
+    it("leaves autopay alone until a cancel at period end takes effect", async () => {
+        await service.cancel(owner, "sub_1", { when: "periodEnd" });
+        expect(tx.paymentMandate!.findMany).not.toHaveBeenCalled();
+        expect(tx.job!.create).not.toHaveBeenCalled();
+    });
+
+    it("queues nothing when there is no autopay to end", async () => {
+        await service.cancel(owner, "sub_1", { when: "now" });
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalled();
+        expect(tx.paymentMandate!.updateMany).not.toHaveBeenCalled();
+        expect(tx.job!.create).not.toHaveBeenCalled();
+    });
+
     it("can be taken back before the period runs out", async () => {
         tx.customerSubscription!.findFirst!.mockResolvedValue(
             sub({ cancelAtPeriodEnd: true }),
@@ -585,6 +642,17 @@ describe("renewal", () => {
             },
         });
         expect(issueInTx).not.toHaveBeenCalled();
+        // Its autopay ends with it (D20).
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ subscriptionId: "sub_1" }),
+            }),
+        );
+    });
+
+    it("keeps autopay on a subscription that renews", async () => {
+        await service.renewOne("sub_1", now);
+        expect(tx.paymentMandate!.findMany).not.toHaveBeenCalled();
     });
 
     it("ends a paused one that was set to end, without an invoice", async () => {
