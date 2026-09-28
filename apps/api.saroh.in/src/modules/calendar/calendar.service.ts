@@ -118,6 +118,13 @@ export interface CalendarMonth {
      */
     takings?: { lead: LayerKey | null; total: MoneyTotal[] | null };
     unavailable: CalendarUnavailable[];
+    /**
+     * The day the business joined Saroh, in its zone ("YYYY-MM-DD") — the
+     * earliest the calendar reaches back to (plan 005 E21, default 119:
+     * `Organization.createdAt` until a joined date exists). Null when it
+     * could not be read; the app then sets no lower edge.
+     */
+    joinedAt: string | null;
 }
 
 /**
@@ -214,13 +221,14 @@ export class CalendarService {
 
         // NOT guarded: without the zone there are no days, and without
         // availability no layer may be shown (Home's rule).
-        const [zone, views] = await Promise.all([
+        const [zone, views, created] = await Promise.all([
             businessZone(this.db, organizationId),
             this.availability.listViews({
                 organizationId,
                 organizationRole: ctx.role,
                 organizationActions: ctx.actions,
             }),
+            this.createdAt(organizationId),
         ]);
         const on = new Set(
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
@@ -359,7 +367,29 @@ export class CalendarService {
                   }
                 : {}),
             unavailable,
+            joinedAt: created ? dayOf(created, zone.zone) : null,
         };
+    }
+
+    /**
+     * When the business was created. Only the calendar's back edge rests on
+     * it, so a failed read leaves the edge open rather than failing the month.
+     */
+    private async createdAt(organizationId: string): Promise<Date | null> {
+        try {
+            const org = await this.db.organization.findUnique({
+                where: { id: organizationId },
+                select: { createdAt: true },
+            });
+            return org?.createdAt ?? null;
+        } catch (error) {
+            this.logger.warn(
+                `Calendar joined date unread: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     /**
