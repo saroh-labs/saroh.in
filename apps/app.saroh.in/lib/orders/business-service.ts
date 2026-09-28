@@ -1,6 +1,8 @@
+import { unstable_rethrow } from "next/navigation";
+
 import { getJson, orgBase } from "@/lib/api/http";
 
-import type { FulfilmentFields } from "./read";
+import type { FulfilmentFields, FulfilmentType } from "./read";
 
 /**
  * Orders across the whole business — the read behind Sell → Orders.
@@ -74,6 +76,32 @@ export interface OrderRow extends FulfilmentFields {
     moreProducts: number;
 }
 
+/** The date presets the API reads in the business's zone (B4). */
+export type OrderDatePreset = "today" | "yesterday" | "7d" | "month";
+
+/**
+ * What the filter bar offers (B4, `GET …/orders/filters`): the ways the
+ * business's orders leave and the words their pills show — from its own
+ * orders, so a pick-up-only bakery is never offered "Handed to courier" —
+ * and the name of the product a link filters on.
+ */
+export interface OrderFilterOptions {
+    types: { type: FulfilmentType; label: string }[];
+    steps: {
+        key: string;
+        label: string;
+        /** The types whose orders show it; empty for Refunded and Cancelled. */
+        types: FulfilmentType[];
+    }[];
+    product: { id: string; name: string } | null;
+}
+
+/** A product the Product filter's search finds. */
+export interface OrderProductOption {
+    id: string;
+    name: string;
+}
+
 /** The list's filters, as the API reads them (plan B, B1). */
 export interface OrderListParams {
     tab?: "all" | "open" | "refunded";
@@ -84,6 +112,13 @@ export interface OrderListParams {
     customerId?: string;
     storeId?: string;
     late?: boolean;
+    /**
+     * What the row's pill says, as the API keys it ("ready",
+     * "handed-to-courier", "refunded"); from `getOrderFilterOptions`. B4.
+     */
+    step?: string;
+    /** A preset the API reads in the business's zone. Not with from/to. B4. */
+    date?: OrderDatePreset;
     /** YYYY-MM-DD, in the business's zone. */
     from?: string;
     to?: string;
@@ -233,13 +268,58 @@ export function toOrderListPage(
 }
 
 /**
+ * What the filter bar offers (B4). Null when it couldn't be read — an API
+ * from before B4 answers 404 here — and the bar then leaves out the menus
+ * it would fill rather than offer nothing in them; the list itself still
+ * renders. Next's interrupts (a 403's `forbidden()`) pass through.
+ */
+export async function getOrderFilterOptions(
+    productId?: string,
+): Promise<OrderFilterOptions | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = productId
+        ? `?${new URLSearchParams({ productId }).toString()}`
+        : "";
+    try {
+        const read = await getJson<OrderFilterOptions>(
+            `${base}/orders/filters${query}`,
+        );
+        return read && Array.isArray(read.types) && Array.isArray(read.steps)
+            ? read
+            : null;
+    } catch (error) {
+        unstable_rethrow(error);
+        return null;
+    }
+}
+
+/**
+ * The Product filter's search (B4): the business's products that are on
+ * its orders, by name. Null when the search couldn't be read.
+ */
+export async function searchOrderProducts(
+    q: string,
+): Promise<OrderProductOption[] | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const query = q.trim()
+        ? `?${new URLSearchParams({ q: q.trim() }).toString()}`
+        : "";
+    const read = await getJson<{ products: OrderProductOption[] }>(
+        `${base}/orders/products${query}`,
+    );
+    return read && Array.isArray(read.products) ? read.products : null;
+}
+
+/**
  * Every matching row, following the cursor to the end.
  *
- * For what needs every row rather than a page: a customer's orders, and the
- * Orders list's Export (`list-actions.ts`). The Orders list itself reads one
- * page at a time (`list-query.ts` holds its address). Stops at `maxPages`
- * pages rather than reading forever; `complete` says whether it reached the
- * end.
+ * For what needs every row rather than a page: a customer's orders. The
+ * Orders list reads one page at a time (`list-query.ts` holds its
+ * address), and its Export walks the pages from the browser, a page per
+ * request (`loadOrdersExportPage`). Stops at `maxPages` pages rather than
+ * reading forever; `complete` says whether it reached the end.
  */
 export async function listAllOrderRows(
     params: Omit<OrderListParams, "cursor"> = {},

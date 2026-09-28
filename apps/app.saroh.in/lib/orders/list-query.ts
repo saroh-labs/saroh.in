@@ -1,22 +1,31 @@
 import { sinceParam } from "@/lib/views/since";
 
-import type { OrderListParams } from "./business-service";
+import type { OrderFilterOptions, OrderListParams } from "./business-service";
+import type { OrdersFilters } from "./list-filters";
+import {
+    FILTER_KEYS,
+    filterParams,
+    filteredEmptyTitle,
+    filtersActive,
+    readOrdersFilters,
+    writeOrdersFilters,
+} from "./list-filters";
 
 /**
- * The Orders list's address (plan B, B3). The tab, the search, the
- * storefront and the page all live in the URL, so a narrowed list is a link
- * someone can share and the server reads it once to ask the API for one page.
- * Pure: the screen builds its links from it, and the page its request.
+ * The Orders list's address (plan B, B3, B4). The tab, the search, the
+ * storefront, the filters and the page all live in the URL, so a narrowed
+ * list is a link someone can share and the server reads it once to ask the
+ * API for one page. Pure: the screen builds its links from it, and the page
+ * its request. The filters' own rules are in `list-filters.ts`.
  *
  * Paging is by the API's cursor, which only goes forward. So the address
  * carries the cursor of the page on screen and `back`, the cursors of the
  * pages before it (the first page has none), and Previous pops one off.
- * B4 adds the filters here.
  */
 
 export type OrdersTab = "all" | "open" | "refunded";
 
-export interface OrdersQuery {
+export interface OrdersQuery extends OrdersFilters {
     tab: OrdersTab;
     q: string;
     storefront: string | null;
@@ -74,6 +83,7 @@ export function readOrdersQuery(params: Params): OrdersQuery {
         storefront: one(params, "storefront") ?? null,
         // A malformed or future instant is no filter (`sinceParam`).
         since: sinceParam(params)?.toISOString() ?? null,
+        ...readOrdersFilters(params),
         cursor,
         // Only meaningful past the first page.
         back: cursor
@@ -82,20 +92,26 @@ export function readOrdersQuery(params: Params): OrdersQuery {
     };
 }
 
+/** Keys whose change lists something else, so the old cursor is void. */
+const RELISTING: readonly (keyof OrdersQuery)[] = [
+    "tab",
+    "q",
+    "storefront",
+    "since",
+    ...FILTER_KEYS,
+];
+
 /**
  * The list at `query` with `patch` applied; defaults leave the URL. Changing
- * what is listed (the tab, the search, the storefront) starts again at the
- * first page, because the old cursor points into a different list.
+ * what is listed (the tab, the search, the storefront, a filter) starts
+ * again at the first page, because the old cursor points into a different
+ * list.
  */
 export function ordersHref(
     query: OrdersQuery,
     patch: Partial<OrdersQuery> = {},
 ): string {
-    const relists =
-        "tab" in patch ||
-        "q" in patch ||
-        "storefront" in patch ||
-        "since" in patch;
+    const relists = RELISTING.some((key) => key in patch);
     const next: OrdersQuery = {
         ...query,
         ...(relists ? { cursor: null, back: [] } : {}),
@@ -106,6 +122,7 @@ export function ordersHref(
     if (next.q) q.set("q", next.q);
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.since) q.set("since", next.since);
+    writeOrdersFilters(next, q);
     if (next.cursor) {
         q.set("cursor", next.cursor);
         if (next.back.length) q.set("back", next.back.join(","));
@@ -156,27 +173,31 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
         q: query.q || undefined,
         storeId: query.storefront ?? undefined,
         since: query.since ?? undefined,
+        ...filterParams(query),
         cursor: query.cursor ?? undefined,
     };
 }
 
 /** What an empty list says, and what fills it. */
 export interface OrdersEmptyCopy {
-    kind: "search" | "tab" | "since" | "first-run";
+    kind: "search" | "filter" | "tab" | "since" | "first-run";
     title: string;
     note: string;
-    action: "clear-search" | "show-all" | "clear-since" | null;
+    action:
+        "clear-search" | "clear-filters" | "show-all" | "clear-since" | null;
 }
 
 /**
  * The design's empty states: a search that found nothing names it and offers
- * Clear search; an empty Open or Refunded tab says what would land there;
- * only an empty business says "No orders yet". The failed and locked states
- * are never empty lists (`orders-states.tsx`, B7); B4 adds the filters'.
+ * Clear search; filters that found nothing say which ("No shipping orders in
+ * the last 7 days") and offer Clear filters; an empty Open or Refunded tab
+ * says what would land there; only an empty business says "No orders yet".
+ * The failed and locked states are never empty lists (`orders-states.tsx`).
  */
 export function ordersEmptyCopy(
     query: OrdersQuery,
     storeName: string | null,
+    options: OrderFilterOptions | null = null,
 ): OrdersEmptyCopy {
     if (query.q) {
         return {
@@ -184,6 +205,14 @@ export function ordersEmptyCopy(
             title: `No orders match “${query.q}”`,
             note: "Search covers customer names and order numbers. Clear it to see everything in this view.",
             action: "clear-search",
+        };
+    }
+    if (filtersActive(query)) {
+        return {
+            kind: "filter",
+            title: filteredEmptyTitle(query, options),
+            note: "Nothing in this view matches every filter. Clear them to see the whole list.",
+            action: "clear-filters",
         };
     }
     if (query.tab === "open") {

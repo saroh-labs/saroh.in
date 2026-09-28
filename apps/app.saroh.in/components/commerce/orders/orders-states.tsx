@@ -9,10 +9,12 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { Check, Receipt, RotateCcw, Search } from "lucide-react";
+import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import type { OrderFilterOptions } from "@/lib/orders/business-service";
+import { NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import { ORDERS_TABS, ordersEmptyCopy } from "@/lib/orders/list-query";
 
@@ -25,8 +27,8 @@ import { ORDER_GRID } from "./order-row";
  * semantics, never by colour alone:
  *
  * - loading: the list's own shape, the rows swept, no counts;
- * - empty: per tab, per search and per `?since=` — only a business with no
- *   orders says "No orders yet";
+ * - empty: per tab, per search, per filter (B4) and per `?since=` — only a
+ *   business with no orders says "No orders yet";
  * - failed: "Couldn't load orders" with Try again, and never an empty list;
  * - locked: for someone holding neither `order:read` nor `order:stage`, why
  *   and who can change it, rather than a hidden screen.
@@ -232,29 +234,39 @@ export function OrderLocked({ text }: { text: string }) {
 export function OrdersEmpty({
     query,
     storeName,
+    options = null,
     go,
 }: {
     query: OrdersQuery;
     storeName: string | null;
+    /** The filter bar's words, to say which filters found nothing (B4). */
+    options?: OrderFilterOptions | null;
     go: (patch: Partial<OrdersQuery>) => void;
 }) {
-    const copy = ordersEmptyCopy(query, storeName);
+    const copy = ordersEmptyCopy(query, storeName, options);
     const Icon =
         copy.kind === "search"
             ? Search
-            : query.tab === "open"
-              ? Check
-              : query.tab === "refunded"
-                ? RotateCcw
-                : Receipt;
-    const action =
+            : copy.kind === "filter"
+              ? ListFilter
+              : query.tab === "open"
+                ? Check
+                : query.tab === "refunded"
+                  ? RotateCcw
+                  : Receipt;
+    const action: {
+        label: string;
+        patch: Partial<OrdersQuery>;
+    } | null =
         copy.action === "clear-search"
             ? { label: "Clear search", patch: { q: "" } }
-            : copy.action === "clear-since"
-              ? { label: "Show all orders", patch: { since: null } }
-              : copy.action === "show-all"
-                ? { label: "View all orders", patch: { tab: "all" as const } }
-                : null;
+            : copy.action === "clear-filters"
+              ? { label: "Clear filters", patch: { ...NO_FILTERS } }
+              : copy.action === "clear-since"
+                ? { label: "Show all orders", patch: { since: null } }
+                : copy.action === "show-all"
+                  ? { label: "View all orders", patch: { tab: "all" as const } }
+                  : null;
     return (
         <EmptyState
             className="gap-[9px] rounded-[11px] border-border-strong"

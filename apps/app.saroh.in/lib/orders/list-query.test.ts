@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { NO_FILTERS } from "@/lib/orders/list-filters";
+
 import {
     nextPageHref,
     orderListParams,
@@ -24,6 +26,7 @@ describe("readOrdersQuery", () => {
             q: "1042",
             storefront: "s1",
             since: null,
+            ...NO_FILTERS,
             cursor: null,
             back: [],
         });
