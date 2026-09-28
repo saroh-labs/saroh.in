@@ -46,6 +46,76 @@ export interface PublicInvoiceView {
     theme: Record<string, string> | null;
 }
 
+/**
+ * An issued invoice as the pay link's paper shows it: the allow-list above.
+ * The pay page reads it by token; the customer's account area (A5) reads a
+ * paid one of their own as a receipt. The caller has already found the
+ * invoice in `organizationId` and runs this in that business's RLS context.
+ * A draft (no number) is a 404.
+ */
+export async function invoicePaper(
+    organizationId: string,
+    invoiceId: string,
+): Promise<PublicInvoiceView> {
+    const invoice = await prisma.invoice.findFirst({
+        where: {
+            id: invoiceId,
+            organizationId,
+        },
+        select: {
+            number: true,
+            status: true,
+            issuedAt: true,
+            dueAt: true,
+            tax: true,
+            total: true,
+            currency: true,
+            billToName: true,
+            organization: { select: { name: true } },
+            lines: {
+                orderBy: { position: "asc" },
+                select: {
+                    description: true,
+                    quantity: true,
+                    unitPrice: true,
+                    amount: true,
+                },
+            },
+        },
+    });
+    if (!invoice?.number || invoice.status === "DRAFT") notFound();
+    const site = await prisma.site.findFirst({
+        where: {
+            organizationId,
+            deletedAt: null,
+            currentPublicationId: { not: null },
+        },
+        orderBy: { createdAt: "asc" },
+        select: { style: true },
+    });
+    return {
+        businessName: invoice.organization.name,
+        number: invoice.number,
+        issuedAt: invoice.issuedAt?.toISOString() ?? null,
+        dueAt: invoice.dueAt?.toISOString() ?? null,
+        lines: invoice.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity,
+            unitPrice: toMoneyString(l.unitPrice),
+            amount: toMoneyString(l.amount),
+        })),
+        tax: toMoneyString(invoice.tax),
+        total: toMoneyString(invoice.total),
+        currency: invoice.currency,
+        status: invoiceStanding(invoice, new Date()) as Exclude<
+            InvoiceStanding,
+            "DRAFT"
+        >,
+        billedTo: invoice.billToName,
+        theme: site ? siteStyleVariables(parseSiteStyle(site.style)) : null,
+    };
+}
+
 /** Reads per link per minute: a page reload is fine, a scraper is not. */
 const READS_PER_WINDOW = 30;
 const READ_WINDOW_MS = 60_000;
@@ -103,67 +173,9 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        return runInOrgContext(found.organizationId, async () => {
-            const invoice = await prisma.invoice.findFirst({
-                where: {
-                    id: found.id,
-                    organizationId: found.organizationId,
-                },
-                select: {
-                    number: true,
-                    status: true,
-                    issuedAt: true,
-                    dueAt: true,
-                    tax: true,
-                    total: true,
-                    currency: true,
-                    billToName: true,
-                    organization: { select: { name: true } },
-                    lines: {
-                        orderBy: { position: "asc" },
-                        select: {
-                            description: true,
-                            quantity: true,
-                            unitPrice: true,
-                            amount: true,
-                        },
-                    },
-                },
-            });
-            if (!invoice?.number || invoice.status === "DRAFT") notFound();
-            const site = await prisma.site.findFirst({
-                where: {
-                    organizationId: found.organizationId,
-                    deletedAt: null,
-                    currentPublicationId: { not: null },
-                },
-                orderBy: { createdAt: "asc" },
-                select: { style: true },
-            });
-            return {
-                businessName: invoice.organization.name,
-                number: invoice.number,
-                issuedAt: invoice.issuedAt?.toISOString() ?? null,
-                dueAt: invoice.dueAt?.toISOString() ?? null,
-                lines: invoice.lines.map((l) => ({
-                    description: l.description,
-                    quantity: l.quantity,
-                    unitPrice: toMoneyString(l.unitPrice),
-                    amount: toMoneyString(l.amount),
-                })),
-                tax: toMoneyString(invoice.tax),
-                total: toMoneyString(invoice.total),
-                currency: invoice.currency,
-                status: invoiceStanding(invoice, new Date()) as Exclude<
-                    InvoiceStanding,
-                    "DRAFT"
-                >,
-                billedTo: invoice.billToName,
-                theme: site
-                    ? siteStyleVariables(parseSiteStyle(site.style))
-                    : null,
-            };
-        });
+        return runInOrgContext(found.organizationId, () =>
+            invoicePaper(found.organizationId, found.id),
+        );
     }
 
     /**

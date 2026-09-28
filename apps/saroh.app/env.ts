@@ -12,7 +12,10 @@ import { z } from "zod";
  * `REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS` and `NGROK_URL` are server/dev-only
  * knobs. `SITE_RELAY_SECRET` signs the `x-saroh-relay` header on every call
  * to the API's customer sign-in routes (ADR-011; `lib/site-relay.ts`); it
- * must be byte-identical to the API's.
+ * must be byte-identical to the API's. `SITE_ACCOUNT_AREA` (`on` | `off`,
+ * unset = off) shows the customer account area — the header's Sign in /
+ * account entry and `/account` — once A6–A8 and A13 have shipped
+ * (`lib/account-area.ts`); switch the API's on first.
  *
  * Access env through this module (`import { env } from "@/env"`) — never
  * `process.env`.
@@ -28,6 +31,7 @@ export const env = createEnv({
         NGROK_URL: z.string().url().optional(),
         REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS: z.string().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
+        SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
     },
     client: {
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
@@ -43,6 +47,7 @@ export const env = createEnv({
         REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS:
             process.env.REDIRECT_TO_CUSTOM_DOMAIN_IF_EXISTS,
         SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
+        SITE_ACCOUNT_AREA: process.env.SITE_ACCOUNT_AREA,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

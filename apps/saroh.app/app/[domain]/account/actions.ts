@@ -3,6 +3,7 @@
 import type {
     CodeRequestResult,
     SignedInCustomer,
+    SignInOptions,
     VerifyResult,
 } from "@saroh/site-blocks";
 
@@ -17,6 +18,7 @@ import {
     codeCallFailed,
     codeResult,
     customerFromEmail,
+    getSignInOptions,
     sessionAnswer,
 } from "@/lib/sign-in";
 
@@ -97,6 +99,16 @@ async function whoIs(token: string, email: string): Promise<SignedInCustomer> {
         }
     }
     return customerFromEmail(email);
+}
+
+/**
+ * What the sign-in sheet needs up front, read when the header's "Sign in"
+ * is pressed (A5) rather than on every page view. Null when the API can't
+ * say; the sheet then goes without the phone line.
+ */
+export async function loadSignInOptions(): Promise<SignInOptions | null> {
+    if (!(await siteOrigin())) return null;
+    return getSignInOptions().catch(() => null);
 }
 
 export async function signOut(): Promise<{ ok: boolean }> {

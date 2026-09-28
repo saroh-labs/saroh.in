@@ -110,7 +110,10 @@ one exists.
   (`customer-workspace/actions.ts`) · B9 #568, after A13 (its "tell the
   customer" notice uses Messages).
 - The account area's flag (A5–A8, A13) switches on at the release after
-  wave 4.
+  wave 4. It is the environment variable `SITE_ACCOUNT_AREA=on`, set in
+  the api first and then in saroh.app (`docs/architecture/ENVIRONMENT.md`);
+  unset or `off`, every `public/site-accounts/me` route is a 404 and no
+  site shows Sign in or `/account`.
 
 ### Wave 5
 - **5a:** B13 #572 · A14 #555 · D20 #612 (adds the `cancelFor` call to C9's
