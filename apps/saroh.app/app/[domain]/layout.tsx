@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import type { SignedInCustomer, SignInOptions } from "@saroh/site-blocks";
+import type { SignInOptions } from "@saroh/site-blocks";
 import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
 import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
+import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
@@ -123,6 +124,10 @@ export default async function SiteLayout({
      * "Book" at once. `/book` reads the same page, once per request. "Order"
      * follows the shop (G11): the API serves `/shop` only while it is open
      * for the business (`SITE_SHOP`), and `/shop` reads the same list.
+     * The checkout options are read beside it rather than after: whether
+     * the shop is open is the API's per-business flag, known here only
+     * from the catalogue's answer, and waiting for it would add a round
+     * trip to every page of a site that sells.
      */
     const [booking, catalogue, checkout] = siteId
         ? await Promise.all([
@@ -140,9 +145,12 @@ export default async function SiteLayout({
      * paused. Elsewhere the product page offers "Ask about ordering".
      */
     const takesOrders = shopServes && checkout?.canOrder === true;
+    // Who is signed in, read once per render: the bag and the account
+    // entry share it. A read that fails is a visitor signed out.
+    const readCustomer = customerReader(getSignedInCustomer);
     const [customer, signInOptions] = takesOrders
         ? await Promise.all([
-              getSignedInCustomer().catch((): SignedInCustomer | null => null),
+              readCustomer(),
               getSignInOptions().catch((): SignInOptions | null => null),
           ])
         : [null, null];
@@ -179,9 +187,7 @@ export default async function SiteLayout({
      */
     const account = accountAreaOn() ? (
         <AccountEntry
-            customer={await getSignedInCustomer().catch(
-                (): SignedInCustomer | null => null,
-            )}
+            customer={await readCustomer()}
             businessName={snapshot.site.name}
             api={{
                 requestCode: requestSignInCode,
