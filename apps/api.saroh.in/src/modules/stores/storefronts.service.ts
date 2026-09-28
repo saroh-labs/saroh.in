@@ -584,6 +584,13 @@ export class StorefrontsService {
                 where: { id: storeId },
                 data: { deletedAt: new Date() },
             });
+            // A site that sold from it sells from nowhere now (G11): its
+            // settings ask again and the pre-publish check says so. Never
+            // swapped for another storefront on the merchant's behalf.
+            await tx.site.updateMany({
+                where: { organizationId, storefrontId: storeId },
+                data: { storefrontId: null },
+            });
         });
     }
 

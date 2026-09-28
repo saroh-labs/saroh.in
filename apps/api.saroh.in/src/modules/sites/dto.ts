@@ -360,6 +360,17 @@ export class UpdateSiteSettingsDto {
     @IsString()
     @MaxLength(64)
     postsPrefix?: string | null;
+
+    /**
+     * The storefront this site sells from (G11). Null clears the choice.
+     * Checked in the service: an open storefront of this business only.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    storefrontId?: string | null;
 }
 
 /** Mint a preview link (#198). The choices are the ones the design offers. */
