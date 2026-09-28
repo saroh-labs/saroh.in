@@ -159,6 +159,8 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         // G11: pure serialisers of the public catalogue.
         "<rootDir>/src/modules/products/public-catalogue.serialize.spec.ts",
+        // G12: what a Product grid asks the catalogue — pure.
+        "<rootDir>/src/modules/products/product-grid.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.

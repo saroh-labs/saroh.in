@@ -8,12 +8,17 @@ import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { MODULE_BY_KEY } from "../capabilities/module-registry";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import {
     commerceOpen,
     effectiveStorefront,
     shopRolloutOn,
 } from "../sites/sells-from";
 import { businessTracksStock } from "../stock/tracking";
+import { collectionOnSale } from "./grid-collection";
+import type { GridQuery } from "./product-grid";
+import { inGridOrder } from "./product-grid";
 import { ratingSummary } from "./product-overview";
 import type {
     PublicCatalogue,
@@ -51,6 +56,11 @@ import {
  * - **An explicit allow-list** (`public-catalogue.serialize.ts`).
  * - **Limited per visitor.** Keyed on the visitor's address: the signed
  *   relay's when saroh.app relays the call, otherwise the caller's own.
+ * - **The Product grid (G12)** asks the same list for the newest, one
+ *   collection's or hand-picked products, and a count. Same gates, same
+ *   allow-list, same per-visitor limit; it also needs Commerce rolled out
+ *   for the business (DEC-057). An empty grid is an empty list, not a 404:
+ *   the shop is open, there is just nothing to show in that block.
  */
 
 /** Page views per visitor per minute: a busy browse is fine, a scraper not. */
@@ -109,6 +119,75 @@ interface ShopScope {
     storefront: { id: string; name: string };
 }
 
+/** What a card needs of a listing and its product. */
+const CARD_SELECT = {
+    soldOutAt: true,
+    variants: { select: { variantId: true } },
+    product: {
+        select: {
+            id: true,
+            slug: true,
+            name: true,
+            description: true,
+            price: true,
+            mrp: true,
+            currency: true,
+            stockTracked: true,
+            images: {
+                orderBy: { position: "asc" },
+                take: 1,
+                select: IMAGE_SELECT,
+            },
+            variants: {
+                orderBy: [{ position: "asc" }, { id: "asc" }],
+                select: VARIANT_SELECT,
+            },
+        },
+    },
+} satisfies Prisma.ProductListingSelect;
+
+type CardListing = Prisma.ProductListingGetPayload<{
+    select: typeof CARD_SELECT;
+}>;
+
+/** A listing with the variants it offers here. */
+interface OfferedListing {
+    listing: CardListing;
+    offered: CardListing["product"]["variants"];
+    /** For `inGridOrder`. */
+    product: { id: string };
+}
+
+/**
+ * The listings with something to offer here: a product with variants, none
+ * of them sold at this storefront, has nothing to sell and is left out.
+ */
+function offeredOnly(listings: readonly CardListing[]): OfferedListing[] {
+    const out: OfferedListing[] = [];
+    for (const listing of listings) {
+        const listed = new Set(listing.variants.map((v) => v.variantId));
+        const p = listing.product;
+        const offered = p.variants.filter((v) => listed.has(v.id));
+        if (p.variants.length > 0 && offered.length === 0) continue;
+        out.push({ listing, offered, product: { id: p.id } });
+    }
+    return out;
+}
+
+// Stateless (it reads the flag rows on every call).
+const flags = new FeatureFlagService();
+
+/**
+ * Whether Commerce is rolled out for the business (DEC-057): a module whose
+ * rollout flag is off is shown nowhere, so its products are in no block.
+ */
+async function commerceRolledOut(organizationId: string): Promise<boolean> {
+    const descriptor = MODULE_BY_KEY.get("COMMERCE");
+    return descriptor
+        ? flags.isEnabled(descriptor.rolloutFlag, organizationId)
+        : false;
+}
+
 @Injectable()
 export class PublicCatalogueService {
     constructor(
@@ -120,112 +199,158 @@ export class PublicCatalogueService {
         ),
     ) {}
 
-    /** Everything sold at the site's storefront, by name. */
+    /**
+     * Everything sold at the site's storefront, by name — or, for a Product
+     * grid (G12), the products `grid` asks for, at most its count.
+     */
     async list(
         siteId: string,
         callerHash: string | undefined,
+        grid: GridQuery | null = null,
     ): Promise<PublicCatalogue> {
         return this.inShop(siteId, callerHash, async (scope) => {
-            const listings = await prisma.productListing.findMany({
-                where: {
-                    organizationId: scope.organizationId,
-                    storeId: scope.storefront.id,
-                    product: { status: "PUBLISHED" },
-                },
-                orderBy: [{ product: { name: "asc" } }, { id: "asc" }],
-                take: MAX_PRODUCTS,
-                select: {
-                    soldOutAt: true,
-                    variants: { select: { variantId: true } },
-                    product: {
-                        select: {
-                            id: true,
-                            slug: true,
-                            name: true,
-                            description: true,
-                            price: true,
-                            mrp: true,
-                            currency: true,
-                            stockTracked: true,
-                            images: {
-                                orderBy: { position: "asc" },
-                                take: 1,
-                                select: IMAGE_SELECT,
-                            },
-                            variants: {
-                                orderBy: [{ position: "asc" }, { id: "asc" }],
-                                select: VARIANT_SELECT,
-                            },
-                        },
+            if (grid) {
+                if (!(await commerceRolledOut(scope.organizationId))) {
+                    notFound();
+                }
+                return {
+                    storefront: { name: scope.storefront.name },
+                    products: await this.grid(scope, grid),
+                };
+            }
+            const listings = offeredOnly(
+                await prisma.productListing.findMany({
+                    where: {
+                        organizationId: scope.organizationId,
+                        storeId: scope.storefront.id,
+                        product: { status: "PUBLISHED" },
                     },
-                },
-            });
-            const [rows, businessTracks] = await Promise.all([
-                this.shelves(
-                    scope,
-                    listings.map((l) => l.product.id),
-                ),
-                businessTracksStock(prisma, scope.organizationId),
-            ]);
+                    orderBy: [{ product: { name: "asc" } }, { id: "asc" }],
+                    take: MAX_PRODUCTS,
+                    select: CARD_SELECT,
+                }),
+            );
+            const products = await this.cards(scope, listings);
+            if (products.length === 0) notFound();
+            return { storefront: { name: scope.storefront.name }, products };
+        });
+    }
 
-            const products: PublicCatalogueCard[] = [];
-            for (const listing of listings) {
-                const p = listing.product;
-                const listed = new Set(
-                    listing.variants.map((v) => v.variantId),
-                );
-                const offered = p.variants.filter((v) => listed.has(v.id));
-                // Variants, none of them sold here: nothing to offer.
-                if (p.variants.length > 0 && offered.length === 0) continue;
-                const tracked = p.stockTracked && businessTracks;
-                const markedSoldOut = listing.soldOutAt !== null;
-                const words =
-                    offered.length > 0
-                        ? offered.map(
-                              (v) =>
-                                  publicStock({
-                                      tracked,
-                                      markedSoldOut,
-                                      row: shelfFor(rows, p.id, v.id),
-                                  }).word,
-                          )
-                        : [
+    /**
+     * The Product grid's products (G12), in its order: published, listed
+     * here, with a variant sold here. A product that isn't (archived, a
+     * draft, unlisted, another business's) drops out and the next moves up.
+     */
+    private async grid(
+        scope: ShopScope,
+        grid: GridQuery,
+    ): Promise<PublicCatalogueCard[]> {
+        const sold = {
+            organizationId: scope.organizationId,
+            storeId: scope.storefront.id,
+            product: { status: "PUBLISHED" },
+        } satisfies Prisma.ProductListingWhereInput;
+
+        if (grid.source === "newest") {
+            const listings = offeredOnly(
+                await prisma.productListing.findMany({
+                    where: sold,
+                    orderBy: [
+                        { product: { createdAt: "desc" } },
+                        { product: { id: "asc" } },
+                    ],
+                    take: MAX_PRODUCTS,
+                    select: CARD_SELECT,
+                }),
+            );
+            return this.cards(scope, listings.slice(0, grid.count));
+        }
+
+        // A collection: its products sold here, in its order. Another
+        // business's collection, or one since deleted, holds none.
+        const order =
+            grid.source === "picked"
+                ? grid.productIds
+                : grid.collectionId
+                  ? ((
+                        await collectionOnSale(
+                            scope.organizationId,
+                            grid.collectionId,
+                            scope.storefront.id,
+                        )
+                    )?.productIds ?? [])
+                  : [];
+        if (order.length === 0) return [];
+        const listings = offeredOnly(
+            await prisma.productListing.findMany({
+                where: { ...sold, productId: { in: [...order] } },
+                select: CARD_SELECT,
+            }),
+        );
+        return this.cards(scope, inGridOrder(order, listings, grid.count));
+    }
+
+    /** Cards for listings already narrowed to what is offered here. */
+    private async cards(
+        scope: ShopScope,
+        listings: readonly OfferedListing[],
+    ): Promise<PublicCatalogueCard[]> {
+        if (listings.length === 0) return [];
+        const [rows, businessTracks] = await Promise.all([
+            this.shelves(
+                scope,
+                listings.map((l) => l.product.id),
+            ),
+            businessTracksStock(prisma, scope.organizationId),
+        ]);
+        return listings.map(({ listing, offered }) => {
+            const p = listing.product;
+            const tracked = p.stockTracked && businessTracks;
+            const markedSoldOut = listing.soldOutAt !== null;
+            const words =
+                offered.length > 0
+                    ? offered.map(
+                          (v) =>
                               publicStock({
                                   tracked,
                                   markedSoldOut,
-                                  row: shelfFor(rows, p.id, null),
+                                  row: shelfFor(rows, p.id, v.id),
                               }).word,
-                          ];
-                const base = {
-                    price: money(p.price) ?? "0.00",
-                    mrp: money(p.mrp),
-                };
-                const cover = p.images.length > 0 ? p.images[0] : null;
-                products.push({
-                    slug: p.slug,
-                    name: p.name,
-                    currency: p.currency,
-                    ...priceOf(
-                        base,
-                        offered.map((v) => ({
-                            price: money(v.price),
-                            mrp: money(v.mrp),
-                        })),
-                    ),
-                    image: cover
-                        ? cover.kind === "video"
-                            ? cover.posterUrl
-                                ? { url: cover.posterUrl, alt: cover.alt }
-                                : null
-                            : { url: cover.url, alt: cover.alt }
-                        : null,
-                    variantTitles: offered.map((v) => v.title),
-                    blurb: blurbOf(p.description),
-                    soldOut: words.every((w) => w === "SOLD_OUT"),
-                });
-            }
-            if (products.length === 0) notFound();
-            return { storefront: { name: scope.storefront.name }, products };
+                      )
+                    : [
+                          publicStock({
+                              tracked,
+                              markedSoldOut,
+                              row: shelfFor(rows, p.id, null),
+                          }).word,
+                      ];
+            const base = {
+                price: money(p.price) ?? "0.00",
+                mrp: money(p.mrp),
+            };
+            const cover = p.images.length > 0 ? p.images[0] : null;
+            return {
+                slug: p.slug,
+                name: p.name,
+                currency: p.currency,
+                ...priceOf(
+                    base,
+                    offered.map((v) => ({
+                        price: money(v.price),
+                        mrp: money(v.mrp),
+                    })),
+                ),
+                image: cover
+                    ? cover.kind === "video"
+                        ? cover.posterUrl
+                            ? { url: cover.posterUrl, alt: cover.alt }
+                            : null
+                        : { url: cover.url, alt: cover.alt }
+                    : null,
+                variantTitles: offered.map((v) => v.title),
+                blurb: blurbOf(p.description),
+                soldOut: words.every((w) => w === "SOLD_OUT"),
+            };
         });
     }
 

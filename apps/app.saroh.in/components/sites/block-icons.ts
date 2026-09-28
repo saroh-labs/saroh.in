@@ -5,6 +5,7 @@ import {
     CircleHelp,
     Clock,
     Images,
+    LayoutGrid,
     LayoutList,
     MailQuestion,
     MapPin,
@@ -39,4 +40,5 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     visitUs: Clock,
     journal: Newspaper,
     plans: Repeat,
+    productGrid: LayoutGrid,
 };

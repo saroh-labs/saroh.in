@@ -18,7 +18,7 @@ import { BlockThumbnail } from "./block-thumbnail";
 import {
     SECTION_HINTS,
     SECTION_LABELS,
-    SECTION_ORDER,
+    addableSections,
 } from "./editor-constants";
 
 /**
@@ -38,6 +38,7 @@ export function AddSectionDialog({
     variables,
     onAdd,
     startType = null,
+    shopOpen = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -51,6 +52,8 @@ export function AddSectionDialog({
      * block again, because the list of blocks is the tab.
      */
     startType?: SectionType | null;
+    /** The shop is open for the business: the Product grid is offered (G12). */
+    shopOpen?: boolean;
 }) {
     const [picked, setType] = useState<SectionType | null>(null);
     const type = picked ?? startType;
@@ -120,7 +123,7 @@ export function AddSectionDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {SECTION_ORDER.map((t) => {
+                            {addableSections(shopOpen).map((t) => {
                                 const m = BLOCK_META[t];
                                 const looks = m.variants.length;
                                 return (

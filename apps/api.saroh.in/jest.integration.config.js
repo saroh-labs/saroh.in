@@ -91,6 +91,8 @@ module.exports = {
         "<rootDir>/src/modules/products/products.gate.spec.ts",
         "<rootDir>/src/modules/collections/collections.gate.spec.ts",
         "<rootDir>/src/modules/collections/website-pages.spec.ts",
+        // G12: pure; the real rows are in public-catalogue-grid.db.spec.ts.
+        "<rootDir>/src/modules/products/product-grid.spec.ts",
         "<rootDir>/src/modules/categories/categories.service.spec.ts",
         "<rootDir>/src/modules/product-reviews/",
         // ADR-007 invoices: DB-free specs run in the unit project; only

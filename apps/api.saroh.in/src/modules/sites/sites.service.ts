@@ -48,6 +48,7 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import type { ApprovalRow, ReviewRoute } from "./review-route";
@@ -1595,6 +1596,13 @@ export class SitesService {
             };
         });
 
+        // A Product grid names only this business's collection and products
+        // (G12). An id its stored self already named passes, so a deleted
+        // product never blocks the page's later saves; the flag says so.
+        await assertGridRefsOwned(ctx.organizationId, validated, () =>
+            storedDraftSectionsByKey(ctx, pageId),
+        );
+
         const draft = await prisma.$transaction(async (tx) => {
             const version = await getOrCreateDraftVersion(tx, ctx, pageId);
 
@@ -2667,6 +2675,22 @@ export class SitesService {
             const ready = chosen
                 ? await checkoutReadiness(prisma, ctx.organizationId, chosen.id)
                 : null;
+            // The Product grids (G12): what each names that isn't on sale
+            // at the storefront. Asked only once one is chosen; until then
+            // the question above covers every grid.
+            if (chosen) {
+                flags.push(
+                    ...(await productGridFlags(
+                        ctx.organizationId,
+                        chosen,
+                        site.pages.map((page) => ({
+                            id: page.id,
+                            hidden: page.hidden,
+                            sections: page.versions.flatMap((v) => v.sections),
+                        })),
+                    )),
+                );
+            }
             flags.unshift(
                 ...checkShop({
                     storefrontChosen: chosen !== null,

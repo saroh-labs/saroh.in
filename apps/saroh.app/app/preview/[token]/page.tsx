@@ -10,6 +10,7 @@ import {
     getPreviewJournalFeed,
 } from "@/lib/publication";
 import { getPreviewPlansFeed } from "@/lib/site-plans";
+import { getPreviewProductGridFeeds } from "@/lib/site-product-grids";
 
 /** The draft's home page, behind a preview token (#198). */
 export default async function PreviewHomePage({
@@ -34,8 +35,9 @@ export default async function PreviewHomePage({
     if (!home) notFound();
 
     // The draft's posts (G10), as the preview's own index shows them, and
-    // the plans on sale now (G9): a draft plan never shows, even here.
-    const [journal, plans] = await Promise.all([
+    // the plans on sale now (G9) and each Product grid's products (G12): a
+    // draft plan or product never shows, even here.
+    const [journal, plans, productGrids] = await Promise.all([
         getPreviewJournalFeed(home.sections, preview.snapshot, token),
         getPreviewPlansFeed(
             home.sections,
@@ -43,6 +45,7 @@ export default async function PreviewHomePage({
             preview.siteId,
             token,
         ),
+        getPreviewProductGridFeeds(home.sections, preview.siteId),
     ]);
 
     return (
@@ -52,6 +55,7 @@ export default async function PreviewHomePage({
             siteId={preview.siteId}
             journal={journal}
             plans={plans}
+            productGrids={productGrids}
         />
     );
 }

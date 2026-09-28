@@ -118,6 +118,15 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { title: "Come and see us" },
             };
+        case "productGrid":
+            // The newest four sold where the site sells from, read live;
+            // the panel chooses a collection or products instead.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Our products" },
+            };
         case "plans":
             // Nothing to choose: the plans on sale, read live.
             return {
