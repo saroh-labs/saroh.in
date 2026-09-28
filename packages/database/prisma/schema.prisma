@@ -282,6 +282,10 @@ model Organization {
   // storefront people the F16 backfill put on the team (DEC-048). Null: not
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
+
+  // A customer's message thread with the business (round-2 A13).
+  customerThreads        CustomerThread[]
+  customerThreadMessages CustomerThreadMessage[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3334,6 +3338,10 @@ model Contact {
   postalCode   String?
   country      String?
 
+  // Their message thread with the business, written from their account on
+  // the business's site and answered by the team (round-2 A13). At most one.
+  customerThread CustomerThread?
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -5177,6 +5185,9 @@ model Invoice {
   // Emails that sent it or reminded about it (D17).
   messages Message[]
 
+  // Account-thread posts that sent it or reminded about it (D17, A13).
+  threadMessages CustomerThreadMessage[]
+
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
   // key. Voided invoices are left out, so a voided period can be reissued.
@@ -5480,6 +5491,9 @@ model CustomerAccount {
   // Bookings made signed in (A9).
   bookings Booking[]
 
+  // Messages the customer wrote to the business from this account (A13).
+  threadMessages CustomerThreadMessage[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5549,4 +5563,79 @@ model CustomerSession {
   @@index([accountId])
   @@index([siteId])
   @@index([expiresAt])
+}
+
+/// Who wrote a thread message (A13): the customer from their account, a
+/// staff member from the workspace, or Saroh itself for the business (an
+/// invoice sent, and later A14's order and booking notices).
+enum CustomerThreadAuthor {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+/// A customer's one message thread with the business (round-2 A13, R14,
+/// default 77): the customer writes from their account on the business's
+/// site, and the team answers in the workspace. Rooted on the Contact, so a
+/// merge absorbs the other's thread (C9) and a removal deletes it (C11).
+model CustomerThread {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The newest message, for the order threads are listed in.
+  lastMessageAt  DateTime  @default(now())
+  // When each side last opened it: a message from the other side after this
+  // is unread, and opening clears the dot.
+  customerReadAt DateTime?
+  staffReadAt    DateTime?
+
+  messages CustomerThreadMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One thread per customer.
+  @@unique([contactId, organizationId])
+  // The target of (threadId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId, lastMessageAt])
+}
+
+/// One message in a customer's thread (A13). Plain text, never rendered as
+/// HTML.
+model CustomerThreadMessage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  threadId String
+  thread   CustomerThread @relation(fields: [threadId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  author CustomerThreadAuthor
+  body   String
+
+  // The account that wrote it (CUSTOMER). "This isn't them" moves the
+  // messages the account wrote since it linked (unlink-plan.ts).
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  // The staff member who wrote it (STAFF), or sent the invoice (SYSTEM).
+  authorUserId      String?
+
+  // What a SYSTEM message says happened, and the invoice it is about: D17's
+  // INVOICE_SENT | INVOICE_REMINDER. The invoice's once-sent and
+  // one-reminder-a-day rules count these beside its emails.
+  event     String?
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([threadId, createdAt])
+  @@index([customerAccountId, createdAt])
+  @@index([invoiceId, createdAt])
 }
