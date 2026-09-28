@@ -178,6 +178,8 @@ export function useKitchen({
                         const res = await refundLines(order.id, {
                             lines: choice.lines,
                             putBack: choice.putBack,
+                            reason: choice.reason,
+                            goodwill: choice.goodwill,
                             idempotencyKey: key,
                         });
                         resolve();
@@ -210,7 +212,7 @@ export function useKitchen({
                                 : null,
                         ].filter((n): n is string => n !== null);
                         showSuccess(
-                            choice.lines === null
+                            choice.lines === null && !choice.goodwill
                                 ? "Refunded in full."
                                 : `Refunded ${sent}. The rest of the order stands.`,
                             notes.length > 0 ? notes.join(" ") : undefined,

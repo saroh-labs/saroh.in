@@ -351,6 +351,41 @@ describe("eventText", () => {
         expect(eventText(ev({ kind: "REFUND" }), money)).toBe("Refunded");
     });
 
+    it("says why a refund was made (B8): a listed reason in the sentence, typed words as typed", () => {
+        expect(
+            eventText(
+                ev({ kind: "REFUND", amountCents: 5000, note: "Late" }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · late");
+        expect(
+            eventText(
+                ev({
+                    kind: "REFUND",
+                    amountCents: 5000,
+                    note: "Customer changed their mind",
+                }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · customer changed their mind");
+        expect(
+            eventText(
+                ev({
+                    kind: "REFUND",
+                    amountCents: 5000,
+                    note: "Priya's cake came crushed",
+                }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · Priya's cake came crushed");
+        expect(
+            eventText(
+                ev({ kind: "REFUND", amountCents: 5000, note: " " }),
+                money,
+            ),
+        ).toBe("Refunded ₹50");
+    });
+
     it("never claims a message went to the customer", () => {
         for (const to of ["READY", "COLLECTED", "HANDED_TO_COURIER"]) {
             expect(eventText(ev({ toStage: to }), money)).not.toMatch(

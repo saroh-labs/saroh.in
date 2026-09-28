@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
+import type { Sellable } from "@/lib/orders/sellables";
+import { addedLines } from "@/lib/orders/sellables";
 
 import { actionClass, FOCUS, PanelTitle, WorkPanel } from "./parts";
 
@@ -28,10 +30,12 @@ const draftOf = (a: DeliveryAddress | null): AddressDraft => ({
 
 /**
  * "Edit #1063" — before preparing only: quantities (down to nothing drops a
- * line) and, for a delivery, the address. It says what the change does to
- * the money before you save it: more is due on the order (nothing is sent to
- * the customer — Saroh sends no messages), less goes back to how they paid.
- * The API reprices it; the figure here is what the lines cost.
+ * line), "Add an item" from the order's storefront (B8; the API holds its
+ * stock there, DEC-032) and, for a delivery, the address. It says what the
+ * change does to the money before you save it: more is due on the order
+ * (nothing is sent to the customer — Saroh sends no messages), less goes
+ * back to how they paid. The API reprices it; the figure here is what the
+ * lines cost.
  */
 export function EditPanel({
     number,
@@ -41,6 +45,7 @@ export function EditPanel({
     delivery,
     refundTo,
     format,
+    addable = null,
     busy,
     onCancel,
     onSave,
@@ -53,6 +58,11 @@ export function EditPanel({
     /** Where money handed back goes: "Razorpay", "the till". */
     refundTo: string;
     format: ((amount: number) => string) | null;
+    /**
+     * What "Add an item" offers — the order's storefront's catalogue (B8);
+     * "unavailable" when it couldn't be read, null when it isn't offered.
+     */
+    addable?: Sellable[] | "unavailable" | null;
     busy: boolean;
     onCancel: () => void;
     onSave: (input: EditOrderInput) => void;
@@ -61,6 +71,7 @@ export function EditPanel({
         Object.fromEntries(lines.map((l) => [l.id, l.quantity])),
     );
     const [addr, setAddr] = useState<AddressDraft>(() => draftOf(address));
+    const [added, setAdded] = useState<Sellable[]>([]);
 
     const was = draftOf(address);
     const addressChanged =
@@ -69,12 +80,22 @@ export function EditPanel({
             (k) => addr[k].trim() !== was[k],
         );
     const changed = lines.filter((l) => qty[l.id] !== l.quantity);
-    const diff = lines.reduce(
-        (n, l) => n + Number(l.price ?? 0) * ((qty[l.id] ?? 0) - l.quantity),
-        0,
-    );
-    const empty = lines.every((l) => (qty[l.id] ?? 0) === 0);
-    const same = changed.length === 0 && !addressChanged;
+    const diff =
+        lines.reduce(
+            (n, l) =>
+                n + Number(l.price ?? 0) * ((qty[l.id] ?? 0) - l.quantity),
+            0,
+        ) + added.reduce((n, s) => n + Number(s.price), 0);
+    const empty =
+        added.length === 0 && lines.every((l) => (qty[l.id] ?? 0) === 0);
+    const same = changed.length === 0 && added.length === 0 && !addressChanged;
+    const pick = (key: string) => {
+        const found =
+            addable && addable !== "unavailable"
+                ? addable.find((s) => s.key === key && !s.soldOut)
+                : undefined;
+        if (found) setAdded((a) => [...a, found]);
+    };
     const addressMissing =
         addressChanged &&
         (Object.keys(addr) as (keyof AddressDraft)[]).some(
@@ -144,6 +165,68 @@ export function EditPanel({
                     );
                 })}
             </div>
+            {added.map((s, i) => {
+                const name = `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}`;
+                return (
+                    <div
+                        // A pick has no id of its own; its place is its key.
+                        key={`${s.key}-${i}`}
+                        className="mt-1.5 flex items-center gap-2 border-t border-border py-[7px] text-[13px]"
+                    >
+                        <span className="min-w-0 flex-1">
+                            {name}{" "}
+                            <span className="text-muted-foreground">
+                                · added
+                            </span>
+                        </span>
+                        <span className="tabular-nums">
+                            {money(Number(s.price))}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setAdded((a) => a.filter((_, j) => j !== i))
+                            }
+                            aria-label={`Remove ${name}`}
+                            className={cn(
+                                FOCUS,
+                                "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground coarse:min-h-11",
+                            )}
+                        >
+                            Remove
+                        </button>
+                    </div>
+                );
+            })}
+            {addable === "unavailable" ? (
+                <p className="mt-2.5 text-[12px] text-muted-foreground">
+                    The products couldn&apos;t be loaded, so nothing can be
+                    added right now. Quantities and the address still change.
+                </p>
+            ) : addable && addable.length > 0 ? (
+                <label className="mt-2.5 block text-[12px] font-medium">
+                    Add an item
+                    <select
+                        value=""
+                        onChange={(e) => pick(e.target.value)}
+                        className={cn(
+                            FOCUS,
+                            "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
+                        )}
+                    >
+                        <option value="">Choose a product…</option>
+                        {addable.map((s) => (
+                            <option
+                                key={s.key}
+                                value={s.key}
+                                disabled={s.soldOut}
+                            >
+                                {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            ) : null}
             {delivery ? (
                 <fieldset className="mt-3">
                     <legend className="text-[12px] font-medium">
@@ -231,6 +314,7 @@ export function EditPanel({
                                       })),
                                   }
                                 : {}),
+                            ...(added.length ? { add: addedLines(added) } : {}),
                             ...(addressChanged
                                 ? {
                                       address: {
