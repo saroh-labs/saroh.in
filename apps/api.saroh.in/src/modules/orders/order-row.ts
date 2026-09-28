@@ -1,4 +1,5 @@
 import { fromMinor, toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import {
     isRemovedStoreCustomer,
     REMOVED_CUSTOMER_NAME,
@@ -180,6 +181,7 @@ export function serializeOrderRow(
     // Their details were removed for a privacy request (C11): the order
     // stays, under "Removed customer", with no email to show.
     const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
 
     return {
         id: order.id,
@@ -201,9 +203,10 @@ export function serializeOrderRow(
                           : customerName || null,
                       ...(view.contact
                           ? {
-                                ...(removed
+                                // Never a placeholder (B13b).
+                                ...(removed || !shownEmail
                                     ? {}
-                                    : { email: order.customer.email }),
+                                    : { email: shownEmail }),
                                 phone: order.customer.phone,
                             }
                           : {}),

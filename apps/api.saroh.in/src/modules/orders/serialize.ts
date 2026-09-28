@@ -1,4 +1,5 @@
 import { toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import type { OrderLineKind } from "./order-line";
 import { lineKind, lineName } from "./order-line";
 
@@ -137,7 +138,13 @@ export function serializeOrderSummary(order: RawSummary): OrderSummaryDto {
         total: toMoneyString(order.total),
         currency: order.currency,
         createdAt: order.createdAt,
-        customer: order.customer ?? null,
+        // Never a placeholder email (a walk-in kept by phone, B13b).
+        customer: order.customer
+            ? {
+                  ...order.customer,
+                  email: contactEmailForDisplay(order.customer.email) ?? "",
+              }
+            : null,
     };
 }
 

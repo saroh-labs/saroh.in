@@ -1,13 +1,19 @@
 /**
  * Walk-in orders (plan B, B13). An order taken at the counter for someone
- * who leaves no email has no storefront customer (`customerId` is null): it
- * carries the name they gave, and their phone if they gave one, instead.
- * No contact is made from them, because a contact needs an email.
+ * who leaves only their name has no storefront customer (`customerId` is
+ * null): it carries the name they gave instead, and no contact is made.
+ *
+ * A walk-in who gives a phone is a customer (B13b, 2026-09-28): New order
+ * makes the order for the store customer that phone finds or makes, so it
+ * is not a walk-in here. `walkInPhone` is only on walk-ins taken before
+ * that, which still read with it.
  *
  * Every reader that names an order's customer goes through here, so a
  * walk-in reads the same everywhere: by their name, never an email, and
  * never as a broken or blank row.
  */
+
+import { contactEmailForDisplay } from "../contacts/contact-email";
 
 /** The fields a walk-in is read from. */
 export interface WalkInFields {
@@ -75,8 +81,8 @@ export function orderPartyName(
     if (order.customer) {
         const name = customerName(order.customer);
         if (name) return name;
-        const email = order.customer.email?.trim();
-        return email !== undefined && email.length > 0 ? email : "Customer";
+        // Never a placeholder: a walk-in kept by their phone (B13b).
+        return contactEmailForDisplay(order.customer.email) ?? "Customer";
     }
     const name = nameOf(order);
     if (!name) return WALK_IN;

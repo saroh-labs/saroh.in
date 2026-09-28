@@ -1,18 +1,20 @@
 import type { Prisma } from "@saroh/database";
 
-import {
-    isReservedContactEmail,
-    reservedRemovedEmail,
-} from "../contacts/contact-email";
+import { reservedRemovedEmail } from "../contacts/contact-email";
 
 /** What Orders, Bookings and the rest call someone whose details were removed. */
 export const REMOVED_CUSTOMER_NAME = "Removed customer";
 
-/** A store customer whose details were removed: its email is the placeholder. */
+/**
+ * A store customer whose details were removed: its email is the removal's
+ * placeholder. Not any placeholder: a walk-in kept by their phone (B13b)
+ * carries `phone+…@phone.invalid` and is nobody removed.
+ */
 export function isRemovedStoreCustomer(
     customer: { email: string } | null | undefined,
 ): boolean {
-    return isReservedContactEmail(customer?.email);
+    const email = customer?.email.trim().toLowerCase() ?? "";
+    return email.startsWith("removed+") && email.endsWith("@removed.invalid");
 }
 
 /**

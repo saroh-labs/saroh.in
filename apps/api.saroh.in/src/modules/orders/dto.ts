@@ -193,7 +193,10 @@ export class CreateOrderDto {
     @Type(() => NewOrderCustomerInput)
     customer?: NewOrderCustomerInput;
 
-    /** A walk-in: a name, and a phone if given; no record (B13). */
+    /**
+     * A walk-in: a name, and a phone if given (B13). A name alone makes no
+     * record; a phone makes them a customer, found or made by it (B13b).
+     */
     @IsOptional()
     @ValidateNested()
     @Type(() => WalkInInput)

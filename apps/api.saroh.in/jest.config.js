@@ -206,6 +206,8 @@ module.exports = {
         // writes are in new-order.db.spec.ts.
         "<rootDir>/src/modules/orders/new-order.spec.ts",
         "<rootDir>/src/modules/orders/walk-in.spec.ts",
+        // B13b: the phone a walk-in is kept by, DB-free.
+        "<rootDir>/src/modules/orders/walk-in-customer.spec.ts",
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",

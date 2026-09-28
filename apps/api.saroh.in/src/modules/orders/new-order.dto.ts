@@ -32,7 +32,9 @@ const PHONE_MSG = "That doesn't look like a phone number.";
 
 /**
  * Someone served at the counter who leaves no email (B13): a name, and a
- * phone if they gave one. No customer and no contact is made from them.
+ * phone if they gave one. A name alone makes no customer and no contact; a
+ * phone makes them a customer, found by it or made with it (B13b), and an
+ * app from before B13b sending one gets the same.
  */
 export class WalkInInput {
     @Transform(trim)

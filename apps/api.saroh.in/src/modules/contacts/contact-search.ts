@@ -113,7 +113,7 @@ function matchClause(terms: SearchTerms): Prisma.Sql | null {
     if (terms.email) {
         const start = `${literal(terms.email)}%`;
         // A site account's placeholder is no email: its account's is.
-        return Prisma.sql`((lower(c.email) LIKE ${start} AND lower(c.email) NOT LIKE '%@account.invalid') OR lower(a.email) LIKE ${start})`;
+        return Prisma.sql`((lower(c.email) LIKE ${start} AND lower(c.email) NOT LIKE '%@account.invalid' AND lower(c.email) NOT LIKE '%@phone.invalid') OR lower(a.email) LIKE ${start})`;
     }
     if (terms.digits.length > 0) {
         const patterns = terms.digits.map((d) => `%${literal(d)}%`);

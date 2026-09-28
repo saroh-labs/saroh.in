@@ -16,6 +16,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { PRODUCT_LINES } from "../orders/order-line";
 import type { IneligibleReason } from "./eligibility";
@@ -237,7 +238,10 @@ export class ProductReviewsService {
         });
         return orders.flatMap((o) => {
             const customer = o.customer;
-            if (!customer?.email.trim()) return [];
+            // No email, or a placeholder (a walk-in kept by phone, B13b).
+            if (!customer || !contactEmailForDisplay(customer.email)) {
+                return [];
+            }
             return [
                 {
                     id: o.id,
@@ -317,7 +321,8 @@ export class ProductReviewsService {
         if (blocked) return skip(blocked);
 
         // A walk-in (B13) has no customer and no email: never invited.
-        const email = order.customer?.email.trim() ?? "";
+        const email =
+            contactEmailForDisplay(order.customer?.email)?.trim() ?? "";
         if (!email || !order.customerId) return skip("no-email");
         const consent = await this.consentFor(
             ctx.organizationId,

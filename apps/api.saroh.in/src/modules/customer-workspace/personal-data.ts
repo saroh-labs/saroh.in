@@ -68,15 +68,18 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         why: "The GST place of supply when no bill-to state is set; tax records need it.",
     },
     "Order.notes": { rule: "cleared", why: "Free text about the order." },
-    // A walk-in (B13) is the order's only record of that person: it has no
-    // customer or contact, so no removal ever reaches it.
+    // A walk-in who leaves only a name (B13) is the order's only record of
+    // them: no customer or contact, so no removal ever reaches it. One who
+    // gives a phone is a customer (B13b): the phone goes on the store
+    // customer and their contact, which a removal clears, and is no longer
+    // written here.
     "Order.walkInName": {
         rule: "kept",
-        why: "A walk-in has no customer or contact; a removal never reaches it.",
+        why: "A name-only walk-in has no customer or contact; a removal never reaches it.",
     },
     "Order.walkInPhone": {
         rule: "kept",
-        why: "A walk-in has no customer or contact; a removal never reaches it.",
+        why: "Only on walk-ins taken before B13b; a phone given now makes a customer, whose phone a removal clears.",
     },
     "Order.courierName": {
         rule: "kept",

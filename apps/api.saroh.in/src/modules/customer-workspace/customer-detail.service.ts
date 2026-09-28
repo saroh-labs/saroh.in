@@ -855,7 +855,8 @@ export class CustomerDetailService {
             linkId: l.id,
             customerId: l.customer.id,
             name: personName(l.customer),
-            email: l.customer.email,
+            // Never a placeholder (a walk-in kept by phone, B13b).
+            email: contactEmailForDisplay(l.customer.email) ?? "",
             storefront: l.customer.store,
             linkedAt: l.createdAt.toISOString(),
         }));
