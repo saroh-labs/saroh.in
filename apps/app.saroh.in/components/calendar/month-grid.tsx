@@ -9,12 +9,12 @@ import type { LayerStyle, Off } from "@/lib/calendar/layers";
 import {
     dayChips,
     dayCount,
-    dayTakings,
     dayTitle,
     leadingBlanks,
     monthTitle,
 } from "@/lib/calendar/layers";
-import { shortMoney, wholeMoney } from "@/lib/calendar/money";
+import type { MoneySum } from "@/lib/calendar/money";
+import { cellMoney, minorMoney } from "@/lib/calendar/money";
 import type { CalendarRange } from "@/lib/calendar/range";
 import { inRange } from "@/lib/calendar/range";
 import type { CalendarDay } from "@/lib/calendar/types";
@@ -46,7 +46,8 @@ export function dayButton(date: string): HTMLButtonElement | null {
  * The month: a week a row from Monday, each day a button with its chips —
  * its named problem first ("1 late order", "2 need you"; E22), then a count
  * per layer — and, for a role that
- * reads money, what was taken that day as a bar scaled to the busiest day.
+ * reads money (`payment:read`, E23), what came in and went out that day:
+ * "+₹3.8k" over "−₹200".
  * Below 760px each chip is a dot per layer, red when something needs acting
  * on, and the tapped day is listed under the month. A day the calendar does
  * not reach — before the business joined, or past what can be planned — is
@@ -67,7 +68,7 @@ export function MonthGrid({
     today,
     selected,
     currency,
-    showTakings,
+    money,
     onPick,
     onMove,
 }: {
@@ -80,8 +81,8 @@ export function MonthGrid({
     today: string;
     selected: string;
     currency: string | null;
-    /** The lead layer is on and this person reads money. */
-    showTakings: boolean;
+    /** Each day's money, for the layers switched on; null: none drawn. */
+    money: Map<string, MoneySum> | null;
     onPick: (date: string) => void;
     /** A key moved to this day — in this month, or the one before or after. */
     onMove: (date: string) => void;
@@ -106,11 +107,6 @@ export function MonthGrid({
         onMove(to);
     };
 
-    const lead = layers.at(0);
-    const takings = days.map((d) =>
-        showTakings ? dayTakings(d, currency) : 0,
-    );
-    const busiest = Math.max(1, ...takings);
     const blanks = leadingBlanks(month);
     const trailing = (7 - ((blanks + days.length) % 7)) % 7;
     // The picked day holds the tab stop; before one is drawn, the first day
@@ -156,13 +152,17 @@ export function MonthGrid({
             >
                 {weeks([
                     ...Array.from({ length: blanks }, (_, i) => blank(`b${i}`)),
-                    ...days.map((day, i) => {
+                    ...days.map((day) => {
                         const outside = !inRange(day.date, range);
                         const past = day.date < today;
                         const isToday = day.date === today;
                         const on = day.date === selected;
                         const chips = dayChips(day, layers, off, today);
-                        const taken = takings[i];
+                        const sum = money?.get(day.date);
+                        const cash =
+                            currency && money
+                                ? cellMoney(sum, currency)
+                                : { in: "", out: "" };
                         const n = dayCount(day, layers, off);
                         // The named problem, said as the chip says it (E22).
                         const problem = chips.find((c) => c.key === "act");
@@ -173,8 +173,11 @@ export function MonthGrid({
                                     : "nothing"
                             }`,
                             problem?.text ?? null,
-                            taken > 0 && currency
-                                ? `${wholeMoney(taken, currency)} taken`
+                            sum?.in && currency
+                                ? `${minorMoney(sum.in, currency)} in`
+                                : null,
+                            sum?.out && currency
+                                ? `${minorMoney(sum.out, currency)} out`
                                 : null,
                         ]
                             .filter(Boolean)
@@ -217,28 +220,29 @@ export function MonthGrid({
                                         {Number(day.date.slice(8))}
                                     </span>
                                     <span className="flex-1" />
-                                    {taken > 0 && currency ? (
-                                        <span className="text-[11px] font-semibold tabular-nums text-neutral-600 dark:text-muted-foreground max-[759px]:hidden">
-                                            {shortMoney(taken, currency)}
+                                    {cash.in || cash.out ? (
+                                        // In over out, as the design stacks
+                                        // them; the cell's label says both.
+                                        <span
+                                            aria-hidden
+                                            title={
+                                                sum && currency
+                                                    ? `Money in ${minorMoney(sum.in, currency)}${sum.out ? `, out ${minorMoney(sum.out, currency)}` : ""}`
+                                                    : undefined
+                                            }
+                                            className="grid flex-none justify-items-end whitespace-nowrap text-[11px] font-semibold tabular-nums leading-[1.25] max-[759px]:hidden"
+                                        >
+                                            <span className="text-neutral-600 dark:text-muted-foreground">
+                                                {cash.in}
+                                            </span>
+                                            {cash.out ? (
+                                                <span className="font-medium text-destructive-subtle-foreground">
+                                                    {cash.out}
+                                                </span>
+                                            ) : null}
                                         </span>
                                     ) : null}
                                 </span>
-                                {taken > 0 && lead ? (
-                                    <span
-                                        aria-hidden
-                                        className="mb-1 mt-[5px] block h-1 overflow-hidden rounded-full bg-muted max-[759px]:hidden"
-                                    >
-                                        <span
-                                            className={cn(
-                                                "block h-full rounded-full",
-                                                TONE_FILL[lead.tone],
-                                            )}
-                                            style={{
-                                                width: `${(taken / busiest) * 100}%`,
-                                            }}
-                                        />
-                                    </span>
-                                ) : null}
                                 {/* Desk: chips in words. */}
                                 <span
                                     aria-hidden

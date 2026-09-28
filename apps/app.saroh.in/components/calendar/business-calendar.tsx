@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Sheet, SheetContent, SheetTitle } from "@saroh/ui/sheet";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,7 +11,9 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { CalendarNothing } from "@/components/calendar/calendar-nothing";
 import { DayPanel } from "@/components/calendar/day-panel";
+import { LayerSwitches } from "@/components/calendar/layer-switches";
 import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
+import { MonthStrip } from "@/components/calendar/month-strip";
 import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
 import {
@@ -22,7 +23,7 @@ import {
     monthTitle,
     shiftMonth,
 } from "@/lib/calendar/layers";
-import { wholeMoney } from "@/lib/calendar/money";
+import { calendarCash, moneyByDate, wholeMoney } from "@/lib/calendar/money";
 import type { ProblemCan } from "@/lib/calendar/problems";
 import type { Edge } from "@/lib/calendar/range";
 import {
@@ -32,8 +33,6 @@ import {
     openingDay,
 } from "@/lib/calendar/range";
 import type { CalendarMonth } from "@/lib/calendar/types";
-
-import { TONE_BORDER, TONE_FILL } from "./tones";
 
 /** Between the phone and the full rail the day opens as a sheet. */
 const SHEET_WIDTHS = "(min-width: 760px) and (max-width: 1099px)";
@@ -91,12 +90,12 @@ export function BusinessCalendar({
     if (layers.length === 0) return <CalendarNothing />;
 
     const currency = mainCurrency(data);
-    const lead = layers[0];
     const day = data.days.find((d) => d.date === selected) ?? data.days.at(0);
     const failed = new Set(data.unavailable.map((u) => u.source));
     const missing = data.unavailable.map((u) => u.label);
     const money = data.takings !== undefined;
-    const showTakings = money && data.takings?.total !== null && !off[lead.key];
+    // In, out and due (E23): only for `payment:read`, whom the API sent them.
+    const cash = calendarCash(data, off, currency);
 
     const pick = (date: string) => {
         setSelected(date);
@@ -132,6 +131,7 @@ export function BusinessCalendar({
                     can,
                 })}
                 can={can}
+                money={cash}
             />
         ) : null;
 
@@ -148,15 +148,18 @@ export function BusinessCalendar({
                 title={monthTitle(data.month)}
                 className="mb-0"
                 actions={
-                    <span className="w-full text-right text-[12.5px] text-muted-foreground sm:w-auto">
-                        {monthSummary({
-                            month: data,
-                            layers,
-                            off,
-                            today,
-                            money: wholeMoney,
-                        })}
-                    </span>
+                    // With the strip, the money is said there (the design).
+                    cash ? undefined : (
+                        <span className="w-full text-right text-[12.5px] text-muted-foreground sm:w-auto">
+                            {monthSummary({
+                                month: data,
+                                layers,
+                                off,
+                                today,
+                                money: wholeMoney,
+                            })}
+                        </span>
+                    )
                 }
             />
 
@@ -210,56 +213,26 @@ export function BusinessCalendar({
                     </span>
                 ) : null}
                 <span className="flex-1" />
-                <div
-                    role="group"
-                    aria-label="Show on the calendar"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {layers.map((layer) => {
-                        const on = !off[layer.key];
-                        const broken = failed.has(layer.key);
-                        return (
-                            <button
-                                key={layer.key}
-                                type="button"
-                                aria-pressed={on}
-                                disabled={broken}
-                                onClick={() =>
-                                    setOff((o) => ({
-                                        ...o,
-                                        [layer.key]: !o[layer.key],
-                                    }))
-                                }
-                                className={cn(
-                                    "inline-flex h-8 items-center gap-[5px] rounded-full border px-[11px] text-[12.5px] font-semibold transition-colors duration-fast coarse:h-11",
-                                    broken
-                                        ? "cursor-not-allowed border-dashed border-border text-muted-foreground"
-                                        : on
-                                          ? "border-foreground bg-card text-foreground"
-                                          : "border-border bg-transparent text-muted-foreground hover:border-border-strong",
-                                )}
-                            >
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "mr-1.5 inline-block size-[9px] rounded-[3px] border-[1.5px]",
-                                        TONE_BORDER[layer.tone],
-                                        on && !broken
-                                            ? TONE_FILL[layer.tone]
-                                            : "bg-transparent",
-                                    )}
-                                />
-                                {layer.label}
-                                <span className="font-medium text-muted-foreground">
-                                    {broken
-                                        ? "couldn't load"
-                                        : (data.totals[layer.key] ?? 0)}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                <LayerSwitches
+                    layers={layers}
+                    off={off}
+                    totals={data.totals}
+                    failed={failed}
+                    onToggle={(key) =>
+                        setOff((o) => ({ ...o, [key]: !o[key] }))
+                    }
+                />
             </div>
+
+            {cash ? (
+                <MonthStrip
+                    month={data.month}
+                    cash={cash}
+                    thisMonth={thisMonth}
+                    today={today}
+                    shop={data.layers.includes("orders")}
+                />
+            ) : null}
 
             {missing.length > 0 ? (
                 <PartialNotice
@@ -276,8 +249,9 @@ export function BusinessCalendar({
                     {listed(missing)} couldn&apos;t be loaded, so{" "}
                     {missing.length === 1 ? "it is" : "they are"} missing from
                     this month — everything else is here.
-                    {money && data.takings?.total === null
-                        ? " Takings are left out while part of them is missing."
+                    {data.money?.total === null ||
+                    (money && data.takings?.total === null)
+                        ? " Money is left out while part of it is missing."
                         : ""}
                 </PartialNotice>
             ) : null}
@@ -291,8 +265,8 @@ export function BusinessCalendar({
                     off={off}
                     today={today}
                     selected={day?.date ?? ""}
-                    currency={currency}
-                    showTakings={showTakings}
+                    currency={cash?.currency ?? null}
+                    money={cash ? moneyByDate(cash.shown) : null}
                     onPick={pick}
                     onMove={move}
                 />
@@ -322,10 +296,10 @@ export function BusinessCalendar({
                     Each dot is a layer with something that day; red means
                     something that needs you. Tap a day to see it.
                 </span>
-                {showTakings ? (
+                {cash ? (
                     <span className="max-[759px]:hidden">
-                        The bar in each day is what was taken that day, scaled
-                        to the busiest day.
+                        Each day&apos;s money is what came in (+) and went out
+                        (−) that day.
                     </span>
                 ) : null}
             </p>

@@ -92,13 +92,15 @@ each with why it stops there:
   state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
   `cancel-panel.tsx` and `use-order-changes.ts`; the header and the money
   column are the next seams.
-- The calendar's `lib/calendar/layers.ts` (449) and
-  `components/calendar/business-calendar.tsx` (404) — the layers' order,
-  tones, words and day lines, and the screen's month, switches and day
-  sheet. E22 put the named problems and their fixes in their own
-  `lib/calendar/problems.ts` rather than grow them; the month summary and
-  the item lines are `layers.ts`'s next seams, and the switches row the
-  screen's.
+- The calendar's `lib/calendar/layers.ts` (443) — the layers' order,
+  tones, words and day lines. E22 put the named problems and their fixes
+  in their own `lib/calendar/problems.ts`, and E23 the money (in, out,
+  due, the strip and the day's line) in `lib/calendar/money.ts` and the
+  export in `lib/calendar/export.ts`, rather than grow it; the month
+  summary and the item lines are its next seams.
+  `components/calendar/business-calendar.tsx` (404 after E22) went back
+  under when E23 took the switches row to `layer-switches.tsx` and the
+  month strip to `month-strip.tsx`.
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
