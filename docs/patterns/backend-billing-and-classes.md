@@ -349,8 +349,16 @@
 
 - Subscriptions and invoices: PAYMENTS, with `@IgnoreModuleReadiness()` so a
   business with no provider still records payments by hand. Courses: its own
-  COURSES module (depends on APPOINTMENTS). Packs and online classes:
-  APPOINTMENTS.
+  COURSES module (depends on APPOINTMENTS). Class packs: its own CLASS_PACKS
+  module (depends on APPOINTMENTS; E12, default 44), reached with
+  `pack:read`. Online classes: APPOINTMENTS.
+- **Switched off, a module stops new work and keeps its rows** (DEC-016).
+  Class packs off refuses a sale from the row itself
+  (`class-packs/class-packs-on.ts`, a missing row counts as on), whatever
+  `MODULE_ENFORCEMENT` says; packs, purchases and classes spent stay, a
+  booking paid with one still says so, and a cancel in time still gives the
+  class back. "Also sell" on Bookings › Services and Settings › Modules flip
+  the same switch through `ModuleLifecycleService`.
 - A Member reads bookings, services and contacts but no billing, course or
   pack screen (DEC-020); every billing read names its own action.
 - Workspace routes: `/billing/{subscriptions,plans,invoices}` (the rail's

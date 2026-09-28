@@ -33,11 +33,11 @@ const NEEDS: Record<
         write: "subscription:write",
         moduleKey: "PAYMENTS",
     },
-    // A pack is booked time sold ahead: Appointments (ADR-007).
+    // A pack is booked time sold ahead: its own module, Class packs (E12).
     packs: {
         read: "pack:read",
         write: "pack:write",
-        moduleKey: "APPOINTMENTS",
+        moduleKey: "CLASS_PACKS",
     },
     courses: {
         read: "course:read",

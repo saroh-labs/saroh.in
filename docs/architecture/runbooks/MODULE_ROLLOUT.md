@@ -68,6 +68,40 @@ check reads the row directly and does not depend on `MODULE_ENFORCEMENT`, so
 turning enforcement off does not reopen booking for a merchant who switched
 Appointments off.
 
+## Splitting a module out: Class packs (E12)
+
+Class packs was part of Appointments until round 2, and is now its own
+module, `CLASS_PACKS`, which needs Appointments. The API gates `/class-packs`
+and "use a pack on a booking" on it, and refuses a sale when the business's
+CLASS_PACKS row is off. The flag resolver fails closed on an unregistered
+flag, so without a step first, every business that sells packs would lose
+them the moment the new API is live under `MODULE_ENFORCEMENT`.
+
+1. **Before deploying the API**, run the backfill on the instance:
+   `pnpm --filter @saroh/database exec tsx src/backfill/class-packs-module.cli.ts`.
+   It needs no migration (`OrganizationModule.moduleKey` is a string). It:
+    - registers `MODULE_CLASS_PACKS` with `MODULE_APPOINTMENTS`'s value for
+      everyone, and copies each business's Appointments override, with a
+      `FeatureFlagAudit` row for every write (actor
+      `system:class-packs-backfill`). A flag already registered is left alone;
+    - writes a CLASS_PACKS row for each business without one: ENABLED where it
+      has a pack or a purchase and Appointments isn't switched off, DISABLED
+      otherwise. A row that is already there is never changed.
+      It prints what it did and is safe to run again (a second run writes
+      nothing). The admin console's module repair (`backfillOneOrganization`)
+      now also counts a pack or a purchase as Class packs evidence.
+2. Deploy the API, then the app. The previous app keeps working against the
+   new API: its rail still keys Class packs on Appointments, and the routes
+   answer as long as step 1 ran.
+3. Check one business that sells packs still reaches Bookings › Class packs,
+   and one that never did (a clinic) no longer lists it.
+
+Rollback: redeploy the previous API. The flag and the rows can stay: the
+previous API lists and gates only the keys it knows. One exception, also true
+between step 1 and step 2: its admin-console module repair counts a
+business's rows and refuses one that has the extra CLASS_PACKS row, so repair
+a business only on the new API.
+
 ## Rollback
 
 1. Set `MODULE_ENFORCEMENT` off (unset / `0`).

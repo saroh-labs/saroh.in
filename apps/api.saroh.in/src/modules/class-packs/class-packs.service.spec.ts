@@ -166,6 +166,33 @@ describe("selling a pack", () => {
         expect(issueInTx).not.toHaveBeenCalled();
     });
 
+    it("refuses a sale once the business switched Class packs off (E12)", async () => {
+        // Only the CLASS_PACKS row is off; Payments stays on.
+        db.organizationModule!.findFirst!.mockImplementation(
+            (args: { where: { moduleKey: string } }) =>
+                Promise.resolve(
+                    args.where.moduleKey === "CLASS_PACKS"
+                        ? { id: "mod_packs" }
+                        : null,
+                ),
+        );
+        const refused = service.sell(owner, "pack_1", { contactId: "c_1" });
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(refused).rejects.toThrow(
+            "Class packs is switched off, so Saroh can't sell a pack.",
+        );
+        expect(db.organizationModule!.findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                moduleKey: "CLASS_PACKS",
+                status: { not: "ENABLED" },
+            },
+            select: { id: true },
+        });
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
     it("refuses to sell an archived pack", async () => {
         db.classPack!.findFirst!.mockResolvedValue({
             ...PACK,

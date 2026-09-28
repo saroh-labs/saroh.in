@@ -73,6 +73,9 @@ const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
     WEBSITE: { note: "Pages, posts and a domain." },
     APPOINTMENTS: { note: "A calendar, services and bookings." },
     COURSES: { note: "A run of dated sessions with seats and a price." },
+    CLASS_PACKS: {
+        note: "A number of visits bought up front and used over time.",
+    },
     COMMUNICATIONS: {
         note: "Email and WhatsApp to your customers and leads. Works in the background — no new menu item.",
     },

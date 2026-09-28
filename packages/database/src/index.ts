@@ -31,3 +31,6 @@ export * from "./backfill/paying-customer-contacts";
 // suite runs it with the API's own decrypt. Its command-line opener
 // (backfill/sealed-credentials.ts) is not exported.
 export * from "./backfill/razorpay-public-keys";
+// The E12 Class packs module backfill, exported so the API's integration
+// suite can run it twice and check what it did.
+export * from "./backfill/class-packs-module";

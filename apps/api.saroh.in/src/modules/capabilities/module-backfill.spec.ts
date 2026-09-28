@@ -59,6 +59,28 @@ describe("Organization module backfill (dev DB)", () => {
         expect(s.COMMERCE).toBe("DISABLED");
     });
 
+    it("reads a pack as Class packs, and pulls in Appointments and CRM (E12)", async () => {
+        const orgId = await makeOrg("Studio");
+        await prisma.classPack.create({
+            data: {
+                organizationId: orgId,
+                name: "10-class pack",
+                credits: 10,
+                validityDays: 90,
+                price: "4500.00",
+                currency: "INR",
+            },
+        });
+
+        await backfillOrganizationModules();
+
+        const s = await statuses(orgId);
+        expect(s.CLASS_PACKS).toBe("ENABLED");
+        expect(s.APPOINTMENTS).toBe("ENABLED");
+        expect(s.CRM).toBe("ENABLED");
+        expect(s.COURSES).toBe("DISABLED");
+    });
+
     it("pulls in hard dependencies (Appointments → CRM)", async () => {
         const orgId = await makeOrg("Salon");
         await prisma.service.create({

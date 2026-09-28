@@ -15,6 +15,7 @@ import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import { assertClassPacksOn } from "./class-packs-on";
 import type {
     ListPacksQueryDto,
     ListPurchasesQueryDto,
@@ -290,6 +291,8 @@ export class ClassPacksService {
     ): Promise<PurchaseView> {
         authorize(ctx, "pack:write");
         const organizationId = ctx.organizationId;
+        // Switched off: no new sales, whatever enforcement says (E12).
+        await assertClassPacksOn(prisma, organizationId);
         const [pack, contact] = await Promise.all([
             prisma.classPack.findFirst({
                 where: { id: packId, organizationId },
