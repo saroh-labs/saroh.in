@@ -6,6 +6,9 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { MANDATE_CANCEL_TYPE } from "./mandate-cancel-job";
+import { MandateCancelHandler } from "./mandate-cancel.handler";
+import { MandatesService } from "./mandates.service";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { providerFactoryProvider } from "./providers/provider.factory";
@@ -43,17 +46,25 @@ import { SEND_REFUND_TYPE, SendRefundHandler } from "./send-refund.handler";
         providerFactoryProvider,
         OrganizationGuard,
         SendRefundHandler,
+        // A mandate ends with its subscription, a removal or a merge (D20).
+        MandatesService,
+        MandateCancelHandler,
     ],
-    exports: [PaymentsService],
+    exports: [PaymentsService, MandatesService],
 })
 export class PaymentsModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly sendRefund: SendRefundHandler,
+        private readonly mandateCancel: MandateCancelHandler,
     ) {}
 
-    /** The job a refused site checkout's refund is sent from (G13). */
+    /**
+     * The job a refused site checkout's refund is sent from (G13), and the
+     * one that confirms a mandate's cancel with the provider (D20).
+     */
     onModuleInit(): void {
         this.registry.register(SEND_REFUND_TYPE, this.sendRefund.handle);
+        this.registry.register(MANDATE_CANCEL_TYPE, this.mandateCancel.handle);
     }
 }

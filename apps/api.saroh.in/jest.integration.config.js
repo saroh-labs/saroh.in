@@ -109,6 +109,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/gst-states.spec.ts",
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
+        // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
+        "<rootDir>/src/modules/payments/mandates.service.spec.ts",
+        "<rootDir>/src/modules/payments/mandate-cancel.handler.spec.ts",
         "<rootDir>/src/modules/webhooks/webhooks.invoice.spec.ts",
         "<rootDir>/src/modules/subscriptions/periods.spec.ts",
         "<rootDir>/src/modules/subscriptions/subscriptions.service.spec.ts",
