@@ -8,6 +8,7 @@ import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
+import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
@@ -39,13 +40,16 @@ export const metadata = { title: "Order" };
  */
 export default async function OrderPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ orderId: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [{ orderId }, organization] = await Promise.all([
+    const [{ orderId }, organization, query] = await Promise.all([
         params,
         resolveActiveOrganization(),
+        searchParams,
     ]);
     if (organization && !ordersAccess(organization).open) {
         return <OrderLocked text={orderLockedText(organization)} />;
@@ -124,6 +128,9 @@ export default async function OrderPage({
                       : null
             }
             addable={addable}
+            // From the Orders list's row menu or quick view (B5): open the
+            // refund or courier panel, or print the ticket, once.
+            arrival={arrivalOf(query)}
             aside={
                 reviewState ? (
                     <OrderReviews

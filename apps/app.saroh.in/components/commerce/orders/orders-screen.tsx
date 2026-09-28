@@ -21,10 +21,13 @@ import {
     pageRange,
     previousPageHref,
 } from "@/lib/orders/list-query";
+import type { OrderAbilities } from "@/lib/orders/row-menu";
 
 import { OrderExport } from "./order-export";
 import { OrderFilters } from "./order-filters";
+import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
+import { OrderRowMenu } from "./order-row-menu";
 import { OrderTabs } from "./order-tabs";
 import { OrdersEmpty, OrdersHeading } from "./orders-states";
 
@@ -39,9 +42,10 @@ import { OrdersEmpty, OrdersHeading } from "./orders-states";
  * are. Previous and Next follow the API's cursor, and so does Export.
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
- * business. The quick view, the row menu and bulk moves are later units
- * (B5, B6). Loading, failed, locked and every empty list are in
- * `orders-states.tsx` (B7).
+ * business. At the desk a row opens its quick view and has a row menu (B5,
+ * `order-quick-view.tsx`, `order-row-menu.tsx`); on a phone the card opens
+ * the order, as the design draws it. Bulk moves are B6. Loading, failed,
+ * locked and every empty list are in `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
     query,
@@ -52,6 +56,7 @@ export function OrdersScreen({
     kitchen = false,
     filterOptions = null,
     shareUrl = null,
+    can = NO_ABILITIES,
 }: {
     query: OrdersQuery;
     /** The page on screen, read on the server. */
@@ -80,6 +85,11 @@ export function OrdersScreen({
      * (B7, built in B8); null when there is none to share.
      */
     shareUrl?: string | null;
+    /**
+     * What the caller may do from a row (B5): its menu and quick view draw
+     * only what they can use. The API decides again on every write.
+     */
+    can?: OrderAbilities;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -87,6 +97,9 @@ export function OrdersScreen({
     const store = stores.find((s) => s.id === query.storefront) ?? null;
     const rows = page.rows;
     const money = !kitchen && rows.some((r) => r.total !== undefined);
+    // The row whose quick view is open (B5).
+    const [peekId, setPeekId] = useState<string | null>(null);
+    const peek = rows.find((r) => r.id === peekId) ?? null;
 
     const go = useCallback(
         (patch: Partial<OrdersQuery>) =>
@@ -200,6 +213,11 @@ export function OrdersScreen({
                                         key={row.id}
                                         row={row}
                                         showStore={many && !store}
+                                        open={row.id === peekId}
+                                        onOpen={() => setPeekId(row.id)}
+                                        menu={
+                                            <OrderRowMenu row={row} can={can} />
+                                        }
                                     />
                                 ))}
                             </ul>
@@ -220,6 +238,14 @@ export function OrdersScreen({
                     </>
                 )}
             </div>
+
+            <OrderQuickView
+                row={peek}
+                can={can}
+                onOpenChange={(open) => {
+                    if (!open) setPeekId(null);
+                }}
+            />
 
             {previous || next ? (
                 <nav
@@ -309,3 +335,11 @@ function SearchField({
         </div>
     );
 }
+
+/** Before the page says: nothing beyond opening the order. */
+const NO_ABILITIES: OrderAbilities = {
+    stage: false,
+    write: false,
+    refund: false,
+    payOnline: false,
+};
