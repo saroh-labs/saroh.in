@@ -28,7 +28,11 @@ import {
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
-import type { OrderFilter, TabKey } from "@/lib/customer-workspace/view";
+import type {
+    OrderFilter,
+    TabKey,
+    ThreadRead,
+} from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
     initials,
@@ -52,6 +56,7 @@ import { BookingsTab } from "./bookings-tab";
 import { EditSheet } from "./edit-sheet";
 import { Crumbs, Header, Tabs } from "./header";
 import { MergeDialog } from "./merge-dialog";
+import { MessagesTab } from "./messages-tab";
 import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
@@ -78,6 +83,7 @@ export function CustomerDetailScreen({
     userId,
     suggestions,
     duplicates,
+    thread = null,
     nowIso,
 }: {
     d: CustomerDetail;
@@ -95,12 +101,14 @@ export function CustomerDetailScreen({
     suggestions: IdentitySuggestion[];
     /** Other records that look like the same person (C2). */
     duplicates: DuplicateSuggestion[];
+    /** Their message thread (A13), for the Messages tab. */
+    thread?: ThreadRead;
     nowIso: string;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d);
+    const tabs = tabsFor(d, thread);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
     const [editing, setEditing] = useState(0);
@@ -237,6 +245,18 @@ export function CustomerDetailScreen({
                     />
                 ) : (
                     <Failed what="Invoices" />
+                );
+            case "msg":
+                return thread && thread !== "failed" ? (
+                    <MessagesTab
+                        contactId={d.contact.id}
+                        thread={thread}
+                        firstName={first}
+                        timeZone={d.timezone}
+                        now={now}
+                    />
+                ) : (
+                    <Failed what="Messages" />
                 );
             case "notes":
                 return d.notes ? (

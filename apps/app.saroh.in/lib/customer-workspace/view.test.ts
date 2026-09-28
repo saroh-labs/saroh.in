@@ -205,6 +205,36 @@ describe("the tabs, by business kind", () => {
         expect(tabsFor(d).find((t) => t.key === "inv")?.count).toBeNull();
     });
 
+    it("adds Messages before Notes, counting what's unread (A13)", () => {
+        const thread = {
+            messages: [],
+            earlier: false,
+            unread: 2,
+            signsIn: true,
+            canReply: true,
+        };
+        const tabs = tabsFor(gym(), thread);
+        expect(tabs.map((t) => t.key)).toEqual([
+            "over",
+            "bk",
+            "sub",
+            "inv",
+            "msg",
+            "notes",
+        ]);
+        expect(tabs.find((t) => t.key === "msg")?.count).toBe(2);
+        expect(
+            tabsFor(gym(), { ...thread, unread: 0 }).find(
+                (t) => t.key === "msg",
+            )?.count,
+        ).toBeNull();
+        expect(
+            tabsFor(gym(), "failed").find((t) => t.key === "msg")?.count,
+        ).toBeNull();
+        expect(tabsFor(gym(), null).map((t) => t.key)).not.toContain("msg");
+        expect(tabFromQuery("msg", tabs)).toBe("msg");
+    });
+
     it("opens the tab the address names, else Overview", () => {
         const tabs = tabsFor(gym());
         expect(tabFromQuery("bk", tabs)).toBe("bk");

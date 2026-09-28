@@ -10,6 +10,7 @@ import type {
 } from "./attention";
 import type { MergeBody, MergePreview, MergeResult } from "./merge";
 import type { UnlinkPreview } from "./site-account";
+import type { CustomerThread, ThreadMessage } from "./thread";
 
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
@@ -314,5 +315,49 @@ export function removeAttention(
     return destroy<{ ok: true }>(
         attentionPath(contactId, entryId),
         "Could not take that off Needs attention.",
+    );
+}
+
+const threadPath = (contactId: string) =>
+    `/customers/${encodeURIComponent(contactId)}/thread`;
+
+/**
+ * The customer's message thread (A13), or null when there is none to show:
+ * the viewer can't read messages (403) or the account area is still off
+ * (404). A failed read throws, so the page can say so.
+ */
+export async function getThread(
+    contactId: string,
+): Promise<CustomerThread | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}${threadPath(contactId)}`);
+    if (res.status === 403 || res.status === 404) return null;
+    if (!res.ok) throw new Error(`GET thread failed: ${res.status}`);
+    return (await res.json()) as CustomerThread;
+}
+
+/** The team opened the thread: the customer's messages are read. */
+export function markThreadRead(
+    contactId: string,
+): Promise<CrmResult<{ unread: 0 }>> {
+    return mutate<{ unread: 0 }>(
+        `${threadPath(contactId)}/read`,
+        "POST",
+        {},
+        "Couldn't mark their messages as read.",
+    );
+}
+
+/** Answer the customer (`message:write`). */
+export function replyToThread(
+    contactId: string,
+    text: string,
+): Promise<CrmResult<ThreadMessage>> {
+    return mutate<ThreadMessage>(
+        `${threadPath(contactId)}/messages`,
+        "POST",
+        { text },
+        "Couldn't send your reply. Nothing was sent.",
     );
 }

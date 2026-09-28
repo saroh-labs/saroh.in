@@ -76,7 +76,7 @@ export function tagText(e: AttentionTagInput): string {
 const FROM: Record<AttentionSource, string | null> = {
     STAFF: null,
     BOOKING_PAGE: "from the booking page",
-    CUSTOMER: "from the customer",
+    CUSTOMER: "from their account",
 };
 
 /**
@@ -352,18 +352,38 @@ export function toSuggestionInput(
     return rest;
 }
 
-/**
- * The card's heading: "1 note from the booking page". Only someone who may
- * read them is sent any, so there is never a count of notes they can't.
- */
-export function suggestionsTitle(count: number): string {
-    return `${count} ${count === 1 ? "note" : "notes"} from the booking page`;
+/** Where the suggestions came from, in words: one place, or both. */
+function suggestionPlace(sources: AttentionSource[]): string {
+    const from = new Set(sources);
+    if (from.size === 1 && from.has("CUSTOMER")) return "from their account";
+    if (from.size === 1 && from.has("BOOKING_PAGE")) {
+        return "from the booking page";
+    }
+    return "from the customer";
 }
 
-/** "Rahul wrote this when booking online, 18 Sep at 10:42". */
+/**
+ * The card's heading, by where the notes came from: "1 note from the
+ * booking page", "2 notes from their account" (a health note sent from Me
+ * on the site, A5), or "3 notes from the customer" when both. Only someone
+ * who may read them is sent any, so there is never a count of notes they
+ * can't.
+ */
+export function suggestionsTitle(
+    entries: Pick<AttentionEntry, "source">[],
+): string {
+    const count = entries.length;
+    return `${count} ${count === 1 ? "note" : "notes"} ${suggestionPlace(entries.map((e) => e.source))}`;
+}
+
+/**
+ * "Rahul wrote this when booking online, 18 Sep at 10:42", or, for a note
+ * sent from their account on the site, "Rahul sent this from their account,
+ * 18 Sep at 10:42".
+ */
 export function suggestionWhen(
     first: string | null,
-    createdAt: string,
+    entry: Pick<AttentionEntry, "source" | "createdAt">,
     timeZone: string,
     now: Date,
 ): string {
@@ -372,9 +392,23 @@ export function suggestionWhen(
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
-    }).format(new Date(createdAt));
+    }).format(new Date(entry.createdAt));
     const who = first?.trim() ? first.trim() : "They";
-    return `${who} wrote this when booking online, ${dayText(createdAt, timeZone, now)} at ${time}`;
+    const how =
+        entry.source === "CUSTOMER"
+            ? "sent this from their account"
+            : "wrote this when booking online";
+    return `${who} ${how}, ${dayText(entry.createdAt, timeZone, now)} at ${time}`;
+}
+
+/**
+ * The Undo toast's words for "Nothing to add": a booking page note stays on
+ * its booking; one sent from their account is simply not added.
+ */
+export function setAsideText(entry: Pick<AttentionEntry, "source">): string {
+    return entry.source === "CUSTOMER"
+        ? "Set aside. It won't be added to their record."
+        : "Set aside. The note stays in their booking history.";
 }
 
 /** A field the API named in a refusal, if the sheet has one like it. */

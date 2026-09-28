@@ -12,7 +12,8 @@ import type {
     DuplicateSuggestion,
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
-import { getSuggestions } from "@/lib/customer-workspace/service";
+import { getSuggestions, getThread } from "@/lib/customer-workspace/service";
+import type { ThreadRead } from "@/lib/customer-workspace/view";
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -76,7 +77,12 @@ export default async function CustomerDetailPage({
                   () => [],
               )
             : [];
-    const tabs = tabsFor(detail);
+    // Their message thread (A13), for whoever may read messages. A failed
+    // read shows the tab with the failure said, never an empty thread.
+    const thread: ThreadRead = may("message:read")
+        ? await getThread(contactId).catch((): ThreadRead => "failed")
+        : null;
+    const tabs = tabsFor(detail, thread);
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
@@ -102,6 +108,7 @@ export default async function CustomerDetailPage({
                 duplicates={suggestions.filter(
                     (s): s is DuplicateSuggestion => s.kind === "contact",
                 )}
+                thread={thread}
                 nowIso={new Date().toISOString()}
             />
         </PageContainer>
