@@ -67,6 +67,11 @@ export interface CustomerRow {
     possibleDuplicate: boolean;
     /** A GRANTED marketing consent on any channel. */
     offers: boolean;
+    /**
+     * Added on the Customers list by hand (DEC-056, C14): listed before
+     * they have paid, and "Added by hand" until they order.
+     */
+    addedByHand: boolean;
     attention: CustomerAttentionTag[];
     /** Sensitive entries on the record this viewer may not see. */
     hiddenSensitiveCount: number;
@@ -169,6 +174,8 @@ interface PeopleRow {
     paid_invoices: number;
     subscriber: boolean;
     offers: boolean;
+    /** Absent from a test double that predates C14. */
+    added_by_hand?: boolean;
 }
 
 function personName(p: {
@@ -242,7 +249,7 @@ export class CustomersListService {
                     SELECT m.id, m."firstName", m."lastName", m.email, m.phone,
                         m.account_email, m.orders, m.paid_orders,
                         m.open_orders, m.last_order_at, m.paid_invoices,
-                        m.subscriber, m.offers
+                        m.subscriber, m.offers, m.added_by_hand
                     FROM m
                     WHERE ${matches} AND ${chipSql(chip, invoicesToo)}
                     ORDER BY ${orderBySql(sort)}
@@ -285,6 +292,7 @@ export class CustomersListService {
                     signsIn: r.account_email != null,
                     possibleDuplicate: duplicates.has(r.id),
                     offers: r.offers,
+                    addedByHand: r.added_by_hand === true,
                     attention: (read?.entries ?? []).map((e) => ({
                         kind: e.kind,
                         label: e.label,
