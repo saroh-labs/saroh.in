@@ -376,6 +376,28 @@ describe("changing the sign-in email", () => {
         ).toBe(0);
     });
 
+    it("sends change codes to at most five new addresses a day", async () => {
+        const biz = await business();
+        const me = await signIn(biz.host);
+        const ask = (to: string, i: number) =>
+            call("POST", "/public/site-accounts/me/email/code", {
+                host: biz.host,
+                token: me.token,
+                // A different visitor address each time, so only the
+                // per-account cap can refuse.
+                address: `203.0.113.${20 + i}`,
+                body: { email: to },
+            });
+        for (let i = 0; i < 5; i++) {
+            expect((await ask(`try-${i}-${next()}@example.in`, i)).status).toBe(
+                202,
+            );
+        }
+        const sixth = await ask(`try-6-${next()}@example.in`, 6);
+        expect(sixth.status).toBe(429);
+        expect(sixth.body.error.details).toMatchObject({ reason: "limit" });
+    });
+
     it("needs the account area switched on and a session", async () => {
         const biz = await business();
         const me = await signIn(biz.host);

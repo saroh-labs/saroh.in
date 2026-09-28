@@ -1,4 +1,6 @@
 import {
+    HttpException,
+    HttpStatus,
     Inject,
     Injectable,
     NotFoundException,
@@ -58,8 +60,23 @@ export interface EmailChanged {
 
 type Applied = { changed: false } | { changed: true; oldEmail: string };
 
+/**
+ * How many different new addresses one account may send change codes to in
+ * a day. A signed-in customer is spared the business's new-destination
+ * ceiling, so this keeps one account from using the merchant's sender to
+ * mail strangers. Counted in process, like the other code limits.
+ */
+export const CHANGE_DESTINATIONS_PER_DAY = 5;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class EmailChangeService {
+    /** Per org and account: the day's window start and its addresses. */
+    private readonly destinations = new Map<
+        string,
+        { since: number; emails: Set<string> }
+    >();
+
     constructor(
         private readonly codes: SignInCodesService,
         @Optional()
@@ -78,6 +95,12 @@ export class EmailChangeService {
             await assertOrganizationOpen(site.organizationId);
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
+            this.takeDestination(
+                site.organizationId,
+                customer.accountId,
+                email,
+                now,
+            );
             const addressBusy = this.codes.takeAddress(site, relay, now);
             return this.codes.sendCode(site, relay, email, {
                 destinationHash: changeDestinationHashFor(
@@ -93,6 +116,35 @@ export class EmailChangeService {
                 now,
             });
         });
+    }
+
+    /** Count `email` in the account's day, or refuse a sixth new address. */
+    private takeDestination(
+        organizationId: string,
+        accountId: string,
+        email: string,
+        now: Date,
+    ): void {
+        const key = `${organizationId}:${accountId}`;
+        const at = now.getTime();
+        let day = this.destinations.get(key);
+        if (!day || at - day.since >= DAY_MS) {
+            day = { since: at, emails: new Set() };
+            this.destinations.set(key, day);
+        }
+        if (day.emails.has(email)) return;
+        if (day.emails.size >= CHANGE_DESTINATIONS_PER_DAY) {
+            const retryAfter = Math.ceil((day.since + DAY_MS - at) / 1000);
+            throw new HttpException(
+                {
+                    message:
+                        "You've tried a few new addresses today. Try again tomorrow.",
+                    details: { reason: "limit", retryAfter },
+                },
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+        day.emails.add(email);
     }
 
     /** Trade the code for the change. */
