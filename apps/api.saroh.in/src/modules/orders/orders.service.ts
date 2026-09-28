@@ -20,6 +20,7 @@ import {
     loadTaxProfile,
 } from "../invoices/order-invoicing";
 import { assertPaymentsOn } from "../invoices/payments-on";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -403,6 +404,14 @@ export class OrdersService {
                                       order.id,
                                   )
                                 : null;
+                        // The team's "New order" (F14), with the order.
+                        if (organizationId) {
+                            await enqueueTeamAlert(tx, organizationId, {
+                                event: "order",
+                                orderId: order.id,
+                                actorUserId: userId,
+                            });
+                        }
                         return { ...order, payLink };
                     },
                     // Serializable ONLY for an order carrying a code: the

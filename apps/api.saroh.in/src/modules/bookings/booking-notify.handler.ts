@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { bookingNoticeKey } from "../site-accounts/customer-notify-queue";
 import { CustomerNotifyService } from "../site-accounts/customer-notify.handler";
 import type { NoticeKind } from "../site-accounts/notify-templates";
@@ -14,6 +15,8 @@ export const BOOKING_NOTIFY_TYPE = "booking.notify";
 /** The team inbox's notice types for what a customer did themselves. */
 export const BOOKING_MOVED_NOTIFICATION_TYPE = "booking.moved";
 export const BOOKING_CANCELLED_NOTIFICATION_TYPE = "booking.cancelled";
+/** A booking the customer made themselves (F14's "New booking"). */
+export const BOOKING_NEW_NOTIFICATION_TYPE = "booking.new";
 
 /**
  * What a booking, a move, a cancel or a payment that confirms a hold
@@ -36,10 +39,11 @@ type Tx = Prisma.TransactionClient;
  * move and cancel since S4-002 and dead-lettered until now.
  *
  * On one transaction, in the business's RLS context:
- * - **The team** is told when the customer moved or cancelled it
- *   themselves (from their account on the site): a `Notification` in the
- *   workspace inbox, once per event. It is what the account's "‹Business›
- *   has been told" stands on.
+ * - **The team** is told when the customer booked, moved or cancelled it
+ *   themselves (on the site, or from their account): a `Notification` in
+ *   the workspace inbox, once per event. It is what the account's
+ *   "‹Business› has been told" stands on. F14 added the booking itself
+ *   ("New booking") and the email to whoever chose it (`team.alert`).
  * - **The customer** is told through `customer.notify`'s service
  *   ({@link CustomerNotifyService}): their thread when it is live, and
  *   email to a verified account through the business's own provider.
@@ -132,8 +136,10 @@ export async function tellAboutBooking(
     const kind = noticeKind(event?.type ?? null, payload.reason);
     const key = event?.id ?? `job:${input.jobId}`;
 
-    // The customer did it themselves: no team member behind the event.
-    if (event?.actorUserId === null && kind !== "BOOKING_CONFIRMED") {
+    // The customer did it themselves: no team member behind the event. A
+    // booking they made is the team's "New booking" (F14), as a move or a
+    // cancel always was.
+    if (event?.actorUserId === null) {
         await tellTeam(tx, organizationId, {
             key,
             kind,
@@ -182,7 +188,7 @@ async function tellTeam(
     organizationId: string,
     input: {
         key: string;
-        kind: "BOOKING_MOVED" | "BOOKING_CANCELLED";
+        kind: "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED";
         bookingId: string;
         who: string;
         service: string;
@@ -208,10 +214,7 @@ async function tellTeam(
     const notification = await tx.notification.create({
         data: {
             organizationId,
-            type:
-                input.kind === "BOOKING_MOVED"
-                    ? BOOKING_MOVED_NOTIFICATION_TYPE
-                    : BOOKING_CANCELLED_NOTIFICATION_TYPE,
+            type: TEAM_NOTICE_TYPE[input.kind],
             title: words.title,
             body: words.body,
         },
@@ -221,7 +224,19 @@ async function tellTeam(
         where: { organizationId_eventKey: { organizationId, eventKey } },
         data: { notificationId: notification.id },
     });
+    // The email to whoever chose it (F14) is its own job: telling the team
+    // and telling the customer are two things.
+    await enqueueTeamAlert(tx, organizationId, {
+        event: "booking",
+        notificationId: notification.id,
+    });
 }
+
+const TEAM_NOTICE_TYPE = {
+    BOOKING_CONFIRMED: BOOKING_NEW_NOTIFICATION_TYPE,
+    BOOKING_MOVED: BOOKING_MOVED_NOTIFICATION_TYPE,
+    BOOKING_CANCELLED: BOOKING_CANCELLED_NOTIFICATION_TYPE,
+} as const;
 
 function payloadOf(value: unknown): BookingNotifyPayload | null {
     if (typeof value !== "object" || value === null) return null;

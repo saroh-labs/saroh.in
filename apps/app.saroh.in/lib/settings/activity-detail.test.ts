@@ -267,6 +267,26 @@ describe("activityDetail — what changed", () => {
         ]);
     });
 
+    it("tells one of someone's own alerts as it was and became (F14)", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "member.alerts.update",
+                    metadata: {
+                        alert: "failed",
+                        channel: "email",
+                        changes: [
+                            { field: "alertOn", before: true, after: false },
+                        ],
+                    },
+                }),
+                KOLKATA,
+            ).changes,
+        ).toEqual([
+            { label: "Payment failed by Email", before: "On", after: "Off" },
+        ]);
+    });
+
     it("tells a storefront's hours, a module, a plan and a role", () => {
         const rows = (e: Partial<AuditEventRow>) =>
             activityDetail(event(e), KOLKATA).changes;

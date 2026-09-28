@@ -27,6 +27,11 @@ jest.mock("../invoices/order-invoicing", () => ({
         .mockResolvedValue({ supplementary: null, creditNote: null }),
 }));
 
+// The team's "New order" alert (F14) is its own job; here, only that it is queued.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = { create: jest.fn(), count: jest.fn() };
     const customer = { findFirst: jest.fn() };
@@ -51,6 +56,7 @@ import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -152,6 +158,21 @@ describe("OrdersService.create — organization stamping (#173)", () => {
         await makeService({ organizationId: null }).create(STORE, USER, DTO);
 
         expect(orderCreate.mock.calls[0][0].data.organizationId).toBeNull();
+    });
+
+    it("queues the team's New order alert with the order, naming who took it (F14)", async () => {
+        await makeService({ organizationId: ORG }).create(STORE, USER, DTO);
+
+        expect(enqueueTeamAlert).toHaveBeenCalledTimes(1);
+        expect((enqueueTeamAlert as jest.Mock).mock.calls[0].slice(1)).toEqual([
+            ORG,
+            { event: "order", orderId: "order_1", actorUserId: USER },
+        ]);
+    });
+
+    it("queues no alert for a legacy org-less store: there is no team to tell", async () => {
+        await makeService({ organizationId: null }).create(STORE, USER, DTO);
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
     });
 
     it("still 404s and writes nothing when the store is not writable", async () => {

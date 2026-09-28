@@ -51,6 +51,9 @@ export const VALUE_FIELDS = [
     "shippingLateAfterMinutes",
     // Whether a storefront links customers who share an email (C15).
     "linkSameEmailCustomers",
+    // One of a person's own alerts on or off (F14); the alert and channel
+    // it is for are named beside it.
+    "alertOn",
 ] as const;
 
 /**

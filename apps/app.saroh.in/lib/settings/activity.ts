@@ -1,3 +1,4 @@
+import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
 import { storefrontHref } from "@/lib/stores/links";
 
@@ -77,6 +78,7 @@ export const ACTIVITY_ACTIONS = [
     "customer.merged",
     "customer.details.changed",
     "customer.removed",
+    "member.alerts.update",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -163,6 +165,26 @@ function productPlace(
     };
 }
 
+/**
+ * One of a person's own alerts turned on or off (F14), as the rest of a
+ * sentence: "turned email on for New order, for themselves". An alert or
+ * channel this page doesn't know is said generally, never as a raw key.
+ */
+function alertWhat(meta: Record<string, unknown>): string {
+    const alert = ALERTS.find((a) => a.key === meta.alert)?.label;
+    const channel = ALERT_CHANNELS.find((c) => c === meta.channel);
+    const after = recordedChanges(meta)?.find(
+        (c) => c.field === "alertOn",
+    )?.after;
+    if (!alert || !channel || typeof after !== "boolean") {
+        return "changed their own alerts";
+    }
+    const how = { bell: "the bell", email: "email", whatsapp: "WhatsApp" }[
+        channel
+    ];
+    return `turned ${how} ${after ? "on" : "off"} for ${alert}, for themselves`;
+}
+
 export function personName(person: AuditPerson | null): string | null {
     if (!person) return null;
     // A blank name is no name: say the email instead.
@@ -220,6 +242,12 @@ export function activityLine(
         }
         case "storefront.hours.update":
             return line("changed the opening hours", business("hours"));
+        case "member.alerts.update":
+            // One of their own alerts (F14): "turned email on for New order".
+            return line(alertWhat(meta), {
+                label: "Alerts",
+                href: "/settings/profile",
+            });
         case "storefront.fulfilment.update": {
             // How orders leave, or when they count as late (B17).
             const where = text(meta.storefront);

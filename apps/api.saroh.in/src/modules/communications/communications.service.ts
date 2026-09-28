@@ -30,30 +30,34 @@ import type {
     InvoiceTemplate,
     NoticeTemplate,
     RenderedMessage,
+    TeamTemplate,
 } from "./transactional";
 import { renderTransactional } from "./transactional";
 
 type Db = Prisma.TransactionClient;
 
 /**
- * Who a transactional message may go to — only ever one of two addresses
- * (D17): the bill-to email the invoice kept when it was issued, or the
- * email a customer verified when they made their site account. Never an
- * address the caller typed, so the path cannot be turned into a way to
- * email anyone.
+ * Who a transactional message may go to — only ever one of three addresses
+ * (D17): the bill-to email the invoice kept when it was issued, the email
+ * a customer verified when they made their site account, or (F14) the
+ * sign-in email of someone on the business's own team. Never an address
+ * the caller typed, so the path cannot be turned into a way to email
+ * anyone.
  */
 export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
-    | { kind: "SITE_ACCOUNT"; contactId: string };
+    | { kind: "SITE_ACCOUNT"; contactId: string }
+    | { kind: "TEAM_MEMBER"; userId: string };
 
 /**
  * What a transactional message says: an invoice's template with its
- * values, or one of A14's notices, already worded by its handler
- * (`site-accounts/notify-templates.ts`) from the same fixed templates.
+ * values, or one of A14's notices or F14's team alerts, already worded by
+ * its handler (`site-accounts/notify-templates.ts`,
+ * `notifications/team-alert.handler.ts`).
  */
 export type TransactionalWords =
     | { template: InvoiceTemplate; vars: InvoiceMailVars }
-    | { template: NoticeTemplate; rendered: RenderedMessage };
+    | { template: NoticeTemplate | TeamTemplate; rendered: RenderedMessage };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
 export type TransactionalInput = TransactionalWords & TransactionalSend;
@@ -575,13 +579,28 @@ export class CommunicationsService {
      * null when there is none. An invoice's bill-to email comes first (a
      * draft's is the contact's, which issuing copies); a reserved
      * placeholder (DEC-049) is no email, and then the contact's verified
-     * site-account email is used, if they have an active account.
+     * site-account email is used, if they have an active account. A team
+     * member (F14) is their sign-in email, only while they are on this
+     * business's team; no contact is involved.
      */
     async transactionalAddress(
         db: Db,
         organizationId: string,
         recipient: TransactionalRecipient,
     ): Promise<TransactionalAddress | null> {
+        if (recipient.kind === "TEAM_MEMBER") {
+            const member = await db.membership.findUnique({
+                where: {
+                    organizationId_userId: {
+                        organizationId,
+                        userId: recipient.userId,
+                    },
+                },
+                select: { user: { select: { email: true } } },
+            });
+            const email = member?.user.email.trim();
+            return email ? { address: email, contactId: null } : null;
+        }
         let contactId: string | null;
         let candidate: string | null = null;
         if (recipient.kind === "INVOICE_BILL_TO") {

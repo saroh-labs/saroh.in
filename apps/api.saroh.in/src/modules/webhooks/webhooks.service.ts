@@ -23,6 +23,7 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
 import { finishCancelInTx } from "../orders/order-cancel";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
@@ -342,7 +343,7 @@ export class WebhooksService {
                         event,
                     );
                 case "FAILED":
-                    return this.applyIntentFailure(tx, intent);
+                    return this.applyInvoiceFailure(tx, intent, invoiceId);
                 case "REFUNDED":
                     return this.applyInvoiceRefund(tx, intent, event);
                 case "REFUND_FAILED":
@@ -447,6 +448,14 @@ export class WebhooksService {
                     intent.organizationId,
                     online.refundId,
                 );
+            }
+            // Paid and held: the team's "New order" (F14). The alert reads
+            // the order again and says nothing of a refused checkout.
+            if (online.applied) {
+                await enqueueTeamAlert(tx, intent.organizationId, {
+                    event: "order",
+                    orderId,
+                });
             }
             return { applied: online.applied };
         }
@@ -589,6 +598,27 @@ export class WebhooksService {
             applied = applied || changed;
         }
         return { applied };
+    }
+
+    /**
+     * An invoice's pay link failed: the intent moves (below), and the
+     * team's "Payment failed" alert (F14) is queued with it, once per
+     * attempt that actually failed.
+     */
+    private async applyInvoiceFailure(
+        tx: Tx,
+        intent: IntentRow,
+        invoiceId: string,
+    ): Promise<{ applied: boolean }> {
+        const result = await this.applyIntentFailure(tx, intent);
+        if (result.applied) {
+            await enqueueTeamAlert(tx, intent.organizationId, {
+                event: "failed",
+                invoiceId,
+                paymentIntentId: intent.id,
+            });
+        }
+        return result;
     }
 
     /**
