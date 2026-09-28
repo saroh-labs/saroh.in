@@ -239,8 +239,10 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
         href: orderPageHref(row.store.id, row.id),
     });
 
-    if (can.refund && money) {
-        if (row.payment === "UNPAID") {
+    // Cancel is a change to the order (`order:write`), as on Order Detail;
+    // Refund hands money back (`payment:manage`).
+    if (money && row.payment === "UNPAID") {
+        if (can.write) {
             items.push({
                 kind: "cancel",
                 label: "Cancel order…",
@@ -252,18 +254,27 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
                           ? null
                           : "It's been handed over.",
             });
-        } else {
-            items.push({
-                kind: "refund",
-                label: "Refund…",
-                href: orderPageHref(row.store.id, row.id, "refund"),
-                disabled:
-                    row.payment === "REFUNDED" ? "Refunded in full." : null,
-            });
         }
+    } else if (money && can.refund) {
+        items.push({
+            kind: "refund",
+            label: "Refund…",
+            href: orderPageHref(row.store.id, row.id, "refund"),
+            disabled: row.payment === "REFUNDED" ? "Refunded in full." : null,
+        });
     }
 
     return items;
+}
+
+/**
+ * What the pay-link item does. A link already out is replaced, after the
+ * confirm ("the link you sent before stops working"), even when this menu
+ * made it a moment ago — re-copying the old address would leave the item
+ * saying "New pay link" and making none. With none out, one is made.
+ */
+export function payLinkAction(item: { replaces: boolean }): "replace" | "make" {
+    return item.replaces ? "replace" : "make";
 }
 
 /**

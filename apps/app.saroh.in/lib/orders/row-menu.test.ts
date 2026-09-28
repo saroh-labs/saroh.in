@@ -6,6 +6,7 @@ import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import {
     arrivalOf,
     orderPageHref,
+    payLinkAction,
     quickNext,
     quickPayment,
     quickSteps,
@@ -314,6 +315,31 @@ describe("rowMenu", () => {
             expect(kinds(items)).not.toContain("refund");
             expect(kinds(items)).not.toContain("cancel");
         });
+
+        it("gates Cancel on changing orders, as Order Detail does, not on refunding", () => {
+            const unpaid = row({
+                paymentStatus: "UNPAID",
+                payment: "UNPAID",
+                status: "PENDING",
+                stage: "NEW",
+                stepIndex: 0,
+            });
+            // May change orders, may not refund: Cancel is there.
+            expect(
+                kinds(rowMenu(unpaid, { ...OWNER, refund: false })),
+            ).toContain("cancel");
+            // May refund, may not change orders: no Cancel.
+            expect(
+                kinds(rowMenu(unpaid, { ...OWNER, write: false })),
+            ).not.toContain("cancel");
+        });
+    });
+});
+
+describe("the pay-link item", () => {
+    it("replaces a link already out, after the confirm, and makes one when none is", () => {
+        expect(payLinkAction({ replaces: true })).toBe("replace");
+        expect(payLinkAction({ replaces: false })).toBe("make");
     });
 });
 

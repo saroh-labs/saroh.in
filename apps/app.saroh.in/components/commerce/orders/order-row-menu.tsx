@@ -35,7 +35,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { updateOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
-import { orderPageHref, rowMenu } from "@/lib/orders/row-menu";
+import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
 
 import { useOrderStep } from "./use-order-step";
 
@@ -148,7 +148,11 @@ export function OrderRowMenu({
                         key="pay-link"
                         className={ITEM}
                         disabled={item.disabled !== null || payLink.busy}
-                        onSelect={payLink.ask}
+                        onSelect={
+                            payLinkAction(item) === "replace"
+                                ? payLink.replace
+                                : payLink.ask
+                        }
                     >
                         <Link2 aria-hidden />
                         <Label text={item.label} reason={item.disabled} />
