@@ -146,6 +146,52 @@ describe("resolveSiteNavigation with module pages (G14)", () => {
         ]);
     });
 
+    it("tags every module page with its kind, hand-listed or not, so the site can drop it while its module is off (G19)", () => {
+        const menu = resolveSiteNavigation(
+            {
+                items: [
+                    { pageId: "home" },
+                    { pageId: "book", label: "Classes" },
+                    { pageId: "about" },
+                ],
+            },
+            pages,
+        );
+        // The menu's own order, then the module pages it didn't list.
+        expect(menu).toEqual([
+            { label: "Home", href: "/" },
+            { label: "Book", href: "/book", kind: "BOOK" },
+            { label: "About", href: "/about" },
+            { label: "Prices", href: "/prices", kind: "PRICES" },
+            { label: "Journal", href: "/journal", kind: "JOURNAL" },
+            { label: "Contact", href: "/contact", kind: "CONTACT" },
+        ]);
+        // Only the free-form entries carry no kind: nothing gates them.
+        expect(menu.filter((i) => !i.kind).map((i) => i.href)).toEqual([
+            "/",
+            "/about",
+        ]);
+    });
+
+    it("keeps a hand-made entry to a free-form page, even one at /shop, ungated (G19)", () => {
+        // A site that never added module pages, whose own page sits at /shop
+        // (served there as before, G11): it is the merchant's page, not the
+        // shop, and no module takes it out of the menu.
+        const legacy = [
+            { id: "home", path: "/", title: "Home", kind: "FREE" },
+            { id: "shop", path: "/shop", title: "Our shop", kind: "FREE" },
+        ];
+        expect(
+            resolveSiteNavigation(
+                { items: [{ pageId: "home" }, { pageId: "shop" }] },
+                legacy,
+            ),
+        ).toEqual([
+            { label: "Home", href: "/" },
+            { label: "Our shop", href: "/shop" },
+        ]);
+    });
+
     it("is what it was for a site with no module pages", () => {
         const free = pages.filter((p) => p.kind === "FREE");
         expect(resolveSiteNavigation(null, free)).toEqual([]);

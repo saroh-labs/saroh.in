@@ -93,6 +93,20 @@ describe("the site header's main button (G17)", () => {
         ).toEqual({ label: "Order", href: "/shop" });
     });
 
+    it("follows the modules as they change, with no republish (G19)", () => {
+        // A shop that also books: Book leads.
+        const both = { booking: booking({}), shopServes: true };
+        expect(headerAction(both)?.label).toBe("Book");
+        // Appointments off: the booking page closes, and Order takes over.
+        const noBooking = { ...both, booking: booking({ open: false }) };
+        expect(headerAction(noBooking)).toEqual({
+            label: "Order",
+            href: "/shop",
+        });
+        // Commerce off too: `/shop` stops serving, and there is no button.
+        expect(headerAction({ ...noBooking, shopServes: false })).toBeNull();
+    });
+
     it("is none when the booking read failed or there is no site id", () => {
         for (const lookup of [
             { ok: false, reason: "unavailable" },
