@@ -29,6 +29,21 @@ strip, what Save sends and the leave dialog's section names are pure
 functions in `lib/services/service-editor.ts`, tested with vitest. It
 replaced the service dialog and the two react-hook-form service forms.
 
+**Current** — **A published record's editor autosaves on the shared shell**
+(D6, DEC-043): `components/editor-shell/editor-shell.tsx`, for the Plan
+Editor (D7) and the Pack Editor (E18), and Courses later. The record type
+passes an adapter of Server Actions (`EditorAdapter` in
+`lib/editor-shell/types.ts`: create, save draft, publish, discard, delete,
+load), its words and rules, and draws its sections from the values the
+shell hands it. The shell owns autosave (about 800 ms, flushed on blur,
+before Publish and on leaving), the banner and actions per status (Draft ·
+Live · Live with unpublished changes), "Not saved" with Try again, and the
+409 conflict state with Reload. Its rules are pure in
+`lib/editor-shell/state.ts` and `autosave.ts`; a record service reads a
+refused write with `editorFailure` (`lib/editor-shell/result.ts`) so a stale
+revision becomes the conflict state. Don't give a record type its own save
+loop.
+
 ## Rules
 
 - **Current** — **Schema first.** A `z.object` at the top defines validation and

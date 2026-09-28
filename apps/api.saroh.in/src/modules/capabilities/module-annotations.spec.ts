@@ -141,6 +141,8 @@ const NEVER: Record<string, string> = {
     "payments/public-payments.controller.ts": "public checkout",
     "payments/public-invoices.controller.ts":
         "a customer's invoice link — no session",
+    "payments/public-order-pay.controller.ts":
+        "a customer's order pay link — no session (B11)",
     "bookings/public-bookings.controller.ts": "public booking",
     // Also the place a site's Visit us block and booking page show (G8): a
     // shop's address and hours stay true whichever modules are on.

@@ -29,6 +29,11 @@ import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { SiteAccountView } from "../site-accounts/account-unlink.service";
 import { toSiteAccountView } from "../site-accounts/account-unlink.service";
+import {
+    ALLOWANCE_SELECT,
+    classesAllowance,
+    HAS_ALLOWANCE_WHERE,
+} from "../subscriptions/classes-allowance";
 import type { AttentionEntryView } from "./attention-read";
 import { attentionFor, attentionSuggestionsFor } from "./attention-read";
 import type { ContactNoteView } from "./contact-notes.service";
@@ -265,7 +270,8 @@ export interface DetailStats {
 }
 
 /**
- * A membership's classes this month (U3: `SubscriptionPlan.classesPerMonth`),
+ * A membership's classes this month — its period's allowance (D10:
+ * `subscriptions/classes-allowance.ts`), the plan's as of its last renewal —
  * counted as a booking with it does: confirmed or cancelled late, in the
  * calendar month of the membership's own timezone.
  */
@@ -279,6 +285,13 @@ export interface MembershipAllowance {
     /** The start of next month, when the allowance comes back. */
     resetsAt: string;
     paused: boolean;
+    /**
+     * The classes a month from the next renewal, when they differ from this
+     * period's (D10): the plan changed, or a plan change is booked. Null
+     * (unlimited) is a value here; the field itself is null when nothing
+     * changes, or when it doesn't renew on a known day.
+     */
+    nextPeriod: { perMonth: number | null; from: string } | null;
 }
 
 /** Offers by email (the `Consent` record), as the customer last said. */
@@ -1223,18 +1236,22 @@ export class CustomerDetailService {
                 organizationId,
                 contactId,
                 status: { not: "CANCELLED" },
-                plan: { classesPerMonth: { not: null } },
+                ...HAS_ALLOWANCE_WHERE,
             },
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
                 status: true,
                 timezone: true,
+                currentPeriodEnd: true,
+                cancelAtPeriodEnd: true,
+                ...ALLOWANCE_SELECT,
                 plan: { select: { name: true, classesPerMonth: true } },
+                pendingPlan: { select: { classesPerMonth: true } },
             },
         });
-        const perMonth = sub?.plan.classesPerMonth;
-        if (!sub || perMonth === null || perMonth === undefined) return null;
+        const perMonth = sub ? classesAllowance(sub) : null;
+        if (!sub || perMonth === null) return null;
         const month = DateTime.now().setZone(sub.timezone).startOf("month");
         const next = month.plus({ months: 1 });
         const used = await this.db.booking.count({
@@ -1249,6 +1266,11 @@ export class CustomerDetailService {
             },
         });
         const paused = sub.status === "PAUSED";
+        // What the next renewal gives (D10): the booked plan's classes, or
+        // the plan's as they stand now. Said only when it differs, and only
+        // while it renews on a known day.
+        const renews = sub.status === "ACTIVE" && !sub.cancelAtPeriodEnd;
+        const upcoming = (sub.pendingPlan ?? sub.plan).classesPerMonth;
         return {
             subscriptionId: sub.id,
             plan: sub.plan.name,
@@ -1257,6 +1279,13 @@ export class CustomerDetailService {
             left: paused ? 0 : Math.max(0, perMonth - used),
             resetsAt: next.toUTC().toISO() ?? next.toJSDate().toISOString(),
             paused,
+            nextPeriod:
+                renews && upcoming !== perMonth
+                    ? {
+                          perMonth: upcoming,
+                          from: sub.currentPeriodEnd.toISOString(),
+                      }
+                    : null,
         };
     }
 

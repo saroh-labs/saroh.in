@@ -2,9 +2,11 @@ import { BadRequestException } from "@nestjs/common";
 import { Prisma } from "@saroh/database";
 import { DateTime, IANAZone } from "luxon";
 
-import type { ListTab, PaymentStanding } from "./dto";
+import type { DatePreset, ListTab, OrderStage, PaymentStanding } from "./dto";
+import { ORDER_FULFILMENTS, ORDER_STAGES } from "./dto";
 import {
     DEFAULT_LATE_THRESHOLDS,
+    fulfilmentView,
     LATE_STAGES,
     LATE_STATUSES,
     lateStoredValues,
@@ -29,8 +31,8 @@ import { refundStanding } from "./order-refunds";
 
 // The tabs and payment standings live with the DTO that validates them
 // (dto.ts), so dto.ts never imports this file.
-export { LIST_TABS, PAYMENT_STANDINGS } from "./dto";
-export type { ListTab, PaymentStanding } from "./dto";
+export { DATE_PRESETS, LIST_TABS, PAYMENT_STANDINGS } from "./dto";
+export type { DatePreset, ListTab, PaymentStanding } from "./dto";
 export type { FulfilmentType } from "./fulfilment";
 
 /**
@@ -52,6 +54,16 @@ export interface OrderListFilter {
     customerId?: string;
     storeId?: string;
     late?: boolean;
+    /**
+     * What the row's pill says, as a key ("ready", "handed-to-courier",
+     * "refunded"): see {@link stepSql}. B4.
+     */
+    step?: string;
+    /**
+     * Today, yesterday, the last 7 days or this month, in the business's
+     * zone (B4). Instead of `from`/`to`, never with them.
+     */
+    date?: DatePreset;
     /** A calendar day, YYYY-MM-DD, in the business's zone. */
     from?: string;
     to?: string;
@@ -94,6 +106,32 @@ export function dayRange(
     return { gte: gte?.toJSDate(), lt: lt?.toJSDate() };
 }
 
+/**
+ * The instants a date preset covers, `[gte, lt)`, in the business's zone
+ * (B4): today, yesterday, the last 7 days (today and the six before it) or
+ * this calendar month so far. Worked out here rather than in the app, so
+ * "today" is the business's today wherever the viewer is.
+ */
+export function presetRange(
+    preset: DatePreset,
+    zone: string,
+    now: Date,
+): { gte: Date; lt: Date } {
+    const tz = IANAZone.isValidZone(zone) ? zone : "Asia/Kolkata";
+    const today = DateTime.fromJSDate(now, { zone: tz }).startOf("day");
+    const tomorrow = today.plus({ days: 1 });
+    const from =
+        preset === "today"
+            ? today
+            : preset === "yesterday"
+              ? today.minus({ days: 1 })
+              : preset === "7d"
+                ? today.minus({ days: 6 })
+                : today.startOf("month");
+    const to = preset === "yesterday" ? today : tomorrow;
+    return { gte: from.toJSDate(), lt: to.toJSDate() };
+}
+
 /** `%`, `_` and `\` taken literally in an ILIKE pattern. */
 function likeEscape(text: string): string {
     return text.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -132,6 +170,70 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
         }
     }
     return Prisma.sql`(${Prisma.join(parts, " OR ")})`;
+}
+
+/** "Handed to courier" → "handed-to-courier": a step's key in a URL. */
+export function stepKey(label: string): string {
+    return label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
+/**
+ * The pill's words for a refunded or cancelled order, which it shows instead
+ * of the step, with `orderStanding`'s precedence: money first.
+ */
+export const STANDING_STEPS = {
+    refunded: "Refunded",
+    cancelled: "Cancelled",
+} as const;
+
+/**
+ * The step word a row's pill shows for a stored fulfilment value and stage
+ * (before refunded or cancelled take over): its type's step, or the step
+ * `stepIndexOf` places a stage its type has none for.
+ */
+export function stepLabelOf(stored: string, stage: OrderStage): string {
+    // `stepIndexOf` always lands on one of the type's steps.
+    const view = fulfilmentView(stored, stage);
+    return view.steps[view.stepIndex].label;
+}
+
+/**
+ * Every stored `fulfilment.stage` pair whose pill reads the step `key`.
+ * Worked out from the table in `fulfilment.ts`, the one the rows read, so
+ * the filter and the pill never disagree, and a word several types share
+ * ("New", "Delivered") matches exactly the orders that show it.
+ */
+export function stepPairs(key: string): string[] {
+    const pairs: string[] = [];
+    for (const stored of ORDER_FULFILMENTS) {
+        for (const stage of ORDER_STAGES) {
+            if (stepKey(stepLabelOf(stored, stage)) === key) {
+                pairs.push(`${stored}.${stage}`);
+            }
+        }
+    }
+    return pairs;
+}
+
+/**
+ * The Step filter (B4): the orders whose pill says what `key` names.
+ * "refunded" and "cancelled" are the pill's words for those standings; any
+ * other key is a step, which a refunded or cancelled order never shows. An
+ * unknown key matches nothing rather than failing, as the enum filters do.
+ */
+export function stepSql(key: string): Prisma.Sql {
+    const refunded = Prisma.sql`o."paymentStatus" = 'REFUNDED'`;
+    if (key === "refunded") return refunded;
+    const cancelled = Prisma.sql`o.status::text = 'CANCELLED'`;
+    if (key === "cancelled")
+        return Prisma.sql`(NOT ${refunded} AND ${cancelled})`;
+    const pairs = stepPairs(key);
+    if (pairs.length === 0) return Prisma.sql`FALSE`;
+    return Prisma.sql`(NOT ${refunded} AND NOT ${cancelled}
+        AND (o.fulfilment::text || '.' || o.stage::text) = ANY(${pairs}))`;
 }
 
 /**
@@ -219,6 +321,7 @@ export function orderConditions(
     if (filter.stage?.length) {
         and.push(Prisma.sql`o.stage::text = ANY(${filter.stage})`);
     }
+    if (filter.step) and.push(stepSql(filter.step));
     if (filter.fulfilment?.length) {
         and.push(
             Prisma.sql`o.fulfilment::text = ANY(${storedValuesOf(filter.fulfilment)})`,

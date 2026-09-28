@@ -8,6 +8,7 @@ import {
     deadlineText,
     paidLine,
     refundLine,
+    refundPolicyLine,
 } from "./booking-money";
 
 const money = (over: Partial<BookingMoney> = {}): BookingMoney => ({
@@ -87,6 +88,7 @@ describe("cancelPlan (DEC-051)", () => {
             }),
         ).toEqual({
             late: false,
+            keeps: false,
             amount: "₹400",
             what: "deposit",
             canOverride: false,
@@ -166,6 +168,96 @@ describe("cancelPlan (DEC-051)", () => {
         ).toBe(
             "It's before the free-cancel time, so the ₹800 payment is refunded to them.",
         );
+    });
+});
+
+describe("the business's refund policy (E30, DEC-058)", () => {
+    const before = new Date("2026-09-19T03:00:00.000Z").getTime();
+    const after = new Date("2026-09-19T06:00:00.000Z").getTime();
+    const plan = (m: BookingMoney, now: number, canRefund: boolean) =>
+        cancelPlan({
+            money: m,
+            freeCancelUntil: DEADLINE,
+            timezone: ZONE,
+            now,
+            canRefund,
+        });
+
+    it("on, as set: the same as before, the deposit refunded in time", () => {
+        expect(
+            plan(money({ refundInTimeCancels: true }), before, false),
+        ).toMatchObject({ late: false, keeps: false, canOverride: false });
+    });
+
+    it("off: in time, the money is kept, and says who can refund it", () => {
+        const desk = plan(money({ refundInTimeCancels: false }), before, false);
+        expect(desk).toMatchObject({
+            late: false,
+            keeps: true,
+            canOverride: false,
+        });
+        expect(desk?.body).toBe(
+            "Your refund policy doesn't refund cancellations automatically, so the ₹400 deposit is kept. Only someone who can refund payments can give it back.",
+        );
+        const owner = plan(money({ refundInTimeCancels: false }), before, true);
+        expect(owner).toMatchObject({ keeps: true, canOverride: true });
+        expect(owner?.body).toMatch(/You can refund it anyway\.$/);
+    });
+
+    it("on: a late cancel still keeps it", () => {
+        expect(
+            plan(money({ refundInTimeCancels: true }), after, false),
+        ).toMatchObject({ late: true, keeps: true });
+    });
+
+    it("never offers more than is left of what was received", () => {
+        const p = plan(money({ refundableCents: 25_000 }), before, false);
+        expect(p?.amount).toBe("₹250");
+        expect(p?.body).toBe(
+            "It's before the free-cancel time, so the ₹250 deposit is refunded to them.",
+        );
+        expect(plan(money({ refundableCents: 0 }), before, true)).toBeNull();
+    });
+
+    it("the booking page states the policy as set", () => {
+        expect(refundPolicyLine(money(), true)).toBe(
+            "Your refund policy: the ₹400 deposit is refunded automatically if it's cancelled by then.",
+        );
+        expect(
+            refundPolicyLine(
+                money({ deposit: false, paidOnlineCents: 80_000 }),
+                false,
+            ),
+        ).toBe(
+            "Your refund policy: the ₹800 paid online is refunded automatically if it's cancelled.",
+        );
+        expect(
+            refundPolicyLine(money({ refundInTimeCancels: false }), true),
+        ).toBe(
+            "Your refund policy: the ₹400 deposit isn't refunded automatically if it's cancelled.",
+        );
+    });
+
+    it("says nothing when nothing paid online is left to refund", () => {
+        expect(refundPolicyLine(undefined, true)).toBeNull();
+        expect(
+            refundPolicyLine(money({ paidOnlineCents: 0 }), true),
+        ).toBeNull();
+        expect(
+            refundPolicyLine(money({ refundableCents: 0 }), true),
+        ).toBeNull();
+        expect(
+            refundPolicyLine(
+                money({
+                    refund: {
+                        amountCents: 40_000,
+                        status: "SUCCEEDED",
+                        beingConfirmed: false,
+                    },
+                }),
+                true,
+            ),
+        ).toBeNull();
     });
 });
 

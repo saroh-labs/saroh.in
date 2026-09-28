@@ -245,6 +245,9 @@ test.describe("orders list", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
 
         // Tap the card away from the name: the link's hit area is the card.
+        // The filter bar (B4) can push the first card under the tab bar, so
+        // bring it into view first.
+        await card.scrollIntoViewIfNeeded();
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         if (!box) return;
@@ -292,5 +295,103 @@ test.describe("orders list", () => {
             }
         }
         await page.close();
+    });
+});
+
+interface FilterOptions {
+    types: { type: string; label: string }[];
+    steps: { key: string; label: string; types: string[] }[];
+}
+
+/** What the filter bar offers, as the screen asks for it (B4). */
+async function filterOptions(page: Page, org: string): Promise<FilterOptions> {
+    const res = await page.request.get(
+        `${urls.API_URL}/organizations/${org}/orders/filters`,
+        { headers: { "x-organization-id": org, origin: urls.APP_URL } },
+    );
+    expect(res.ok()).toBe(true);
+    return (await res.json()) as FilterOptions;
+}
+
+test.describe("orders list filters (B4)", () => {
+    test("step, fulfilment and date filters survive a reload", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const options = await filterOptions(page, NORTHWIND);
+        const type = options.types.at(0);
+        const step = options.steps.find(
+            (s) => type && s.types.includes(type.type),
+        );
+        test.skip(!type || !step, "No orders to filter here.");
+        if (!type || !step) return;
+
+        const address = `step=${step.key}&fulfilment=${type.type.toLowerCase()}&date=month`;
+        const expected = await list(
+            page,
+            NORTHWIND,
+            `&step=${step.key}&fulfilment=${type.type}&date=month`,
+        );
+        await page.goto(`/commerce/orders?${address}`);
+        await page.reload();
+        await expect(page).toHaveURL(new RegExp(`step=${step.key}`));
+        const bar = page.getByRole("group", { name: "Filter orders" });
+        await expect(bar.getByRole("combobox", { name: "Step" })).toContainText(
+            step.label,
+        );
+        await expect(
+            bar.getByRole("combobox", { name: "How it's fulfilled" }),
+        ).toContainText(type.label);
+        await expect(bar.getByRole("combobox", { name: "Date" })).toContainText(
+            "This month",
+        );
+        await expect(tab(page, "All")).toContainText(
+            String(expected.counts.all),
+        );
+        if (expected.rows.length === 0) {
+            await expect(
+                page.getByRole("button", { name: "Clear filters" }).last(),
+            ).toBeVisible();
+        } else {
+            await expect(orders(page).getByRole("listitem")).toHaveCount(
+                expected.rows.length,
+            );
+        }
+    });
+
+    test("a filter that finds nothing says so, and Clear filters empties the address", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const empty = await list(page, NORTHWIND, "&step=teleported");
+        expect(empty.counts.all).toBe(0);
+
+        await page.goto("/commerce/orders?step=teleported&date=today");
+        await expect(page.getByText(/^No orders .*today$/)).toBeVisible();
+        await expect(page.getByText("No orders yet")).toHaveCount(0);
+        await page
+            .getByRole("button", { name: "Clear filters" })
+            .first()
+            .click();
+        await expect(page).not.toHaveURL(/step=|date=/);
+    });
+
+    test("Late is a toggle in the address; Needs attention waits for B15", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto("/commerce/orders");
+        const bar = page.getByRole("group", { name: "Filter orders" });
+        const late = bar.getByRole("button", { name: "Late" });
+        await expect(late).toHaveAttribute("aria-pressed", "false");
+        await late.click();
+        await expect(page).toHaveURL(/late=true/);
+        await expect(late).toHaveAttribute("aria-pressed", "true");
+        await expect(
+            bar.getByRole("button", { name: "Needs attention" }),
+        ).toHaveCount(0);
     });
 });

@@ -1,7 +1,8 @@
-import { Controller, Get, Header, Ip, Param } from "@nestjs/common";
+import { Controller, Get, Header, Headers, Ip, Param } from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
 
 import { hashClientIp } from "../../common/client-ip";
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
@@ -113,14 +114,20 @@ export class PublicSitesController {
      * open shop, else the business profile's registered address and hours.
      * What the booking page's header shows (E6). Not a snapshot: read live,
      * so it is never cached.
+     *
+     * saroh.app's server reads it for the booking page, so it relays the
+     * visitor's address in the signed `x-saroh-relay` (ADR-011) and the limit
+     * counts the visitor, not the renderer. Anything unsigned counts the
+     * caller, as before.
      */
     @Get(":siteId/visit")
     @Header("Cache-Control", "no-store")
     visit(
         @Param("siteId") siteId: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicVisit> {
-        return this.visits.read(siteId, undefined, hashClientIp(ip));
+        return this.visits.read(siteId, undefined, visitorKey(ip, relay));
     }
 
     /**

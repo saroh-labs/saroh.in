@@ -2,6 +2,7 @@ import { toMoneyString } from "../../common/money";
 import { stateName } from "./gst-states";
 import type { InvoiceStanding } from "./invoice-state";
 import { invoiceStanding } from "./invoice-state";
+import type { InvoiceSendView, InvoiceSentView } from "./send-view";
 
 interface Money {
     toString(): string;
@@ -292,6 +293,10 @@ export interface InvoiceViewModel {
     lines?: InvoiceLineView[];
     /** On `GET /invoices/:id` only: the pay link and money taken online. */
     online?: InvoiceOnlineView;
+    /** On `GET /invoices/:id` only: whether it can be sent, and how (D17). */
+    send?: InvoiceSendView;
+    /** On `GET /invoices/:id` only: its sends and reminders, newest first. */
+    sent?: InvoiceSentView[];
 }
 
 /** One payment taken online through the invoice's pay link (U13). */

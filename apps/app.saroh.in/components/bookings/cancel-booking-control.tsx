@@ -26,9 +26,10 @@ import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
  * idempotent, so a double click is harmless.
  *
  * With money paid online for it (E8), it first says what the cancel does
- * with it: refunded before the free-cancel time fixed at booking, kept
- * after it. Someone who may refund payments can hand a kept deposit back
- * anyway; anyone else is told who can. Afterwards the toast says what
+ * with it: refunded before the free-cancel time fixed at booking, if the
+ * business's refund policy says so (E30, DEC-058), and kept otherwise.
+ * Someone who may refund payments can hand kept money back anyway; anyone
+ * else is told who can. Afterwards the toast says what
  * happened, refund refused or still being confirmed included.
  */
 export function CancelBookingControl({
@@ -127,7 +128,7 @@ export function CancelBookingControl({
                             })}
                             onClick={() => void cancel(false)}
                         >
-                            {plan?.late
+                            {plan?.keeps
                                 ? `Cancel, keep the ${plan.what}`
                                 : "Cancel booking"}
                         </AlertDialogAction>

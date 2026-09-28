@@ -349,16 +349,22 @@ export async function checkShowcase(
     fail(
         "memberships used past their classes a month",
         await prisma.$queryRaw<Row[]>`
-            SELECT b."subscriptionId", p."classesPerMonth", COUNT(*)::int AS used
+            SELECT b."subscriptionId", a.allowance, COUNT(*)::int AS used
             FROM "Booking" b
             JOIN "CustomerSubscription" cs ON cs.id = b."subscriptionId"
             JOIN "SubscriptionPlan" p ON p.id = cs."planId"
+            -- The subscription's own allowance (D10), or the plan's while
+            -- it was never set.
+            CROSS JOIN LATERAL (
+                SELECT CASE WHEN cs."classesPerPeriodSetAt" IS NULL
+                    THEN p."classesPerMonth" ELSE cs."classesPerPeriod" END AS allowance
+            ) a
             WHERE b."organizationId" = ANY(${orgs})
               AND (b.status = 'CONFIRMED' OR b."cancelledLate")
-              AND p."classesPerMonth" IS NOT NULL
-            GROUP BY b."subscriptionId", p."classesPerMonth",
+              AND a.allowance IS NOT NULL
+            GROUP BY b."subscriptionId", a.allowance,
                 date_trunc('month', (b."startAt" AT TIME ZONE 'UTC') AT TIME ZONE cs.timezone)
-            HAVING COUNT(*) > p."classesPerMonth"`,
+            HAVING COUNT(*) > a.allowance`,
     );
 
     // Who takes a booking (U3): someone who takes that service, never in two

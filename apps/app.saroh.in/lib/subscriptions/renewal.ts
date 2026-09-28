@@ -60,15 +60,25 @@ export function standing(sub: Pick<Sub, "status" | "overdue">): Standing {
     return sub.status;
 }
 
-/** The "Next" column: "Starts 1 Oct", "Renews 1 Oct", "Ends 1 Oct", "Paused since 5 Sep". */
-export function nextLine(sub: Sub): string {
+/**
+ * The "Next" column: "Starts 1 Oct", "Renews 1 Oct", "Ends 1 Oct", "Paused
+ * since 5 Sep", "Paused until 3 Oct". A pause whose end date has come, but
+ * that the renewal job hasn't resumed yet, says "Pause ended 3 Oct" as the
+ * detail does (`view.ts` `pausedText`) — never "until" a day that has passed.
+ */
+export function nextLine(sub: Sub, now: Date = new Date()): string {
     const tz = sub.timezone;
     if (sub.status === "CANCELLED") {
         return sub.cancelledAt ? `Ended ${day(sub.cancelledAt, tz)}` : "Ended";
     }
     if (sub.status === "PAUSED") {
         // A pause with an end date resumes on its own that day (D8).
-        if (sub.pausedUntil) return `Paused until ${day(sub.pausedUntil, tz)}`;
+        if (sub.pausedUntil) {
+            const until = day(sub.pausedUntil, tz);
+            return Date.parse(sub.pausedUntil) <= now.getTime()
+                ? `Pause ended ${until}`
+                : `Paused until ${until}`;
+        }
         return sub.pausedAt
             ? `Paused since ${day(sub.pausedAt, tz)}`
             : "Paused";

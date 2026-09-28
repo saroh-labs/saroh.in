@@ -196,6 +196,8 @@ module.exports = {
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
+        // B4: the filter bar's options, DB-free.
+        "<rootDir>/src/modules/orders/order-list-options.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -210,6 +212,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // D17: sending an invoice, with the database mocked
+        // (invoice-send.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-send.service.spec.ts",
         // U5 GST: the tax maths, the states and GSTINs, and the order
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
@@ -235,6 +240,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         // D21: which plans are on sale; a DRAFT is refused.
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
+        // D10: a subscription's own classes a month, and the fallback.
+        "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

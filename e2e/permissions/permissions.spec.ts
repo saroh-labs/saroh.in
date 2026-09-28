@@ -281,6 +281,17 @@ test("someone who can't read or stage orders sees the locked card", async ({
     await expect(
         page.getByRole("link", { name: "Back to Home", exact: true }),
     ).toBeVisible();
+
+    // Elsewhere in Sell, the gate's own denial still answers (DEC-056
+    // changes Orders only).
+    await page.goto("/commerce/products");
+    await expect(
+        page.getByRole("heading", {
+            name: "You do not have access to Sell",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(page.getByText("You can't open orders")).toHaveCount(0);
 });
 
 test("a failed Orders read says so, and is never an empty list", async ({

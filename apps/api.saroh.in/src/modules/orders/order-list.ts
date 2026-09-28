@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import { businessTimezone } from "../bookings/staff-availability";
@@ -12,6 +12,7 @@ import {
     openSql,
     orderConditions,
     paymentSql,
+    presetRange,
     tabCondition,
     ts,
 } from "./order-list-filters";
@@ -50,11 +51,19 @@ export async function listOrderRows(
     view: OrderListView & { money: boolean },
     now: Date = new Date(),
 ): Promise<OrderListPage> {
+    if (query.date && (query.from || query.to)) {
+        throw new BadRequestException({
+            message: "Pick a date range or a preset, not both.",
+            details: { field: "date" },
+        });
+    }
     const zone =
-        query.from || query.to
+        query.from || query.to || query.date
             ? await businessTimezone(prisma, organizationId)
             : "Asia/Kolkata";
-    const range = dayRange(query.from, query.to, zone);
+    const range = query.date
+        ? presetRange(query.date, zone, now)
+        : dayRange(query.from, query.to, zone);
 
     let after = Prisma.sql`TRUE`;
     if (query.cursor) {

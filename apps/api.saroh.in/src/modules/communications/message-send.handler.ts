@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
 import type {
     CommsCredentials,
@@ -11,6 +12,7 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
+import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
 export const MESSAGE_SEND_TYPE = "message.send";
@@ -24,6 +26,13 @@ export const MESSAGE_SEND_TYPE = "message.send";
 export interface MessageSendPayload {
     messageId: string;
     deliveryId: string;
+    /**
+     * A transactional message's secret link (an invoice's pay link, D17),
+     * sealed with the credentials' key. It is opened only here, put into the
+     * body where the stored one has the slot, and never logged or written
+     * back.
+     */
+    link?: EncryptedSecret;
 }
 
 /** Delivery states that are terminal-success — a re-run must NOT re-send. */
@@ -61,7 +70,7 @@ export class MessageSendHandler {
 
     /** Bound {@link JobHandler} to register with the {@link JobHandlerRegistry}. */
     readonly handle = async (job: Job): Promise<void> => {
-        const { messageId, deliveryId } =
+        const { messageId, deliveryId, link } =
             job.payload as unknown as MessageSendPayload;
 
         const delivery = await prisma.delivery.findUnique({
@@ -122,6 +131,20 @@ export class MessageSendHandler {
             return;
         }
 
+        // A body waiting for its secret link goes nowhere without it.
+        let body = message.body;
+        if (body.includes(SECRET_LINK_SLOT)) {
+            if (!link) {
+                await this.recordFailure(
+                    delivery.id,
+                    message.id,
+                    "secret link missing",
+                );
+                return;
+            }
+            body = fillSecretLink(body, decryptSecret(link));
+        }
+
         const credentials = this.openCredentials(providerRow);
         const provider = this.factory.get(
             message.channel,
@@ -133,7 +156,7 @@ export class MessageSendHandler {
                 to: message.toAddress,
                 from: providerRow.fromAddress ?? undefined,
                 subject: message.subject ?? undefined,
-                body: message.body,
+                body,
                 credentials,
             });
 

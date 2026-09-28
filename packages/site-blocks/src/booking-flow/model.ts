@@ -41,6 +41,11 @@ export interface BookingRules {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
     freeCancelHours: number | null;
+    /**
+     * The business's refund policy (E30, DEC-058): money paid online goes
+     * back on its own when cancelled in time. Absent from an older API: on.
+     */
+    refundInTimeCancels?: boolean;
 }
 
 /** What the page opens with: `GET /public/sites/:siteId/booking`. */
@@ -285,7 +290,7 @@ export function payChoices(
     const payNow: PayChoice = {
         pay: "NOW",
         label: isClass ? `Pay ${price} for this class` : `Pay ${price} now`,
-        sub: `UPI or card — your ${place} is confirmed straight away`,
+        sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
     const deposit = service.depositCents ?? null;
@@ -304,7 +309,7 @@ export function payChoices(
             {
                 ...payNow,
                 label: `Pay the full ${price} now`,
-                sub: "UPI or card",
+                sub: "Online, in one payment",
             },
         ];
     }
@@ -515,15 +520,19 @@ export function describeMinutes(minutes: number): string {
 /**
  * The business's rules, as the summary card says them: "Free to cancel
  * until 12 hours before the start. Bookings open 21 days ahead and close 2
- * hours before." Only the rules it has; empty when it has none.
+ * hours before." Only the rules it has; empty when it has none. Paying
+ * online with a business that doesn't refund on its own (DEC-058), it says
+ * so.
  */
-export function rulesText(rules: BookingRules): string {
+export function rulesText(rules: BookingRules, payingOnline = false): string {
     const out: string[] = [];
     if (rules.freeCancelHours !== null) {
         out.push(
             `Free to cancel until ${describeMinutes(rules.freeCancelHours * 60)} before the start.`,
         );
     }
+    const kept = keptText(rules, payingOnline);
+    if (kept) out.push(kept);
     const ahead =
         rules.bookAheadDays !== null
             ? `open ${describeMinutes(rules.bookAheadDays * 1440)} ahead`
@@ -539,15 +548,31 @@ export function rulesText(rules: BookingRules): string {
 }
 
 /**
+ * The business's refund policy, said only where it takes money from the
+ * customer: paying online with a business that doesn't refund a cancel on
+ * its own (E30, DEC-058). Null otherwise, so the default reads as before.
+ */
+function keptText(rules: BookingRules, payingOnline: boolean): string | null {
+    return payingOnline && rules.refundInTimeCancels === false
+        ? "What you pay online isn't refunded automatically if you cancel."
+        : null;
+}
+
+/**
  * The confirmation's closing line. Saroh sends no message, so there is no
  * "link in your confirmation" to point at: changes go through the business.
  */
-export function changeText(business: string, rules: BookingRules): string {
+export function changeText(
+    business: string,
+    rules: BookingRules,
+    paidOnline = false,
+): string {
     const free =
         rules.freeCancelHours !== null
             ? ` Free to cancel until ${describeMinutes(rules.freeCancelHours * 60)} before the start.`
             : "";
-    return `Need to change it? Get in touch with ${business}.${free}`;
+    const kept = keptText(rules, paidOnline);
+    return `Need to change it? Get in touch with ${business}.${free}${kept ? ` ${kept}` : ""}`;
 }
 
 /** "Places left" words for a class session. */

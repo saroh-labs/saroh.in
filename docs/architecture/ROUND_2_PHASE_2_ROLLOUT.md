@@ -91,13 +91,161 @@ the backfill wrote stay; the old API sends them in the checkout handoff,
 which is what its checkout needed all along, so nothing breaks. Nothing
 needs undoing.
 
-### Cashfree (noted, not changed)
+### Payment methods (DEC-059)
 
 Cashfree's drop-in opens on the order's payment session, so it needs no
-public key and its setup is unchanged. It shows whatever methods the
-business's Cashfree account has on, because the order Saroh creates sets
-none (`providers/cashfree.provider.ts`), while Razorpay's window is limited
-to UPI and card (`packages/site-blocks/src/booking-flow/checkout.ts`). The
-booking page promises "UPI or card". Limiting Cashfree the same way would
-mean setting `order_meta.payment_methods` (for example `"upi,cc,dc"`) on the
-order; it is left for a decision.
+public key and its setup is unchanged. Neither provider's order sets any
+methods, and since D23 Razorpay's window isn't limited either: each shows the
+methods the business has switched on in its own account. Saroh's copy names
+no methods ("Pay online in the ‹provider› window").
+
+---
+
+## D17: sending an invoice (wave 2)
+
+"Send with pay link" and "Send reminder" on Invoice Detail, through the
+business's own connected email provider (`invoices/invoice-send.service.ts`,
+the transactional path in `communications/communications.service.ts`).
+
+- **Migration** `20261013160000_invoice_messages`: two nullable columns on
+  `Message` (`invoiceId`, `template`), an index and a foreign key. Additive;
+  the old API never reads them.
+- **API before app.** The workspace shows Send only when the invoice read
+  carries a `send` flag with a channel, so the new app on the old API shows
+  "Copy pay link" as before, and the old app ignores the new fields.
+- **The account thread stays off.** The thread channel needs A14's poster
+  (not yet built) **and** the `ACCOUNT_THREAD` flag. Leave the flag without
+  a row until A13 and A14 are live in production (waves plan, boundary 6);
+  never configured, it is off.
+- Nothing changes for a business without a connected email provider: no
+  Send, and the Payment panel points at Settings › Providers.
+
+### Verify
+
+1. On a test business with an email provider and a payment provider, open an
+   unpaid invoice: "Send with pay link" is offered; send it. The email
+   arrives with a pay link that opens the pay page; "What happened" says
+   "Sent to …".
+2. "Send reminder" is then offered but off, and the Payment panel says when
+   the next can go.
+3. Without an email provider: no Send, only "Copy pay link".
+
+### Rollback
+
+A queued send whose job has not run yet carries its pay link sealed in the
+job, and its stored body holds a slot the old API's worker doesn't fill.
+Before deploying the previous API, check no such job is waiting, or it goes
+out with the slot instead of the link:
+
+```sql
+SELECT count(*) FROM "Job"
+WHERE type = 'message.send' AND status IN ('PENDING', 'PROCESSING')
+  AND payload ? 'link';
+```
+
+Wait for 0 (the worker sends them within seconds). The two columns stay;
+the old API ignores them.
+
+## D10: classes from the next renewal (CP-2, a manual release)
+
+Plan: `docs/plans/2026-09-26-004-feat-payments-plan.md` §D10, and the
+overview's "Rollout and rollback" row "The classes allowance (D10)". Until
+now a membership read its plan's classes a month live, so changing a plan's
+classes changed every member's allowance at once. From this release a
+subscription takes its plan's number at subscribe and at each renewal
+(`CustomerSubscription.classesPerPeriod`, stamped with
+`classesPerPeriodSetAt`), and a booking paid with the membership, and
+Customer Detail's "Classes left", read the subscription's number. Customer
+Detail also says "10 a month from 1 Nov" when the next renewal changes it.
+
+**Why it is manual (overview rule 4).** The migration
+`20261013180000_subscription_classes_per_period` adds the two columns and
+fills them for every live subscription. But the previous API image keeps
+creating and renewing subscriptions until it stops serving, and again after
+a rollback, without setting either column. A null there means "no
+allowance", which would read as unlimited. So, **for this release, a
+subscription whose `classesPerPeriodSetAt` is null reads its plan's number**
+(`subscriptions/classes-allowance.ts`), exactly as before, and the backfill
+script is re-run after the deploy to set those rows. Follow-up Z1 removes
+the fallback once the verify query below finds none, in wave 4 or later.
+This release does not go through the automatic push-to-deploy.
+
+### Deploy
+
+1. **Back up** production (the host's rollout takes one before it
+   migrates; note its name).
+2. **Migrate** with the release image: `db:migrate:deploy` applies
+   `20261013180000_subscription_classes_per_period`. It is additive (two
+   nullable columns the old API never reads) plus a one-statement fill, so
+   the old API keeps serving while it runs.
+3. **Deploy the API** and wait for `/health/ready`.
+4. **Run the backfill**, from a checkout of the release commit pointed at
+   the production database. It sets only live (ACTIVE or PAUSED) rows whose
+   `classesPerPeriodSetAt` is null, to their plan's number as it stands,
+   which is what the API reads for them today, so no member's allowance
+   moves. Idempotent, and safe while either image serves.
+
+    ```bash
+    DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/classes-per-period.cli.ts
+    ```
+
+    It prints:
+
+    ```text
+    [classes-per-period] <database>: live subscriptions unset: <n>, set now: <n>, still unset: <n>
+    ```
+
+    Record the three numbers in the release issue. "Set now" is usually
+    small: the subscriptions the old API made or renewed between the
+    migration and the deploy. **"Still unset" must be 0.** If it isn't, a
+    renewal changed a row while the statement ran; the script says so and
+    exits 1. Run it again.
+
+5. **Then the workspace** (`app.saroh.in`), for the "10 a month from 1 Nov"
+   line. The old workspace on the new API is safe: the field is new and
+   optional, and the old one ignores it.
+
+### Verify
+
+6. No live subscription is left unset (read-only; must return 0):
+
+    ```sql
+    SELECT count(*) FROM "CustomerSubscription"
+    WHERE status <> 'CANCELLED' AND "classesPerPeriodSetAt" IS NULL;
+    ```
+
+7. A second run of the backfill prints `set now: 0, still unset: 0`.
+8. Nobody's allowance moved (read-only). Right after the deploy every live
+   subscription holds its plan's number, so this returns no rows; later, only
+   members of a plan whose classes changed since the deploy (its History
+   says when), until their renewal.
+
+    ```sql
+    SELECT s.id, p.name FROM "CustomerSubscription" s
+    JOIN "SubscriptionPlan" p ON p.id = s."planId"
+    WHERE s.status <> 'CANCELLED'
+      AND s."classesPerPeriod" IS DISTINCT FROM p."classesPerMonth";
+    ```
+
+9. In the workspace, on a business with class memberships (Northwind in
+   development, never a demo store): change a plan's classes; a member's
+   Customer Detail still shows the old number and adds "‹new› a month from
+   ‹their renewal day›".
+
+### Rollback
+
+Deploy the previous API tag (and the previous workspace). The columns stay.
+The old API never reads them and reads each plan's number live, which is
+where every member stood before this release, so nothing breaks. What it
+creates or renews meanwhile is left unset or stale:
+
+- a subscription it creates has both columns null, and reads the plan's
+  number again once this release is back (the fallback);
+- a subscription it renews keeps the number stamped at its last renewal
+  under this release, so a plan whose classes changed during the rollback
+  reaches those members one renewal late.
+
+**Before deploying this release again, run the backfill once more** (step 4) and check step 6. After Z1 has removed the fallback, rolling back below
+this release means running the backfill before re-deploying, or members
+the old API added would read as unlimited.

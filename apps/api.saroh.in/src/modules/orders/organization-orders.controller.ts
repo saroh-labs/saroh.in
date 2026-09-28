@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -16,15 +17,30 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { orderPayLinkUrl } from "../invoices/pay-link-url";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
     EditOrderDto,
     ListOrdersQuery,
     MoveStageDto,
+    OrderFilterOptionsQuery,
+    OrderProductsQuery,
     UndoStageDto,
 } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersService } from "./orders.service";
+
+/**
+ * Who may list the business's orders: `order:read` in full, or
+ * `order:stage` for the kitchen's view (DEC-024); anyone else is refused.
+ * True when the caller reads them in full, money included.
+ */
+function listAccess(ctx: OrganizationContext): boolean {
+    const full = allows(ctx, "order:read");
+    if (!full && !allows(ctx, "order:stage")) authorize(ctx, "order:read");
+    return full;
+}
 
 /**
  * Orders across the whole business — what Sell → Orders reads.
@@ -52,6 +68,7 @@ export class OrganizationOrdersController {
     constructor(
         private readonly orders: OrdersService,
         private readonly kitchen: OrderKitchenService,
+        private readonly payLinks: OrderPayLinkService,
     ) {}
 
     @Get()
@@ -69,8 +86,7 @@ export class OrganizationOrdersController {
         // needs the list to open the order in front of them. They get the
         // kitchen's view of it — no totals and no customer emails — the same
         // line the order read draws.
-        const full = allows(ctx, "order:read");
-        if (!full && !allows(ctx, "order:stage")) authorize(ctx, "order:read");
+        const full = listAccess(ctx);
 
         // Rows, tab counts and a cursor (plan B, B1), with or without `v=2`:
         // the bare array an app before B1 read went in the contract release
@@ -86,6 +102,31 @@ export class OrganizationOrdersController {
             },
             { money: full, contact: allows(ctx, "contact:read") },
         );
+    }
+
+    /**
+     * What the list's filter bar offers (B4): the ways and steps the
+     * business's orders show, and the name of the product a link names.
+     * Whoever may list orders may ask. Declared before `:orderId`, which
+     * would otherwise take "filters" for an order id.
+     */
+    @Get("filters")
+    filters(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: OrderFilterOptionsQuery = {},
+    ) {
+        listAccess(ctx);
+        return this.orders.filterOptions(ctx.organizationId, query.productId);
+    }
+
+    /** The Product filter's search (B4): products on the business's orders. */
+    @Get("products")
+    products(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: OrderProductsQuery = {},
+    ) {
+        listAccess(ctx);
+        return this.orders.searchProducts(ctx.organizationId, query.q);
     }
 
     /** One order as Order Detail shows it; money only with a money read. */
@@ -117,6 +158,25 @@ export class OrganizationOrdersController {
         @Body() dto: UndoStageDto,
     ) {
         return this.kitchen.undoStage(ctx, orderId, dto.eventId);
+    }
+
+    /**
+     * Make the order's pay link and answer with it — once: only its hash is
+     * kept, so asking again makes a new link and the old one stops working
+     * (B11). `order:write`.
+     */
+    @Post(":orderId/pay-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async payLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+    ): Promise<{ url: string; payLinkCreatedAt: Date }> {
+        const { token, payLinkCreatedAt } = await this.payLinks.make(
+            ctx,
+            orderId,
+        );
+        return { url: orderPayLinkUrl(token), payLinkCreatedAt };
     }
 
     /** Change lines, fulfilment, address or notes (`order:write`). */

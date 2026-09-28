@@ -32,6 +32,8 @@ jest.mock("@saroh/database", () => {
         job: { create: jest.fn() },
         contact: { findUnique: jest.fn() },
         lead: { findUnique: jest.fn() },
+        invoice: { findFirst: jest.fn() },
+        customerAccount: { findFirst: jest.fn() },
     };
     return {
         prisma: {
@@ -568,5 +570,182 @@ describe("CommunicationsService reads (auditable lifecycle)", () => {
             service.listMessages(ctx({ role: "MEMBER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(messageFindMany).not.toHaveBeenCalled();
+    });
+});
+
+// ---- D17: the transactional path ------------------------------------------
+
+describe("CommunicationsService.queueTransactional (D17)", () => {
+    const invoiceFindFirst = prisma.invoice.findFirst as jest.Mock;
+    const accountFindFirst = prisma.customerAccount.findFirst as jest.Mock;
+    const tx = prisma as unknown as Parameters<
+        CommunicationsService["queueTransactional"]
+    >[0];
+    const vars = {
+        business: "Rye & Co.",
+        firstName: "Asha",
+        number: "INV-0042",
+        total: "₹2,400.00",
+        dueOn: "3 Oct 2026",
+        overdue: false,
+    };
+    const input = (
+        secretLink = jest.fn().mockResolvedValue("https://saroh.app/pay/tok_1"),
+    ) => ({
+        template: "INVOICE_SENT" as const,
+        vars,
+        recipient: { kind: "INVOICE_BILL_TO" as const, invoiceId: "inv_1" },
+        secretLink,
+        invoiceId: "inv_1",
+        createdByUserId: "user_1",
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            billToEmail: "asha@example.com",
+            contactId: "contact_1",
+            contact: { email: "asha@example.com" },
+        });
+        accountFindFirst.mockResolvedValue(null);
+        providerFindUnique.mockResolvedValue({
+            provider: "RESEND",
+            status: "CONNECTED",
+        });
+        consentFindUnique.mockResolvedValue(null);
+        messageCreate.mockImplementation(
+            ({ data }: { data: { status: string } }) =>
+                Promise.resolve({ id: "msg_1", ...data }),
+        );
+        deliveryCreate.mockResolvedValue({ id: "del_1" });
+        jobCreate.mockResolvedValue({ id: "job_1" });
+    });
+
+    it("queues Message + Delivery + job on the caller's transaction, the link sealed in the job", async () => {
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(res).toEqual({
+            id: "msg_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        expect(messageCreate.mock.calls[0][0].data).toMatchObject({
+            organizationId: "org_1",
+            channel: "EMAIL",
+            contactId: "contact_1",
+            toAddress: "asha@example.com",
+            invoiceId: "inv_1",
+            template: "INVOICE_SENT",
+            createdByUserId: "user_1",
+            status: "QUEUED",
+        });
+        const payload = jobCreate.mock.calls[0][0].data.payload;
+        expect(payload).toMatchObject({
+            messageId: "msg_1",
+            deliveryId: "del_1",
+        });
+        expect(JSON.stringify(payload)).not.toContain("tok_1");
+        expect(decryptSecret(payload.link)).toBe("https://saroh.app/pay/tok_1");
+        expect(JSON.stringify(messageCreate.mock.calls)).not.toContain("tok_1");
+        // It never opens a transaction of its own.
+        expect($transaction).not.toHaveBeenCalled();
+    });
+
+    it("a revoked email consent suppresses it and never makes the link", async () => {
+        consentFindUnique.mockResolvedValue({ status: "REVOKED" });
+        const link = jest.fn();
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(link),
+        );
+        expect(res.status).toBe("SUPPRESSED");
+        expect(link).not.toHaveBeenCalled();
+        expect(deliveryCreate).not.toHaveBeenCalled();
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("needs no marketing opt-in: a GRANTED or absent consent both send", async () => {
+        consentFindUnique.mockResolvedValue({ status: "GRANTED" });
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(res.status).toBe("QUEUED");
+    });
+
+    it("refuses with 409 when the business has no connected email provider", async () => {
+        providerFindUnique.mockResolvedValue({
+            provider: "RESEND",
+            status: "DISABLED",
+        });
+        const link = jest.fn();
+        await expect(
+            new CommunicationsService().queueTransactional(
+                tx,
+                "org_1",
+                input(link),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(link).not.toHaveBeenCalled();
+        expect(messageCreate).not.toHaveBeenCalled();
+    });
+
+    it("a placeholder bill-to goes to the verified account email instead", async () => {
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            billToEmail: "account+contact_1@account.invalid",
+            contactId: "contact_1",
+            contact: null,
+        });
+        accountFindFirst.mockResolvedValue({ email: "meera@example.com" });
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(res.toAddress).toBe("meera@example.com");
+        expect(accountFindFirst.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            contactId: "contact_1",
+            status: "ACTIVE",
+        });
+    });
+
+    it("with neither a bill-to email nor an account: 409, nothing written", async () => {
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            billToEmail: "removed+contact_1@removed.invalid",
+            contactId: "contact_1",
+            contact: null,
+        });
+        await expect(
+            new CommunicationsService().queueTransactional(
+                tx,
+                "org_1",
+                input(),
+            ),
+        ).rejects.toThrow("There's no email address to send this to.");
+        expect(messageCreate).not.toHaveBeenCalled();
+    });
+
+    it("reads the invoice only within the business", async () => {
+        invoiceFindFirst.mockResolvedValue(null);
+        await expect(
+            new CommunicationsService().queueTransactional(
+                tx,
+                "org_1",
+                input(),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(invoiceFindFirst.mock.calls[0][0].where).toEqual({
+            id: "inv_1",
+            organizationId: "org_1",
+        });
     });
 });

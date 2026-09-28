@@ -73,6 +73,18 @@ a note saying so.
   until a refund is recorded.
 - **Current** — **Consent gates the send.** A revoked consent makes a message
   `SUPPRESSED`: no job, no delivery.
+- **Current** (D17) — **One transactional path.** A message about a
+  customer's own invoice (and, with A14, order, booking or waitlist) goes
+  through `CommunicationsService.queueTransactional` on the caller's
+  transaction: fixed templates (`communications/transactional.ts`), only to
+  the bill-to email or a verified site-account email (never a typed
+  address, never a DEC-049 placeholder), only through the business's own
+  EMAIL provider (409 otherwise), no marketing opt-in, and a revoked email
+  consent still suppresses it. A secret link in it (a pay link) is sealed
+  into the `message.send` job with the credentials' key and filled in only
+  as the email goes to the provider; the stored body keeps a slot, so
+  `message:read` never shows the token. A suppressed send never makes the
+  link, so the one already shared keeps working.
 - **Current** — **Storage keys are server-derived and tenant-scoped**
   (`org/<organizationId>/…`), and uploads are presigned PUTs checked against a
   content-type allowlist and a size cap.

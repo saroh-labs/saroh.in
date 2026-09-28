@@ -65,6 +65,19 @@ export interface CalendarItem {
     amount?: string;
     currency?: string;
     link: CalendarLink;
+    /**
+     * The money this item moved or still asks for on its day, in minor
+     * units of `currency` (plan 005 E19): present only for a caller holding
+     * `payment:read`, and only on an item with any. `out` is refunds plus
+     * the fees providers reported; `failed` is a renewal charge unpaid past
+     * its due date, kept apart from `due`.
+     */
+    in?: number;
+    out?: number;
+    due?: number;
+    failed?: number;
+    /** What `out` is made of, when there is any. */
+    outWhy?: ("refund" | "fee")[];
 }
 
 /** An item and the local day it belongs to. */
@@ -72,6 +85,19 @@ export interface DatedItem {
     layer: LayerKey;
     date: string;
     item: CalendarItem;
+    /**
+     * Money the item itself still asks for (Due) or failed to take — read
+     * with the item, sent only as `in`/`out`/`due`/`failed` to a caller
+     * holding `payment:read` (`money.ts`).
+     */
+    owes?: ItemOwes;
+}
+
+/** What an item is owed, in minor units — see {@link DatedItem.owes}. */
+export interface ItemOwes {
+    kind: "invoice_due" | "renewal_due" | "booking_due" | "renewal_failed";
+    currency: string;
+    cents: number;
 }
 
 export interface LayerDay {
@@ -101,6 +127,24 @@ export interface CalendarDay {
     toActOn: number;
     /** Money only: what was taken this day, each rupee once. */
     takings?: MoneyTotal[];
+    /**
+     * `payment:read` only (plan 005 E19): the day's money in, out, due and
+     * failed, per currency, each rupee once. Absent when the money could not
+     * be added up.
+     */
+    money?: MoneyCell[];
+}
+
+/** A day's or a month's money in one currency, in minor units. */
+export interface MoneyCell {
+    currency: string;
+    in: number;
+    out: number;
+    /** In less out. */
+    net: number;
+    due: number;
+    /** Renewal charges unpaid past their due date, apart from `due`. */
+    failed: number;
 }
 
 /** A payment taken, on a day — an order or a non-order invoice (ADR-008). */
@@ -181,6 +225,11 @@ export function buildDays(input: {
     items: DatedItem[];
     toActOn: ToActOn[];
     takings: TakingEntry[] | null;
+    /**
+     * Each day's money cells (`money.ts`); every day gets a list, empty on
+     * a quiet day. Absent or null: no day carries money.
+     */
+    money?: Map<string, MoneyCell[]> | null;
     itemsPerDay?: number;
 }): CalendarDay[] {
     const cap = input.itemsPerDay ?? ITEMS_PER_DAY;
@@ -198,6 +247,7 @@ export function buildDays(input: {
             layers,
             toActOn: 0,
             ...(input.takings === null ? {} : { takings: [] }),
+            ...(input.money ? { money: input.money.get(date) ?? [] } : {}),
         });
     }
 

@@ -4,12 +4,15 @@ import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
+import { sellablesOf } from "@/lib/orders/sellables";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
+import { listProducts } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Order" };
@@ -56,18 +59,50 @@ export default async function OrderPage({
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     const contactId = order.customer?.contactId ?? null;
-    const [notes, payments, reviewState] = await Promise.all([
-        contactId
-            ? getAllergyNotes(contactId)
-            : Promise.resolve<AllergyNote[]>([]),
-        order.money
-            ? getOrderPayments(order.id).catch(() => null)
-            : Promise.resolve(null),
-        // Unknown on failure: the section is left out rather than guessing.
-        may("order:read")
-            ? invitationState(order.id).catch(() => null)
-            : Promise.resolve(null),
-    ]);
+    // A pay link (B11) is offered only to someone who may change the order,
+    // on an order that shows money, and only while a provider can open the
+    // checkout window (DEC-054).
+    const payOnline =
+        may("order:write") && order.money
+            ? hasPaymentProvider().catch(() => false)
+            : Promise.resolve(false);
+    const [notes, payments, reviewState, canPayOnline, addable] =
+        await Promise.all([
+            contactId
+                ? getAllergyNotes(contactId)
+                : Promise.resolve<AllergyNote[]>([]),
+            order.money
+                ? getOrderPayments(order.id).catch(() => null)
+                : Promise.resolve(null),
+            // Unknown on failure: the section is left out rather than guessing.
+            may("order:read")
+                ? invitationState(order.id).catch(() => null)
+                : Promise.resolve(null),
+            payOnline,
+            // "Add an item" (B8): only while items can change, for someone who
+            // may change them — from the order's own storefront (DEC-032).
+            may("order:write") && order.next.editable
+                ? listProducts({ storefront: order.store.id })
+                      .then((products) =>
+                          // Set to Not sold (archived): nobody orders it.
+                          sellablesOf(
+                              products
+                                  .filter((p) => p.status !== "ARCHIVED")
+                                  .map((p) => ({
+                                      id: p.id,
+                                      name: p.name,
+                                      price: p.price,
+                                      variants: p.variants,
+                                      soldOut:
+                                          p.soldOut === true ||
+                                          (p.inventory !== null &&
+                                              p.inventory.quantity <= 0),
+                                  })),
+                          ),
+                      )
+                      .catch(() => "unavailable" as const)
+                : Promise.resolve(null),
+        ]);
 
     return (
         <OrderDetail
@@ -78,6 +113,8 @@ export default async function OrderPage({
                 stage: may("order:stage"),
                 write: may("order:write"),
                 refund: may("payment:manage"),
+                payOnline: canPayOnline,
+                manageProviders: may("payment:manage"),
             }}
             customerHref={
                 contactId
@@ -86,6 +123,7 @@ export default async function OrderPage({
                       ? customerHref(order.store.id, order.customer.id)
                       : null
             }
+            addable={addable}
             aside={
                 reviewState ? (
                     <OrderReviews

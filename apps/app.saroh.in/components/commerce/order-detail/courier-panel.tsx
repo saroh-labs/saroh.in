@@ -9,8 +9,10 @@ import {
     COURIER_FIELD_MAX,
     courierChoices,
     courierFields,
+    courierName,
     COURIERS,
     isTrackingLink,
+    OTHER_COURIER,
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
@@ -56,12 +58,24 @@ export function CourierPanel({
     const [courier, setCourier] = useState<string>(
         before?.courier ?? COURIERS[0],
     );
+    const [otherName, setOtherName] = useState("");
     const [number, setNumber] = useState(before?.number ?? "");
     const [link, setLink] = useState(before?.url ?? "");
     const numberRef = useRef<HTMLInputElement>(null);
+    const otherRef = useRef<HTMLInputElement>(null);
     const own = courier === OWN_DRIVER;
+    const other = courier === OTHER_COURIER;
+    const name = courierName(courier, otherName);
+    const unnamed = other && !name;
     const bad = !own && link.trim() !== "" && !isTrackingLink(link.trim());
     const handover = mode === "handover";
+    const pickChip = (c: string) => {
+        setCourier(c);
+        // Other asks for the name next.
+        if (c === OTHER_COURIER) {
+            requestAnimationFrame(() => otherRef.current?.focus());
+        }
+    };
 
     // Opened from the card to add the number: start there.
     useEffect(() => {
@@ -97,7 +111,7 @@ export function CourierPanel({
                             type="button"
                             role="radio"
                             aria-checked={on}
-                            onClick={() => setCourier(c)}
+                            onClick={() => pickChip(c)}
                             className={cn(
                                 FOCUS,
                                 "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
@@ -111,6 +125,28 @@ export function CourierPanel({
                     );
                 })}
             </div>
+            {other ? (
+                <label className="mt-3 block text-[12px] font-medium">
+                    Courier&apos;s name
+                    <input
+                        ref={otherRef}
+                        type="text"
+                        value={otherName}
+                        maxLength={COURIER_FIELD_MAX}
+                        autoComplete="off"
+                        onChange={(e) => setOtherName(e.target.value)}
+                        placeholder="DTDC, India Post…"
+                        aria-describedby={`${ids}-other-help`}
+                        className={cn(FIELD, "font-sans")}
+                    />
+                    <span
+                        id={`${ids}-other-help`}
+                        className="mt-[5px] block text-[11.5px] font-normal text-muted-foreground"
+                    >
+                        As the order will name it.
+                    </span>
+                </label>
+            ) : null}
             {!own ? (
                 <>
                     <label className="mt-3 block text-[12px] font-medium">
@@ -134,7 +170,7 @@ export function CourierPanel({
                     >
                         {handover
                             ? "You can add it later, once the courier sends it."
-                            : `As ${courier} gave it to you.`}
+                            : `As ${name || "the courier"} gave it to you.`}
                     </p>
                     <label className="mt-3 block text-[12px] font-medium">
                         Tracking link
@@ -160,7 +196,7 @@ export function CourierPanel({
                     >
                         {bad
                             ? "That isn't a web address — paste the whole link, starting https://."
-                            : `Optional. Paste the link ${courier} gave you. It stays on the order; nothing is sent to ${first}.`}
+                            : `Optional. Paste the link ${name || "the courier"} gave you. It stays on the order; nothing is sent to ${first}.`}
                     </p>
                 </>
             ) : null}
@@ -186,11 +222,11 @@ export function CourierPanel({
                 <Button
                     type="button"
                     className={actionClass("primary")}
-                    disabled={bad || busy}
+                    disabled={bad || unnamed || busy}
                     onClick={() =>
                         onSave(
                             courierFields(
-                                { courier, number, link },
+                                { courier: name, number, link },
                                 handover ? undefined : before,
                             ),
                         )

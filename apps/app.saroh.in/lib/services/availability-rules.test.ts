@@ -7,6 +7,7 @@ import {
     draftFrom,
     outsideHours,
     rangeRefusal,
+    refundsInTime,
     ruleChoices,
     saveOps,
     weeklyHours,
@@ -203,6 +204,37 @@ describe("saveOps", () => {
         ]);
         const add = ops.find((o) => o.kind === "addOff");
         expect(add?.kind === "addOff" && add.off.staffId).toBeNull();
+    });
+});
+
+describe("the refund policy (E30, DEC-058)", () => {
+    it("reads as on when an older API leaves it out, or never set", () => {
+        expect(refundsInTime(RULES)).toBe(true);
+        expect(refundsInTime({ ...RULES, refundInTimeCancels: false })).toBe(
+            false,
+        );
+    });
+
+    it("turning it off is a rules write, with the old policy for Undo", () => {
+        const staff = [person()];
+        const before = { ...RULES, refundInTimeCancels: true };
+        const draft = draftFrom(staff, before);
+        expect(saveOps(staff, before, draft)).toEqual([]);
+        draft.rules.refundInTimeCancels = false;
+        expect(saveOps(staff, before, draft)).toEqual([
+            {
+                kind: "rules",
+                rules: { ...before, refundInTimeCancels: false },
+                before,
+            },
+        ]);
+    });
+
+    it("on, set or left out, is no change", () => {
+        const staff = [person()];
+        const draft = draftFrom(staff, RULES);
+        draft.rules.refundInTimeCancels = true;
+        expect(saveOps(staff, RULES, draft)).toEqual([]);
     });
 });
 

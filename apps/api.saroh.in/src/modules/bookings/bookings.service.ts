@@ -22,7 +22,8 @@ import {
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import { PaymentsService } from "../payments/payments.service";
-import { isValidSlotStart } from "./availability";
+import { OPENS_CHECKOUT } from "../payments/public-key";
+import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import { BookingEventType } from "./booking-event-type";
@@ -37,7 +38,11 @@ import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
 import { bookingMoney } from "./booking-money";
 import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
-import { isLateCancel, loadBookingRules } from "./booking-rules";
+import {
+    isLateCancel,
+    loadBookingRules,
+    refundsAutomatically,
+} from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
     loadStaffing,
@@ -649,17 +654,21 @@ export class BookingsService {
      * paid (U3, E8). The deadline is the one fixed when the booking was made
      * (`freeCancelUntil`, DEC-051), so a move never changes it. Cancelled in
      * time, a pack's class goes back, and money paid online for it — a
-     * deposit or the whole price — is refunded once. Inside the window the
-     * class stays used (a membership's counts against its month), the money
-     * is kept, and the booking says it was cancelled late. With no rule,
-     * every cancel is in time — as before the rules existed.
+     * deposit or the whole price — is refunded once, if the business's
+     * refund policy says so (E30, DEC-058; on unless it was turned off).
+     * Inside the window the class stays used (a membership's counts against
+     * its month), the money is kept, and the booking says it was cancelled
+     * late. With no rule, every cancel is in time — as before the rules
+     * existed. A refund is never more than what is left of what was
+     * received (`reserveBookingRefundInTx`).
      *
      * `returnCredit` is the business cancelling rather than the customer —
      * a whole class called off (U15). The rule protects the business from a
      * customer dropping out late; it never takes a class from someone whose
      * class was cancelled on them. It hands back money kept by a late cancel
      * only for a caller who also holds `payment:manage`; anyone else's
-     * cancel keeps it, and the answer says so.
+     * cancel keeps it, and the answer says so. The same by-hand refund
+     * hands back money an in-time cancel keeps under a no-refund policy.
      *
      * The refund is two-phase (DEC-026): under the locks (intent → invoice
      * → booking, the documented order) the booking is re-read — already
@@ -727,16 +736,18 @@ export class BookingsService {
             // A class paid for with a pack goes back to it (ADR-007) —
             // unless it was cancelled too late to (U3).
             if (!late) await reversePackInTx(tx, booking.id);
-            // Money paid online goes back once when cancelled in time; a
-            // late one is handed back only by someone who may refund (E8).
+            // Money paid online goes back once when cancelled in time and
+            // the business's policy refunds (E8, DEC-058). Otherwise only
+            // someone who may refund hands it back, by hand.
+            const automatic = refundsAutomatically(inTime, rules);
             const refunds =
-                inTime ||
+                automatic ||
                 (!!options.returnCredit && allows(ctx, "payment:manage"));
             const reserved = refunds
                 ? await reserveBookingRefundInTx(tx, {
                       organizationId: ctx.organizationId,
                       bookingId: booking.id,
-                      reason: inTime
+                      reason: automatic
                           ? "Booking cancelled in time"
                           : "Booking cancelled by the business",
                   })
@@ -914,8 +925,10 @@ export class BookingsService {
             where: { id: bookingId },
             include: bookingDetailInclude,
         });
-        // What was paid at booking, what is due and any refund (E8).
-        const money = await bookingMoney(prisma, booking);
+        // What was paid at booking, what is due and any refund (E8), with
+        // the business's refund policy the screen states (E30).
+        const rules = await loadBookingRules(prisma, ctx.organizationId);
+        const money = await bookingMoney(prisma, booking, rules);
         // The booker's note (E7) only behind C1's sensitive gate.
         return { ...intakeNoteFor(ctx, booking), money };
     }
@@ -1036,6 +1049,8 @@ export class BookingsService {
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
         );
+        // The buffers either side stay clear (DEC-052), as the listing keeps.
+        const clear = guarded({ startAt, endAt }, availService);
 
         try {
             return await prisma.$transaction(
@@ -1045,8 +1060,8 @@ export class BookingsService {
                             where: {
                                 serviceId: service.id,
                                 ...holdsPlace(new Date()),
-                                startAt: { lt: endAt },
-                                endAt: { gt: startAt },
+                                startAt: { lt: clear.endAt },
+                                endAt: { gt: clear.startAt },
                                 // Itself is not a competitor for its own seat.
                                 id: { not: booking.id },
                             },
@@ -1054,8 +1069,8 @@ export class BookingsService {
                         const held = await courseSeatsHeld(
                             tx,
                             service.id,
-                            startAt,
-                            endAt,
+                            clear.startAt,
+                            clear.endAt,
                         );
                         if (taken + held >= service.capacity) {
                             throw new ConflictException(
@@ -1070,6 +1085,7 @@ export class BookingsService {
                         startAt,
                         endAt,
                         booking.id,
+                        guardMinutes(availService),
                     );
                     // A class paid with a pack is only paid while the pack
                     // is good on the day (ADR-007): the same rule as spending.
@@ -1393,8 +1409,15 @@ export class BookingsService {
         authorize(ctx, "booking:write");
         authorize(ctx, "invoice:write");
         await this.requireOwnedBooking(ctx, bookingId);
+        // Only a connection that can open the checkout window counts: a
+        // Razorpay one still missing its public key id would make a link
+        // the customer can't pay (DEC-054).
         const connected = await prisma.merchantPaymentProvider.count({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+            where: {
+                organizationId: ctx.organizationId,
+                status: "CONNECTED",
+                ...OPENS_CHECKOUT,
+            },
         });
         if (connected === 0) {
             throw new ConflictException(

@@ -17,12 +17,25 @@ import {
 } from "@/components/invoices/invoice-actions";
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
+import { SendDialog } from "@/components/invoices/send-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { createPayLink } from "@/lib/invoices/actions";
+import { canSend, wasSent } from "@/lib/invoices/send";
+import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 
-type Dialog = "issue" | "delete" | "pay" | "cancel" | "refund" | "newLink";
+type Dialog =
+    | "issue"
+    | "delete"
+    | "pay"
+    | "cancel"
+    | "refund"
+    | "newLink"
+    | "send"
+    | "remind"
+    | "draftSend";
 
 async function copy(text: string): Promise<boolean> {
     try {
@@ -42,8 +55,13 @@ async function copy(text: string): Promise<boolean> {
  * Actions by status — a draft is issued, edited or deleted; an unpaid one
  * gets its pay link copied, is marked paid, printed or cancelled; a paid one
  * is printed or refunded (an order's refund is made on the order, so stock
- * and the kitchen stay right). Saroh never sends the invoice itself: the pay
- * link is copied for the merchant to send.
+ * and the kitchen stay right).
+ *
+ * Sending (D17): where the API's `send` flag names a channel — the
+ * business's own email, and later the customer's account thread — a draft
+ * gets "Send with pay link" (issue and send), an unpaid one "Send with pay
+ * link" and then "Send reminder", once a day. Where it names none, Saroh
+ * doesn't send it: the pay link is copied for the merchant to send.
  */
 export function InvoiceDetail({
     invoice,
@@ -54,6 +72,8 @@ export function InvoiceDetail({
     orderHref,
     editHref,
     online,
+    send,
+    sent,
     payLine,
     late,
     paper,
@@ -70,6 +90,10 @@ export function InvoiceDetail({
     orderHref: string | null;
     editHref: string;
     online: { providerConnected: boolean; payLinkActive: boolean } | null;
+    /** Whether it can be sent, and how; null from an API before D17. */
+    send: InvoiceSend | null;
+    /** Its sends and reminders, newest first. */
+    sent: InvoiceSent[];
     /** How it stands, in a sentence, for the Payment panel. */
     payLine: ReactNode;
     /** The overdue banner's words, when it is overdue. */
@@ -86,6 +110,9 @@ export function InvoiceDetail({
     const credit = invoice.kind === "CREDIT_NOTE";
     const owed = (s === "ISSUED" || s === "OVERDUE") && !credit && !orderHref;
     const canLink = owed && (online?.providerConnected ?? false);
+    const sendable = canWrite && canSend(send);
+    const reminding = wasSent(sent);
+    const nextReminderAt = send?.nextReminderAt ?? null;
     const dialog = (d: Dialog) => (v: boolean) => setOpen(v ? d : null);
 
     async function makeLink() {
@@ -127,10 +154,17 @@ export function InvoiceDetail({
     }
     const actions: Action[] = [];
     if (canWrite && s === "DRAFT") {
+        if (sendable) {
+            actions.push({
+                label: "Send with pay link",
+                primary: true,
+                onClick: () => setOpen("draftSend"),
+            });
+        }
         actions.push(
             {
                 label: "Issue it",
-                primary: true,
+                primary: !sendable,
                 onClick: () => setOpen("issue"),
             },
             { label: "Edit", href: editHref },
@@ -141,10 +175,27 @@ export function InvoiceDetail({
             },
         );
     } else if (canWrite && owed) {
+        if (sendable) {
+            actions.push(
+                reminding
+                    ? {
+                          label: "Send reminder",
+                          primary: true,
+                          // One a day: the Payment panel says when.
+                          disabled: nextReminderAt !== null,
+                          onClick: () => setOpen("remind"),
+                      }
+                    : {
+                          label: "Send with pay link",
+                          primary: true,
+                          onClick: () => setOpen("send"),
+                      },
+            );
+        }
         if (canLink) {
             actions.push({
                 label: busy ? "Making a link…" : "Copy pay link",
-                primary: true,
+                primary: !sendable,
                 disabled: busy,
                 onClick: copyLink,
             });
@@ -152,7 +203,7 @@ export function InvoiceDetail({
         actions.push(
             {
                 label: "Mark paid",
-                primary: !canLink,
+                primary: !canLink && !sendable,
                 onClick: () => setOpen("pay"),
             },
             { label: "Print", onClick: print },
@@ -291,10 +342,34 @@ export function InvoiceDetail({
                                 <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     A pay link is out. Its address was shown
                                     once, when it was copied — copying it again
-                                    makes a new one, and the old one stops
-                                    working.
+                                    {sendable ? " or sending it" : ""} makes a
+                                    new one, and the old one stops working.
                                 </p>
                             ) : null
+                        ) : null}
+                        {owed && sendable && reminding && nextReminderAt ? (
+                            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                One reminder a day. The next can go after{" "}
+                                <ViewerDate
+                                    iso={nextReminderAt}
+                                    variant="datetime"
+                                />
+                                .
+                            </p>
+                        ) : null}
+                        {owed &&
+                        canWrite &&
+                        send?.reason === "NO_EMAIL_PROVIDER" ? (
+                            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                To send invoices by email, connect your email
+                                provider.{" "}
+                                <Link
+                                    href="/settings/providers"
+                                    className="font-medium text-foreground underline underline-offset-4"
+                                >
+                                    Providers
+                                </Link>
+                            </p>
                         ) : null}
                     </section>
                     {after}
@@ -305,7 +380,29 @@ export function InvoiceDetail({
                 open={open === "issue"}
                 onOpenChange={dialog("issue")}
                 invoice={invoice}
+                canSend={sendable}
             />
+            {send && sendable ? (
+                <SendDialog
+                    open={
+                        open === "send" ||
+                        open === "remind" ||
+                        open === "draftSend"
+                    }
+                    onOpenChange={(v) => {
+                        if (!v) setOpen(null);
+                    }}
+                    invoice={invoice}
+                    send={send}
+                    mode={
+                        open === "remind"
+                            ? "reminder"
+                            : open === "draftSend"
+                              ? "draft"
+                              : "send"
+                    }
+                />
+            ) : null}
             <DeleteDraftDialog
                 open={open === "delete"}
                 onOpenChange={dialog("delete")}

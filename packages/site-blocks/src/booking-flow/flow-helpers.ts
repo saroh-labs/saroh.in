@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import type { PublicVisit } from "../blocks/visit-us";
+import { weekSummary } from "../lib/opening-hours";
 import type { BookingDays, BookingService, BookingStart } from "./model";
 import { dateIn, dateText, timeIn } from "./model";
 
@@ -72,4 +74,48 @@ export function nextFreeStart(
 export function nextChosenText(start: BookingStart, zone: string): string {
     const day = dateText(dateIn(start.startAt, zone), true);
     return `That time has just gone. We've chosen the next free one: ${day} at ${timeIn(start.startAt, zone)}.`;
+}
+
+// ── The header's facts (E6) ─────────────────────────────────────────────
+
+/** The page's title: a session where classes are offered, else an appointment. */
+export function pageTitle(services: BookingService[]): string {
+    return services.some((s) => s.kind === "class")
+        ? "Book your next session"
+        : "Book your appointment";
+}
+
+/** What the header says about the business, from G8's public visit read. */
+export interface HeaderFacts {
+    /** "12th Main, Indiranagar · Open Mon–Sat 9am–7pm", or null for neither. */
+    place: string | null;
+    /** The public phone, E.164 (for `tel:`), or null when none is set. */
+    phone: string | null;
+}
+
+/**
+ * The business's address, hours and phone as the header shows them (E6).
+ * They come from the one public visit read Visit us uses (G8), so the two
+ * never disagree. Anything missing is left out rather than guessed: no
+ * hours saved is no hours line, never "Closed".
+ */
+export function headerFacts(
+    visit: PublicVisit | null | undefined,
+): HeaderFacts {
+    if (!visit) return { place: null, phone: null };
+    const address = (visit.address ?? "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(", ");
+    const week = weekSummary(visit.hours);
+    const parts = [
+        address,
+        week ? `Open ${week.split(" · ").join(", ")}` : "",
+    ].filter(Boolean);
+    const phone = visit.phone?.trim();
+    return {
+        place: parts.length > 0 ? parts.join(" · ") : null,
+        phone: phone === undefined || phone === "" ? null : phone,
+    };
 }

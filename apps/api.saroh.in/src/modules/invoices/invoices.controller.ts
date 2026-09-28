@@ -29,6 +29,7 @@ import {
     RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrl } from "./pay-link-url";
 
@@ -45,7 +46,10 @@ import { payLinkUrl } from "./pay-link-url";
 @RequireModule("PAYMENTS")
 @IgnoreModuleReadiness()
 export class InvoicesController {
-    constructor(private readonly invoices: InvoicesService) {}
+    constructor(
+        private readonly invoices: InvoicesService,
+        private readonly sending: InvoiceSendService,
+    ) {}
 
     @Get()
     list(
@@ -61,12 +65,17 @@ export class InvoicesController {
         return this.invoices.owed(ctx, query);
     }
 
+    /** With the send flag (D17): which channels can carry it, and what went. */
     @Get(":invoiceId")
-    get(
+    async get(
         @OrgContext() ctx: OrganizationContext,
         @Param("invoiceId") id: string,
     ) {
-        return this.invoices.get(ctx, id);
+        const invoice = await this.invoices.get(ctx, id);
+        return {
+            ...invoice,
+            ...(await this.sending.readFor(ctx.organizationId, id)),
+        };
     }
 
     @Post()
@@ -154,6 +163,29 @@ export class InvoicesController {
     ): Promise<{ url: string }> {
         const { token } = await this.invoices.createPayLink(ctx, id);
         return { url: payLinkUrl(token) };
+    }
+
+    /**
+     * Send it with a fresh pay link through the business's own provider
+     * (D17). The link is never in the answer: it goes only to the customer.
+     */
+    @Post(":invoiceId/send")
+    @HttpCode(200)
+    send(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.sending.send(ctx, id);
+    }
+
+    /** The same, in reminder words; one a day, or 429 with the next time. */
+    @Post(":invoiceId/remind")
+    @HttpCode(200)
+    remind(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ) {
+        return this.sending.remind(ctx, id);
     }
 
     @Post(":invoiceId/payments")

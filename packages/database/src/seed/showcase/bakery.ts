@@ -2290,6 +2290,9 @@ export function planWorld(input: PlanInput): World {
             collectionWeekday: SATURDAY_ISO,
             collectionNote: "One large sourdough loaf",
             pendingPlanId: s.state === "CHANGING" ? input.planIds[1] : null,
+            // Bread plans include no classes (D10).
+            classesPerPeriod: null,
+            classesPerPeriodSetAt: at(n),
             createdAt: subscribedAt,
             updatedAt: pausedAt && pausedAt > lastTouch ? pausedAt : lastTouch,
         });

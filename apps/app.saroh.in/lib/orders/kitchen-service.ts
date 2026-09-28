@@ -111,6 +111,8 @@ export function undoOrderStage(
 
 export interface EditOrderInput {
     lines?: { itemId: string; quantity: number }[];
+    /** "Add an item" (B8): held at the order's own storefront. */
+    add?: { productId: string; variantId?: string; quantity: number }[];
     address?: {
         line1: string;
         line2?: string | null;
@@ -151,26 +153,57 @@ export interface RefundOutcome {
 /**
  * Refund chosen lines — or, with none, everything still refundable. The API
  * works out the amount; `idempotencyKey` makes a retry return the first
- * refund instead of a second one. `putBack` ("Put N back in stock") puts
+ * refund instead of a second one. `putBack` ("Put back in stock") puts
  * units back on the shelf once the provider confirms the refund.
+ *
+ * `goodwill` ("Or another amount", B8) refunds that amount instead, and no
+ * line: it needs a `reason`, and the API caps it at what is left.
  */
 export function refundOrderLines(
     orderId: string,
     input: {
         lines: { itemId: string; quantity: number }[] | null;
         putBack?: { itemId: string; quantity: number }[];
+        /** Why, as the order keeps it. */
+        reason?: string | null;
+        /** Another amount, as money ("49.50"). */
+        goodwill?: string | null;
         idempotencyKey: string;
     },
 ): Promise<CrmResult<RefundOutcome>> {
+    const reason = input.reason ? { reason: input.reason } : {};
     return mutate(
         path(orderId, "/refund"),
         "POST",
-        {
-            ...(input.lines ? { lines: input.lines } : {}),
-            ...(input.putBack?.length ? { putBack: input.putBack } : {}),
-            idempotencyKey: input.idempotencyKey,
-        },
+        input.goodwill
+            ? {
+                  kind: "goodwill",
+                  amount: input.goodwill,
+                  ...reason,
+                  idempotencyKey: input.idempotencyKey,
+              }
+            : {
+                  ...(input.lines ? { lines: input.lines } : {}),
+                  ...(input.putBack?.length ? { putBack: input.putBack } : {}),
+                  ...reason,
+                  idempotencyKey: input.idempotencyKey,
+              },
         "The refund didn't go through. Nothing was sent back.",
+    );
+}
+
+/**
+ * Make the order's pay link (B11) — or a new one, which stops the old one
+ * working. The address comes back this once; the API keeps only its hash.
+ */
+export function createOrderPayLink(
+    orderId: string,
+): Promise<CrmResult<{ url: string; payLinkCreatedAt: string }>> {
+    return mutate(
+        path(orderId, "/pay-link"),
+        "POST",
+        {},
+        "The pay link wasn't made. Try again.",
     );
 }
 

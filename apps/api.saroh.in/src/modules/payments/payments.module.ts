@@ -8,6 +8,8 @@ import { PaymentsService } from "./payments.service";
 import { providerFactoryProvider } from "./providers/provider.factory";
 import { PublicInvoicesController } from "./public-invoices.controller";
 import { PublicInvoicesService } from "./public-invoices.service";
+import { PublicOrderPayController } from "./public-order-pay.controller";
+import { PublicOrderPayService } from "./public-order-pay.service";
 import { PublicPaymentsController } from "./public-payments.controller";
 
 /**
@@ -23,10 +25,12 @@ import { PublicPaymentsController } from "./public-payments.controller";
         PaymentsController,
         PublicPaymentsController,
         PublicInvoicesController,
+        PublicOrderPayController,
     ],
     providers: [
         PaymentsService,
         PublicInvoicesService,
+        PublicOrderPayService,
         providerFactoryProvider,
         OrganizationGuard,
     ],

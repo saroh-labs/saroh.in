@@ -16,6 +16,7 @@ import { ForbiddenException } from "@nestjs/common";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { OrderKitchenService } from "./order-kitchen.service";
+import type { OrderPayLinkService } from "./order-pay-link.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -32,9 +33,18 @@ describe("OrganizationOrdersController", () => {
         counts: { all: 0, open: 0, refunded: 0 },
         nextCursor: null,
     });
+    const filterOptions = jest
+        .fn()
+        .mockResolvedValue({ types: [], steps: [], product: null });
+    const searchProducts = jest.fn().mockResolvedValue({ products: [] });
     const controller = new OrganizationOrdersController(
-        { listRows } as unknown as OrdersService,
+        {
+            listRows,
+            filterOptions,
+            searchProducts,
+        } as unknown as OrdersService,
         {} as unknown as OrderKitchenService,
+        {} as unknown as OrderPayLinkService,
     );
 
     const as = (
@@ -162,6 +172,50 @@ describe("OrganizationOrdersController", () => {
                 ForbiddenException,
             );
             expect(listRows).not.toHaveBeenCalled();
+        });
+
+        it("passes B4's step and date preset through", async () => {
+            await controller.list(as("OWNER"), {
+                v: "2",
+                step: "handed-to-courier",
+                date: "7d",
+            });
+            expect(listRows).toHaveBeenCalledWith(
+                "org_1",
+                { step: "handed-to-courier", date: "7d", late: undefined },
+                { money: true, contact: true },
+            );
+        });
+    });
+
+    describe("the filter bar's options (B4)", () => {
+        const counter = () =>
+            as("MEMBER", {
+                roleKey: "counter",
+                actions: resolveCapabilities("counter", ["order:stage"]),
+            });
+
+        beforeEach(() => {
+            filterOptions.mockClear();
+            searchProducts.mockClear();
+        });
+
+        it("answers whoever may list orders, the kitchen included", async () => {
+            await controller.filters(as("OWNER"), { productId: "p1" });
+            expect(filterOptions).toHaveBeenCalledWith("org_1", "p1");
+            await controller.products(counter(), { q: "sour" });
+            expect(searchProducts).toHaveBeenCalledWith("org_1", "sour");
+        });
+
+        it("refuses a caller with neither order:read nor order:stage", () => {
+            expect(() => controller.filters(as("REVIEWER"))).toThrow(
+                ForbiddenException,
+            );
+            expect(() => controller.products(as("REVIEWER"))).toThrow(
+                ForbiddenException,
+            );
+            expect(filterOptions).not.toHaveBeenCalled();
+            expect(searchProducts).not.toHaveBeenCalled();
         });
     });
 });

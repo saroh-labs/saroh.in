@@ -21,6 +21,8 @@ import type {
 import {
     allocateAcrossPayments,
     apportionLines,
+    capGoodwill,
+    goodwillRequest,
     planLineRefund,
     planRemainingLines,
 } from "../orders/order-refunds";
@@ -28,6 +30,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
+import { payLinkProvider } from "./pay-link-provider";
 import type {
     MerchantProvider,
     ProviderCredentials,
@@ -51,8 +54,15 @@ export interface ConnectProviderInput {
     webhookSecret?: string;
 }
 
-/** What a merchant asks to refund (U6). Never an amount. */
+/**
+ * What a merchant asks to refund (U6): lines, or everything left — never an
+ * amount — or, as `goodwill` (B8), an amount with its reason and no line.
+ */
 export interface RefundRequest {
+    /** Omitted: by line. */
+    kind?: "lines" | "goodwill";
+    /** Another amount, in minor units — `goodwill` only. */
+    amountCents?: number;
     reason?: string;
     /** Lines and how many of each; none means everything left. */
     lines?: LineRefundRequest[];
@@ -537,7 +547,9 @@ export class PaymentsService {
      *   back.
      * - The amount is worked out HERE: with `lines`, what each chosen line
      *   paid for the chosen quantity, capped at what is left of the line;
-     *   with none, everything still refundable. Never from client input.
+     *   with none, everything still refundable. Never from client input —
+     *   except `kind: "goodwill"`, another amount with its reason, capped
+     *   at what is left ({@link refundGoodwill}).
      * - Two phases. Under the order's row lock the refund is RESERVED — the
      *   PaymentRefund rows (PENDING, with the lines they cover) and the
      *   timeline step are written — so two racing requests cannot both see
@@ -558,6 +570,15 @@ export class PaymentsService {
         input: RefundRequest = {},
     ): Promise<InitiateRefundResult> {
         authorize(ctx, "payment:manage");
+        if (input.kind === "goodwill") {
+            return this.refundGoodwill(ctx, orderId, input);
+        }
+        if (input.amountCents !== undefined) {
+            throw new BadRequestException({
+                message: "An amount goes with another amount only.",
+                field: "amount",
+            });
+        }
         const order = await this.requireOwnedOrder(ctx, orderId);
         const lines = input.lines;
         const putBack = (input.putBack ?? []).filter((p) => p.quantity > 0);
@@ -591,6 +612,34 @@ export class PaymentsService {
                       // whatever is left of the lines.
                       { amountCents: "REMAINING", lines: withPutBack };
             },
+        });
+    }
+
+    /**
+     * "Or another amount" (B8): hand back an amount that no line explains —
+     * late, a goodwill gesture — with the reason it was given. The caller
+     * holds `payment:manage` ({@link initiateRefund}).
+     *
+     * The same two phases as a refund by line: it is capped at what was
+     * paid and not yet handed back, read under the order's row lock (a
+     * pending refund's money stays held, DEC-026), so two at once can never
+     * together pass it — the second is told "At most ₹X can be refunded".
+     * It names no line, so no stock comes back, and the provider's taking
+     * it makes a credit note for the amount against the order's invoice.
+     */
+    private async refundGoodwill(
+        ctx: OrganizationContext,
+        orderId: string,
+        input: RefundRequest,
+    ): Promise<InitiateRefundResult> {
+        const { amountCents, reason } = goodwillRequest(input);
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        return this.refundOrder(ctx, order, {
+            idempotencyKey: input.idempotencyKey,
+            reason,
+            forEdit: false,
+            cap: capGoodwill,
+            plan: () => Promise.resolve({ amountCents, lines: [] }),
         });
     }
 
@@ -789,6 +838,15 @@ export class PaymentsService {
             idempotencyKey?: string;
             reason: string | null;
             forEdit: boolean;
+            /**
+             * Refuses an amount above what is left, in its own words, before
+             * the order-level cap would (another amount, B8).
+             */
+            cap?: (
+                amountCents: number,
+                leftCents: number,
+                currency: string,
+            ) => void;
             plan: (tx: Prisma.TransactionClient) => Promise<{
                 amountCents: number | "REMAINING";
                 lines: (PlannedLineRefund & { putBackQuantity?: number })[];
@@ -866,6 +924,11 @@ export class PaymentsService {
                     "Nothing is left to refund on this order",
                 );
             }
+            opts.cap?.(
+                amountCents,
+                refundable.reduce((s, p) => s + Math.max(0, p.leftCents), 0),
+                refundable[0].intent.currency,
+            );
             // The order-level cap: never more than was taken and not yet
             // handed back, whatever the lines add up to.
             const split = allocateAcrossPayments(refundable, amountCents);
@@ -1260,6 +1323,39 @@ export class PaymentsService {
                     options.provider,
                     { firstWhenSeveral: true },
                 ),
+        );
+    }
+
+    /**
+     * PUBLIC order pay-link create-intent (plan B, B11) — the write behind
+     * `POST /public/order-pay/:token/payment-intent`. The caller found the
+     * order by its token, checked it is still owed money, and worked out
+     * `amountCents` from the stored order: its total less what was taken.
+     *
+     * SECURITY: the request carries only an idempotency key. The business,
+     * amount and currency come from the order row, and the provider is the
+     * one its storefront takes payment through ({@link payLinkProvider}).
+     */
+    async createIntentForOrderPayLink(
+        order: {
+            id: string;
+            organizationId: string;
+            storeId: string;
+            amountCents: number;
+            currency: string;
+        },
+        options: { idempotencyKey?: string } = {},
+    ): Promise<CreateIntentResult> {
+        return this.createIntentFor(
+            order.organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: order.amountCents,
+                currency: order.currency,
+            },
+            options.idempotencyKey,
+            () => payLinkProvider(prisma, order.organizationId, order.storeId),
         );
     }
 

@@ -146,6 +146,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   **Adopted** (2026-09-26, DEC-038): autopay will run on the business's own
   provider's mandates, with a pay link as the fallback. The copy above stays
   true for every subscription without a mandate.
+  **Current** (round-2 D17): an invoice is sent only when someone presses
+  "Send with pay link" or "Send reminder", and only where the API's `send`
+  flag names a channel (the business's own email provider; the account
+  thread once A13 and A14 are live). Where it names none, the old copy
+  stays: "Saroh doesn't send it", "Copy pay link".
 - **Current** — **Mention an invoice only when Payments is on.** With Payments
   off, subscribing is refused, and a pack or course is recorded with the price
   paid and no invoice — so no copy may promise one. The API says which
@@ -189,6 +194,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   It goes out by email, SMS or WhatsApp only through the business's connected
   provider. Saroh's own email sends a site's sign-in codes and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
+  Invoices went first (D17): see Money above.
 
 ## Analytics
 

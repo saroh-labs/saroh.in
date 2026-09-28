@@ -38,6 +38,7 @@ const NO_RULES: BookingRules = {
     bookAheadDays: null,
     latestBookingMinutes: null,
     freeCancelHours: null,
+    refundInTimeCancels: true,
 };
 
 async function readStaff(): Promise<StaffList | null> {

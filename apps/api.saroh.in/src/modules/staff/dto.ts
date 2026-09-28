@@ -3,6 +3,7 @@ import {
     ArrayMaxSize,
     ArrayMinSize,
     IsArray,
+    IsBoolean,
     IsIn,
     IsInt,
     IsISO8601,
@@ -264,4 +265,12 @@ export class UpdateBookingRulesDto {
     @Min(0)
     @Max(720)
     freeCancelHours?: number | null;
+
+    /**
+     * The refund policy for a booking cancelled in time (E30, DEC-058):
+     * refund what was paid online automatically, or not. Never null.
+     */
+    @IsOptional()
+    @IsBoolean()
+    refundInTimeCancels?: boolean;
 }

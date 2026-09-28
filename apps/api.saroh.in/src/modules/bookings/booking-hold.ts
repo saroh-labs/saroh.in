@@ -290,13 +290,24 @@ async function placeStillFree(
         startAt: Date;
         endAt: Date;
     },
-    capacity: number,
+    service: {
+        capacity: number;
+        bufferBeforeMinutes: number;
+        bufferAfterMinutes: number;
+    },
     now: Date,
 ): Promise<boolean> {
+    const { capacity } = service;
+    // With the service's buffers either side (DEC-052), as the listing and
+    // the booking's own check keep them clear.
+    const pad =
+        (service.bufferBeforeMinutes + service.bufferAfterMinutes) * 60_000;
+    const clearFrom = new Date(booking.startAt.getTime() - pad);
+    const clearTo = new Date(booking.endAt.getTime() + pad);
     const overlapping = {
         id: { not: booking.id },
-        startAt: { lt: booking.endAt },
-        endAt: { gt: booking.startAt },
+        startAt: { lt: clearTo },
+        endAt: { gt: clearFrom },
         ...holdsPlace(now),
     } satisfies Prisma.BookingWhereInput;
     if (booking.staffId && capacity === 1) {
@@ -312,8 +323,8 @@ async function placeStillFree(
     const held = await courseSeatsHeld(
         tx,
         booking.serviceId,
-        booking.startAt,
-        booking.endAt,
+        clearFrom,
+        clearTo,
     );
     return taken + held < capacity;
 }
@@ -362,13 +373,19 @@ export async function confirmHoldInTx(
             startAt: true,
             endAt: true,
             holdExpiresAt: true,
-            service: { select: { capacity: true } },
+            service: {
+                select: {
+                    capacity: true,
+                    bufferBeforeMinutes: true,
+                    bufferAfterMinutes: true,
+                },
+            },
         },
     });
     if (booking?.status !== "PENDING") return "released";
     const free =
         !isExpiredHold(booking, now) ||
-        (await placeStillFree(tx, booking, booking.service.capacity, now));
+        (await placeStillFree(tx, booking, booking.service, now));
     if (!free) {
         await releaseHoldInTx(tx, booking.id, now);
         return "released";

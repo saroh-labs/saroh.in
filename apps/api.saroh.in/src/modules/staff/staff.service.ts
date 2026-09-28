@@ -567,6 +567,9 @@ export class StaffService {
             ...(dto.freeCancelHours !== undefined
                 ? { freeCancelHours: dto.freeCancelHours }
                 : {}),
+            ...(dto.refundInTimeCancels !== undefined
+                ? { refundInTimeCancels: dto.refundInTimeCancels }
+                : {}),
         };
         const row = await prisma.bookingRules.upsert({
             where: { organizationId: ctx.organizationId },
@@ -576,6 +579,7 @@ export class StaffService {
                 bookAheadDays: true,
                 latestBookingMinutes: true,
                 freeCancelHours: true,
+                refundInTimeCancels: true,
             },
         });
         return row;

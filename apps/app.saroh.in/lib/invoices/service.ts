@@ -52,6 +52,44 @@ export interface InvoiceOnline {
     payments: InvoiceOnlinePayment[];
 }
 
+/** Where an invoice can be sent (D17): the business's email, the account thread. */
+export type SendChannel = "email" | "thread";
+
+/**
+ * Whether it can be sent, and how (D17) — the one flag Invoice Detail and
+ * Home both read. No channels: no Send, only "Copy pay link".
+ */
+export interface InvoiceSend {
+    channels: SendChannel[];
+    reason?:
+        | "NOT_OWED"
+        | "NO_PAYMENT_PROVIDER"
+        | "NO_EMAIL_PROVIDER"
+        | "NO_EMAIL_ADDRESS";
+    /** Where the email would go. */
+    emailTo?: string;
+    /** Something went in the last day: the next reminder can go from here. */
+    nextReminderAt: string | null;
+}
+
+/** One send or reminder, newest first. */
+export interface InvoiceSent {
+    id: string;
+    channel: "email";
+    to: string;
+    at: string;
+    reminder: boolean;
+    /** QUEUED | SENT | FAILED | SUPPRESSED (they turned email off). */
+    status: string;
+}
+
+/** What a send did. */
+export interface SendResult {
+    channels: SendChannel[];
+    email: { status: "QUEUED" | "SUPPRESSED"; to: string } | null;
+    thread: boolean;
+}
+
 /** INVOICE, or a correction to one: a credit note (down) or a supplementary invoice (up). */
 export type InvoiceKind = "INVOICE" | "CREDIT_NOTE" | "SUPPLEMENTARY";
 
@@ -165,6 +203,9 @@ export interface Invoice {
     lines?: InvoiceLine[];
     /** On the detail read only; absent from an API that predates pay links. */
     online?: InvoiceOnline;
+    /** On the detail read only; absent from an API before D17: no Send. */
+    send?: InvoiceSend;
+    sent?: InvoiceSent[];
 }
 
 export interface InvoiceInput {
@@ -345,5 +386,29 @@ export function createPayLink(id: string) {
         "POST",
         {},
         "Could not make a pay link.",
+    );
+}
+
+/**
+ * Send it with a fresh pay link (D17), through the business's own email
+ * and, once it is live, the customer's account thread. The link itself
+ * never comes back here: it goes only to the customer.
+ */
+export function sendInvoice(id: string) {
+    return send<SendResult>(
+        `${at(id)}/send`,
+        "POST",
+        {},
+        "Could not send that invoice.",
+    );
+}
+
+/** The same, as a reminder: one a day. */
+export function remindInvoice(id: string) {
+    return send<SendResult>(
+        `${at(id)}/remind`,
+        "POST",
+        {},
+        "Could not send that reminder.",
     );
 }

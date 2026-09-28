@@ -14,14 +14,20 @@ import { DateTime, IANAZone } from "luxon";
  * Model:
  *  - `AvailabilityRule`s are recurring WEEKLY windows expressed as minutes from
  *    LOCAL midnight in the Service's timezone (`dayOfWeek` 0=Sun..6=Sat).
- *  - Within a window we place back-to-back slots. Each slot's booking occupies
- *    `durationMinutes`; consecutive slot STARTS are spaced by
- *    `durationMinutes + bufferBeforeMinutes + bufferAfterMinutes` — so with zero
- *    buffers slots step purely by duration, and buffers add dead time between
- *    slots ("buffers space slots"). A slot is emitted only if its whole booking
- *    interval `[start, start+duration]` fits inside the window.
- *  - A slot is OPEN iff the number of CONFIRMED bookings overlapping it is
- *    strictly less than the Service `capacity`.
+ *  - Within a window we place slots stepping from the window's start by
+ *    {@link stepMinutes}: the service's length plus its buffers, but for a
+ *    one-to-one never more than 30 minutes (DEC-052, E6). A one-to-one of 30
+ *    minutes or more is offered on every half hour from the window's start;
+ *    a shorter one keeps stepping by its own length (a 20-minute check-up
+ *    still offers :00, :20 and :40), so no service loses a start it offered
+ *    before. A class keeps its back-to-back sessions. A slot is
+ *    emitted only if its whole booking interval `[start, start+duration]`
+ *    fits inside the window.
+ *  - A slot is OPEN iff the number of CONFIRMED bookings overlapping its
+ *    {@link guarded} interval — the slot widened by both buffers either side
+ *    — is strictly less than the Service `capacity`. The step used to carry
+ *    the buffers; now that starts can sit closer than a booking plus its
+ *    buffers, the overlap check carries them instead.
  */
 
 /** The Service terms this module needs — a structural subset of the Prisma row. */
@@ -73,13 +79,53 @@ export function countOverlapping(slot: Interval, bookings: Interval[]): number {
     return n;
 }
 
-/** The spacing between consecutive slot starts within a window. */
-function stepMinutes(service: AvailabilityService): number {
-    return (
+/** The most a start ever steps by: every half hour (DEC-052). */
+export const HALF_HOUR_STEP = 30;
+
+/**
+ * The spacing between consecutive slot starts within a window (DEC-052):
+ * the length plus both buffers, capped at half an hour for a one-to-one. A
+ * service of 30 minutes or more gains the half hours; a shorter one steps by
+ * its own length (plus buffers), as it always did.
+ *
+ * A class (capacity above one) keeps its own step: its starts are sessions
+ * people share, run back to back. A session every half hour would overlap
+ * the one before, with the same instructor and the same places, so its
+ * sessions stay where they were.
+ */
+export function stepMinutes(service: AvailabilityService): number {
+    const whole =
         service.durationMinutes +
         service.bufferBeforeMinutes +
-        service.bufferAfterMinutes
-    );
+        service.bufferAfterMinutes;
+    return service.capacity > 1 ? whole : Math.min(whole, HALF_HOUR_STEP);
+}
+
+/**
+ * How far either side of a booking must stay clear of another: both
+ * buffers. Two bookings of a service clash when their buffered intervals
+ * `[start - before, end + after)` overlap, which is exactly when one's core
+ * interval overlaps the other's widened by `before + after` on each side.
+ */
+export function guardMinutes(service: AvailabilityService): number {
+    return service.bufferBeforeMinutes + service.bufferAfterMinutes;
+}
+
+/**
+ * `slot` widened by {@link guardMinutes} either side: the interval that must
+ * be clear of other bookings (counted against capacity) for it to be free.
+ * With no buffers it is the slot itself.
+ */
+export function guarded(
+    slot: Interval,
+    service: AvailabilityService,
+): Interval {
+    const pad = guardMinutes(service) * 60_000;
+    if (pad === 0) return { startAt: slot.startAt, endAt: slot.endAt };
+    return {
+        startAt: new Date(slot.startAt.getTime() - pad),
+        endAt: new Date(slot.endAt.getTime() + pad),
+    };
 }
 
 /** luxon weekday (1=Mon..7=Sun) → schema dayOfWeek (0=Sun..6=Sat). */
@@ -201,7 +247,9 @@ export function availableSlots(
     confirmed: Interval[],
 ): Slot[] {
     return enumerateSlots(service, rules, from, to).filter(
-        (slot) => countOverlapping(slot, confirmed) < service.capacity,
+        (slot) =>
+            countOverlapping(guarded(slot, service), confirmed) <
+            service.capacity,
     );
 }
 
@@ -247,7 +295,8 @@ export function isValidSlotStart(
 // time: their weekly hours plus any one-off extra hours, minus time off,
 // intersected with the service's own weekly rules when it has any. Slots step
 // from the start of each resulting window, so "Mon 6–12, 60 minutes" offers
-// 6:00 … 11:00. A person already booked — on any service — is not free.
+// 6:00, 6:30 … 11:00 (DEC-052). A person already booked — on any service,
+// within this service's buffers — is not free.
 //
 // Hours are authored in the BUSINESS's timezone; a service's rules in its
 // own. Both become absolute intervals before they meet, so they agree even
@@ -500,7 +549,9 @@ export function personSlots(
         stepMinutes(service),
         from,
         to,
-    ).filter((slot) => countOverlapping(slot, person.busy) === 0);
+    ).filter(
+        (slot) => countOverlapping(guarded(slot, service), person.busy) === 0,
+    );
 }
 
 /**

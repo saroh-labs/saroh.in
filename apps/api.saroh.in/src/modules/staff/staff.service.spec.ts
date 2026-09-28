@@ -409,13 +409,39 @@ describe("StaffService — who a person is", () => {
 });
 
 describe("StaffService — booking rules", () => {
-    it("reads no rules as nulls", async () => {
+    it("reads no rules as nulls, and the refund policy as on (E30)", async () => {
         db.bookingRules!.findUnique!.mockResolvedValue(null);
         await expect(service.getBookingRules(member)).resolves.toEqual({
             bookAheadDays: null,
             latestBookingMinutes: null,
             freeCancelHours: null,
+            refundInTimeCancels: true,
         });
+    });
+
+    it("writes the refund policy when sent, and leaves it when not (E30)", async () => {
+        db.bookingRules!.upsert!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: 12,
+            refundInTimeCancels: false,
+        });
+        await expect(
+            service.updateBookingRules(ctx(), { refundInTimeCancels: false }),
+        ).resolves.toMatchObject({ refundInTimeCancels: false });
+        expect(db.bookingRules!.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                create: {
+                    organizationId: "org_1",
+                    refundInTimeCancels: false,
+                },
+                update: { refundInTimeCancels: false },
+            }),
+        );
+        await service.updateBookingRules(ctx(), { freeCancelHours: 24 });
+        expect(db.bookingRules!.upsert).toHaveBeenLastCalledWith(
+            expect.objectContaining({ update: { freeCancelHours: 24 } }),
+        );
     });
 
     it("writes only what was sent, and null clears", async () => {
