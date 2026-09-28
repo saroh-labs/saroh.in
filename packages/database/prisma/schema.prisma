@@ -1541,6 +1541,9 @@ model Order {
   @@index([storeId])
   @@index([customerId])
   @@index([organizationId])
+  // The calendar's Orders layer and Home's week read a business's orders
+  // by when they were placed (round 2, E20).
+  @@index([organizationId, createdAt])
 }
 
 model OrderItem {
@@ -3944,6 +3947,9 @@ model StaffTimeOff {
 
   @@index([organizationId])
   @@index([staffId, startAt])
+  // The calendar's days off read a business's time off overlapping a month
+  // (round 2, E20).
+  @@index([organizationId, startAt])
 }
 
 /// One-off hours on one date, on top of the weekly ones (a closed day opened).
@@ -5185,6 +5191,12 @@ model Invoice {
   @@index([orderId])
   @@index([bookingId])
   @@index([relatedInvoiceId])
+  // The calendar's money, Payments and Invoices layers and Home's week read
+  // invoices by when they were paid, and credit notes by when they were
+  // issued (round 2, E19, E20).
+  @@index([organizationId, status, paidAt])
+  @@index([organizationId, paidAt])
+  @@index([organizationId, issuedAt])
 }
 
 model InvoiceLine {
