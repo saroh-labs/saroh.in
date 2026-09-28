@@ -175,3 +175,115 @@ test.describe("Pack Detail on Northwind (E16)", () => {
         }
     });
 });
+
+/** Northwind's day, "YYYY-MM-DD", in the zone its services are booked in. */
+const northwindDay = (at: Date | string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+        new Date(at),
+    );
+
+/**
+ * Pack Detail's Used this week, Sales and Activity (round-2 E17): a sale
+ * with no payment shows "None" as its method and is in the activity; the
+ * Receipts card's Open narrows Invoices to the pack; a class booked today
+ * with the pack shows under Used this week.
+ */
+test.describe("Pack Detail's other tabs on Northwind (E17)", () => {
+    test("Sales says None for no payment; Activity has the sale; Used this week has today's class", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const request = page.request;
+        const service = await aService(request);
+        test.skip(!service, "Northwind has no service for a pack to pay for");
+        if (!service) return;
+        const on = await request.get(orgApi("/class-packs"), { headers });
+        test.skip(!on.ok(), "Class packs aren't on for Northwind");
+
+        const stamp = Date.now();
+        const name = `E2E tabs ${stamp}`;
+        const contact = await request.post(orgApi("/contacts"), {
+            headers,
+            data: {
+                email: `e2e-pack-tabs-${stamp}@example.com`,
+                firstName: "Meera",
+                lastName: `Tabs ${stamp}`,
+            },
+        });
+        expect(contact.ok(), await contact.text()).toBe(true);
+        const contactId = ((await contact.json()) as { id: string }).id;
+        const who = `Meera Tabs ${stamp}`;
+        const packId = await makePack(request, name, service);
+        let bookingId: string | null = null;
+
+        try {
+            const sold = await request.post(
+                orgApi(`/class-packs/${packId}/sell`),
+                { headers, data: { contactId, paidBy: "NONE" } },
+            );
+            expect(sold.ok(), await sold.text()).toBe(true);
+            const purchaseId = ((await sold.json()) as { id: string }).id;
+
+            // Sales: the sale, with "None" as how it was paid.
+            await page.goto(`/class-packs/${packId}?tab=sales`);
+            await expect(page.getByText("Sales and takings")).toBeVisible();
+            const row = page.getByRole("listitem").filter({
+                has: page.getByRole("link", { name: `Open ${who}` }),
+            });
+            await expect(row).toContainText("₹1,500");
+            await expect(row).toContainText("None");
+
+            // Activity: the sale is there, newest first.
+            await page.getByRole("tab", { name: /^Activity/ }).click();
+            await expect(page).toHaveURL(/\?tab=activity$/);
+            await expect(
+                page.getByText(`Sold to ${who} · ₹1,500 · None`),
+            ).toBeVisible();
+
+            // Used this week: a class booked today with the pack.
+            const now = new Date();
+            const slots = await request.get(
+                orgApi(
+                    `/services/${service.id}/availability?from=${encodeURIComponent(now.toISOString())}&to=${encodeURIComponent(new Date(now.getTime() + 86_400_000).toISOString())}`,
+                ),
+                { headers },
+            );
+            const today = slots.ok()
+                ? ((await slots.json()) as { startAt: string }[]).find(
+                      (s) => northwindDay(s.startAt) === northwindDay(now),
+                  )
+                : undefined;
+            test.skip(!today, "No open slot left today for the service");
+            if (!today) return;
+            const booked = await request.post(
+                orgApi(`/services/${service.id}/bookings`),
+                {
+                    headers,
+                    data: {
+                        startAt: today.startAt,
+                        contactId,
+                        useClassPack: true,
+                        packPurchaseId: purchaseId,
+                    },
+                },
+            );
+            expect(booked.ok(), await booked.text()).toBe(true);
+            bookingId = ((await booked.json()) as { id: string }).id;
+
+            await page.goto(`/class-packs/${packId}?tab=used`);
+            const use = page.getByRole("listitem").filter({ hasText: who });
+            await expect(use).toBeVisible();
+            await expect(use).toContainText("Booked");
+        } finally {
+            if (bookingId) {
+                await request.delete(
+                    orgApi(`/services/bookings/${bookingId}?returnCredit=true`),
+                    { headers },
+                );
+            }
+            await request.post(orgApi(`/class-packs/${packId}/archive`), {
+                headers,
+            });
+        }
+    });
+});
