@@ -39,19 +39,18 @@ function reservedEmail(column: Prisma.Sql): Prisma.Sql {
     return Prisma.sql`(lower(btrim(${column})) LIKE ANY (${patterns}::text[]))`;
 }
 
-/** A privacy removal's placeholder (`reservedRemovedEmail`), until C11. */
+/** A privacy removal's placeholder (`reservedRemovedEmail`). */
 const REMOVED_PLACEHOLDER = "removed+%@removed.invalid";
 
 /**
- * Not a merge's tombstone (C9: `mergedIntoId`) or a privacy removal. A
- * removal is still read from its `removed+<id>@removed.invalid` placeholder
- * (`contact-email.ts`) until C11 adds `removedAt`, and then this reads that
- * column. A site account's separate contact (`…@account.invalid`) is a
- * customer.
+ * Not a merge's tombstone (C9: `mergedIntoId`) or a privacy removal (C11:
+ * `removedAt`, and its `removed+<id>@removed.invalid` placeholder, which
+ * every removal also writes). A site account's separate contact
+ * (`…@account.invalid`) is a customer.
  */
 export function notRetired(alias: string): Prisma.Sql {
     const column = (name: string) => Prisma.raw(`${alias}."${name}"`);
-    return Prisma.sql`(${column("mergedIntoId")} IS NULL AND lower(btrim(${column("email")})) NOT LIKE ${REMOVED_PLACEHOLDER})`;
+    return Prisma.sql`(${column("mergedIntoId")} IS NULL AND ${column("removedAt")} IS NULL AND lower(btrim(${column("email")})) NOT LIKE ${REMOVED_PLACEHOLDER})`;
 }
 
 /**

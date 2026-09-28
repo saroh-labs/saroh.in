@@ -1,6 +1,116 @@
 import { describe, expect, it } from "vitest";
 
-import { deletedLine, holdingsSentence } from "./removal";
+import {
+    asSentence,
+    confirmMatches,
+    deletedLine,
+    holdingsSentence,
+    removalBody,
+    REMOVED_TOAST,
+} from "./removal";
+import type { RemovalPreview } from "./service";
+
+const NOTHING: Pick<RemovalPreview, "goes" | "stays"> = {
+    goes: {
+        notes: 0,
+        attention: 0,
+        consents: 0,
+        messages: 0,
+        threadMessages: 0,
+        storeRecords: 0,
+        ordersScrubbed: 0,
+        bookingsCancelled: 0,
+        bookings: 0,
+        reviews: 0,
+        account: false,
+        autopay: 0,
+    },
+    stays: {
+        orders: 0,
+        invoices: 0,
+        leads: 0,
+        submissions: 0,
+        packs: 0,
+        subscriptions: 0,
+        courses: 0,
+    },
+};
+
+function preview(
+    goes: Partial<RemovalPreview["goes"]> = {},
+    stays: Partial<RemovalPreview["stays"]> = {},
+): Pick<RemovalPreview, "goes" | "stays"> {
+    return {
+        goes: { ...NOTHING.goes, ...goes },
+        stays: { ...NOTHING.stays, ...stays },
+    };
+}
+
+describe("removalBody (C11)", () => {
+    it("says the design's two sentences for someone with orders", () => {
+        expect(removalBody(preview({}, { orders: 6 }))).toBe(
+            "Their name, email, phone and address are removed and cannot be brought back. Their 6 orders stay in Orders as “Removed customer”, so your totals and records stay right.",
+        );
+    });
+
+    it("counts one order in the singular", () => {
+        expect(removalBody(preview({}, { orders: 1 }))).toContain(
+            "Their 1 order stays in Orders",
+        );
+    });
+
+    it("leaves out the orders sentence for someone who never ordered", () => {
+        expect(removalBody(preview())).toBe(
+            "Their name, email, phone and address are removed and cannot be brought back.",
+        );
+    });
+
+    it("says bookings to come are cancelled, and autopay first", () => {
+        const body = removalBody(
+            preview({ bookingsCancelled: 2, autopay: 1 }, { orders: 1 }),
+        );
+        expect(body).toContain("Their 2 bookings still to come are cancelled.");
+        expect(body).toContain("Their autopay is cancelled first.");
+    });
+
+    it("says their leads and form entries stay (DEC-041)", () => {
+        expect(
+            removalBody(preview({}, { leads: 2, submissions: 1 })),
+        ).toContain("Their 2 leads and 1 form entry stay as they are.");
+        expect(removalBody(preview({}, { leads: 1 }))).toContain(
+            "Their 1 lead stays as it is.",
+        );
+    });
+});
+
+describe("confirmMatches (type the name to confirm)", () => {
+    it("needs the name as the page shows it", () => {
+        expect(confirmMatches("Priya Raman", "Priya Raman")).toBe(true);
+        expect(confirmMatches("  Priya   Raman ", "Priya Raman")).toBe(true);
+        expect(confirmMatches("Priya", "Priya Raman")).toBe(false);
+        expect(confirmMatches("priya raman", "Priya Raman")).toBe(false);
+    });
+
+    it("never matches an empty name", () => {
+        expect(confirmMatches("", "")).toBe(false);
+        expect(confirmMatches("   ", " ")).toBe(false);
+    });
+});
+
+describe("the words around it", () => {
+    it("toasts in the design's words", () => {
+        expect(REMOVED_TOAST).toBe(
+            "Details removed. Their orders stay in Orders.",
+        );
+    });
+
+    it("ends an API sentence with a full stop, once", () => {
+        expect(asSentence("Finish or cancel their open order first")).toBe(
+            "Finish or cancel their open order first.",
+        );
+        expect(asSentence("Try again.")).toBe("Try again.");
+    });
+});
 
 describe("holdingsSentence", () => {
     it("names the counts when all three are known", () => {

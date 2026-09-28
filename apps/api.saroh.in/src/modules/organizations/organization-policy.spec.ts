@@ -310,3 +310,35 @@ describe("customer:merge (DEC-042, C9)", () => {
         expect(outOfReach(editor, merger)).toEqual(["customer:merge"]);
     });
 });
+
+describe("customer:remove (DEC-042, C11)", () => {
+    it("is Owner's and Admin's, never a Member's or a Reviewer's", () => {
+        expect(can("OWNER", "customer:remove")).toBe(true);
+        expect(can("ADMIN", "customer:remove")).toBe(true);
+        expect(can("MEMBER", "customer:remove")).toBe(false);
+        expect(can("REVIEWER", "customer:remove")).toBe(false);
+    });
+
+    it("is not implied by contact:write or customer:merge", () => {
+        const editor = resolveCapabilities("front-desk", [
+            "contact:read",
+            "contact:write",
+            "customer:merge",
+        ]);
+        expect(editor.has("contact:write")).toBe(true);
+        expect(editor.has("customer:remove")).toBe(false);
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const remover = resolveCapabilities("remover", ["customer:remove"]);
+        expect(remover.has("customer:remove")).toBe(true);
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["contact:write"]),
+        };
+        expect(outOfReach(editor, remover)).toEqual(["customer:remove"]);
+    });
+});

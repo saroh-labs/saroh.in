@@ -36,6 +36,9 @@ jest.mock("@saroh/database", () => {
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
             order: { groupBy: jest.fn(), findMany: jest.fn() },
+            // D20: a delete asks about autopay first, under the contact's lock.
+            paymentMandate: { findFirst: jest.fn().mockResolvedValue(null) },
+            $queryRaw: jest.fn().mockResolvedValue([]),
         },
     };
 });
@@ -110,7 +113,11 @@ describe("ContactsService.list", () => {
         await service.list(ctx());
 
         expect(findMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", mergedIntoId: null },
+            where: {
+                organizationId: "org_1",
+                mergedIntoId: null,
+                removedAt: null,
+            },
             orderBy: { createdAt: "desc" },
         });
     });
@@ -752,5 +759,109 @@ describe("ContactsService.remove", () => {
             new ContactsService().remove(ctx({ role: "MEMBER" }), "c_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(contactDelete).not.toHaveBeenCalled();
+    });
+
+    describe("their autopay (D20)", () => {
+        const mandateFindFirst = prisma.paymentMandate.findFirst as jest.Mock;
+        afterEach(() => mandateFindFirst.mockResolvedValue(null));
+
+        it("cancels it at the provider through cancelFor before the delete", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            leadCount.mockResolvedValue(0);
+            contactDelete.mockResolvedValue({ id: "c_1" });
+            // Open before the cancel, confirmed after it.
+            mandateFindFirst
+                .mockResolvedValueOnce({ provider: "razorpay" })
+                .mockResolvedValueOnce(null);
+            const cancelFor = jest.fn().mockResolvedValue({
+                cancelled: 1,
+                awaitingProvider: 1,
+                unconfirmed: 0,
+            });
+            const service = new ContactsService({
+                cancelFor,
+            } as unknown as ConstructorParameters<typeof ContactsService>[0]);
+
+            await service.remove(ctx(), "c_1");
+
+            expect(cancelFor).toHaveBeenCalledWith(
+                { organizationId: "org_1", contactId: "c_1" },
+                "STAFF",
+            );
+            const [asked] = cancelFor.mock.invocationCallOrder;
+            const [deleted] = contactDelete.mock.invocationCallOrder;
+            expect(asked).toBeLessThan(deleted ?? 0);
+        });
+
+        it("refuses while the provider hasn't confirmed, and deletes nothing", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            mandateFindFirst.mockResolvedValue({ provider: "razorpay" });
+            const cancelFor = jest.fn().mockResolvedValue({
+                cancelled: 0,
+                awaitingProvider: 0,
+                unconfirmed: 1,
+            });
+            const service = new ContactsService({
+                cancelFor,
+            } as unknown as ConstructorParameters<typeof ContactsService>[0]);
+
+            await expect(service.remove(ctx(), "c_1")).rejects.toMatchObject({
+                response: {
+                    message:
+                        "Their autopay couldn't be cancelled at Razorpay yet, so nothing was deleted. Try again in a few minutes",
+                    details: { reason: "autopay" },
+                },
+            });
+            expect(contactDelete).not.toHaveBeenCalled();
+        });
+
+        it("refuses an open mandate when it can't reach the provider at all", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            mandateFindFirst.mockResolvedValue({ provider: "razorpay" });
+
+            await expect(
+                new ContactsService().remove(ctx(), "c_1"),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(contactDelete).not.toHaveBeenCalled();
+        });
+    });
+});
+
+describe("a contact whose details were removed (C11)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("can't be read or edited: it is a 404", async () => {
+        findUnique.mockResolvedValue({
+            ...CONTACT,
+            removedAt: new Date("2026-09-28T00:00:00Z"),
+            mergedIntoId: null,
+        });
+        await expect(
+            new ContactsService().remove(ctx(), "c_1"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(contactDelete).not.toHaveBeenCalled();
+    });
+
+    it("is left out of the list", async () => {
+        findMany.mockResolvedValue([]);
+        await new ContactsService().list(ctx());
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    mergedIntoId: null,
+                    removedAt: null,
+                },
+            }),
+        );
     });
 });

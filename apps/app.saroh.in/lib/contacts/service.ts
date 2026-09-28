@@ -17,6 +17,8 @@ export interface Contact {
     source: string | null;
     createdAt: string;
     updatedAt: string;
+    /** When their details were removed for a privacy request (C11). */
+    removedAt?: string | null;
 }
 
 /**
@@ -138,4 +140,79 @@ export function deleteContact(
     contactId: string,
 ): Promise<CrmResult<ContactRemoval>> {
     return destroy(`/contacts/${contactId}`, "Could not delete the contact");
+}
+
+/** Why a privacy removal can't go ahead yet (the API's `RemovalRefusal`). */
+export interface RemovalRefusal {
+    reason: "open-order" | "live-subscription" | "autopay";
+    message: string;
+}
+
+/** What a privacy removal would do (C11): the API's `RemovalPreview`. */
+export interface RemovalPreview {
+    contactId: string;
+    name: string | null;
+    refusals: RemovalRefusal[];
+    goes: {
+        notes: number;
+        attention: number;
+        consents: number;
+        messages: number;
+        threadMessages: number;
+        storeRecords: number;
+        ordersScrubbed: number;
+        bookingsCancelled: number;
+        bookings: number;
+        reviews: number;
+        account: boolean;
+        autopay: number;
+    };
+    stays: {
+        orders: number;
+        invoices: number;
+        leads: number;
+        submissions: number;
+        packs: number;
+        subscriptions: number;
+        courses: number;
+    };
+}
+
+/** What removing their details said it did. */
+export interface RemovalDone {
+    contactId: string;
+    removedAt: string;
+}
+
+/** What removing their details would do, and anything that refuses it. */
+export async function getRemovalPreview(
+    contactId: string,
+): Promise<CrmResult<RemovalPreview>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}/customers/${contactId}/removal/preview`,
+    );
+    const data = (await res.json().catch(() => null)) as
+        (RemovalPreview & { message?: string }) | null;
+    if (res.ok && data) return { ok: true, data };
+    return {
+        ok: false,
+        error:
+            typeof data?.message === "string"
+                ? data.message
+                : "Couldn't check what removing them would do.",
+    };
+}
+
+/** Remove their details for a privacy request (C11). Final. */
+export function removeDetails(
+    contactId: string,
+): Promise<CrmResult<RemovalDone>> {
+    return mutate<RemovalDone>(
+        `/customers/${contactId}/removal`,
+        "POST",
+        {},
+        "Couldn't remove their details. Nothing has changed.",
+    );
 }

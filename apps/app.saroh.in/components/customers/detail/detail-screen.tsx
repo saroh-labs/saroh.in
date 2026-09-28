@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteContact } from "@/lib/contacts/actions";
-import { deletedLine } from "@/lib/contacts/removal";
+import { deletedLine, REMOVED_TOAST } from "@/lib/contacts/removal";
 import {
     restoreOffersAction,
     stopOffersAction,
@@ -17,7 +17,7 @@ import {
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import type { MergeTarget } from "@/lib/customer-workspace/merge";
 import { clashTarget, suggestedTarget } from "@/lib/customer-workspace/merge";
-import { moreMenu } from "@/lib/customer-workspace/more-menu";
+import { hasMoneyRecords, moreMenu } from "@/lib/customer-workspace/more-menu";
 import type {
     DuplicateSuggestion,
     IdentitySuggestion,
@@ -62,6 +62,7 @@ import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
 import { Overview } from "./overview";
 import { Failed } from "./parts";
+import { RemoveDetailsDialog } from "./remove-details-dialog";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18), after "Saroh Customer Detail":
@@ -79,6 +80,7 @@ export function CustomerDetailScreen({
     sells,
     canWrite,
     canMerge,
+    canRemove = false,
     canConsent,
     userId,
     suggestions,
@@ -95,6 +97,8 @@ export function CustomerDetailScreen({
     canWrite: boolean;
     /** `customer:merge`: merge with a duplicate (C10). */
     canMerge: boolean;
+    /** `customer:remove`: remove their details for a privacy request (C11). */
+    canRemove?: boolean;
     /** `consent:write`: record that they asked to stop. */
     canConsent: boolean;
     userId: string | null;
@@ -114,6 +118,8 @@ export function CustomerDetailScreen({
     const [editing, setEditing] = useState(0);
     const [linking, setLinking] = useState(false);
     const [removing, setRemoving] = useState(false);
+    // "Remove their details (privacy request)…" (C11).
+    const [removingDetails, setRemovingDetails] = useState(false);
     const [stopping, setStopping] = useState(false);
     const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
     // The merge (C10): with the other record known, or null to search.
@@ -183,18 +189,29 @@ export function CustomerDetailScreen({
         router.push(sells ? "/commerce/customers" : "/contacts");
     }
 
+    // After a privacy removal there is no one left to show: back to the
+    // list, in the design's words.
+    function removedDetails() {
+        setRemovingDetails(false);
+        showSuccess(REMOVED_TOAST);
+        router.push(sells ? "/commerce/customers" : "/contacts");
+    }
+
     const menu = moreMenu(
         {
             canWrite,
             canMerge,
+            canRemove,
             canLink: d.linkedCustomers !== undefined,
             canUnlink: !!d.siteAccount?.canUnlink,
+            hasRecords: hasMoneyRecords(d),
         },
         {
             merge: () => mergeWith(null),
             link: () => setLinking(true),
             notThem: () => void askNotThem(),
             remove: () => setRemoving(true),
+            removeDetails: () => setRemovingDetails(true),
         },
     );
 
@@ -320,7 +337,7 @@ export function CustomerDetailScreen({
                     }
                     attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
-                    canMore={canWrite || canMerge}
+                    canMore={canWrite || canMerge || canRemove}
                     onEdit={() => setEditing((n) => n + 1)}
                     menu={menu}
                 />
@@ -372,6 +389,15 @@ export function CustomerDetailScreen({
                             ? (holder) => mergeWith(clashTarget(holder))
                             : undefined
                     }
+                />
+            ) : null}
+            {canRemove && removingDetails ? (
+                <RemoveDetailsDialog
+                    contactId={d.contact.id}
+                    name={name}
+                    open
+                    onOpenChange={setRemovingDetails}
+                    onRemoved={removedDetails}
                 />
             ) : null}
             {merging ? (

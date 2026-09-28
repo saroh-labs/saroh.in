@@ -69,6 +69,7 @@ export default async function CustomerDetailPage({
 
     const canWrite = may("contact:write");
     const canMerge = may("customer:merge");
+    const canRemove = may("customer:remove");
     // Only whoever may link or merge reads what they'd be offered: store
     // customers to link, and other records that look like the same person.
     const suggestions =
@@ -100,6 +101,7 @@ export default async function CustomerDetailPage({
                 }
                 canWrite={canWrite}
                 canMerge={canMerge}
+                canRemove={canRemove}
                 canConsent={may("consent:write")}
                 userId={session.user.id}
                 suggestions={suggestions.filter(

@@ -35,6 +35,7 @@ import {
 } from "./dto";
 import { MergeContactsDto, MergePreviewQueryDto } from "./merge.dto";
 import { MergeService } from "./merge.service";
+import { PrivacyRemovalService } from "./privacy-removal.service";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -63,6 +64,7 @@ export class CustomerWorkspaceController {
         private readonly customers: CustomersListService,
         private readonly accounts: AccountUnlinkService,
         private readonly merges: MergeService,
+        private readonly removals: PrivacyRemovalService,
     ) {}
 
     /**
@@ -112,6 +114,28 @@ export class CustomerWorkspaceController {
         @Body() dto: MergeContactsDto,
     ) {
         return this.merges.merge(ctx, contactId, otherId, dto);
+    }
+
+    /**
+     * What removing their details for a privacy request would do (DEC-042,
+     * C11): what goes, what stays, and anything that refuses it.
+     */
+    @Get(":contactId/removal/preview")
+    removalPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.removals.preview(ctx, contactId);
+    }
+
+    /** Remove their details for a privacy request (DEC-042, C11). Final. */
+    @Post(":contactId/removal")
+    @HttpCode(200)
+    removeDetails(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.removals.remove(ctx, contactId);
     }
 
     /**

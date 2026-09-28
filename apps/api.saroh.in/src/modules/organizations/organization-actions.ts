@@ -57,6 +57,11 @@ export type OrgAction =
     // and a business lets staff fix a phone number long before it lets them
     // join two people's histories. OWNER/ADMIN only.
     | "customer:merge"
+    // Remove a customer's details for a privacy request (DEC-042, C11). Its
+    // own power from the day it shipped, never implied by `contact:write`:
+    // it can't be undone, and it reaches every order, booking and message
+    // that names them. OWNER/ADMIN only.
+    | "customer:remove"
     | "lead:read"
     | "lead:write"
     | "pipeline:read"
@@ -148,6 +153,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "contact:read",
     "contact:write",
     "customer:merge",
+    "customer:remove",
     "lead:read",
     "lead:write",
     "pipeline:read",

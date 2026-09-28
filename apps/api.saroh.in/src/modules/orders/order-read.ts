@@ -1,4 +1,8 @@
 import { toMoneyString } from "../../common/money";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import type { OrderAttention } from "./order-attention";
@@ -423,12 +427,16 @@ export function serializeOrderRead(
         postalCode: order.deliveryPostalCode,
     };
     const hasAddress = Object.values(address).some((v) => v !== null);
-    const name = order.customer
-        ? [order.customer.firstName, order.customer.lastName]
-              .filter(Boolean)
-              .join(" ")
-              .trim()
-        : "";
+    // Their details were removed for a privacy request (C11).
+    const removed = isRemovedStoreCustomer(order.customer);
+    const name = removed
+        ? REMOVED_CUSTOMER_NAME
+        : order.customer
+          ? [order.customer.firstName, order.customer.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+          : "";
 
     return {
         id: order.id,
@@ -467,7 +475,9 @@ export function serializeOrderRead(
                   id: order.customer.id,
                   name: name || null,
                   phone: opts.contact ? order.customer.phone : null,
-                  ...(opts.contact ? { email: order.customer.email } : {}),
+                  ...(opts.contact && !removed
+                      ? { email: order.customer.email }
+                      : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
                   orderCount: order.customer._count?.orders ?? 1,

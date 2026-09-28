@@ -136,6 +136,27 @@ describe("serializeOrderRow", () => {
         expect(row.customer).toEqual({ id: "c1", name: "Asha Rao" });
     });
 
+    it("reads “Removed customer”, with no email, once their details were removed (C11)", () => {
+        const row = serializeOrderRow(
+            raw({
+                customer: {
+                    email: "removed+c1@removed.invalid",
+                    firstName: null,
+                    lastName: null,
+                    phone: null,
+                },
+            }),
+            { money: true, contact: true, now },
+        );
+        expect(row.customer).toEqual({
+            id: "c1",
+            name: "Removed customer",
+            phone: null,
+        });
+        // The order itself is unchanged.
+        expect(row).toMatchObject({ orderId: "1042", total: "610.00" });
+    });
+
     it("counts an unpaid order's whole total as unpaid", () => {
         const row = serializeOrderRow(
             raw({ paymentStatus: "UNPAID", paymentIntents: [] }),
