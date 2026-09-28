@@ -130,9 +130,16 @@ describe("activityLine — settings saves", () => {
             "deliveryGstRate",
             "deliverySacCode",
             "logo",
+            "phone",
         ]) {
             expect(FIELD_PHRASES[field], field).toBeDefined();
         }
+    });
+
+    it("says the website's phone changed, by name and on the Contact tab (DEC-053)", () => {
+        expect(said({ metadata: { fields: ["phone"] } })).toBe(
+            "Sanjay updated the phone on your website → Contact",
+        );
     });
 });
 
