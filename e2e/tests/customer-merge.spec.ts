@@ -67,7 +67,14 @@ async function makeContact(
 ): Promise<string> {
     const res = await page.request.post(
         `${urls.API_URL}/organizations/${NORTHWIND}/contacts`,
-        { data: body, headers: { "x-organization-id": NORTHWIND } },
+        // The API refuses a write with no Origin (#50).
+        {
+            data: body,
+            headers: {
+                "x-organization-id": NORTHWIND,
+                origin: urls.APP_URL,
+            },
+        },
     );
     expect(res.ok(), await res.text()).toBe(true);
     return ((await res.json()) as { id: string }).id;
@@ -174,6 +181,9 @@ test.describe("Customer Detail — merge", () => {
         await expect(page.getByRole("button", { name: "Merge…" })).toHaveCount(
             0,
         );
-        await expect(page.getByRole("button", { name: "More" })).toBeDisabled();
+        // The page's own More, not the phone tab bar's.
+        await expect(
+            page.getByRole("main").getByRole("button", { name: "More" }),
+        ).toBeDisabled();
     });
 });
