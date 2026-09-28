@@ -10,6 +10,7 @@ import { FaqFields } from "./faq";
 import { FeaturesFields } from "./features";
 import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
+import { JournalFields } from "./journal";
 import { RichTextFields } from "./rich-text";
 import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
@@ -157,6 +158,15 @@ function perTypeFields({
         case "visitUs":
             return (
                 <VisitUsFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "journal":
+            return (
+                <JournalFields
                     section={section}
                     pages={pages}
                     services={services}

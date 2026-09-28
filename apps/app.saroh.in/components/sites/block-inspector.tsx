@@ -6,7 +6,7 @@ import { Info } from "lucide-react";
 import Link from "next/link";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
-import { BOUND_BLOCKS } from "@/components/sites/block-kinds";
+import { BOUND_BLOCKS, boundHref } from "@/components/sites/block-kinds";
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { SectionFields } from "@/components/sites/section-fields";
@@ -24,6 +24,7 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
  * that saves, so the inspector cannot disagree with what autosave sends.
  */
 export function BlockInspector({
+    siteId,
     active,
     count,
     pages,
@@ -39,6 +40,8 @@ export function BlockInspector({
     onMove,
     onRemove,
 }: {
+    /** The site being edited, for a link to one of its own screens. */
+    siteId?: string;
     /** The selected block and where it sits, or null when nothing is. */
     active: { index: number; section: Section } | null;
     /** How many blocks the page has, for the move arrows. */
@@ -75,6 +78,7 @@ export function BlockInspector({
     const { index, section } = active;
     const Icon = SECTION_ICONS[section.type];
     const bound = BOUND_BLOCKS[section.type];
+    const boundLink = bound ? boundHref(bound, siteId) : null;
 
     return (
         <div className="space-y-4 p-4">
@@ -136,14 +140,16 @@ export function BlockInspector({
                          * A new tab: leaving the editor mid-edit would drop
                          * work autosave has not sent yet.
                          */}
-                        <Link
-                            href={bound.href}
-                            target="_blank"
-                            rel="noopener"
-                            className="font-medium underline underline-offset-2"
-                        >
-                            {bound.linkLabel}
-                        </Link>
+                        {boundLink ? (
+                            <Link
+                                href={boundLink}
+                                target="_blank"
+                                rel="noopener"
+                                className="font-medium underline underline-offset-2"
+                            >
+                                {bound.linkLabel}
+                            </Link>
+                        ) : null}
                     </div>
                 </div>
             ) : null}

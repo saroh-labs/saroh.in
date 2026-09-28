@@ -9,6 +9,7 @@ import {
     MailQuestion,
     MapPin,
     MousePointerClick,
+    Newspaper,
     PanelTop,
     Quote,
     Sparkles,
@@ -35,4 +36,5 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     contact: MapPin,
     servicesList: LayoutList,
     visitUs: Clock,
+    journal: Newspaper,
 };

@@ -118,6 +118,14 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { title: "Come and see us" },
             };
+        case "journal":
+            // Nothing to choose: the site's newest three posts, read live.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Journal" },
+            };
         case "contact":
             // Invalid until one channel is filled in, and the editor says so.
             return {
