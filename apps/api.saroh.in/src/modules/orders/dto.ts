@@ -331,7 +331,7 @@ export class OrderLineChangeInput {
 }
 
 /**
- * Change an order before anyone starts on it (`order:write`, ADR-008): its
+ * Change an order before anyone starts on it (`order:edit`, ADR-008; B16): its
  * lines, its fulfilment and address, and its notes. Lines, fulfilment and
  * address only while it is New; notes until it is handed over or cancelled.
  *
@@ -559,6 +559,15 @@ export class ListOrdersQuery {
     @IsString()
     @MaxLength(64)
     cursor?: string;
+
+    /**
+     * "true": this page is read for Export (B16), which takes
+     * `order:export`. The rows are the list's own; an app before B16 sends
+     * nothing and is read as the list.
+     */
+    @IsOptional()
+    @IsIn(["true"], { message: "export is true" })
+    export?: "true";
 }
 
 /**

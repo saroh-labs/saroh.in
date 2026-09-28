@@ -79,7 +79,7 @@ function makeService(
     discounts: DiscountsService | null = new DiscountsService(),
 ) {
     const stores = {
-        writableOrganization: jest.fn().mockResolvedValue({ organizationId }),
+        orderWriteOrganization: jest.fn().mockResolvedValue({ organizationId }),
     } as unknown as StoresService;
     const activation = {
         firstOrderCreated: jest.fn().mockResolvedValue(undefined),

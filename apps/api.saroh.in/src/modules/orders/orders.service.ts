@@ -64,9 +64,16 @@ const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
 } as const;
 
+/** What a store-scoped order write says to a role without its power (B16). */
+const ORDER_WRITE_REFUSAL = {
+    "order:create": "Your role can't take new orders.",
+    "order:edit": "Your role can't change orders.",
+    "order:refund": "Your role can't refund or cancel orders.",
+} as const;
+
 /**
- * Order management. Authorization delegates to StoresService (read = access,
- * write = canWrite). Totals are computed server-side from snapshotted product
+ * Order management. Authorization delegates to StoresService (read = access;
+ * writes = the order power each asks, `requireOrderWrite`, B16). Totals are computed server-side from snapshotted product
  * prices; inventory is reserved on create and committed/released on status
  * change — all inside one transaction so stock and order stay consistent.
  */
@@ -160,7 +167,11 @@ export class OrdersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
-        const organizationId = await this.requireWrite(storeId, userId);
+        const organizationId = await this.requireOrderWrite(
+            storeId,
+            userId,
+            "order:create",
+        );
         // Who it is for, and how it is paid (B13): checked before anything
         // is priced, so a request that can't be served costs nothing.
         assertOneParty(dto);
@@ -440,7 +451,7 @@ export class OrdersService {
 
     /** New order's lines (B13): see `new-order.ts`. */
     async newOrderLines(storeId: string, userId: string, productIds: string[]) {
-        await this.requireWrite(storeId, userId);
+        await this.requireOrderWrite(storeId, userId, "order:create");
         return newOrderLines(storeId, productIds);
     }
 
@@ -450,7 +461,21 @@ export class OrdersService {
         userId: string,
         dto: UpdateOrderDto,
     ) {
-        await this.requireWrite(storeId, userId);
+        // Recording a status or a payment by hand is a change to the order
+        // (`order:edit`); cancelling it or recording money handed back is
+        // `order:refund`'s (B16, matrix §2). Both asked when both are sent.
+        const refunds =
+            dto.status === "CANCELLED" || dto.paymentStatus === "REFUNDED";
+        const edits =
+            (dto.status !== undefined && dto.status !== "CANCELLED") ||
+            (dto.paymentStatus !== undefined &&
+                dto.paymentStatus !== "REFUNDED");
+        if (refunds) {
+            await this.requireOrderWrite(storeId, userId, "order:refund");
+        }
+        if (edits || !refunds) {
+            await this.requireOrderWrite(storeId, userId, "order:edit");
+        }
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
 
@@ -618,8 +643,8 @@ export class OrdersService {
     /**
      * What New order v2 asks beyond writing to the storefront (B13): a
      * picked person is read by their email, which takes `contact:read` (as
-     * the search that found them does); a pay link takes `order:write` and
-     * a business that takes payments (B11).
+     * the search that found them does); a pay link takes `order:create`
+     * (B16) and a business that takes payments (B11).
      */
     private async assertNewOrderAllowed(
         storeId: string,
@@ -639,7 +664,9 @@ export class OrdersService {
         if (!organizationId) {
             throw new BadRequestException("A pay link needs a business.");
         }
-        if (!(await this.stores.memberAllows(storeId, userId, "order:write"))) {
+        if (
+            !(await this.stores.memberAllows(storeId, userId, "order:create"))
+        ) {
             throw new ForbiddenException(
                 "Your role can't make a pay link. Take the payment at the counter, or leave it to pay later.",
             );
@@ -658,18 +685,26 @@ export class OrdersService {
         return requireOrderRead(this.stores, storeId, userId, "orders");
     }
 
-    private async requireWrite(
+    /**
+     * A store-scoped order write (B16): the owning Organization when the
+     * caller may take `action` on this storefront's orders (see
+     * `StoresService.orderWriteOrganization`). A storefront they can't reach
+     * stays a 404, so nothing says it exists; one they can reach, without
+     * the power, is a 403 in words.
+     */
+    private async requireOrderWrite(
         storeId: string,
         userId: string,
+        action: "order:create" | "order:edit" | "order:refund",
     ): Promise<string | null> {
-        const writable = await this.stores.writableOrganization(
+        const writable = await this.stores.orderWriteOrganization(
             storeId,
             userId,
+            action,
         );
-        if (writable === null) {
-            throw new NotFoundException("Store not found");
-        }
-        return writable.organizationId;
+        if (writable !== null) return writable.organizationId;
+        await this.stores.getForUser(storeId, userId);
+        throw new ForbiddenException(ORDER_WRITE_REFUSAL[action]);
     }
 
     private isUniqueOrderNumber(err: unknown): boolean {

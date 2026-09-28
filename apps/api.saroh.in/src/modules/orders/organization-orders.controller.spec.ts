@@ -119,6 +119,47 @@ describe("OrganizationOrdersController", () => {
         expect(() => controller.list(tidier)).toThrow(ForbiddenException);
     });
 
+    describe("Export (B16): order:export", () => {
+        const custom = (actions: string[]) =>
+            as("MEMBER", {
+                roleKey: "custom",
+                actions: resolveCapabilities("custom", actions),
+            });
+
+        it("refuses an export page to a role that only reads orders", () => {
+            expect(() =>
+                controller.list(custom(["order:read"]), { export: "true" }),
+            ).toThrow(ForbiddenException);
+            expect(listRows).not.toHaveBeenCalled();
+        });
+
+        it("still lists for that role without the export flag", async () => {
+            await controller.list(custom(["order:read"]));
+            expect(listRows).toHaveBeenCalled();
+        });
+
+        it("answers an export page to order:export, or a role saved with order:write", async () => {
+            for (const actions of [["order:export"], ["order:write"]]) {
+                listRows.mockClear();
+                await controller.list(custom(actions), { export: "true" });
+                // The flag is the export's own, never a filter.
+                expect(listRows).toHaveBeenCalledWith(
+                    "org_1",
+                    {},
+                    expect.objectContaining({ money: true }),
+                );
+            }
+        });
+
+        it("lets an Owner export; refuses the kitchen's Member", async () => {
+            await controller.list(as("OWNER"), { export: "true" });
+            expect(listRows).toHaveBeenCalled();
+            expect(() =>
+                controller.list(as("MEMBER"), { export: "true" }),
+            ).toThrow(ForbiddenException);
+        });
+    });
+
     describe("rows, counts and a cursor (plan B, B1)", () => {
         it("answers the paged rows without v=2 too: the bare array is gone (B2d)", async () => {
             const page = await controller.list(as("OWNER"), {

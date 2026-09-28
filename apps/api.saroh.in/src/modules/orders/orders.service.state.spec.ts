@@ -55,6 +55,7 @@ jest.mock("@saroh/database", () => {
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -81,7 +82,7 @@ function makeService(canWrite = true) {
     const stores = {
         // The write guard resolves access AND the owning org in one pass
         // (#173): null means "not writable", an object means writable.
-        writableOrganization: jest
+        orderWriteOrganization: jest
             .fn()
             .mockResolvedValue(canWrite ? { organizationId: ORG } : null),
     } as unknown as StoresService;
@@ -408,5 +409,82 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         await expect(
             service.updateStatus(STORE, ORDER, USER, { status: "SHIPPED" }),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
+/**
+ * The store-scoped status write asks the order power it uses (B16):
+ * recording a status or a payment by hand is `order:edit`, cancelling or
+ * recording money handed back is `order:refund`. A role that can see the
+ * storefront without it gets a 403 in words, and nothing is written.
+ */
+describe("OrdersService.updateStatus — the order power each change asks (B16)", () => {
+    function withPowers(held: string[]) {
+        const stores = {
+            orderWriteOrganization: jest.fn(
+                (_s: string, _u: string, action: string) =>
+                    Promise.resolve(
+                        held.includes(action) ? { organizationId: ORG } : null,
+                    ),
+            ),
+            getForUser: jest.fn().mockResolvedValue({ id: STORE }),
+        };
+        return {
+            stores,
+            service: new OrdersService(stores as unknown as StoresService),
+        };
+    }
+
+    beforeEach(() => {
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            stage: "NEW",
+            fulfilment: "PICKUP",
+            organizationId: ORG,
+            items: [],
+        });
+    });
+
+    it("records a payment by hand with order:edit", async () => {
+        const { service, stores } = withPowers(["order:edit"]);
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "PAID",
+        });
+        expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
+            STORE,
+            USER,
+            "order:edit",
+        );
+        expect(orderUpdate).toHaveBeenCalled();
+    });
+
+    it("refuses a cancel to order:edit alone, and writes nothing", async () => {
+        const { service } = withPowers(["order:edit"]);
+        const cancel = service.updateStatus(STORE, ORDER, USER, {
+            status: "CANCELLED",
+        });
+        await expect(cancel).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(cancel).rejects.toThrow(
+            "Your role can't refund or cancel orders.",
+        );
+        expect(orderUpdate).not.toHaveBeenCalled();
+    });
+
+    it("cancels with order:refund", async () => {
+        const { service } = withPowers(["order:refund"]);
+        await service.updateStatus(STORE, ORDER, USER, {
+            status: "CANCELLED",
+        });
+        expect(orderUpdate).toHaveBeenCalled();
+    });
+
+    it("refuses a payment recorded by hand to order:refund alone", async () => {
+        const { service } = withPowers(["order:refund"]);
+        await expect(
+            service.updateStatus(STORE, ORDER, USER, { paymentStatus: "PAID" }),
+        ).rejects.toThrow("Your role can't change orders.");
+        expect(orderUpdate).not.toHaveBeenCalled();
     });
 });

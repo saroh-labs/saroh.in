@@ -47,7 +47,7 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
@@ -72,10 +72,22 @@ const DTO = {
     items: [{ productId: PRODUCT, quantity: 2 }],
 };
 
-/** `writableOrganization` returning null means "not writable" (#173). */
-function makeService(writable: { organizationId: string | null } | null) {
+/**
+ * `orderWriteOrganization` returning null means "may not take orders here"
+ * (#173, B16); `reachable` is whether the caller can see the storefront at
+ * all, which decides between a 403 and a 404.
+ */
+function makeService(
+    writable: { organizationId: string | null } | null,
+    reachable = false,
+) {
     const stores = {
-        writableOrganization: jest.fn().mockResolvedValue(writable),
+        orderWriteOrganization: jest.fn().mockResolvedValue(writable),
+        getForUser: reachable
+            ? jest.fn().mockResolvedValue({ id: STORE })
+            : jest
+                  .fn()
+                  .mockRejectedValue(new NotFoundException("Store not found")),
     } as unknown as StoresService;
     // Activation events are fire-and-forget instrumentation (#176); a stub
     // keeps these tests about order writes rather than about analytics.
@@ -149,6 +161,31 @@ describe("OrdersService.create — organization stamping (#173)", () => {
 
         expect(orderCreate).not.toHaveBeenCalled();
     });
+
+    it("403s in words, and writes nothing, for a role that sees the storefront but can't take orders (B16)", async () => {
+        const made = makeService(null, true).create(STORE, USER, DTO);
+        await expect(made).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(made).rejects.toThrow("Your role can't take new orders.");
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("asks for order:create, not store:write (B16)", async () => {
+        const stores = {
+            orderWriteOrganization: jest
+                .fn()
+                .mockResolvedValue({ organizationId: ORG }),
+        };
+        await new OrdersService(stores as unknown as StoresService).create(
+            STORE,
+            USER,
+            DTO,
+        );
+        expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
+            STORE,
+            USER,
+            "order:create",
+        );
+    });
 });
 
 describe("OrdersService.create — the storefront's currency", () => {
@@ -181,7 +218,7 @@ describe("OrdersService.create — what New order v2 asks beyond the storefront 
     const writable = { organizationId: ORG };
     function withMember(allowed: string[]) {
         const stores = {
-            writableOrganization: jest.fn().mockResolvedValue(writable),
+            orderWriteOrganization: jest.fn().mockResolvedValue(writable),
             memberAllows: jest.fn((_s: string, _u: string, action: string) =>
                 Promise.resolve(allowed.includes(action)),
             ),
@@ -199,7 +236,7 @@ describe("OrdersService.create — what New order v2 asks beyond the storefront 
         expect(orderCreate).not.toHaveBeenCalled();
     });
 
-    it("a pay link takes order:write", async () => {
+    it("a pay link takes order:create (B16)", async () => {
         await expect(
             withMember(["contact:read"]).create(STORE, USER, {
                 items: DTO.items,

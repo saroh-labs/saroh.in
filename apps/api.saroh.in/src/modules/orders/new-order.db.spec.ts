@@ -18,7 +18,7 @@ jest.mock("../../env", () => ({
 import {
     BadRequestException,
     ConflictException,
-    NotFoundException,
+    ForbiddenException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -431,8 +431,8 @@ describe("a pay link made with the order (B13, B11)", () => {
 
     it("is not for a role that can't take orders: no order, no link", async () => {
         const before = await prisma.order.count({ where: { storeId } });
-        // A Member works the kitchen; taking an order isn't theirs (the
-        // storefront's write refuses first).
+        // A Member works the kitchen; taking an order isn't theirs. They see
+        // the storefront, so it is a 403 in words (B16: `order:create`).
         await expect(
             place(
                 {
@@ -441,7 +441,9 @@ describe("a pay link made with the order (B13, B11)", () => {
                 },
                 memberId,
             ),
-        ).rejects.toBeInstanceOf(NotFoundException);
+        ).rejects.toThrow(
+            new ForbiddenException("Your role can't take new orders."),
+        );
         expect(await prisma.order.count({ where: { storeId } })).toBe(before);
     });
 });

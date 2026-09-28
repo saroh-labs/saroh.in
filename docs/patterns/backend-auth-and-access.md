@@ -58,8 +58,9 @@ what the API allows.
 - **Adopted** — **Members move kitchen stages, nothing else on an order**
   (DEC-024, amends DEC-020). `order:stage` reads the order's kitchen view —
   items, stage, notes, allergens, customer name — with money figures left out
-  by the API, and moves its stage or undoes the last step. Refunds and edits
-  to items or address stay `order:write` / `payment:manage` (Owner/Admin).
+  by the API, and moves its stage or undoes the last step. Taking, changing,
+  refunding and exporting orders are the split order powers below
+  (Owner/Admin by default).
   **Current** since U14: a module may name several `requiredAction`s, any one
   of which reaches it, and Commerce takes `order:read` or `order:stage`, so a
   Member reaches Sell → Orders (the list comes back without totals or emails)
@@ -67,6 +68,23 @@ what the API allows.
   store-scoped order list and read send totals, so they refuse a role with
   `order:stage` but no `order:read`. A new read inside Commerce must ask for
   its own action; the module gate no longer implies `order:read`.
+- **Current** (B16, DEC-039) — **Each order endpoint asks its own power.**
+  `order:create` takes a new order (store-scoped `POST stores/:id/orders`
+  and its New order lines) and its pay link; `order:edit` changes a placed
+  order (`PATCH`, "Change how it's fulfilled", recording a payment by hand);
+  a pay link on an order takes either; `order:refund` refunds, retries a
+  refund and cancels (a cancel is a refund in full), and settles the money
+  when a paid order changes; `order:export` is asked of every Export page
+  (`GET orders?export=true`). Reads stay `order:read` or `order:stage`, and
+  moving steps and the courier's details `order:stage`. `resolveCapabilities`
+  adds implied holds: `order:write` → create, edit, export; `payment:manage`
+  → refund; each of the four → `order:read` (the whole order, money
+  included — Order Detail sends money to `order:read` or `payment:read`).
+  So a role saved before the split keeps what it could do; no backfill. On
+  the store-scoped writes `store:write` no longer takes orders; a storefront
+  role that writes to its storefront still does (DEC-048).
+  `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
+  order endpoint adds its row there.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
