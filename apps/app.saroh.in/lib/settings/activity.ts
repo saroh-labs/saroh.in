@@ -12,6 +12,7 @@ import {
     recordedChanges,
     text,
 } from "./activity-changes";
+import { customerPlace, detailsWhat, mergedWhat } from "./activity-customers";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -37,6 +38,10 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * Track stock turned on or off (#515), for a product or the business, says
  * what it did in the same voice: "turned Track stock off for Plum jam — 38
  * set to 0", "turned Track stock on for Plum jam with its first count".
+ *
+ * A customer record merged or its details changed by staff (C10) is told
+ * without the customer's name, which the stream never holds (DEC-035), and
+ * links to them: `activity-customers.ts`.
  */
 
 /**
@@ -63,6 +68,8 @@ export const ACTIVITY_ACTIONS = [
     "product.stock-tracking.off",
     "business.stock-tracking.on",
     "business.stock-tracking.off",
+    "customer.merged",
+    "customer.details.changed",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -307,6 +314,10 @@ export function activityLine(
                 PRODUCTS,
             );
         }
+        case "customer.merged":
+            return line(mergedWhat(meta), customerPlace(event.targetId));
+        case "customer.details.changed":
+            return line(detailsWhat(meta), customerPlace(event.targetId));
         default:
             return null;
     }
