@@ -31,6 +31,16 @@ export function RowPill({
     );
 }
 
+/** A tab whose part of the read failed: said so, never an empty tab. */
+export function Failed({ what }: { what: string }) {
+    return (
+        <Empty title={`${what} couldn't be read`}>
+            The connection dropped while we were fetching them. Nothing has
+            changed — try again in a minute.
+        </Empty>
+    );
+}
+
 /** The dashed empty state: a title and a line, or just a line. */
 export function Empty({
     title,

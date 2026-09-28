@@ -13,7 +13,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";
-import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
+import type {
+    DuplicateSuggestion,
+    IdentitySuggestion,
+} from "@/lib/customer-workspace/service";
 
 /**
  * Confirm a customer identity link (#120). Saroh never merges people
@@ -23,15 +26,23 @@ import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
  *
  * Customer Detail opens it from its "Possible match — link?" notice and its
  * More menu, so it can also be controlled, without a trigger of its own.
+ * Another contact that looks like the same person is listed too, with
+ * Merge (C10): two contacts are merged, never linked (DEC-042).
  */
 export function IdentityLinkDialog({
     contactId,
     suggestions,
+    duplicates = [],
+    onMerge,
     open: controlled,
     onOpenChange,
 }: {
     contactId: string;
     suggestions: IdentitySuggestion[];
+    /** Other customer records that look like them (C2): merged, not linked. */
+    duplicates?: DuplicateSuggestion[];
+    /** Open the merge for one of them (C10); absent without `customer:merge`. */
+    onMerge?: (duplicate: DuplicateSuggestion) => void;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
 }) {
@@ -110,6 +121,54 @@ export function IdentityLinkDialog({
                         ))}
                     </ul>
                 )}
+
+                {duplicates.length > 0 ? (
+                    <div className="grid gap-2">
+                        <p className="text-sm text-muted-foreground">
+                            These customer records look like the same person.
+                            Two customers aren&apos;t linked — they&apos;re
+                            merged into one.
+                        </p>
+                        <ul className="divide-y rounded-xl border">
+                            {duplicates.map((dup) => (
+                                <li
+                                    key={dup.contactId}
+                                    className="flex items-center justify-between gap-4 p-3"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">
+                                            {dup.name ??
+                                                dup.email ??
+                                                "Another record"}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {dup.email ? `${dup.email} · ` : ""}
+                                            matched on{" "}
+                                            {dup.matchedOn.join(" + ")}
+                                        </p>
+                                    </div>
+                                    {onMerge ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={pending}
+                                            onClick={() => {
+                                                setOpen(false);
+                                                onMerge(dup);
+                                            }}
+                                        >
+                                            Merge…
+                                        </Button>
+                                    ) : (
+                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                            An owner or admin can merge them
+                                        </span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
             </DialogContent>
         </Dialog>
     );

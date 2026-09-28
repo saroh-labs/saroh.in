@@ -4,6 +4,7 @@ import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
 import type { FulfilmentType } from "@/lib/orders/read";
 import type { Interval } from "@/lib/subscriptions/service";
 
+import type { MergedRedirect } from "./merge";
 import type { SiteAccount } from "./site-account";
 
 /**
@@ -235,15 +236,17 @@ export interface CustomerDetail {
 
 /**
  * The customer, or null when there is no such contact in this business. A
- * 403 renders the forbidden boundary and any other failure throws to the
- * route's error boundary — a failed read is never an empty customer.
+ * record merged into another (C9) answers `{ mergedInto }`, and the page
+ * goes there (C10). A 403 renders the forbidden boundary and any other
+ * failure throws to the route's error boundary — a failed read is never an
+ * empty customer.
  */
 export async function getCustomerDetail(
     contactId: string,
-): Promise<CustomerDetail | null> {
+): Promise<CustomerDetail | MergedRedirect | null> {
     const base = await orgBase();
     if (!base) return null;
-    return getJson<CustomerDetail>(
+    return getJson<CustomerDetail | MergedRedirect>(
         `${base}/customers/${encodeURIComponent(contactId)}/detail`,
     );
 }
