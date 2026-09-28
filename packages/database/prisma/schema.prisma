@@ -4215,9 +4215,18 @@ model Message {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The invoice this message sent or reminded about (round-2 D17), and
+  // which transactional template wrote it: INVOICE_SENT | INVOICE_REMINDER.
+  // Null on a message someone typed. The invoice's "Sent to …" line and
+  // its one-reminder-a-day rule read these rows.
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  template  String?
+
   @@index([organizationId])
   @@index([leadId])
   @@index([contactId])
+  @@index([invoiceId, createdAt])
 }
 
 // Delivery — one provider send attempt for a Message, with its final state.
@@ -5044,6 +5053,9 @@ model Invoice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Emails that sent it or reminded about it (D17).
+  messages Message[]
 
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
