@@ -155,6 +155,8 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
     } | null;
     /** Paid online, due at the visit and any refund (E8); the API's sums. */
     money?: BookingMoney;
+    /** A visit of a treatment (E10); absent from an older API. */
+    treatment?: TreatmentView | null;
 }
 
 /** One open slot on a service, as the api's availability preview returns it. */
@@ -171,7 +173,7 @@ export interface BookingWithService extends Booking {
 // The calendar read's shape and its pure shaping live in ./booking-calendar,
 // which client components can import; re-exported so server callers have one
 // place to look.
-import type { BookingsCalendar } from "./booking-calendar";
+import type { BookingsCalendar, TreatmentView } from "./booking-calendar";
 import { flattenCalendar } from "./booking-calendar";
 
 export { flattenCalendar } from "./booking-calendar";
@@ -181,6 +183,7 @@ export type {
     DiaryBooking,
     PaidWith,
     PersonDiary,
+    TreatmentView,
 } from "./booking-calendar";
 
 export interface CreateServiceInput {
@@ -558,6 +561,22 @@ export function bookByHand(
         "POST",
         input,
         "Could not make the booking",
+    );
+}
+
+/**
+ * Book visit `n` of a treatment (E10, DEC-050): against its order, never
+ * invoiced on its own. 409 past its visits or before the one before it.
+ */
+export function bookVisit(
+    orderId: string,
+    input: { visitNumber: number; startAt: string; staffId?: string },
+): Promise<ApiResult<Booking>> {
+    return send<Booking>(
+        `/treatments/${encodeURIComponent(orderId)}/visits`,
+        "POST",
+        input,
+        "Could not book the visit",
     );
 }
 

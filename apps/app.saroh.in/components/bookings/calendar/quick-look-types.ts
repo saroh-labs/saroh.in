@@ -26,6 +26,8 @@ export interface QuickLookContext {
     money: boolean;
     rules: BookingRules | null;
     canBook: boolean;
+    /** `order:read`: a treatment's order is a link, else words (E10). */
+    canReadOrder?: boolean;
 }
 
 export const btn = {

@@ -56,6 +56,7 @@ import {
     restAfterDeposit,
     rulesText,
     timeIn,
+    visitsOf,
     whereText,
 } from "./model";
 import { DetailsStep } from "./steps/details-step";
@@ -886,6 +887,7 @@ export default function BookingFlow({
                                     : null
                             }
                             rules={page.rules}
+                            visits={visitsOf(service)}
                             onAgain={bookAnother}
                         />
                     ) : phase.kind === "paying" ? (
@@ -1006,6 +1008,7 @@ export default function BookingFlow({
                 {choosing && !phone && services.length > 0 && page.open ? (
                     <SummaryAside
                         serviceName={service?.name ?? null}
+                        visits={visitsOf(service)}
                         whenText={whenText}
                         name={
                             bookerName !== ""

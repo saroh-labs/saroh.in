@@ -25,12 +25,15 @@ export function DepositField({
     deposit,
     price,
     currency,
+    visits = 1,
     onChange,
 }: {
     deposit: DepositMode;
     /** The price as typed. */
     price: string;
     currency: string;
+    /** A treatment's rest is paid over its visits (E10). */
+    visits?: number;
     onChange: (deposit: DepositMode) => void;
 }) {
     const label = useId();
@@ -55,7 +58,9 @@ export function DepositField({
                     </Chip>
                 ))}
             </div>
-            <p className={HELP}>{depositNote(deposit, price, currency)}</p>
+            <p className={HELP}>
+                {depositNote(deposit, price, currency, visits)}
+            </p>
         </>
     );
 }
