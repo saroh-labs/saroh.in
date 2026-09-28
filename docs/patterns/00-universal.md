@@ -76,8 +76,15 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,293 after C7, which moved the packs read out to `customer-detail-packs.ts`;
-  1,351 before), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  (1,289 after C14, whose Spent read — net of refunds, the list's rule — is
+  `customer-spent.ts` over `spent.sql.ts`; 1,293 after C7, which moved the
+  packs read out to `customer-detail-packs.ts`; 1,351 before). Beside it,
+  `customer-workspace/customers-list.service.ts` (565; C14 added only
+  "added by hand" on a row, and Add customer is `customer-add.service.ts`)
+  and the app's `lib/customer-workspace/view.ts` (799 after C14 took the
+  dates to `when.ts` and "added by hand" to `added.ts`; 823 before) — the
+  list's read and the detail's words, each a set of small functions whose
+  seams are the parts of the page. `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
   days-off, payments and working-hours reads already sit in their own files;
   E27 added only the response's `hours` field; split next),
   `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
@@ -282,7 +289,10 @@ went along its row, its add row and its save — `variant-row.tsx`,
 `variant-add-row.tsx`, `variant-save.ts`, with the row rules in
 `lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 332
 now) along its two ways of counting, to `stock-fields.tsx` and
-`lib/products/editor-stock.ts`.
+`lib/products/editor-stock.ts`. Customer Detail's
+`customers/detail/detail-screen.tsx` (489 before; 359 after C14) went along
+its header's actions: Edit details, ⋯ More actions and every sheet and
+dialog they open are `useMoreActions` in `more-actions.tsx`.
 
 ## 7. No `any`, no `@ts-ignore`
 
