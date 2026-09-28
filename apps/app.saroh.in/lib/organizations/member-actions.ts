@@ -2,6 +2,7 @@
 
 import type { InviteMemberInput } from "./members";
 import {
+    dismissStorefrontTeamNotice as dismissStorefrontTeamNoticeApi,
     inviteMember as inviteMemberApi,
     removeMember as removeMemberApi,
     revokeInvitation as revokeInvitationApi,
@@ -33,4 +34,9 @@ export async function removeMember(userId: string) {
 
 export async function revokeInvitation(invitationId: string) {
     return revokeInvitationApi(invitationId);
+}
+
+/** Team's storefront-people notice, dismissed for the business (F16). */
+export async function dismissStorefrontTeamNotice() {
+    return dismissStorefrontTeamNoticeApi();
 }

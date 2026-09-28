@@ -31,6 +31,26 @@ export interface OrganizationMember {
      * absent from an older API. The Team row says nothing when it is null.
      */
     lastActiveAt?: string | null;
+    /**
+     * The storefronts this person works on and their role at each (Admin,
+     * Manager, Editor or Viewer; DEC-048), shown under their name. Absent
+     * from an older API.
+     */
+    storefronts?: MemberStorefront[];
+}
+
+export interface MemberStorefront {
+    storeId: string;
+    name: string;
+    role: string;
+}
+
+/** Someone the storefront backfill put on the team (F16), for Team's notice. */
+export interface StorefrontTeamNoticePerson {
+    userId: string;
+    name: string | null;
+    email: string;
+    storefronts: string[];
 }
 
 export interface OrganizationInvitation {
@@ -70,6 +90,40 @@ export async function listInvitations(): Promise<OrganizationInvitation[]> {
     const res = await apiFetch(`${base}/invitations`);
     if (!res.ok) return [];
     return (await res.json()) as OrganizationInvitation[];
+}
+
+/**
+ * The people the storefront backfill put on the team as Storefront team and
+ * whose role nobody has changed since (F16, DEC-048), for Team's one-time
+ * notice. Empty rather than throwing — for a viewer who may not change
+ * roles, an older API, or a failed read — because the notice is an aside on
+ * a page that must still render the roster.
+ */
+export async function getStorefrontTeamNotice(): Promise<
+    StorefrontTeamNoticePerson[]
+> {
+    const base = await orgBase();
+    if (!base) return [];
+    const res = await apiFetch(`${base}/storefront-team-notice`).catch(
+        () => null,
+    );
+    if (!res?.ok) return [];
+    const data = (await res.json().catch(() => null)) as {
+        people?: StorefrontTeamNoticePerson[];
+    } | null;
+    return data?.people ?? [];
+}
+
+/** Dismiss that notice for the whole business. */
+export async function dismissStorefrontTeamNotice(): Promise<
+    CrmResult<{ dismissed: boolean }>
+> {
+    return mutate(
+        "/storefront-team-notice/dismiss",
+        "POST",
+        {},
+        "Could not dismiss that notice.",
+    );
 }
 
 /**

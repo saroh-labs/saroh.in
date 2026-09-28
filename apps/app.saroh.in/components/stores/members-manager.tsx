@@ -29,11 +29,17 @@ export function MembersManager({
     members,
     invitations,
     canManage,
+    canInvite = canManage,
 }: {
     storeId: string;
     members: Member[];
     invitations: Invitation[];
     canManage: boolean;
+    /**
+     * May invite here: a storefront owner who may also invite to the team,
+     * because whoever accepts joins it (DEC-048, F16).
+     */
+    canInvite?: boolean;
 }) {
     const router = useRouter();
     const [email, setEmail] = useState("");
@@ -58,7 +64,9 @@ export function MembersManager({
         }
         setEmail("");
         setRole("VIEWER");
-        showSuccess("Invitation sent");
+        showSuccess(
+            "Invitation sent. When they accept, they're also added to your team, as Storefront team.",
+        );
         router.refresh();
     }
 
@@ -100,9 +108,17 @@ export function MembersManager({
 
     return (
         <div className="space-y-8">
-            {canManage && (
+            {canManage && !canInvite ? (
+                <p className="rounded-xl border p-4 text-sm text-muted-foreground">
+                    Inviting someone here also adds them to your team, and your
+                    role can&apos;t invite people to the team. Ask an owner or
+                    admin to invite them.
+                </p>
+            ) : null}
+            {canInvite && (
                 <form
                     onSubmit={onInvite}
+                    aria-describedby="invite-joins-team"
                     className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
                 >
                     <div className="grid min-w-[200px] flex-1 gap-2">
@@ -139,6 +155,15 @@ export function MembersManager({
                     >
                         {inviting ? "Sending…" : "Send invite"}
                     </Button>
+                    <p
+                        id="invite-joins-team"
+                        className="basis-full text-xs text-muted-foreground"
+                    >
+                        Also added to your team, as Storefront team: they see
+                        the team and your storefronts, not the business&apos;s
+                        customers, bookings or money. Someone already on the
+                        team keeps their role.
+                    </p>
                 </form>
             )}
 
@@ -254,7 +279,7 @@ export function MembersManager({
                         if (!o) setRemoving(null);
                     }}
                     title={`Remove ${removing.name}?`}
-                    description="They lose access to this storefront's catalogue, orders and customers straight away. Bringing them back means inviting them again."
+                    description="They lose access to this storefront's catalogue, orders and customers straight away. They stay on your team; remove them there to take that away too. Bringing them back here means inviting them again."
                     confirmLabel="Remove"
                     onConfirm={() => {
                         const r = removing;
