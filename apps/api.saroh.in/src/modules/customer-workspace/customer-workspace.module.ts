@@ -7,6 +7,7 @@ import { PaymentsModule } from "../payments/payments.module";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
+import { CustomerAddService } from "./customer-add.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
@@ -37,6 +38,7 @@ import { CustomerThreadsController } from "./threads.controller";
         ContactNotesService,
         ContactAttentionService,
         CustomersListService,
+        CustomerAddService,
         MergeService,
         PrivacyRemovalService,
         OrganizationGuard,

@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
     deleteRole,
@@ -30,19 +31,6 @@ import type {
     Role,
     RoleCatalogue,
 } from "@/lib/organizations/roles";
-
-/** What a catalogue group is called on screen. */
-const GROUP_LABEL: Record<string, string> = {
-    business: "Business",
-    team: "Team",
-    sell: "Sell",
-    website: "Website",
-    contacts: "Customers and contacts",
-    schedule: "Schedule",
-    money: "Money",
-    messaging: "Messaging",
-    insights: "Insights",
-};
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [

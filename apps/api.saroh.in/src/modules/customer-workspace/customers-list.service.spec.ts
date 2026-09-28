@@ -45,6 +45,7 @@ const PERSON = {
     paid_invoices: 1,
     subscriber: true,
     offers: true,
+    added_by_hand: false,
 };
 
 /** The SQL text a tagged `$queryRaw` call was given, for routing. */
@@ -141,6 +142,7 @@ describe("CustomersListService.list", () => {
             signsIn: false,
             possibleDuplicate: false,
             offers: true,
+            addedByHand: false,
             attention: [],
             hiddenSensitiveCount: 0,
             returning: true,
@@ -152,6 +154,25 @@ describe("CustomersListService.list", () => {
             },
             spent: [{ currency: "INR", amount: "2050.00" }],
             subscriber: true,
+        });
+    });
+
+    it("says who was added on the list by hand (DEC-056, C14)", async () => {
+        const { service } = make([
+            {
+                ...PERSON,
+                orders: 0,
+                paid_orders: 0,
+                open_orders: 0,
+                last_order_at: null,
+                paid_invoices: 0,
+                added_by_hand: true,
+            },
+        ]);
+        const page = await service.list(ctx(EVERYTHING), {});
+        expect(page.rows[0]).toMatchObject({
+            addedByHand: true,
+            orders: { count: 0, lastAt: null },
         });
     });
 

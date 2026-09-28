@@ -3,6 +3,11 @@ import { Prisma } from "@saroh/database";
 import { RESERVED_CONTACT_EMAIL_DOMAINS } from "../contacts/contact-email";
 import { openSql } from "../orders/order-list-filters";
 import type { CustomerChip, CustomerSort } from "./customers-list.dto";
+import { PAID_NON_ORDER_INVOICE, spentRowsSql } from "./spent.sql";
+
+// Spent's rule lives in `spent.sql.ts` (C14: net of refunds), which
+// Customer Detail reads too.
+export { PAID_NON_ORDER_INVOICE, spentRowsSql };
 
 /**
  * The Customers list as SQL (DEC-041, C3). Pure: builds `Prisma.Sql`, runs
@@ -11,24 +16,26 @@ import type { CustomerChip, CustomerSort } from "./customers-list.dto";
  * A customer is a contact who has paid — an order through a store customer
  * linked to them, a paid invoice that isn't an order's own, a subscription
  * or a class pack — or who signs in on the business's site (a live
- * `CustomerAccount`, A1). Leads, Pipeline and Contacts are not asked.
+ * `CustomerAccount`, A1), or whom the merchant added on the list itself
+ * (`ADDED_AS_CUSTOMER`, DEC-056). Leads, Pipeline and Contacts are not asked.
  *
  * Every figure comes from one CTE, so the chip counts can never disagree with
  * the rows they count.
  */
+
+/**
+ * Where a contact came from when the merchant added them on the Customers
+ * list (DEC-056, C14; `customer-add.service.ts`). The list shows them before
+ * they have paid — "Added by hand" — which it doesn't for a contact made in
+ * Contacts, a lead or an enquiry.
+ */
+export const ADDED_AS_CUSTOMER = "customers:added";
 
 /** Account states that sign in; a MERGED account sits on a tombstone. */
 const LIVE_ACCOUNT = ["ACTIVE", "BLOCKED"] as const;
 
 /** An order that was paid for, whether or not it was refunded since. */
 export const PAID_ORDER = Prisma.sql`o."paymentStatus" IN ('PAID', 'REFUNDED')`;
-
-/**
- * A paid invoice that is not an order's own and not a credit note
- * (`invoice-state.ts` `OWED_WHERE`): the order already counts that money, so
- * a sum that took the order's invoice too would count each rupee twice.
- */
-export const PAID_NON_ORDER_INVOICE = Prisma.sql`(i.status = 'PAID' AND i."orderId" IS NULL AND i.kind <> 'CREDIT_NOTE')`;
 
 /** An order that counts at all: never an abandoned checkout (plan B, B1). */
 const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`;
@@ -51,40 +58,6 @@ const REMOVED_PLACEHOLDER = "removed+%@removed.invalid";
 export function notRetired(alias: string): Prisma.Sql {
     const column = (name: string) => Prisma.raw(`${alias}."${name}"`);
     return Prisma.sql`(${column("mergedIntoId")} IS NULL AND ${column("removedAt")} IS NULL AND lower(btrim(${column("email")})) NOT LIKE ${REMOVED_PLACEHOLDER})`;
-}
-
-/**
- * "Spent" (R4, ADR-008): paid orders, delivery included, through the store
- * customers linked to the contact, plus paid invoices that are not an
- * order's own. One row per payment; callers sum it per contact and currency.
- * Customer Detail reads the same rule (`customer-detail.service.ts`), and
- * `customers-list.db.spec.ts` holds the two to the same figure.
- *
- * Only a PAID order counts: a refunded order's money went back.
- */
-export function spentRowsSql(
-    organizationId: string,
-    contactIds?: readonly string[],
-): Prisma.Sql {
-    const onlyLinks = contactIds
-        ? Prisma.sql`AND l."contactId" = ANY(${[...contactIds]}::text[])`
-        : Prisma.empty;
-    const onlyInvoices = contactIds
-        ? Prisma.sql`AND i."contactId" = ANY(${[...contactIds]}::text[])`
-        : Prisma.empty;
-    return Prisma.sql`
-        SELECT l."contactId", o.currency, o.total AS amount
-        FROM "CustomerIdentityLink" l
-        JOIN "Order" o ON o."customerId" = l."customerId"
-        WHERE l."organizationId" = ${organizationId} ${onlyLinks}
-          AND o."organizationId" = ${organizationId}
-          AND o."paymentStatus" = 'PAID'
-        UNION ALL
-        SELECT i."contactId", i.currency, i.total AS amount
-        FROM "Invoice" i
-        WHERE i."organizationId" = ${organizationId}
-          AND i."contactId" IS NOT NULL ${onlyInvoices}
-          AND ${PAID_NON_ORDER_INVOICE}`;
 }
 
 export interface PeopleOptions {
@@ -145,6 +118,7 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
             COALESCE(ord.at_store, FALSE) AS at_store,
             COALESCE(inv.paid_invoices, 0) AS paid_invoices,
             spent.spent,
+            COALESCE(c.source = ${ADDED_AS_CUSTOMER}, FALSE) AS added_by_hand,
             EXISTS (
                 SELECT 1 FROM "CustomerSubscription" s
                 WHERE s."contactId" = c.id AND s."organizationId" = ${org}
@@ -194,6 +168,7 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
            OR people.has_subscription
            OR people.has_pack
            OR people.account_email IS NOT NULL
+           OR people.added_by_hand
     )`;
 }
 

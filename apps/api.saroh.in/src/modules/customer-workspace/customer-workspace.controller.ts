@@ -20,6 +20,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AccountUnlinkService } from "../site-accounts/account-unlink.service";
 import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
+import { AddCustomerDto, CustomerAddService } from "./customer-add.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 import {
@@ -65,12 +66,13 @@ export class CustomerWorkspaceController {
         private readonly accounts: AccountUnlinkService,
         private readonly merges: MergeService,
         private readonly removals: PrivacyRemovalService,
+        private readonly adds: CustomerAddService,
     ) {}
 
     /**
-     * The business's customers (DEC-041, C3): everyone who has paid or signs
-     * in on its site, with search, chips and counts, sort, "Bought at" and
-     * pages of 50.
+     * The business's customers (DEC-041, C3): everyone who has paid, signs
+     * in on its site or was added with Add customer (DEC-056, C14), with
+     * search, chips and counts, sort, "Bought at" and pages of 50.
      */
     @Get()
     list(
@@ -78,6 +80,16 @@ export class CustomerWorkspaceController {
         @Query() query: ListCustomersQueryDto,
     ) {
         return this.customers.list(ctx, query);
+    }
+
+    /**
+     * Add customer (DEC-056, C14): a contact only, never a storefront's
+     * customer. A 409 names the contact that already holds the email.
+     */
+    @Post()
+    @HttpCode(201)
+    add(@OrgContext() ctx: OrganizationContext, @Body() dto: AddCustomerDto) {
+        return this.adds.add(ctx, dto);
     }
 
     /** Paying store customers no contact holds yet, for the review sheet. */

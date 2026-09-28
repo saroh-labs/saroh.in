@@ -19,6 +19,7 @@ import {
     mergedWhat,
     removedWhat,
 } from "./activity-customers";
+import { extrasWhat } from "./activity-extras";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -68,6 +69,7 @@ export const ACTIVITY_ACTIONS = [
     "membership.accept",
     "membership.storefront-join",
     "membership.role.update",
+    "membership.extras.update",
     "membership.remove",
     "product.sold-out.mark",
     "product.sold-out.clear",
@@ -331,6 +333,9 @@ export function activityLine(
             if (to) return line(`made ${whom} ${to}`, TEAM());
             return line(`changed ${whom}'s role`, TEAM());
         }
+        case "membership.extras.update":
+            // A person's extra permissions (F17), in the owner's words.
+            return line(extrasWhat(target ?? "someone", meta), TEAM());
         case "membership.remove":
             return line(`removed ${target ?? "someone"} from the team`, TEAM());
         case "product.sold-out.mark":

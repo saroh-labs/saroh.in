@@ -1,5 +1,5 @@
-import type { OrgAction } from "./organization-policy";
-import { ORG_ACTIONS } from "./organization-policy";
+import type { OrgAction } from "./organization-actions";
+import { ORG_ACTIONS } from "./organization-actions";
 
 /**
  * Every permission, in the words a business owner would use to grant it.

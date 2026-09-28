@@ -4,7 +4,7 @@ import {
     CAPABILITY_GROUPS,
     grantableCapabilities,
 } from "./capability-catalogue";
-import { ORG_ACTIONS } from "./organization-policy";
+import { isNeverExtra, ORG_ACTIONS } from "./organization-policy";
 
 /**
  * The catalogue is what an owner picks permissions from, and `ORG_ACTIONS` is
@@ -206,6 +206,16 @@ describe("the booking and class-pack powers (E26)", () => {
         expect(CAPABILITY_BY_ACTION.get("pack:write")?.note).toMatch(
             /can also sell them/,
         );
+    });
+});
+
+describe("extra permissions for one person (F17)", () => {
+    it("never offers as an extra what only the Owner may hold", () => {
+        // The policy's own list and the catalogue's `ownerOnly` agree, so
+        // what the screen can't offer the gate can't resolve either.
+        for (const c of CAPABILITIES) {
+            expect(isNeverExtra(c.action)).toBe(c.ownerOnly === true);
+        }
     });
 });
 

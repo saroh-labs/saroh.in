@@ -49,6 +49,7 @@ import {
 import { requireCustomerPower } from "./customer-access";
 import type { DetailPack } from "./customer-detail-packs";
 import { readContactPacks } from "./customer-detail-packs";
+import { spentPart } from "./customer-spent";
 import { normaliseEmail } from "./duplicates";
 
 export type {
@@ -87,7 +88,8 @@ export type {
  * else, not sent for the screen to hide.
  *
  * "Spent" counts each rupee once: paid orders plus paid invoices that are not
- * an order's own invoice (ADR-008). Owed is unpaid issued invoices, again
+ * an order's own invoice (ADR-008), each net of what went back to them
+ * (`spent.sql.ts`, C14). Owed is unpaid issued invoices, again
  * leaving order invoices out — the order is the ledger for its own payment.
  */
 
@@ -640,7 +642,12 @@ export class CustomerDetailService {
                 : links === null || links === undefined
                   ? this.missing("orders", unavailable)
                   : attempt("orders", () =>
-                        this.readOrders(organizationId, links, money),
+                        this.readOrders(
+                            organizationId,
+                            contactId,
+                            links,
+                            money,
+                        ),
                     ),
             wants.bookings
                 ? attempt("bookings", () =>
@@ -905,6 +912,7 @@ export class CustomerDetailService {
 
     private async readOrders(
         organizationId: string,
+        contactId: string,
         links: LinkedCustomer[],
         /** Sum what was paid, for Spent. */
         sumPaid: boolean,
@@ -959,21 +967,15 @@ export class CustomerDetailService {
                 },
             }),
             this.db.order.count({ where }),
+            // Net of refunds, as the list sums it (C14).
             sumPaid
-                ? this.db.order.groupBy({
-                      by: ["currency"],
-                      where: { ...where, paymentStatus: "PAID" },
-                      _sum: { total: true },
-                  })
+                ? spentPart(this.db, organizationId, contactId, "orders")
                 : Promise.resolve([]),
         ]);
 
         return {
             count,
-            paid: paid.map((p) => ({
-                currency: p.currency,
-                sum: p._sum.total,
-            })),
+            paid,
             // Read by the person's customers, so never a walk-in (B13).
             rows: rows.filter(hasCustomer).map((o) => ({
                 id: o.id,
@@ -1168,11 +1170,8 @@ export class CustomerDetailService {
                     currency: true,
                 },
             }),
-            this.db.invoice.groupBy({
-                by: ["currency"],
-                where: { ...where, ...NOT_AN_ORDER_INVOICE, status: "PAID" },
-                _sum: { total: true },
-            }),
+            // Net of credit notes, as the list sums it (C14).
+            spentPart(this.db, organizationId, contactId, "invoices"),
         ]);
         const owed = new Purse();
         let overdueCount = 0;
@@ -1202,10 +1201,7 @@ export class CustomerDetailService {
                 unpaidCount: unpaid.length,
                 overdueCount,
             },
-            paid: paid.map((p) => ({
-                currency: p.currency,
-                sum: p._sum.total,
-            })),
+            paid,
         };
     }
 

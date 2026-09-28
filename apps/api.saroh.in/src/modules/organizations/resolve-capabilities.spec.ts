@@ -4,7 +4,9 @@ import {
     authorize,
     builtInActions,
     canWriteStock,
+    extraActionsFor,
     isBuiltInRole,
+    isNeverExtra,
     resolveCapabilities,
 } from "./organization-policy";
 
@@ -267,5 +269,103 @@ describe("inventory:write", () => {
         expect(
             canWriteStock(ctx({ actions: new Set(["store:write"] as const) })),
         ).toBe(true);
+    });
+});
+
+/**
+ * A person's extra permissions (F17, DEC-039; matrix §5): the role's set and
+ * the extras, united, filtered, then implied holds.
+ */
+describe("resolveCapabilities with a person's extras", () => {
+    it("adds an extra to a built-in role, and it only adds", () => {
+        const set = resolveCapabilities("MEMBER", null, ["order:refund"]);
+        expect(set.has("order:refund")).toBe(true);
+        // Everything the Member already held is still held.
+        for (const a of builtInActions("MEMBER")) expect(set.has(a)).toBe(true);
+        // A refund power does not bring editing an order with it.
+        expect(set.has("order:edit")).toBe(false);
+    });
+
+    it("counts implied holds on the union", () => {
+        // A refund shows the order it refunds.
+        expect(
+            resolveCapabilities("MEMBER", null, ["order:refund"]).has(
+                "order:read",
+            ),
+        ).toBe(true);
+        // Making packs sells them, and selling shows them.
+        const packs = resolveCapabilities("MEMBER", null, ["pack:write"]);
+        expect(packs.has("pack:sell")).toBe(true);
+        expect(packs.has("pack:read")).toBe(true);
+        // Payments manages refunds too.
+        expect(
+            resolveCapabilities("MEMBER", null, ["payment:manage"]).has(
+                "order:refund",
+            ),
+        ).toBe(true);
+    });
+
+    it("adds to an invented role's own list", () => {
+        const set = resolveCapabilities(
+            "stock-clerk",
+            ["store:read"],
+            ["contact:write"],
+        );
+        expect([...set].sort()).toEqual([
+            "contact:read",
+            "contact:write",
+            "store:read",
+        ]);
+    });
+
+    it("drops unknown strings and owner-only powers", () => {
+        const set = resolveCapabilities("MEMBER", null, [
+            "order:teleport",
+            "org:delete",
+        ]);
+        expect(set.has("org:delete")).toBe(false);
+        expect([...set].sort()).toEqual([...builtInActions("MEMBER")].sort());
+    });
+
+    it("gives a Reviewer nothing beyond reviewing websites (DEC-006)", () => {
+        const set = resolveCapabilities("REVIEWER", null, [
+            "payment:read",
+            "contact:read",
+            "site:comment",
+        ]);
+        expect([...set].sort()).toEqual([
+            "site:approve",
+            "site:comment",
+            "site:read",
+        ]);
+        expect(extraActionsFor("REVIEWER", ["payment:read"])).toEqual([]);
+    });
+
+    it("resolves exactly as before with no extras", () => {
+        expect(resolveCapabilities("MEMBER", null, [])).toBe(
+            resolveCapabilities("MEMBER"),
+        );
+        expect(resolveCapabilities("ADMIN", null, null)).toBe(
+            resolveCapabilities("ADMIN"),
+        );
+    });
+
+    it("lets an allows() check pass for an extra, and fail once it is gone", () => {
+        const withExtra = ctx({
+            roleKey: "MEMBER",
+            actions: resolveCapabilities("MEMBER", null, ["order:refund"]),
+        });
+        expect(allows(withExtra, "order:refund")).toBe(true);
+        expect(allows(withExtra, "order:edit")).toBe(false);
+        const without = ctx({
+            roleKey: "MEMBER",
+            actions: resolveCapabilities("MEMBER", null, []),
+        });
+        expect(allows(without, "order:refund")).toBe(false);
+    });
+
+    it("never treats org:delete as an extra", () => {
+        expect(isNeverExtra("org:delete")).toBe(true);
+        expect(isNeverExtra("order:refund")).toBe(false);
     });
 });

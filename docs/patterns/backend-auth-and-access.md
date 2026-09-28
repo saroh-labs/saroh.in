@@ -140,6 +140,26 @@ what the API allows.
   resolved set (implied holds count); the refusal is a 403 naming the
   permissions in the owner's words. Any new write of a permission list
   (F17's extras) asks the same helper.
+- **Current** (F17, DEC-039) — **A person can hold extra permissions beyond
+  their role.** `Membership.extraActions` (action keys, default empty).
+  `resolveCapabilities(roleKey, stored, extras)` unites the role's set with
+  the extras, filtered by `extraActionsFor` (known actions only, never
+  `org:delete`, and for a Reviewer only `site:read`, `site:comment`,
+  `site:approve` — DEC-006), then runs `withImplied` over the union; with no
+  extras it returns exactly the role's set. Every place that resolves a
+  person passes their extras: `OrganizationContextService.resolve` and
+  `listForUser`, `StoresService`'s membership check, and the members
+  service's reach checks. `PUT organizations/:id/members/:userId/extra-actions`
+  replaces the list, under `member:role:update` and the reach rule for every
+  actor, Owner included: never your own list (403), never someone whose role
+  and current extras exceed yours (403), and nothing afterwards beyond what
+  you hold, implied holds counted (403 "Your role can't give a permission
+  you don't have: …"); an owner-only power or a non-review power for a
+  Reviewer is a 400. An extra the role already grants is not stored. Changing
+  or removing someone also counts their extras; moving someone to Reviewer
+  drops their non-review extras. Each change writes
+  `membership.extras.update` (given and taken, keys and labels), which
+  Settings › Activity reads as "gave Ravi Refund orders".
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the

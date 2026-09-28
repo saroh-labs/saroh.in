@@ -411,6 +411,12 @@ model Membership {
   // The staff member this team member is on the diary as, if any (U3).
   staffMember StaffMember?
 
+  // Extra permissions for this one person, on top of their role (F17,
+  // DEC-039). Action keys, like OrganizationRole.actions: unknown strings are
+  // dropped on read, and an extra only ever adds. Set by someone holding
+  // `member:role:update`, within their own reach, never on themselves.
+  extraActions String[] @default([])
+
   @@unique([organizationId, userId])
   @@index([organizationId])
 }

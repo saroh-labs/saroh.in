@@ -175,7 +175,7 @@ export async function getList<T>(path: string): Promise<T[]> {
  */
 export async function mutate<T>(
     path: string,
-    method: "POST" | "PATCH",
+    method: "POST" | "PATCH" | "PUT",
     body: unknown,
     fallback: string,
 ): Promise<CrmResult<T>> {

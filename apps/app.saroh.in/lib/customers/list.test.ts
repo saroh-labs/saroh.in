@@ -10,6 +10,7 @@ import {
     isNarrowed,
     lastSub,
     listHref,
+    noOrderText,
     pageCount,
     pageText,
     readListQuery,
@@ -427,5 +428,13 @@ describe("a row", () => {
                 { currency: "USD", amount: "20.00" },
             ]),
         ).toBe("₹100 + US$20");
+    });
+});
+
+describe("noOrderText (DEC-056, C14)", () => {
+    it("says someone added on the list was added by hand, and nothing of anyone else", () => {
+        expect(noOrderText(row({ addedByHand: true }))).toBe("Added by hand");
+        expect(noOrderText(row({ addedByHand: false }))).toBe("—");
+        expect(noOrderText(row())).toBe("—");
     });
 });

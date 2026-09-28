@@ -158,7 +158,7 @@ test.describe("Customer Detail — merge", () => {
         await page.goto(`/customers/${lone}`);
         await page
             .getByRole("main")
-            .getByRole("button", { name: "More" })
+            .getByRole("button", { name: "More actions" })
             .click();
         await page
             .getByRole("menuitem", { name: "Merge with a duplicate…" })
@@ -186,7 +186,9 @@ test.describe("Customer Detail — merge", () => {
         );
         // The page's own More, not the phone tab bar's.
         await expect(
-            page.getByRole("main").getByRole("button", { name: "More" }),
+            page
+                .getByRole("main")
+                .getByRole("button", { name: "More actions" }),
         ).toBeDisabled();
     });
 });

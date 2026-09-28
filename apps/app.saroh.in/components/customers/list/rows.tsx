@@ -9,6 +9,7 @@ import { Pill } from "@/components/subscriptions/pill";
 import type { CustomerRow, CustomersPage } from "@/lib/customers/list";
 import {
     lastSub,
+    noOrderText,
     rowName,
     rowSub,
     rowTags,
@@ -134,6 +135,8 @@ function Row({
                     <span className="truncate text-[12px] text-muted-foreground sm:hidden">
                         {orders?.lastAt ? (
                             <ViewerDate iso={orders.lastAt} variant="recent" />
+                        ) : row.addedByHand ? (
+                            "Added by hand · no orders yet"
                         ) : (
                             "No orders yet"
                         )}
@@ -161,7 +164,7 @@ function Row({
                                     variant="recent"
                                 />
                             ) : (
-                                "—"
+                                noOrderText(row)
                             )}
                         </span>
                         {sub ? (

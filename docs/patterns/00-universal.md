@@ -76,8 +76,15 @@ each with why it stops there:
   more hook seams, which is new logic; the sign-in handlers are the next
   one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,293 after C7, which moved the packs read out to `customer-detail-packs.ts`;
-  1,351 before), `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  (1,289 after C14, whose Spent read — net of refunds, the list's rule — is
+  `customer-spent.ts` over `spent.sql.ts`; 1,293 after C7, which moved the
+  packs read out to `customer-detail-packs.ts`; 1,351 before). Beside it,
+  `customer-workspace/customers-list.service.ts` (565; C14 added only
+  "added by hand" on a row, and Add customer is `customer-add.service.ts`)
+  and the app's `lib/customer-workspace/view.ts` (799 after C14 took the
+  dates to `when.ts` and "added by hand" to `added.ts`; 823 before) — the
+  list's read and the detail's words, each a set of small functions whose
+  seams are the parts of the page. `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
   days-off, payments and working-hours reads already sit in their own files;
   E27 added only the response's `hours` field; split next),
   `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
@@ -163,10 +170,14 @@ each with why it stops there:
   its rules out (`lib/organizations/settings-undo.ts`, and the hold and
   toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
-- `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
-  member drawer and the invite dialog share the screen's roster and role
-  state. Each piece is its own function already; moving them is a file split
-  with props threaded through, not yet done.
+- `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
+  People tabs, the member drawer and the invite dialog share the screen's
+  roster and role state. Each piece is its own function already; moving them
+  is a file split with props threaded through, not yet done. F17 put a
+  person's extra permissions in `member-extras.tsx` (the column's chips, the
+  drawer's list and its draft hook) and `lib/organizations/extras.ts`, adding
+  only the calls, the drawer's two-step save and the column's grid; the
+  drawer is the next cut.
 - `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
@@ -282,7 +293,10 @@ went along its row, its add row and its save — `variant-row.tsx`,
 `variant-add-row.tsx`, `variant-save.ts`, with the row rules in
 `lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 332
 now) along its two ways of counting, to `stock-fields.tsx` and
-`lib/products/editor-stock.ts`.
+`lib/products/editor-stock.ts`. Customer Detail's
+`customers/detail/detail-screen.tsx` (489 before; 359 after C14) went along
+its header's actions: Edit details, ⋯ More actions and every sheet and
+dialog they open are `useMoreActions` in `more-actions.tsx`.
 
 ## 7. No `any`, no `@ts-ignore`
 

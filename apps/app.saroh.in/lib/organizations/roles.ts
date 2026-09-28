@@ -21,6 +21,12 @@ export interface Role {
     /** Built-in: cannot be renamed, re-permissioned or removed. */
     system: boolean;
     members: number;
+    /**
+     * Everything an invented role lets its holders do, implied holds
+     * included (a built-in's `actions` already are). Absent from an older
+     * API, and for a built-in.
+     */
+    grants?: string[];
 }
 
 export interface Capability {

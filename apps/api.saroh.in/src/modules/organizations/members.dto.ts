@@ -3,11 +3,14 @@ import {
     ArrayMaxSize,
     IsArray,
     IsEmail,
+    IsIn,
     IsOptional,
     IsString,
     MaxLength,
     MinLength,
 } from "class-validator";
+
+import { ORG_ACTIONS } from "./organization-actions";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -68,4 +71,20 @@ export class UpdateMemberRoleDto {
     @ArrayMaxSize(50)
     @IsString({ each: true })
     siteIds?: string[];
+}
+
+/**
+ * A person's extra permissions, as the whole list they should hold (F17).
+ *
+ * Replaces the list outright, like a reviewer's sites: the drawer shows the
+ * current set, and switching one off means it is taken away. Each is checked
+ * against the closed set here, so a stale client gets a clear 400; the
+ * service decides everything else — what may be given at all, what the
+ * person saving holds, and whose permissions they may change.
+ */
+export class SetExtraActionsDto {
+    @IsArray()
+    @ArrayMaxSize(ORG_ACTIONS.length)
+    @IsIn(ORG_ACTIONS, { each: true, message: "Unknown permission" })
+    actions!: string[];
 }
