@@ -74,7 +74,12 @@ export interface AllergenRef {
 
 export interface OrderReadLine {
     id: string;
-    productId: string;
+    /** Null on a treatment's line (E9, DEC-050): it bills a service. */
+    productId: string | null;
+    /** The service a treatment's line bills; absent from an API before E9. */
+    serviceId?: string | null;
+    /** What the line bills; absent from an API before E9 (a product). */
+    kind?: "product" | "service";
     name: string | null;
     variantTitle: string | null;
     sku: string | null;
