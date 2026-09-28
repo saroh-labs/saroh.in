@@ -805,9 +805,9 @@ export type ReserveOnPaymentResult =
  * webhook, when the online checkout exists) must hold nothing below the
  * intent. The refund row is PENDING with the idempotency key
  * `sold-out:<intent>` (unique per intent), so its id — Saroh's reference to
- * the provider (DEC-026) — is the same on every call; the caller sends it
- * after this transaction commits (`PaymentsService.sendAutomaticRefund`),
- * and the refund webhook confirms it.
+ * the provider (DEC-026) — is the same on every call; the caller writes
+ * the job that sends it on this transaction (`send-refund.handler.ts`,
+ * retried until the provider answers), and the refund webhook confirms it.
  */
 export async function reserveOnPayment(
     tx: Tx,

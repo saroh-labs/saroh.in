@@ -82,10 +82,14 @@ export interface CheckoutStarted {
 /** How a started checkout stands while the payment is confirmed. */
 export interface CheckoutStanding {
     orderNumber: string;
-    state: "paying" | "placed" | "refunded" | "closed";
+    /**
+     * refunding: paid, but it sold out or had closed; the refund is owed
+     * and being sent. refunded: the provider has taken it — on its way.
+     */
+    state: "paying" | "placed" | "refunding" | "refunded" | "closed";
     total: string;
     currency: string;
-    /** For "refunded": what the customer is told. */
+    /** For "refunding" and "refunded": what the customer is told. */
     message: string | null;
 }
 

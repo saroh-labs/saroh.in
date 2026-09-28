@@ -22,6 +22,11 @@ import {
     shopRolloutOn,
 } from "../sites/sells-from";
 import { soldOutRefundKey } from "../stock/reserve";
+import {
+    ORDER_CLOSED_REFUNDING,
+    ORDER_CLOSED_WHILE_PAYING,
+    SOLD_OUT_REFUNDING,
+} from "../stock/stock-words";
 import type { ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
@@ -97,17 +102,26 @@ export interface CheckoutStarted {
  * How a started checkout stands, for the sheet waiting on the payment.
  * - paying: no answer from the provider yet.
  * - placed: paid, and its items held — a real order now.
- * - refunded: paid, but it sold out meanwhile or had closed; the money is
- *   on its way back.
+ * - refunding: paid, but it sold out meanwhile or had closed; the refund
+ *   is owed and not yet taken by the provider.
+ * - refunded: the same, and the provider has taken the refund: the money
+ *   is on its way back (DEC-026).
  * - closed: never paid, and closed.
  */
 export interface CheckoutStanding {
     orderNumber: string;
-    state: "paying" | "placed" | "refunded" | "closed";
+    state: "paying" | "placed" | "refunding" | "refunded" | "closed";
     total: string;
     currency: string;
-    /** For "refunded": the words the customer is told (DEC-032). */
+    /** For "refunding" and "refunded": what the customer is told (DEC-032). */
     message: string | null;
+}
+
+/** A refusal's words while its refund is still being sent (DEC-026). */
+function refundingWords(reason: string | null): string {
+    return reason === ORDER_CLOSED_WHILE_PAYING
+        ? ORDER_CLOSED_REFUNDING
+        : SOLD_OUT_REFUNDING;
 }
 
 /** Every miss looks the same: no shop, another business's order alike. */
@@ -307,7 +321,12 @@ export class PublicCheckoutService {
                         select: {
                             id: true,
                             refunds: {
-                                select: { idempotencyKey: true, reason: true },
+                                select: {
+                                    idempotencyKey: true,
+                                    reason: true,
+                                    status: true,
+                                    providerRefundId: true,
+                                },
                             },
                         },
                     },
@@ -322,12 +341,22 @@ export class PublicCheckoutService {
                 ),
             );
             const refused = refusals.length > 0 ? refusals[0] : null;
+            // "On its way back" only once the provider has taken the refund
+            // (DEC-026); until then — sending, retried, or refused and left
+            // to staff — it is owed, and said so.
+            const taken =
+                refused !== null &&
+                (refused.status === "SUCCEEDED" ||
+                    (refused.status === "PENDING" &&
+                        refused.providerRefundId !== null));
             const state: CheckoutStanding["state"] =
                 order.paymentStatus === "PAID" ||
                 order.paymentStatus === "REFUNDED"
                     ? "placed"
                     : refused
-                      ? "refunded"
+                      ? taken
+                          ? "refunded"
+                          : "refunding"
                       : order.status === "CANCELLED"
                         ? "closed"
                         : "paying";
@@ -337,7 +366,11 @@ export class PublicCheckoutService {
                 total: toMoneyString(order.total),
                 currency: order.currency,
                 message:
-                    state === "refunded" ? (refused?.reason ?? null) : null,
+                    state === "refunded"
+                        ? (refused?.reason ?? null)
+                        : state === "refunding"
+                          ? refundingWords(refused?.reason ?? null)
+                          : null,
             };
         });
     }

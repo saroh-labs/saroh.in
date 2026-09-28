@@ -32,7 +32,13 @@ const isStringOrNull = (v: unknown): v is string | null =>
     v === null || isString(v);
 const WAYS = new Set(["PICKUP", "LOCAL_DELIVERY", "SHIPPING"]);
 const LINE_STATES = new Set(["ok", "short", "sold-out", "gone"]);
-const STANDINGS = new Set(["paying", "placed", "refunded", "closed"]);
+const STANDINGS = new Set([
+    "paying",
+    "placed",
+    "refunding",
+    "refunded",
+    "closed",
+]);
 
 function isWay(v: unknown): boolean {
     return (

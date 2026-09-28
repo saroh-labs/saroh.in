@@ -139,21 +139,29 @@ export function CheckoutPay({
                 </SheetFrame>
             );
         }
+        // "On its way back" only once the provider has the refund; until
+        // then it is owed and being sent (DEC-026).
+        const words =
+            s.state === "refunded"
+                ? {
+                      title: "Your money is on its way back",
+                      lead:
+                          s.message ??
+                          "Sorry, it sold out while you were paying — your money is on its way back.",
+                  }
+                : s.state === "refunding"
+                  ? {
+                        title: "We're sending your money back",
+                        lead:
+                            s.message ??
+                            "Sorry, it sold out while you were paying. We're sending your money back.",
+                    }
+                  : {
+                        title: "This checkout has closed",
+                        lead: "It wasn't paid in time, so nothing was ordered. Your bag is still here.",
+                    };
         return (
-            <SheetFrame
-                title={
-                    s.state === "refunded"
-                        ? "Your money is on its way back"
-                        : "This checkout has closed"
-                }
-                lead={
-                    s.state === "refunded"
-                        ? (s.message ??
-                          "Sorry, it sold out while you were paying — your money is on its way back.")
-                        : "It wasn't paid in time, so nothing was ordered. Your bag is still here."
-                }
-                onClose={onClose}
-            >
+            <SheetFrame title={words.title} lead={words.lead} onClose={onClose}>
                 <button
                     type="button"
                     onClick={onBack}

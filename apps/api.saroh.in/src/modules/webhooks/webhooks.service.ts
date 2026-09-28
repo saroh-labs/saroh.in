@@ -29,6 +29,7 @@ import {
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
+import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { applyOnlineOrderSuccess } from "./online-order-payment";
 import type {
@@ -180,11 +181,9 @@ export class WebhooksService {
 
         // Reconcile. On error, record FAILED and return 200 (see class docs).
         try {
-            const refunds: string[] = [];
             const { applied } = await prisma.$transaction((tx) =>
-                this.reconcile(tx, name, organizationId, event, refunds),
+                this.reconcile(tx, name, organizationId, event),
             );
-            await this.sendRefunds(organizationId, refunds);
             await prisma.webhookEvent.update({
                 where: { id: inboxId },
                 data: {
@@ -270,17 +269,9 @@ export class WebhooksService {
                 payload: stored.payload,
                 headers: {},
             });
-            const refunds: string[] = [];
             const { applied } = await prisma.$transaction((tx) =>
-                this.reconcile(
-                    tx,
-                    provider.name,
-                    organizationId,
-                    event,
-                    refunds,
-                ),
+                this.reconcile(tx, provider.name, organizationId, event),
             );
-            await this.sendRefunds(organizationId, refunds);
             await prisma.webhookEvent.update({
                 where: { id: stored.id },
                 data: {
@@ -312,8 +303,6 @@ export class WebhooksService {
         provider: string,
         organizationId: string,
         event: NormalizedWebhookEvent,
-        /** Automatic refunds to send once the transaction commits (G13). */
-        refunds: string[] = [],
     ): Promise<{ applied: boolean }> {
         if (event.outcome === "IGNORED") return { applied: false };
 
@@ -325,7 +314,7 @@ export class WebhooksService {
         );
         if (!intent) return { applied: false };
 
-        const result = await this.applyOutcome(tx, intent, event, refunds);
+        const result = await this.applyOutcome(tx, intent, event);
         const feeRecorded = await recordFee(tx, intent, event);
         return { applied: result.applied || feeRecorded };
     }
@@ -335,7 +324,6 @@ export class WebhooksService {
         tx: Tx,
         intent: IntentRow,
         event: NormalizedWebhookEvent,
-        refunds: string[],
     ): Promise<{ applied: boolean }> {
         // An invoice's pay link (U13): the same outcomes, applied to the
         // invoice instead of an order.
@@ -364,7 +352,7 @@ export class WebhooksService {
         if (!orderId) return { applied: false };
         switch (event.outcome) {
             case "SUCCEEDED":
-                return this.applySuccess(tx, intent, orderId, event, refunds);
+                return this.applySuccess(tx, intent, orderId, event);
             case "FAILED":
                 return this.applyFailure(tx, intent, orderId);
             case "REFUNDED":
@@ -421,7 +409,6 @@ export class WebhooksService {
         found: IntentRow,
         orderId: string,
         event: NormalizedWebhookEvent,
-        refunds: string[],
     ): Promise<{ applied: boolean }> {
         // The intent's status as it stands under its row lock: an edit
         // supersedes a difference charge under the order's lock, and must not
@@ -447,7 +434,16 @@ export class WebhooksService {
                 event,
                 (target) => this.moveOrderPayment(tx, orderId, target),
             );
-            if (online.refundId) refunds.push(online.refundId);
+            // A refused checkout's refund is sent from a job written here,
+            // with the refusal (G13, DEC-032): retried with backoff until
+            // the provider answers, and never lost to a failed call.
+            if (online.refundId && online.refundCreated) {
+                await enqueueRefundSendInTx(
+                    tx,
+                    intent.organizationId,
+                    online.refundId,
+                );
+            }
             return { applied: online.applied };
         }
 
@@ -1052,30 +1048,6 @@ export class WebhooksService {
             `Payment captured for invoice ${invoiceId} while it was ${found}; recorded as needing a refund`,
         );
         return { applied: true };
-    }
-
-    /**
-     * Send the automatic refunds a reconciliation recorded (G13: a checkout
-     * payment that lost the last unit, or came after the checkout closed),
-     * once its transaction has committed. A failure is logged, never thrown:
-     * the refund row stays PENDING, where Order Detail and the retry path
-     * find it, and the webhook itself was handled.
-     */
-    private async sendRefunds(
-        organizationId: string,
-        refundIds: readonly string[],
-    ): Promise<void> {
-        for (const id of refundIds) {
-            try {
-                await this.payments.sendAutomaticRefund(organizationId, id);
-            } catch (err) {
-                this.logger.warn(
-                    `Automatic refund ${id} not sent yet: ${
-                        err instanceof Error ? err.message : String(err)
-                    }`,
-                );
-            }
-        }
     }
 
     /**

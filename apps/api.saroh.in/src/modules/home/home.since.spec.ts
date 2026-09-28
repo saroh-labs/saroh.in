@@ -205,7 +205,11 @@ describe("readSince", () => {
                 organizationId: "org_1",
                 createdAt: { gte: since },
                 // Real orders only, as the Orders list counts them (H-3).
-                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
+                NOT: {
+                    placedOnline: true,
+                    paymentStatus: "UNPAID",
+                    paymentIntents: { none: { status: "SUCCEEDED" } },
+                },
             },
         });
         expect(client.booking.count).toHaveBeenCalledWith({

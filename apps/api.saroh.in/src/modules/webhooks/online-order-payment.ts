@@ -33,8 +33,8 @@ export interface OnlineIntent {
  * - **REFUSED** (another payment took the last unit, or the checkout had
  *   closed): the money is recorded as received and owed back, the refund
  *   row waits PENDING, and the checkout closes. It is never shown as a paid
- *   order. The caller sends the refund after its transaction commits
- *   (`PaymentsService.sendAutomaticRefund`), with DEC-032's words.
+ *   order. The caller writes the job that sends the refund on this
+ *   transaction (`send-refund.handler.ts`), with DEC-032's words.
  *
  * Idempotent: a repeat of the payment's webhook reads the same answer from
  * `reserveOnPayment`, and every write below checks the state it moves from.
@@ -45,7 +45,12 @@ export async function applyOnlineOrderSuccess(
     orderId: string,
     event: NormalizedWebhookEvent,
     moveOrderPayment: (target: PaymentStatus) => Promise<boolean>,
-): Promise<{ applied: boolean; refundId: string | null }> {
+): Promise<{
+    applied: boolean;
+    refundId: string | null;
+    /** This call recorded the refusal and its refund (not a repeat). */
+    refundCreated: boolean;
+}> {
     const result = await reserveOnPayment(tx, {
         organizationId: intent.organizationId,
         orderId,
@@ -86,12 +91,12 @@ export async function applyOnlineOrderSuccess(
             });
             applied = true;
         }
-        return { applied, refundId: null };
+        return { applied, refundId: null, refundCreated: false };
     }
 
     // Refused: the checkout closes (a no-op when it had closed already), and
-    // the refund goes out after commit. A repeat sends the same refund row,
-    // which the provider makes once.
+    // the refund goes out from its job. A repeat finds the same refund row
+    // and writes no second job.
     const closed = await closeCheckoutInTx(
         tx,
         orderId,
@@ -100,5 +105,6 @@ export async function applyOnlineOrderSuccess(
     return {
         applied: applied || closed || result.created,
         refundId: result.refundId,
+        refundCreated: result.created,
     };
 }

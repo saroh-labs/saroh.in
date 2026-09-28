@@ -143,9 +143,13 @@
   (lines held at placement say nothing about it). A payment that lost the
   last unit, or reached a closed order, records one
   refusal (`CAPTURED_NEEDS_REFUND`) and one PENDING refund of the whole
-  payment keyed `sold-out:<intent>`, sent after commit
-  (`PaymentsService.sendAutomaticRefund`) and confirmed by the refund
-  webhook (DEC-026).
+  payment keyed `sold-out:<intent>`, sent from a `payments.send-refund`
+  job written on the same transaction (`send-refund.handler.ts`: looks
+  before it sends, retried with backoff while the provider's answer is
+  unknown) and confirmed by the refund webhook (DEC-026). A refused
+  checkout had money reach it, so it is a real order (`realOrderWhere`):
+  staff see it and its refund in Orders, and the customer is told the
+  money is on its way only once the provider has the refund.
 - **A refund moves stock only in the transaction that moves it into
   SUCCEEDED** — the provider's word, never the request — so a redelivered
   webhook changes nothing. By line, each line gives back min(refunded,

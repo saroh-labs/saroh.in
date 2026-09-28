@@ -4,6 +4,7 @@ import {
     enquiryPagePath,
     isCheckoutOptions,
     isQuote,
+    isStanding,
     problemOf,
     quoteBody,
     resultOf,
@@ -118,6 +119,26 @@ describe("the API's answers", () => {
             ok: false,
             reason: "error",
         });
+    });
+
+    it("takes each way a checkout stands, a refund being sent included", () => {
+        const standing = (state: string) => ({
+            orderNumber: "ORD-1",
+            state,
+            total: "500.00",
+            currency: "INR",
+            message: null,
+        });
+        for (const state of [
+            "paying",
+            "placed",
+            "refunding",
+            "refunded",
+            "closed",
+        ]) {
+            expect(isStanding(standing(state))).toBe(true);
+        }
+        expect(isStanding(standing("lost"))).toBe(false);
     });
 
     it("says each refusal in the page's words", () => {

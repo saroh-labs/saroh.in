@@ -400,6 +400,32 @@ describe("the header's bag", () => {
         expect(readBag(SITE)).toHaveLength(1);
     });
 
+    it("says the money is being sent back, not on its way, until the provider has the refund", async () => {
+        setup({
+            signedIn: true,
+            standing: {
+                ok: true,
+                data: {
+                    orderNumber: "ORD-008",
+                    state: "refunding",
+                    total: "500.00",
+                    currency: "INR",
+                    message:
+                        "Sorry, it sold out while you were paying. We're sending your money back.",
+                },
+            },
+        });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        expect(
+            await screen.findByRole("heading", {
+                name: "We're sending your money back",
+            }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/on its way back/)).not.toBeInTheDocument();
+        expect(readBag(SITE)).toHaveLength(1);
+    });
+
     it("offers another go when the payment window closes", async () => {
         const { openCheckout } = setup({ signedIn: true, outcome: "closed" });
         await openTheBag();

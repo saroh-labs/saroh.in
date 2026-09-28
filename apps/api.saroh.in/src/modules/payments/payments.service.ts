@@ -831,6 +831,71 @@ export class PaymentsService {
         return refundResult([outcome.row]);
     }
 
+    /**
+     * Send an automatic refund from its job (`SEND_REFUND_TYPE`): a
+     * refused site checkout's (G13, DEC-032). It looks before it sends, as
+     * try-again does (DEC-026): the provider is asked for the refund made
+     * under the row's id, and only when it has none is it sent — under the
+     * same reference, so a repeat is the same refund. Idempotent: a row
+     * already taken, settled or failed is left as it is.
+     *
+     * Reads what became of it: `ACCEPTED` (the provider has it; its webhook
+     * settles it), `REFUSED` (the row is FAILED — money still owed, which
+     * the order shows staff), `UNKNOWN` (no answer; the job tries again)
+     * or `DONE` (nothing to send).
+     */
+    async sendQueuedRefund(
+        organizationId: string,
+        refundId: string,
+    ): Promise<"ACCEPTED" | "REFUSED" | "UNKNOWN" | "DONE"> {
+        const row = await prisma.paymentRefund.findFirst({
+            where: { id: refundId, organizationId },
+            include: {
+                ...REFUND_ROW_INCLUDE,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        orderId: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (!row || row.status !== "PENDING" || row.providerRefundId) {
+            return "DONE";
+        }
+        let found: RefundResult | null = null;
+        try {
+            const call = await this.refundCall(
+                organizationId,
+                row.paymentIntent,
+            );
+            found = await this.factory.get(call.provider).findRefund({
+                reference: row.id,
+                providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                providerPaymentRef: call.providerPaymentRef,
+                credentials: call.credentials,
+            });
+        } catch {
+            // No answer about it: it may exist, so nothing is sent yet.
+            return "UNKNOWN";
+        }
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(organizationId, row, row.paymentIntent);
+        if (outcome.kind === "ACCEPTED" && row.paymentIntent.orderId) {
+            await this.recordRefundTaken(
+                { organizationId, userId: null },
+                row.paymentIntent.orderId,
+                row.reason,
+                [outcome],
+            );
+        }
+        return outcome.kind;
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,

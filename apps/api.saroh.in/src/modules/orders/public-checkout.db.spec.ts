@@ -41,6 +41,10 @@ import {
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
 import {
+    SEND_REFUND_TYPE,
+    SendRefundHandler,
+} from "../payments/send-refund.handler";
+import {
     SiteCodeAlerts,
     SiteCodeDelivery,
 } from "../site-accounts/code-delivery";
@@ -78,6 +82,7 @@ const webhooks = new WebhooksService(
     payments,
 );
 const closer = new CloseAbandonedCheckoutHandler();
+const sender = new SendRefundHandler(payments);
 
 const sent: { to: string; code: string }[] = [];
 let app: INestApplication;
@@ -656,7 +661,8 @@ describe("a payment that can't hold (G13)", () => {
             where: { id: second.body.orderId as string },
             include: { events: true },
         });
-        // Never a paid order: closed, and hidden from Orders.
+        // Never a paid order: closed, but the customer's money came in and
+        // is owed back, so staff find it in Orders.
         expect(lost).toMatchObject({
             status: "CANCELLED",
             paymentStatus: "UNPAID",
@@ -666,22 +672,56 @@ describe("a payment that can't hold (G13)", () => {
             await prisma.order.count({
                 where: { id: lost.id, ...realOrderWhere() },
             }),
-        ).toBe(0);
+        ).toBe(1);
         const refund = await prisma.paymentRefund.findFirstOrThrow({
             where: { paymentIntentId: payment(second.body).paymentIntentId },
         });
         expect(refund.amountCents).toBe(25000);
-        // Sent to the provider once the webhook's transaction committed.
-        expect(fake.refundCalls.length).toBe(refundsBefore + 1);
         expect(
             await prisma.invoice.count({ where: { orderId: lost.id } }),
         ).toBe(0);
 
-        const standing = await call(
-            "GET",
-            `/public/sites/${s.siteId}/checkout/orders/${lost.id}`,
-            { host: s.host, token: two.token },
+        // Not sent inline: a job, written with the refusal, sends it.
+        expect(fake.refundCalls.length).toBe(refundsBefore);
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: SEND_REFUND_TYPE,
+                payload: { equals: { refundId: refund.id } },
+            },
+        });
+        const standingNow = () =>
+            call(
+                "GET",
+                `/public/sites/${s.siteId}/checkout/orders/${lost.id}`,
+                { host: s.host, token: two.token },
+            );
+        // Owed, not yet "on its way back".
+        const waiting = await standingNow();
+        expect(waiting.body).toMatchObject({ state: "refunding" });
+        expect(waiting.body.message).not.toMatch(/on its way/i);
+
+        // No answer from the provider: the job throws, so it is tried again.
+        fake.failNextRefund("UNKNOWN");
+        await expect(sender.handle(job as Job)).rejects.toThrow(
+            "no answer from the provider",
         );
+        expect((await standingNow()).body).toMatchObject({
+            state: "refunding",
+        });
+        await sender.handle(job as Job);
+        expect(fake.refundCalls.length).toBe(refundsBefore + 2);
+        expect(
+            (
+                await prisma.paymentRefund.findUniqueOrThrow({
+                    where: { id: refund.id },
+                })
+            ).providerRefundId,
+        ).not.toBeNull();
+        // A repeat sends nothing more.
+        await sender.handle(job as Job);
+        expect(fake.refundCalls.length).toBe(refundsBefore + 2);
+
+        const standing = await standingNow();
         expect(standing.body).toMatchObject({ state: "refunded" });
         expect(standing.body.message).toMatch(/sold out/i);
         // The other customer's order is theirs alone to read.
