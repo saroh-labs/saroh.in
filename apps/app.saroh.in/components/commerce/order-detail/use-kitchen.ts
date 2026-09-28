@@ -32,10 +32,25 @@ export type PendingHold = Hold & {
     /** What the hold records when it runs out, or on "now". */
     run: () => Promise<void>;
     amount?: number;
+    /**
+     * Its own words on the hold card (a cancel, B9); a refund's and
+     * Ready's are the card's own.
+     */
+    words?: {
+        title: (seconds: number) => string;
+        body: string;
+        nowLabel: string;
+        /** What Undo says: nothing was recorded. */
+        undone: string;
+    };
 };
 
-/** `courier` hands the order over; `tracking` fills in its details after. */
-export type Panel = null | "refund" | "edit" | "courier" | "tracking";
+/**
+ * `courier` hands the order over; `tracking` fills in its details after;
+ * `fulfilment` and `cancel` are B9's sheets.
+ */
+export type Panel =
+    null | "refund" | "edit" | "courier" | "tracking" | "fulfilment" | "cancel";
 
 /**
  * What Order Detail does, apart from how it looks: stage moves with their
@@ -155,6 +170,13 @@ export function useKitchen({
             until: Date.now() + HOLD_MS,
             run: () => move("READY"),
         });
+    };
+
+    /** Hold another change ten seconds before it is recorded (a cancel). */
+    const startHold = (h: PendingHold) => {
+        setPanel(null);
+        dismissToasts();
+        setHold(h);
     };
 
     /** Undo a hold before it runs out: nothing was recorded. */
@@ -321,6 +343,7 @@ export function useKitchen({
         holdReady,
         commitHold,
         cancelHold,
+        startHold,
         startRefund,
         retryRefund,
         saveEdit,

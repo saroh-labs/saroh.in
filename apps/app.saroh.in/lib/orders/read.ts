@@ -208,6 +208,19 @@ export interface OrderRead extends FulfilmentFields {
         stages: KitchenStage[];
         undo: { eventId: string; until: string } | null;
         editable: boolean;
+        /**
+         * "Change how it's fulfilled…" (B9): the ways it can take now, its
+         * own among them, and why it can't change when it can't. Absent
+         * from an API before B9.
+         */
+        fulfilment?: {
+            options: { type: FulfilmentType; label: string }[];
+            refusal: string | null;
+        };
+        /** "Cancel order…" (B9): why not, and whether one waits on its refund. */
+        cancel?: { refusal: string | null; pending: boolean };
+        /** A note in the customer's messages would reach them (A13). */
+        tell?: boolean;
     };
     money: OrderReadMoney | null;
     /** Null for a role without `invoice:read`. */

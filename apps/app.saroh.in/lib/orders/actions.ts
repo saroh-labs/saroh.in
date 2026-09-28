@@ -1,8 +1,14 @@
 "use server";
 
 import type { CourierFields } from "./courier";
-import type { EditOrderInput, MoveStageInput } from "./kitchen-service";
+import type {
+    ChangeFulfilmentInput,
+    EditOrderInput,
+    MoveStageInput,
+} from "./kitchen-service";
 import {
+    cancelOrderInFull,
+    changeOrderFulfilment,
     createOrderPayLink,
     editOrderBeforePreparing,
     moveOrderStage,
@@ -79,4 +85,20 @@ export async function retryRefund(orderId: string, refundId: string) {
 /** Make the order's pay link, or replace it (B11). */
 export async function makeOrderPayLink(orderId: string) {
     return createOrderPayLink(orderId);
+}
+
+/** "Change how it's fulfilled…" (B9). */
+export async function changeFulfilment(
+    orderId: string,
+    input: ChangeFulfilmentInput,
+) {
+    return changeOrderFulfilment(orderId, input);
+}
+
+/** "Cancel order…" — a refund in full, kept as cancelled (B9). */
+export async function cancelOrder(
+    orderId: string,
+    input: { reason: string | null; idempotencyKey: string; tell?: boolean },
+) {
+    return cancelOrderInFull(orderId, input);
 }
