@@ -113,6 +113,27 @@ describe("quoteLines", () => {
             "gone",
         ]);
         expect(lines.every((l) => l.unitCents === 0)).toBe(true);
+        // An unpublished product is never named, linked or shown (#20).
+        expect(lines[1]).toMatchObject({
+            name: "No longer sold here",
+            slug: null,
+            image: null,
+        });
+        // A published product whose option went keeps its own name.
+        expect(lines[2]).toMatchObject({
+            name: "Product opts",
+            slug: "slug-opts",
+        });
+    });
+
+    it("says how many are left only for a short line (#20)", () => {
+        const tracked = listing("l1", { stockTracked: true });
+        const shelves: QuoteShelf[] = [
+            { productId: "p-l1", variantId: null, onHand: 40, promised: 0 },
+        ];
+        expect(
+            quoteLines([line("l1", 1)], [tracked], shelves, true)[0]?.available,
+        ).toBeNull();
     });
 
     it("reads on hand minus promised for a product that counts stock", () => {
@@ -122,7 +143,7 @@ describe("quoteLines", () => {
         ];
         expect(
             quoteLines([line("l1", 2)], [tracked], shelves, true)[0],
-        ).toMatchObject({ state: "ok", available: 2 });
+        ).toMatchObject({ state: "ok", available: null });
         expect(
             quoteLines([line("l1", 3)], [tracked], shelves, true)[0],
         ).toMatchObject({ state: "short", available: 2 });

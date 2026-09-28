@@ -128,14 +128,17 @@ export function quoteLines(
     return [...joined.values()].map((line) => {
         const listing = byId.get(line.listingId);
         const product = listing?.product;
+        // A product that isn't published is named in no public answer: the
+        // visitor sees a generic line, never its name, address or photo.
+        const shown = product?.status === "PUBLISHED" ? product : null;
         const gone = (name = "No longer sold here"): QuotedLine => ({
             listingId: line.listingId,
             variantId: line.variantId,
             productId: null,
-            slug: product?.slug ?? null,
-            name: product?.name ?? name,
+            slug: shown?.slug ?? null,
+            name: shown?.name ?? name,
             variantTitle: null,
-            image: product?.cover ?? null,
+            image: shown?.cover ?? null,
             unitCents: 0,
             quantity: line.quantity,
             state: "gone",
@@ -164,6 +167,10 @@ export function quoteLines(
             available = shelf ? Math.max(0, shelf.onHand - shelf.promised) : 0;
             if (available <= 0) state = "sold-out";
             else if (available < line.quantity) state = "short";
+            // The public quote says how many are left only when it matters
+            // ("Only 2 left"); otherwise the stock count stays private.
+            if (state === "ok") available = null;
+            else if (state === "sold-out") available = 0;
         } else if (listing.soldOutAt) {
             state = "sold-out";
             available = 0;
