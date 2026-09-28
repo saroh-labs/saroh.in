@@ -1,3 +1,4 @@
+import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -10,6 +11,7 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { toCents } from "../invoices/totals";
+import { assertFirstPackAllowed } from "./first-pack";
 
 /**
  * A class pack bought online by a signed-in customer (round-2 A11, R12;
@@ -249,9 +251,22 @@ export async function completePackDraftInTx(
     // pack is never deleted once anyone might hold it, but check anyway.
     const pack = await tx.classPack.findFirst({
         where: { id: terms.packId, organizationId },
-        select: { id: true },
+        select: { id: true, kind: true, firstPackOnly: true },
     });
     if (!pack) return "gone";
+    // An intro pack (E13) checked again as the money lands: the desk may
+    // have sold them one meanwhile. Then nothing is bought, and the payment
+    // is owed back like any other that found no draft to fill.
+    try {
+        await assertFirstPackAllowed(tx, {
+            organizationId,
+            contactId: buyer.id,
+            pack,
+        });
+    } catch (e) {
+        if (e instanceof ConflictException) return "gone";
+        throw e;
+    }
 
     const purchase = await tx.packPurchase.create({
         data: {
@@ -262,6 +277,7 @@ export async function completePackDraftInTx(
             price: terms.price,
             currency: terms.currency,
             expiresAt: packExpiry(terms, now),
+            paidBy: "ONLINE",
         },
         select: { id: true },
     });

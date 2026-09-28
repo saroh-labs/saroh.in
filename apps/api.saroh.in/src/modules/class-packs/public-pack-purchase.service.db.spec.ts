@@ -58,6 +58,7 @@ import {
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { AccountPacksController } from "./account-packs.controller";
 import { ClassPacksService } from "./class-packs.service";
+import { FIRST_PACK_ONLY } from "./first-pack";
 import { PACK_DRAFT_DISCARDED_REASON } from "./pack-checkout";
 import {
     BUY_AT_DESK,
@@ -715,6 +716,68 @@ describe("buying a pack", () => {
             },
         );
         expect(peek.status).toBe(404);
+    });
+});
+
+describe("an intro pack (E13's first pack only)", () => {
+    it("sells it once, paid online, and refuses a second before any payment", async () => {
+        const s = await studio();
+        await prisma.classPack.update({
+            where: { id: s.packId },
+            data: { firstPackOnly: true },
+        });
+        const { token } = await signIn(s.host);
+        const started = await buy(s, token);
+        await paid(s.organizationId, started.body.payment.providerIntentId);
+        const bought = await prisma.packPurchase.findFirstOrThrow({
+            where: { organizationId: s.organizationId },
+        });
+        expect(bought.paidBy).toBe("ONLINE");
+
+        const again = await buy(s, token);
+        expect(again.status).toBe(409);
+        expect(again.body.error).toMatchObject({
+            message: FIRST_PACK_ONLY,
+            details: { reason: "first-pack-only" },
+        });
+    });
+
+    it("the desk selling one meanwhile: nothing more is bought, and the payment is owed back", async () => {
+        const s = await studio();
+        await prisma.classPack.update({
+            where: { id: s.packId },
+            data: { firstPackOnly: true },
+        });
+        const { token } = await signIn(s.host);
+        const started = await buy(s, token);
+        const draft = await prisma.invoice.findUniqueOrThrow({
+            where: { id: started.body.ref as string },
+        });
+        await prisma.packPurchase.create({
+            data: {
+                organizationId: s.organizationId,
+                packId: s.packId,
+                contactId: draft.contactId as string,
+                credits: 10,
+                price: "4500.00",
+                currency: "INR",
+                expiresAt: new Date(Date.now() + 60 * 86_400_000),
+                paidBy: "CASH",
+            },
+        });
+
+        await paid(s.organizationId, started.body.payment.providerIntentId);
+        expect(
+            await prisma.packPurchase.count({
+                where: { organizationId: s.organizationId },
+            }),
+        ).toBe(1);
+        await prisma.paymentAttempt.findFirstOrThrow({
+            where: {
+                paymentIntent: { invoiceId: draft.id },
+                status: "CAPTURED_NEEDS_REFUND",
+            },
+        });
     });
 });
 

@@ -26,6 +26,7 @@ import {
     packCheckoutView,
     packOnSaleView,
 } from "../site-accounts/customer-view";
+import { assertFirstPackAllowed } from "./first-pack";
 import {
     createPackDraftInTx,
     MAX_OPEN_PACK_ATTEMPTS,
@@ -152,6 +153,8 @@ export class PublicPackPurchaseService {
                 price: true,
                 currency: true,
                 status: true,
+                kind: true,
+                firstPackOnly: true,
             },
         });
         // A draft isn't published and an archived pack isn't sold: to the
@@ -175,6 +178,13 @@ export class PublicPackPurchaseService {
             // One start at a time per customer, so two tabs can't both slip
             // under the open-attempts limit.
             await tx.$queryRaw`SELECT id FROM "Contact" WHERE id = ${contactId} AND "organizationId" = ${organizationId} FOR NO KEY UPDATE`;
+            // An intro pack (E13) is for someone who has never had one of
+            // its kind: refused before any payment is started.
+            await assertFirstPackAllowed(tx, {
+                organizationId,
+                contactId,
+                pack,
+            });
             const open = await tx.invoice.findMany({
                 where: openPackDraftsWhere(organizationId, contactId, now),
                 orderBy: { createdAt: "asc" },
