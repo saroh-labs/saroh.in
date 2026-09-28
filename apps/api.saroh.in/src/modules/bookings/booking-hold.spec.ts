@@ -43,6 +43,10 @@ function makeTx() {
         },
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
+        contactAttention: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({ id: "att_1" }),
+        },
     };
 }
 type FakeTx = ReturnType<typeof makeTx>;
@@ -348,6 +352,59 @@ describe("confirmHoldInTx — the money arrived", () => {
         });
         // Paid in time: nothing needed counting.
         expect(tx.booking.count).not.toHaveBeenCalled();
+        // No note, no suggestion.
+        expect(tx.contactAttention.create).not.toHaveBeenCalled();
+    });
+
+    it("puts the booker's note on their record as a suggestion once paid (C12)", async () => {
+        const tx = makeTx();
+        wire(
+            tx,
+            heldBooking({
+                organizationId: "org_1",
+                contactId: "c1",
+                intakeNote: "Nervous about needles",
+            }),
+        );
+
+        await confirmHoldInTx(asTx(tx), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: NOW,
+            payment,
+        });
+
+        expect(tx.contactAttention.create.mock.calls[0][0].data).toMatchObject({
+            organizationId: "org_1",
+            contactId: "c1",
+            bookingId: "bk_1",
+            label: "Nervous about needles",
+            status: "SUGGESTED",
+            source: "BOOKING_PAGE",
+            sensitive: true,
+        });
+    });
+
+    it("suggests nothing for a hold released because the place was taken", async () => {
+        const tx = makeTx();
+        wire(
+            tx,
+            heldBooking({
+                holdExpiresAt: EARLIER,
+                contactId: "c1",
+                intakeNote: "Nervous about needles",
+            }),
+        );
+        tx.booking.count.mockResolvedValue(1);
+
+        await confirmHoldInTx(asTx(tx), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: NOW,
+            payment,
+        });
+
+        expect(tx.contactAttention.create).not.toHaveBeenCalled();
     });
 
     it("still confirms a late payment when the place is free", async () => {

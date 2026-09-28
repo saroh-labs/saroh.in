@@ -63,6 +63,24 @@ function make() {
                 stored = { ...stored, ...data };
                 return Promise.resolve({});
             }),
+            // A guarded write: only a suggestion still waiting changes.
+            updateMany: jest.fn().mockImplementation(({ where, data }) => {
+                if (
+                    stored.status !== where.status ||
+                    (stored as { removedAt?: Date | null }).removedAt
+                ) {
+                    return Promise.resolve({ count: 0 });
+                }
+                const { allergenId, ...rest } = data;
+                stored = {
+                    ...stored,
+                    ...rest,
+                    allergen: allergenId
+                        ? { id: allergenId, name: "Sesame" }
+                        : null,
+                };
+                return Promise.resolve({ count: 1 });
+            }),
             findFirst: jest
                 .fn()
                 .mockImplementation(() => Promise.resolve(stored)),
@@ -413,9 +431,22 @@ describe("ContactAttentionService", () => {
 
             const confirmed = await svc.confirm(ADMIN, "c1", "att_1");
 
-            expect(db.contactAttention.update).toHaveBeenCalledWith({
-                where: { id: "att_1" },
-                data: { status: "ACTIVE", confirmedByUserId: "user_1" },
+            expect(db.contactAttention.updateMany).toHaveBeenCalledWith({
+                where: {
+                    id: "att_1",
+                    organizationId: "org_1",
+                    status: "SUGGESTED",
+                    removedAt: null,
+                },
+                data: {
+                    kind: "MEDICAL",
+                    label: "Blood thinners",
+                    detail: null,
+                    sensitive: true,
+                    allergenId: null,
+                    status: "ACTIVE",
+                    confirmedByUserId: "user_1",
+                },
             });
             expect(confirmed.status).toBe("ACTIVE");
         });
@@ -427,6 +458,7 @@ describe("ContactAttentionService", () => {
 
             expect(again.status).toBe("ACTIVE");
             expect(db.contactAttention.update).not.toHaveBeenCalled();
+            expect(db.contactAttention.updateMany).not.toHaveBeenCalled();
         });
 
         it("refuses a Member confirming or removing", async () => {
@@ -438,6 +470,194 @@ describe("ContactAttentionService", () => {
             await expect(
                 svc.remove(MEMBER, "c1", "att_1"),
             ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+    });
+
+    describe("booking-page notes (C12)", () => {
+        const RAHUL = {
+            status: "SUGGESTED",
+            source: "BOOKING_PAGE",
+            kind: "MEDICAL",
+            label: "I take amlodipine 5mg for blood pressure",
+            detail: "I take amlodipine 5mg for blood pressure. Please check before the numbing.",
+            sensitive: true,
+            bookingId: "bk_1",
+            createdByUserId: null,
+        };
+
+        it("adds Rahul's note as a Medical tag with the label staff wrote, sensitive, keeping his words", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+
+            const added = await svc.confirm(OWNER, "c1", "att_1", {
+                kind: "MEDICAL",
+                label: "Takes amlodipine",
+                sensitive: true,
+            });
+
+            expect(
+                db.contactAttention.updateMany.mock.calls[0][0].data,
+            ).toEqual({
+                kind: "MEDICAL",
+                label: "Takes amlodipine",
+                detail: RAHUL.detail,
+                sensitive: true,
+                allergenId: null,
+                status: "ACTIVE",
+                confirmedByUserId: "user_1",
+            });
+            expect(added).toMatchObject({
+                kind: "MEDICAL",
+                label: "Takes amlodipine",
+                sensitive: true,
+                status: "ACTIVE",
+                source: "BOOKING_PAGE",
+                bookingId: "bk_1",
+            });
+            // Activity says what kind, never the words.
+            const audit = db.auditEvent.create.mock.calls[0][0].data;
+            expect(audit).toMatchObject({
+                action: "contact.attention.confirmed",
+                metadata: {
+                    contactId: "c1",
+                    kind: "MEDICAL",
+                    sensitive: "yes",
+                },
+            });
+            expect(JSON.stringify(audit)).not.toContain("amlodipine");
+        });
+
+        it("adds it as another kind, not sensitive, when staff untick it", async () => {
+            const { svc, db, setStored } = make();
+            setStored({ ...RAHUL, label: "Uses a wheelchair" });
+
+            const added = await svc.confirm(OWNER, "c1", "att_1", {
+                kind: "ACCESS",
+                sensitive: false,
+            });
+
+            expect(added).toMatchObject({
+                kind: "ACCESS",
+                label: "Uses a wheelchair",
+                sensitive: false,
+            });
+            expect(
+                db.auditEvent.create.mock.calls[0][0].data.metadata,
+            ).toMatchObject({ kind: "ACCESS", sensitive: "no" });
+        });
+
+        it("adds it as it stands when the old app confirms with no body", async () => {
+            const { svc, setStored } = make();
+            setStored(RAHUL);
+
+            const added = await svc.confirm(OWNER, "c1", "att_1");
+
+            expect(added).toMatchObject({
+                kind: "MEDICAL",
+                label: RAHUL.label,
+                sensitive: true,
+            });
+        });
+
+        it("needs a label", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+
+            const err = await svc
+                .confirm(OWNER, "c1", "att_1", { label: "  " })
+                .catch((e: unknown) => e);
+
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect(reason(err).field).toBe("label");
+            expect(db.contactAttention.updateMany).not.toHaveBeenCalled();
+        });
+
+        it("asks for the allergen from the list when added as an Allergy, and takes one", async () => {
+            const { svc, db, setStored } = make();
+            setStored({ ...RAHUL, label: "Allergic to sesame" });
+
+            const err = await svc
+                .confirm(OWNER, "c1", "att_1", { kind: "ALLERGY" })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect(reason(err).field).toBe("allergenId");
+
+            const added = await svc.confirm(OWNER, "c1", "att_1", {
+                kind: "ALLERGY",
+                label: "",
+                allergenId: "alg_sesame",
+                sensitive: false,
+            });
+            expect(
+                db.contactAttention.updateMany.mock.calls[0][0].data,
+            ).toMatchObject({
+                kind: "ALLERGY",
+                label: "Sesame",
+                allergenId: "alg_sesame",
+                sensitive: false,
+            });
+            expect(added.allergen).toEqual({
+                id: "alg_sesame",
+                name: "Sesame",
+            });
+        });
+
+        it("refuses an allergy already on their list", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+            db.contactAttention.findMany.mockResolvedValue([
+                { label: "Sesame", allergen: { name: "Sesame" } },
+            ]);
+
+            await expect(
+                svc.confirm(OWNER, "c1", "att_1", {
+                    kind: "ALLERGY",
+                    allergenId: "alg_sesame",
+                }),
+            ).rejects.toBeInstanceOf(ConflictException);
+        });
+
+        it("refuses a Member, who never sees the note", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+
+            await expect(
+                svc.confirm(MEMBER, "c1", "att_1", {
+                    label: "Takes amlodipine",
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(db.contactAttention.findFirst).not.toHaveBeenCalled();
+        });
+
+        it("adds nothing when a teammate set it aside first, and audits nothing", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+            // Read as waiting, then set aside before the write.
+            db.contactAttention.updateMany.mockResolvedValueOnce({ count: 0 });
+
+            await svc.confirm(OWNER, "c1", "att_1", {
+                label: "Takes amlodipine",
+            });
+
+            expect(db.auditEvent.create).not.toHaveBeenCalled();
+        });
+
+        it("Nothing to add sets it aside and leaves the booking alone", async () => {
+            const { svc, db, setStored } = make();
+            setStored(RAHUL);
+
+            await svc.remove(OWNER, "c1", "att_1");
+
+            expect(db.contactAttention.update).toHaveBeenCalledWith({
+                where: { id: "att_1" },
+                data: { removedAt: expect.any(Date) },
+            });
+            expect(db.auditEvent.create.mock.calls[0][0].data).toMatchObject({
+                action: "contact.attention.dismissed",
+                metadata: { contactId: "c1", kind: "MEDICAL" },
+            });
+            // Nothing but the entry is written: the booking keeps its note.
+            expect(Object.keys(db)).not.toContain("booking");
         });
     });
 

@@ -27,7 +27,12 @@ import {
     ListUnlinkedQueryDto,
 } from "./customers-list.dto";
 import { CustomersListService } from "./customers-list.service";
-import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
+import {
+    ConfirmAttentionDto,
+    ContactNoteDto,
+    CreateAttentionDto,
+    UpdateAttentionDto,
+} from "./dto";
 import { MergeContactsDto, MergePreviewQueryDto } from "./merge.dto";
 import { MergeService } from "./merge.service";
 
@@ -213,15 +218,20 @@ export class CustomerWorkspaceController {
         return { ok: true };
     }
 
-    /** "Add to Needs attention" on a suggestion. */
+    /**
+     * "Add to Needs attention" on a suggestion, with the kind, label and
+     * sensitive tick the confirm card settled on (C12). No body adds it as
+     * it stands.
+     */
     @Post(":contactId/attention/:entryId/confirm")
     @HttpCode(200)
     confirmAttention(
         @OrgContext() ctx: OrganizationContext,
         @Param("contactId") contactId: string,
         @Param("entryId") entryId: string,
+        @Body() dto: ConfirmAttentionDto,
     ) {
-        return this.attention.confirm(ctx, contactId, entryId);
+        return this.attention.confirm(ctx, contactId, entryId, dto);
     }
 
     /** Which contact a store customer is linked to (U18), or null. */

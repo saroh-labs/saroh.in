@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
@@ -367,6 +368,9 @@ export async function confirmHoldInTx(
         where: { id: invoice.bookingId },
         select: {
             id: true,
+            organizationId: true,
+            contactId: true,
+            intakeNote: true,
             serviceId: true,
             staffId: true,
             status: true,
@@ -395,6 +399,8 @@ export async function confirmHoldInTx(
         where: { id: booking.id },
         data: { status: "CONFIRMED", holdExpiresAt: null, paidWith: "PAID" },
     });
+    // Confirmed now, so its booking-page note waits for staff (C12).
+    await suggestFromBookingNoteInTx(tx, { ...booking, status: "CONFIRMED" });
     const profile = await loadTaxProfile(tx, input.organizationId);
     const number = await numberFor(
         tx,

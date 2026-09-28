@@ -11,6 +11,7 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { isValidSlotStart } from "./availability";
@@ -461,6 +462,10 @@ export class PublicBookingsService {
             onRace: "This slot is fully booked",
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
+                // A note on a booking confirmed now waits on the customer's
+                // record for staff (C12). A pay-now hold's waits for the
+                // payment (`confirmHoldInTx`).
+                await suggestFromBookingNoteInTx(tx, booking);
                 if (!price || !booking.contactId) return;
                 const hold = await createHoldInvoiceInTx(tx, {
                     organizationId: service.organizationId,
