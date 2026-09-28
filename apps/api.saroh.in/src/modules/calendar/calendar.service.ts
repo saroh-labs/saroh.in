@@ -14,6 +14,7 @@ import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
+import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
 import { dateKey } from "../subscriptions/collections";
 import type { CalendarStaff, DayOff } from "./days-off";
@@ -644,6 +645,8 @@ export class CalendarService {
                 where: {
                     organizationId,
                     createdAt: { gte: window.start, lt: window.end },
+                    // Never an abandoned site checkout, as Orders (B1).
+                    ...realOrderWhere(),
                 },
                 orderBy: { createdAt: "asc" },
                 select: {

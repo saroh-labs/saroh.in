@@ -26,6 +26,7 @@ import {
 } from "../invoices/invoice-state";
 import type { FulfilmentType } from "../orders/fulfilment";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
+import { realOrderWhere } from "../orders/open-orders";
 import type { OrderLineKind } from "../orders/order-line";
 import { LINE_SERVICE_SELECT, lineKind, lineName } from "../orders/order-line";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -901,7 +902,12 @@ export class CustomerDetailService {
     }> {
         const customerIds = links.map((l) => l.customerId);
         if (customerIds.length === 0) return { rows: [], count: 0, paid: [] };
-        const where = { organizationId, customerId: { in: customerIds } };
+        // Never an abandoned site checkout, as Orders (B1).
+        const where = {
+            organizationId,
+            customerId: { in: customerIds },
+            ...realOrderWhere(),
+        };
 
         const [rows, count, paid] = await Promise.all([
             this.db.order.findMany({

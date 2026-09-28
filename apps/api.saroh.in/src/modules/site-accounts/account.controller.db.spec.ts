@@ -439,6 +439,20 @@ describe("Home", () => {
                 },
             },
         });
+        // A later site checkout never paid: not an order, so not listed.
+        await prisma.order.create({
+            data: {
+                organizationId: biz.organizationId,
+                storeId: store.id,
+                customerId: customer.id,
+                orderId: "1020",
+                subtotal: "120",
+                total: "120",
+                currency: "INR",
+                placedOnline: true,
+                createdAt: new Date(Date.now() + 60_000),
+            },
+        });
 
         const plan = await prisma.subscriptionPlan.create({
             data: {

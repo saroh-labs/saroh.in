@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction } from "../audit/audit.service";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { MatchedOn } from "./duplicates";
 import { duplicatesOf, storeCustomerMatches } from "./duplicates";
@@ -283,6 +284,8 @@ export class CustomerWorkspaceService {
                 where: {
                     customerId: { in: customerIds },
                     organizationId: ctx.organizationId,
+                    // Never an abandoned site checkout (B1).
+                    ...realOrderWhere(),
                 },
                 select: { createdAt: true, status: true },
                 take: 50,

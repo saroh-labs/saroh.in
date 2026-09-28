@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
+import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
 import { emailHeldBy, planContactEdit } from "./contact-edit";
 import type { ContactSearchResult } from "./contact-search";
@@ -296,7 +297,8 @@ export class ContactsService {
          */
         const newest = await prisma.order.groupBy({
             by: ["customerId"],
-            where: { customerId: { in: customerIds } },
+            // Never an abandoned site checkout (B1).
+            where: { customerId: { in: customerIds }, ...realOrderWhere() },
             _max: { createdAt: true },
         });
 
@@ -312,6 +314,7 @@ export class ContactsService {
             where: {
                 customerId: { in: [...newestByCustomer.keys()] },
                 createdAt: { in: [...newestByCustomer.values()] },
+                ...realOrderWhere(),
             },
             select: {
                 customerId: true,

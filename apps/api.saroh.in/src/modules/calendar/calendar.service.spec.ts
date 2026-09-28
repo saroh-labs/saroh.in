@@ -364,6 +364,12 @@ describe("CalendarService.month", () => {
                         gte: new Date("2026-08-31T18:30:00Z"),
                         lt: new Date("2026-09-30T18:30:00Z"),
                     },
+                    // Never an abandoned site checkout.
+                    NOT: {
+                        placedOnline: true,
+                        paymentStatus: "UNPAID",
+                        paymentIntents: { none: { status: "SUCCEEDED" } },
+                    },
                 },
             }),
         );

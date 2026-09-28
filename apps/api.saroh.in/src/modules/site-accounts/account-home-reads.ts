@@ -1,6 +1,7 @@
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { realOrderWhere } from "../orders/open-orders";
 import {
     ALLOWANCE_SELECT,
     classesAllowance,
@@ -163,6 +164,8 @@ export async function readLatestOrders(
         where: {
             organizationId: ctx.organizationId,
             customerId: { in: links.map((l) => l.customerId) },
+            // Never an abandoned site checkout (B1).
+            ...realOrderWhere(),
         },
         orderBy: { createdAt: "desc" },
         take,

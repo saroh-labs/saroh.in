@@ -851,6 +851,12 @@ describe("CustomerDetailService", () => {
         expect(where).toEqual({
             organizationId: "org_1",
             customerId: { in: ["cust_1"] },
+            // Never an abandoned site checkout.
+            NOT: {
+                placedOnline: true,
+                paymentStatus: "UNPAID",
+                paymentIntents: { none: { status: "SUCCEEDED" } },
+            },
         });
     });
 
