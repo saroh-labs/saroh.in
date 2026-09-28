@@ -573,6 +573,29 @@ const plansV1 = z.object({
     showDescriptions: z.boolean().optional(),
 });
 
+/**
+ * packs v1 — the business's class packs on sale, read live (G20).
+ *
+ * A bound block like `plans` (ADR-004): it stores the section title and how
+ * the packs show, never a pack. They are read when the page is served
+ * (`GET public/sites/:siteId/packs`): only packs on sale (published and
+ * active), with their published values, never a draft or an unpublished
+ * change, and nothing at all while Class packs is off for the business.
+ *
+ * `buttonLabel` is the card's button; ABSENT means the block's own default
+ * ("Buy", or "Ask about this pack" where the business can't take payment
+ * online). `showDescriptions` defaults to on, so ABSENT means shown. With no
+ * pack on sale the block renders nothing on the site; the editor's canvas
+ * says why.
+ */
+const packsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    buttonLabel: z.string().trim().max(40).optional(),
+    showDescriptions: z.boolean().optional(),
+});
+
 /** How many products a Product grid shows, at most, and when it isn't set. */
 export const PRODUCT_GRID_MAX = 12;
 export const PRODUCT_GRID_DEFAULT_COUNT = 4;
@@ -719,6 +742,7 @@ export const SECTION_TYPES = [
     "journal",
     "plans",
     "productGrid",
+    "packs",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -865,6 +889,13 @@ const REGISTRY: Record<string, SectionContract> = {
         // A title, which products by id, a count and a switch; the products
         // themselves are read live.
         schema: productGridV1,
+        sanitizedFields: [],
+    },
+    [key("packs", 1)]: {
+        type: "packs",
+        version: 1,
+        // A title and display options; the packs are read live.
+        schema: packsV1,
         sanitizedFields: [],
     },
 };
