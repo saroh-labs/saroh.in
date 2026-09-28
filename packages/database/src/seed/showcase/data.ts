@@ -57,7 +57,8 @@ export type ModuleKey =
     | "INSIGHTS"
     | "COMMUNICATIONS"
     | "AUTOMATIONS"
-    | "COURSES";
+    | "COURSES"
+    | "CLASS_PACKS";
 
 // --- Accounts ------------------------------------------------------------
 
@@ -1097,7 +1098,15 @@ export const PULSE: ShowcaseBusiness = {
     key: "pulse",
     slug: "pulse-fitness",
     name: "Pulse Fitness",
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COURSES"],
+    modules: [
+        "APPOINTMENTS",
+        "CRM",
+        "WEBSITE",
+        "PAYMENTS",
+        "COURSES",
+        // Sells packs, so Class packs is on (E12).
+        "CLASS_PACKS",
+    ],
     demoRole: "OWNER",
     owner: null,
     staff: [
@@ -1598,7 +1607,15 @@ export const PRANA: ShowcaseBusiness = {
     key: "prana",
     slug: "prana-yoga",
     name: "Prana Yoga",
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COURSES"],
+    modules: [
+        "APPOINTMENTS",
+        "CRM",
+        "WEBSITE",
+        "PAYMENTS",
+        "COURSES",
+        // Sells packs, so Class packs is on (E12).
+        "CLASS_PACKS",
+    ],
     demoRole: "ADMIN",
     owner: { first: "Radhika", last: "Bhat", role: "OWNER" },
     staff: [
