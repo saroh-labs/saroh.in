@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     courierChoices,
     courierFields,
+    courierName,
     isTrackingLink,
     shipmentOf,
     shipmentWords,
@@ -267,14 +268,31 @@ describe("courierFields", () => {
 });
 
 describe("courierChoices", () => {
-    it("offers the usual couriers, and the order's own first if it's another", () => {
+    it("offers the usual couriers, the order's own first if it's another, and Other last", () => {
         expect(courierChoices(null)).toEqual([
             "Delhivery",
             "Blue Dart",
             "Our own driver",
+            "Other",
         ]);
-        expect(courierChoices("Blue Dart")).toHaveLength(3);
-        expect(courierChoices("DTDC")[0]).toBe("DTDC");
+        expect(courierChoices("Blue Dart")).toHaveLength(4);
+        expect(courierChoices("DTDC")).toEqual([
+            "DTDC",
+            "Delhivery",
+            "Blue Dart",
+            "Our own driver",
+            "Other",
+        ]);
+        // A courier literally called "Other" isn't offered twice.
+        expect(courierChoices("Other")).toHaveLength(4);
+    });
+});
+
+describe("courierName", () => {
+    it("is the chip, or what was typed for Other", () => {
+        expect(courierName("Delhivery", "ignored")).toBe("Delhivery");
+        expect(courierName("Other", "  DTDC ")).toBe("DTDC");
+        expect(courierName("Other", "  ")).toBe("");
     });
 });
 
