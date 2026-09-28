@@ -285,7 +285,7 @@ export function payChoices(
     const payNow: PayChoice = {
         pay: "NOW",
         label: isClass ? `Pay ${price} for this class` : `Pay ${price} now`,
-        sub: `UPI or card — your ${place} is confirmed straight away`,
+        sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
     const deposit = service.depositCents ?? null;
@@ -304,7 +304,7 @@ export function payChoices(
             {
                 ...payNow,
                 label: `Pay the full ${price} now`,
-                sub: "UPI or card",
+                sub: "Online, in one payment",
             },
         ];
     }

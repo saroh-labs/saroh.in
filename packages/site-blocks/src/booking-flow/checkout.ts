@@ -7,8 +7,9 @@ import type { PaymentHandoff } from "./api";
  * answered with its non-secret handoff (`POST /public/invoices/:token/
  * payment-intent`): the amount is the invoice's, never the page's. This opens
  * that order in the provider's own window — Razorpay's Checkout, or
- * Cashfree's drop-in. Razorpay's is set to UPI and card only; Cashfree's
- * shows what the business's account has on (its order sets no methods).
+ * Cashfree's drop-in. Saroh never chooses or restricts the payment methods
+ * (DEC-059): each window shows what the business's own account has switched
+ * on, so neither the checkout nor the order sets any.
  *
  * What the window says is only ever a hint. "Paid" here means the provider's
  * window closed on a payment; the booking is confirmed by the provider's
@@ -111,23 +112,6 @@ function loadScript(
 const text = (v: unknown): string | null =>
     typeof v === "string" && v.trim() ? v.trim() : null;
 
-/**
- * Only UPI and card, in one block (R9): what the booking page promises —
- * "UPI or card" — and nothing else the account may have switched on.
- */
-const RAZORPAY_METHODS = {
-    display: {
-        blocks: {
-            saroh_upi_card: {
-                name: "UPI or card",
-                instruments: [{ method: "upi" }, { method: "card" }],
-            },
-        },
-        sequence: ["block.saroh_upi_card"],
-        preferences: { show_default_blocks: false },
-    },
-};
-
 function openRazorpay(
     request: CheckoutRequest,
     settle: (outcome: CheckoutOutcome) => void,
@@ -169,7 +153,6 @@ function openRazorpay(
                             ? { contact: request.booker.phone }
                             : {}),
                     },
-                    config: RAZORPAY_METHODS,
                     // A refusal comes back to the page, which says so and
                     // offers another try on the same order.
                     retry: { enabled: false },
