@@ -22,7 +22,7 @@ import {
     reserveBookingRefundInTx,
 } from "../payments/booking-refund";
 import { PaymentsService } from "../payments/payments.service";
-import { isValidSlotStart } from "./availability";
+import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import { BookingEventType } from "./booking-event-type";
@@ -1036,6 +1036,8 @@ export class BookingsService {
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
         );
+        // The buffers either side stay clear (DEC-052), as the listing keeps.
+        const clear = guarded({ startAt, endAt }, availService);
 
         try {
             return await prisma.$transaction(
@@ -1045,8 +1047,8 @@ export class BookingsService {
                             where: {
                                 serviceId: service.id,
                                 ...holdsPlace(new Date()),
-                                startAt: { lt: endAt },
-                                endAt: { gt: startAt },
+                                startAt: { lt: clear.endAt },
+                                endAt: { gt: clear.startAt },
                                 // Itself is not a competitor for its own seat.
                                 id: { not: booking.id },
                             },
@@ -1054,8 +1056,8 @@ export class BookingsService {
                         const held = await courseSeatsHeld(
                             tx,
                             service.id,
-                            startAt,
-                            endAt,
+                            clear.startAt,
+                            clear.endAt,
                         );
                         if (taken + held >= service.capacity) {
                             throw new ConflictException(
@@ -1070,6 +1072,7 @@ export class BookingsService {
                         startAt,
                         endAt,
                         booking.id,
+                        guardMinutes(availService),
                     );
                     // A class paid with a pack is only paid while the pack
                     // is good on the day (ADR-007): the same rule as spending.

@@ -590,11 +590,21 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 
-    it("refuses a time off the duration grid", async () => {
+    it("moves a one-to-one to a half hour (DEC-052)", async () => {
+        wireReschedule();
+        const moved = await new BookingsService().rescheduleBooking(
+            ctx(),
+            "bk_1",
+            { startAt: "2026-07-20T09:30:00.000Z" },
+        );
+        expect(moved.startAt.toISOString()).toBe("2026-07-20T09:30:00.000Z");
+    });
+
+    it("refuses a time off the grid", async () => {
         wireReschedule();
         await expect(
             new BookingsService().rescheduleBooking(ctx(), "bk_1", {
-                startAt: "2026-07-20T09:30:00.000Z",
+                startAt: "2026-07-20T09:15:00.000Z",
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(bookingUpdate).not.toHaveBeenCalled();

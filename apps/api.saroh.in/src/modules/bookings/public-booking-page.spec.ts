@@ -584,9 +584,11 @@ describe("the next two weeks (U19)", () => {
         expect(out.timezone).toBe("UTC");
         expect(out.days).toHaveLength(14);
         expect(out.days[0]!.date).toBe("2026-09-18");
-        // Today: 09:00 has started, 10:00 and 11:00 are left.
+        // Today: 09:00 and 09:30 have started; 10:00, 10:30 and 11:00 are
+        // left — the half hours of a one-to-one (DEC-052).
         expect(out.days[0]!.starts.map((s) => s.startAt)).toEqual([
             "2026-09-18T10:00:00.000Z",
+            "2026-09-18T10:30:00.000Z",
             "2026-09-18T11:00:00.000Z",
         ]);
         // Sat and Sun: no hours, so Closed.
@@ -598,7 +600,7 @@ describe("the next two weeks (U19)", () => {
             open: true,
             starts: [],
         });
-        expect(out.days[4]!.starts).toHaveLength(3);
+        expect(out.days[4]!.starts).toHaveLength(5); // 09:00, 09:30 … 11:00
         // What fills the time is read through the hold rule.
         expect(db.booking.findMany.mock.calls[0][0].where).toMatchObject({
             OR: [
@@ -692,8 +694,8 @@ describe("the next two weeks (U19)", () => {
 
         // Mon 21 Sep: he works Mondays, so the day is open — and Full.
         expect(out.days[3]).toMatchObject({ open: true, starts: [] });
-        // Mon 28 Sep: three starts, with him.
-        expect(out.days[10]!.starts).toHaveLength(3);
+        // Mon 28 Sep: 06:00, 06:30 … 08:00, with him.
+        expect(out.days[10]!.starts).toHaveLength(5);
         expect(out.days[10]!.starts[0]).toMatchObject({
             staffId: "staff_karan",
             staffName: "Karan Mehta",
