@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { setConsent } from "@/lib/messages/service";
 
-import type { AttentionInput } from "./attention";
+import type { AttentionInput, SuggestionInput } from "./attention";
 import type { NoteInput, WorkspaceResult } from "./service";
 import {
+    confirmAttention,
     createAttention,
     createNote,
     deleteNote,
@@ -63,7 +64,21 @@ export async function updateAttentionAction(
     return result;
 }
 
-/** Sent when the Undo window closes, never before. */
+/** A booking-page note, added to Needs attention (C12). */
+export async function confirmAttentionAction(
+    contactId: string,
+    entryId: string,
+    input: SuggestionInput,
+) {
+    const result = await confirmAttention(contactId, entryId, input);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/**
+ * Sent when the Undo window closes, never before. On a booking-page note
+ * it is "Nothing to add".
+ */
 export async function removeAttentionAction(
     contactId: string,
     entryId: string,
