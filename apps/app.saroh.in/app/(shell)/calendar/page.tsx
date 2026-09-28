@@ -35,7 +35,8 @@ const FALLBACK_ZONE = "Asia/Kolkata";
  * business joined, or past what can be planned, opens the nearest one the
  * calendar reaches (E21): the API refuses it and names that month (E20).
  * `?day=YYYY-MM-DD` opens it on that day: a key in the grid that moves past
- * the month's edge asks for it (E28).
+ * the month's edge asks for it (E28). `?team=<staff id>` opens it on one
+ * person's bookings and classes (E24), for a viewer the team is named to.
  *
  * A role that reads none of the layers is told so before anything is read,
  * and again if the API refuses it (E20's 403).
@@ -43,10 +44,10 @@ const FALLBACK_ZONE = "Asia/Kolkata";
 export default async function CalendarPage({
     searchParams,
 }: {
-    searchParams: Promise<{ month?: string; day?: string }>;
+    searchParams: Promise<{ month?: string; day?: string; team?: string }>;
 }) {
     await requireSession();
-    const [{ month: asked, day }, organization] = await Promise.all([
+    const [{ month: asked, day, team }, organization] = await Promise.all([
         searchParams,
         resolveActiveOrganization(),
     ]);
@@ -115,6 +116,9 @@ export default async function CalendarPage({
                     }}
                     // A key crossed into this month on this day (E28).
                     day={typeof day === "string" ? day : undefined}
+                    // The team filter's person (E24); one the filter
+                    // doesn't list opens on Everyone.
+                    team={typeof team === "string" ? team : undefined}
                 />
             ) : (
                 <CalendarNothing />

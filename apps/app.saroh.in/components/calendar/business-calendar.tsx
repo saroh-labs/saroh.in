@@ -7,13 +7,16 @@ import { Sheet, SheetContent, SheetTitle } from "@saroh/ui/sheet";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 import { CalendarNothing } from "@/components/calendar/calendar-nothing";
 import { DayPanel } from "@/components/calendar/day-panel";
 import { LayerSwitches } from "@/components/calendar/layer-switches";
 import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
+import { MonthStep } from "@/components/calendar/month-step";
 import { MonthStrip } from "@/components/calendar/month-strip";
+import { TeamFilter } from "@/components/calendar/team-filter";
+import { cellOff, dayOffLine } from "@/lib/calendar/days-off";
 import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
 import {
@@ -23,15 +26,25 @@ import {
     monthTitle,
     shiftMonth,
 } from "@/lib/calendar/layers";
-import { calendarCash, moneyByDate, wholeMoney } from "@/lib/calendar/money";
+import {
+    calendarCash,
+    moneyByDate,
+    monthEntries,
+    wholeMoney,
+} from "@/lib/calendar/money";
 import type { ProblemCan } from "@/lib/calendar/problems";
-import type { Edge } from "@/lib/calendar/range";
 import {
     calendarRange,
     dayShortcuts,
     monthEdges,
     openingDay,
 } from "@/lib/calendar/range";
+import {
+    calendarHref,
+    forPerson,
+    pickedPerson,
+    teamOptions,
+} from "@/lib/calendar/team";
 import type { CalendarMonth } from "@/lib/calendar/types";
 
 /** Between the phone and the full rail the day opens as a sheet. */
@@ -58,7 +71,9 @@ const listed = (labels: string[]) =>
 /**
  * Home › Calendar, after the "Saroh Business Calendar" design: the month, a
  * switch per layer with its count, the day's chips and takings, and the
- * picked day grouped by layer with a link to each record.
+ * picked day grouped by layer with a link to each record. Days off are
+ * said on their day, and a team of two or more can be narrowed to one
+ * person (E24).
  */
 export function BusinessCalendar({
     data,
@@ -66,6 +81,7 @@ export function BusinessCalendar({
     thisMonth,
     can,
     day: asked,
+    team,
 }: {
     data: CalendarMonth;
     /** "YYYY-MM-DD" and "YYYY-MM" now, in the business's zone. */
@@ -75,11 +91,28 @@ export function BusinessCalendar({
     can: { order: boolean; book: boolean } & ProblemCan;
     /** `?day=`: the day to open on, when a key crossed into this month. */
     day?: string;
+    /** `?team=`: the person the team filter opens on (E24). */
+    team?: string;
 }) {
     const router = useRouter();
+    // Every layer the month has keeps its switch while one person is picked.
     const layers = layersFor(data);
     const range = calendarRange(data.joinedAt, thisMonth);
     const [off, setOff] = useState<Off>({});
+    const people = teamOptions(data);
+    const [person, setPerson] = useState(() => pickedPerson(team, people));
+    const shown = useMemo(() => forPerson(data, person), [data, person]);
+    const hrefFor = (m: string, day?: string) =>
+        calendarHref({ month: m, thisMonth, day, team: person });
+    // The URL says who is picked, so a link or a reload keeps them; no read.
+    const pickPerson = (id: string | null) => {
+        setPerson(id);
+        window.history.replaceState(
+            null,
+            "",
+            calendarHref({ month: data.month, thisMonth, team: id }),
+        );
+    };
     const [selected, setSelected] = useState(() => {
         const dates = data.days.map((d) => d.date);
         return askedDay(asked, dates, range) ?? openingDay(dates, today, range);
@@ -90,12 +123,23 @@ export function BusinessCalendar({
     if (layers.length === 0) return <CalendarNothing />;
 
     const currency = mainCurrency(data);
-    const day = data.days.find((d) => d.date === selected) ?? data.days.at(0);
+    const day = shown.days.find((d) => d.date === selected) ?? shown.days.at(0);
     const failed = new Set(data.unavailable.map((u) => u.source));
     const missing = data.unavailable.map((u) => u.label);
     const money = data.takings !== undefined;
     // In, out and due (E23): only for `payment:read`, whom the API sent them.
-    const cash = calendarCash(data, off, currency);
+    // The person picked narrows what is drawn; the file stays the month's.
+    const narrowed = calendarCash(shown, off, currency);
+    const cash = narrowed && {
+        ...narrowed,
+        all: monthEntries(data) ?? narrowed.all,
+    };
+    const offs = new Map(
+        shown.days.flatMap((d) => {
+            const o = cellOff(data, d.date, person);
+            return o ? [[d.date, o] as const] : [];
+        }),
+    );
 
     const pick = (date: string) => {
         setSelected(date);
@@ -110,8 +154,7 @@ export function BusinessCalendar({
             setSelected(date);
             return;
         }
-        const month = m === thisMonth ? "" : `month=${m}&`;
-        router.push(`/calendar?${month}day=${date}`, { scroll: false });
+        router.push(hrefFor(m, date), { scroll: false });
     };
 
     const panel = (heading: (title: string) => React.ReactNode) =>
@@ -132,11 +175,10 @@ export function BusinessCalendar({
                 })}
                 can={can}
                 money={cash}
+                offLine={dayOffLine(data, day.date)}
             />
         ) : null;
 
-    const monthHref = (m: string) =>
-        m === thisMonth ? "/calendar" : `/calendar?month=${m}`;
     const edges = monthEdges(data.month, range);
     const edgeNote = edges.before?.note ?? edges.after?.note;
     const isThisMonth = data.month === thisMonth;
@@ -152,7 +194,7 @@ export function BusinessCalendar({
                     cash ? undefined : (
                         <span className="w-full text-right text-[12.5px] text-muted-foreground sm:w-auto">
                             {monthSummary({
-                                month: data,
+                                month: shown,
                                 layers,
                                 off,
                                 today,
@@ -166,7 +208,7 @@ export function BusinessCalendar({
             <div className="!mt-0.5 flex flex-wrap items-center gap-1.5">
                 <div className="flex gap-1">
                     <MonthStep
-                        href={monthHref(shiftMonth(data.month, -1))}
+                        href={hrefFor(shiftMonth(data.month, -1))}
                         label="Previous month"
                         edge={edges.before}
                     >
@@ -191,11 +233,11 @@ export function BusinessCalendar({
                             size="sm"
                             className="px-[11px] text-[12.5px]"
                         >
-                            <Link href="/calendar">This month</Link>
+                            <Link href={hrefFor(thisMonth)}>This month</Link>
                         </Button>
                     )}
                     <MonthStep
-                        href={monthHref(shiftMonth(data.month, 1))}
+                        href={hrefFor(shiftMonth(data.month, 1))}
                         label="Next month"
                         edge={edges.after}
                     >
@@ -213,10 +255,17 @@ export function BusinessCalendar({
                     </span>
                 ) : null}
                 <span className="flex-1" />
+                {people.length > 0 ? (
+                    <TeamFilter
+                        options={people}
+                        value={person}
+                        onChange={pickPerson}
+                    />
+                ) : null}
                 <LayerSwitches
                     layers={layers}
                     off={off}
-                    totals={data.totals}
+                    totals={shown.totals}
                     failed={failed}
                     onToggle={(key) =>
                         setOff((o) => ({ ...o, [key]: !o[key] }))
@@ -259,7 +308,7 @@ export function BusinessCalendar({
             <div className="!mt-3.5 flex flex-wrap items-start gap-4">
                 <MonthGrid
                     month={data.month}
-                    days={data.days}
+                    days={shown.days}
                     range={range}
                     layers={layers}
                     off={off}
@@ -267,6 +316,7 @@ export function BusinessCalendar({
                     selected={day?.date ?? ""}
                     currency={cash?.currency ?? null}
                     money={cash ? moneyByDate(cash.shown) : null}
+                    offs={offs}
                     onPick={pick}
                     onMove={move}
                 />
@@ -334,45 +384,5 @@ export function BusinessCalendar({
                 </SheetContent>
             </Sheet>
         </>
-    );
-}
-
-/**
- * ‹ or ›: a link to the next month, or — at the edge of what the calendar
- * reaches — a greyed button that stays focusable and says why.
- */
-function MonthStep({
-    href,
-    label,
-    edge,
-    children,
-}: {
-    href: string;
-    label: string;
-    edge: Edge | null;
-    children: React.ReactNode;
-}) {
-    if (edge) {
-        return (
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-disabled
-                aria-label={label}
-                aria-describedby="calendar-edge"
-                title={edge.title}
-                className="w-8 cursor-default px-0 text-muted-foreground hover:bg-card hover:text-muted-foreground"
-            >
-                {children}
-            </Button>
-        );
-    }
-    return (
-        <Button asChild variant="outline" size="sm" className="w-8 px-0">
-            <Link href={href} aria-label={label}>
-                {children}
-            </Link>
-        </Button>
     );
 }
