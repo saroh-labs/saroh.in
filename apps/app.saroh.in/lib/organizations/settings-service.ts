@@ -25,6 +25,11 @@ export interface OrganizationProfile {
      * numbers and the calendar then read India's). Absent from an older API.
      */
     timezone?: string | null;
+    /**
+     * The phone the business's website shows (DEC-053), E.164
+     * ("+919845012345"); null when none is set. Absent from an older API.
+     */
+    phone?: string | null;
 }
 
 /** GST (ADR-008). The GSTIN is the profile's `taxId`. */

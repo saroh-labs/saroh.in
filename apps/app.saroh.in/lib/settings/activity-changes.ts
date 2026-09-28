@@ -42,7 +42,12 @@ export const FIELD_PHRASES: Partial<
         tab: "contact",
     },
     website: { phrase: "the website", label: "Website", tab: "contact" },
-    phone: { phrase: "the phone number", label: "Phone", tab: "contact" },
+    // The public phone the website shows (DEC-053); recorded by name only.
+    phone: {
+        phrase: "the phone on your website",
+        label: "Phone on your website",
+        tab: "contact",
+    },
     gstRegistered: {
         phrase: "the GST registration",
         label: "GST registration",

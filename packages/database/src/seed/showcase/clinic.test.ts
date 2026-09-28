@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
     KAVI_DENTISTS,
+    KAVI_PHONE,
+    KAVI_PHONE_E164,
     KAVI_RULES,
     KAVI_SAC,
     KAVI_SERVICES,
@@ -450,5 +452,12 @@ describe("Kavi Dental seeded on any day", () => {
 
     it("refuses a day past the last Diwali it knows", () => {
         expect(() => plan(ist("2031-01-01", "10:00"))).toThrow(/DIWALI/);
+    });
+});
+
+describe("Kavi Dental's public phone (DEC-053)", () => {
+    it("is the desk's number as the profile stores it, E.164", () => {
+        expect(KAVI_PHONE_E164).toMatch(/^\+[1-9]\d{7,14}$/);
+        expect(KAVI_PHONE_E164).toBe(KAVI_PHONE.replace(/\s/g, ""));
     });
 });

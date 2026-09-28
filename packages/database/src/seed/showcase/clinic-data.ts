@@ -53,6 +53,8 @@ export const KAVI_ADDRESS_PRINTED =
 
 /** The desk's number (Book Kavi Dental: "Call +91 80 4099 2210"). */
 export const KAVI_PHONE = "+91 80 4099 2210";
+/** The same number as the business profile stores it (E.164, DEC-053). */
+export const KAVI_PHONE_E164 = "+918040992210";
 
 /** Open 9am–7pm Monday to Saturday, and Sunday mornings. */
 export const KAVI_OPENING_HOURS = [
