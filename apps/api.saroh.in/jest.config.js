@@ -198,6 +198,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-row.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
+        // B13: New order's rules and how a walk-in reads, DB-free. The
+        // writes are in new-order.db.spec.ts.
+        "<rootDir>/src/modules/orders/new-order.spec.ts",
+        "<rootDir>/src/modules/orders/walk-in.spec.ts",
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",

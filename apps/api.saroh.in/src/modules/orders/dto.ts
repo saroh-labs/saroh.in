@@ -15,6 +15,12 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import {
+    NewOrderCustomerInput,
+    NewOrderPaymentInput,
+    WalkInInput,
+} from "./new-order.dto";
+
 /** The Orders list's tabs: All · Open · Refunded (default 14). */
 export const LIST_TABS = ["all", "open", "refunded"] as const;
 export type ListTab = (typeof LIST_TABS)[number];
@@ -165,9 +171,42 @@ export class OrderItemInput {
 }
 
 export class CreateOrderDto {
+    /**
+     * The storefront's customer. One of this, `contactId`, `customer` or
+     * `walkIn` names who it is for (B13); an app from before B13 sends only
+     * this.
+     */
+    @IsOptional()
     @Transform(trim)
     @IsString()
-    customerId!: string;
+    customerId?: string;
+
+    /** A person picked from the customer search (E4's picker, B13). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    contactId?: string;
+
+    /** Someone new, by email (B13). */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => NewOrderCustomerInput)
+    customer?: NewOrderCustomerInput;
+
+    /** A walk-in: a name, and a phone if given; no record (B13). */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => WalkInInput)
+    walkIn?: WalkInInput;
+
+    /**
+     * How it is paid (B13). Absent, it is left unpaid, as every order was
+     * before B13.
+     */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => NewOrderPaymentInput)
+    payment?: NewOrderPaymentInput;
 
     @IsArray()
     @ArrayMinSize(1, { message: "An order needs at least one item" })

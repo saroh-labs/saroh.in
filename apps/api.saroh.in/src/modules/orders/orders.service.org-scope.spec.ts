@@ -176,3 +176,46 @@ describe("OrdersService.create — the storefront's currency", () => {
         expect(orderCreate.mock.calls[0][0].data.currency).toBe("USD");
     });
 });
+
+describe("OrdersService.create — what New order v2 asks beyond the storefront (B13)", () => {
+    const writable = { organizationId: ORG };
+    function withMember(allowed: string[]) {
+        const stores = {
+            writableOrganization: jest.fn().mockResolvedValue(writable),
+            memberAllows: jest.fn((_s: string, _u: string, action: string) =>
+                Promise.resolve(allowed.includes(action)),
+            ),
+        } as unknown as StoresService;
+        return new OrdersService(stores);
+    }
+
+    it("a picked person takes contact:read, and nothing is written without it", async () => {
+        await expect(
+            withMember([]).create(STORE, USER, {
+                items: DTO.items,
+                contactId: "contact_1",
+            }),
+        ).rejects.toThrow(/can't look customers up/);
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("a pay link takes order:write", async () => {
+        await expect(
+            withMember(["contact:read"]).create(STORE, USER, {
+                items: DTO.items,
+                walkIn: { name: "Asha" },
+                payment: { kind: "LINK" },
+            }),
+        ).rejects.toThrow(/can't make a pay link/);
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("an order for nobody is refused before anything is read", async () => {
+        await expect(
+            withMember(["contact:read"]).create(STORE, USER, {
+                items: DTO.items,
+            }),
+        ).rejects.toThrow(/Say who the order is for/);
+        expect(productFindFirst).not.toHaveBeenCalled();
+    });
+});
