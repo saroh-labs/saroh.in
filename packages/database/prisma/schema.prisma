@@ -2939,9 +2939,33 @@ model Page {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // What the page is (round-2 G14, DEC-046): FREE is a page the merchant
+  // lays out by hand, as every page was before; the others are module pages,
+  // which sit beside them. At most one of each module kind per site (the
+  // partial unique index below). A Book page is always at /book and a Shop
+  // page at /shop; the others default to /prices, /journal and /contact.
+  kind PageKind @default(FREE)
+
+  // "Show in menu" (G14). A module page joins the site's menu on its own
+  // while this is on; any page with it off is reachable by link but never
+  // listed. On by default, so every page that existed before keeps the menu
+  // it had.
+  inMenu Boolean @default(true)
+
   @@unique([siteId, path])
+  @@unique([siteId, kind], map: "Page_siteId_module_kind_key", where: raw("kind <> 'FREE'"))
   @@index([siteId])
   @@index([organizationId])
+}
+
+/// A page's kind (G14): FREE, or the module it presents.
+enum PageKind {
+  FREE
+  SHOP
+  BOOK
+  PRICES
+  JOURNAL
+  CONTACT
 }
 
 // PageVersion — a DRAFT / working version of a Page. Editing happens here; a
