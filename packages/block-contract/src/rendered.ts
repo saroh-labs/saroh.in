@@ -267,6 +267,9 @@ const renderedServicesList = z.object({
     serviceIds: z.array(z.string()),
     showPrices: z.boolean().optional(),
     cta: renderedCtaSchema.optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel: z.string().optional(),
 });
 
 /**
@@ -293,6 +296,8 @@ const renderedJournal = z.object({
     count: z.union([z.literal(3), z.literal(6)]).optional(),
     showExcerpts: z.boolean().optional(),
     showImages: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    buttonLabel: z.string().optional(),
 });
 
 /**
@@ -306,6 +311,8 @@ const renderedPlans = z.object({
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel: z.string().optional(),
     showDescriptions: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showPrices: z.boolean().optional(),
 });
 
 /**
@@ -321,6 +328,10 @@ const renderedProductGrid = z.object({
     productIds: z.array(z.string()).optional(),
     count: z.number().int().optional(),
     showPrices: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showPhotos: z.boolean().optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel: z.string().optional(),
 });
 
 /**
