@@ -262,6 +262,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         // G9: the order a site lists plans in, and Most chosen.
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
+        // G20: a plan joined online — its snapshot and waiting joins. Pure.
+        "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
@@ -271,6 +273,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         // A11: a pack bought online — its snapshot, words and dates. Pure.
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
+        // G20: a pack as the site's Prices page shows it. Pure.
+        "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

@@ -183,6 +183,15 @@ const NEVER: Record<string, string> = {
     // unless Class packs is rolled out and switched on (DEC-057, E12).
     "class-packs/account-packs.controller.ts":
         "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
+    // G20: the Prices page's Class packs section. Class packs being off is
+    // checked by the service (`packsOffered`), which answers 404, as a
+    // site with no packs.
+    "class-packs/public-packs.controller.ts":
+        "a published site's Class packs section — Class packs checked by the service",
+    // G20: joining a plan from the site. Payments being off is checked by
+    // the service (`paymentsOffered`), which answers 404.
+    "subscriptions/account-plan-join.controller.ts":
+        "a signed-in customer joining a plan — Payments checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.

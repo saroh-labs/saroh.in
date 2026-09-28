@@ -89,9 +89,16 @@ export type InvoiceSource = (typeof INVOICE_SOURCES)[number];
  * A pack a customer is buying online (A11) is the same: a source PACK draft
  * with no number, paid (and numbered) or voided after 24 hours. A pack the
  * desk sells is issued there and then, so it always has a number.
+ *
+ * So is a plan a customer is joining online (G20): a source SUBSCRIPTION
+ * draft with no number. A period's invoice the desk or the renewal job
+ * issues always has a number.
  */
 export const NOT_A_BOOKING_HOLD = {
-    NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+    NOT: {
+        source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+        number: null,
+    },
 } satisfies Prisma.InvoiceWhereInput;
 
 /**
