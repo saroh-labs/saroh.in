@@ -276,10 +276,20 @@ export const CAPABILITIES: readonly Capability[] = [
     },
 
     // — Schedule ——————————————————————————————————————————————
-    { action: "service:read", group: "schedule", label: "See services" },
-    { action: "service:write", group: "schedule", label: "Change services" },
     { action: "booking:read", group: "schedule", label: "See bookings" },
-    { action: "booking:write", group: "schedule", label: "Change bookings" },
+    {
+        action: "booking:write",
+        group: "schedule",
+        label: "Change bookings",
+        note: "Book, check in, mark a no-show, move and cancel. Whoever can change bookings also sees them.",
+    },
+    { action: "service:read", group: "schedule", label: "See services" },
+    {
+        action: "service:write",
+        group: "schedule",
+        label: "Change services, hours, time off and booking rules",
+        note: "Setting up how the business takes bookings, not the day's bookings. Whoever can change services also sees them.",
+    },
     { action: "course:read", group: "schedule", label: "See courses" },
     {
         action: "course:write",
@@ -291,11 +301,19 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "pack:read",
         group: "schedule",
         label: "See class packs and who bought them",
+        note: "The whole pack: who holds one, classes left, prices and every sale.",
+    },
+    {
+        action: "pack:sell",
+        group: "schedule",
+        label: "Sell class packs and book with them",
+        note: "Sells a pack at the desk and pays for a booking with one. Setting a pack's price or how long it lasts needs Make and change class packs.",
     },
     {
         action: "pack:write",
         group: "schedule",
-        label: "Sell class packs and book with them",
+        label: "Make and change class packs",
+        note: "Prices, classes, how long they last, publishing, extending and archiving. Whoever can change packs can also sell them.",
     },
 
     // — Money —————————————————————————————————————————————————

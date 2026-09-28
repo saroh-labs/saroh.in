@@ -107,8 +107,9 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
  * the kitchen. Someone at the counter reads an order's kitchen view — items,
  * stage, notes, who it is for, never money — and moves its stage. Taking,
  * changing, refunding and exporting orders are `order:create`, `order:edit`,
- * `order:refund` and `order:export` (B16), which a Member does not hold; the
- * Member default bundle is F18's to change.
+ * `order:refund` and `order:export` (B16), which a Member does not hold; nor
+ * does a Member hold `booking:write`, `pack:read` or `pack:sell` (E26). The
+ * Member default bundle is F18's to change (matrix Q1).
  *
  * Kept apart from the floor because it is a write: the floor is what every
  * reading role shares, and this is one narrow thing a Member may DO.
@@ -287,10 +288,21 @@ const ORDER_POWERS: readonly OrgAction[] = [
  * Customers (C13, matrix §2): `contact:write` → `contact:read`, since editing
  * a person means seeing them. Nothing implies `customer:sensitive`,
  * `customer:merge` or `customer:remove`: each is granted on its own.
+ *
+ * Bookings and class packs (E26, matrix §2): `booking:write` →
+ * `booking:read` and `service:write` → `service:read`, since changing the
+ * diary or a service means seeing it. `pack:write` → `pack:sell`, since
+ * selling a pack was always its, and `pack:sell` → `pack:read`, since a
+ * sale shows the pack it sells; applied in that order, so `pack:write`
+ * reaches `pack:read` through `pack:sell`.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("store:write")) set.add("inventory:write");
     if (set.has("contact:write")) set.add("contact:read");
+    if (set.has("booking:write")) set.add("booking:read");
+    if (set.has("service:write")) set.add("service:read");
+    if (set.has("pack:write")) set.add("pack:sell");
+    if (set.has("pack:sell")) set.add("pack:read");
     if (set.has("order:write")) {
         for (const part of ORDER_WRITE_PARTS) set.add(part);
     }
