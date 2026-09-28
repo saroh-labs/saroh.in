@@ -97,6 +97,24 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
     });
 
+    it("keeps a private limited company as company this release, and takes a new type as sent (F10)", async () => {
+        await service.onboard("user_1", {
+            name: "Acme",
+            profile: { type: "pvt" },
+        });
+        expect(profileCreate).toHaveBeenLastCalledWith({
+            data: expect.objectContaining({ type: "company" }),
+        });
+
+        await service.onboard("user_1", {
+            name: "Acme",
+            profile: { type: "partnership" },
+        });
+        expect(profileCreate).toHaveBeenLastCalledWith({
+            data: expect.objectContaining({ type: "partnership" }),
+        });
+    });
+
     it("emits an organization.onboard SUCCESS audit event after commit", async () => {
         await service.onboard("user_1", { name: "Acme" });
 
