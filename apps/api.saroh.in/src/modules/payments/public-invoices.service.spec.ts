@@ -157,6 +157,7 @@ describe("PublicInvoicesService.read", () => {
         const view = await makeService().service.read(TOKEN);
         expect(Object.keys(view).sort()).toEqual(
             [
+                "billOfSupply",
                 "billedTo",
                 "businessName",
                 "currency",
@@ -188,6 +189,7 @@ describe("PublicInvoicesService.read", () => {
             currency: "INR",
             status: "ISSUED",
             billedTo: "Asha Rao",
+            billOfSupply: false,
             theme: null,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
@@ -204,6 +206,38 @@ describe("PublicInvoicesService.read", () => {
         ]) {
             expect(select).not.toHaveProperty(hidden);
         }
+    });
+
+    it("calls a registered business's exempt paper a bill of supply, sending no GSTIN or rate", async () => {
+        invoiceFindFirst.mockResolvedValue({
+            ...STORED,
+            tax: dec("0.00"),
+            kind: "INVOICE",
+            sellerGstin: "29ABCDE1234F1Z5",
+            lines: STORED.lines.map((l) => ({ ...l, gstRate: dec("0.00") })),
+        });
+        const view = await makeService().service.read(TOKEN);
+        expect(view.billOfSupply).toBe(true);
+        expect(JSON.stringify(view)).not.toContain("29ABCDE1234F1Z5");
+        expect(JSON.stringify(view)).not.toContain("gstRate");
+    });
+
+    it.each([
+        ["a taxed line", "INVOICE", "18.00"],
+        ["a rate never set", "INVOICE", null],
+        ["a credit note", "CREDIT_NOTE", "0.00"],
+    ])("is not a bill of supply with %s", async (_label, kind, rate) => {
+        invoiceFindFirst.mockResolvedValue({
+            ...STORED,
+            kind,
+            sellerGstin: "29ABCDE1234F1Z5",
+            lines: STORED.lines.map((l) => ({
+                ...l,
+                gstRate: rate === null ? null : dec(rate),
+            })),
+        });
+        const view = await makeService().service.read(TOKEN);
+        expect(view.billOfSupply).toBe(false);
     });
 
     it("says OVERDUE past the due date, as the workspace does", async () => {

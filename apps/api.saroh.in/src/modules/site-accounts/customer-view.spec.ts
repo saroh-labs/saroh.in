@@ -508,6 +508,9 @@ describe("the account's allow-list", () => {
             paidAt: new Date("2026-09-02T00:00:00Z"),
             total: "12000",
             currency: "INR",
+            kind: "INVOICE",
+            sellerGstin: null,
+            lines: [{ gstRate: null }],
             ...noisy,
         } as never);
         expect(view).toEqual({
@@ -517,7 +520,35 @@ describe("the account's allow-list", () => {
             paidAt: "2026-09-02T00:00:00.000Z",
             total: "12000.00",
             currency: "INR",
+            billOfSupply: false,
         });
+        expect(leaks(view)).toEqual([]);
+    });
+
+    it("an exempt receipt says bill of supply, and never its GSTIN or rates", () => {
+        const view = receiptView({
+            id: "inv_2",
+            number: "KD/26-27/0001",
+            issuedAt: new Date("2026-09-01T00:00:00Z"),
+            paidAt: new Date("2026-09-01T00:00:00Z"),
+            total: "900",
+            currency: "INR",
+            kind: "INVOICE",
+            sellerGstin: "29ABCDE1234F1Z5",
+            lines: [{ gstRate: "0.00" }],
+            ...noisy,
+        } as never);
+        expect(view.billOfSupply).toBe(true);
+        expect(Object.keys(view).sort()).toEqual([
+            "billOfSupply",
+            "currency",
+            "issuedAt",
+            "number",
+            "paidAt",
+            "ref",
+            "total",
+        ]);
+        expect(JSON.stringify(view)).not.toContain("29ABCDE1234F1Z5");
         expect(leaks(view)).toEqual([]);
     });
 

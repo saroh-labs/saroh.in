@@ -275,6 +275,10 @@ export class AccountHomeService {
                 paidAt: true,
                 total: true,
                 currency: true,
+                // Whether it is a bill of supply (D15); only that leaves.
+                kind: true,
+                sellerGstin: true,
+                lines: { select: { gstRate: true } },
             },
         });
         return rows.map(receiptView);

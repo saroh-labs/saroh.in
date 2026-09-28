@@ -13,6 +13,7 @@ import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
+import { isBillOfSupply } from "../invoices/invoice-title";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
@@ -42,6 +43,12 @@ export interface PublicInvoiceView {
     /** Overdue is derived, as in the workspace. Void means not payable. */
     status: Exclude<InvoiceStanding, "DRAFT">;
     billedTo: string | null;
+    /**
+     * A registered business's paper whose every line is exempt (D15): the
+     * page calls it a bill of supply, as the merchant's copy does. The
+     * rates and the GSTIN it is worked out from stay behind.
+     */
+    billOfSupply: boolean;
     /** The business's site theme as `--site-*` variables; null for defaults. */
     theme: Record<string, string> | null;
 }
@@ -71,6 +78,8 @@ export async function invoicePaper(
             total: true,
             currency: true,
             billToName: true,
+            kind: true,
+            sellerGstin: true,
             organization: { select: { name: true } },
             lines: {
                 orderBy: { position: "asc" },
@@ -79,6 +88,7 @@ export async function invoicePaper(
                     quantity: true,
                     unitPrice: true,
                     amount: true,
+                    gstRate: true,
                 },
             },
         },
@@ -112,6 +122,7 @@ export async function invoicePaper(
             "DRAFT"
         >,
         billedTo: invoice.billToName,
+        billOfSupply: isBillOfSupply(invoice),
         theme: site ? siteStyleVariables(parseSiteStyle(site.style)) : null,
     };
 }

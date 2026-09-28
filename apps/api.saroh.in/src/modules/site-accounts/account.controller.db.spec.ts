@@ -638,6 +638,8 @@ describe("receipts", () => {
                 ref: paid.id,
                 number: "KD-0001",
                 total: "12000.00",
+                // Not registered for GST: a receipt, never a bill of supply.
+                billOfSupply: false,
             }),
         ]);
 
@@ -651,6 +653,7 @@ describe("receipts", () => {
             number: "KD-0001",
             status: "PAID",
             total: "12000.00",
+            billOfSupply: false,
             lines: [expect.objectContaining({ description: "Root canal" })],
         });
 
