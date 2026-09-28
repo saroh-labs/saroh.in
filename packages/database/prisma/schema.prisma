@@ -360,6 +360,13 @@ model BusinessProfile {
   // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
+
+  // "Members can pause from their account" (round-2 A8), beside the
+  // subscriptions' time zone above: on, a member pauses their own plan for
+  // 2, 4 or 8 weeks from the account area on the business's site; off, the
+  // account shows no Pause and the API refuses a customer's pause (403).
+  // Staff pause either way. No profile yet reads as on.
+  membersCanPause Boolean @default(true)
 }
 
 // Membership: links a User to an Organization with a role (renamed from

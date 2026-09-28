@@ -8,6 +8,13 @@ import { InvoicesModule } from "../invoices/invoices.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AccountPlanController } from "../site-accounts/account-plan.controller";
+import {
+    AccountPlanService,
+    AUTOPAY_CHARGE_PENDING,
+    NO_AUTOPAY_YET,
+} from "../site-accounts/account-plan.service";
+import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import {
     SUBSCRIPTION_RENEW_TYPE,
     SubscriptionRenewHandler,
@@ -26,6 +33,11 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
  * (ADR-007). On start-up it registers the renewal handler and makes sure a
  * run is waiting — the job reschedules itself from then on, and a timer
  * restarts the chain if it ever stops.
+ *
+ * A member's own plan, from their account on the business's site (round-2
+ * A8), is served here too: {@link AccountPlanController}, behind the
+ * customer's session (`SiteAccountsModule`), as bookings serve a signed-in
+ * customer's booking.
  */
 @Module({
     imports: [
@@ -33,12 +45,20 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         CapabilitiesModule,
         InvoicesModule,
         JobsModule,
+        SiteAccountsModule,
     ],
-    controllers: [SubscriptionPlansController, SubscriptionsController],
+    controllers: [
+        SubscriptionPlansController,
+        SubscriptionsController,
+        AccountPlanController,
+    ],
     providers: [
         SubscriptionsService,
         SubscriptionRenewHandler,
         OrganizationGuard,
+        AccountPlanService,
+        // No autopay charge is ever under way until D13 provides the check.
+        { provide: AUTOPAY_CHARGE_PENDING, useValue: NO_AUTOPAY_YET },
     ],
     exports: [SubscriptionsService],
 })

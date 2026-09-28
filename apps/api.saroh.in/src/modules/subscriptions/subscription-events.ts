@@ -85,6 +85,15 @@ export function subscriptionActor(ctx: OrganizationContext): SubscriptionActor {
 export const JOB: SubscriptionActor = JOB_ACTOR;
 
 /**
+ * The member, from their own account on the business's site (round-2 A8):
+ * no user id, and the account that acted, so the log can say "from their
+ * account" and never names a team member.
+ */
+export function customerActor(customerAccountId: string): SubscriptionActor {
+    return { actorKind: "CUSTOMER", actorUserId: null, customerAccountId };
+}
+
+/**
  * A plan as an event names it: enough to say it in words later. A type,
  * not an interface, so it fits the JSON column's index signature.
  */

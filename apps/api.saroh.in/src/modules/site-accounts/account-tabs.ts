@@ -24,7 +24,10 @@ export interface AccountOffers {
     appointments: boolean;
     /** Commerce is rolled out and on. */
     orders: boolean;
-    /** A plan anyone can join, or one this customer is on. */
+    /**
+     * A plan on sale (never a draft, `PLANS_ON_SALE`), one this customer is
+     * on, or a pack of theirs not yet expired: what the Plan tab shows (A8).
+     */
     plans: boolean;
     /** The customer can message the business (A13). */
     messages: boolean;
@@ -41,6 +44,8 @@ export interface AccountOffers {
  */
 export const SHIPPED_ACCOUNT_TABS: ReadonlySet<AccountTabKey> = new Set([
     "home",
+    // A8: the plan and packs.
+    "plan",
     "me",
 ]);
 

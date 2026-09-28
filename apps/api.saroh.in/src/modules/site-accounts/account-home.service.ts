@@ -13,6 +13,7 @@ import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
+import { PLANS_ON_SALE } from "../subscriptions/plan-on-sale";
 import {
     readClasses,
     readLatestOrders,
@@ -144,18 +145,26 @@ export class AccountHomeService {
      */
     async offers(ctx: Ctx): Promise<AccountOffers> {
         const { organizationId, contactId } = ctx;
-        const [appointments, orders, livePlans, ownPlan, classes] =
+        const [appointments, orders, livePlans, ownPlan, ownPacks, classes] =
             await Promise.all([
                 this.moduleOffered(organizationId, "APPOINTMENTS"),
                 this.moduleOffered(organizationId, "COMMERCE"),
+                // Only what is on sale: a draft is never shown (D21).
                 prisma.subscriptionPlan.count({
-                    where: { organizationId, status: "ACTIVE" },
+                    where: { organizationId, ...PLANS_ON_SALE },
                 }),
                 prisma.customerSubscription.count({
                     where: {
                         organizationId,
                         contactId,
                         status: { not: "CANCELLED" },
+                    },
+                }),
+                prisma.packPurchase.count({
+                    where: {
+                        organizationId,
+                        contactId,
+                        expiresAt: { gt: new Date() },
                     },
                 }),
                 prisma.service.count({
@@ -169,7 +178,7 @@ export class AccountHomeService {
         return {
             appointments,
             orders,
-            plans: livePlans > 0 || ownPlan > 0,
+            plans: livePlans > 0 || ownPlan > 0 || ownPacks > 0,
             // Every business can be written to; A13 builds the thread.
             messages: true,
             bookingsLabel: classes > 0 ? "Bookings" : "Appointments",
@@ -356,8 +365,11 @@ export function noteLabel(text: string): string {
     return `${(space > 20 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
-/** Read one Home block on its own; a failure is logged and said, never zero. */
-async function block<T>(
+/**
+ * Read one block on its own; a failure is logged and said, never zero.
+ * Home's cards and the Plan tab's parts (A8) each go through it.
+ */
+export async function block<T>(
     name: string,
     read: () => Promise<T>,
 ): Promise<Block<T>> {

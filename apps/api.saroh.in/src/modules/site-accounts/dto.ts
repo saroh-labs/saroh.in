@@ -17,6 +17,8 @@ import {
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
 } from "../bookings/dto";
+import type { PauseWeeks } from "../subscriptions/dto";
+import { PAUSE_WEEKS } from "../subscriptions/dto";
 
 /**
  * The two bodies site sign-in takes (round-2 plan A, A2). Email is the only
@@ -181,4 +183,15 @@ export class AddNoteDto {
     @MinLength(1, { message: "Write your note" })
     @MaxLength(500, { message: "Keep it to 500 characters" })
     text!: string;
+}
+
+/**
+ * A member pausing their plan from their account (A8): 2, 4 or 8 weeks and
+ * nothing else. There is no `until`, so a customer's pause always has an
+ * end date; "until I resume" stays a staff choice (D8). With the global
+ * pipe's `forbidNonWhitelisted`, a body carrying `until` is a 400.
+ */
+export class AccountPauseDto {
+    @IsIn(PAUSE_WEEKS, { message: "Pause for 2, 4 or 8 weeks" })
+    weeks!: PauseWeeks;
 }

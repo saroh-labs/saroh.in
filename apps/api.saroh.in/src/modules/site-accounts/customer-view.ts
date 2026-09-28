@@ -1,3 +1,5 @@
+import { DateTime } from "luxon";
+
 import { toMoneyString } from "../../common/money";
 import { lineName } from "../orders/order-line";
 import type { AccountTab } from "./account-tabs";
@@ -73,6 +75,52 @@ export interface AccountPlan {
     pausedUntil: string | null;
     /** Set to end at the close of this period. */
     endsAt: string | null;
+    /** The zone its dates are days in (a pause ends at the start of a day there). */
+    timezone: string;
+}
+
+/**
+ * A plan on the account's Plan tab (A8): the plan as Home shows it, its
+ * classes this month, a "Pay now" when an invoice is overdue, and what the
+ * member may do to it from here.
+ */
+export interface AccountSubscription extends AccountPlan {
+    /** This month's classes (D10), or null when it includes no number. */
+    classes: { perMonth: number; left: number; resetsAt: string } | null;
+    /**
+     * An overdue invoice the member can pay online now, through a link made
+     * when they press it. Null when nothing is overdue, Payments can't take
+     * it online, or an autopay charge is already under way (D13).
+     */
+    payNow: { total: string; currency: string; dueAt: string | null } | null;
+    /** Active, and the business lets members pause (the pause sheet's weeks are the tab's). */
+    canPause: boolean;
+    canResume: boolean;
+    /** Not ended, and not already set to end. */
+    canCancel: boolean;
+}
+
+export interface AccountPack {
+    name: string;
+    credits: number;
+    left: number;
+    expiresAt: string;
+    /** Classes left to use; a used-up pack stays listed until it expires. */
+    live: boolean;
+}
+
+/** The account's Plan tab (A8): each part read on its own, as Home's are. */
+export interface AccountPlanTab {
+    subscriptions: Block<AccountSubscription[]>;
+    packs: Block<AccountPack[]>;
+    /** The weeks a pause may last (2, 4, 8); empty when members can't pause. */
+    pauseWeeks: number[];
+}
+
+/** What a pause, resume or cancel answers: what happened, and the tab now. */
+export interface AccountPlanChange {
+    message: string;
+    tab: AccountPlanTab;
 }
 
 export interface AccountClasses {
@@ -247,10 +295,12 @@ export function planView(row: {
     currentPeriodEnd: Date;
     cancelAtPeriodEnd: boolean;
     pausedUntil: Date | null;
+    timezone: string;
     plan: { name: string };
 }): AccountPlan {
     const paused = row.status === "PAUSED";
     return {
+        timezone: row.timezone,
         ref: row.id,
         name: row.plan.name,
         price: toMoneyString(row.price),
@@ -281,6 +331,82 @@ export function packView(row: {
         expiresAt: row.expiresAt.toISOString(),
     };
 }
+
+export function subscriptionView(input: {
+    row: Parameters<typeof planView>[0];
+    classes: { perMonth: number; left: number; resetsAt: string } | null;
+    payNow: {
+        total: { toString(): string };
+        currency: string;
+        dueAt: Date | null;
+    } | null;
+    membersCanPause: boolean;
+}): AccountSubscription {
+    const plan = planView(input.row);
+    const { row } = input;
+    return {
+        ...plan,
+        classes: input.classes
+            ? {
+                  perMonth: input.classes.perMonth,
+                  left: input.classes.left,
+                  resetsAt: input.classes.resetsAt,
+              }
+            : null,
+        payNow: input.payNow
+            ? {
+                  total: toMoneyString(input.payNow.total),
+                  currency: input.payNow.currency,
+                  dueAt: input.payNow.dueAt?.toISOString() ?? null,
+              }
+            : null,
+        canPause: row.status === "ACTIVE" && input.membersCanPause,
+        canResume: row.status === "PAUSED",
+        canCancel: row.status === "PAUSED" || !row.cancelAtPeriodEnd,
+    };
+}
+
+export function accountPackView(row: {
+    credits: number;
+    used: number;
+    expiresAt: Date;
+    pack: { name: string };
+}): AccountPack {
+    const view = packView(row);
+    return { ...view, live: view.left > 0 };
+}
+
+/** "18 Oct 2026", as the day falls in the plan's own zone. */
+function planDay(at: Date, timezone: string): string {
+    return DateTime.fromJSDate(at, { zone: timezone }).toFormat("d LLL yyyy");
+}
+
+/** What the member reads after an action on their plan (A8). */
+export const planMessages = {
+    paused(until: Date | null, timezone: string): string {
+        return until
+            ? `Paused until ${planDay(until, timezone)}. Nothing is charged till then.`
+            : "Paused. Nothing is charged until you resume.";
+    },
+    resumed(restarted: boolean, renewsAt: Date, timezone: string): string {
+        return restarted
+            ? `Resumed. Your plan starts again today and renews on ${planDay(renewsAt, timezone)}.`
+            : `Resumed. Your next payment is on ${planDay(renewsAt, timezone)}.`;
+    },
+    cancelled(
+        outcome: "scheduled" | "already" | "now",
+        endsAt: Date,
+        timezone: string,
+    ): string {
+        if (outcome === "now") {
+            return "Cancelled. Nothing more is charged.";
+        }
+        if (outcome === "already") {
+            return `Your plan is already set to end on ${planDay(endsAt, timezone)}. Nothing more is charged.`;
+        }
+        return `Cancelled. You keep it until ${planDay(endsAt, timezone)}, and nothing more is charged.`;
+    },
+};
 
 export function receiptView(row: {
     id: string;
