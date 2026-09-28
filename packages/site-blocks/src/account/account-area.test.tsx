@@ -129,6 +129,7 @@ describe("the account's words", () => {
                 currency: "INR",
                 open: true,
                 status: "Ready",
+                fulfilment: "Pick-up",
                 items: [
                     { name: "Sourdough", quantity: 2 },
                     { name: "Rye", quantity: 1 },

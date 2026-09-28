@@ -91,6 +91,11 @@ each with why it stops there:
   not yet made.
 - `modules/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
+- `site-accounts/customer-view.ts` (499 after A7) — the account area's one
+  allow-list (ADR-011): every answer a signed-in customer gets is built here,
+  so a reviewer reads one file to know what can leave. A7's Track words went
+  to `account-track.ts`; the order serializers are the seam if A6, A8 and
+  A13 grow it further, split into a second allow-list file it re-exports.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:

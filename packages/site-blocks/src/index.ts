@@ -166,6 +166,7 @@ export { AccountEntry } from "./account/account-entry";
 export { AccountHome } from "./account/account-home";
 export { Me } from "./account/me";
 export type { DetailsResult, MeApi, MeProps, NoteResult } from "./account/me";
+// A7: the Orders tab and an order's Track.
 export type {
     Block as AccountBlock,
     AccountBooking,
@@ -173,14 +174,20 @@ export type {
     AccountHome as AccountHomeData,
     AccountNote,
     AccountOrder,
+    AccountOrderDetail,
+    AccountOrderLine,
+    AccountOrderVisit,
     AccountPlan,
     AccountReceipt,
     AccountTab,
     AccountTabKey,
+    AccountTrackStep,
     AccountView,
 } from "./account/model";
+export { AccountOrders, ORDERS_HREF, trackHref } from "./account/orders-list";
 export { AccountCard } from "./account/parts";
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+export type { TrackLookup } from "./account/track-sheet";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";

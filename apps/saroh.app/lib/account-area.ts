@@ -4,14 +4,18 @@ import type {
     AccountBlock,
     AccountHomeData,
     AccountNote,
+    AccountOrder,
     AccountReceipt,
     AccountView,
+    TrackLookup,
 } from "@saroh/site-blocks";
 
 import {
     homeResult,
     isAccountView,
     notesResult,
+    orderDetailResult,
+    ordersResult,
     receiptsResult,
 } from "./account-shape";
 import { accountFetch } from "./customer-session";
@@ -88,6 +92,26 @@ export async function getNotes(): Promise<AccountBlock<AccountNote[]>> {
     const read = await readJson("me/notes");
     const value = read.ok ? notesResult(read.body) : null;
     return value ? { ok: true, value } : { ok: false };
+}
+
+/** The Orders tab's list (A7). A failed read stays failed, never "none". */
+export async function getOrders(): Promise<AccountBlock<AccountOrder[]>> {
+    const read = await readJson("me/orders");
+    const value = read.ok ? ordersResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+/** One order's Track (A7). Another customer's is "missing". */
+export async function getOrder(orderId: string): Promise<TrackLookup> {
+    const read = await readJson(`me/orders/${encodeURIComponent(orderId)}`);
+    if (!read.ok) {
+        return {
+            ok: false,
+            reason: read.reason === "missing" ? "missing" : "unavailable",
+        };
+    }
+    const order = orderDetailResult(read.body);
+    return order ? { ok: true, order } : { ok: false, reason: "unavailable" };
 }
 
 export type ReceiptLookup =
