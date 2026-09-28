@@ -122,7 +122,7 @@ export function CalendarScreen({
     rules: BookingRules | null;
     /** What New booking may do about the customer and a pay link (E4). */
     people: BookingPeople;
-    can: { book: boolean; hours: boolean };
+    can: { book: boolean; hours: boolean; order?: boolean };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
 }) {
@@ -645,7 +645,14 @@ export function CalendarScreen({
             <BookingQuickLook
                 block={peekBlock}
                 onClose={() => setPeek(null)}
-                ctx={{ timezone, now, money, rules, canBook: can.book }}
+                ctx={{
+                    timezone,
+                    now,
+                    money,
+                    rules,
+                    canBook: can.book,
+                    canReadOrder: can.order ?? false,
+                }}
                 act={act}
                 heldFor={(id) => {
                     const key = pending.find(

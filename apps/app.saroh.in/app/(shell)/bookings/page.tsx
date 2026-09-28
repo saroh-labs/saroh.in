@@ -154,6 +154,7 @@ export default async function BookingsPage({
                 can={{
                     book: may("booking:write"),
                     hours: may("service:write"),
+                    order: may("order:read"),
                 }}
                 newBooking={
                     may("booking:write") ? (

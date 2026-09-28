@@ -8,6 +8,7 @@ import { CancelBookingControl } from "@/components/bookings/cancel-booking-contr
 import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
+import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatStatus } from "@/lib/format/status";
 import {
@@ -229,7 +230,8 @@ export function BookingDetailView({
                         />
                     </dl>
                     {/* A linked contact is a destination; a typed-in name is
-                        not — the same rule the list row follows. */}
+                        not — the same rule the list row follows. Their page
+                        is Customer Detail, as the peek's link is. */}
                     {contact ? (
                         <Button
                             asChild
@@ -237,13 +239,27 @@ export function BookingDetailView({
                             size="sm"
                             className="mt-4"
                         >
-                            <Link href={`/contacts/${contact.id}`}>
-                                Open contact
+                            <Link
+                                href={`/customers/${encodeURIComponent(contact.id)}`}
+                            >
+                                Open {firstName(bookerLabel(booking))}&apos;s
+                                page
                             </Link>
                         </Button>
                     ) : null}
                 </section>
             </div>
+
+            {/* A visit of a treatment (E10): which visit, its order, and
+                the next one to book. */}
+            {booking.treatment ? (
+                <TreatmentVisits
+                    treatment={booking.treatment}
+                    service={service}
+                    who={bookerLabel(booking)}
+                    canReadOrder={canReadOrder}
+                />
+            ) : null}
 
             {showPacks ? (
                 <section className="mt-6 rounded-lg border border-border p-5">
@@ -350,6 +366,11 @@ function shortTime(iso: string, timeZone: string): string {
         minute: "2-digit",
         hour12: true,
     }).format(new Date(iso));
+}
+
+/** "Asha" from "Asha Rao"; an email stays whole. */
+function firstName(label: string): string {
+    return label.includes("@") ? label : (label.split(" ")[0] ?? label);
 }
 
 /** The contact's name if the CRM knows them, else whatever was typed in. */
