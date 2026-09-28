@@ -3,7 +3,13 @@ import { prisma } from "@saroh/database";
 
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
+import { accountAreaOn } from "../site-accounts/account-area";
+import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
+import {
+    overdueFollowUps,
+    crmNumbers as readCrmNumbers,
+} from "./home-crm-sources";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
     HomeAction,
@@ -15,7 +21,7 @@ import type {
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
-import { EVIDENCE_LIMIT, holds, overdueTag, personName } from "./home-model";
+import { EVIDENCE_LIMIT, holds, personName } from "./home-model";
 import type { RefundReason } from "./home-money-sources";
 import {
     failedRenewals,
@@ -28,6 +34,13 @@ import { flattenNeeds, HOME_DEFAULT_ZONE } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
 import { readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
+import {
+    bookingPageNotes,
+    lowStarReviews,
+    MESSAGE_WAIT_MS,
+    unansweredMessages,
+    viewerOf,
+} from "./home-people-sources";
 import { readReviews } from "./home-reviewer";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { readToday, todayScope } from "./home-today";
@@ -106,6 +119,8 @@ export class HomeService {
         // Optional so a spec can build Home without the stock module; the
         // app always injects it, and without it the stock row is not read.
         @Optional() private readonly stockChecks?: StockChecksService,
+        // Optional as the stock checks: without it no message is read.
+        @Optional() private readonly threads?: ThreadsService,
     ) {}
 
     /**
@@ -240,6 +255,8 @@ export class HomeService {
         const canReadInvoices = holds(input, "invoice:read");
         const canReadSubscriptions = holds(input, "subscription:read");
         const stockChecks = this.stockChecks;
+        const threads = this.threads;
+        const viewer = viewerOf(input);
         const scope = todayScope(input, available);
         const week = weekScope(input, available);
 
@@ -257,18 +274,27 @@ export class HomeService {
             short,
             notLive,
             thisWeek,
+            reviews,
+            notes,
+            messages,
         ] = await Promise.all([
             available.has("CRM")
                 ? guard(
                       { moduleKey: "CRM", label: "Customer numbers" },
-                      () => this.crmNumbers(input.organizationId, canReadLeads),
+                      () =>
+                          readCrmNumbers(
+                              this.db,
+                              input.organizationId,
+                              canReadLeads,
+                          ),
                       [] as HomeNumber[],
                   )
                 : skip([] as HomeNumber[]),
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
-                      () => this.overdueFollowUps(input.organizationId, now),
+                      () =>
+                          overdueFollowUps(this.db, input.organizationId, now),
                       noEvidence,
                   )
                 : skip(noEvidence),
@@ -416,6 +442,43 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // People waiting on the business (F2), each for whoever may
+            // read it. Low-rated reviews without a reply.
+            available.has("COMMERCE") && holds(input, "product-review:read")
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Reviews" },
+                      () => lowStarReviews(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
+            // Notes from the booking page, waiting to be checked (C12).
+            available.has("APPOINTMENTS") && holds(input, "contact:write")
+                ? guard(
+                      {
+                          moduleKey: "APPOINTMENTS",
+                          label: "Booking-page notes",
+                      },
+                      () => bookingPageNotes(this.db, viewer, now),
+                      null,
+                  )
+                : skip(null),
+            // Messages nobody has answered (A13): only once customers can
+            // write them, and only to someone who may read them.
+            accountAreaOn() && holds(input, "message:read") && threads
+                ? guard(
+                      { moduleKey: "CRM", label: "Messages" },
+                      async () =>
+                          unansweredMessages(
+                              await threads.waitingOnTeam(viewer, {
+                                  now,
+                                  olderThanMs: MESSAGE_WAIT_MS,
+                                  limit: EVIDENCE_LIMIT,
+                              }),
+                              now,
+                          ),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -506,6 +569,9 @@ export class HomeService {
         if (waiting) actions.push(waiting);
         if (overdueInvoiceAction) actions.push(overdueInvoiceAction);
         if (short) actions.push(short);
+        for (const waitingOnUs of [notes, messages, reviews]) {
+            if (waitingOnUs) actions.push(waitingOnUs);
+        }
         if (notLive) {
             // It names the sites, so readiness's general "Publish your site
             // to go live" would say the same thing twice.
@@ -605,52 +671,6 @@ export class HomeService {
             );
             return HOME_DEFAULT_ZONE;
         }
-    }
-
-    /**
-     * Overdue follow-up tasks, oldest due date first, with the lead and person
-     * each one is about.
-     */
-    private async overdueFollowUps(
-        organizationId: string,
-        now: Date,
-    ): Promise<{ count: number; evidence: HomeEvidence[] }> {
-        const where = {
-            organizationId,
-            dueAt: { lt: now },
-            completedAt: null,
-        };
-
-        const [count, rows] = await Promise.all([
-            this.db.activity.count({ where }),
-            this.db.activity.findMany({
-                where,
-                orderBy: { dueAt: "asc" },
-                take: EVIDENCE_LIMIT,
-                include: { lead: { include: { contact: true } } },
-            }),
-        ]);
-
-        return {
-            count,
-            evidence: rows.map((row) => ({
-                id: row.id,
-                title: row.lead.title,
-                // `Lead.contactId` is required, so a lead always has a contact
-                // — no null branch to guard.
-                subtitle: personName(row.lead.contact),
-                at: row.dueAt?.toISOString() ?? null,
-                // A Lead's value is a bare integer in minor units with no
-                // currency recorded anywhere on the row — see HomeEvidence.
-                amountMinor: row.lead.value,
-                currency: null,
-                href: `/leads/${row.lead.id}`,
-                // The where asked for a due date before now.
-                ...(row.dueAt
-                    ? { tag: overdueTag(row.dueAt, now), tone: "bad" as const }
-                    : {}),
-            })),
-        };
     }
 
     /**
@@ -754,44 +774,5 @@ export class HomeService {
             status: row.status,
             href: "/bookings",
         }));
-    }
-
-    /** Counts that are destinations: open leads, and everyone on file. */
-    private async crmNumbers(
-        organizationId: string,
-        canReadLeads: boolean,
-    ): Promise<HomeNumber[]> {
-        const [openLeads, contacts] = await Promise.all([
-            canReadLeads
-                ? this.db.lead.count({
-                      where: { organizationId, status: "OPEN" },
-                  })
-                : Promise.resolve(0),
-            this.db.contact.count({ where: { organizationId } }),
-        ]);
-
-        const out: HomeNumber[] = [];
-        if (openLeads > 0) {
-            out.push({
-                key: "OPEN_LEADS",
-                label: "Open leads",
-                value: openLeads,
-                // `?view=` is the DataView filter contract: this lands on Leads
-                // with the open filter already applied, not on a list the
-                // merchant has to narrow again by hand.
-                href: "/leads?view=open",
-                moduleKey: "CRM",
-            });
-        }
-        if (contacts > 0) {
-            out.push({
-                key: "CONTACTS",
-                label: "Contacts",
-                value: contacts,
-                href: "/contacts",
-                moduleKey: "CRM",
-            });
-        }
-        return out;
     }
 }

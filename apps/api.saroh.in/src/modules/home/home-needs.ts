@@ -15,11 +15,13 @@ import type {
  *
  * The design ranks by what has gone wrong, not by module:
  *
- * 1. Late, and someone is waiting: late orders, overdue invoices, money to
- *    refund, overdue follow-ups.
+ * 1. Late, and someone is waiting: late orders, a note for a visit in the
+ *    next two days, a message waiting on a reply, overdue invoices, money
+ *    to refund, overdue follow-ups.
  * 2. Blocked: stock short for orders, a renewal not paid, a site not live, a
  *    module that needs fixing.
- * 3. Due: orders not late yet.
+ * 3. Due: orders not late yet, notes for a later visit, low-rated reviews
+ *    to answer.
  * 4. Setting up: a module not ready yet.
  *
  * Within a rank, sources keep {@link SOURCE_ORDER} (orders before invoices,
@@ -41,17 +43,22 @@ interface Ranked {
 }
 
 /**
- * Sources in the order the design lists them within a rank. F2's notes,
- * reviews and messages slot in here when they land.
+ * Sources in the order the design lists them within a rank: a patient's
+ * note sits under the late orders and above the overdue invoices, and the
+ * reviews come last. The design has no message row; a customer waiting on
+ * a reply sits with the notes, as someone waiting on the business.
  */
 const SOURCE_ORDER = [
     "COMMERCE_OPEN_ORDERS",
+    "APPOINTMENTS_BOOKING_NOTES",
+    "CRM_UNANSWERED_MESSAGES",
     "PAYMENTS_OVERDUE_INVOICES",
     "PAYMENTS_REFUNDS_OWED",
     "CRM_OVERDUE_FOLLOWUPS",
     "COMMERCE_STOCK_SHORT",
     "PAYMENTS_FAILED_RENEWALS",
     "WEBSITE_NOT_LIVE",
+    "COMMERCE_LOW_STAR_REVIEWS",
 ] as const;
 
 function sourceIndex(code: string): number {
@@ -209,6 +216,42 @@ const ROWERS: Partial<Record<string, Rower>> = {
             };
         },
         more: (n) => `${n} more renewal${n === 1 ? "" : "s"} not paid`,
+    },
+    // F2: "Rahul Verma left a note when booking", the note quoted under it.
+    APPOINTMENTS_BOOKING_NOTES: {
+        rank: (ev) => (ev.tone === "due" ? 1 : 3),
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.headline ?? `${ev.title} left a note when booking`,
+            sub: ev.detail ?? null,
+            amountIn: null,
+        }),
+        more: (n) =>
+            `${n} more note${n === 1 ? "" : "s"} from the booking page`,
+    },
+    // F2: someone who wrote in and hasn't heard back.
+    CRM_UNANSWERED_MESSAGES: {
+        rank: () => 1,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.headline ?? `${ev.title} is waiting for a reply`,
+            sub: ev.detail ?? null,
+            amountIn: null,
+        }),
+        more: (n) =>
+            `${n} more customer${n === 1 ? "" : "s"} waiting for a reply`,
+    },
+    // F2: "Farah Khan left 1 star", with what they said, the product and
+    // the day it was left.
+    COMMERCE_LOW_STAR_REVIEWS: {
+        rank: () => 3,
+        row: (action, ev, zone) => ({
+            ...fromEvidence(action, ev),
+            title: `${ev.subtitle ?? "A customer"} left ${ev.tag ?? "a low rating"}`,
+            sub: joined(ev.detail, ev.title, ev.at ? day(ev.at, zone) : null),
+            amountIn: null,
+        }),
+        more: (n) => `${n} more low-rated review${n === 1 ? "" : "s"}`,
     },
 };
 

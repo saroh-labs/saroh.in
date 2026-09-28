@@ -349,6 +349,9 @@ describe("HomeService: the header", () => {
                 findMany: empty.findMany,
             },
             invoice: { ...empty, ...client.invoice },
+            // F2's low-rated reviews read the same table as the strip.
+            productReview: { ...empty, ...client.productReview },
+            contactAttention: empty,
             paymentIntent: empty,
             site: empty,
             // Open orders' one raw read: none open.
