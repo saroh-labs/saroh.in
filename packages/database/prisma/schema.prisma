@@ -771,8 +771,7 @@ model Product {
   allergens   ProductAllergen[]
 
   // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
-  // or DIGITAL — only the new names, never COLLECT or DELIVERY, so B2d's
-  // cast finds nothing to convert. Empty: every way its storefronts offer
+  // or DIGITAL (never an appointment type). Empty: every way its storefronts offer
   // (StoreSettings.fulfilmentTypes). An order offers only the types every
   // item allows; read it through `productTypesOf` in orders/fulfilment.ts.
   fulfilmentTypes OrderFulfilment[] @default([])
@@ -1472,7 +1471,7 @@ model Order {
   stage      OrderStage      @default(NEW)
   fulfilment OrderFulfilment @default(PICKUP)
 
-  // Where a DELIVERY order goes. `deliveryState` is also the place of
+  // Where a local delivery or a shipment goes. `deliveryState` is also the place of
   // supply for GST when no bill-to state is set (U5).
   deliveryName       String?
   deliveryPhone      String?
@@ -1596,15 +1595,13 @@ enum OrderStage {
   SENT
 }
 
-// How an order leaves (DEC-045). COLLECT and DELIVERY are the legacy words
-// for PICKUP and LOCAL_DELIVERY: release 1 (B2a) adds the six types beside
-// them and still writes only the legacy two, release 2 (B2c) switches every
-// row and write to the new names (20261011160000), and release 3 (B2d)
-// drops COLLECT and DELIVERY. Read it through `typeOf` in
+// How an order leaves (DEC-045). The six types came in by expand and
+// contract (docs/architecture/ORDER_FULFILMENT_ROLLOUT.md): release 1 (B2a)
+// added them beside the legacy COLLECT and DELIVERY, release 2 (B2c)
+// switched every row and write to them (20261011160000), and release 3
+// (B2d, 20261013100000) dropped the legacy two. Read it through `typeOf` in
 // orders/fulfilment.ts, never raw.
 enum OrderFulfilment {
-  COLLECT
-  DELIVERY
   PICKUP
   LOCAL_DELIVERY
   SHIPPING
