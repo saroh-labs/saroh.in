@@ -18,6 +18,10 @@
  *   (`commerceOpen`), and checkout is refused.
  * - Website: nothing public reads the module, so a live site stays up as
  *   last published.
+ * - A published Shop or Book page leaves the live site's menu, and its
+ *   address says it isn't available, while its module is off (G15, G19:
+ *   `publicModulePageStates` on every public read). The line names the
+ *   page by its title, which is also its menu name.
  * - The account area's tabs follow the module (`account-home.service.ts`),
  *   and only while the area itself is on (`SITE_ACCOUNT_AREA`).
  *
@@ -82,6 +86,70 @@ async function counted(p: Promise<number>): Promise<Counted> {
 /** A site the public can see: not deleted, and published at least once. */
 const LIVE_SITE = { deletedAt: null, currentPublicationId: { not: null } };
 
+/**
+ * The live title of a published module page of `kind`, or null when the
+ * snapshot has none. A blank title reads as the kind's own word.
+ */
+function modulePageTitle(
+    snapshot: unknown,
+    kind: string,
+    fallback: string,
+): string | null {
+    const pages = (snapshot as { pages?: unknown } | null)?.pages;
+    if (!Array.isArray(pages)) return null;
+    for (const entry of pages) {
+        const page = entry as { kind?: unknown; title?: unknown } | null;
+        if (page?.kind !== kind) continue;
+        const title = typeof page.title === "string" ? page.title.trim() : "";
+        return title === "" ? fallback : title;
+    }
+    return null;
+}
+
+/**
+ * The live sites that publish a module page of `kind` (G19), with the
+ * pages' titles: what leaves the site's menu when the module goes off.
+ * Read from each site's current publication, which is what the public sees.
+ */
+async function liveModulePages(
+    db: Db,
+    organizationId: string,
+    kind: string,
+    fallback: string,
+): Promise<Counted> {
+    const sites = await db.site.findMany({
+        where: { organizationId, ...LIVE_SITE },
+        select: { currentPublication: { select: { snapshot: true } } },
+    });
+    const titles: string[] = [];
+    let count = 0;
+    for (const site of sites) {
+        const title = modulePageTitle(
+            site.currentPublication?.snapshot,
+            kind,
+            fallback,
+        );
+        if (title === null) continue;
+        count += 1;
+        if (!titles.includes(title)) titles.push(title);
+    }
+    return { count, names: titles };
+}
+
+/** "Your website stops showing Shop." — the module page leaving the site. */
+function stopsShowing(fallback: string) {
+    return (c: Counted | null | undefined): string | null => {
+        if (c === undefined) return null;
+        if (c === null)
+            return `We couldn't check your website. If it has a ${fallback} page, it stops showing.`;
+        if (c.count === 0) return null;
+        const shown = c.names?.length ? names(c.names) : fallback;
+        return c.count === 1
+            ? `Your website stops showing ${shown}.`
+            : `Your ${c.count} websites stop showing ${shown}.`;
+    };
+}
+
 const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
     APPOINTMENTS: [
         {
@@ -113,6 +181,13 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
                     return "The booking page stops taking new bookings.";
                 return `${n(c.count, "upcoming booking stays", "upcoming bookings stay")} booked; the booking page stops taking new ones.`;
             },
+        },
+        {
+            code: "APPOINTMENTS_SITE_BOOK_PAGE",
+            reads: ["site:read"],
+            read: (db, organizationId) =>
+                liveModulePages(db, organizationId, "BOOK", "Book"),
+            say: stopsShowing("Book"),
         },
         {
             code: "APPOINTMENTS_ACCOUNT_TAB",
@@ -331,6 +406,15 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
                     return "Your site's shop, product pages and Product grid stop showing.";
                 return `The shop, product pages and Product grid stop showing on ${c.count} sites.`;
             },
+        },
+        {
+            code: "COMMERCE_SITE_SHOP_PAGE",
+            reads: ["site:read"],
+            // A Shop page exists only once the shop is rolled out (DEC-057).
+            applies: (organizationId) => shopRolloutOn(organizationId),
+            read: (db, organizationId) =>
+                liveModulePages(db, organizationId, "SHOP", "Shop"),
+            say: stopsShowing("Shop"),
         },
         {
             code: "COMMERCE_ACCOUNT_TAB",
