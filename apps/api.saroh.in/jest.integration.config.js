@@ -110,6 +110,8 @@ module.exports = {
         "<rootDir>/src/modules/invoices/gst.spec.ts",
         "<rootDir>/src/modules/invoices/gst-states.spec.ts",
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
+        // D18: pure; list-filter.db.spec.ts runs here.
+        "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",

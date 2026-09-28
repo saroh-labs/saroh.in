@@ -235,6 +235,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // Which refunds make no credit note — a jest-mocked transaction.
         "<rootDir>/src/modules/invoices/order-invoicing.spec.ts",
+        // D18: what narrows the list by source, pack, course or order, and
+        // its query (list-filter.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
