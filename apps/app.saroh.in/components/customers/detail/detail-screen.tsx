@@ -328,14 +328,8 @@ export function CustomerDetailScreen({
                     key={editing}
                     open
                     onOpenChange={(o) => (o ? null : setEditing(0))}
-                    contactId={d.contact.id}
-                    email={d.contact.email}
-                    initial={{
-                        firstName: d.contact.firstName ?? "",
-                        lastName: d.contact.lastName ?? "",
-                        phone: d.contact.phone ?? "",
-                        company: d.contact.company ?? "",
-                    }}
+                    contact={d.contact}
+                    signsInWith={d.siteAccount?.email ?? null}
                 />
             ) : null}
             {canWrite ? (

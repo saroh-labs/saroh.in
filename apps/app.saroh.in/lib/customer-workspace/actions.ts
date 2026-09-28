@@ -16,6 +16,7 @@ import {
     removeAttention,
     unlinkAccount,
     updateAttention,
+    updateDetails,
 } from "./service";
 
 /**
@@ -28,6 +29,16 @@ export async function linkCustomerAction(
     customerId: string,
 ): Promise<WorkspaceResult> {
     const result = await linkCustomer(contactId, customerId);
+    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    return result;
+}
+
+/** The edit sheet's Save, and its Undo (C8). */
+export async function saveDetailsAction(
+    contactId: string,
+    input: Record<string, string>,
+) {
+    const result = await updateDetails(contactId, input);
     if (result.ok) revalidatePath(`/customers/${contactId}`);
     return result;
 }

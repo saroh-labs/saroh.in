@@ -169,6 +169,18 @@ export interface CustomerDetail {
         email: string;
         phone: string | null;
         company: string | null;
+        /**
+         * Their postal address (C8), each line null when not kept. Absent
+         * from an API before C8.
+         */
+        addressLine1?: string | null;
+        addressLine2?: string | null;
+        city?: string | null;
+        /** In India, the GST state's name. */
+        state?: string | null;
+        postalCode?: string | null;
+        /** ISO 3166-1 alpha-2. */
+        country?: string | null;
         source: string | null;
         createdAt: string;
     };
