@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import {
     demoUser,
     ignoreHTTPSErrors,
+    ownSeededDatabase,
     refundOrder,
     urls,
 } from "../playwright.config";
@@ -706,5 +707,124 @@ test.describe("change and cancel on order detail (B9)", () => {
         await expect(
             page.getByRole("button", { name: "Change how it's fulfilled…" }),
         ).toBeDisabled();
+    });
+});
+
+/**
+ * A treatment's order is fulfilled by its visits (B14, R16), on Kavi Dental
+ * (E29), whose treatments' orders E9 seeds. Kavi is a film set: the Visits
+ * card is only read here, and "Mark visit N attended" — a write — runs only
+ * in CI, on the test run's own seeded database.
+ */
+const KAVI = "seed_sc_kavi_org";
+
+interface TreatmentRead {
+    id: string;
+    orderId: string;
+    visits?: {
+        total: number;
+        attended: number;
+        next: { attend: number | null; book: number | null };
+    } | null;
+}
+
+/** Kavi's treatments' orders, read as Order Detail reads them. */
+async function kaviTreatments(page: Page): Promise<TreatmentRead[]> {
+    const headers = { "x-organization-id": KAVI, origin: urls.APP_URL };
+    const base = `${urls.API_URL}/organizations/${KAVI}/orders`;
+    const list = await page.request.get(`${base}?v=2`, { headers });
+    expect(list.ok()).toBe(true);
+    const { rows } = (await list.json()) as {
+        rows: { id: string; fulfilmentType: string }[];
+    };
+    const reads: TreatmentRead[] = [];
+    for (const row of rows) {
+        if (!row.fulfilmentType.startsWith("APPOINTMENT_")) continue;
+        const res = await page.request.get(`${base}/${row.id}`, { headers });
+        expect(res.ok()).toBe(true);
+        reads.push((await res.json()) as TreatmentRead);
+    }
+    return reads;
+}
+
+test.describe("visits on a treatment's order (B14)", () => {
+    test("the Visits card in place of the kitchen, read only", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const treatments = await kaviTreatments(page);
+        const multi = treatments.find((t) => (t.visits?.total ?? 0) > 1);
+        expect(multi, "Kavi Dental seeds a treatment of visits").toBeDefined();
+        if (!multi?.visits) return;
+        await page.goto(`/commerce/orders/${multi.id}`);
+
+        const card = page.getByRole("region", { name: "Visits" });
+        await expect(card).toContainText(
+            `${multi.visits.attended} of ${multi.visits.total} attended`,
+        );
+        await expect(card.getByRole("list", { name: "Visits" })).toBeVisible();
+        // No kitchen: no stages, no ticket, no wait clock.
+        await expect(
+            page.getByRole("button", { name: "Start preparing" }),
+        ).toHaveCount(0);
+        await expect(page.getByRole("button", { name: /^Print/ })).toHaveCount(
+            0,
+        );
+        await expect(
+            page.getByRole("group", { name: /^Visits: / }),
+        ).toBeVisible();
+
+        const doc = await page.evaluate(() => ({
+            vw: window.innerWidth,
+            sw: document.documentElement.scrollWidth,
+        }));
+        expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+    });
+
+    test("Book visit N opens New booking for the treatment (nothing is saved)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const toBook = (await kaviTreatments(page)).find(
+            (t) => t.visits?.next.book != null,
+        );
+        test.skip(!toBook, "No Kavi treatment has a visit to book today");
+        if (!toBook?.visits) return;
+        const n = toBook.visits.next.book;
+        await page.goto(`/commerce/orders/${toBook.id}`);
+        await page.getByRole("button", { name: `Book visit ${n}` }).click();
+        await expect(
+            page.getByRole("dialog", {
+                name: `Book visit ${n} of ${toBook.visits.total}`,
+            }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+    });
+
+    test("Mark visit N attended, in the test run's own database", async ({
+        page,
+    }) => {
+        test.skip(
+            !ownSeededDatabase,
+            "Kavi is a film set: writes run in CI only",
+        );
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const due = (await kaviTreatments(page)).find(
+            (t) => t.visits?.next.attend != null,
+        );
+        test.skip(!due, "No Kavi visit has started and waits to be marked");
+        if (!due?.visits) return;
+        const n = due.visits.next.attend;
+        await page.goto(`/commerce/orders/${due.id}`);
+        await page
+            .getByRole("button", { name: `Mark visit ${n} attended` })
+            .click();
+        await expect(shown(page, `Visit ${n} marked attended.`)).toBeVisible();
+        await expect(
+            page.getByRole("region", { name: "What happened" }),
+        ).toContainText(`Visit ${n} attended`);
     });
 });
