@@ -7,7 +7,6 @@ import { gridKeyTarget, isGridKey } from "@/lib/calendar/grid-keys";
 
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
 import {
-    actOnCount,
     dayChips,
     dayCount,
     dayTakings,
@@ -45,7 +44,8 @@ export function dayButton(date: string): HTMLButtonElement | null {
 
 /**
  * The month: a week a row from Monday, each day a button with its chips —
- * what needs acting on first, then a count per layer — and, for a role that
+ * its named problem first ("1 late order", "2 need you"; E22), then a count
+ * per layer — and, for a role that
  * reads money, what was taken that day as a bar scaled to the busiest day.
  * Below 760px each chip is a dot per layer, red when something needs acting
  * on, and the tapped day is listed under the month. A day the calendar does
@@ -161,17 +161,18 @@ export function MonthGrid({
                         const past = day.date < today;
                         const isToday = day.date === today;
                         const on = day.date === selected;
-                        const chips = dayChips(day, layers, off);
+                        const chips = dayChips(day, layers, off, today);
                         const taken = takings[i];
                         const n = dayCount(day, layers, off);
-                        const act = actOnCount(day, off);
+                        // The named problem, said as the chip says it (E22).
+                        const problem = chips.find((c) => c.key === "act");
                         const label = [
                             `${dayTitle(day.date, today)}${isToday ? ", today" : ""}: ${
                                 n
                                     ? `${n} ${n === 1 ? "thing" : "things"}`
                                     : "nothing"
                             }`,
-                            act ? `${act} to act on` : null,
+                            problem?.text ?? null,
                             taken > 0 && currency
                                 ? `${wholeMoney(taken, currency)} taken`
                                 : null,
@@ -262,7 +263,7 @@ export function MonthGrid({
                                     ))}
                                 </span>
                                 {/* Phone: a dot per layer, red first when
-                                something needs acting on. */}
+                                something needs you. */}
                                 <span
                                     aria-hidden
                                     className="mt-1.5 flex flex-wrap gap-[3px] min-[760px]:hidden"

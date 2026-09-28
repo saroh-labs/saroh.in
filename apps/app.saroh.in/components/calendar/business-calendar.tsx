@@ -23,6 +23,7 @@ import {
     shiftMonth,
 } from "@/lib/calendar/layers";
 import { wholeMoney } from "@/lib/calendar/money";
+import type { ProblemCan } from "@/lib/calendar/problems";
 import type { Edge } from "@/lib/calendar/range";
 import {
     calendarRange,
@@ -71,8 +72,8 @@ export function BusinessCalendar({
     /** "YYYY-MM-DD" and "YYYY-MM" now, in the business's zone. */
     today: string;
     thisMonth: string;
-    /** May take an order (`order:write`) or a booking (`booking:write`). */
-    can: { order: boolean; book: boolean };
+    /** May take an order, a booking, or send a reminder (E22): `*:write`. */
+    can: { order: boolean; book: boolean } & ProblemCan;
     /** `?day=`: the day to open on, when a key crossed into this month. */
     day?: string;
 }) {
@@ -130,6 +131,7 @@ export function BusinessCalendar({
                     layers: data.layers,
                     can,
                 })}
+                can={can}
             />
         ) : null;
 
@@ -318,7 +320,7 @@ export function BusinessCalendar({
                 bookings — nothing is entered on the calendar itself.{" "}
                 <span className="min-[760px]:hidden">
                     Each dot is a layer with something that day; red means
-                    something to act on. Tap a day to see it.
+                    something that needs you. Tap a day to see it.
                 </span>
                 {showTakings ? (
                     <span className="max-[759px]:hidden">

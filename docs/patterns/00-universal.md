@@ -77,6 +77,13 @@ each with why it stops there:
   (1,173), `calendar/calendar.service.ts` (1,409 after E19 and E20, whose range,
   days-off and payments reads already sit in their own files; split next),
   `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
+- The calendar's `lib/calendar/layers.ts` (449) and
+  `components/calendar/business-calendar.tsx` (404) — the layers' order,
+  tones, words and day lines, and the screen's month, switches and day
+  sheet. E22 put the named problems and their fixes in their own
+  `lib/calendar/problems.ts` rather than grow them; the month summary and
+  the item lines are `layers.ts`'s next seams, and the switches row the
+  screen's.
 - `organizations/organization-settings-form.tsx` (1,246) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format

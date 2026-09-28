@@ -107,6 +107,9 @@ export default async function CalendarPage({
                     can={{
                         order: may("order:write"),
                         book: may("booking:write"),
+                        // A named problem's fix (E22): offered only to
+                        // whoever may make it.
+                        remind: may("invoice:write"),
                     }}
                     // A key crossed into this month on this day (E28).
                     day={typeof day === "string" ? day : undefined}
