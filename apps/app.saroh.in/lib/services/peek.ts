@@ -9,6 +9,8 @@
  * than "No phone yet".
  */
 
+import type { NoticeReach } from "@/lib/messages/notice-reach";
+
 export type AttentionKind = "ALLERGY" | "MEDICAL" | "ACCESS" | "OTHER";
 
 /** One Needs attention entry, as C1's read gives it. */
@@ -34,6 +36,11 @@ export interface PeekPerson {
     phone: string | null;
     /** Null when Needs attention could not be read. */
     attention: PeekAttention | null;
+    /**
+     * How a move or cancel reaches them (A14); null when it couldn't be
+     * read, and the peek then keeps its advice to tell them.
+     */
+    reach?: NoticeReach | null;
 }
 
 const KIND_WORD: Record<AttentionKind, string> = {

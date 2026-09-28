@@ -195,6 +195,17 @@ organizations/:org/customers`: everyone who has paid (an order through a
   provider. Saroh's own email sends a site's sign-in codes and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
   Invoices went first (D17): see Money above.
+- **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and
+  an order's Ready and handover, are told to the customer: in their account
+  thread while it is live (`SITE_ACCOUNT_AREA` and the `ACCOUNT_THREAD`
+  flag), and by email to a verified site account through the business's
+  own provider. Nothing by SMS or WhatsApp. **Copy names what is sent, from
+  the API's reach** (`EMAIL_AND_ACCOUNT` | `EMAIL` | `ACCOUNT` |
+  `ON_SIGN_IN` | `NONE`, `lib/messages/notice-reach.ts`): "Saroh doesn't
+  message ‹First›" only for `NONE`, and a read that failed claims nothing
+  either way. The account's "‹Business› has been told" / "The team has been
+  told" shows only when the API says it (`told`): the customer's own move or
+  cancel reaches the team's inbox.
 
 ## Analytics
 

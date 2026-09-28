@@ -17,8 +17,9 @@ export interface Hold {
 /**
  * A step held for ten seconds before it is recorded (ADR-008): Ready, in the
  * Saffron card, and a refund, in the red one — the amount, where it goes,
- * Undo and "now". Nothing is sent to the customer by either; the card says
- * what IS recorded instead of promising a text.
+ * Undo and "now". The card says what IS recorded, and for Ready what the
+ * customer is told once it is (A14's notice, `readyNoticeText`) — never a
+ * text that isn't sent.
  *
  * It counts itself down and calls `onDone` once when the time is up; the
  * screen owns what "done" does. Leaving the page is handled there too.

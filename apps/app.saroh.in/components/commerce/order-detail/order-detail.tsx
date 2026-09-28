@@ -8,6 +8,7 @@ import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
+import { readyNoticeText } from "@/lib/messages/notice-reach";
 import { shipmentOf } from "@/lib/orders/courier";
 import {
     allergenWords,
@@ -338,7 +339,7 @@ export function OrderDetail({
                         hold={hold}
                         title={(s) => `Marking ready in ${s}s`}
                         note="Leave this page and it's marked ready straight away. Undo is only here."
-                        body={`Nothing is sent to ${first} — the step shows on the order.`}
+                        body={readyNoticeText(order.customerNotice, first)}
                         nowLabel="Mark now"
                         onUndo={() =>
                             kitchen.cancelHold(

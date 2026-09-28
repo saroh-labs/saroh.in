@@ -2,6 +2,7 @@ import type {
     AttentionKind,
     AttentionSource,
 } from "@/lib/customer-workspace/attention";
+import type { NoticeReach } from "@/lib/messages/notice-reach";
 
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14):
@@ -217,6 +218,12 @@ export interface OrderRead extends FulfilmentFields {
      * the API couldn't read it; absent from an API before B15.
      */
     attention?: OrderAttention | null;
+    /**
+     * How its Ready and handover reach the customer (A14): emailed, in
+     * their account, or nothing. Null when the API couldn't read it;
+     * absent from an API before A14.
+     */
+    customerNotice?: NoticeReach | null;
 }
 
 /** One Needs attention entry, as the order read carries it (B15). */

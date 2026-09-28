@@ -1,5 +1,6 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
 import { getContact } from "@/lib/contacts/service";
+import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 
 import type { PeekAttention, PeekPerson } from "./peek";
 
@@ -8,7 +9,7 @@ import type { PeekAttention, PeekPerson } from "./peek";
  *
  * Two reads the viewer's own role decides: the contact (for the phone) and
  * Needs attention (C1, `GET customers/:contactId/attention`), both under
- * `contact:read`. The attention read already hides sensitive entries from a
+ * `contact:read`, and how a move or cancel reaches them (A14). The attention read already hides sensitive entries from a
  * viewer who may not see them and only counts them.
  *
  * Null when the contact can't be read — not permitted, gone, or the API
@@ -20,12 +21,13 @@ export async function readPeekPerson(
 ): Promise<PeekPerson | null> {
     const base = await orgBase();
     if (!base) return null;
-    const [contact, attention] = await Promise.all([
+    const [contact, attention, notices] = await Promise.all([
         getContact(contactId).catch(() => null),
         readAttention(base, contactId),
+        readNoticeReach(contactId),
     ]);
     if (!contact) return null;
-    return { phone: contact.phone, attention };
+    return { phone: contact.phone, attention, reach: notices?.reach ?? null };
 }
 
 /** Needs attention for one contact; null when it can't be read. The
