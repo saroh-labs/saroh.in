@@ -901,6 +901,21 @@ describe("a plan's read (D1)", () => {
         expect(db.customerSubscription!.groupBy).not.toHaveBeenCalled();
     });
 
+    it.each([
+        [{}, { status: { not: "DRAFT" } }],
+        [{ include: "drafts" as const }, {}],
+        [{ status: "DRAFT" as const }, { status: "DRAFT" }],
+        [{ status: "ACTIVE" as const }, { status: "ACTIVE" }],
+    ])("lists drafts only when asked (D5): %p", async (query, where) => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        await service.listPlans(owner, query);
+        expect(db.subscriptionPlan!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { ...where, organizationId: "org_1" },
+            }),
+        );
+    });
+
     it("answers another business's plan with a 404", async () => {
         db.subscriptionPlan!.findMany!.mockResolvedValue([]);
         await expect(service.getPlan(owner, "plan_x")).rejects.toBeInstanceOf(
@@ -971,14 +986,34 @@ describe("a plan's name and classes (D1)", () => {
     });
 
     it("changes classes a month, or clears them with null", async () => {
+        // Leaving out the draft revision each recorded change bumps (D5).
+        const writes = () =>
+            tx
+                .subscriptionPlan!.updateMany!.mock.calls.map((c) => c[0].data)
+                .filter((d) => !("draftRevision" in d));
         await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
-        expect(tx.subscriptionPlan!.updateMany!.mock.calls[0]![0].data).toEqual(
-            { classesPerMonth: 12 },
-        );
+        expect(writes()[0]).toEqual({ classesPerMonth: 12 });
         await service.updatePlan(owner, "plan_1", { classesPerMonth: null });
-        expect(tx.subscriptionPlan!.updateMany!.mock.calls[1]![0].data).toEqual(
-            { classesPerMonth: null },
-        );
+        expect(writes()[1]).toEqual({ classesPerMonth: null });
+    });
+
+    it("bumps the draft revision when a change is recorded (D5)", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
+        expect(tx.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
+            where: { id: "plan_1", organizationId: "org_1" },
+            data: { draftRevision: { increment: 1 } },
+        });
+    });
+
+    it("refuses the old whole-plan save on a draft (D5)", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...PLAN,
+            status: "DRAFT",
+        });
+        await expect(
+            service.updatePlan(owner, "plan_1", { classesPerMonth: 12 }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
     });
 
     it("refuses a name another live plan has, ignoring case, naming it", async () => {

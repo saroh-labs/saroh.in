@@ -174,8 +174,11 @@ describe("ACTIVE and ARCHIVED plans behave as today (D21, real database)", () =>
         );
     });
 
-    it("the staff list without a filter still lists every plan", async () => {
-        const all = await service.listPlans(shop, {});
+    it("the staff list without a filter lists live and archived plans, not drafts (D5)", async () => {
+        const plain = (await service.listPlans(shop, {})).map((p) => p.id);
+        expect(plain).toEqual(expect.arrayContaining([activeId, archivedId]));
+        expect(plain).not.toContain(draftId);
+        const all = await service.listPlans(shop, { include: "drafts" });
         expect(all.map((p) => p.id)).toEqual(
             expect.arrayContaining([activeId, archivedId, draftId]),
         );

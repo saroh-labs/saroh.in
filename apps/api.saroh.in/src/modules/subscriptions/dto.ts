@@ -79,10 +79,50 @@ export class PlanInputDto {
     classesPerMonth?: number | null;
 }
 
+/** What the staff list can be filtered to, drafts included (D5). */
+export const PLAN_LIST_STATUSES = ["DRAFT", ...PLAN_STATUSES] as const;
+export type PlanListStatus = (typeof PLAN_LIST_STATUSES)[number];
+
+/**
+ * The staff Plans list. With no `status`, it lists live and archived plans
+ * but not drafts, as every app before the Plan Editor (D7) expects: an
+ * older Plans tab would draw a draft as a live card. The editor's app asks
+ * for them with `include=drafts` (everything) or `status=DRAFT`.
+ */
 export class ListPlansQueryDto {
     @IsOptional()
-    @IsIn(PLAN_STATUSES)
-    status?: PlanStatus;
+    @IsIn(PLAN_LIST_STATUSES)
+    status?: PlanListStatus;
+
+    @IsOptional()
+    @IsIn(["drafts"])
+    include?: "drafts";
+}
+
+/** The draft revision an editor holds, sent with every draft write (#285). */
+export class DraftRevisionDto {
+    @IsInt({ message: "Reload the plan and try again" })
+    @Min(0)
+    revision!: number;
+}
+
+/**
+ * An autosave from the Plan Editor (D5): the fields in view and the
+ * revision it holds. On a DRAFT it writes the plan; on a live plan it
+ * writes the unpublished changes, and buyers keep the published terms.
+ */
+export class PlanDraftDto extends PlanInputDto {
+    @IsInt({ message: "Reload the plan and try again" })
+    @Min(0)
+    revision!: number;
+}
+
+/** Deleting a draft names the revision in the query: a DELETE has no body. */
+export class DeleteDraftQueryDto {
+    @Type(() => Number)
+    @IsInt({ message: "Reload the plan and try again" })
+    @Min(0)
+    revision!: number;
 }
 
 /** A page of a plan's history (D2): after the event `cursor`, `limit` of them. */
