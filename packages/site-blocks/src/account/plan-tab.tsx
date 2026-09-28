@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
+import { BuyPackSheet } from "./buy-pack-sheet";
 import { CancelSheet } from "./cancel-sheet";
 import type { AccountPlanTab, AccountSubscription, AccountView } from "./model";
 import {
@@ -14,6 +15,7 @@ import {
     planLine,
     planPrice,
 } from "./model";
+import type { PlanPacksShop } from "./packs-api";
 import {
     AccountCard,
     AccountRow,
@@ -36,6 +38,10 @@ import { PLAN_OFFLINE } from "./plan-api";
  * and pays an overdue invoice with "Pay now", which opens a pay link made
  * that moment. There is no plan change (default 8) and no autopay until
  * D12. Everything goes through the site's server actions (`api`).
+ *
+ * With packs on sale (A11, `packs`), the Class packs card shows even with
+ * none held, and "Buy a pack" opens the sheet that buys one online — or
+ * says to buy at the desk when the business takes no payment online.
  */
 
 export type { PayNowResult, PlanApi, PlanChangeResult } from "./plan-api";
@@ -44,6 +50,8 @@ export interface PlanTabProps {
     account: AccountView;
     tab: AccountPlanTab;
     api: PlanApi;
+    /** Packs on sale online and the actions that buy one (A11). */
+    packs?: PlanPacksShop | null;
 }
 
 /** What is being done, to which plan: one thing at a time. */
@@ -52,11 +60,25 @@ type Busy = { ref: string; what: "pay" | "resume" } | null;
 type Open =
     | { kind: "pause"; plan: AccountSubscription }
     | { kind: "cancel"; plan: AccountSubscription }
+    | { kind: "buy" }
     | null;
 
-export function PlanTab({ account, tab: initial, api }: PlanTabProps) {
+export function PlanTab({
+    account,
+    tab: initial,
+    api,
+    packs: shop = null,
+}: PlanTabProps) {
     const router = useRouter();
     const [tab, setTab] = useState(initial);
+    // A refresh from the server (after a pack is bought, A11) brings the
+    // tab as it is now: taken while rendering, as React advises for state
+    // that follows a prop.
+    const [fromServer, setFromServer] = useState(initial);
+    if (initial !== fromServer) {
+        setFromServer(initial);
+        setTab(initial);
+    }
     const [open, setOpen] = useState<Open>(null);
     const [busy, setBusy] = useState<Busy>(null);
     const [said, setSaid] = useState<string | null>(null);
@@ -105,7 +127,8 @@ export function PlanTab({ account, tab: initial, api }: PlanTabProps) {
 
     const plans = tab.subscriptions;
     const packs = tab.packs;
-    const showPacks = !packs.ok || packs.value.length > 0;
+    const canBuy = shop !== null && shop.onSale.packs.length > 0;
+    const showPacks = !packs.ok || packs.value.length > 0 || canBuy;
 
     return (
         <div className="grid gap-3.5">
@@ -156,7 +179,31 @@ export function PlanTab({ account, tab: initial, api }: PlanTabProps) {
             )}
 
             {showPacks ? (
-                <AccountCard labelledBy="plan-packs" title="Class packs">
+                <AccountCard
+                    labelledBy="plan-packs"
+                    title="Class packs"
+                    lead={
+                        packs.ok && packs.value.length === 0
+                            ? "No packs."
+                            : undefined
+                    }
+                    actions={
+                        canBuy ? (
+                            <button
+                                type="button"
+                                className={buttonClasses(false)}
+                                disabled={busy !== null}
+                                onClick={() => {
+                                    setSaid(null);
+                                    setProblem(null);
+                                    setOpen({ kind: "buy" });
+                                }}
+                            >
+                                Buy a pack
+                            </button>
+                        ) : undefined
+                    }
+                >
                     {packs.ok ? (
                         packs.value.map((pack, i) => (
                             <AccountRow
@@ -178,6 +225,23 @@ export function PlanTab({ account, tab: initial, api }: PlanTabProps) {
                 </AccountCard>
             ) : null}
 
+            {shop && canBuy ? (
+                <BuyPackSheet
+                    open={open?.kind === "buy"}
+                    onClose={() => setOpen(null)}
+                    onSale={shop.onSale}
+                    businessName={account.businessName}
+                    customer={{ name: account.name, email: account.email }}
+                    api={shop.api}
+                    onBought={(message) => {
+                        setOpen(null);
+                        setProblem(null);
+                        setSaid(message);
+                        // The new pack is read with the tab.
+                        router.refresh();
+                    }}
+                />
+            ) : null}
             <PauseSheet
                 plan={open?.kind === "pause" ? open.plan : null}
                 weeks={tab.pauseWeeks}
