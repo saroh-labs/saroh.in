@@ -565,3 +565,12 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - **A Reviewer on Orders sees the Orders locked card**, not the generic module card (B7, F9).
 - **"Returning" counts only what the viewer can read.** Without `invoice:read` it is judged from orders alone (C3).
 - **The bot check (Cloudflare Turnstile, free) is deferred.** Code sign-in runs without a challenge until abuse shows up. The API logs `site_codes_challenge_unconfigured` meanwhile, and the check is switched on by setting the two keys.
+
+## DEC-057 A module Saroh has switched off is never shown to the business
+
+**Status: Accepted — 2026-09-28** · applies to every surface that lists or gates modules
+
+- Context: on a fresh production database every module's rollout flag was unset, so Settings › Modules listed Website, Contacts, Appointments and Sell with their switches on and a raw `ROLLOUT_DISABLED` line under each.
+- Decision: **a module whose rollout flag is off (`ROLLOUT_DISABLED`) is not shown to the business anywhere**: not in Settings › Modules, the rail, the command menu, "Also sell", onboarding's module choices, setup checklists or any upsell. Only modules Saroh has rolled out appear, and the business turns those on or off. A raw blocker code is never shown to a merchant.
+- Consequences: the module list the app renders is the set that has passed the rollout gate. Turning a rollout flag off in the admin console hides the module; the business's own setting and its data are kept.
+- Migration: none.
