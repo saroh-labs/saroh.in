@@ -9,6 +9,7 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Skeleton } from "@saroh/ui/skeleton";
+import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -236,14 +237,33 @@ export function OrdersEmpty({
     storeName,
     options = null,
     go,
+    shareUrl = null,
 }: {
     query: OrdersQuery;
     storeName: string | null;
     /** The filter bar's words, to say which filters found nothing (B4). */
     options?: OrderFilterOptions | null;
     go: (patch: Partial<OrdersQuery>) => void;
+    /**
+     * The live site's address: a business with no orders yet is offered
+     * "Share your storefront", which copies it. Null: no live site, so no
+     * button — there is nothing to share yet.
+     */
+    shareUrl?: string | null;
 }) {
     const copy = ordersEmptyCopy(query, storeName, options);
+    const share = copy.kind === "first-run" && shareUrl ? shareUrl : null;
+    const copyLink = async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            showSuccess("Storefront link copied", url);
+        } catch {
+            showError(
+                "Couldn't copy the link. Select it and copy it instead.",
+                url,
+            );
+        }
+    };
     const Icon =
         copy.kind === "search"
             ? Search
@@ -281,6 +301,14 @@ export function OrdersEmpty({
                         onClick={() => go(action.patch)}
                     >
                         {action.label}
+                    </Button>
+                ) : share ? (
+                    <Button
+                        variant="outline"
+                        className="mt-1"
+                        onClick={() => void copyLink(share)}
+                    >
+                        Share your storefront
                     </Button>
                 ) : undefined
             }

@@ -89,10 +89,31 @@ export function shipmentOf(
     };
 }
 
-/** The chips to offer: the usual couriers, and the order's own if it's another. */
+/**
+ * The chip for any other courier (B10's follow-up, taken in B8): picking it
+ * asks for the courier's name, which is what the order keeps.
+ */
+export const OTHER_COURIER = "Other";
+
+/**
+ * The chips to offer: the usual couriers, the order's own if it's another,
+ * and "Other" to type one in.
+ */
 export function courierChoices(current: string | null): string[] {
     const usual: string[] = [...COURIERS];
-    return current && !usual.includes(current) ? [current, ...usual] : usual;
+    const all =
+        current && !usual.includes(current) && current !== OTHER_COURIER
+            ? [current, ...usual]
+            : usual;
+    return [...all, OTHER_COURIER];
+}
+
+/**
+ * The courier's name a draft records: the chip, or for "Other" what was
+ * typed beside it. Empty when "Other" has no name yet — the panel asks.
+ */
+export function courierName(chip: string, typed: string): string {
+    return chip === OTHER_COURIER ? typed.trim() : chip;
 }
 
 export interface CourierDraft {

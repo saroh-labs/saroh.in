@@ -21,6 +21,7 @@ import {
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
+import type { Sellable } from "@/lib/orders/sellables";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
@@ -85,6 +86,7 @@ export function OrderDetail({
     payments,
     can,
     customerHref,
+    addable = null,
     aside,
 }: {
     order: OrderRead;
@@ -93,6 +95,11 @@ export function OrderDetail({
     payments: OrderPaymentsSummary | null;
     can: OrderPermissions;
     customerHref: string | null;
+    /**
+     * What "Add an item" offers while items can change (B8): the order's
+     * storefront's catalogue, "unavailable" if it couldn't be read.
+     */
+    addable?: Sellable[] | "unavailable" | null;
     /** Extra panels for the right column (reviews). */
     aside?: ReactNode;
 }) {
@@ -361,6 +368,7 @@ export function OrderDetail({
                                 delivery={delivery}
                                 refundTo={refundTo}
                                 format={money ? format : null}
+                                addable={addable}
                                 busy={busy}
                                 onCancel={() => setPanel(null)}
                                 onSave={kitchen.saveEdit}

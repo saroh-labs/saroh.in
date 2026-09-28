@@ -74,10 +74,18 @@ function Unavailable({
 export async function ModuleGate({
     moduleKey,
     switchedOnAt,
+    denied,
     children,
 }: {
     moduleKey: string;
     switchedOnAt?: SwitchedOnAt;
+    /**
+     * What a role the module is out of reach for sees instead of the generic
+     * denial, which is passed in (`standard`) — for a section whose screens
+     * have a locked card of their own (Orders, DEC-056). Called only on a
+     * denial, so it may read what it needs then.
+     */
+    denied?: (standard: ReactNode) => ReactNode | Promise<ReactNode>;
     children: ReactNode;
 }) {
     const access = await moduleAccess(moduleKey);
@@ -95,12 +103,13 @@ export async function ModuleGate({
             (b) => b.code === "UNAUTHORIZED",
         );
         if (unauthorized) {
-            return (
+            const standard = (
                 <AccessDenied
                     title={`You do not have access to ${access.module.label}`}
                     description={`Your role in this organization doesn't include ${access.module.label}. An owner or admin can change what you can reach.`}
                 />
             );
+            return denied ? await denied(standard) : standard;
         }
         return (
             <Unavailable

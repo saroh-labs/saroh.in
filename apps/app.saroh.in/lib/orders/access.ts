@@ -35,6 +35,19 @@ export function ordersAccess(
     };
 }
 
+/**
+ * Which Orders screen an address is (DEC-056): the list (and New order), one
+ * order, or none. Sell's module gate asks it, so a role Sell is closed to
+ * gets Orders' own locked card there rather than the generic one — the
+ * gate runs in the section's layout, which can't see the route.
+ */
+export function ordersPlace(pathname: string | null): "list" | "order" | null {
+    const parts = (pathname ?? "").split("/").filter(Boolean);
+    if (parts[0] !== "commerce" || parts[1] !== "orders") return null;
+    if (parts.length === 2 || parts[2] === "new") return "list";
+    return "order";
+}
+
 /** Whose role it is, as the locked cards name it. */
 interface Viewer {
     role: string;

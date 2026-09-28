@@ -16,63 +16,9 @@ import { OptionSelect } from "@/components/shared/option-select";
 import { formatMoney } from "@/lib/format/money";
 import { createOrder } from "@/lib/orders/actions";
 import { orderHref } from "@/lib/orders/links";
+import type { ProductLite } from "@/lib/orders/sellables";
+import { firstSellable, sellablesOf } from "@/lib/orders/sellables";
 
-interface ProductLite {
-    id: string;
-    name: string;
-    price: string;
-    variants?: { id: string; title: string; price: string | null }[];
-    /**
-     * Nothing on the shelf at this storefront (#511): it can't be ordered
-     * here. The API is the one that decides — it counts what is promised to
-     * other orders too, and says "Only N left" when there are fewer than
-     * asked for.
-     */
-    soldOut?: boolean;
-}
-
-/**
- * What a line can be for. A product with variants is bought as one of them
- * — "Linen Wrap Dress · M" — at that variant's price, so each is its own
- * choice; the key carries both ids ("product:variant") to the submit.
- */
-interface Sellable {
-    key: string;
-    productId: string;
-    variantId?: string;
-    label: string;
-    price: string;
-    soldOut: boolean;
-}
-
-function sellablesOf(products: ProductLite[]): Sellable[] {
-    return products.flatMap((p) =>
-        p.variants && p.variants.length > 0
-            ? p.variants.map((v) => ({
-                  key: `${p.id}:${v.id}`,
-                  productId: p.id,
-                  variantId: v.id,
-                  label: `${p.name} · ${v.title}`,
-                  price: v.price ?? p.price,
-                  soldOut: p.soldOut ?? false,
-              }))
-            : [
-                  {
-                      key: p.id,
-                      productId: p.id,
-                      label: p.name,
-                      price: p.price,
-                      soldOut: p.soldOut ?? false,
-                  },
-              ],
-    );
-}
-
-/** The line a new row starts on: the first thing that isn't sold out. */
-function firstSellable(products: ProductLite[]): string {
-    const all = sellablesOf(products);
-    return (all.find((s) => !s.soldOut) ?? all.at(0))?.key ?? "";
-}
 /**
  * What the storefront says about checkout (Sell → Storefronts). Defaults, not
  * rules: an order keyed in by hand is the merchant's own call, so every figure

@@ -64,6 +64,8 @@ export async function refundLines(
     input: {
         lines: { itemId: string; quantity: number }[] | null;
         putBack?: { itemId: string; quantity: number }[];
+        reason?: string | null;
+        goodwill?: string | null;
         idempotencyKey: string;
     },
 ) {

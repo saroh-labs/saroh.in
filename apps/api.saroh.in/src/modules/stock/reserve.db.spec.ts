@@ -1044,6 +1044,43 @@ describe("switching to per-variant stock", () => {
 });
 
 describe("the kitchen and the shelf", () => {
+    it("Add an item at New holds it at the order's storefront; at Preparing it is refused (B8)", async () => {
+        const bread = await product("Rye bread", { hill: 5, online: 5 });
+        const bun = await product("Cardamom bun", { hill: 4, online: 4 });
+        const order = await place(hill, [{ productId: bread, quantity: 1 }]);
+
+        await kitchen.edit(owner, order, {
+            add: [{ productId: bun, quantity: 2 }],
+        });
+        // DEC-032: held where the order was taken, not anywhere else.
+        expect(await shelf(hill, bun)).toMatchObject({
+            onHand: 4,
+            promised: 2,
+        });
+        expect(await shelf(online, bun)).toMatchObject({
+            onHand: 4,
+            promised: 0,
+        });
+
+        // Paid at the counter, then started.
+        await prisma.order.update({
+            where: { id: order },
+            data: { paymentStatus: "PAID" },
+        });
+        await kitchen.moveStage(owner, order, { to: "PREPARING" });
+        await expect(
+            kitchen.edit(owner, order, {
+                add: [{ productId: bun, quantity: 1 }],
+            }),
+        ).rejects.toThrow(
+            "Items and the address can only change before the order starts preparing.",
+        );
+        expect(await shelf(hill, bun)).toMatchObject({ promised: 2 });
+        expect(
+            await prisma.orderItem.count({ where: { orderId: order } }),
+        ).toBe(2);
+    });
+
     it("fulfil → undo → fulfil nets −q, with Sold, Reversed, Sold entries", async () => {
         const loaf = await product("Seeded loaf", { hill: 10 });
         const order = await place(hill, [{ productId: loaf, quantity: 3 }]);

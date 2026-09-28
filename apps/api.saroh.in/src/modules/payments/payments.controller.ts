@@ -15,6 +15,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { toCents } from "../invoices/totals";
 import { ConnectProviderDto, CreateIntentDto, RefundOrderDto } from "./dto";
 import { PaymentsService } from "./payments.service";
 
@@ -93,7 +94,10 @@ export class PaymentsController {
         @Body() dto: RefundOrderDto,
     ) {
         return this.payments.initiateRefund(ctx, orderId, {
+            kind: dto.kind,
             reason: dto.reason,
+            amountCents:
+                dto.amount !== undefined ? toCents(dto.amount) : undefined,
             lines: dto.lines,
             putBack: dto.putBack,
             idempotencyKey: dto.idempotencyKey,

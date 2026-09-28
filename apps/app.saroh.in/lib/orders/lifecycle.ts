@@ -8,6 +8,7 @@ import type {
     OrderReadEvent,
     OrderReadLine,
 } from "@/lib/orders/read";
+import { REFUND_REASONS } from "@/lib/orders/refund-choice";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
 /**
@@ -310,7 +311,13 @@ export function eventText(
         case "REFUND": {
             const amount =
                 typeof e.amountCents === "number" ? money(e.amountCents) : null;
-            return amount ? `Refunded ${amount}` : "Refunded";
+            const said = amount ? `Refunded ${amount}` : "Refunded";
+            // Why (B8): one of the sheet's reasons reads in the sentence,
+            // "Refunded ₹50 · late"; words typed for Other stay as typed.
+            const why = e.note?.trim();
+            if (!why) return said;
+            const listed = REFUND_REASONS.some((r) => r.label === why);
+            return `${said} · ${listed ? why.charAt(0).toLowerCase() + why.slice(1) : why}`;
         }
         case "STATUS": {
             if (e.toStatus === "CANCELLED") return "Cancelled";

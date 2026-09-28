@@ -6,9 +6,11 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    Matches,
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
     ValidateNested,
 } from "class-validator";
 
@@ -113,22 +115,53 @@ export class RefundPutBackInput {
     quantity!: number;
 }
 
+/** How a refund is asked for: by line (or everything left), or an amount (B8). */
+export const REFUND_KINDS = ["lines", "goodwill"] as const;
+export type RefundKind = (typeof REFUND_KINDS)[number];
+
+/** Money as a decimal string, two places at most — never a float. */
+const MONEY_RE = /^\d+(\.\d{1,2})?$/;
+
 /**
  * Initiate a refund against an Order's successful payment (S5-003), by line
- * (ADR-008, U6).
+ * (ADR-008, U6), or as another amount (B8).
  *
- * SECURITY: there is NO amount field — the amount is worked out server-side
- * from the chosen lines (what each paid, less what was already refunded of
- * it), or with no lines, everything still refundable on the order. A client
- * can never influence how much is refunded. `idempotencyKey` makes a retry
- * return the first refund instead of making a second.
+ * SECURITY: a refund by line carries NO amount — it is worked out
+ * server-side from the chosen lines (what each paid, less what was already
+ * refunded of it), or with no lines, everything still refundable on the
+ * order. `kind: "goodwill"` ("Or another amount") is the one refund that
+ * names an amount, and it needs a reason: the server caps it at what was
+ * paid and not yet handed back, under the order's row lock; it names no
+ * line and returns no stock. `idempotencyKey` makes a retry return the
+ * first refund instead of making a second.
  */
 export class RefundOrderDto {
+    /** Omitted: `lines`, the refund as it was before B8. */
     @IsOptional()
+    @IsIn(REFUND_KINDS, { message: "Unknown kind of refund" })
+    kind?: RefundKind;
+
+    /** Required for another amount; optional, and kept, by line. */
+    @ValidateIf(
+        (o: RefundOrderDto, v: unknown) =>
+            o.kind === "goodwill" || (v != null && v !== ""),
+    )
     @Transform(trim)
-    @IsString()
+    @IsString({ message: "Say why you're refunding this amount" })
+    @MinLength(1, { message: "Say why you're refunding this amount" })
     @MaxLength(500)
     reason?: string;
+
+    /** Another amount, in the order's currency ("50" or "49.50"). */
+    @ValidateIf(
+        (o: RefundOrderDto, v: unknown) => o.kind === "goodwill" || v != null,
+    )
+    @Transform(trim)
+    @IsString({ message: "Type the amount to refund" })
+    @Matches(MONEY_RE, {
+        message: "The amount must be a number with up to 2 decimals",
+    })
+    amount?: string;
 
     @IsOptional()
     @IsArray()
