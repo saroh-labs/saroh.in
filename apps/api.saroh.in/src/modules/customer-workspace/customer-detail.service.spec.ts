@@ -180,6 +180,21 @@ const ATTENTION_MEDICAL = {
     allergen: null,
 };
 
+/** Spent's orders part joins orders; its invoices part never does. */
+function isOrdersPart(sql: { sql: string }): boolean {
+    return sql.sql.includes('JOIN "Order" o');
+}
+
+/** The Spent reads made, of one part. */
+function spentReads(
+    db: { $queryRaw: jest.Mock },
+    part: "orders" | "invoices",
+): { sql: string; values: unknown[] }[] {
+    return db.$queryRaw.mock.calls
+        .map((c: [{ sql: string; values: unknown[] }]) => c[0])
+        .filter((sql) => isOrdersPart(sql) === (part === "orders"));
+}
+
 function make(views: Views = ALL_ON) {
     const db = {
         contact: {
@@ -234,11 +249,6 @@ function make(views: Views = ALL_ON) {
         order: {
             findMany: jest.fn().mockResolvedValue([ORDER]),
             count: jest.fn().mockResolvedValue(1),
-            groupBy: jest
-                .fn()
-                .mockResolvedValue([
-                    { currency: "INR", _sum: { total: "450" } },
-                ]),
         },
         booking: {
             findMany: jest
@@ -301,12 +311,18 @@ function make(views: Views = ALL_ON) {
                         : [INVOICE],
                 ),
             ),
-            groupBy: jest
-                .fn()
-                .mockResolvedValue([
-                    { currency: "INR", _sum: { total: "1200" } },
-                ]),
         },
+        // Spent's two parts (`customer-spent.ts`), net of refunds and
+        // credit notes in the database: orders 450, invoices 1,200.
+        $queryRaw: jest
+            .fn()
+            .mockImplementation((sql: { sql: string }) =>
+                Promise.resolve(
+                    isOrdersPart(sql)
+                        ? [{ currency: "INR", sum: "450" }]
+                        : [{ currency: "INR", sum: "1200" }],
+                ),
+            ),
         packPurchase: { findMany: jest.fn().mockResolvedValue([PACK]) },
         businessProfile: {
             findUnique: jest
@@ -466,16 +482,15 @@ describe("CustomerDetailService", () => {
             }),
         );
         // Spent: paid orders are summed on the orders; paid invoices only
-        // when they are not an order's own.
-        expect(
-            (db.invoice.groupBy as jest.Mock).mock.calls[0][0].where,
-        ).toEqual(
-            expect.objectContaining({
-                status: "PAID",
-                orderId: null,
-                kind: { not: "CREDIT_NOTE" },
-            }),
-        );
+        // when they are not an order's own — each for this contact alone,
+        // by the list's rule (C14).
+        const [orders] = spentReads(db, "orders");
+        const [invoices] = spentReads(db, "invoices");
+        expect(orders.sql).toContain(`o."paymentStatus" = 'PAID'`);
+        expect(orders.values).toContainEqual(["c1"]);
+        expect(invoices.sql).toContain(`i."orderId" IS NULL`);
+        expect(invoices.sql).toContain(`i.kind <> 'CREDIT_NOTE'`);
+        expect(invoices.values).toContainEqual(["c1"]);
     });
 
     it("offers an unlinked same-email store customer only as a possible match", async () => {
@@ -498,7 +513,7 @@ describe("CustomerDetailService", () => {
         ]);
         // None of their data: no orders read, no orders counted, no money.
         expect(db.order.findMany).not.toHaveBeenCalled();
-        expect(db.order.groupBy).not.toHaveBeenCalled();
+        expect(spentReads(db, "orders")).toHaveLength(0);
         expect(detail.orders?.rows).toEqual([]);
         expect(detail.stats.orders).toBe(0);
         expect(detail.stats.spent).toEqual([
@@ -749,10 +764,10 @@ describe("CustomerDetailService", () => {
         expect(detail.stats).not.toHaveProperty("owed");
         expect(detail.stats).not.toHaveProperty("classesLeft");
         expect(db.invoice.findMany).not.toHaveBeenCalled();
-        expect(db.invoice.groupBy).not.toHaveBeenCalled();
+        expect(spentReads(db, "invoices")).toHaveLength(0);
         expect(db.customerSubscription.findMany).not.toHaveBeenCalled();
         expect(db.packPurchase.findMany).not.toHaveBeenCalled();
-        expect(db.order.groupBy).not.toHaveBeenCalled();
+        expect(spentReads(db, "orders")).toHaveLength(0);
 
         // What they do see: the diary, and the notes (an allergy matters at
         // the counter).
@@ -784,7 +799,7 @@ describe("CustomerDetailService", () => {
         expect(detail.money).toBe(false);
         expect(detail.stats).not.toHaveProperty("spent");
         expect(detail).not.toHaveProperty("invoices");
-        expect(db.order.groupBy).not.toHaveBeenCalled();
+        expect(spentReads(db, "orders")).toHaveLength(0);
     });
 
     it("gives invoices and Owed to invoice:read alone, with no Spent or orders", async () => {

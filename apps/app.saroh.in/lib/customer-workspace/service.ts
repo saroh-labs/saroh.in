@@ -218,6 +218,50 @@ export async function updateDetails(
     return holder ? { ...failure, holder } : failure;
 }
 
+/** Add customer's fields (DEC-056): an email, and whatever else is known. */
+export interface AddCustomerInput {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+}
+
+export type AddCustomerResult =
+    | { ok: true; contactId: string }
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          /** Set when a contact already holds the email. */
+          holder?: EmailHolder;
+      };
+
+/**
+ * Add customer on the Customers list (DEC-056, C14): a contact only, never a
+ * storefront's customer. An email a contact already holds names them, so the
+ * screen can open that person instead.
+ */
+export async function addCustomer(
+    input: AddCustomerInput,
+): Promise<AddCustomerResult> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(`${base}/customers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) {
+        const id = (body as { contactId?: unknown } | null)?.contactId;
+        return typeof id === "string"
+            ? { ok: true, contactId: id }
+            : { ok: false, error: "Couldn't add them." };
+    }
+    const failure = toFailure(body, "Couldn't add them.");
+    const holder = res.status === 409 ? holderOf(body) : undefined;
+    return holder ? { ...failure, holder } : failure;
+}
+
 export interface NoteInput {
     body: string;
     allergenIds: string[];

@@ -7,8 +7,14 @@ import { setConsent } from "@/lib/messages/service";
 import type { AttentionInput, SuggestionInput } from "./attention";
 import type { MergeBody, MergeColumn, MergePreviews } from "./merge";
 import { keptColumn } from "./merge";
-import type { NoteInput, WorkspaceResult } from "./service";
+import type {
+    AddCustomerInput,
+    AddCustomerResult,
+    NoteInput,
+    WorkspaceResult,
+} from "./service";
 import {
+    addCustomer,
     confirmAttention,
     createAttention,
     createNote,
@@ -30,6 +36,15 @@ import {
  * to api.saroh.in, which enforces the role and the organization, and
  * revalidates the page so what changed is read again.
  */
+/** Add customer (DEC-056, C14): a contact only; the list shows them. */
+export async function addCustomerAction(
+    input: AddCustomerInput,
+): Promise<AddCustomerResult> {
+    const result = await addCustomer(input);
+    if (result.ok) revalidatePath("/commerce/customers");
+    return result;
+}
+
 export async function linkCustomerAction(
     contactId: string,
     customerId: string,

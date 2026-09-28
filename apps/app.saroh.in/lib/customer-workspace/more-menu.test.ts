@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasMoneyRecords, moreMenu } from "./more-menu";
+import { DELETE_KEEPS_RECORDS, hasMoneyRecords, moreMenu } from "./more-menu";
 
 describe("hasMoneyRecords (C11)", () => {
     it("is true with an order or an invoice", () => {
@@ -109,7 +109,7 @@ describe("moreMenu", () => {
         ]);
     });
 
-    it("offers the privacy removal instead of Delete for someone with orders or invoices", () => {
+    it("offers the privacy removal instead of Delete for someone with orders or invoices, keeping Delete off with its reason (C14)", () => {
         const items = moreMenu(
             {
                 canWrite: true,
@@ -124,11 +124,15 @@ describe("moreMenu", () => {
         expect(items.map((i) => i.label)).toEqual([
             "Merge with a duplicate…",
             "Link a store customer…",
+            "Delete their record…",
             "Remove their details (privacy request)…",
         ]);
-        expect(items.filter((i) => i.danger).map((i) => i.label)).toEqual([
-            "Remove their details (privacy request)…",
-        ]);
+        expect(
+            items.filter((i) => i.danger && !i.disabled).map((i) => i.label),
+        ).toEqual(["Remove their details (privacy request)…"]);
+        expect(items.find((i) => i.label === "Delete their record…")).toEqual(
+            expect.objectContaining({ disabled: DELETE_KEEPS_RECORDS }),
+        );
     });
 
     it("keeps Delete for someone with orders when the viewer can't remove", () => {

@@ -445,3 +445,113 @@ test.describe("needs attention", () => {
         await expect(page.getByRole("main")).not.toContainText("you can't see");
     });
 });
+
+/**
+ * Customer Detail on a 375px phone (C14, default 28). Rye is a film set, so
+ * nothing here is saved: the long name is drawn in place, and More actions
+ * is only opened.
+ */
+test.describe("customer detail on a 375px phone", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    /** Whether the element shows whole across the 375px screen. */
+    const whole = async (el: ReturnType<Page["locator"]>) => {
+        const b = await el.boundingBox();
+        return b !== null && b.x >= 0 && b.x + b.width <= 375;
+    };
+
+    /** The page itself never scrolls sideways. */
+    const noSideways = (page: Page) =>
+        page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+        );
+
+    test("the tabs are one row that scrolls, keeping the chosen one in view", async ({
+        page,
+    }) => {
+        await signIn(page, RYE);
+        await page.goto(`/customers/${PRIYA}?tab=notes`);
+        const list = page.getByRole("tablist", { name: "Customer sections" });
+        const notes = tab(page, /^Notes/);
+        await expect(notes).toHaveAttribute("aria-selected", "true");
+
+        // One row, never wrapped, wider than the screen.
+        const tops = await list
+            .getByRole("tab")
+            .evaluateAll((els) =>
+                els.map((e) => Math.round(e.getBoundingClientRect().top)),
+            );
+        expect(new Set(tops).size).toBe(1);
+        expect(
+            await list.evaluate((el) => el.scrollWidth > el.clientWidth),
+        ).toBe(true);
+        // Opened from the address, the chosen tab was scrolled into view.
+        await expect.poll(() => whole(notes)).toBe(true);
+        expect(await noSideways(page)).toBe(true);
+
+        // The arrow keys go round to Overview, which comes back into view.
+        await notes.focus();
+        await page.keyboard.press("ArrowRight");
+        const over = tab(page, /^Overview/);
+        await expect(over).toHaveAttribute("aria-selected", "true");
+        await expect(over).toBeFocused();
+        await expect.poll(() => whole(over)).toBe(true);
+    });
+
+    test("a long name wraps without pushing the tags off-screen", async ({
+        page,
+    }) => {
+        await signIn(page, RYE);
+        await page.goto(`/customers/${PRIYA}`);
+        const h1 = page.getByRole("heading", { level: 1 });
+        await expect(h1).toHaveText("Priya Raman");
+        // Far longer than any name the seed holds, and unbroken.
+        await h1.evaluate((el) => {
+            el.textContent = `${"Priyadarshini".repeat(4)} Venkataraghavan-Subramaniam`;
+        });
+        const row = nameRow(page);
+        const edges = await row.locator(":scope > *").evaluateAll((els) =>
+            els.map((e) => {
+                const r = e.getBoundingClientRect();
+                return { left: r.left, right: r.right };
+            }),
+        );
+        for (const e of edges) {
+            expect(e.left).toBeGreaterThanOrEqual(0);
+            expect(e.right).toBeLessThanOrEqual(375);
+        }
+        await expect(
+            row.getByText("Returning", { exact: true }),
+        ).toBeInViewport();
+        expect(await noSideways(page)).toBe(true);
+    });
+
+    test("More actions is the ⋯ button, and Delete says why it's off", async ({
+        page,
+    }) => {
+        await signIn(page, RYE);
+        await page.goto(`/customers/${PRIYA}`);
+        const more = page
+            .getByRole("main")
+            .getByRole("button", { name: "More actions" });
+        await expect(more).toBeEnabled();
+        await more.click();
+        await expect(
+            page.getByRole("menuitem", { name: "Merge with a duplicate…" }),
+        ).toBeVisible();
+        // Priya has orders: the privacy removal is offered, and Delete stays
+        // in the menu, off, with its reason.
+        const del = page.getByRole("menuitem", { name: /Delete their record/ });
+        await expect(del).toHaveAttribute("aria-disabled", "true");
+        await expect(del).toContainText(
+            "They have orders or invoices. Remove their details instead.",
+        );
+        await expect(
+            page.getByRole("menuitem", {
+                name: "Remove their details (privacy request)…",
+            }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(more).toBeFocused();
+    });
+});

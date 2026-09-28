@@ -29,9 +29,10 @@ import { UnlinkedNotice } from "./unlinked-sheet";
  * with search, chips and their counts, the sort, "Bought at" and pages of
  * 50. A row opens Customer Detail.
  *
- * Add customer and Import stay (default 21). Both are kept per storefront,
- * so with several storefronts and none picked they lead to a page that
- * asks which — never quietly to the first.
+ * Add customer and Import stay (default 21). Add customer makes a contact
+ * for the whole business (DEC-056), so it asks no storefront. Import is
+ * still brought in at one: with several storefronts and none picked it
+ * leads to a page that asks which — never quietly to the first.
  */
 export function CustomersList({
     query,
@@ -63,22 +64,24 @@ export function CustomersList({
     const many = stores.length > 1;
     const here = stores.find((s) => s.id === query.store) ?? null;
     const target = here?.id ?? (many ? undefined : first?.id);
-    const actions = first ? (
+    const actions = (
         <>
-            <Button variant="outline" asChild>
-                <Link href={importCustomersHref(target)}>
-                    <Upload className="mr-1.5 size-4" />
-                    Import
-                </Link>
-            </Button>
+            {first ? (
+                <Button variant="outline" asChild>
+                    <Link href={importCustomersHref(target)}>
+                        <Upload className="mr-1.5 size-4" />
+                        Import
+                    </Link>
+                </Button>
+            ) : null}
             <Button asChild>
-                <Link href={newCustomerHref(target)}>
+                <Link href={newCustomerHref()}>
                     <Plus className="mr-1.5 size-4" />
                     Add customer
                 </Link>
             </Button>
         </>
-    ) : null;
+    );
 
     const heading = (
         <ListHeading count={customersText(page.everyone)} actions={actions} />

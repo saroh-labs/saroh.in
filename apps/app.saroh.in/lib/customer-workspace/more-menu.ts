@@ -11,8 +11,14 @@
  *
  * Delete their record (the hard delete) is for a record kept by mistake. For
  * someone with orders or invoices, a viewer who may remove is offered the
- * privacy removal instead, which keeps what the business must keep (R12).
+ * privacy removal instead, which keeps what the business must keep (R12) —
+ * and Delete stays in the menu, off, saying why (C14), so nobody hunts for
+ * it.
  */
+
+/** Why Delete is off for someone with orders or invoices. */
+export const DELETE_KEEPS_RECORDS =
+    "They have orders or invoices. Remove their details instead.";
 
 /**
  * Whether they have orders or invoices, from what this viewer's read holds;
@@ -33,6 +39,8 @@ export function hasMoneyRecords(d: {
 export interface MoreItem {
     label: string;
     danger?: boolean;
+    /** Shown but off, with the reason under its label. */
+    disabled?: string;
     go: () => void;
 }
 
@@ -76,13 +84,14 @@ export function moreMenu(
         if (may.canUnlink) {
             items.push({ label: "This isn't them…", go: go.notThem });
         }
-        if (!(canRemove && may.hasRecords === true)) {
-            items.push({
-                label: "Delete their record…",
-                danger: true,
-                go: go.remove,
-            });
-        }
+        items.push({
+            label: "Delete their record…",
+            danger: true,
+            ...(canRemove && may.hasRecords === true
+                ? { disabled: DELETE_KEEPS_RECORDS }
+                : {}),
+            go: go.remove,
+        });
     }
     if (canRemove && go.removeDetails) {
         items.push({

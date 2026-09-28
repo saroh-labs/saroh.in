@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ADDED_BY_HAND, addedByHand } from "./added";
 import type {
     CustomerDetail,
     DetailBooking,
@@ -387,8 +388,35 @@ describe("the header", () => {
 
     it("says since when a shop customer buys, and where", () => {
         expect(sinceLine(shop(), "Rye & Co.", NOW)).toBe(
-            "Customer since August 2026 · buys at Rye & Co. · Returning means 2 or more orders",
+            "Customer since August 2026 · buys at Rye & Co.",
         );
+    });
+
+    it("says someone added on the Customers list was added by hand (DEC-056, C14)", () => {
+        const today = shop({
+            orders: { from: "linked-customers", rows: [] },
+        });
+        today.contact = {
+            ...today.contact,
+            source: ADDED_BY_HAND,
+            createdAt: "2026-09-23T06:00:00Z",
+        };
+        expect(sinceLine(today, "Rye & Co.", NOW)).toBe(
+            "Added by hand today · no orders yet",
+        );
+        expect(addedByHand(today)).toBe(true);
+        const earlier = shop({
+            orders: { from: "linked-customers", rows: [] },
+        });
+        earlier.contact = { ...earlier.contact, source: ADDED_BY_HAND };
+        expect(sinceLine(earlier, "Rye & Co.", NOW)).toBe(
+            "Added by hand on 1 Jul · no orders yet",
+        );
+        expect(addedByHand(shop())).toBe(false);
+    });
+
+    it("says what Returning means on the word itself", () => {
+        expect(tagFor(shop())?.title).toBe("Returning: 2 or more orders");
     });
 });
 
@@ -397,7 +425,7 @@ describe("a shop customer's overview", () => {
         const tiles = orderTiles(shop(), NOW);
         expect(tiles.map((t) => [t.label, t.value, t.note])).toEqual([
             ["Orders", "2", "1 open, new"],
-            ["Spent", "₹1,500", "Since August 2026"],
+            ["Spent", "₹1,500", "Including delivery"],
             ["Average order", "₹750", "Across 2 orders"],
             ["Last order", "Today", "12:44 at Rye & Co."],
         ]);
