@@ -51,6 +51,7 @@ import type { Interval, Period } from "./periods";
 import { periodContaining } from "./periods";
 import type { PlanEventsPage } from "./plan-events";
 import { listPlanEvents, planActor } from "./plan-events";
+import { assertPlanOnSale } from "./plan-on-sale";
 import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
@@ -434,12 +435,8 @@ export class SubscriptionsService {
         ]);
         if (!contact) notFound("Contact", "contactId");
         if (!plan) notFound("Plan", "planId");
-        if (plan.status !== "ACTIVE") {
-            fieldError(
-                "That plan is archived and takes no new sign-ups",
-                "planId",
-            );
-        }
+        // A draft isn't published yet; an archived plan takes no one new.
+        assertPlanOnSale(plan);
 
         // A cleared business timezone is stored as "", which is no zone.
         const timezone =
@@ -1013,12 +1010,8 @@ export class SubscriptionsService {
                 },
             });
             if (!plan) notFound("Plan", "planId");
-            if (plan.status !== "ACTIVE") {
-                fieldError(
-                    "That plan is archived and takes no new sign-ups",
-                    "planId",
-                );
-            }
+            // Switching onto a plan sells it: never a draft or an archived one.
+            assertPlanOnSale(plan);
             if (plan.id === sub.planId) {
                 fieldError(`They are already on ${plan.name}`, "planId");
             }
