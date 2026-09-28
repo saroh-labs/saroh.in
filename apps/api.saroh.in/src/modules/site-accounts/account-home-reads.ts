@@ -182,6 +182,7 @@ export async function readLatestOrders(
                 select: {
                     quantity: true,
                     product: { select: { name: true } },
+                    service: { select: { name: true } },
                 },
             },
         },

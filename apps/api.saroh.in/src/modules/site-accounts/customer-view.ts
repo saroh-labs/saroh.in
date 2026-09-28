@@ -1,4 +1,5 @@
 import { toMoneyString } from "../../common/money";
+import { lineName } from "../orders/order-line";
 import type { AccountTab } from "./account-tabs";
 
 /**
@@ -206,7 +207,11 @@ export function orderView(row: {
     status: string;
     paymentStatus: string;
     stage: string;
-    items: { quantity: number; product: { name: string } }[];
+    items: {
+        quantity: number;
+        product: { name: string } | null;
+        service?: { name: string } | null;
+    }[];
     _count: { items: number };
 }): AccountOrder {
     const refunded = row.paymentStatus === "REFUNDED";
@@ -225,7 +230,8 @@ export function orderView(row: {
               ? "Cancelled"
               : (STAGE_WORDS[row.stage] ?? "Received"),
         items: listed.map((i) => ({
-            name: i.product.name,
+            // A treatment's line bills a service, not a product (E9).
+            name: lineName(i) ?? "",
             quantity: i.quantity,
         })),
         moreItems: Math.max(0, row._count.items - listed.length),
