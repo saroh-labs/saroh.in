@@ -5980,7 +5980,7 @@ model ClassWaitlistEntry {
 
   // One live place per person per session; one who left or let an offer
   // run out may join again, at the back.
-  @@unique([serviceId, startAt, contactId], map: "ClassWaitlistEntry_one_live_per_session", where: raw("status IN ('WAITING', 'OFFERED')"))
+  @@unique([serviceId, startAt, contactId], map: "ClassWaitlistEntry_one_live_per_session", where: raw("status = ANY (ARRAY['WAITING'::\"ClassWaitlistStatus\", 'OFFERED'::\"ClassWaitlistStatus\"])"))
   @@index([organizationId])
   @@index([serviceId, startAt, status, position])
   @@index([status, offeredUntil])
