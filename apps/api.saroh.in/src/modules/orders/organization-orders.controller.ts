@@ -93,15 +93,25 @@ export class OrganizationOrdersController {
         // the bare array an app before B1 read went in the contract release
         // (B2d). Money needs `order:read`; a customer's phone and email need
         // `contact:read`. Every filter narrows within the organization.
-        const { v: _v, late, since, ...filter } = query;
+        //
+        // Each row carries the customer's Needs attention as the caller may
+        // see it, and `attention=` filters on the same (B15): sensitive
+        // entries count only for a caller who may read them.
+        const { v: _v, late, attention, since, ...filter } = query;
         return this.orders.listRows(
             ctx.organizationId,
             {
                 ...filter,
                 late: late === undefined ? undefined : late === "true",
+                attention:
+                    attention === undefined ? undefined : attention === "true",
                 since: since ? new Date(since) : undefined,
             },
-            { money: full, contact: allows(ctx, "contact:read") },
+            {
+                money: full,
+                contact: allows(ctx, "contact:read"),
+                viewer: ctx,
+            },
         );
     }
 

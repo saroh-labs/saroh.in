@@ -459,6 +459,15 @@ export class ListOrdersQuery {
     late?: "true" | "false";
 
     /**
+     * Needs attention (B15): "true" keeps the orders whose customer has an
+     * entry the caller may see; "false" the others. A sensitive-only entry
+     * counts only for a caller who may read sensitive entries.
+     */
+    @IsOptional()
+    @IsIn(["true", "false"], { message: "attention is true or false" })
+    attention?: "true" | "false";
+
+    /**
      * What the row's pill says, as a key: a step's word ("ready",
      * "handed-to-courier") or "refunded" / "cancelled" (B4). The keys the
      * business's orders show come from `GET …/orders/filters`; an unknown

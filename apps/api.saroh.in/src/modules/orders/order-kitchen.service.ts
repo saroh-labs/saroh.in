@@ -36,6 +36,8 @@ import {
     typeOf,
 } from "./fulfilment";
 import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
+import type { OrderAttention } from "./order-attention";
+import { attentionByCustomer } from "./order-attention";
 import {
     adjustReservation,
     applyInventoryTransition,
@@ -127,6 +129,10 @@ export class OrderKitchenService {
                 ? await owedBackOn(prisma, ctx.organizationId, order.id)
                 : [],
             fullRead: allows(ctx, "order:read"),
+            // The customer's own phone and email (review #19); the delivery
+            // phone stays for whoever works the order.
+            contact: allows(ctx, "contact:read"),
+            attention: await this.attentionOf(ctx, order.customerId),
             invoiceRead: allows(ctx, "invoice:read"),
             actors: new Map(actors.map((a) => [a.id, a.name])),
             now: new Date(),
@@ -137,6 +143,27 @@ export class OrderKitchenService {
                 ? { returnable: await returnableUnits(prisma, order.id) }
                 : {}),
         });
+    }
+
+    /**
+     * The customer's Needs attention as this caller may see it (B15). A
+     * failed read is null, never an empty list: the screen then says it
+     * couldn't check, because silence reads as "no allergy".
+     */
+    private async attentionOf(
+        ctx: OrganizationContext,
+        customerId: string | null,
+    ): Promise<OrderAttention | null> {
+        if (!customerId) return { entries: [], hiddenSensitiveCount: 0 };
+        try {
+            const reads = await attentionByCustomer(ctx, [customerId]);
+            return reads.get(customerId) ?? null;
+        } catch (error) {
+            this.logger.warn(
+                `Needs attention couldn't be read for an order's customer: ${String(error)}`,
+            );
+            return null;
+        }
     }
 
     /**
