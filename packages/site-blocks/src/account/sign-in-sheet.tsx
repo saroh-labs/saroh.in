@@ -43,8 +43,12 @@ export interface SignInSheetProps {
     onClose: () => void;
     options: SignInOptions;
     api: SignInApi;
-    /** "book": asked at the last step of booking or buying. */
-    purpose?: "book" | "sign-in";
+    /**
+     * "book": asked at the last step of booking or buying. "change-email":
+     * Me's change of sign-in email (A5), where the code goes to the new
+     * address and `onSignedIn` gets the customer as they now are.
+     */
+    purpose?: "book" | "sign-in" | "change-email";
     onSignedIn: (customer: SignedInCustomer) => void;
 }
 
@@ -181,14 +185,21 @@ export function SignInSheet({
         }
     }
 
+    const changing = purpose === "change-email";
     const title =
-        step === "email" ? `Sign in — ${businessName}` : "Enter the code";
+        step === "code"
+            ? "Enter the code"
+            : changing
+              ? "Change your sign-in email"
+              : `Sign in — ${businessName}`;
     const lead =
         step === "code"
             ? `We sent a 6-digit code to ${email.trim()}.`
-            : purpose === "book"
-              ? "Last step: confirm it's you, then we'll finish. No password."
-              : "No password. We'll send you a one-time code.";
+            : changing
+              ? "We'll send a code to the new address to check it's yours."
+              : purpose === "book"
+                ? "Last step: confirm it's you, then we'll finish. No password."
+                : "No password. We'll send you a one-time code.";
     const expired = problem?.reason === "expired";
 
     return (
@@ -244,7 +255,7 @@ export function SignInSheet({
                 >
                     {step === "email" ? (
                         <label className="mt-3.5 block text-[13.5px] font-medium">
-                            Email
+                            {changing ? "New email" : "Email"}
                             <input
                                 ref={field}
                                 type="email"
@@ -286,7 +297,7 @@ export function SignInSheet({
                         />
                     ) : null}
 
-                    {step === "email" ? (
+                    {step === "email" && !changing ? (
                         <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                             New here? The same code creates your account.
                         </p>
@@ -309,7 +320,9 @@ export function SignInSheet({
                                 : "Send code"
                             : busy
                               ? "Checking…"
-                              : "Sign in"}
+                              : changing
+                                ? "Confirm new email"
+                                : "Sign in"}
                     </button>
                 </form>
 
@@ -328,7 +341,7 @@ export function SignInSheet({
                         onClick={changeEmail}
                         className={altButton}
                     >
-                        Change email
+                        {changing ? "Use another email" : "Change email"}
                     </button>
                 ) : null}
             </div>

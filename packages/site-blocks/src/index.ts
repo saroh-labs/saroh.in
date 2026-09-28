@@ -123,6 +123,29 @@ export type {
 export { SignInSheet } from "./account/sign-in-sheet";
 export type { SignInSheetProps } from "./account/sign-in-sheet";
 
+// The customer account area (plan A, A5): the header's entry, the tab bar,
+// Home and Me. Data arrives from the site's server; changes go through its
+// server actions.
+export { AccountEntry } from "./account/account-entry";
+export { AccountHome } from "./account/account-home";
+export { Me } from "./account/me";
+export type { DetailsResult, MeApi, MeProps, NoteResult } from "./account/me";
+export type {
+    Block as AccountBlock,
+    AccountBooking,
+    AccountClasses,
+    AccountHome as AccountHomeData,
+    AccountNote,
+    AccountOrder,
+    AccountPlan,
+    AccountReceipt,
+    AccountTab,
+    AccountTabKey,
+    AccountView,
+} from "./account/model";
+export { AccountCard } from "./account/parts";
+export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
