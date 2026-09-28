@@ -7,13 +7,17 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { navRowsForModule } from "@/components/shared/nav-items";
-import { setModuleStatusAction } from "@/lib/modules/actions";
-import type { ModuleView } from "@/lib/modules/schema";
+import {
+    readModuleImpactAction,
+    setModuleStatusAction,
+} from "@/lib/modules/actions";
+import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
     enabledDependents,
     listWords,
     missingDependencies,
     offImpact,
+    refusalActionLabel,
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
 
@@ -31,7 +35,15 @@ import {
  * and the rows are read from the nav itself so the sentence cannot drift
  * from what the rail does. A module with nothing to say goes off at once.
  */
-export function ModuleList({ modules }: { modules: ModuleView[] }) {
+export function ModuleList({
+    modules,
+    all = modules,
+}: {
+    /** The modules shown: the ones Saroh has rolled out (DEC-057). */
+    modules: ModuleView[];
+    /** Every module, hidden ones too, for what goes off with what. */
+    all?: ModuleView[];
+}) {
     const canManage = modules.some((m) => m.canManage);
     return (
         <div className="max-w-[760px]">
@@ -41,6 +53,7 @@ export function ModuleList({ modules }: { modules: ModuleView[] }) {
                         key={module.key}
                         module={module}
                         modules={modules}
+                        all={all}
                         first={i === 0}
                     />
                 ))}
@@ -120,14 +133,20 @@ function rank(module: ModuleView): number {
 function ModuleRow({
     module,
     modules,
+    all,
     first,
 }: {
     module: ModuleView;
     modules: ModuleView[];
+    all: ModuleView[];
     first: boolean;
 }) {
     const [pending, startTransition] = useTransition();
     const [asking, setAsking] = useState(false);
+    // What the API said turning it off touches (F13), read on the flip: the
+    // sentence with real counts, and anything that refuses it.
+    const [impact, setImpact] = useState<string | null>(null);
+    const [refusals, setRefusals] = useState<ModuleBlocker[]>([]);
     const keepRef = useRef<HTMLButtonElement>(null);
     const rowRef = useRef<HTMLDivElement>(null);
     const labelId = useId();
@@ -144,17 +163,17 @@ function ModuleRow({
     const missing = on ? [] : missingDependencies(modules, module.key);
     const blocked = missing.length > 0;
     const missingLabels = missing.map((k) => labelOf(modules, k));
-    // On, and other modules need it: they go off with it.
-    const dependents = on ? enabledDependents(modules, module.key) : [];
-    const dependentLabels = dependents.map((k) => labelOf(modules, k));
-    const leaving = [module.key, ...dependents].flatMap((k) =>
-        navRowsForModule(k),
-    );
-
-    const impact =
-        on && module.canManage
-            ? offImpact({ rows: leaving, dependents: dependentLabels })
-            : null;
+    // On, and other modules need it: they go off with it. Worked out over
+    // every module, hidden ones too, because the API refuses to turn this
+    // off while any of them is on; only the ones shown are named (DEC-057).
+    const dependents = on ? enabledDependents(all, module.key) : [];
+    const shown = new Set(modules.map((m) => m.key));
+    const dependentLabels = dependents
+        .filter((k) => shown.has(k))
+        .map((k) => labelOf(modules, k));
+    const leaving = [module.key, ...dependents]
+        .filter((k) => shown.has(k))
+        .flatMap((k) => navRowsForModule(k));
     // The step the API says is left, for a module that is on.
     const step =
         on && module.readiness !== "ACTIVE" ? module.blockers[0] : undefined;
@@ -214,11 +233,35 @@ function ModuleRow({
         );
     };
 
+    /**
+     * Ask the API what turning it off touches, then ask the person. The
+     * counts are read now, not when the page loaded: "3 upcoming bookings"
+     * is true at the moment of deciding. A module with nothing to say goes
+     * off at once, as before.
+     */
+    const askFirst = () => {
+        startTransition(async () => {
+            const read = await readModuleImpactAction(module.key);
+            const text = offImpact({
+                rows: leaving,
+                dependents: dependentLabels,
+                lines: read ? read.items.map((i) => i.message) : null,
+            });
+            const refused = read?.blockers ?? [];
+            if (!text && refused.length === 0) return turnOff();
+            setImpact(text);
+            setRefusals(refused);
+            setAsking(true);
+        });
+    };
+
     const flip = () => {
         if (!module.canManage || blocked || pending) return;
         if (!on) return turnOn([module.key]);
-        // A second press while asking is the answer "yes".
-        if (impact && !asking) return setAsking(true);
+        if (!asking) return askFirst();
+        // A second press while asking is the answer "yes" — unless
+        // something refuses it, which no press overrides.
+        if (refusals.length > 0) return;
         turnOff();
     };
 
@@ -228,6 +271,8 @@ function ModuleRow({
             ?.querySelector<HTMLButtonElement>('[role="switch"]')
             ?.focus();
     };
+    const refusal = refusals.at(0);
+    const refusalAction = refusal ? refusalActionLabel(refusal.code) : null;
 
     const locked = !module.canManage || blocked;
 
@@ -256,7 +301,7 @@ function ModuleRow({
                 >
                     {noteOf(modules, module)}
                 </p>
-                {asking && impact ? (
+                {asking && (impact || refusal) ? (
                     <div
                         role="alert"
                         onKeyDown={(e) => {
@@ -265,17 +310,32 @@ function ModuleRow({
                         className="mt-2.5 grid gap-2 rounded-[9px] border border-highlight-border bg-brand-subtle px-3 py-2.5"
                     >
                         <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
-                            <strong>Turn off {label}?</strong> {impact}
+                            <strong>Turn off {label}?</strong>{" "}
+                            {refusal
+                                ? refusals.map((r) => r.message).join(" ")
+                                : impact}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                            <Button
-                                type="button"
-                                size="sm"
-                                disabled={pending}
-                                onClick={turnOff}
-                            >
-                                Turn off
-                            </Button>
+                            {refusal ? (
+                                // Something refuses it (open orders): no
+                                // Turn off to press, only the way to clear it.
+                                refusalAction && refusal.actionHref ? (
+                                    <Button asChild size="sm">
+                                        <Link href={refusal.actionHref}>
+                                            {refusalAction}
+                                        </Link>
+                                    </Button>
+                                ) : null
+                            ) : (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={pending}
+                                    onClick={turnOff}
+                                >
+                                    Turn off
+                                </Button>
+                            )}
                             <Button
                                 ref={keepRef}
                                 type="button"
@@ -300,10 +360,11 @@ function ModuleRow({
                         Turn on {listWords([...missingLabels, label])}
                     </Button>
                 ) : null}
-                {step ? (
+                {step?.message ? (
                     <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                        {/* The API's sentence, never its code (DEC-057). */}
                         <span className="text-[12.5px] text-foreground/80">
-                            {step.message ?? step.code}
+                            {step.message}
                         </span>
                         {stepAction && step.actionHref && module.canManage ? (
                             <Button asChild variant="outline" size="sm">
