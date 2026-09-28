@@ -10,6 +10,7 @@ import type {
     DetailOrder,
     DetailPack,
     DetailSubscription,
+    MembershipAllowance,
     MoneyTotal,
 } from "./detail";
 
@@ -576,6 +577,24 @@ export function packLines(
                 warn: soon,
             };
         });
+}
+
+/**
+ * "10 a month from 1 Nov": a membership's classes change at its next
+ * renewal (D10) — the plan's number changed, or a plan change is booked.
+ * Null when nothing changes (or the API doesn't say yet).
+ */
+export function allowanceChangeLine(
+    m: Pick<MembershipAllowance, "nextPeriod">,
+    timeZone: string,
+    now: Date,
+): string | null {
+    const next = m.nextPeriod;
+    if (!next) return null;
+    const from = dayText(next.from, timeZone, now);
+    return next.perMonth === null
+        ? `Unlimited classes from ${from}`
+        : `${next.perMonth} a month from ${from}`;
 }
 
 /** "Next class uses: membership" — what the next class is paid with. */

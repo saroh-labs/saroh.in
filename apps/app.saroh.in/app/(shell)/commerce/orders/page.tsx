@@ -4,16 +4,26 @@ import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
+import { env } from "@/env";
 import { ordersAccess, ordersLockedCopy } from "@/lib/orders/access";
-import { listOrderRows } from "@/lib/orders/business-service";
+import {
+    getOrderFilterOptions,
+    listOrderRows,
+} from "@/lib/orders/business-service";
 import {
     orderListParams,
+    ordersEmptyCopy,
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { storefrontShareUrl } from "@/lib/orders/share";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { listSites } from "@/lib/sites/service";
 import { listBusinessStores } from "@/lib/stores/service";
+
+/** Where a merchant's subdomain lives, as the Website screen reads it. */
+const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 /**
  * Sell → Orders: every order in the business, a page at a time (plan B, B3).
@@ -25,8 +35,8 @@ import { listBusinessStores } from "@/lib/stores/service";
  * the rail badges and this list the same fact.
  *
  * The address is the list's state (`list-query.ts`): the tab, the search, the
- * storefront and the page. A link from before B3 (`?view=unfulfilled`) still
- * lands on the tab it meant.
+ * storefront, the filters (B4) and the page. A link from before B3
+ * (`?view=unfulfilled`) still lands on the tab it meant.
  *
  * Someone holding neither `order:read` nor `order:stage` gets the locked card
  * before anything is read (B7). The list read failing is the page failing
@@ -58,13 +68,15 @@ export default async function OrdersPage({
 
     const query = readOrdersQuery(params);
     const storesRead = listBusinessStores();
-    const [page, stores, openByStore] = await Promise.all([
+    const [page, stores, openByStore, filterOptions] = await Promise.all([
         listOrderRows(orderListParams(query)),
         storesRead,
         // Counted beside the page, not after it.
         storesRead.then((all) =>
             all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
         ),
+        // What the filter bar offers (B4); null leaves its menus out.
+        getOrderFilterOptions(query.product ?? undefined),
     ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
@@ -72,6 +84,16 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
+    // No orders yet: "Share your storefront" copies the live site's address
+    // (B7's first run, built in B8). Only then is the site read, and a read
+    // that fails just leaves the button out.
+    const shareUrl =
+        page.rows.length === 0 &&
+        ordersEmptyCopy(query, null).kind === "first-run"
+            ? await listSites()
+                  .then((sites) => storefrontShareUrl(sites, ROOT_DOMAIN))
+                  .catch(() => null)
+            : null;
 
     return (
         <PageContainer width="full">
@@ -86,6 +108,8 @@ export default async function OrdersPage({
                 // A Member reaches the list through `order:stage` alone
                 // (DEC-024) and gets the kitchen's view of it.
                 kitchen={!access.money}
+                filterOptions={filterOptions}
+                shareUrl={shareUrl}
             />
         </PageContainer>
     );

@@ -42,6 +42,14 @@ export const FlagKey = {
      * ship, so no product page goes live without a way to order.
      */
     SITE_SHOP: "SITE_SHOP",
+
+    /**
+     * Posting to a customer's account thread (round-2 D17, then F4's Reply).
+     * The thread is A13's, so this stays off until A13 is live in
+     * production; with it off, sending an invoice offers email alone and
+     * never the thread. Read in `communications/account-thread.ts`.
+     */
+    ACCOUNT_THREAD: "ACCOUNT_THREAD",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -107,5 +115,13 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-01-31",
         removeWhen:
             "The bag and checkout are live, the shop is on for every business on every instance, and it has needed no kill switch for a release.",
+    },
+    ACCOUNT_THREAD: {
+        purpose:
+            "Lets Saroh post to a customer's account thread on the business's site: an invoice sent or reminded about, and later Home's Reply. Turn it on only once the message thread (A13) and its notify job (A14) are live in production; off, invoices go by email alone.",
+        owner: "Release manager",
+        reviewBy: "2027-01-31",
+        removeWhen:
+            "The account thread is live on every instance and has needed no kill switch for a release.",
     },
 };

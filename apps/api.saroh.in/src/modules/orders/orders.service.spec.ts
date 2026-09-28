@@ -100,7 +100,7 @@ describe("Orders & inventory (dev DB)", () => {
             discount: "2.00",
             // Shipped below: only an order that goes to an address is
             // (B2a — the status PATCH no longer turns a pick-up into one).
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             address: {
                 line1: "12 Church Street",
                 city: "Bengaluru",

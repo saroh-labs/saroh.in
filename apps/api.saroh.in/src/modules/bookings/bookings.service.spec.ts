@@ -590,11 +590,21 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 
-    it("refuses a time off the duration grid", async () => {
+    it("moves a one-to-one to a half hour (DEC-052)", async () => {
+        wireReschedule();
+        const moved = await new BookingsService().rescheduleBooking(
+            ctx(),
+            "bk_1",
+            { startAt: "2026-07-20T09:30:00.000Z" },
+        );
+        expect(moved.startAt.toISOString()).toBe("2026-07-20T09:30:00.000Z");
+    });
+
+    it("refuses a time off the grid", async () => {
         wireReschedule();
         await expect(
             new BookingsService().rescheduleBooking(ctx(), "bk_1", {
-                startAt: "2026-07-20T09:30:00.000Z",
+                startAt: "2026-07-20T09:15:00.000Z",
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(bookingUpdate).not.toHaveBeenCalled();
@@ -2232,6 +2242,104 @@ describe("money paid online when a booking is cancelled (E8, DEC-051)", () => {
             payments,
         ).cancelBooking(desk, "bk_1", IN_TIME);
         expect(out.money.refund).toMatchObject({ amountCents: 40_000 });
+    });
+
+    describe("the business's refund policy (E30, DEC-058)", () => {
+        const policy = (refundInTimeCancels: boolean) =>
+            db.bookingRules!.findUnique!.mockResolvedValue({
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: 24,
+                refundInTimeCancels,
+            });
+
+        it("on, as set: a cancel in time refunds what was paid online", async () => {
+            policy(true);
+            const out = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(desk, "bk_1", IN_TIME);
+            expect(out.money.refund).toMatchObject({ amountCents: 40_000 });
+            expect(db.paymentRefund!.create.mock.calls[0][0].data.reason).toBe(
+                "Booking cancelled in time",
+            );
+        });
+
+        it("off: a cancel in time keeps the money, and nothing is sent", async () => {
+            policy(false);
+            const out = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(ctx(), "bk_1", IN_TIME);
+            // Still in time: the class goes back, and it is not late.
+            expect(bookingUpdate.mock.calls[0][0].data).toMatchObject({
+                cancelledLate: false,
+            });
+            expect(db.packRedemption!.updateMany).toHaveBeenCalled();
+            expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+            expect(sendAutomaticRefund).not.toHaveBeenCalled();
+            expect(out.money).toEqual({
+                refund: null,
+                kept: { amountCents: 40_000, currency: "INR" },
+            });
+        });
+
+        it("off: someone who may refund can still hand it back by hand", async () => {
+            policy(false);
+            const owner = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(ctx(), "bk_1", IN_TIME, { returnCredit: true });
+            expect(owner.money.refund).toMatchObject({ amountCents: 40_000 });
+            expect(db.paymentRefund!.create.mock.calls[0][0].data.reason).toBe(
+                "Booking cancelled by the business",
+            );
+
+            jest.clearAllMocks();
+            const byDesk = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(desk, "bk_1", IN_TIME, { returnCredit: true });
+            expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+            expect(byDesk.money.kept).toEqual({
+                amountCents: 40_000,
+                currency: "INR",
+            });
+        });
+
+        it("on: a late cancel is still never refunded automatically", async () => {
+            policy(true);
+            const out = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(ctx(), "bk_1", LATE);
+            expect(db.paymentRefund!.create).not.toHaveBeenCalled();
+            expect(out.money.kept).toEqual({
+                amountCents: 40_000,
+                currency: "INR",
+            });
+        });
+
+        it("never refunds more than is left of what was received", async () => {
+            policy(true);
+            // ₹150 of the ₹400 already went back; a failed try doesn't count.
+            db.paymentIntent!.findMany!.mockResolvedValue([
+                {
+                    id: "pi_1",
+                    amountCents: 40_000,
+                    currency: "INR",
+                    refunds: [{ amountCents: 15_000 }],
+                },
+            ]);
+            const out = await new BookingsService(
+                undefined,
+                payments,
+            ).cancelBooking(ctx(), "bk_1", IN_TIME);
+            expect(
+                db.paymentRefund!.create.mock.calls[0][0].data.amountCents,
+            ).toBe(25_000);
+            expect(out.money.refund).toMatchObject({ amountCents: 25_000 });
+        });
     });
 
     it("says where the refund stands: refused, or still being confirmed", async () => {

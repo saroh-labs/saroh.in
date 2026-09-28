@@ -180,3 +180,31 @@ export const RelayContext = createParamDecorator(
         return relay;
     },
 );
+
+/**
+ * The address a limit counts, hashed: the relayed visitor's when the relay
+ * checks, else the caller's own. For the public reads saroh.app's server
+ * makes on a visitor's behalf (the shop, G11; the booking page's header, E6):
+ * a relay that doesn't check — forged, stale, or no secret here — counts the
+ * caller instead, so forging it buys nothing.
+ */
+export function visitorKey(
+    ip: string | undefined,
+    relay: string | undefined,
+    secret: () => string = siteRelaySecret,
+): string | undefined {
+    if (relay) {
+        const checked = relayOrNull(relay, secret);
+        if (checked) return checked.clientHash;
+    }
+    return hashClientIp(ip);
+}
+
+function relayOrNull(relay: string, secret: () => string): SiteRelay | null {
+    try {
+        return verifySiteRelay(relay, secret());
+    } catch {
+        // No secret configured on this instance: count the caller instead.
+        return null;
+    }
+}

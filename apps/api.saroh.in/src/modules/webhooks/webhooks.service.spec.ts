@@ -40,6 +40,7 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             findMany: jest.fn(),
             update: jest.fn(),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
         paymentRefund: {
@@ -98,6 +99,7 @@ const whUpdate = prisma.webhookEvent.update as jest.Mock;
 const intentFindFirst = prisma.paymentIntent.findFirst as jest.Mock;
 const intentUpdate = prisma.paymentIntent.update as jest.Mock;
 const intentFindMany = prisma.paymentIntent.findMany as jest.Mock;
+const intentUpdateMany = prisma.paymentIntent.updateMany as jest.Mock;
 const attemptCreate = prisma.paymentAttempt.create as jest.Mock;
 const refundFindFirst = prisma.paymentRefund.findFirst as jest.Mock;
 const refundFindUnique = prisma.paymentRefund.findUniqueOrThrow as jest.Mock;
@@ -192,7 +194,12 @@ describe("WebhooksService signature verification", () => {
         // Order.paymentStatus moved to PAID (through the state machine).
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "PAID" },
+            data: {
+                paymentStatus: "PAID",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
         // Intent settled + a CAPTURED attempt records the provider payment id.
         expect(intentUpdate).toHaveBeenCalledWith({
@@ -210,6 +217,31 @@ describe("WebhooksService signature verification", () => {
             where: { id: "wh_1" },
             data: expect.objectContaining({ status: "PROCESSED" }),
         });
+    });
+
+    it("keeps the fee the provider reported, once, and none when it reported none (E19)", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_1" });
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        orderFindUnique.mockResolvedValue({ paymentStatus: "UNPAID" });
+
+        const raw = bodyOf({ providerPaymentRef: "pay_1", feeCents: 1180 });
+        await service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+        // Only while no fee is recorded: a second report changes nothing.
+        expect(intentUpdateMany).toHaveBeenCalledWith({
+            where: { id: "pi_1", feeCents: null },
+            data: { feeCents: 1180 },
+        });
+
+        intentUpdateMany.mockClear();
+        const none = bodyOf({ providerEventId: "evt_2" });
+        await service.handle("razorpay", "org_1", none, {
+            "x-fake-signature": sign(none),
+        });
+        expect(intentUpdateMany).not.toHaveBeenCalled();
     });
 
     it("rejects a WRONG signature with 401 and records/changes NOTHING", async () => {
@@ -416,7 +448,12 @@ describe("WebhooksService refund settlement", () => {
         );
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "REFUNDED" },
+            data: {
+                paymentStatus: "REFUNDED",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
         // The refund path attached the provider's id and wrote the step.
         expect(orderEventCreate).not.toHaveBeenCalled();
@@ -462,7 +499,12 @@ describe("WebhooksService refund settlement", () => {
 
         expect(orderUpdate).toHaveBeenCalledWith({
             where: { id: "order_1" },
-            data: { paymentStatus: "REFUNDED" },
+            data: {
+                paymentStatus: "REFUNDED",
+                // Paid or refunded: the order's pay link is cleared (B11).
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
     });
 

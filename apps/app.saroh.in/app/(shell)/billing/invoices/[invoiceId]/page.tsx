@@ -10,6 +10,7 @@ import { PaymentsToRefund } from "@/components/invoices/pay-link";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { canSend } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import { getInvoice, listInvoicesFor } from "@/lib/invoices/service";
 import {
@@ -98,7 +99,9 @@ export default async function InvoicePage({
                 }
                 editHref={`/billing/invoices/${encodeURIComponent(invoice.id)}/edit`}
                 online={invoice.online ?? null}
-                payLine={payLine(invoice, who.name)}
+                send={invoice.send ?? null}
+                sent={invoice.sent ?? []}
+                payLine={payLine(invoice, who.name, canWrite)}
                 late={
                     invoice.standing === "OVERDUE" && invoice.dueAt ? (
                         <>
@@ -139,7 +142,7 @@ export default async function InvoicePage({
 }
 
 /** How it stands, in the Payment panel's words. */
-function payLine(i: Invoice, who: string) {
+function payLine(i: Invoice, who: string, canWrite: boolean) {
     const first = who.split(" ")[0] ?? who;
     if (i.kind === "CREDIT_NOTE") {
         return `A credit note — nothing is owed on it. It cancels ${i.related?.number ?? "an invoice"}.`;
@@ -172,8 +175,11 @@ function payLine(i: Invoice, who: string) {
         case "DRAFT":
             return "Not issued yet. A draft has no number and can still change.";
         default:
+            if (canWrite && canSend(i.send)) {
+                return `Not paid. ${first} can pay by UPI or card from the pay link — send it to them, or mark it paid when the money arrives.`;
+            }
             return i.online?.providerConnected
-                ? `Not paid. ${first} can pay by UPI or card from the pay link — copy it and send it, or mark it paid when the money arrives.`
+                ? `Not paid. ${first} can pay online from the pay link — copy it and send it, or mark it paid when the money arrives.`
                 : `Not paid. Mark it paid when the money arrives.`;
     }
 }

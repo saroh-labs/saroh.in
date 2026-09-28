@@ -62,6 +62,7 @@ beforeAll(async () => {
         data: {
             organizationId: org.id,
             provider: "RAZORPAY",
+            publicKey: "rzp_test_Kavi1",
             encryptedCredentials: "x",
             credentialsIv: "x",
             credentialsAuthTag: "x",
@@ -168,5 +169,26 @@ describe("a booking's pay link (E4, real database)", () => {
         await expect(
             prisma.invoice.count({ where: { bookingId: booking.id } }),
         ).resolves.toBe(0);
+    });
+
+    it("says to connect a provider while Razorpay lacks its public key id (DEC-054)", async () => {
+        const booking = await book(serviceId, "2026-10-04T05:30:00Z");
+        await prisma.merchantPaymentProvider.updateMany({
+            where: { organizationId: owner.organizationId },
+            data: { publicKey: null },
+        });
+        try {
+            await expect(
+                bookings.payLink(owner, booking.id, NOW),
+            ).rejects.toThrow("Connect a payment provider");
+            await expect(
+                prisma.invoice.count({ where: { bookingId: booking.id } }),
+            ).resolves.toBe(0);
+        } finally {
+            await prisma.merchantPaymentProvider.updateMany({
+                where: { organizationId: owner.organizationId },
+                data: { publicKey: "rzp_test_Kavi1" },
+            });
+        }
     });
 });

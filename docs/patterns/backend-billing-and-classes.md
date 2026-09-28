@@ -304,6 +304,19 @@
   currency and interval — a new interval starts its chain where the old
   period ended. Undo clears it; cancelling now drops it; archived plans are
   refused.
+- **A plan's classes reach a member at their next renewal** (round-2
+  D10). A subscription takes its plan's `classesPerMonth` into
+  `classesPerPeriod`, stamped `classesPerPeriodSetAt`, at subscribe, at
+  each renewal and at a resume that starts a new period — a booked plan
+  change's classes with it, in the same transaction as the invoice. Read a
+  member's allowance only through `subscriptions/classes-allowance.ts`
+  (`classesAllowance`, `HAS_ALLOWANCE_WHERE`): booking with the membership
+  and Customer Detail's "Classes left" do, and the detail names the next
+  period's number when it differs. A null stamp is a row the previous image
+  wrote and reads the plan's number (the one-release fallback; follow-up Z1
+  removes it once no live row is unset); the backfill is
+  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10).
+  A seed writing subscriptions sets both columns.
 - **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
   String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
   — subscribe, a plan change, and a sign-up from the site — calls

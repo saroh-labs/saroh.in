@@ -10,6 +10,8 @@ import type {
 import { SignInSheet } from "../account/sign-in-sheet";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import type { PublicVisit } from "../blocks/visit-us";
+import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import type { BookSignedIn, Result } from "./api";
 import {
@@ -20,10 +22,12 @@ import {
     startPayment,
 } from "./api";
 import {
+    headerFacts,
     kicker,
     newKey,
     nextChosenText,
     nextFreeStart,
+    pageTitle,
     usePhone,
     zoneName,
 } from "./flow-helpers";
@@ -126,6 +130,12 @@ export interface BookingFlowProps {
     account: BookingAccount;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /**
+     * The business's place, hours and phone for the header (E6): G8's public
+     * visit read, the one Visit us shows. Null or absent when it could not be
+     * read — the header then names the business only, and booking works.
+     */
+    visit?: PublicVisit | null;
     /** A service to open on (`?service=`), when it is one the page offers. */
     initialServiceId?: string | null;
     /** With it, a day and time to choose (`?date=&start=`, On today, G18). */
@@ -137,6 +147,7 @@ export default function BookingFlow({
     page,
     account,
     apiUrl = DEFAULT_API_URL,
+    visit = null,
     initialServiceId = null,
     initialDate = null,
     initialStart = null,
@@ -375,7 +386,7 @@ export default function BookingFlow({
         : pay === "NOW" || pay === "DEPOSIT"
           ? "Pay and book"
           : "Book";
-    const rules = rulesText(page.rules);
+    const rules = rulesText(page.rules, pay === "NOW" || pay === "DEPOSIT");
 
     // ── Watching a hold ─────────────────────────────────────────────────
 
@@ -733,6 +744,7 @@ export default function BookingFlow({
         onConfirm: () => void confirm(),
     };
     const choosing = phase.kind === "choose";
+    const facts = headerFacts(visit);
     const showBar = phone && choosing && services.length > 0 && page.open;
 
     return (
@@ -748,11 +760,34 @@ export default function BookingFlow({
                         {kicker(services)}
                     </p>
                     <h1 className="font-site-heading mt-2.5 text-balance text-[clamp(34px,6vw,56px)] font-semibold leading-[1.02] tracking-[-0.035em]">
-                        Book your next session
+                        {pageTitle(services)}
                     </h1>
-                    <p className="mt-3 text-[14.5px] opacity-70">
-                        {page.businessName} · Times are in{" "}
-                        {zoneName(page.timezone)}
+                    {facts.place ? (
+                        <p className="mt-3 text-[14.5px] opacity-70">
+                            {facts.place}
+                        </p>
+                    ) : null}
+                    <p
+                        className={cn(
+                            "opacity-70",
+                            facts.place
+                                ? "mt-1.5 text-[13px]"
+                                : "mt-3 text-[14.5px]",
+                        )}
+                    >
+                        {facts.place ? null : <>{page.businessName} · </>}
+                        {facts.phone ? (
+                            <>
+                                <a
+                                    href={`tel:${facts.phone}`}
+                                    className="focus-visible:ring-site-accent rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2"
+                                >
+                                    {phoneText(facts.phone)}
+                                </a>{" "}
+                                ·{" "}
+                            </>
+                        ) : null}
+                        Times are in {zoneName(page.timezone)}
                     </p>
                 </div>
             </section>

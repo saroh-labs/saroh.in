@@ -1,10 +1,13 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import type { RefundableLine } from "./order-refunds";
 import {
     allocateAcrossPayments,
     apportionLines,
+    capGoodwill,
+    goodwillRequest,
     linePaidCents,
+    moneyWords,
     planLineRefund,
     planRemainingLines,
     refundStanding,
@@ -195,5 +198,84 @@ describe("refundStanding — derived, never stored", () => {
         expect(refundStanding("PAID", 4250, 1000)).toBe("PARTLY_REFUNDED");
         expect(refundStanding("PAID", 4250, 4250)).toBe("REFUNDED");
         expect(refundStanding("REFUNDED", 4250, 4250)).toBe("REFUNDED");
+    });
+});
+
+describe("moneyWords — an amount as a refusal says it", () => {
+    it("drops paise when there are none, and keeps them when there are", () => {
+        expect(moneyWords(125000, "INR")).toBe("₹1,250");
+        expect(moneyWords(4950, "INR")).toBe("₹49.50");
+    });
+
+    it("falls back to the code for a currency Intl doesn't know", () => {
+        expect(moneyWords(500, "ZZZ1")).toBe("ZZZ1 5");
+    });
+});
+
+describe("goodwillRequest — another amount (B8)", () => {
+    it("takes an amount and its reason, trimmed", () => {
+        expect(
+            goodwillRequest({ amountCents: 5000, reason: " Late " }),
+        ).toEqual({ amountCents: 5000, reason: "Late" });
+    });
+
+    it("refuses another amount with no reason (400)", () => {
+        for (const reason of [undefined, null, "", "   "]) {
+            expect(() =>
+                goodwillRequest({ amountCents: 5000, reason }),
+            ).toThrow(BadRequestException);
+        }
+    });
+
+    it("refuses no amount, zero, a negative or a fraction of a paisa", () => {
+        for (const amountCents of [undefined, 0, -100, 10.5]) {
+            expect(() =>
+                goodwillRequest({ amountCents, reason: "Late" }),
+            ).toThrow(BadRequestException);
+        }
+    });
+
+    it("names no line and puts nothing back in stock", () => {
+        expect(() =>
+            goodwillRequest({
+                amountCents: 5000,
+                reason: "Late",
+                lines: [{ itemId: "a", quantity: 1 }],
+            }),
+        ).toThrow(BadRequestException);
+        expect(() =>
+            goodwillRequest({
+                amountCents: 5000,
+                reason: "Late",
+                putBack: [{ itemId: "a", quantity: 1 }],
+            }),
+        ).toThrow(BadRequestException);
+    });
+});
+
+describe("capGoodwill — never more than was paid and not handed back", () => {
+    it("lets an amount up to the balance through", () => {
+        expect(() => capGoodwill(5000, 5000, "INR")).not.toThrow();
+        expect(() => capGoodwill(100, 5000, "INR")).not.toThrow();
+    });
+
+    it("refuses more with 409 'At most ₹X can be refunded'", () => {
+        let caught: unknown;
+        try {
+            capGoodwill(5001, 4250, "INR");
+        } catch (err) {
+            caught = err;
+        }
+        expect(caught).toBeInstanceOf(ConflictException);
+        expect((caught as ConflictException).getResponse()).toMatchObject({
+            message: "At most ₹42.50 can be refunded.",
+            field: "amount",
+        });
+    });
+
+    it("says nothing is left when it has all gone back", () => {
+        expect(() => capGoodwill(100, 0, "INR")).toThrow(
+            "Nothing is left to refund on this order.",
+        );
     });
 });

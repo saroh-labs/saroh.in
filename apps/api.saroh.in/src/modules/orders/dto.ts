@@ -79,18 +79,12 @@ export const FULFILMENT_TYPES = [
 export type FulfilmentType = (typeof FULFILMENT_TYPES)[number];
 
 /**
- * The words the column held before the six types: COLLECT means PICKUP and
- * DELIVERY means LOCAL_DELIVERY. Accepted until the contract release (B2d)
- * drops them, because an app built before B2a still sends them.
+ * Every value `Order.fulfilment` can hold, and a client can send: the six
+ * types. The legacy words COLLECT and DELIVERY went in the contract release
+ * (B2d, `20261013100000_order_fulfilment_contract`); a client sending one
+ * gets 400.
  */
-export const LEGACY_FULFILMENTS = ["COLLECT", "DELIVERY"] as const;
-export type LegacyFulfilment = (typeof LEGACY_FULFILMENTS)[number];
-
-/** Every value `Order.fulfilment` can hold, and a client can send, today. */
-export const ORDER_FULFILMENTS = [
-    ...LEGACY_FULFILMENTS,
-    ...FULFILMENT_TYPES,
-] as const;
+export const ORDER_FULFILMENTS = FULFILMENT_TYPES;
 export type OrderFulfilment = (typeof ORDER_FULFILMENTS)[number];
 
 const trim = ({ value }: { value: unknown }) =>
@@ -218,9 +212,8 @@ export class CreateOrderDto {
     discountCode?: string;
 
     /**
-     * How it leaves: picked up (the default) or delivered (ADR-008). Either
-     * vocabulary; until B2c only the two types a legacy word names can be
-     * written (`fulfilment.ts`).
+     * How it leaves (DEC-045): Pick-up by default. An appointment type is
+     * refused: it is made by booking it (`fulfilment.ts`).
      */
     @IsOptional()
     @IsIn(ORDER_FULFILMENTS, { message: "Unknown way to fulfil an order" })
@@ -393,14 +386,22 @@ const blankToUndefined = ({ value }: { value: unknown }) => {
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * `GET organizations/:org/orders` (plan B, B1). Without `v=2` only `storeId`
- * is read and the route answers today's bare array; with it, every filter
- * applies and the answer is `{ rows, counts, nextCursor }`.
+ * The Orders list's date presets (B4), read in the business's zone:
+ * today, yesterday, the last 7 days (today included) and this month.
+ */
+export const DATE_PRESETS = ["today", "yesterday", "7d", "month"] as const;
+export type DatePreset = (typeof DATE_PRESETS)[number];
+
+/**
+ * `GET organizations/:org/orders` (plan B, B1): every filter applies and the
+ * answer is `{ rows, counts, nextCursor }`. The bare array an app before B1
+ * read without `v=2` went in the contract release (B2d); `v=2` is still
+ * accepted, and changes nothing, because the app sends it.
  */
 export class ListOrdersQuery {
     @IsOptional()
-    @IsIn(["1", "2"], { message: "Unknown list version" })
-    v?: "1" | "2";
+    @IsIn(["2"], { message: "Unknown list version" })
+    v?: "2";
 
     @IsOptional()
     @Transform(({ value }: { value: unknown }) =>
@@ -415,7 +416,7 @@ export class ListOrdersQuery {
     @IsIn(ORDER_STAGES, { each: true, message: "Unknown step" })
     stage?: string[];
 
-    /** The types, or the legacy words (matched as their types until B2d). */
+    /** The types (DEC-045). */
     @IsOptional()
     @Transform(listOf)
     @IsArray()
@@ -457,6 +458,27 @@ export class ListOrdersQuery {
     @IsIn(["true", "false"], { message: "late is true or false" })
     late?: "true" | "false";
 
+    /**
+     * What the row's pill says, as a key: a step's word ("ready",
+     * "handed-to-courier") or "refunded" / "cancelled" (B4). The keys the
+     * business's orders show come from `GET …/orders/filters`; an unknown
+     * one matches nothing.
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @Matches(/^[a-z0-9-]{1,40}$/, { message: "Unknown step" })
+    step?: string;
+
+    /** A date preset in the business's zone (B4); not with `from`/`to`. */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(DATE_PRESETS, { message: "Unknown date range" })
+    date?: DatePreset;
+
     /** A calendar day in the business's zone. */
     @IsOptional()
     @Matches(DAY_RE, { message: "A date is YYYY-MM-DD" })
@@ -489,4 +511,25 @@ export class ListOrdersQuery {
     @IsString()
     @MaxLength(64)
     cursor?: string;
+}
+
+/**
+ * `GET organizations/:org/orders/filters` (B4): what the filter bar offers.
+ * `productId` names the product a shared link filters on, for its name.
+ */
+export class OrderFilterOptionsQuery {
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(64)
+    productId?: string;
+}
+
+/** `GET organizations/:org/orders/products` (B4): the product picker's search. */
+export class OrderProductsQuery {
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(100)
+    q?: string;
 }

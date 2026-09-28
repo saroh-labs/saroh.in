@@ -55,6 +55,22 @@ async function rulesEveryDay(serviceId: string, from: number, to: number) {
     });
 }
 
+/**
+ * Every half hour from `first` to `last` ("HH:MM"): the starts a one-hour,
+ * one-to-one service offers since half-hour starts (DEC-052, E6).
+ */
+function halfHourly(first: string, last: string): string[] {
+    const toMin = (t: string) =>
+        Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+    const out: string[] = [];
+    for (let m = toMin(first); m <= toMin(last); m += 30) {
+        out.push(
+            `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`,
+        );
+    }
+    return out;
+}
+
 async function service(name: string, capacity: number) {
     return (
         await prisma.service.create({
@@ -155,9 +171,9 @@ describe("business closed (real database)", () => {
             cls: await startsOn(classId, 4),
             walkIn: await startsOn(walkInId, 4),
         };
-        expect(before.pt).toHaveLength(12);
+        expect(before.pt).toEqual(halfHourly("06:00", "17:00"));
         expect(before.cls).toEqual(["10:00", "11:00"]);
-        expect(before.walkIn).toHaveLength(8);
+        expect(before.walkIn).toEqual(halfHourly("09:00", "16:00"));
 
         await closures.add(org, {
             fromDate: date(3),
@@ -170,9 +186,11 @@ describe("business closed (real database)", () => {
             expect(await startsOn(classId, days)).toEqual([]);
             expect(await startsOn(walkInId, days)).toEqual([]);
         }
-        expect(await startsOn(ptId, 6)).toHaveLength(12);
+        expect(await startsOn(ptId, 6)).toEqual(halfHourly("06:00", "17:00"));
         expect(await startsOn(classId, 6)).toEqual(["10:00", "11:00"]);
-        expect(await startsOn(walkInId, 2)).toHaveLength(8);
+        expect(await startsOn(walkInId, 2)).toEqual(
+            halfHourly("09:00", "16:00"),
+        );
     });
 
     it("takes out only 14:00–18:00 of a part-day range, on each of its days", async () => {
@@ -184,23 +202,12 @@ describe("business closed (real database)", () => {
         });
         expect(added.closures).toHaveLength(3);
         for (const days of [3, 4, 5]) {
-            expect(await startsOn(walkInId, days)).toEqual([
-                "09:00",
-                "10:00",
-                "11:00",
-                "12:00",
-                "13:00",
-            ]);
-            expect(await startsOn(ptId, days)).toEqual([
-                "06:00",
-                "07:00",
-                "08:00",
-                "09:00",
-                "10:00",
-                "11:00",
-                "12:00",
-                "13:00",
-            ]);
+            expect(await startsOn(walkInId, days)).toEqual(
+                halfHourly("09:00", "13:00"),
+            );
+            expect(await startsOn(ptId, days)).toEqual(
+                halfHourly("06:00", "13:00"),
+            );
         }
     });
 
@@ -299,12 +306,16 @@ describe("business closed (real database)", () => {
             startMinute: 9 * 60,
             endMinute: 12 * 60,
         });
-        expect(await startsOn(walkInId, 3)).toHaveLength(5);
+        expect(await startsOn(walkInId, 3)).toEqual(
+            halfHourly("12:00", "16:00"),
+        );
         await closures.remove(
             org,
             added.closures.map((c) => c.id),
         );
-        expect(await startsOn(walkInId, 3)).toHaveLength(8);
+        expect(await startsOn(walkInId, 3)).toEqual(
+            halfHourly("09:00", "16:00"),
+        );
         expect(await closures.list(org)).toEqual([]);
     });
 

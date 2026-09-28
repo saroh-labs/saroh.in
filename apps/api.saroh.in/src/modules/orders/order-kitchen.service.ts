@@ -546,8 +546,8 @@ export class OrderKitchenService {
                     toCents(order.discount.toString()),
             );
 
-            // Compared as types, so COLLECT and PICKUP are the same order;
-            // a change is stored in what this release may write.
+            // A change of type is stored as the new type (an appointment is
+            // refused: it is made by booking it).
             const was = typeOf(order.fulfilment);
             const type = dto.fulfilment ? typeOf(dto.fulfilment) : was;
             const newStored = type !== was ? storedValueFor(type) : null;

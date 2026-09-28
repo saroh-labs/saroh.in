@@ -157,6 +157,11 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      */
     courierName: string | null;
     trackingNumber: string | null;
+    /**
+     * When the order's pay link was made (B11); null when it has none. Never
+     * the link — only its hash is kept. Only with `order:read`.
+     */
+    payLinkCreatedAt?: Date | null;
     items: OrderLineDto[];
     events: OrderEventDto[];
     /** What the caller may do next, worked out by the API. */
@@ -205,6 +210,7 @@ export interface RawOrderRead {
     trackingUrl: string | null;
     courierName: string | null;
     trackingNumber: string | null;
+    payLinkCreatedAt?: Date | null;
     deliveryName: string | null;
     deliveryPhone: string | null;
     deliveryLine1: string | null;
@@ -395,8 +401,8 @@ export function serializeOrderRead(
             refundedCents,
         ),
         stage: order.stage,
-        // The legacy word and the type, their steps and where it stands
-        // (fulfilment.ts); the app draws these and keeps no copy.
+        // The type, its steps and where it stands (fulfilment.ts); the
+        // app draws these and keeps no copy.
         ...fulfilmentView(order.fulfilment, stage),
         // Late by the threshold its storefront sets for its type (B17): the
         // rule the Orders list's Late filter runs, so the two never disagree.
@@ -428,6 +434,9 @@ export function serializeOrderRead(
         trackingUrl: order.trackingUrl,
         courierName: order.courierName,
         trackingNumber: order.trackingNumber,
+        ...(opts.fullRead
+            ? { payLinkCreatedAt: order.payLinkCreatedAt ?? null }
+            : {}),
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,

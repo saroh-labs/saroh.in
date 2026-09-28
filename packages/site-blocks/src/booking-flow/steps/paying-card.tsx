@@ -23,7 +23,8 @@ function providerName(provider: string): string {
 
 /**
  * A pay-now hold while its booker pays (U19, E11). The business's provider
- * opens its own window — UPI or card — over the page as soon as the payment
+ * opens its own window — with the methods the business's account has on
+ * (DEC-059) — over the page as soon as the payment
  * has started. The card says where that stands: open, closed without paying,
  * refused (try again; the time stays held), or "Paying…" once the window
  * closed on a payment, until the webhook confirms the booking and the page
@@ -167,7 +168,7 @@ export function PayingCard({
                               ? "Paying…"
                               : checkout.status === "closed"
                                 ? "The payment window was closed before you paid"
-                                : `Pay with UPI or card in the ${provider} window`}
+                                : `Pay online in the ${provider} window`}
                     </p>
                     <p className="text-site-muted mt-1 text-[12.5px]">
                         {paying

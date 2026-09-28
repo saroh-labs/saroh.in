@@ -132,8 +132,9 @@ describe("staff and their hours (real database)", () => {
             from.toISOString(),
             to.toISOString(),
         );
-        // 06:00 … 17:00 starts, both people on each.
-        expect(before).toHaveLength(12);
+        // 06:00 … 17:00 starts every half hour (DEC-052, E6), both people
+        // on each.
+        expect(before).toHaveLength(23);
         expect(before[1]!.staffIds).toEqual([asha.id, ben.id]);
 
         const c = await contact();
@@ -265,8 +266,10 @@ describe("staff and their hours (real database)", () => {
             day.toISOString(),
             new Date(day.getTime() + 8 * DAY).toISOString(),
         );
+        // A one-hour service in 14:00–16:00, every half hour (E6).
         expect(slots.map((s) => s.startAt.toISOString())).toEqual([
             at(9, 14).toISOString(),
+            new Date(at(9, 14).getTime() + 30 * 60_000).toISOString(),
             at(9, 15).toISOString(),
         ]);
     });

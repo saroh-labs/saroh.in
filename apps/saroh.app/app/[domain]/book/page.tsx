@@ -10,7 +10,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
-import { getBookingPage } from "@/lib/booking-page";
+import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
@@ -38,7 +38,9 @@ import { bookSignedIn } from "./actions";
  * session (`./actions.ts`). The page reads who is signed in on this host and
  * what the sheet needs (the business's phone, the challenge) as it renders.
  * Neither read can take the page down: without them the visitor is simply
- * not signed in, and the sheet goes without the phone line.
+ * not signed in, and the sheet goes without the phone line. The header's
+ * place, hours and phone (E6) are the site's public visit read, the one
+ * Visit us shows; without it the header names the business only.
  *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
@@ -76,8 +78,10 @@ export default async function BookPage({
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
 
-    const [lookup, customer, options] = await Promise.all([
+    const [lookup, visit, customer, options] = await Promise.all([
         getBookingPage(resolved.siteId),
+        // The header's place, hours and phone (E6); null never blocks booking.
+        getBookingVisit(resolved.siteId),
         getSignedInCustomer().catch((): SignedInCustomer | null => null),
         getSignInOptions().catch((): SignInOptions | null => null),
     ]);
@@ -88,6 +92,7 @@ export default async function BookPage({
     return (
         <BookingFlow
             page={lookup.page}
+            visit={visit}
             account={{
                 customer,
                 options: options ?? {

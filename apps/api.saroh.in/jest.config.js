@@ -157,6 +157,8 @@ module.exports = {
         "<rootDir>/src/modules/products/product-images.service.spec.ts",
         // #530 the merge report: Owner/Admin only, with a mocked Prisma.
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
+        // G11: pure serialisers of the public catalogue.
+        "<rootDir>/src/modules/products/public-catalogue.serialize.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
@@ -187,12 +189,15 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-standing.spec.ts",
         // The order screen reads when an order last changed (#374).
         "<rootDir>/src/modules/orders/serialize.spec.ts",
-        "<rootDir>/src/modules/orders/orders.service.organization.spec.ts",
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
+        // B2d: the legacy fulfilment words are refused.
+        "<rootDir>/src/modules/orders/dto.spec.ts",
         // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
+        // B4: the filter bar's options, DB-free.
+        "<rootDir>/src/modules/orders/order-list-options.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -207,6 +212,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",
+        // D17: sending an invoice, with the database mocked
+        // (invoice-send.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-send.service.spec.ts",
         // U5 GST: the tax maths, the states and GSTINs, and the order
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
@@ -232,6 +240,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/pause-until.spec.ts",
         // D21: which plans are on sale; a DRAFT is refused.
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
+        // D10: a subscription's own classes a month, and the fallback.
+        "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

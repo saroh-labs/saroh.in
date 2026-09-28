@@ -124,7 +124,7 @@ describe("provider rows", () => {
 
         const [cashfree, resend] = view.connected;
         expect(cashfree.note).toBe(
-            "Takes card and UPI payments at Northwind Supply Store.",
+            "Takes online payments at Northwind Supply Store.",
         );
         expect(cashfree.refs).toEqual([
             { label: "Public key", code: "cf_live_abc" },
@@ -138,7 +138,9 @@ describe("provider rows", () => {
             kind: "payments",
             provider: "CASHFREE",
         });
-        expect(cashfree.consequence).toMatch(/^Checkout stops taking card/);
+        expect(cashfree.consequence).toMatch(
+            /^Checkout stops taking online payments/,
+        );
 
         expect(resend.note).toBe("Email to your customers and leads.");
         expect(resend.refs).toEqual([
@@ -194,7 +196,7 @@ describe("provider rows", () => {
             }),
         );
         const [razorpay, cashfree] = view.connected;
-        expect(razorpay.note).toBe("Takes card and UPI payments at Rye & Co.");
+        expect(razorpay.note).toBe("Takes online payments at Rye & Co.");
         expect(cashfree.note).toMatch(/no storefront's checkout uses it yet/);
         expect(view.available.some((e) => e.type === "Payments")).toBe(false);
     });

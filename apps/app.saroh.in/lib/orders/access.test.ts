@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { orderLockedText, ordersAccess, ordersLockedCopy } from "./access";
+import {
+    orderLockedText,
+    ordersAccess,
+    ordersLockedCopy,
+    ordersPlace,
+} from "./access";
 
 describe("ordersAccess", () => {
     it("opens Orders with order:read, and shows the money", () => {
@@ -99,5 +104,24 @@ describe("orderLockedText", () => {
         expect(orderLockedText({ role: "MEMBER" })).toBe(
             "Your role doesn't include orders. An owner or admin can change that in Team.",
         );
+    });
+});
+
+describe("ordersPlace — where Sell's gate shows Orders' locked card (DEC-056)", () => {
+    it("the list, and New order, are the list", () => {
+        expect(ordersPlace("/commerce/orders")).toBe("list");
+        expect(ordersPlace("/commerce/orders/")).toBe("list");
+        expect(ordersPlace("/commerce/orders/new")).toBe("list");
+    });
+
+    it("an order is one order", () => {
+        expect(ordersPlace("/commerce/orders/cm_order_1")).toBe("order");
+    });
+
+    it("anywhere else in Sell keeps the gate's own denial", () => {
+        expect(ordersPlace("/commerce/products")).toBeNull();
+        expect(ordersPlace("/commerce")).toBeNull();
+        expect(ordersPlace("/orders")).toBeNull();
+        expect(ordersPlace(null)).toBeNull();
     });
 });

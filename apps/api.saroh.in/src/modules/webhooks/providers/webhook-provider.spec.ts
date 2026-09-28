@@ -81,6 +81,26 @@ describe("RazorpayWebhookProvider", () => {
         });
     });
 
+    it("reads the fee Razorpay reports on a captured payment, in paise (E19)", () => {
+        const captured = (entity: object) =>
+            rzp.parseEvent({
+                payload: {
+                    event: "payment.captured",
+                    payload: {
+                        payment: { entity: { id: "pay_9", ...entity } },
+                    },
+                },
+                headers: {},
+            });
+        // `fee` already includes the GST on it.
+        expect(captured({ fee: 1180, tax: 180 }).feeCents).toBe(1180);
+        expect(captured({ fee: 0 }).feeCents).toBe(0);
+        // None reported, or not a whole number of paise: no fee, no guess.
+        expect(captured({}).feeCents).toBeUndefined();
+        expect(captured({ fee: 11.8 }).feeCents).toBeUndefined();
+        expect(captured({ fee: "1180" }).feeCents).toBeUndefined();
+    });
+
     it("maps payment.failed→FAILED, refund.processed→REFUNDED, refund.failed→REFUND_FAILED", () => {
         const outcome = (event: string) =>
             rzp.parseEvent({
@@ -223,6 +243,48 @@ describe("CashfreeWebhookProvider", () => {
         expect(event.orderRef).toBe("order_cf_1");
         expect(event.providerPaymentRef).toBe("55");
         expect(event.providerEventId).toBe("PAYMENT_SUCCESS_WEBHOOK:55");
+    });
+
+    it("reads the fee Cashfree reports: service charge plus its tax, in paise (E19)", () => {
+        const success = (data: object) =>
+            cf.parseEvent({
+                payload: {
+                    type: "PAYMENT_SUCCESS_WEBHOOK",
+                    data: {
+                        order: { order_id: "order_cf_1" },
+                        payment: { cf_payment_id: 55 },
+                        ...data,
+                    },
+                },
+                headers: {},
+            });
+        expect(
+            success({
+                charges_details: { service_charge: 2.36, service_tax: 0.42 },
+            }).feeCents,
+        ).toBe(278);
+        // On the payment, and as decimal text, it reads the same.
+        expect(
+            success({
+                payment: {
+                    cf_payment_id: 55,
+                    charges_details: {
+                        service_charge: "2.36",
+                        service_tax: null,
+                    },
+                },
+            }).feeCents,
+        ).toBe(236);
+        // None reported, or not an amount: no fee, never a guess.
+        expect(success({}).feeCents).toBeUndefined();
+        expect(
+            success({ charges_details: { service_charge: null } }).feeCents,
+        ).toBeUndefined();
+        expect(
+            success({
+                charges_details: { service_charge: 2, service_tax: "x" },
+            }).feeCents,
+        ).toBeUndefined();
     });
 
     it("only treats a REFUND_STATUS_WEBHOOK with refund_status SUCCESS as REFUNDED", () => {

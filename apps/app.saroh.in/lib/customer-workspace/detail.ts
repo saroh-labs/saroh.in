@@ -52,10 +52,8 @@ export interface DetailOrder {
         variant: string | null;
         quantity: number;
     }[];
-    /** The legacy word (COLLECT or DELIVERY) until B2d. */
-    fulfilment: string;
-    /** How it leaves (DEC-045); absent only from an API before B2a. */
-    fulfilmentType?: FulfilmentType;
+    /** How it leaves (DEC-045). */
+    fulfilmentType: FulfilmentType;
     stage: string;
     delivery: string | null;
     total?: string;
@@ -134,6 +132,11 @@ export interface MembershipAllowance {
     left: number;
     resetsAt: string;
     paused: boolean;
+    /**
+     * The classes a month from the next renewal, when they differ (D10).
+     * Optional: an API before D10 doesn't send it.
+     */
+    nextPeriod?: { perMonth: number | null; from: string } | null;
 }
 
 export interface DetailStats {

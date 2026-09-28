@@ -102,6 +102,8 @@ export function redactObject(value: unknown, depth = 0): unknown {
 const TOKEN_PATHS = [
     /^(\/public\/product-reviews\/)[^/?#]+/,
     /^(\/public\/invoices\/)[^/?#]+/,
+    // An order's pay link (B11).
+    /^(\/public\/order-pay\/)[^/?#]+/,
     // A pay-now hold's pay token (U19), read and released by it.
     /^(\/public\/services\/holds\/)[^/?#]+/,
     /^(\/public\/sites\/preview\/)[^/?#]+/,

@@ -70,54 +70,21 @@ describe("the kitchen flow", () => {
             { stage: "NEW" as const, label: "Paid" },
             { stage: "SENT" as const, label: "Sent" },
         ];
-        expect(stepsOf({ fulfilment: "COLLECT", steps })).toBe(steps);
-        expect(flowOf({ fulfilment: "COLLECT", steps })).toEqual([
-            "NEW",
-            "SENT",
-        ]);
-    });
-
-    it("falls back to the two flows an API before B2a knew", () => {
-        expect(flowOf({ fulfilment: "COLLECT" })).toEqual([
-            "NEW",
-            "PREPARING",
-            "READY",
-            "COLLECTED",
-        ]);
-        expect(flowOf({ fulfilment: "DELIVERY" }).at(-2)).toBe(
-            "HANDED_TO_COURIER",
-        );
-        expect(stepsOf({ fulfilment: "DELIVERY" })[3]).toEqual({
-            stage: "HANDED_TO_COURIER",
-            label: "Handed to courier",
-        });
+        expect(stepsOf({ steps })).toBe(steps);
+        expect(flowOf({ steps })).toEqual(["NEW", "SENT"]);
     });
 
     it("goes to an address for a local delivery or a shipment, read from the type", () => {
-        expect(
-            goesToAddress({
-                fulfilment: "DELIVERY",
-                fulfilmentType: "SHIPPING",
-            }),
-        ).toBe(true);
-        expect(
-            goesToAddress({
-                fulfilment: "DELIVERY",
-                fulfilmentType: "LOCAL_DELIVERY",
-            }),
-        ).toBe(true);
-        expect(
-            goesToAddress({ fulfilment: "COLLECT", fulfilmentType: "DIGITAL" }),
-        ).toBe(false);
-        expect(goesToAddress({ fulfilment: "DELIVERY" })).toBe(true);
-        expect(goesToAddress({ fulfilment: "COLLECT" })).toBe(false);
+        expect(goesToAddress({ fulfilmentType: "SHIPPING" })).toBe(true);
+        expect(goesToAddress({ fulfilmentType: "LOCAL_DELIVERY" })).toBe(true);
+        expect(goesToAddress({ fulfilmentType: "PICKUP" })).toBe(false);
+        expect(goesToAddress({ fulfilmentType: "DIGITAL" })).toBe(false);
     });
 
     it("is done at the last of the type's steps", () => {
         const o = {
             status: "PROCESSING" as const,
             stage: "NEW" as const,
-            fulfilment: "COLLECT" as const,
             steps: [
                 { stage: "NEW" as const, label: "Paid" },
                 { stage: "SENT" as const, label: "Sent" },
@@ -132,7 +99,12 @@ describe("the kitchen flow", () => {
         const o = {
             status: "PROCESSING" as const,
             stage: "READY" as const,
-            fulfilment: "COLLECT" as const,
+            steps: [
+                { stage: "NEW" as const, label: "New" },
+                { stage: "PREPARING" as const, label: "Preparing" },
+                { stage: "READY" as const, label: "Ready" },
+                { stage: "COLLECTED" as const, label: "Collected" },
+            ],
             refundStanding: "NONE" as const,
         };
         expect(isOpen(o)).toBe(true);
@@ -349,6 +321,41 @@ describe("eventText", () => {
             eventText(ev({ kind: "REFUND", amountCents: 36000 }), money),
         ).toBe("Refunded ₹360");
         expect(eventText(ev({ kind: "REFUND" }), money)).toBe("Refunded");
+    });
+
+    it("says why a refund was made (B8): a listed reason in the sentence, typed words as typed", () => {
+        expect(
+            eventText(
+                ev({ kind: "REFUND", amountCents: 5000, note: "Late" }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · late");
+        expect(
+            eventText(
+                ev({
+                    kind: "REFUND",
+                    amountCents: 5000,
+                    note: "Customer changed their mind",
+                }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · customer changed their mind");
+        expect(
+            eventText(
+                ev({
+                    kind: "REFUND",
+                    amountCents: 5000,
+                    note: "Priya's cake came crushed",
+                }),
+                money,
+            ),
+        ).toBe("Refunded ₹50 · Priya's cake came crushed");
+        expect(
+            eventText(
+                ev({ kind: "REFUND", amountCents: 5000, note: " " }),
+                money,
+            ),
+        ).toBe("Refunded ₹50");
     });
 
     it("never claims a message went to the customer", () => {

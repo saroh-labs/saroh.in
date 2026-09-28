@@ -771,8 +771,7 @@ model Product {
   allergens   ProductAllergen[]
 
   // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
-  // or DIGITAL — only the new names, never COLLECT or DELIVERY, so B2d's
-  // cast finds nothing to convert. Empty: every way its storefronts offer
+  // or DIGITAL (never an appointment type). Empty: every way its storefronts offer
   // (StoreSettings.fulfilmentTypes). An order offers only the types every
   // item allows; read it through `productTypesOf` in orders/fulfilment.ts.
   fulfilmentTypes OrderFulfilment[] @default([])
@@ -1472,7 +1471,7 @@ model Order {
   stage      OrderStage      @default(NEW)
   fulfilment OrderFulfilment @default(PICKUP)
 
-  // Where a DELIVERY order goes. `deliveryState` is also the place of
+  // Where a local delivery or a shipment goes. `deliveryState` is also the place of
   // supply for GST when no bill-to state is set (U5).
   deliveryName       String?
   deliveryPhone      String?
@@ -1516,6 +1515,13 @@ model Order {
   // optional link.
   courierName    String?
   trackingNumber String?
+
+  // An order's pay link (plan B, B11), as ADR-007's invoice pay link: only
+  // the SHA-256 of its token is kept, so no one can read the link back, and
+  // `order:read` sees only when it was made. Both are cleared when the order
+  // is paid online, cancelled or refunded.
+  payTokenHash     String?   @unique
+  payLinkCreatedAt DateTime?
 
   @@unique([storeId, orderId])
   @@index([storeId])
@@ -1596,15 +1602,13 @@ enum OrderStage {
   SENT
 }
 
-// How an order leaves (DEC-045). COLLECT and DELIVERY are the legacy words
-// for PICKUP and LOCAL_DELIVERY: release 1 (B2a) adds the six types beside
-// them and still writes only the legacy two, release 2 (B2c) switches every
-// row and write to the new names (20261011160000), and release 3 (B2d)
-// drops COLLECT and DELIVERY. Read it through `typeOf` in
+// How an order leaves (DEC-045). The six types came in by expand and
+// contract (docs/architecture/ORDER_FULFILMENT_ROLLOUT.md): release 1 (B2a)
+// added them beside the legacy COLLECT and DELIVERY, release 2 (B2c)
+// switched every row and write to them (20261011160000), and release 3
+// (B2d, 20261013100000) dropped the legacy two. Read it through `typeOf` in
 // orders/fulfilment.ts, never raw.
 enum OrderFulfilment {
-  COLLECT
-  DELIVERY
   PICKUP
   LOCAL_DELIVERY
   SHIPPING
@@ -3935,6 +3939,13 @@ model BookingRules {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// The business's refund policy for a booking cancelled in time (E30,
+  /// DEC-058): true refunds what the customer paid online automatically,
+  /// which is what E8 shipped and the default for a business that never
+  /// set it. Never more than was received; a late cancel is never refunded
+  /// automatically.
+  refundInTimeCancels Boolean @default(true)
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -4044,6 +4055,12 @@ model PaymentIntent {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // What the provider kept from this payment, in minor units, as its own
+  // capture report says (plan 005 E19, default 47): Razorpay's `fee` (GST
+  // included), Cashfree's service charge plus its tax. Null when the
+  // provider reported none — never an estimate.
+  feeCents Int?
 
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
@@ -4229,9 +4246,18 @@ model Message {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The invoice this message sent or reminded about (round-2 D17), and
+  // which transactional template wrote it: INVOICE_SENT | INVOICE_REMINDER.
+  // Null on a message someone typed. The invoice's "Sent to …" line and
+  // its one-reminder-a-day rule read these rows.
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  template  String?
+
   @@index([organizationId])
   @@index([leadId])
   @@index([contactId])
+  @@index([invoiceId, createdAt])
 }
 
 // Delivery — one provider send attempt for a Message, with its final state.
@@ -4890,6 +4916,15 @@ model CustomerSubscription {
   // renewal job resumes it then; null pauses until someone resumes it.
   pausedUntil DateTime?
 
+  // The classes a month this period includes (D10): the plan's value, taken
+  // at subscribe and at each renewal, so a plan's new allowance reaches a
+  // member at their next renewal. Null is no allowance (unlimited). Only a
+  // set `classesPerPeriodSetAt` makes it authoritative: while that is null
+  // (a row the previous image wrote), readers take the plan's value
+  // (`subscriptions/classes-allowance.ts`), until follow-up Z1.
+  classesPerPeriod      Int?
+  classesPerPeriodSetAt DateTime?
+
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
   @@unique([planId, contactId], map: "CustomerSubscription_one_live_per_person", where: raw("status <> 'CANCELLED'"))
@@ -5058,6 +5093,9 @@ model Invoice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Emails that sent it or reminded about it (D17).
+  messages Message[]
 
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency

@@ -8,6 +8,7 @@ import type {
     DetailPack,
 } from "./detail";
 import {
+    allowanceChangeLine,
     bookingLists,
     bookingRow,
     canStopOffers,
@@ -48,7 +49,7 @@ function order(over: Partial<DetailOrder> = {}): DetailOrder {
                 quantity: 1,
             },
         ],
-        fulfilment: "COLLECT",
+        fulfilmentType: "PICKUP",
         stage: "COLLECTED",
         delivery: null,
         total: "500.00",
@@ -109,7 +110,7 @@ function shop(over: Partial<CustomerDetail> = {}): CustomerDetail {
                     id: "o2",
                     number: "1050",
                     placedAt: "2026-08-12T05:00:00Z",
-                    fulfilment: "DELIVERY",
+                    fulfilmentType: "LOCAL_DELIVERY",
                     delivery: "14 Hill Road, Bengaluru",
                     total: "1000.00",
                 }),
@@ -340,16 +341,12 @@ describe("a shop customer's overview", () => {
         expect(howTheyGet([order()])).toBe("Always collects at Rye & Co.");
         // Read from the type (DEC-045): a shipment is delivered too, and a
         // download is not.
-        expect(
-            howTheyGet([
-                order({ fulfilment: "DELIVERY", fulfilmentType: "SHIPPING" }),
-            ]),
-        ).toBe("Always delivered.");
-        expect(
-            howTheyGet([
-                order({ fulfilment: "COLLECT", fulfilmentType: "PICKUP" }),
-            ]),
-        ).toBe("Always collects at Rye & Co.");
+        expect(howTheyGet([order({ fulfilmentType: "SHIPPING" })])).toBe(
+            "Always delivered.",
+        );
+        expect(howTheyGet([order({ fulfilmentType: "PICKUP" })])).toBe(
+            "Always collects at Rye & Co.",
+        );
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
         );
@@ -408,6 +405,28 @@ describe("a gym customer's bookings and classes", () => {
 
     it("says the next class uses the membership while it has classes", () => {
         expect(nextCredit(gym())).toBe("Next class uses: membership");
+    });
+
+    it("says what a membership's classes become at its next renewal (D10)", () => {
+        // 1 Nov 00:00 in Kolkata.
+        const from = "2026-10-31T18:30:00Z";
+        expect(
+            allowanceChangeLine(
+                { nextPeriod: { perMonth: 10, from } },
+                IST,
+                NOW,
+            ),
+        ).toBe("10 a month from 1 Nov");
+        expect(
+            allowanceChangeLine(
+                { nextPeriod: { perMonth: null, from } },
+                IST,
+                NOW,
+            ),
+        ).toBe("Unlimited classes from 1 Nov");
+        // Nothing changes, or an API from before D10.
+        expect(allowanceChangeLine({ nextPeriod: null }, IST, NOW)).toBeNull();
+        expect(allowanceChangeLine({}, IST, NOW)).toBeNull();
     });
 
     it("lists a pack with its use-by, soon in amber, and a lost one", () => {

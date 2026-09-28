@@ -26,6 +26,8 @@ jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
         update: jest.fn(),
+        // Cancelling or refunding retires the order's pay link (B11).
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
     const inventory = {
         findUnique: jest.fn(),
@@ -143,7 +145,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             status: "PROCESSING",
             paymentStatus: "UNPAID",
             stage: "READY",
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             items: [{ productId: "p1", quantity: 1 }],
         });
 
@@ -205,6 +207,13 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             USER,
         );
         expect(ensureOrderInvoice).not.toHaveBeenCalled();
+        // Refunded: its pay link stops working (B11).
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).toHaveBeenCalledWith({
+            where: { id: ORDER, payTokenHash: { not: null } },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
+        });
     });
 
     it("is idempotent: re-setting the SAME status is a no-op change, not rejected", async () => {
@@ -259,7 +268,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             status: "PROCESSING",
             paymentStatus: "PAID",
             stage: "READY",
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             organizationId: ORG,
             items: [{ productId: "p1", quantity: 1 }],
         });
@@ -298,7 +307,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             status: "PROCESSING",
             paymentStatus: "PAID",
             stage: "READY",
-            fulfilment: "COLLECT",
+            fulfilment: "PICKUP",
             organizationId: ORG,
             items: [{ productId: "p1", quantity: 1 }],
         });
@@ -316,7 +325,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
     });
 
     it.each([
-        ["COLLECT", "READY", "SHIPPED", /A pick-up order isn't shipped/],
+        ["PICKUP", "READY", "SHIPPED", /A pick-up order isn't shipped/],
         ["PICKUP", "READY", "SHIPPED", /A pick-up order isn't shipped/],
         ["DIGITAL", "NEW", "SHIPPED", /A digital order isn't shipped/],
         ["APPOINTMENT_IN_PERSON", "NEW", "DELIVERED", /finished by its visits/],

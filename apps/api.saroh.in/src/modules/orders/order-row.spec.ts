@@ -15,7 +15,7 @@ function raw(over: Partial<RawOrderRow> = {}): RawOrderRow {
         status: "PENDING",
         paymentStatus: "PAID",
         stage: "NEW",
-        fulfilment: "COLLECT",
+        fulfilment: "PICKUP",
         currency: "INR",
         total: { toString: () => "610" },
         createdAt: new Date("2026-09-27T09:15:00.000Z"),
@@ -51,7 +51,6 @@ describe("serializeOrderRow", () => {
             id: "o1",
             orderId: "1042",
             ageMinutes: 45,
-            fulfilment: "COLLECT",
             fulfilmentType: "PICKUP",
             standing: "UNFULFILLED",
             payment: "PAID",
@@ -100,7 +99,7 @@ describe("serializeOrderRow", () => {
     it("carries the courier and tracking number (B2b)", () => {
         const row = serializeOrderRow(
             raw({
-                fulfilment: "DELIVERY",
+                fulfilment: "LOCAL_DELIVERY",
                 stage: "HANDED_TO_COURIER",
                 status: "SHIPPED",
                 courierName: "Delhivery",

@@ -187,9 +187,28 @@ function sameRules(a: BookingRules, b: BookingRules): boolean {
     return (
         a.bookAheadDays === b.bookAheadDays &&
         a.latestBookingMinutes === b.latestBookingMinutes &&
-        a.freeCancelHours === b.freeCancelHours
+        a.freeCancelHours === b.freeCancelHours &&
+        refundsInTime(a) === refundsInTime(b)
     );
 }
+
+/** The business's refund policy, on unless it was turned off (DEC-058). */
+export function refundsInTime(rules: BookingRules): boolean {
+    return rules.refundInTimeCancels ?? true;
+}
+
+/**
+ * The refund policy's choice (E30, DEC-058), beside the rules: what a
+ * booking cancelled in time does with money paid online.
+ */
+export const REFUND_POLICY = {
+    label: "Cancelled in time",
+    options: [
+        { value: "refund", label: "Refund what they paid online" },
+        { value: "keep", label: "Don't refund automatically" },
+    ],
+    hint: "A late cancel is never refunded automatically. Someone who can refund payments can still give money back when they cancel. You can change this any time.",
+} as const;
 
 /**
  * The writes that make the saved state the draft; empty when unchanged. A

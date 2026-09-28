@@ -172,7 +172,7 @@ describe("OrdersService.create — a GST-registered business (ADR-008)", () => {
 describe("OrdersService.create — delivery", () => {
     it("refuses a delivery without an address, on the address field, creating nothing", async () => {
         const err = await makeService()
-            .create("st_1", "u_1", { ...DTO, fulfilment: "DELIVERY" })
+            .create("st_1", "u_1", { ...DTO, fulfilment: "LOCAL_DELIVERY" })
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(BadRequestException);
         expect((err as BadRequestException).getResponse()).toMatchObject({
@@ -185,7 +185,7 @@ describe("OrdersService.create — delivery", () => {
     it("takes a delivery with an address, and a collection without one", async () => {
         await makeService().create("st_1", "u_1", {
             ...DTO,
-            fulfilment: "DELIVERY",
+            fulfilment: "LOCAL_DELIVERY",
             address: {
                 line1: "12 Church Street",
                 city: "Bengaluru",
@@ -200,15 +200,16 @@ describe("OrdersService.create — delivery", () => {
         });
         await makeService().create("st_1", "u_1", {
             ...DTO,
-            fulfilment: "COLLECT",
+            fulfilment: "PICKUP",
         });
         expect(db.order!.create).toHaveBeenCalledTimes(2);
     });
 });
 
-// B2c, the switch release: either vocabulary in, each type stored in its
-// own name; Shipping and Digital open, appointments are booked (E9).
-describe("OrdersService.create — fulfilment types (DEC-045, release 2)", () => {
+// Each type stored in its own name (B2c; the legacy words went in B2d, and
+// the DTO refuses them); Shipping and Digital open, appointments are booked
+// (E9).
+describe("OrdersService.create — fulfilment types (DEC-045)", () => {
     const ADDRESS = {
         line1: "12 Church Street",
         city: "Bengaluru",
@@ -216,22 +217,22 @@ describe("OrdersService.create — fulfilment types (DEC-045, release 2)", () =>
         postalCode: "560001",
     };
 
-    it("stores PICKUP, the old app's COLLECT and an order with no type as PICKUP", async () => {
-        for (const fulfilment of ["PICKUP", "COLLECT", undefined] as const) {
+    it("stores PICKUP, and an order with no type, as PICKUP", async () => {
+        for (const fulfilment of ["PICKUP", undefined] as const) {
             await makeService().create("st_1", "u_1", { ...DTO, fulfilment });
         }
         for (const call of db.order!.create!.mock.calls) {
             expect(call[0].data).toMatchObject({ fulfilment: "PICKUP" });
         }
-        expect(db.order!.create).toHaveBeenCalledTimes(3);
+        expect(db.order!.create).toHaveBeenCalledTimes(2);
     });
 
-    it("stores LOCAL_DELIVERY and the old app's DELIVERY as LOCAL_DELIVERY, with the address rule", async () => {
+    it("stores LOCAL_DELIVERY as itself, with the address rule", async () => {
         const err = await makeService()
             .create("st_1", "u_1", { ...DTO, fulfilment: "LOCAL_DELIVERY" })
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(BadRequestException);
-        for (const fulfilment of ["LOCAL_DELIVERY", "DELIVERY"] as const) {
+        for (const fulfilment of ["LOCAL_DELIVERY"] as const) {
             await makeService().create("st_1", "u_1", {
                 ...DTO,
                 fulfilment,

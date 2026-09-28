@@ -12,7 +12,6 @@ import {
     FULFILMENT_TYPES,
     movesFor,
     typeOf,
-    WRITES_NEW_FULFILMENT_VALUES,
 } from "./fulfilment";
 import { assertStatusTransition } from "./order-state";
 
@@ -64,7 +63,7 @@ export type { StageMove } from "./fulfilment";
 export const UNDO_WINDOW_MS = 10 * 60 * 1000;
 
 /**
- * Every legal forward move, per type, as this release makes them. Terminal
+ * Every legal forward move, per type. Terminal
  * stages have none; appointments have none at all.
  */
 export const STAGE_MOVES: Readonly<
@@ -90,7 +89,7 @@ export interface StageSubject {
     stage: OrderStage;
     status: string;
     paymentStatus: string;
-    /** As stored: either vocabulary (read through `typeOf`). */
+    /** As stored (read through `typeOf`). */
     fulfilment: OrderFulfilment;
 }
 
@@ -298,7 +297,6 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function stageForStatus(
     status: OrderStatus,
     current: { stage: OrderStage; fulfilment: OrderFulfilment },
-    writesNew: boolean = WRITES_NEW_FULFILMENT_VALUES,
 ): { stage: OrderStage } {
     const type = typeOf(current.fulfilment);
     const rule = FULFILMENT_RULES[type];
@@ -321,7 +319,7 @@ export function stageForStatus(
                 // Already with a courier the old way, it stays there.
                 return {
                     stage:
-                        current.stage === "HANDED_TO_COURIER" || !writesNew
+                        current.stage === "HANDED_TO_COURIER"
                             ? "HANDED_TO_COURIER"
                             : "OUT_FOR_DELIVERY",
                 };

@@ -90,6 +90,7 @@ const ADDRESS = {
 async function freshOrder(
     page: Page,
     fulfilment: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING" = "PICKUP",
+    { paid = true }: { paid?: boolean } = {},
 ): Promise<string> {
     const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
     const made = await page.request.post(
@@ -113,11 +114,12 @@ async function freshOrder(
     );
     expect(made.ok()).toBe(true);
     const { id } = (await made.json()) as { id: string };
-    const paid = await page.request.patch(
+    if (!paid) return id;
+    const marked = await page.request.patch(
         `${urls.API_URL}/stores/${NW_STORE}/orders/${id}`,
         { headers, data: { paymentStatus: "PAID" } },
     );
-    expect(paid.ok()).toBe(true);
+    expect(marked.ok()).toBe(true);
     return id;
 }
 
@@ -290,6 +292,72 @@ test.describe("order detail", () => {
             money.getByRole("link", { name: /Credit note/ }),
         ).toBeVisible();
     });
+
+    test("another amount needs a reason, and refunds only that (B8)", async ({
+        page,
+    }) => {
+        const id = refundOrder.id;
+        const org = refundOrder.org ?? NORTHWIND;
+        test.skip(
+            !id,
+            "Needs a provider-paid order (E2E_REFUND_ORDER_ID); a dev stack takes no provider payments.",
+        );
+        await signIn(page);
+        await page.goto(`/open/${org}`);
+        await page.goto(`/commerce/orders/${id}`);
+
+        await page.getByRole("button", { name: "Refund…" }).click();
+        const panel = page.getByRole("region", { name: "Refund" });
+        await panel.getByLabel("Refund another amount, in rupees").fill("1");
+        const go = panel.getByRole("button", { name: /^Refund / });
+        await expect(go).toBeDisabled();
+        await expect(
+            panel.getByText("Say why you're refunding this amount."),
+        ).toBeVisible();
+        await panel.getByLabel("Why").selectOption({ label: "Late" });
+        await expect(go).toHaveText("Refund ₹1");
+        await go.click();
+        await page.getByRole("button", { name: "Refund now" }).click();
+        await expect(shown(page, /The rest of the order stands/)).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText("Refunded ₹1 · late"),
+        ).toBeVisible();
+    });
+
+    test("Add an item before preparing puts it on the order (B8)", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        // Unpaid: the edit changes what is due, and no money moves.
+        const id = await freshOrder(page, "PICKUP", { paid: false });
+        await page.goto(`/commerce/orders/${id}`);
+
+        await page
+            .getByRole("button", { name: "Edit items or address" })
+            .click();
+        const panel = page.getByRole("region", { name: "Edit order" });
+        const add = panel.getByLabel("Add an item");
+        await expect(add).toBeVisible();
+        // The first thing on offer that isn't sold out.
+        const choice = await add
+            .locator("option:not([disabled]):not([value=''])")
+            .first()
+            .getAttribute("value");
+        expect(choice).toBeTruthy();
+        await add.selectOption(choice ?? "");
+        await expect(panel.getByText("· added")).toBeVisible();
+        await panel.getByRole("button", { name: /^Save/ }).click();
+        await expect(shown(page, /^Saved\./)).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText(/added 1 line/),
+        ).toBeVisible();
+    });
 });
 
 async function memberPage(browser: Browser): Promise<Page> {
@@ -381,6 +449,103 @@ test.describe("shipping on order detail", () => {
                 .getByRole("region", { name: "What happened" })
                 .getByText("Edited · tracking number 1487 2290 3314"),
         ).toBeVisible();
+    });
+
+    test("Other asks for the courier's name, and the order keeps it (B8)", async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const id = await readyOrder(page, "SHIPPING");
+        await page.goto(`/commerce/orders/${id}`);
+
+        await page
+            .getByRole("button", { name: "Hand to courier", exact: true })
+            .click();
+        const panel = page.getByRole("region", { name: "Hand to courier" });
+        await panel.getByRole("radio", { name: "Other" }).click();
+        const name = panel.getByLabel("Courier's name");
+        await expect(name).toBeFocused();
+        // No name yet: nothing to hand over to.
+        await expect(
+            panel.getByRole("button", { name: "Handed over" }),
+        ).toBeDisabled();
+        await name.fill("DTDC");
+        await panel.getByLabel("Tracking number").fill("D 4410 2291");
+        await panel.getByRole("button", { name: "Handed over" }).click();
+
+        await expect(
+            shown(page, "Handed to DTDC · D 4410 2291."),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByRole("region", { name: "What happened" })
+                .getByText("Handed to DTDC · D 4410 2291"),
+        ).toBeVisible();
+    });
+
+    test("a pay link: shown once, then replaced (B11)", async ({ page }) => {
+        test.setTimeout(90_000);
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        // An unpaid order: made, never marked paid. Northwind's Cashfree
+        // connection can open a checkout, so a link can be made.
+        const headers = {
+            "x-organization-id": NORTHWIND,
+            origin: urls.APP_URL,
+        };
+        const made = await page.request.post(
+            `${urls.API_URL}/stores/${NW_STORE}/orders`,
+            {
+                headers,
+                data: {
+                    customerId: "seed_customer_6",
+                    items: [
+                        {
+                            productId: "seed_product_11",
+                            variantId: "seed_variant_11_0",
+                            quantity: 1,
+                        },
+                    ],
+                },
+            },
+        );
+        expect(made.ok()).toBe(true);
+        const { id } = (await made.json()) as { id: string };
+        await page.goto(`/commerce/orders/${id}`);
+
+        const money = page.getByRole("region", { name: "Money" });
+        await money.getByRole("button", { name: "Make a pay link" }).click();
+        const address = money.locator("code");
+        await expect(address).toContainText("/pay/o/");
+        const first = (await address.textContent()) ?? "";
+        await expect(
+            money.getByText("Shown this once — copy it now."),
+        ).toBeVisible();
+
+        // The customer's page reads the order, by the token alone.
+        const token = first.split("/pay/o/")[1];
+        const read = await page.request.get(
+            `${urls.API_URL}/public/order-pay/${token}`,
+        );
+        expect(read.ok()).toBe(true);
+        expect(await read.json()).toMatchObject({ status: "DUE" });
+
+        // After a reload the address is gone: only when it was made shows.
+        await page.reload();
+        await expect(money.getByText(/^Pay link made/)).toBeVisible();
+        await expect(money.locator("code")).toHaveCount(0);
+
+        // A new link says the old one stops working, and it does.
+        await money.getByRole("button", { name: "New pay link" }).click();
+        await page.getByRole("button", { name: "Make a new link" }).click();
+        await expect(money.locator("code")).toContainText("/pay/o/");
+        await expect(money.locator("code")).not.toHaveText(first);
+        const old = await page.request.get(
+            `${urls.API_URL}/public/order-pay/${token}`,
+        );
+        expect(old.status()).toBe(404);
     });
 
     test("a local delivery never asks for a courier", async ({ page }) => {

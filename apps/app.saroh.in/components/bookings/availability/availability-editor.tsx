@@ -16,6 +16,8 @@ import type {
 } from "@/lib/services/availability-rules";
 import {
     draftFrom,
+    REFUND_POLICY,
+    refundsInTime,
     ruleChoices,
     saveOps,
     weeklyHours,
@@ -479,6 +481,34 @@ export function AvailabilityEditor({
                                 />
                             </div>
                         ))}
+                        {/* The business's refund policy (E30, DEC-058). */}
+                        <div className="flex items-center gap-2 py-1.5">
+                            <span className="flex-1 text-[13px]">
+                                {REFUND_POLICY.label}
+                            </span>
+                            <OptionSelect
+                                aria-label={REFUND_POLICY.label}
+                                aria-describedby="refund-policy-hint"
+                                disabled={!canEdit}
+                                value={
+                                    refundsInTime(d.rules) ? "refund" : "keep"
+                                }
+                                onValueChange={(v) =>
+                                    edit((x) => {
+                                        x.rules.refundInTimeCancels =
+                                            v === "refund";
+                                    })
+                                }
+                                className="h-8 w-auto rounded-[8px] text-[12.5px]"
+                                options={[...REFUND_POLICY.options]}
+                            />
+                        </div>
+                        <p
+                            id="refund-policy-hint"
+                            className="text-[11.5px] text-muted-foreground"
+                        >
+                            {REFUND_POLICY.hint}
+                        </p>
                     </section>
                 </div>
             </div>

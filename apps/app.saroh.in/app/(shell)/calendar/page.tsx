@@ -32,17 +32,18 @@ const FALLBACK_ZONE = "Asia/Kolkata";
  * is, and on the rare hour the server's guess falls in a different month, the
  * page reads again rather than open on the wrong one. A month before the
  * business joined, or past what can be planned, opens the nearest one the
- * calendar reaches (E21).
+ * calendar reaches (E21). `?day=YYYY-MM-DD` opens it on that day: a key in
+ * the grid that moves past the month's edge asks for it (E28).
  *
  * A role that reads none of the layers is told so before anything is read.
  */
 export default async function CalendarPage({
     searchParams,
 }: {
-    searchParams: Promise<{ month?: string }>;
+    searchParams: Promise<{ month?: string; day?: string }>;
 }) {
     await requireSession();
-    const [{ month: asked }, organization] = await Promise.all([
+    const [{ month: asked, day }, organization] = await Promise.all([
         searchParams,
         resolveActiveOrganization(),
     ]);
@@ -90,6 +91,8 @@ export default async function CalendarPage({
                         order: may("order:write"),
                         book: may("booking:write"),
                     }}
+                    // A key crossed into this month on this day (E28).
+                    day={typeof day === "string" ? day : undefined}
                 />
             ) : (
                 <CalendarNothing />

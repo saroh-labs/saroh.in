@@ -48,7 +48,7 @@ const ORDER = {
     currency: "INR",
     store: BAKERY,
     _count: { items: 3 },
-    fulfilment: "DELIVERY",
+    fulfilment: "LOCAL_DELIVERY",
     stage: "DELIVERED",
     deliveryLine1: "14 Hill Road",
     deliveryLine2: null,
@@ -341,6 +341,8 @@ describe("CustomerDetailService", () => {
                 cancelledLate: false,
             }),
         );
+        // No legacy word beside the type since the contract release (B2d).
+        expect(detail.orders?.rows[0]).not.toHaveProperty("fulfilment");
         expect(detail.orders?.rows[0]).toEqual(
             expect.objectContaining({
                 items: [
@@ -351,7 +353,7 @@ describe("CustomerDetailService", () => {
                         quantity: 2,
                     },
                 ],
-                fulfilment: "DELIVERY",
+                fulfilmentType: "LOCAL_DELIVERY",
                 delivery: "14 Hill Road, Bengaluru, Karnataka 560038",
             }),
         );
@@ -568,6 +570,102 @@ describe("CustomerDetailService", () => {
 
         expect(detail.stats.classesLeft?.allowance?.left).toBe(0);
         expect(detail.stats.classesLeft?.total).toBe(6);
+    });
+
+    describe("classes from the next renewal (D10)", () => {
+        const member = (over: Record<string, unknown> = {}) => ({
+            id: "sub_m",
+            status: "ACTIVE",
+            timezone: "Asia/Kolkata",
+            currentPeriodEnd: new Date("2026-10-31T18:30:00Z"),
+            cancelAtPeriodEnd: false,
+            classesPerPeriod: 8,
+            classesPerPeriodSetAt: new Date("2026-10-01T00:00:00Z"),
+            plan: { name: "Monthly membership", classesPerMonth: 10 },
+            pendingPlan: null,
+            ...over,
+        });
+
+        it("counts this period's 8 and says 10 a month from the renewal", async () => {
+            const { svc, db } = make();
+            db.customerSubscription.findFirst.mockResolvedValue(member());
+
+            const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
+                ?.allowance;
+
+            expect(m).toMatchObject({ perMonth: 8, used: 3, left: 5 });
+            expect(m?.nextPeriod).toEqual({
+                perMonth: 10,
+                from: "2026-10-31T18:30:00.000Z",
+            });
+        });
+
+        it("says nothing when the renewal gives the same number", async () => {
+            const { svc, db } = make();
+            db.customerSubscription.findFirst.mockResolvedValue(
+                member({ classesPerPeriod: 10 }),
+            );
+            const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
+                ?.allowance;
+            expect(m?.nextPeriod).toBeNull();
+        });
+
+        it("names a booked plan's classes, unlimited included", async () => {
+            const { svc, db } = make();
+            db.customerSubscription.findFirst.mockResolvedValue(
+                member({ pendingPlan: { classesPerMonth: null } }),
+            );
+            const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
+                ?.allowance;
+            expect(m?.nextPeriod).toEqual({
+                perMonth: null,
+                from: "2026-10-31T18:30:00.000Z",
+            });
+        });
+
+        it("says nothing for one that won't renew, or is paused", async () => {
+            for (const over of [
+                { cancelAtPeriodEnd: true },
+                { status: "PAUSED" },
+            ]) {
+                const { svc, db } = make();
+                db.customerSubscription.findFirst.mockResolvedValue(
+                    member(over),
+                );
+                const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
+                    ?.allowance;
+                expect(m?.nextPeriod).toBeNull();
+            }
+        });
+
+        it("reads the plan's number for a row never set (the fallback)", async () => {
+            const { svc, db } = make();
+            db.customerSubscription.findFirst.mockResolvedValue(
+                member({ classesPerPeriod: null, classesPerPeriodSetAt: null }),
+            );
+            const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
+                ?.allowance;
+            expect(m).toMatchObject({ perMonth: 10, nextPeriod: null });
+        });
+
+        it("finds a membership by its own allowance, or its plan's while unset", async () => {
+            const { svc, db } = make();
+            db.customerSubscription.findFirst.mockResolvedValue(null);
+            await svc.detail(OWNER, "c1");
+            const where = (
+                db.customerSubscription.findFirst as jest.Mock
+            ).mock.calls.at(-1)![0].where;
+            expect(where.OR).toEqual([
+                {
+                    classesPerPeriodSetAt: { not: null },
+                    classesPerPeriod: { not: null },
+                },
+                {
+                    classesPerPeriodSetAt: null,
+                    plan: { classesPerMonth: { not: null } },
+                },
+            ]);
+        });
     });
 
     it("carries Needs attention: sensitive entries only for who may read them (C1)", async () => {

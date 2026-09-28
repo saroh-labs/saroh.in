@@ -97,6 +97,27 @@ describe("OrdersEmpty", () => {
         expect(html).not.toContain('role="alert"');
     });
 
+    it("offers Share your storefront on the first run only when a site is live (B8)", () => {
+        const share = (params: Record<string, string>, url: string | null) =>
+            renderToStaticMarkup(
+                <OrdersEmpty
+                    query={readOrdersQuery(params)}
+                    storeName="Hill Road"
+                    go={noop}
+                    shareUrl={url}
+                />,
+            );
+        expect(share({}, "https://rye.saroh.app")).toContain(
+            "Share your storefront",
+        );
+        // No live site: nothing to share, so no button.
+        expect(share({}, null)).not.toContain("Share your storefront");
+        // Another empty view keeps its own way back.
+        const open = share({ tab: "open" }, "https://rye.saroh.app");
+        expect(open).not.toContain("Share your storefront");
+        expect(open).toContain("View all orders");
+    });
+
     it("says what each tab would hold, with the way back to All", () => {
         const open = empty({ tab: "open" }, null);
         expect(open).toContain("Nothing left to fulfil");
@@ -117,6 +138,29 @@ describe("OrdersEmpty", () => {
         const html = empty({ since }, null);
         expect(html).toContain("No orders in the last 24 hours");
         expect(html).toContain("Show all orders");
+        expect(html).not.toContain("No orders yet");
+    });
+
+    it("says which filters found nothing, and offers to clear them (B4)", () => {
+        const html = renderToStaticMarkup(
+            <OrdersEmpty
+                query={readOrdersQuery({
+                    fulfilment: "shipping",
+                    date: "7d",
+                    tab: "open",
+                })}
+                storeName={null}
+                options={{
+                    types: [{ type: "SHIPPING", label: "Shipping" }],
+                    steps: [],
+                    product: null,
+                }}
+                go={noop}
+            />,
+        );
+        expect(html).toContain("No shipping orders in the last 7 days");
+        expect(html).toContain("Clear filters");
+        expect(html).not.toContain("Nothing left to fulfil");
         expect(html).not.toContain("No orders yet");
     });
 });

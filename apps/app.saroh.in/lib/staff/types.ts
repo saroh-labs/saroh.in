@@ -78,6 +78,12 @@ export interface BookingRules {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
     freeCancelHours: number | null;
+    /**
+     * The refund policy for a booking cancelled in time (E30, DEC-058):
+     * refund what was paid online automatically. Absent from an API older
+     * than it, which always refunded: read as on.
+     */
+    refundInTimeCancels?: boolean;
 }
 
 /** A kept booking the API reports after hours or time off change. */

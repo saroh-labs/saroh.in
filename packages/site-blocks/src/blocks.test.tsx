@@ -477,7 +477,7 @@ describe("the merchant's type (H1)", () => {
             />,
         );
         const title = screen.getByRole("heading", {
-            name: "Book your next session",
+            name: "Book your appointment",
         });
         const step = screen.getByRole("heading", {
             name: "What would you like?",

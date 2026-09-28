@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
+import type { PublicVisit } from "../blocks/visit-us";
 import type { SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -336,7 +337,7 @@ describe("the booking page (U19)", () => {
                 name: "Pay ₹1,200 to confirm your place",
             }),
         ).toBeInTheDocument();
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         const intent = calls.find((c) => c.url.endsWith("/payment-intent"));
         expect(intent?.url).toBe(`${API}/public/invoices/tok_1/payment-intent`);
         expect(JSON.parse(intent?.init?.body as string)).not.toHaveProperty(
@@ -945,7 +946,7 @@ describe("Where and anything we should know (E7)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
 
         holdState = "CONFIRMED";
@@ -961,7 +962,7 @@ describe("Where and anything we should know (E7)", () => {
     });
 });
 
-describe("UPI and card checkout (E11)", () => {
+describe("online checkout (E11)", () => {
     const HANDOFF = {
         paymentIntentId: "pi_1",
         provider: "RAZORPAY",
@@ -1000,7 +1001,7 @@ describe("UPI and card checkout (E11)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay with UPI or card in the Razorpay window");
+        await screen.findByText("Pay online in the Razorpay window");
         // The card can draw before the effect that opens the window runs; on a
         // slow runner the test answered a window not yet made (CI, #687).
         await waitFor(() => expect(checkouts.opened.length).toBeGreaterThan(0));
@@ -1019,7 +1020,7 @@ describe("UPI and card checkout (E11)", () => {
         });
     };
 
-    it("offers UPI or card in the designs' words: an appointment now, a class for the class", async () => {
+    it("offers paying online, naming no methods (DEC-059): an appointment now, a class for the class", async () => {
         serve((url) =>
             url.includes("svc_hiit") ? json(CLASS_DAYS) : json(ONE_DAYS),
         );
@@ -1027,7 +1028,7 @@ describe("UPI and card checkout (E11)", () => {
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹1,200 now UPI or card — your appointment is confirmed straight away",
+                name: "Pay ₹1,200 now Online — your appointment is confirmed straight away",
             }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
@@ -1042,9 +1043,11 @@ describe("UPI and card checkout (E11)", () => {
         );
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹500 for this class UPI or card — your place is confirmed straight away",
+                name: "Pay ₹500 for this class Online — your place is confirmed straight away",
             }),
         ).toBeInTheDocument();
+        // Saroh can't vouch for the account's methods, so it names none.
+        expect(screen.queryByText(/UPI|netbanking/i)).toBeNull();
     });
 
     it("pays: opens the provider on the hold's order, says Paying… and confirms when the webhook does", async () => {
@@ -1215,7 +1218,7 @@ describe("UPI and card checkout (E11)", () => {
                 name: "07:00 with Karan Mehta",
             }),
         );
-        expect(screen.queryByText(/UPI or card/)).toBeNull();
+        expect(screen.queryByText(/Online — /)).toBeNull();
         expect(checkouts.opened).toHaveLength(0);
     });
 });
@@ -1853,7 +1856,7 @@ describe("a deposit at booking (E8)", () => {
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByRole("radio", {
-                name: "Pay the full ₹1,200 now UPI or card",
+                name: "Pay the full ₹1,200 now Online, in one payment",
             }),
         ).toBeInTheDocument();
         expect(screen.queryByRole("radio", { name: /at the desk/ })).toBeNull();
@@ -1862,7 +1865,7 @@ describe("a deposit at booking (E8)", () => {
 
         fireEvent.click(
             screen.getByRole("radio", {
-                name: "Pay the full ₹1,200 now UPI or card",
+                name: "Pay the full ₹1,200 now Online, in one payment",
             }),
         );
         expect(
@@ -1983,5 +1986,122 @@ describe("a deposit at booking (E8)", () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
         expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
+    });
+});
+
+describe("the header's facts (E6)", () => {
+    const KAVI_VISIT: PublicVisit = {
+        source: "business",
+        storeId: null,
+        name: "Kavi Dental",
+        address: "12th Main, Indiranagar\nBengaluru 560038",
+        phone: "+918040992210",
+        hours: [
+            { day: "MON", open: "09:00", close: "19:00", closed: false },
+            { day: "TUE", open: "09:00", close: "19:00", closed: false },
+            { day: "WED", open: "09:00", close: "19:00", closed: false },
+            { day: "THU", open: "09:00", close: "19:00", closed: false },
+            { day: "FRI", open: "09:00", close: "19:00", closed: false },
+            { day: "SAT", open: "09:00", close: "19:00", closed: false },
+            { day: "SUN", open: "09:00", close: "13:00", closed: false },
+        ],
+        timezone: "Asia/Kolkata",
+        closedDates: [],
+    };
+    const KAVI_PAGE: BookingPageData = {
+        ...PAGE,
+        businessName: "Kavi Dental",
+        services: [PAGE.services[0]],
+    };
+
+    it("shows the address, the week's hours and the phone, grouped, as a call link", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={KAVI_VISIT}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Book your appointment",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                "12th Main, Indiranagar, Bengaluru 560038 · Open Mon–Sat 9am–7pm, Sun 9am–1pm",
+            ),
+        ).toBeInTheDocument();
+        const call = screen.getByRole("link", { name: "+91 80409 92210" });
+        expect(call).toHaveAttribute("href", "tel:+918040992210");
+        // The facts replace the business's name; the zone stays.
+        expect(document.body.textContent).toMatch(/Times are in /);
+    });
+
+    it("says a session where classes are offered", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={PAGE}
+                visit={KAVI_VISIT}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Book your next session",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("leaves the hours out when none are saved — never 'Closed' — and the call link when there's no phone", () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={{ ...KAVI_VISIT, hours: null, phone: null }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByText("12th Main, Indiranagar, Bengaluru 560038"),
+        ).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Open |Closed/);
+        expect(screen.queryByRole("link", { name: /\+91/ })).toBeNull();
+    });
+
+    it("names the business only when the visit read failed, and booking still works", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow
+                page={KAVI_PAGE}
+                visit={null}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByText(/^Kavi Dental · Times are in /),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: /\+91/ })).toBeNull();
+
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
     });
 });

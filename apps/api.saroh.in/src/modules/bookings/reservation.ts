@@ -11,6 +11,7 @@ import type { ActivationEvents } from "../analytics/activation-events";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
+import { guarded, guardMinutes } from "./availability";
 import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
@@ -352,13 +353,17 @@ export async function reserveInTx(
     // Authoritative capacity gate — re-counted INSIDE the tx. A
     // one-to-one somebody takes is capacity per person (U3), checked
     // below; everything else counts the service's seats as before.
+    // Counted over the slot widened by the buffers (DEC-052): starts can
+    // now sit closer than a booking and its buffers, so the check carries
+    // them, as the listing does.
+    const clear = guarded({ startAt, endAt }, service);
     if (!(person?.perPerson && person.staffId)) {
         const confirmed = await tx.booking.count({
             where: {
                 serviceId,
                 ...holdsPlace(new Date()),
-                startAt: { lt: endAt },
-                endAt: { gt: startAt },
+                startAt: { lt: clear.endAt },
+                endAt: { gt: clear.startAt },
             },
         });
         // Seats an open course still holds count as taken (ADR-007) —
@@ -367,8 +372,8 @@ export async function reserveInTx(
         const held = await courseSeatsHeld(
             tx,
             serviceId,
-            startAt,
-            endAt,
+            clear.startAt,
+            clear.endAt,
             course?.courseId,
         );
         if (confirmed + held >= service.capacity) {
@@ -376,7 +381,15 @@ export async function reserveInTx(
         }
     }
     if (person) {
-        await assertPersonFreeInTx(tx, person, serviceId, startAt, endAt);
+        await assertPersonFreeInTx(
+            tx,
+            person,
+            serviceId,
+            startAt,
+            endAt,
+            undefined,
+            guardMinutes(service),
+        );
     }
     // The same person twice in one session (A9). Read in the same
     // serializable transaction, so two tabs racing both can't commit.
@@ -515,7 +528,8 @@ async function releaseOwnHoldInTx(
  *
  * For a class, the other places in the SAME session (same service, same
  * start) are not a clash — they are the class. `excludeBookingId` is a
- * booking being moved, which is not its own competitor.
+ * booking being moved, which is not its own competitor. `padMinutes` is the
+ * service's buffers either side (DEC-052): what the listing keeps clear too.
  */
 export async function assertPersonFreeInTx(
     tx: Prisma.TransactionClient,
@@ -524,15 +538,17 @@ export async function assertPersonFreeInTx(
     startAt: Date,
     endAt: Date,
     excludeBookingId?: string,
+    padMinutes = 0,
 ): Promise<void> {
     if (!person.staffId) return;
+    const pad = padMinutes * 60_000;
     await tx.$queryRaw`SELECT id FROM "StaffMember" WHERE id = ${person.staffId} FOR UPDATE`;
     const clashes = await tx.booking.count({
         where: {
             staffId: person.staffId,
             ...holdsPlace(new Date()),
-            startAt: { lt: endAt },
-            endAt: { gt: startAt },
+            startAt: { lt: new Date(endAt.getTime() + pad) },
+            endAt: { gt: new Date(startAt.getTime() - pad) },
             ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
             ...(person.perPerson ? {} : { NOT: { serviceId, startAt } }),
         },

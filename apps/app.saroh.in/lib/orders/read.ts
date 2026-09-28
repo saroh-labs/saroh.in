@@ -21,10 +21,7 @@ export type KitchenStage =
     | "OUT_FOR_DELIVERY"
     | "SENT";
 
-/** The legacy word the API sends as `fulfilment` until B2d. */
-export type Fulfilment = "COLLECT" | "DELIVERY";
-
-/** The six ways an order leaves (DEC-045); COLLECT reads as PICKUP. */
+/** The six ways an order leaves (DEC-045). */
 export type FulfilmentType =
     | "PICKUP"
     | "LOCAL_DELIVERY"
@@ -45,8 +42,6 @@ export interface FulfilmentStep {
 
 /** How an order leaves, as every order read and row answers it. */
 export interface FulfilmentFields {
-    /** The legacy word, until the contract release (B2d). */
-    fulfilment: Fulfilment;
     fulfilmentType: FulfilmentType;
     /** "Pick-up", "Local delivery"… */
     fulfilmentLabel: string;
@@ -185,6 +180,12 @@ export interface OrderRead extends FulfilmentFields {
     deliveryAddress: DeliveryAddress | null;
     notes: string | null;
     trackingUrl: string | null;
+    /**
+     * When the order's pay link was made (B11); null when it has none.
+     * Never the link: only its hash is kept, so it is shown once, to whoever
+     * makes it. Only with `order:read`; absent from an API before B11.
+     */
+    payLinkCreatedAt?: string | null;
     items: OrderReadLine[];
     events: OrderReadEvent[];
     next: {

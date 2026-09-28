@@ -1,6 +1,5 @@
 import { hashClientIp } from "../../common/client-ip";
-import { signSiteRelay } from "../site-accounts/site-relay";
-import { visitorKey } from "./public-catalogue.controller";
+import { signSiteRelay, visitorKey } from "../site-accounts/site-relay";
 import {
     allergenText,
     blurbOf,
@@ -139,6 +138,15 @@ describe("blurbOf", () => {
         expect(blurbOf(null)).toBeNull();
         expect(blurbOf("<p> </p>")).toBeNull();
         expect(blurbOf(`<p>${"a".repeat(300)}</p>`)?.length).toBe(158);
+    });
+
+    it("unescapes once: an escaped entity stays as its own text", () => {
+        expect(blurbOf("<p>Write &amp;lt;b&amp;gt; for bold.</p>")).toBe(
+            "Write &lt;b&gt; for bold.",
+        );
+        expect(blurbOf("<p>Salt &amp;amp; pepper.</p>")).toBe(
+            "Salt &amp; pepper.",
+        );
     });
 });
 

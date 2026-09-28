@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { showError } from "@saroh/ui/toast";
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,19 +9,21 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
-import type { OrderListPage, OrderRow } from "@/lib/orders/business-service";
-import { ordersToCsv } from "@/lib/orders/export";
+import type {
+    OrderFilterOptions,
+    OrderListPage,
+} from "@/lib/orders/business-service";
 import { newOrderHref } from "@/lib/orders/links";
-import { loadOrdersForExport } from "@/lib/orders/list-actions";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import {
     nextPageHref,
-    orderListParams,
     ordersHref,
     pageRange,
     previousPageHref,
 } from "@/lib/orders/list-query";
 
+import { OrderExport } from "./order-export";
+import { OrderFilters } from "./order-filters";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderTabs } from "./order-tabs";
 import { OrdersEmpty, OrdersHeading } from "./orders-states";
@@ -31,15 +32,15 @@ import { OrdersEmpty, OrdersHeading } from "./orders-states";
  * Sell → Orders, after the "Saroh Orders Screen" design (plan B, B3): every
  * order in the business, newest first, a page at a time.
  *
- * The API does the narrowing: the tab, the search and the storefront live in
- * the address, the server asks for one page of them, and the tab counts come
- * back with it — so the counts, the rows and the rail's badge are the same
- * fact however many orders there are. Previous and Next follow the API's
- * cursor.
+ * The API does the narrowing: the tab, the search, the storefront and the
+ * filters (B4, `order-filters.tsx`) live in the address, the server asks for
+ * one page of them, and the tab counts come back with it — so the counts,
+ * the rows and the rail's badge are the same fact however many orders there
+ * are. Previous and Next follow the API's cursor, and so does Export.
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
- * business. Filters, the quick view, the row menu and bulk moves are later
- * units (B4, B5, B6). Loading, failed, locked and every empty list are in
+ * business. The quick view, the row menu and bulk moves are later units
+ * (B5, B6). Loading, failed, locked and every empty list are in
  * `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
@@ -49,10 +50,17 @@ export function OrdersScreen({
     openByStore,
     businessName,
     kitchen = false,
+    filterOptions = null,
+    shareUrl = null,
 }: {
     query: OrdersQuery;
     /** The page on screen, read on the server. */
     page: OrderListPage;
+    /**
+     * What the filter bar offers (B4); null when it couldn't be read, and
+     * the bar leaves out the menus it would fill.
+     */
+    filterOptions?: OrderFilterOptions | null;
     stores: { id: string; name: string }[];
     /**
      * Open orders per storefront, for the storefront menu; null when they
@@ -67,6 +75,11 @@ export function OrdersScreen({
      * is not theirs to do.
      */
     kitchen?: boolean;
+    /**
+     * The live site's address, for the first-run "Share your storefront"
+     * (B7, built in B8); null when there is none to share.
+     */
+    shareUrl?: string | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -111,9 +124,9 @@ export function OrdersScreen({
                                     New order
                                 </Link>
                             </Button>
-                            <ExportButton
+                            <OrderExport
                                 query={query}
-                                disabled={page.counts.all === 0}
+                                total={page.counts[query.tab]}
                                 storeName={store?.name}
                             />
                         </>
@@ -165,12 +178,16 @@ export function OrdersScreen({
                 ) : null}
             </div>
 
+            <OrderFilters query={query} options={filterOptions} go={go} />
+
             <div aria-busy={navigating} className="pt-3.5">
                 {rows.length === 0 ? (
                     <OrdersEmpty
                         query={query}
                         storeName={store?.name ?? firstStore?.name ?? null}
+                        options={filterOptions}
                         go={go}
+                        shareUrl={shareUrl}
                     />
                 ) : (
                     <>
@@ -291,72 +308,4 @@ function SearchField({
             />
         </div>
     );
-}
-
-/**
- * Export: every order the list is narrowed to — the tab, the search and the
- * storefront, not only the page on screen — as a CSV built in the browser.
- */
-function ExportButton({
-    query,
-    disabled,
-    storeName,
-}: {
-    query: OrdersQuery;
-    disabled: boolean;
-    storeName?: string;
-}) {
-    const [busy, setBusy] = useState(false);
-    async function run() {
-        setBusy(true);
-        const res = await loadOrdersForExport(
-            orderListParams({ ...query, cursor: null, back: [] }),
-        );
-        setBusy(false);
-        if (!res.ok) {
-            showError("Nothing was exported.", res.error);
-            return;
-        }
-        downloadCsv(res.data.rows, storeName);
-        if (!res.data.complete) {
-            showError(
-                `Only the newest ${res.data.rows.length} orders were exported.`,
-                "Narrow the list, by storefront or search, to export the rest.",
-            );
-        }
-    }
-    return (
-        <Button
-            variant="outline"
-            disabled={disabled || busy}
-            onClick={() => void run()}
-        >
-            {busy ? "Exporting…" : "Export"}
-        </Button>
-    );
-}
-
-/**
- * Hand the orders to the browser as a CSV file. Named for the storefront
- * when the list is filtered to one, and dated, so a folder of exports sorts
- * itself.
- */
-function downloadCsv(rows: OrderRow[], storeName?: string) {
-    // A byte-order mark, so Excel reads ₹ and names in the right encoding.
-    const blob = new Blob(["﻿", ordersToCsv(rows)], {
-        type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const day = new Date().toISOString().slice(0, 10);
-    const scope = storeName
-        ? `-${storeName
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "")}`
-        : "";
-    a.href = url;
-    a.download = `orders${scope}-${day}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
 }

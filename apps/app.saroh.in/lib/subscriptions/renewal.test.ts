@@ -51,13 +51,16 @@ describe("nextLine", () => {
         ).toBe("Paused since 5 Sept");
         // D8: a pause with an end date says when it resumes.
         expect(
-            nextLine({
-                ...base,
-                status: "PAUSED",
-                nextRenewalAt: null,
-                pausedAt: "2026-09-05T08:00:00.000Z",
-                pausedUntil: "2026-10-03T00:00:00.000Z",
-            }),
+            nextLine(
+                {
+                    ...base,
+                    status: "PAUSED",
+                    nextRenewalAt: null,
+                    pausedAt: "2026-09-05T08:00:00.000Z",
+                    pausedUntil: "2026-10-03T00:00:00.000Z",
+                },
+                NOW,
+            ),
         ).toBe("Paused until 3 Oct");
         expect(
             nextLine({
@@ -67,6 +70,25 @@ describe("nextLine", () => {
                 cancelledAt: "2026-09-10T08:00:00.000Z",
             }),
         ).toBe("Ended 10 Sept");
+    });
+
+    it("never says paused until a day that has passed", () => {
+        const paused = {
+            ...base,
+            status: "PAUSED" as const,
+            nextRenewalAt: null,
+            pausedAt: "2026-09-05T08:00:00.000Z",
+            pausedUntil: "2026-09-20T00:00:00.000Z",
+        };
+        // The end date has come; the renewal job hasn't resumed it yet.
+        expect(nextLine(paused, NOW)).toBe("Pause ended 20 Sept");
+        // On the day itself, from its first moment.
+        expect(nextLine(paused, new Date("2026-09-20T00:00:00.000Z"))).toBe(
+            "Pause ended 20 Sept",
+        );
+        expect(nextLine(paused, new Date("2026-09-19T23:59:59.000Z"))).toBe(
+            "Paused until 20 Sept",
+        );
     });
 
     it("says when one that has not begun starts", () => {
