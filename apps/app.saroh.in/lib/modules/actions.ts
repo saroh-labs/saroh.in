@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { ModuleLifecycle } from "./schema";
+import type { ModuleImpact, ModuleLifecycle } from "./schema";
 import type { ModuleMutationResult } from "./service";
 import {
     deselectProjectModule as deselectApi,
+    getModuleImpact,
     selectProjectModule as selectApi,
     setModuleStatus as setStatusApi,
 } from "./service";
@@ -27,6 +28,16 @@ export async function setModuleStatusAction(
     const result = await setStatusApi(moduleKey, status, options);
     if (result.ok) revalidatePath(MODULES_PATH);
     return result;
+}
+
+/**
+ * What turning a module off touches, read when someone asks to (F13). A
+ * read: nothing to revalidate. Null when it couldn't be read.
+ */
+export async function readModuleImpactAction(
+    moduleKey: string,
+): Promise<ModuleImpact | null> {
+    return getModuleImpact(moduleKey);
 }
 
 export async function selectProjectModuleAction(

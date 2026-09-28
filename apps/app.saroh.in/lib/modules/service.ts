@@ -1,7 +1,16 @@
 import { apiFetch, orgBase, readError } from "@/lib/api/http";
 
-import type { ModuleBlocker, ModuleLifecycle, ModuleView } from "./schema";
-import { decodeModuleList, moduleMutationResponseSchema } from "./schema";
+import type {
+    ModuleBlocker,
+    ModuleImpact,
+    ModuleLifecycle,
+    ModuleView,
+} from "./schema";
+import {
+    decodeModuleList,
+    moduleImpactResponseSchema,
+    moduleMutationResponseSchema,
+} from "./schema";
 
 /**
  * Modular-capabilities data access for app.saroh.in (ADR-003 / #115). Forwards
@@ -26,6 +35,27 @@ export async function listModules(projectId?: string): Promise<ModuleView[]> {
         throw new Error(`GET modules failed: ${res.status}`);
     }
     return decodeModuleList(await res.json());
+}
+
+/**
+ * What turning a module off touches, with real counts (F13). Null when the
+ * API couldn't be asked or answered in a shape we don't know: the confirm
+ * then says it couldn't count, and blockers are still enforced by the API
+ * when the switch is flipped.
+ */
+export async function getModuleImpact(
+    moduleKey: string,
+): Promise<ModuleImpact | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(
+        `${base}/modules/${encodeURIComponent(moduleKey)}/impact`,
+    ).catch(() => null);
+    if (!res?.ok) return null;
+    const parsed = moduleImpactResponseSchema.safeParse(
+        await res.json().catch(() => null),
+    );
+    return parsed.success ? parsed.data.data : null;
 }
 
 async function moduleMutation(

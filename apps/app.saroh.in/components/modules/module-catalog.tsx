@@ -1,6 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
 import type { ModuleView } from "@/lib/modules/schema";
+import { rolledOut } from "@/lib/modules/switch-plan";
 
 import { ModuleList } from "./module-list";
 
@@ -14,7 +15,10 @@ import { ModuleList } from "./module-list";
  * a person rises to the top of the list.
  */
 export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
-    if (modules.length === 0) {
+    // Only what Saroh has rolled out (DEC-057); the rest still count for
+    // what goes off with what.
+    const shown = rolledOut(modules);
+    if (shown.length === 0) {
         return (
             <EmptyState
                 title="No modules to show"
@@ -23,5 +27,5 @@ export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
         );
     }
 
-    return <ModuleList modules={modules} />;
+    return <ModuleList modules={shown} all={modules} />;
 }

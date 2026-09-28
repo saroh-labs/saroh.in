@@ -27,7 +27,9 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { auditMetadata } from "../audit/audit.service";
-import { authorize } from "../organizations/organization-policy";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { allows, authorize } from "../organizations/organization-policy";
+import type { ModuleImpactView } from "./dto";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, MODULES } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
@@ -53,7 +55,87 @@ export class ModuleLifecycleService {
         // tests without a container, and instrumentation must never be the
         // reason a capability cannot be switched on (#176).
         @Optional() private readonly activation?: ActivationEvents,
+        // The rollout gate, for `impact` (DEC-057). Optional like the rest:
+        // without it every module counts as rolled out.
+        @Optional() private readonly flags?: FeatureFlagService,
     ) {}
+
+    /**
+     * What turning a module off touches, with real counts (F13): the module's
+     * own lines and those of every module that goes off with it, and the
+     * blockers that would refuse it. Reading it needs `module:read`; each
+     * count needs its own read, and without it the line says what stops
+     * without a number. A module Saroh hasn't rolled out is not there to
+     * ask about (DEC-057): 404, as for an unknown key.
+     */
+    async impact(
+        ctx: OrganizationContext,
+        moduleKey: ModuleKey,
+    ): Promise<ModuleImpactView> {
+        authorize(ctx, "module:read");
+        this.descriptor(moduleKey);
+        if (!(await this.rolledOut(ctx, moduleKey))) {
+            throw new NotFoundException("Unknown module");
+        }
+
+        const rows = await this.db.organizationModule.findMany({
+            where: { organizationId: ctx.organizationId },
+            select: { moduleKey: true, status: true },
+        });
+        const enabled = new Set(
+            rows.filter((r) => r.status === "ENABLED").map((r) => r.moduleKey),
+        );
+        // What goes off with it: the modules that are on and need it,
+        // directly or through another, a module before what it needs — the
+        // order the app turns them off in. One Saroh hasn't rolled out is
+        // hidden, so it isn't named (DEC-057).
+        const goesWith: ModuleKey[] = [];
+        const seen = new Set<ModuleKey>([moduleKey]);
+        const visit = async (of: ModuleKey): Promise<void> => {
+            for (const m of MODULES) {
+                if (seen.has(m.key) || !m.dependencies.includes(of)) continue;
+                seen.add(m.key);
+                await visit(m.key);
+                if (enabled.has(m.key) && (await this.rolledOut(ctx, m.key)))
+                    goesWith.push(m.key);
+            }
+        };
+        await visit(moduleKey);
+
+        const input = {
+            organizationId: ctx.organizationId,
+            may: (a: Parameters<typeof allows>[1]) => allows(ctx, a),
+        };
+        const offOrder = [...goesWith, moduleKey];
+        const [items, blockers] = await Promise.all([
+            Promise.all(
+                [moduleKey, ...goesWith].map((k) =>
+                    this.readiness.deactivationImpact(k, input),
+                ),
+            ),
+            Promise.all(
+                offOrder.map((k) =>
+                    this.readiness.deactivationBlockers(k, input),
+                ),
+            ),
+        ]);
+        return {
+            moduleKey,
+            enabled: enabled.has(moduleKey),
+            goesWith,
+            items: items.flat(),
+            blockers: blockers.flat(),
+        };
+    }
+
+    private async rolledOut(
+        ctx: OrganizationContext,
+        moduleKey: ModuleKey,
+    ): Promise<boolean> {
+        const flag = MODULE_BY_KEY.get(moduleKey)?.rolloutFlag;
+        if (!this.flags || !flag) return true;
+        return this.flags.isEnabled(flag, ctx.organizationId);
+    }
 
     /** Enable a module for the Organization. Requires its dependencies enabled. */
     async enable(
@@ -180,6 +262,7 @@ export class ModuleLifecycleService {
         // Safe-deactivation: never abandon public/financial obligations.
         const blockers = await this.readiness.deactivationBlockers(moduleKey, {
             organizationId: ctx.organizationId,
+            may: (a) => allows(ctx, a),
         });
         if (blockers.length > 0) {
             throw new ConflictException({

@@ -2,6 +2,7 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    NotFoundException,
 } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -238,5 +239,190 @@ describe("ModuleLifecycleService", () => {
                 }),
             }),
         );
+    });
+});
+
+describe("ModuleLifecycleService.impact (F13)", () => {
+    const item = (moduleKey: string, code: string) => ({
+        code,
+        moduleKey,
+        count: 3,
+        message: `${code} message`,
+    });
+
+    function setup(opts: {
+        enabled?: string[];
+        rolledOut?: (flag: string) => boolean;
+        blockers?: Record<string, unknown[]>;
+    }) {
+        const db = makeDb();
+        db.organizationModule.findMany.mockResolvedValue(
+            (opts.enabled ?? []).map((moduleKey) => ({
+                moduleKey,
+                status: "ENABLED",
+            })),
+        );
+        const readiness = {
+            deactivationImpact: jest.fn((key: string) =>
+                Promise.resolve([item(key, `${key}_LINE`)]),
+            ),
+            deactivationBlockers: jest.fn((key: string) =>
+                Promise.resolve(opts.blockers?.[key] ?? []),
+            ),
+        };
+        const flags = {
+            isEnabled: jest.fn((flag: string) =>
+                Promise.resolve(opts.rolledOut ? opts.rolledOut(flag) : true),
+            ),
+        };
+        const svc = new ModuleLifecycleService(
+            readiness as unknown as ModuleReadinessRegistry,
+            db as never,
+            undefined,
+            flags as never,
+        );
+        return { svc, readiness, flags, db };
+    }
+
+    it("returns the module's lines and those of the modules going with it", async () => {
+        const { svc, readiness } = setup({
+            enabled: ["CRM", "APPOINTMENTS", "COURSES", "CLASS_PACKS"],
+        });
+        const view = await svc.impact(OWNER, "APPOINTMENTS");
+        expect(view.enabled).toBe(true);
+        expect(view.goesWith).toEqual(["COURSES", "CLASS_PACKS"]);
+        expect(view.items.map((i) => i.code)).toEqual([
+            "APPOINTMENTS_LINE",
+            "COURSES_LINE",
+            "CLASS_PACKS_LINE",
+        ]);
+        // Each read is asked with the viewer's own reads.
+        const input = readiness.deactivationImpact.mock.calls[0][1] as {
+            organizationId: string;
+            may: (a: string) => boolean;
+        };
+        expect(input.organizationId).toBe("org_1");
+        expect(input.may("booking:read")).toBe(true);
+    });
+
+    it("goes through dependents of dependents, a module before what it needs", async () => {
+        const { svc } = setup({
+            enabled: ["CRM", "APPOINTMENTS", "COURSES", "COMMUNICATIONS"],
+        });
+        const view = await svc.impact(OWNER, "CRM");
+        expect(view.goesWith).toEqual([
+            "COURSES",
+            "APPOINTMENTS",
+            "COMMUNICATIONS",
+        ]);
+    });
+
+    it("never names a module going with it that Saroh hasn't rolled out (DEC-057)", async () => {
+        const { svc } = setup({
+            enabled: ["CRM", "APPOINTMENTS", "CLASS_PACKS"],
+            rolledOut: (flag) => flag !== "MODULE_CLASS_PACKS",
+        });
+        const view = await svc.impact(OWNER, "APPOINTMENTS");
+        expect(view.goesWith).toEqual([]);
+        expect(view.items.map((i) => i.moduleKey)).toEqual(["APPOINTMENTS"]);
+    });
+
+    it("404s a module Saroh hasn't rolled out, as for an unknown one (DEC-057)", async () => {
+        const { svc, readiness } = setup({
+            enabled: ["PAYMENTS"],
+            rolledOut: () => false,
+        });
+        await expect(svc.impact(OWNER, "PAYMENTS")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(readiness.deactivationImpact).not.toHaveBeenCalled();
+    });
+
+    it("carries the blockers, which still block", async () => {
+        const blocker = {
+            code: "COMMERCE_OPEN_ORDERS",
+            message: "2 open orders need sending or cancelling first.",
+        };
+        const { svc, db } = setup({
+            enabled: ["COMMERCE"],
+            blockers: { COMMERCE: [blocker] },
+        });
+        const view = await svc.impact(OWNER, "COMMERCE");
+        expect(view.blockers).toEqual([blocker]);
+        // And turning it off is still refused.
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([]);
+        await expect(svc.disable(OWNER, "COMMERCE")).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+    });
+
+    it("needs module:read; turning off needs module:manage", async () => {
+        const { svc } = setup({ enabled: ["APPOINTMENTS"] });
+        // A MEMBER reads what it would touch, but can't turn it off.
+        await expect(svc.impact(MEMBER, "APPOINTMENTS")).resolves.toEqual(
+            expect.objectContaining({ moduleKey: "APPOINTMENTS" }),
+        );
+        await expect(
+            svc.disable(MEMBER, "APPOINTMENTS"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        // A role the business invented without module:read reads nothing.
+        const NO_READ: OrganizationContext = {
+            ...OWNER,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: new Set(["booking:read"]),
+        };
+        await expect(
+            svc.impact(NO_READ, "APPOINTMENTS"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("passes the viewer's reads to the counts: a role without booking:read", async () => {
+        const { svc, readiness } = setup({ enabled: ["APPOINTMENTS"] });
+        const FRONT_DESK: OrganizationContext = {
+            ...OWNER,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: new Set(["module:read", "module:manage"]),
+        };
+        await svc.impact(FRONT_DESK, "APPOINTMENTS");
+        const input = readiness.deactivationImpact.mock.calls[0][1] as {
+            may: (a: string) => boolean;
+        };
+        expect(input.may("booking:read")).toBe(false);
+        expect(input.may("module:read")).toBe(true);
+    });
+
+    it("turning off still works when a count couldn't be read: only blockers refuse", async () => {
+        const { svc, readiness, db } = setup({ enabled: ["APPOINTMENTS"] });
+        readiness.deactivationImpact.mockRejectedValue(new Error("boom"));
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([]);
+        await svc.disable(OWNER, "APPOINTMENTS");
+        expect(db.organizationModule.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                update: expect.objectContaining({ status: "DISABLED" }),
+            }),
+        );
+        expect(readiness.deactivationImpact).not.toHaveBeenCalled();
+    });
+
+    it("disable asks the blockers with the viewer's reads", async () => {
+        const { svc, readiness, db } = setup({ enabled: ["COMMERCE"] });
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([]);
+        await svc.disable(OWNER, "COMMERCE");
+        const input = readiness.deactivationBlockers.mock.calls[0][1] as {
+            may: (a: string) => boolean;
+        };
+        expect(input.may("order:read")).toBe(true);
     });
 });
