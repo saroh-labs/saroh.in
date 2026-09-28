@@ -182,3 +182,15 @@ export class AddNoteDto {
     @MaxLength(500, { message: "Keep it to 500 characters" })
     text!: string;
 }
+
+// ---- Bookings (A6) ----------------------------------------------------------
+
+/**
+ * A new time for one of the customer's bookings, or for a treatment's next
+ * visit. Only the time: the booking, its service and its person are the
+ * ones already booked, found by the path and the customer's session.
+ */
+export class AccountBookingTimeDto {
+    @IsISO8601()
+    startAt!: string;
+}

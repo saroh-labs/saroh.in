@@ -22,7 +22,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
-import type { BookInput } from "./reservation";
+import type { BookInput, SignedInBooker } from "./reservation";
 import { loadBookableService, reserveInTx } from "./reservation";
 
 /*
@@ -343,9 +343,17 @@ export interface BookVisitInput {
  * treatment was sold once, on its order.
  */
 export async function bookVisit(
-    ctx: OrganizationContext,
+    ctx: Pick<OrganizationContext, "organizationId"> & {
+        userId: string | null;
+    },
     orderId: string,
     dto: BookVisitInput,
+    /**
+     * The customer booking it themselves from their account (A6): the
+     * booking goes on their account's contact, names the account, and a
+     * time they can't have reads as gone rather than why.
+     */
+    customer?: SignedInBooker,
 ): Promise<Booking> {
     const n = dto.visitNumber;
     const order = await prisma.order.findFirst({
@@ -411,7 +419,7 @@ export async function bookVisit(
         staffing,
         startAt,
         dto.staffId,
-        "team",
+        customer ? "public" : "team",
     );
     // The treatment's customer, as its first visit was booked.
     const first = order.bookings.length > 0 ? order.bookings[0] : null;
@@ -452,7 +460,13 @@ export async function bookVisit(
                     startAt,
                     endAt,
                     booker,
-                    { source: "manual", actorUserId: ctx.userId },
+                    customer
+                        ? {
+                              source: `booking:service:${service.id}`,
+                              actorUserId: null,
+                              account: customer,
+                          }
+                        : { source: "manual", actorUserId: ctx.userId },
                     undefined,
                     {
                         ...person,

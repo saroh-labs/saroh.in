@@ -53,10 +53,13 @@ this was written, led by `sites.service.ts`, `site-editor.tsx` and
 Still over after #508 split the booking page and the bookings service (U10),
 each with why it stops there:
 
-- `bookings/bookings.service.ts` (1,298) — the merchant's side: service and
-  rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
-  hand behind one controller. Under 400 means one injectable per feature and
-  a controller and DI change, not a move.
+- `bookings/bookings.service.ts` (1,380; 1,712 before A6) — the merchant's
+  side: service and rule CRUD, the calendar read, cancel, outcome,
+  reschedule and booking by hand behind one controller. A6 moved the cancel
+  and move writes, which the customer's account shares, to
+  `booking-cancel.ts` and `booking-move.ts`; what is left calls them. Under
+  400 means one injectable per feature and a controller and DI change, not
+  a move.
 - `bookings/public-bookings.service.ts` (820 after A10, C12 and E9) and
   `bookings/reservation.ts` (725) — one class sharing its rate limiters, and
   one serializable write with its helpers; cutting them splits a method.
@@ -91,11 +94,12 @@ each with why it stops there:
   not yet made.
 - `modules/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
-- `site-accounts/customer-view.ts` (499 after A7) — the account area's one
+- `site-accounts/customer-view.ts` (502 after A6) — the account area's one
   allow-list (ADR-011): every answer a signed-in customer gets is built here,
   so a reviewer reads one file to know what can leave. A7's Track words went
-  to `account-track.ts`; the order serializers are the seam if A6, A8 and
-  A13 grow it further, split into a second allow-list file it re-exports.
+  to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
+  the second allow-list file it re-exports; the order serializers are the
+  next seam if A8 and A13 grow it further.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:

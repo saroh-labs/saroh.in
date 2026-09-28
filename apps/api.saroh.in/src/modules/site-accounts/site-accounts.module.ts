@@ -35,7 +35,8 @@ import { SiteRelayGuard } from "./site-relay";
  * calls (`AccountUnlinkService`). A5 adds the account area (`/me`: Me,
  * Home, receipts, health notes and the email change), dark behind
  * `SITE_ACCOUNT_AREA` until A6–A8 and A13 ship with it. A7 adds Orders
- * and Track (`/me/orders`).
+ * and Track (`/me/orders`). A6's Bookings (`/me/bookings`) are served by
+ * `BookingsModule`, which owns the booking writes they share with the team.
  */
 @Module({
     controllers: [
@@ -64,6 +65,7 @@ import { SiteRelayGuard } from "./site-relay";
         CustomerSessionGuard,
     ],
     exports: [
+        AccountAreaGuard,
         CustomerAccountRepository,
         AccountUnlinkService,
         SiteRelayGuard,
