@@ -10,6 +10,7 @@ import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 import { CustomersListService } from "./customers-list.service";
+import { MergeService } from "./merge.service";
 
 /**
  * Unified customer workspace (#120). Depends on CapabilitiesModule for the
@@ -26,6 +27,7 @@ import { CustomersListService } from "./customers-list.service";
         ContactNotesService,
         ContactAttentionService,
         CustomersListService,
+        MergeService,
         OrganizationGuard,
     ],
 })

@@ -50,7 +50,10 @@ function make(overrides: Record<string, unknown> = {}) {
         booking: { findMany: jest.fn().mockResolvedValue([]) },
         order: { findMany: jest.fn().mockResolvedValue([]) },
         message: { findMany: jest.fn().mockResolvedValue([]) },
-        auditEvent: { create: jest.fn().mockResolvedValue({}) },
+        auditEvent: {
+            create: jest.fn().mockResolvedValue({}),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db)),
         ...overrides,
     };
@@ -326,6 +329,30 @@ describe("CustomerWorkspaceService", () => {
             "Linked when the list was set up",
             "Linked to their store record by your team",
         ]);
+    });
+
+    it("shows a merge into this person on the timeline, from its audit row (C9)", async () => {
+        const { svc, db } = make();
+        db.auditEvent.findMany.mockResolvedValue([
+            { createdAt: new Date("2026-09-28T10:00:00Z") },
+        ]);
+        const { events } = await svc.timeline(CTX, "c1");
+        expect(db.auditEvent.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    action: "customer.merged",
+                    targetType: "contact",
+                    targetId: "c1",
+                },
+            }),
+        );
+        expect(events).toContainEqual({
+            type: "MERGE",
+            at: "2026-09-28T10:00:00.000Z",
+            title: "Merged with a duplicate",
+            moduleKey: "CRM",
+        });
     });
 
     it("finds the contact a store customer is linked to, in this organization", async () => {
