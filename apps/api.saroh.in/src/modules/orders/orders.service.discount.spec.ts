@@ -21,6 +21,11 @@ jest.mock("../invoices/order-invoicing", () => ({
         .mockResolvedValue({ supplementary: null, creditNote: null }),
 }));
 
+// The team's "New order" alert (F14) is its own job; here, only that it is queued.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {

@@ -62,6 +62,9 @@ model User {
   // Bookings they moved or cancelled on a customer's behalf (#121).
   bookingEvents BookingEvent[] @relation("BookingEventActor")
 
+  // What this person chose to hear about, per business (round-2 F14).
+  notificationPreferences NotificationPreference[]
+
   @@index([email])
 }
 
@@ -298,6 +301,8 @@ model Organization {
   classWaitlistEntries ClassWaitlistEntry[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
   orderStageBatches OrderStageBatch[]
+  // Each person's alert choices here (round-2 F14).
+  notificationPreferences NotificationPreference[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3708,6 +3713,38 @@ model Notification {
   @@unique([reviewId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
+}
+
+// NotificationPreference: one person's choice for one alert on one channel,
+// in one business (round-2 F14, R13). "What you hear about" in Settings ›
+// Your profile.
+//
+// The defaults are code (`notifications/alert-preferences.ts`): the bell on
+// for everything, email on for Payment failed only, WhatsApp off. A row is
+// written only when the person changes a switch, so a business that never
+// opens the grid has no rows and hears exactly the defaults.
+//
+// `event` is an alert key (order | booking | failed | team) and `channel`
+// one of bell | email | whatsapp. Strings, not enums, so a new alert is a
+// code change and never a migration.
+model NotificationPreference {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  event   String
+  channel String
+  enabled Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, userId, event, channel])
+  @@index([organizationId])
+  @@index([userId])
 }
 
 // ============================================================================

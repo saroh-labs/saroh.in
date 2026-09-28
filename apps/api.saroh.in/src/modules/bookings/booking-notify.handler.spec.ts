@@ -2,15 +2,21 @@
 // told only of what the customer did themselves, the customer's side is
 // handed to customer.notify's service keyed to the event, and a job from
 // before A14 (no event id) still finds what it is about.
+// F14: the team is also told of a booking the customer made, and each
+// notice queues its email (`team.alert`) for whoever chose it.
 
 jest.mock("@saroh/database", () => ({
     prisma: { $transaction: jest.fn() },
     runInOrgContext: jest.fn((_org: string, fn: () => unknown) => fn()),
 }));
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
 
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { CustomerNotifyService } from "../site-accounts/customer-notify.handler";
 import type { BookingNotifyPayload } from "./booking-notify.handler";
 import {
@@ -101,6 +107,11 @@ describe("booking.notify", () => {
         expect(tx.customerNotice.update.mock.calls[0][0].data).toEqual({
             notificationId: "ntf_1",
         });
+        // Its email, for whoever chose it, is the team.alert job (F14).
+        expect((enqueueTeamAlert as jest.Mock).mock.calls[0].slice(1)).toEqual([
+            ORG,
+            { event: "booking", notificationId: "ntf_1" },
+        ]);
         expect(notify).toHaveBeenCalledWith(
             tx,
             ORG,
@@ -148,7 +159,7 @@ describe("booking.notify", () => {
         expect(notify).toHaveBeenCalledTimes(1);
     });
 
-    it("a booking made online is confirmed to the customer; the team's inbox isn't filled with it", async () => {
+    it("a booking made online: the team's New booking, and the customer's confirmation (F14)", async () => {
         const tx = makeTx();
         tx.bookingEvent.findFirst.mockResolvedValue({
             id: "ev_booked",
@@ -162,7 +173,18 @@ describe("booking.notify", () => {
             reason: "booked",
             eventId: "ev_booked",
         });
-        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "booking.new",
+            title: "Asha Rao booked Check-up",
+            body: "Tue 6 Oct at 11:00.",
+        });
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({
+            eventKey: "team:booking:ev_booked",
+            kind: "TEAM_TOLD",
+        });
+        expect(enqueueTeamAlert).toHaveBeenCalledTimes(1);
         expect(notify.mock.calls[0][2]).toMatchObject({
             kind: "BOOKING_CONFIRMED",
             eventKey: "booking:ev_booked",
@@ -181,6 +203,7 @@ describe("booking.notify", () => {
         tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
         await run(tx, { bookingId: "bk_1", eventId: "ev_move" });
         expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
     });
 
     it("a job from before A14 (no event id) reads the booking's latest event", async () => {

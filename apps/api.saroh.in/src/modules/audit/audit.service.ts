@@ -68,6 +68,10 @@ export const AuditAction = {
     // written in the removal's transaction with the contact as the target.
     // Counts only (what was deleted, blanked or cancelled), never a value.
     CustomerRemoved: "customer.removed",
+    // Someone changed one of their own alerts (F14): which alert, which
+    // channel, and on or off as it was and became. Their own choice, about
+    // no one else, so it carries the value.
+    MemberAlertsUpdate: "member.alerts.update",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
