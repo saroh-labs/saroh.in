@@ -742,7 +742,7 @@ export async function balanceStockLog(
  * LOCAL_DELIVERY where it has taken a delivery, SHIPPING where shipping is
  * on. The seeds write settings and orders after that backfill ran on an
  * empty database, so they apply it once their orders exist. Idempotent.
- * The legacy DELIVERY word and LOCAL_DELIVERY both count as a delivery.
+ * A LOCAL_DELIVERY order counts as having delivered.
  *
  * Only the storefronts of `organizationIds`, the businesses the seed just
  * wrote: a seed run against a database holding other businesses must not
@@ -765,7 +765,7 @@ export async function syncStorefrontFulfilmentTypes(
                 WHERE EXISTS (
                     SELECT 1 FROM "Order" o
                     WHERE o."storeId" = s."storeId"
-                      AND o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY')
+                      AND o.fulfilment = 'LOCAL_DELIVERY'
                 )
                 UNION ALL
                 SELECT 3, 'SHIPPING' WHERE s."shippingEnabled"

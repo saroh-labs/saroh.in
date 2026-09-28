@@ -692,17 +692,16 @@ export async function checkRye(
             .map((b) => ({ id: b.id })),
     );
 
-    // B2c (DEC-045): the seed writes the types' own names, and each order
-    // stands on a step its type has: out for delivery is a local delivery's,
-    // handed to a courier a shipment's.
+    // DEC-045: each order stands on a step its type has: out for delivery
+    // is a local delivery's, handed to a courier a shipment's. (The legacy
+    // words COLLECT and DELIVERY are no longer values at all, B2d.)
     fail(
-        "orders in the legacy words COLLECT or DELIVERY, or on another type's step",
+        "orders on another type's step",
         await prisma.$queryRaw<Row[]>`
             SELECT o.id, o.fulfilment::text AS fulfilment, o.stage::text AS stage
             FROM "Order" o
             WHERE o."organizationId" = ${orgId} AND (
-                o.fulfilment::text IN ('COLLECT', 'DELIVERY')
-                OR (o.stage = 'COLLECTED' AND o.fulfilment::text <> 'PICKUP')
+                (o.stage = 'COLLECTED' AND o.fulfilment::text <> 'PICKUP')
                 OR (o.stage = 'OUT_FOR_DELIVERY'
                     AND o.fulfilment::text <> 'LOCAL_DELIVERY')
                 OR (o.stage = 'HANDED_TO_COURIER'
@@ -727,14 +726,13 @@ export async function checkRye(
                 i."billToEmail" <> c.email
                 OR i."billToName" <> trim(concat_ws(' ', c."firstName", c."lastName"))
                 OR i."sellerGstin" IS NULL
-                -- Both vocabularies (B2a, DEC-045): a local delivery or a
-                -- shipment goes to an address; anything else is supplied
-                -- where the business is.
-                OR (o.fulfilment::text NOT IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                -- DEC-045: a local delivery or a shipment goes to an
+                -- address; anything else is supplied where the business is.
+                OR (o.fulfilment::text NOT IN ('LOCAL_DELIVERY', 'SHIPPING')
                     AND i."placeOfSupply" <> i."sellerState")
-                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                OR (o.fulfilment::text IN ('LOCAL_DELIVERY', 'SHIPPING')
                     AND (o."deliveryState" = 'Karnataka') <> (i."placeOfSupply" = i."sellerState"))
-                OR (o.fulfilment::text IN ('DELIVERY', 'LOCAL_DELIVERY', 'SHIPPING')
+                OR (o.fulfilment::text IN ('LOCAL_DELIVERY', 'SHIPPING')
                     AND i."billToAddress" IS NULL))`,
     );
     fail(
