@@ -16,7 +16,9 @@ const create = jest.fn();
 const updateMany = jest.fn();
 const moduleFind = jest.fn();
 const queryRaw = jest.fn();
+const serviceFind = jest.fn();
 const tx = {
+    service: { findFirst: serviceFind },
     packPurchase: { findFirst, findMany: jest.fn() },
     packRedemption: { count, findUnique, create, update: jest.fn() },
     booking: { updateMany },
@@ -39,13 +41,19 @@ function purchase(over: Record<string, unknown> = {}) {
         contactId: "c_1",
         credits: 5,
         expiresAt: new Date("2026-12-01T00:00:00Z"),
-        pack: { name: "5 classes", services: [{ serviceId: "svc_hiit" }] },
+        pack: {
+            name: "5 classes",
+            kind: "CLASSES",
+            services: [{ serviceId: "svc_hiit" }],
+        },
         ...over,
     };
 }
 
 beforeEach(() => {
     jest.clearAllMocks();
+    // HIIT is a class: twenty people at once.
+    serviceFind.mockResolvedValue({ id: "svc_hiit", capacity: 20 });
     findFirst.mockResolvedValue(purchase());
     count.mockResolvedValue(0);
     findUnique.mockResolvedValue(null);
@@ -139,6 +147,65 @@ describe("the team spending a pack at the desk, as before", () => {
         moduleFind.mockResolvedValue({ id: "mod_1" });
         await expect(redeemPackInTx(tx, SPEND)).resolves.toMatchObject({
             purchaseId: "pp_1",
+        });
+    });
+});
+
+describe("a pack pays only for its kind of booking (E13, default 45)", () => {
+    it("refuses a one-to-one pack for a class, as not covering it", async () => {
+        findFirst.mockResolvedValue(
+            purchase({
+                pack: {
+                    name: "5 PT sessions",
+                    kind: "ONE_TO_ONE",
+                    services: [{ serviceId: "svc_hiit" }],
+                },
+            }),
+        );
+        await expect(redeemPackInTx(tx, SPEND)).rejects.toThrow(
+            "That class pack does not cover this service.",
+        );
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("spends a one-to-one pack on a one-to-one session", async () => {
+        serviceFind.mockResolvedValue({ id: "svc_hiit", capacity: 1 });
+        findFirst.mockResolvedValue(
+            purchase({
+                pack: {
+                    name: "5 PT sessions",
+                    kind: "ONE_TO_ONE",
+                    services: [{ serviceId: "svc_hiit" }],
+                },
+            }),
+        );
+        await expect(redeemPackInTx(tx, SPEND)).resolves.toEqual({
+            purchaseId: "pp_1",
+            packName: "5 PT sessions",
+        });
+    });
+
+    it("refuses a Classes pack for a one-to-one session", async () => {
+        serviceFind.mockResolvedValue({ id: "svc_hiit", capacity: 1 });
+        await expect(redeemPackInTx(tx, SPEND)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+    });
+
+    it("looks only among packs of the service's kind when none is named", async () => {
+        const findMany = (
+            tx as unknown as { packPurchase: { findMany: jest.Mock } }
+        ).packPurchase.findMany;
+        findMany.mockResolvedValue([]);
+        const { purchaseId: _named, ...whichever } = SPEND;
+        await expect(redeemPackInTx(tx, whichever)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        expect(findMany.mock.calls[0]![0].where).toMatchObject({
+            pack: {
+                kind: "CLASSES",
+                services: { some: { serviceId: "svc_hiit" } },
+            },
         });
     });
 });

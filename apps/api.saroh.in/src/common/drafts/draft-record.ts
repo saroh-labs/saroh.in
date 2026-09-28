@@ -19,9 +19,10 @@ import { ConflictException } from "@nestjs/common";
 /**
  * A value a draft field holds: money travels as "1500.00". A list (a pack's
  * services, E14) is a set of ids the record keeps sorted, so two lists are
- * the same value only when they hold the same ids in the same order.
+ * the same value only when they hold the same ids in the same order. A
+ * switch (a pack's "first pack only", E13) is a boolean.
  */
-export type DraftValue = string | number | null | readonly string[];
+export type DraftValue = string | number | boolean | null | readonly string[];
 
 /** Whether two field values are the same: lists by their items. */
 export function sameValue(a: DraftValue, b: DraftValue): boolean {
@@ -32,9 +33,17 @@ export function sameValue(a: DraftValue, b: DraftValue): boolean {
     return a === b;
 }
 
-/** A stored value a field can hold: a string, a number, null or a string list. */
+/**
+ * A stored value a field can hold: a string, a number, a boolean, null or a
+ * string list.
+ */
 function isDraftValue(v: unknown): v is DraftValue {
-    if (v === null || typeof v === "string" || typeof v === "number") {
+    if (
+        v === null ||
+        typeof v === "string" ||
+        typeof v === "number" ||
+        typeof v === "boolean"
+    ) {
         return true;
     }
     return Array.isArray(v) && v.every((x) => typeof x === "string");

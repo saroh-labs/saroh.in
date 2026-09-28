@@ -11,6 +11,8 @@ import {
 import { toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
+import type { PackKind } from "./pack-kind";
+import { KIND_LOCKED, MIN_VALIDITY_DAYS, readPackKind } from "./pack-kind";
 import { PACK_DRAFT } from "./pack-on-sale";
 
 /**
@@ -24,8 +26,9 @@ import { PACK_DRAFT } from "./pack-on-sale";
 type Db = Prisma.TransactionClient | typeof prisma;
 
 /**
- * The fields a pack's draft holds; nothing else is published. E13 adds the
- * kind and "first pack only" here, and owns the kind's lock at publish.
+ * The fields a pack's draft holds; nothing else is published. The kind and
+ * "first pack only" are E13's, which owns the kind's lock: a sold pack's
+ * pending kind change is listed in `problems` and refused at Publish.
  */
 export const PACK_DRAFT_FIELDS = [
     "name",
@@ -35,6 +38,8 @@ export const PACK_DRAFT_FIELDS = [
     "price",
     "currency",
     "serviceIds",
+    "kind",
+    "firstPackOnly",
 ] as const;
 
 /**
@@ -50,6 +55,8 @@ export interface PackValues {
     price: string | null;
     currency: string;
     serviceIds: string[];
+    kind: PackKind;
+    firstPackOnly: boolean;
 }
 
 /** A reason the pack can't be published yet, beside its field. */
@@ -91,6 +98,8 @@ export const PACK_DRAFT_SELECT = {
     draftRevision: true,
     revisedAt: true,
     revisedById: true,
+    kind: true,
+    firstPackOnly: true,
     services: { select: { serviceId: true } },
 } as const;
 
@@ -116,6 +125,8 @@ export function columnValues(row: PackDraftRow): PackValues {
             draft && toMinor(row.price) === 0 ? null : toMoneyString(row.price),
         currency: row.currency,
         serviceIds: serviceSet(row.services.map((s) => s.serviceId)),
+        kind: readPackKind(row.kind),
+        firstPackOnly: row.firstPackOnly,
     };
 }
 
@@ -138,6 +149,8 @@ export function valueColumns(values: PackValues) {
         validityDays: values.validityDays ?? 0,
         price: values.price ?? "0",
         currency: values.currency,
+        kind: values.kind,
+        firstPackOnly: values.firstPackOnly,
     };
 }
 
@@ -168,24 +181,42 @@ export async function lockPack(
 }
 
 /**
+ * The live pack whose kind is locked once sold (E13): its id and the kind it
+ * is published as. Null for a draft, which nobody can have bought.
+ */
+export interface PackKindLock {
+    packId: string;
+    liveKind: PackKind;
+}
+
+/** A live pack's kind lock; none for a draft. */
+export function kindLockOf(row: PackDraftRow): PackKindLock | null {
+    if (row.status === PACK_DRAFT) return null;
+    return { packId: row.id, liveKind: readPackKind(row.kind) };
+}
+
+/**
  * What stops these values being published: a name, how many classes, how
- * long it is valid, a price above zero, and at least one service still
- * offered. The DTO has already checked each field's shape and range; E13
- * adds its own rules (validity of at least 7 days, the kind lock).
+ * long it is valid (at least 7 days, E13), a price above zero, at least one
+ * service still offered, and — for a live pack that has been sold — the
+ * kind it was sold as (E13 owns that lock). The DTO has already checked
+ * each field's shape and range.
  */
 export async function packProblems(
     db: Db,
     organizationId: string,
     values: PackValues,
+    lock: PackKindLock | null = null,
 ): Promise<PackProblem[]> {
     const problems: PackProblem[] = [];
+    const units = values.kind === "ONE_TO_ONE" ? "sessions" : "classes";
     if (!values.name.trim()) {
         problems.push({ field: "name", message: "Give the pack a name" });
     }
     if (values.credits === null) {
         problems.push({
             field: "credits",
-            message: "Say how many classes it holds",
+            message: `Say how many ${units} it holds`,
         });
     }
     if (values.validityDays === null) {
@@ -193,14 +224,26 @@ export async function packProblems(
             field: "validityDays",
             message: "Say how long it is valid",
         });
+    } else if (values.validityDays < MIN_VALIDITY_DAYS) {
+        problems.push({
+            field: "validityDays",
+            message: "A pack is valid for at least 7 days",
+        });
     }
     if (!values.price || toMinor(values.price) === 0) {
         problems.push({ field: "price", message: "Set a price" });
     }
+    if (
+        lock &&
+        values.kind !== lock.liveKind &&
+        (await timesSold(db, organizationId, lock.packId)) > 0
+    ) {
+        problems.push({ field: "kind", message: KIND_LOCKED });
+    }
     if (values.serviceIds.length === 0) {
         problems.push({
             field: "serviceIds",
-            message: "Choose the classes it pays for",
+            message: `Choose the ${units} it pays for`,
         });
     } else {
         const offered = await db.service.count({
@@ -275,7 +318,7 @@ export async function packEditorView(
     const isDraft = row.status === PACK_DRAFT;
     const values = editorValues(row);
     const [problems, sold] = await Promise.all([
-        packProblems(db, organizationId, values),
+        packProblems(db, organizationId, values, kindLockOf(row)),
         isDraft ? timesSold(db, organizationId, row.id) : Promise.resolve(0),
     ]);
     return {

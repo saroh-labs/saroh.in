@@ -391,11 +391,35 @@
   field too (a sorted id list; `sameValue` compares lists): a draft's are
   written to `ClassPackService` directly, a live pack's wait in the pending
   set, and sales and redemptions keep reading the published ones until
-  Publish. There are no pack events yet (E13 adds `PackEvent`), so who
-  moved the revision is kept on the pack itself (`revisedAt`,
-  `revisedById`; null for an operator, named Saroh support). E13 adds the
-  kind and first-pack-only fields to `PACK_DRAFT_FIELDS` and owns the kind
-  lock at publish.
+  Publish. Who moved the revision is kept on the pack itself (`revisedAt`,
+  `revisedById`; null for an operator, named Saroh support). Draft
+  autosaves record no event.
+- **A pack's kind, first pack only, paid by, extensions and history**
+  (round-2 E13, defaults 45 and 46; `class-packs/pack-kind.ts`).
+  `ClassPack.kind` is CLASSES (pays for classes, `capacity > 1`) or
+  ONE_TO_ONE (`capacity` 1). Every read that offers or spends a pack for a
+  booking — `redeemPackInTx`, New booking's `purchases?serviceId=`, and the
+  customer's credit online (`booking-credit.ts`) — filters with
+  `purchasesPayingFor(service)`, so what is offered is what is spent. The
+  kind is locked once sold: the old `PATCH` is a 409 on `kind`; an autosave
+  keeps a pending kind change and lists it in `problems`, and Publish
+  refuses it. Validity is at least 7 days. A `firstPackOnly` pack is sold
+  only to someone with no earlier purchase of a pack of its kind
+  (`first-pack.ts`: an advisory lock per person on the sale's transaction,
+  after `resolveContact`; A11's online sale calls it too). The sale holds
+  the pack FOR SHARE, so a publish or kind change waits for it.
+  `PackPurchase.paidBy` records how the desk was paid (CASH, UPI, CARD,
+  BANK, ONLINE, NONE; null before E13) and never restricts how anyone pays
+  (DEC-059). An extension adds 1–30 days to `expiresAt` under the
+  purchase's FOR UPDATE lock (the redeem lock), with a reason, as a
+  `PackExtension` row; a pack with nothing left can't be extended, and an
+  expired one can if the new date is still to come. Every create, publish,
+  change, sale, extension, archive and restore writes one `PackEvent` in
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
+  reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
+  `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);
+  only an invoice id needs `invoice:read`.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one

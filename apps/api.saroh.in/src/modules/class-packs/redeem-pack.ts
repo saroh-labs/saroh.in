@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 
 import { classPacksOn } from "./class-packs-on";
+import { packKindFor, purchasesPayingFor, readPackKind } from "./pack-kind";
 
 type Tx = Prisma.TransactionClient;
 
@@ -99,11 +100,19 @@ export async function redeemPackInTx(
     tx: Tx,
     input: RedeemInput,
 ): Promise<{ purchaseId: string; packName: string }> {
+    // What kind of pack pays for it (E13, default 45): a Classes pack for a
+    // class, a One-to-one pack for a one-to-one session. A service that
+    // isn't this business's is covered by none of its packs anyway.
+    const service = (await tx.service.findFirst({
+        where: { id: input.serviceId, organizationId: input.organizationId },
+        select: { id: true, capacity: true },
+    })) ?? { id: input.serviceId, capacity: 1 };
+    const kind = packKindFor(service);
     const where = {
         organizationId: input.organizationId,
         contactId: input.contactId,
         expiresAt: { gt: input.startAt },
-        pack: { services: { some: { serviceId: input.serviceId } } },
+        ...purchasesPayingFor(service),
     } satisfies Prisma.PackPurchaseWhereInput;
 
     let chosen: { id: string; credits: number; packName: string } | null = null;
@@ -136,6 +145,7 @@ export async function redeemPackInTx(
                 pack: {
                     select: {
                         name: true,
+                        kind: true,
                         services: {
                             where: { serviceId: input.serviceId },
                             select: { serviceId: true },
@@ -150,7 +160,10 @@ export async function redeemPackInTx(
             if (input.actor === "customer") missing(input.actor);
             refuse(words.elsewhere, input.actor);
         }
-        if (named.pack.services.length === 0) {
+        if (
+            named.pack.services.length === 0 ||
+            readPackKind(named.pack.kind) !== kind
+        ) {
             refuse(words.uncovered, input.actor);
         }
         if (named.expiresAt <= input.startAt) {
