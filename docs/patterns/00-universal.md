@@ -76,7 +76,7 @@ each with why it stops there:
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
   (1,173), `calendar/calendar.service.ts` (1,411 after E19, E20 and B13, whose range,
   days-off and payments reads already sit in their own files; split next),
-  `orders/order-kitchen.service.ts` (1,138 after B2b–B15 and B9), `staff/staff.service.ts` (744).
+  `orders/order-kitchen.service.ts` (996; 1,138 after B2b–B15 and B9, until B6), `staff/staff.service.ts` (744).
   B9 kept its change of fulfilment and its cancel out of the kitchen
   service (`order-fulfilment-change.service.ts`, 402, one transaction and
   its money; `order-cancel.service.ts`, `order-cancel.ts`,
@@ -85,6 +85,10 @@ each with why it stops there:
   B13 (walk-ins, New order v2) left it untouched: who the order is for, the
   counter payment and the ways a cart may leave are `orders/new-order.ts`,
   and how a walk-in reads everywhere is `orders/walk-in.ts`.
+  B6 (bulk kitchen moves) took the single move, its Undo and `lockOrder`
+  out to `orders/order-stage-write.ts`, which every batch line shares;
+  the batch itself is `order-stage-batch.service.ts` and its lines'
+  helpers `order-stage-batch-lines.ts`.
 - `orders/orders.service.ts` (683 after B13) and `orders/dto.ts` (583) —
   the storefront-scoped create, its pricing, discount code and stock
   promise in one serializable write, and the order DTOs. B13 added only the

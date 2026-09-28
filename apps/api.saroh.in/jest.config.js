@@ -194,6 +194,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
         // B2d: the legacy fulfilment words are refused.
         "<rootDir>/src/modules/orders/dto.spec.ts",
+        // B6: the bulk move body; the rows are in order-stage-batch.db.spec.ts.
+        "<rootDir>/src/modules/orders/order-stage-batch.dto.spec.ts",
         // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",

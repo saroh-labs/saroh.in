@@ -35,9 +35,9 @@ import {
 } from "./fulfilment";
 import type { ChangeFulfilmentDto } from "./order-change.dto";
 import { fulfilmentNote, tellOrderCustomer } from "./order-customer-note";
-import { lockOrder } from "./order-kitchen.service";
 import { isServiceLine } from "./order-line";
 import { fromCents, toCents, withGstRates } from "./order-pricing";
+import { lockOrder } from "./order-stage-write";
 
 /** What a change of how an order is fulfilled did. */
 export interface FulfilmentChangeOutcome {

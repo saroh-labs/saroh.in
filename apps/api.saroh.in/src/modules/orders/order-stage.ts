@@ -73,7 +73,8 @@ export const STAGE_MOVES: Readonly<
     readonly StageMove[]
 >;
 
-const STAGE_WORDS: Record<OrderStage, string> = {
+/** A stage in the words of a sentence ("already collected", B6). */
+export const STAGE_WORDS: Record<OrderStage, string> = {
     NEW: "new",
     PREPARING: "preparing",
     READY: "ready",

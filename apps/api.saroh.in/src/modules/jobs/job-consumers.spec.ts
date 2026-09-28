@@ -126,6 +126,11 @@ describe("job producers and consumers agree", () => {
         }
     });
 
+    it("commits a held bulk move (B6): orders.stage-batch.commit has its handler", () => {
+        expect(produced.has("orders.stage-batch.commit")).toBe(true);
+        expect(consumed.has("orders.stage-batch.commit")).toBe(true);
+    });
+
     it("names every job type with a string literal or an exported constant", () => {
         expect(unresolved).toEqual([]);
     });
